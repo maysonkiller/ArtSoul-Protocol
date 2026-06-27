@@ -221,6 +221,15 @@
             { id: 'collected', label: 'Owned NFTs', icon: '', description: 'NFTs you own' },
         ];
 
+        function TransactionProcessingLabel() {
+            return (
+                <span className="inline-flex items-center justify-center gap-2">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+                    Processing...
+                </span>
+            );
+        }
+
         function ProfilePage() {
             const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
             const [profile, setProfile] = useState(null);
@@ -234,6 +243,8 @@
             const fileInputRef = useRef(null);
             const profileSignalRef = useRef({ address: null, chainId: null });
             const profileRequestRef = useRef(0);
+            const transactionActionsRef = useRef(new Set());
+            const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
             const WALLET_BOOTSTRAP_TIMEOUT = 2500;
@@ -991,11 +1002,50 @@
                 window.location.href = 'upload.html';
             }
 
+            function getTransactionActionKey(action, artwork) {
+                const artworkKey = artwork?.id || artwork?.blockchain_id || artwork?.artwork_id || 'unknown';
+                return `${action}:${artworkKey}`;
+            }
+
+            function beginTransactionAction(action, artwork) {
+                const key = getTransactionActionKey(action, artwork);
+                if (transactionActionsRef.current.has(key)) return null;
+
+                transactionActionsRef.current.add(key);
+                setTransactionActions(current => ({ ...current, [key]: true }));
+                return key;
+            }
+
+            function finishTransactionAction(key) {
+                if (!key) return;
+                transactionActionsRef.current.delete(key);
+                setTransactionActions(current => {
+                    const next = { ...current };
+                    delete next[key];
+                    return next;
+                });
+            }
+
+            function isTransactionActionPending(action, artwork) {
+                return Boolean(transactionActions[getTransactionActionKey(action, artwork)]);
+            }
+
+            function getTransactionErrorMessage(error, fallback) {
+                return window.ArtSoulTransactionErrors?.message?.(error, fallback) ||
+                    error?.shortMessage ||
+                    error?.reason ||
+                    error?.message ||
+                    fallback;
+            }
+
             // ============================================
             // AUCTION MANAGEMENT FUNCTIONS
             // ============================================
 
             async function handleCreateAuction(artwork) {
+                const actionKey = beginTransactionAction('create-auction', artwork);
+                if (!actionKey) return;
+
                 // Primary auctions support 24h / 36h / 48h only.
                 const durationHours = 24;
 
@@ -1086,7 +1136,11 @@
                     }
                 } catch (error) {
                     console.error('Create auction failed:', error);
-                    alert('Failed to create auction: ' + (error.message || 'Unknown error'));
+                    const message = getTransactionErrorMessage(error, 'The auction could not be created. Please try again.');
+                    console.log('Create auction error shown to user:', message);
+                    alert(`Auction could not be created: ${message}`);
+                } finally {
+                    finishTransactionAction(actionKey);
                 }
             }
 
@@ -1121,19 +1175,22 @@
             }
 
             async function handleListForResale(artwork) {
-                const defaultPrice = artwork.sale_price && parseFloat(artwork.sale_price) > 0
-                    ? artwork.sale_price
-                    : artwork.creator_value;
-                const newPrice = prompt('Resale price (ETH):', defaultPrice || '0.01');
-                if (!newPrice) return;
-
-                const price = parseFloat(newPrice);
-                if (isNaN(price) || price <= 0) {
-                    alert('Invalid price');
-                    return;
-                }
+                const actionKey = beginTransactionAction('list-resale', artwork);
+                if (!actionKey) return;
 
                 try {
+                    const defaultPrice = artwork.sale_price && parseFloat(artwork.sale_price) > 0
+                        ? artwork.sale_price
+                        : artwork.creator_value;
+                    const newPrice = prompt('Resale price (ETH):', defaultPrice || '0.01');
+                    if (!newPrice) return;
+
+                    const price = parseFloat(newPrice);
+                    if (isNaN(price) || price <= 0) {
+                        alert('Invalid price');
+                        return;
+                    }
+
                     // Check wallet connection
                     const provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
@@ -1171,7 +1228,11 @@
                     loadMyArtworks(); // Reload artworks
                 } catch (error) {
                     console.error('Resale listing failed:', error);
-                    alert('Failed to list for resale: ' + (error.message || 'Unknown error'));
+                    const message = getTransactionErrorMessage(error, 'The resale listing could not be created. Please try again.');
+                    console.log('Resale listing error shown to user:', message);
+                    alert(`Resale listing failed: ${message}`);
+                } finally {
+                    finishTransactionAction(actionKey);
                 }
             }
 
@@ -1179,6 +1240,8 @@
                 if (!isOwnProfile) return null;
 
                 const buttonClass = 'artsoul-card-action-btn';
+                const createAuctionPending = isTransactionActionPending('create-auction', artwork);
+                const resalePending = isTransactionActionPending('list-resale', artwork);
 
                 if (
                     artwork.source === 'pending_indexer' &&
@@ -1186,8 +1249,13 @@
                     canCreateNewAuction(artwork, connectedWalletAddress)
                 ) {
                     return (
-                        <button onClick={() => handleCreateAuction(artwork)} className={buttonClass}>
-                            Retry Auction
+                        <button
+                            onClick={() => handleCreateAuction(artwork)}
+                            className={buttonClass}
+                            disabled={createAuctionPending}
+                            aria-busy={createAuctionPending}
+                        >
+                            {createAuctionPending ? <TransactionProcessingLabel /> : 'Retry Auction'}
                         </button>
                     );
                 }
@@ -1197,8 +1265,13 @@
                 return (
                     <>
                         {canCreateNewAuction(artwork, connectedWalletAddress) && (
-                            <button onClick={() => handleCreateAuction(artwork)} className={buttonClass}>
-                                Create New Auction
+                            <button
+                                onClick={() => handleCreateAuction(artwork)}
+                                className={buttonClass}
+                                disabled={createAuctionPending}
+                                aria-busy={createAuctionPending}
+                            >
+                                {createAuctionPending ? <TransactionProcessingLabel /> : 'Create New Auction'}
                             </button>
                         )}
                         {hasActiveAuction(artwork) && (
@@ -1207,8 +1280,13 @@
                             </button>
                         )}
                         {canListForResale(artwork, connectedWalletAddress) && (
-                            <button onClick={() => handleListForResale(artwork)} className={buttonClass}>
-                                List for resale
+                            <button
+                                onClick={() => handleListForResale(artwork)}
+                                className={buttonClass}
+                                disabled={resalePending}
+                                aria-busy={resalePending}
+                            >
+                                {resalePending ? <TransactionProcessingLabel /> : 'List for resale'}
                             </button>
                         )}
                     </>
@@ -1711,13 +1789,17 @@
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => handleCreateAuction(artwork)}
+                                                        disabled={isTransactionActionPending('create-auction', artwork)}
+                                                        aria-busy={isTransactionActionPending('create-auction', artwork)}
                                                         className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-all ${
                                                             isClassic
                                                                 ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
                                                                 : 'bg-purple-900/30 hover:bg-purple-900/50 text-purple-400 border border-purple-500/30'
                                                         }`}
                                                     >
-                                                        Retry Auction
+                                                        {isTransactionActionPending('create-auction', artwork)
+                                                            ? <TransactionProcessingLabel />
+                                                            : 'Retry Auction'}
                                                     </button>
                                                 </div>
                                             )}
@@ -1726,13 +1808,17 @@
                                                     {canCreateNewAuction(artwork, connectedWalletAddress) && (
                                                         <button
                                                             onClick={() => handleCreateAuction(artwork)}
+                                                            disabled={isTransactionActionPending('create-auction', artwork)}
+                                                            aria-busy={isTransactionActionPending('create-auction', artwork)}
                                                             className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-all ${
                                                                 isClassic
                                                                     ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
                                                                 : 'bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 border border-cyan-500/30'
                                                             }`}
                                                         >
-                                                            Create New Auction
+                                                            {isTransactionActionPending('create-auction', artwork)
+                                                                ? <TransactionProcessingLabel />
+                                                                : 'Create New Auction'}
                                                         </button>
                                                     )}
                                                     {hasActiveAuction(artwork) && (
@@ -1750,13 +1836,17 @@
                                                     {canListForResale(artwork, connectedWalletAddress) && (
                                                         <button
                                                             onClick={() => handleListForResale(artwork)}
+                                                            disabled={isTransactionActionPending('list-resale', artwork)}
+                                                            aria-busy={isTransactionActionPending('list-resale', artwork)}
                                                             className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-all ${
                                                                 isClassic
                                                                     ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
                                                                 : 'bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 border border-cyan-500/30'
                                                             }`}
                                                         >
-                                                            List for resale
+                                                            {isTransactionActionPending('list-resale', artwork)
+                                                                ? <TransactionProcessingLabel />
+                                                                : 'List for resale'}
                                                         </button>
                                                     )}
                                                 </div>

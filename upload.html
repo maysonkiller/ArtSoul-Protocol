@@ -388,6 +388,26 @@ header {
         let selectedFile = null;
         let uploading = false;
 
+        function getTransactionErrorMessage(error, fallback) {
+            return window.ArtSoulTransactionErrors?.message?.(error, fallback) ||
+                error?.shortMessage ||
+                error?.reason ||
+                error?.message ||
+                fallback;
+        }
+
+        function setTransactionButtonProcessing(button, label = 'Processing...') {
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            button.innerHTML = `<span class="inline-flex items-center justify-center gap-2"><span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>${label}</span>`;
+        }
+
+        function restoreTransactionButton(button, originalMarkup) {
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            button.innerHTML = originalMarkup;
+        }
+
         const PLACEHOLDER_TITLES = new Set([
             'test',
             'testing',
@@ -463,7 +483,7 @@ header {
             if (code === 'INVALID_UPLOAD_PAYLOAD') {
                 return error.message || 'Upload an image, video, or audio file under the supported size limit.';
             }
-            return error?.message || 'Unknown error';
+            return getTransactionErrorMessage(error, 'The publish flow could not be completed. Please try again.');
         }
 
         function mapPublishError(error) {
@@ -481,7 +501,10 @@ header {
                 return { code: 'INSUFFICIENT_FUNDS', message: 'The wallet does not have enough testnet ETH for gas or the transaction value.' };
             }
             if (code === 'CALL_EXCEPTION' || lower.includes('reverted') || lower.includes('execution reverted')) {
-                return { code: 'TRANSACTION_REVERTED', message: 'The transaction reverted on-chain. No new artwork was created for a failed register transaction.' };
+                return {
+                    code: 'TRANSACTION_REVERTED',
+                    message: getTransactionErrorMessage(error, 'The transaction reverted on-chain. No new artwork was created for a failed register transaction.')
+                };
             }
             if (lower.includes('unsupported network') || lower.includes('wrong network')) {
                 return { code: 'UNSUPPORTED_NETWORK', message: 'Please switch to Base Sepolia and try again.' };
@@ -632,28 +655,27 @@ header {
                 return;
             }
 
-            // Check authentication
-            const isAuth = await window.SupabaseAuth?.isAuthenticated();
-            if (!isAuth) {
-                const authenticated = await window.ensureAuthenticated?.();
-                if (!authenticated) return;
-            }
-
             uploading = true;
             const uploadBtn = document.getElementById('publishBtn');
-            const originalText = uploadBtn.textContent;
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = 'Publishing...';
+            const originalMarkup = uploadBtn.innerHTML;
+            setTransactionButtonProcessing(uploadBtn);
             let pendingArtwork = null;
 
             try {
+                // Authentication is part of the guarded flow so a second click cannot start another SIWE/transaction sequence.
+                const isAuth = await window.SupabaseAuth?.isAuthenticated();
+                if (!isAuth) {
+                    const authenticated = await window.ensureAuthenticated?.();
+                    if (!authenticated) return;
+                }
+
                 // Step 1: Generate file hash for duplicate detection
-                uploadBtn.textContent = 'Preparing artwork fingerprint...';
+                setTransactionButtonProcessing(uploadBtn, 'Preparing artwork fingerprint...');
                 const fileHash = await window.IPFSClient.generateFileHash(selectedFile);
                 console.log('📝 File hash:', fileHash);
 
                 // Step 2: Prepare media storage
-                uploadBtn.textContent = 'Preparing media...';
+                setTransactionButtonProcessing(uploadBtn, 'Preparing media...');
                 const fileUpload = await window.IPFSClient.uploadFile(selectedFile);
                 pendingArtwork = createPendingArtworkDraft({
                     walletAddress,
@@ -666,7 +688,7 @@ header {
                 console.log('📤 File uploaded:', fileUpload.ipfsHash);
 
                 // Step 3: Create artwork details
-                uploadBtn.textContent = 'Preparing artwork details...';
+                setTransactionButtonProcessing(uploadBtn, 'Preparing artwork details...');
                 const metadata = window.IPFSClient.createMetadata({
                     title: title,
                     description: description,
@@ -695,7 +717,7 @@ header {
                 console.log('📤 Metadata uploaded:', metadataUpload.ipfsHash);
 
                 // Step 5: Initialize contracts
-                uploadBtn.textContent = 'Connecting wallet...';
+                setTransactionButtonProcessing(uploadBtn, 'Connecting wallet...');
                 if (!window.ArtSoulContracts.marketplaceContract) {
                     const provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) throw new Error('No wallet provider');
@@ -703,7 +725,7 @@ header {
                 }
 
                 // Step 6: Register artwork with the protocol
-                uploadBtn.textContent = 'Registering artwork...';
+                setTransactionButtonProcessing(uploadBtn, 'Registering artwork...');
                 const result = await window.ArtSoulContracts.uploadArtwork(
                     fileUpload.ipfsHash,
                     metadataUpload.url,
@@ -728,7 +750,7 @@ header {
                 });
 
                 // Step 8: Indexer projection replaces legacy browser writes.
-                uploadBtn.textContent = 'Finalizing...';
+                setTransactionButtonProcessing(uploadBtn, 'Finalizing...');
                 console.log('Legacy artwork DB write skipped; v41 indexer will project registration.', {
                     artworkId: result.artworkId,
                     txHash: result.txHash,
@@ -736,7 +758,7 @@ header {
                 });
 
                 // Step 7: Create the initial auction immediately (24h)
-                uploadBtn.textContent = 'Launching auction...';
+                setTransactionButtonProcessing(uploadBtn, 'Launching auction...');
                 let auctionCreated = false;
                 let dbSynced = false;
                 try {
@@ -761,6 +783,7 @@ header {
                 } catch (auctionError) {
                     console.error(' Auction creation error:', auctionError);
                     const mappedAuctionError = mapPublishError(auctionError);
+                    console.log('Auction creation error shown to user:', mappedAuctionError.message);
                     pendingArtwork = savePendingArtwork({
                         ...pendingArtwork,
                         stage: 'auction_failed',
@@ -792,11 +815,11 @@ header {
                 const mapped = mapPublishError(error);
                 const errorMessage = `Publish failed: ${mapped.message}`;
 
+                console.log('Publish error shown to user:', errorMessage);
                 alert(errorMessage);
             } finally {
                 uploading = false;
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = originalText;
+                restoreTransactionButton(uploadBtn, originalMarkup);
             }
         }
     </script>
