@@ -450,6 +450,15 @@ body.classic {
             );
         }
 
+        function TransactionProcessingLabel() {
+            return (
+                <span className="inline-flex items-center justify-center gap-2">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
+                    Processing...
+                </span>
+            );
+        }
+
         function ArtworkPage() {
             const [theme, setTheme] = useState('classic');
             const [artwork, setArtwork] = useState(null);
@@ -474,11 +483,42 @@ body.classic {
                 watching: 0
             });
             const [aiGuidance, setAiGuidance] = useState(null);
+            const transactionActionsRef = useRef(new Set());
+            const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
             const artworkId = new URLSearchParams(window.location.search).get('id');
             const v41CompositeId = parseV41CompositeArtworkId(artworkId);
             const isV41CompositeId = Boolean(v41CompositeId);
+
+            function beginTransactionAction(action) {
+                if (transactionActionsRef.current.has(action)) return false;
+
+                transactionActionsRef.current.add(action);
+                setTransactionActions(current => ({ ...current, [action]: true }));
+                return true;
+            }
+
+            function finishTransactionAction(action) {
+                transactionActionsRef.current.delete(action);
+                setTransactionActions(current => {
+                    const next = { ...current };
+                    delete next[action];
+                    return next;
+                });
+            }
+
+            function isTransactionActionPending(action) {
+                return Boolean(transactionActions[action]);
+            }
+
+            function getTransactionErrorMessage(error, fallback) {
+                return window.ArtSoulTransactionErrors?.message?.(error, fallback) ||
+                    error?.shortMessage ||
+                    error?.reason ||
+                    error?.message ||
+                    fallback;
+            }
 
             useEffect(() => {
                 const syncTheme = (newTheme) => setTheme(newTheme);
@@ -1146,6 +1186,16 @@ body.classic {
             }
 
             async function handlePlaceBid() {
+                if (!beginTransactionAction('bid')) return;
+
+                try {
+                    await placeBidOnce();
+                } finally {
+                    finishTransactionAction('bid');
+                }
+            }
+
+            async function placeBidOnce() {
                 const minimumBidDetails = calculateMinimumBidDetails(auction);
                 const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
                 const creatorAddress = artwork?.creator_id || artwork?.creator;
@@ -1250,11 +1300,23 @@ body.classic {
                     loadArtwork(); // Reload to show new bid
                 } catch (error) {
                     console.error('Bid failed:', error);
-                    alert(formatBidFailureMessage(error, bidContext));
+                    const message = formatBidFailureMessage(error, bidContext);
+                    console.log('Bid error shown to user:', message);
+                    alert(message);
                 }
             }
 
             async function handleEndAuction() {
+                if (!beginTransactionAction('end-auction')) return;
+
+                try {
+                    await endAuctionOnce();
+                } finally {
+                    finishTransactionAction('end-auction');
+                }
+            }
+
+            async function endAuctionOnce() {
                 if (!confirm('End this auction?')) return;
                 const auctionActionId = getAuctionActionId();
                 if (!auctionActionId) {
@@ -1299,7 +1361,9 @@ body.classic {
                     loadArtwork();
                 } catch (error) {
                     console.error('End auction failed:', error);
-                    alert('Failed to end auction: ' + (error.message || 'Unknown error'));
+                    const message = getTransactionErrorMessage(error, 'The auction could not be ended. Please try again.');
+                    console.log('End auction error shown to user:', message);
+                    alert(`Auction could not be ended: ${message}`);
                 }
             }
 
@@ -1404,6 +1468,16 @@ body.classic {
             }
 
             async function handleWinnerPurchase() {
+                if (!beginTransactionAction('settlement')) return;
+
+                try {
+                    await settleAuctionOnce();
+                } finally {
+                    finishTransactionAction('settlement');
+                }
+            }
+
+            async function settleAuctionOnce() {
                 const auctionActionId = getAuctionActionId();
                 if (!auctionActionId) {
                     alert('Auction ID is unavailable');
@@ -1445,11 +1519,23 @@ body.classic {
                     loadArtwork();
                 } catch (error) {
                     console.error('Settlement failed:', error);
-                    alert('Settlement failed: ' + (error.message || 'Unknown error'));
+                    const message = getTransactionErrorMessage(error, 'Settlement could not be completed. Please try again.');
+                    console.log('Settlement error shown to user:', message);
+                    alert(`Settlement failed: ${message}`);
                 }
             }
 
             async function handleDirectPurchase() {
+                if (!beginTransactionAction('resale-purchase')) return;
+
+                try {
+                    await purchaseResaleOnce();
+                } finally {
+                    finishTransactionAction('resale-purchase');
+                }
+            }
+
+            async function purchaseResaleOnce() {
                 if (!artwork.blockchain_id) {
                     alert('Blockchain ID not found');
                     return;
@@ -1497,7 +1583,9 @@ body.classic {
                     loadArtwork();
                 } catch (error) {
                     console.error('Resale purchase failed:', error);
-                    alert('Purchase failed: ' + (error.message || 'Unknown error'));
+                    const message = getTransactionErrorMessage(error, 'The resale purchase could not be completed. Please try again.');
+                    console.log('Resale purchase error shown to user:', message);
+                    alert(`Purchase failed: ${message}`);
                 }
             }
 
@@ -1788,21 +1876,36 @@ body.classic {
                                                     placeholder="Enter bid amount (ETH)"
                                                     value={bidAmount}
                                                     onChange={(e) => setBidAmount(e.target.value)}
+                                                    disabled={isTransactionActionPending('bid')}
                                                     className={`w-full px-4 py-3 rounded-lg ${isClassic ? 'bg-gray-700 border border-gray-600' : 'bg-gray-800/50 border border-cyan-500/30'}`}
                                                 />
                                                 <div className="text-sm opacity-70 text-center">
                                                     Minimum bid: {minimumBidDetails.eth} ETH
                                                 </div>
-                                                <button onClick={handlePlaceBid} className="btn-main w-full">
-                                                    Place Bid (10% deposit required)
+                                                <button
+                                                    onClick={handlePlaceBid}
+                                                    className="btn-main w-full"
+                                                    disabled={isTransactionActionPending('bid')}
+                                                    aria-busy={isTransactionActionPending('bid')}
+                                                >
+                                                    {isTransactionActionPending('bid')
+                                                        ? <TransactionProcessingLabel />
+                                                        : 'Place Bid (10% deposit required)'}
                                                 </button>
                                             </div>
                                         )}
 
                                         {/* End Auction Button (for anyone after time expires) */}
                                         {canEndAuction && (
-                                            <button onClick={handleEndAuction} className="btn-secondary w-full mt-4">
-                                                End Auction
+                                            <button
+                                                onClick={handleEndAuction}
+                                                className="btn-secondary w-full mt-4"
+                                                disabled={isTransactionActionPending('end-auction')}
+                                                aria-busy={isTransactionActionPending('end-auction')}
+                                            >
+                                                {isTransactionActionPending('end-auction')
+                                                    ? <TransactionProcessingLabel />
+                                                    : 'End Auction'}
                                             </button>
                                         )}
 
@@ -1825,13 +1928,17 @@ body.classic {
                                                 <button
                                                     onClick={handleWinnerPurchase}
                                                     className="btn-main w-full text-lg font-bold"
+                                                    disabled={isTransactionActionPending('settlement')}
+                                                    aria-busy={isTransactionActionPending('settlement')}
                                                     style={!isClassic ? {
                                                         background: 'linear-gradient(90deg, var(--c-accent), var(--c-accent-2))',
                                                         boxShadow: '0 0 20px rgba(var(--c-accent-rgb), 0.5)',
                                                         animation: 'glow-pulse 2s ease-in-out infinite'
                                                     } : {}}
                                                 >
-                                                    Complete Settlement - {auction.highestBid} ETH
+                                                    {isTransactionActionPending('settlement')
+                                                        ? <TransactionProcessingLabel />
+                                                        : `Complete Settlement - ${auction.highestBid} ETH`}
                                                 </button>
                                             </div>
                                         )}
@@ -1853,8 +1960,15 @@ body.classic {
                                         {/* Resale purchase button (only after successful settlement/mint) */}
                                         {artwork.sale_price && parseFloat(artwork.sale_price) > 0 && artwork.status === 'for_sale' && (
                                             <div className="mt-6">
-                                                <button onClick={handleDirectPurchase} className="btn-main w-full">
-                                                    Buy Now - {artwork.sale_price} ETH
+                                                <button
+                                                    onClick={handleDirectPurchase}
+                                                    className="btn-main w-full"
+                                                    disabled={isTransactionActionPending('resale-purchase')}
+                                                    aria-busy={isTransactionActionPending('resale-purchase')}
+                                                >
+                                                    {isTransactionActionPending('resale-purchase')
+                                                        ? <TransactionProcessingLabel />
+                                                        : `Buy Now - ${artwork.sale_price} ETH`}
                                                 </button>
                                             </div>
                                         )}

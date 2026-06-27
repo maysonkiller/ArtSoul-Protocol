@@ -40,6 +40,41 @@ function buildContractConfig(overrides = {}) {
     );
 }
 
+function formatTransactionError(error, fallback = 'The transaction could not be completed. Please try again.') {
+    const nestedError = error?.info?.error || error?.error || {};
+    const code = String(error?.code || nestedError?.code || '').toUpperCase();
+    const messages = [
+        error?.shortMessage,
+        error?.reason,
+        error?.revert?.name ? `Contract rejected the transaction: ${error.revert.name}` : '',
+        nestedError?.message,
+        error?.data?.message,
+        error?.message
+    ].filter(message => typeof message === 'string' && message.trim());
+    const combined = messages.join(' | ').toLowerCase();
+
+    if (code === 'ACTION_REJECTED' || code === '4001' || combined.includes('user rejected') || combined.includes('user denied')) {
+        return 'Transaction was rejected in your wallet.';
+    }
+    if (combined.includes('insufficient funds') || combined.includes('insufficient gas') || combined.includes('not enough funds')) {
+        return 'Not enough testnet ETH to cover the transaction and gas.';
+    }
+    if (combined.includes('nonce too low') || combined.includes('replacement transaction underpriced')) {
+        return 'Your wallet has a pending or out-of-sync transaction. Wait for it to clear, then try again.';
+    }
+    if (combined.includes('unsupported network') || combined.includes('wrong network') || combined.includes('network changed')) {
+        return 'The wallet network changed or is unsupported. Switch back to the artwork network and try again.';
+    }
+
+    const usefulMessage = messages.find(message => !/missing revert data|call_exception|unknown error/i.test(message));
+    if (!usefulMessage) return fallback;
+
+    return usefulMessage
+        .replace(/^execution reverted(?::\s*)?/i, 'Transaction reverted: ')
+        .replace(/\s*\(action=.*$/i, '')
+        .trim() || fallback;
+}
+
 const CONTRACTS = buildContractConfig(globalThis.ARTSOUL_CONTRACTS);
 
 const NFT_ABI = [
@@ -580,5 +615,6 @@ class ArtSoulContracts {
 }
 
 window.ArtSoulContracts = new ArtSoulContracts();
+window.ArtSoulTransactionErrors = Object.freeze({ message: formatTransactionError });
 
 console.log('ArtSoul V4.1 contracts module loaded');
