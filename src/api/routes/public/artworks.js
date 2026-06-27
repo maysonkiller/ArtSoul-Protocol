@@ -206,6 +206,34 @@ function getMediaType(metadata = {}, mediaUrl = '') {
   return 'image';
 }
 
+function getAIValueGuidance(metadata = {}) {
+  const guidance = metadata.ai_value_guidance || metadata.properties?.ai_value_guidance;
+  if (!guidance || typeof guidance !== 'object' || Array.isArray(guidance)) return null;
+
+  const minimum = Number(guidance.estimated_value_min_eth);
+  const maximum = Number(guidance.estimated_value_max_eth);
+  const suggested = Number(guidance.suggested_start_price_eth);
+  if (![minimum, maximum, suggested].every(Number.isFinite)) return null;
+
+  const confidence = normalizeText(guidance.confidence).toLowerCase();
+  return {
+    estimated_value_min_eth: Math.max(0, minimum),
+    estimated_value_max_eth: Math.max(Math.max(0, minimum), maximum),
+    suggested_start_price_eth: Math.max(0, suggested),
+    confidence: ['low', 'medium', 'high'].includes(confidence) ? confidence : 'medium',
+    rationale: normalizeText(guidance.rationale).slice(0, 500),
+    factors: Array.isArray(guidance.factors)
+      ? guidance.factors.map(item => normalizeText(item).slice(0, 120)).filter(Boolean).slice(0, 6)
+      : [],
+    risk_flags: Array.isArray(guidance.risk_flags)
+      ? guidance.risk_flags.map(item => normalizeText(item).slice(0, 120)).filter(Boolean).slice(0, 6)
+      : [],
+    used_media: Boolean(guidance.used_media),
+    model: normalizeText(guidance.model).slice(0, 80) || null,
+    guidance_only: true
+  };
+}
+
 async function queryTable(table, query, warnings) {
   try {
     return await supabaseRest(`${table}?${query}`) || [];
@@ -373,6 +401,7 @@ async function toPublicCard(artwork, maps) {
     file_url: mediaUrl,
     media_type: getMediaType(metadata, mediaUrl),
     file_type: getMediaType(metadata, mediaUrl),
+    ai_guidance: getAIValueGuidance(metadata),
     metadata_uri: artwork.metadata_uri,
     status,
     current_bid: weiToEth(currentBid),
