@@ -1,0 +1,1233 @@
+/* ArtSoul - Unified Button Sizes and Styles */
+/* Apply consistent button sizes across all pages */
+/*
+ * Theme color contract:
+ * All theme colors live here as variables under `.classic` / `.future`.
+ * NEVER hardcode theme hex in pages or JS; use `var(--c-*)`.
+ * Layout/responsive CSS must be color-neutral (colors identical on all devices;
+ * only layout changes by breakpoint).
+ */
+
+/* CSS Variables */
+:root {
+    --bg-classic: #010101;
+    --text-classic: #a9ddd3;
+    --accent-classic: #a9ddd3;
+    --accent-future: #00f5ff;
+    --neon-purple: #bf00ff;
+    --accent-future-2: #ff00bf;
+}
+
+.classic {
+    --c-bg: var(--bg-classic);
+    --c-surface: #010101;
+    --c-surface-muted: rgba(169, 221, 211, 0.05);
+    --c-text: var(--text-classic);
+    --c-accent: var(--accent-classic);
+    --c-accent-2: var(--accent-classic);
+    --c-accent-3: var(--accent-classic);
+    --c-border: rgba(169, 221, 211, 0.72);
+    --c-border-soft: rgba(169, 221, 211, 0.3);
+    --c-glow: rgba(169, 221, 211, 0.28);
+    --c-glow-strong: rgba(169, 221, 211, 0.55);
+    --c-accent-rgb: 169, 221, 211;
+    --c-accent-2-rgb: 169, 221, 211;
+    --c-accent-3-rgb: 169, 221, 211;
+}
+
+.future {
+    --c-bg: #000000;
+    --c-surface: #020611;
+    --c-surface-muted: rgba(0, 245, 255, 0.05);
+    --c-text: var(--accent-future);
+    --c-accent: var(--accent-future);
+    --c-accent-2: var(--neon-purple);
+    --c-accent-3: var(--accent-future-2);
+    --c-border: rgba(0, 245, 255, 0.64);
+    --c-border-soft: rgba(0, 245, 255, 0.3);
+    --c-glow: rgba(0, 245, 255, 0.28);
+    --c-glow-strong: rgba(191, 0, 255, 0.42);
+    --c-accent-rgb: 0, 245, 255;
+    --c-accent-2-rgb: 191, 0, 255;
+    --c-accent-3-rgb: 255, 0, 191;
+}
+
+.artsoul-artwork-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border-soft);
+    color: var(--c-text);
+    text-decoration: none;
+    transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.artsoul-artwork-card:hover,
+.artsoul-artwork-card:focus-visible {
+    border-color: var(--c-border);
+}
+
+body.future .artsoul-artwork-card:hover,
+body.future .artsoul-artwork-card:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 0 18px rgba(var(--c-accent-rgb), 0.28), 0 0 28px rgba(var(--c-accent-2-rgb), 0.18);
+}
+
+.artsoul-card-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--c-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.artsoul-card-media-object {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.artsoul-card-media video.artsoul-card-media-object {
+    background: linear-gradient(135deg, rgba(var(--c-accent-rgb), 0.08), rgba(var(--c-accent-2-rgb), 0.08));
+}
+
+.artsoul-card-media-placeholder,
+.artsoul-card-audio {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px;
+    text-align: center;
+    background: linear-gradient(135deg, rgba(var(--c-accent-rgb), 0.08), rgba(var(--c-accent-2-rgb), 0.08));
+    color: var(--c-text);
+}
+
+.artsoul-card-media-badge,
+.artsoul-card-audio-label {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--c-border-soft);
+    background: var(--c-surface);
+    color: var(--c-accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.artsoul-card-media-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+.artsoul-card-audio audio {
+    width: 100%;
+    max-width: 260px;
+}
+
+.artsoul-card-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+}
+
+.artsoul-card-eyebrow {
+    min-height: 16px;
+    color: var(--c-accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    opacity: 0.78;
+}
+
+.artsoul-card-title {
+    margin: 0;
+    color: var(--c-text);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.artsoul-card-description {
+    min-height: 36px;
+    margin: 0;
+    color: var(--c-text);
+    font-size: 13px;
+    line-height: 1.4;
+    opacity: 0.72;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.artsoul-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.artsoul-card-status,
+.artsoul-card-price {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.artsoul-card-status {
+    border: 1px solid var(--c-border-soft);
+    background: rgba(var(--c-accent-rgb), 0.1);
+    color: var(--c-accent);
+}
+
+.artsoul-card-status-sold,
+.artsoul-card-status-minted {
+    background: rgba(var(--c-accent-2-rgb), 0.12);
+    color: var(--c-accent-2);
+}
+
+.artsoul-card-status-ended_no_bids,
+.artsoul-card-status-unsettled {
+    background: rgba(var(--c-accent-3-rgb), 0.12);
+    color: var(--c-accent-3);
+}
+
+.artsoul-card-price {
+    color: var(--c-text);
+    background: rgba(var(--c-accent-rgb), 0.06);
+}
+
+.artsoul-card-signals {
+    min-height: 16px;
+    margin: 0;
+    color: var(--c-text);
+    font-size: 12px;
+    opacity: 0.62;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.artsoul-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.artsoul-card-action-btn {
+    flex: 1 1 auto;
+    min-height: 36px;
+    border-radius: 6px;
+    border: 1px solid var(--c-border-soft);
+    background: rgba(var(--c-accent-rgb), 0.08);
+    color: var(--c-accent);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 8px 10px;
+    transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.artsoul-card-action-btn:hover,
+.artsoul-card-action-btn:focus-visible {
+    border-color: var(--c-border);
+    background: rgba(var(--c-accent-rgb), 0.14);
+}
+
+body.future .artsoul-card-action-btn:hover,
+body.future .artsoul-card-action-btn:focus-visible {
+    box-shadow: 0 0 14px rgba(var(--c-accent-rgb), 0.24);
+}
+
+html,
+body {
+    min-height: 100%;
+}
+
+html.classic,
+html.classic body {
+    background: var(--bg-classic);
+    color: var(--text-classic);
+    color-scheme: dark;
+}
+
+html.future,
+html.future body {
+    background: var(--c-bg);
+    color: var(--c-text);
+    color-scheme: dark;
+}
+
+/* Roadmap Current Card Styles */
+.classic .roadmap-current-card {
+    background: rgba(var(--c-accent-rgb), 0.2);
+    border: 2px solid rgba(var(--c-accent-rgb), 0.6);
+}
+
+.classic .roadmap-current-dot {
+    background: var(--c-accent);
+}
+
+.future .roadmap-current-card {
+    background: rgba(var(--c-accent-rgb), 0.1);
+    border: 2px solid rgba(var(--c-accent-rgb), 0.5);
+    box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
+}
+
+.future .roadmap-current-dot {
+    background: var(--c-accent);
+    box-shadow: 0 0 10px rgba(var(--c-accent-rgb), 0.8);
+}
+
+/* Logo Animations */
+@keyframes logoLevitate {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+@keyframes logoBorderGlow {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.8), 0 0 40px rgba(var(--c-accent-2-rgb), 0.6);
+        border-color: rgba(var(--c-accent-rgb), 0.6);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba(var(--c-accent-2-rgb), 0.8), 0 0 60px rgba(var(--c-accent-rgb), 0.6);
+        border-color: rgba(var(--c-accent-2-rgb), 0.6);
+    }
+}
+
+@keyframes colorShift {
+    0%, 100% {
+        filter: drop-shadow(0 0 10px rgba(var(--c-accent-rgb), 0.8));
+        border-color: rgba(var(--c-accent-rgb), 0.8);
+    }
+    33% {
+        filter: drop-shadow(0 0 10px rgba(var(--c-accent-2-rgb), 0.8));
+        border-color: rgba(var(--c-accent-2-rgb), 0.8);
+    }
+    66% {
+        filter: drop-shadow(0 0 10px rgba(var(--c-accent-3-rgb), 0.8));
+        border-color: rgba(var(--c-accent-3-rgb), 0.8);
+    }
+}
+
+.logo-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: center;
+    transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.logo-link:hover {
+    transform: scale(1.04);
+}
+
+.site-logo {
+    height: auto !important;
+    width: auto !important;
+    max-height: 72px !important;
+    max-width: 100% !important;
+    display: block !important;
+    box-sizing: border-box !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    filter: none !important;
+    animation: none !important;
+    object-fit: contain !important;
+    image-rendering: auto !important;
+    transition: transform 0.3s ease, filter 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.classic .site-logo {
+    animation: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    filter: none !important;
+}
+
+body.classic header .logo-link > .site-logo,
+.classic header .logo-link > .site-logo {
+    height: auto !important;
+    width: auto !important;
+    max-height: 72px !important;
+    max-width: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    filter: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    object-fit: contain !important;
+    transform: none !important;
+}
+
+body.future header .logo-link > .site-logo,
+.future header .logo-link > .site-logo {
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    border: none !important;
+    outline: 3px solid rgba(var(--c-accent-rgb), 0.45) !important;
+    outline-offset: -3px !important;
+    box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.6), 0 0 40px rgba(var(--c-accent-2-rgb), 0.4) !important;
+    animation: logoBorderGlow 3s ease-in-out infinite, logoLevitate 4s ease-in-out infinite !important;
+}
+
+.logo-link:hover .site-logo {
+    transform: none !important;
+}
+
+body.future header .logo-link:hover > .site-logo,
+.future header .logo-link:hover > .site-logo {
+    transform: none !important;
+    box-shadow: 0 0 40px rgba(var(--c-accent-rgb), 1), 0 0 80px rgba(var(--c-accent-2-rgb), 0.8) !important;
+    animation-play-state: running !important;
+}
+
+img:not(.pixel-art):not([data-rendering="pixel-art"]),
+.avatar-button img,
+.site-logo,
+.network-switcher-btn img {
+    image-rendering: auto !important;
+    -ms-interpolation-mode: bicubic;
+}
+
+/* Classic Mode Styles */
+.classic .btn-main {
+    background: var(--text-classic);
+    color: var(--bg-classic);
+    border: 1px solid var(--text-classic);
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 1rem;
+}
+
+.classic .btn-main:hover {
+    background: transparent;
+    color: var(--text-classic);
+}
+
+.classic .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--text-classic);
+    color: var(--text-classic);
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 1rem;
+}
+
+.classic .btn-secondary:hover {
+    background: var(--text-classic);
+    color: var(--bg-classic);
+}
+
+/* Future Mode Styles */
+.future .btn-main {
+    background: linear-gradient(135deg, var(--accent-future) 0%, var(--neon-purple) 100%);
+    color: #000000;
+    clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
+    border: none;
+    font-weight: 600;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 1rem;
+}
+
+.future .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--accent-future);
+    color: var(--accent-future);
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 1rem;
+}
+.theme-toggle {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+}
+
+.classic .theme-toggle {
+    background: rgba(var(--c-accent-rgb), 0.1);
+}
+
+.future .theme-toggle {
+    background: rgba(var(--c-accent-rgb), 0.1);
+}
+
+/* Theme Toggle Buttons */
+.theme-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s;
+    border-radius: 0.375rem;
+    color: currentColor;
+}
+
+.classic .theme-btn.active-classic {
+    background: var(--accent-classic);
+    color: var(--bg-classic);
+}
+
+.future .theme-btn.active-future {
+    background: linear-gradient(135deg, var(--accent-future), var(--neon-purple));
+    color: #000000;
+}
+
+.avatar-dropdown-menu .avatar-theme-switch {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0 !important;
+    width: 100% !important;
+    padding: 0.25rem !important;
+    border-radius: 9999px !important;
+    overflow: hidden !important;
+}
+
+.avatar-dropdown-menu .avatar-theme-label {
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+    margin-bottom: 0.55rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+    opacity: 0.78 !important;
+}
+
+.avatar-dropdown-menu .avatar-theme-switch .theme-btn {
+    position: relative !important;
+    z-index: 1 !important;
+    min-height: 36px !important;
+    padding: 0.45rem 0.9rem !important;
+    border: 0 !important;
+    border-radius: 9999px !important;
+    background: transparent !important;
+    letter-spacing: 0 !important;
+}
+
+.classic .avatar-dropdown-menu .avatar-theme-switch {
+    background: var(--c-surface) !important;
+    border: 1px solid var(--c-border) !important;
+    color: var(--text-classic) !important;
+    box-shadow: none !important;
+}
+
+.classic .avatar-dropdown-menu .avatar-theme-label {
+    color: var(--text-classic) !important;
+    text-shadow: none !important;
+}
+
+.classic .avatar-dropdown-menu .avatar-theme-switch .theme-btn {
+    color: var(--text-classic) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+.classic .avatar-dropdown-menu .avatar-theme-switch #classicBtnDropdown,
+.classic .avatar-dropdown-menu .avatar-theme-switch .theme-btn.active-classic {
+    background: var(--text-classic) !important;
+    color: var(--bg-classic) !important;
+}
+
+.future .avatar-dropdown-menu .avatar-theme-switch {
+    background:
+        linear-gradient(var(--c-surface), var(--c-surface)) padding-box,
+        linear-gradient(110deg, var(--accent-future), var(--neon-purple), var(--accent-future)) border-box !important;
+    border: 1px solid transparent !important;
+    color: var(--accent-future) !important;
+    box-shadow: inset 0 0 20px rgba(var(--c-accent-rgb), 0.12), 0 0 18px rgba(var(--c-accent-2-rgb), 0.14) !important;
+}
+
+.future .avatar-dropdown-menu .avatar-theme-label {
+    color: var(--accent-future) !important;
+    text-shadow: 0 0 8px rgba(var(--c-accent-rgb), 0.45) !important;
+}
+
+.future .avatar-dropdown-menu .avatar-theme-switch .theme-btn {
+    color: var(--accent-future) !important;
+}
+
+.future .avatar-dropdown-menu .avatar-theme-switch #futureBtnDropdown,
+.future .avatar-dropdown-menu .avatar-theme-switch .theme-btn.active-future {
+    background: linear-gradient(135deg, var(--accent-future), var(--neon-purple)) !important;
+    color: var(--c-bg) !important;
+    box-shadow: 0 0 16px rgba(var(--c-accent-rgb), 0.28) !important;
+}
+
+/* Network Badge */
+.network-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+/* Devnet Banner */
+.devnet-banner {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.page-context {
+    flex: 1;
+    min-width: 160px;
+    text-align: center;
+    line-height: 1.25;
+    padding: 0 1rem;
+}
+
+.page-context-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.page-context-subtitle {
+    font-size: 0.8rem;
+    opacity: 0.72;
+    margin-top: 0.2rem;
+}
+
+@media (max-width: 768px) {
+    .site-logo {
+        height: 72px !important;
+        width: 72px !important;
+    }
+
+    .page-context {
+        order: 3;
+        flex-basis: 100%;
+        padding: 0.25rem 0 0;
+    }
+}
+
+.classic .page-context-title,
+.classic .page-context-subtitle {
+    color: var(--text-classic) !important;
+    background: none !important;
+    -webkit-text-fill-color: currentColor !important;
+    animation: none !important;
+}
+
+.future .page-context-title {
+    background: linear-gradient(90deg, var(--accent-future), var(--neon-purple), var(--accent-future));
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientFlow 3s linear infinite;
+}
+
+.future .page-context-subtitle {
+    color: var(--accent-future);
+}
+
+/* Gradient Flow Animation for Future Mode */
+@keyframes gradientFlow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+/* Apply gradient flow to headings in Future mode */
+.future h1,
+.future h2,
+.future h3 {
+    background: linear-gradient(90deg, var(--accent-future), var(--neon-purple), var(--accent-future));
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientFlow 3s linear infinite;
+}
+
+/* Reduce neon glow intensity on profile page */
+.future h1 {
+    text-shadow: none;
+}
+
+.future h2 {
+    text-shadow: none;
+}
+
+.future h3 {
+    text-shadow: none;
+}
+
+/* Avatar Button Glow Effect */
+.future .avatar-button {
+    box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.6), 0 0 40px rgba(var(--c-accent-2-rgb), 0.4);
+    animation: avatarGlow 3s ease-in-out infinite;
+}
+
+.future .avatar-button .avatar-info > div:first-child {
+    background: linear-gradient(90deg, var(--accent-future), var(--neon-purple), var(--accent-future)) !important;
+    background-size: 200% 100% !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    animation: gradientFlow 3s linear infinite !important;
+}
+
+@keyframes avatarGlow {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.6), 0 0 40px rgba(var(--c-accent-2-rgb), 0.4);
+        border-color: rgba(var(--c-accent-rgb), 0.6);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba(var(--c-accent-2-rgb), 0.8), 0 0 60px rgba(var(--c-accent-rgb), 0.6);
+        border-color: rgba(var(--c-accent-2-rgb), 0.6);
+    }
+}
+
+.classic .avatar-button {
+    box-shadow: none;
+}
+
+/* Classic mode is intentionally static and two-tone: black + ArtSoul mint. */
+body.classic,
+.classic {
+    background-color: var(--bg-classic) !important;
+    color: var(--text-classic) !important;
+}
+
+body.classic::before,
+.classic::before {
+    animation: none !important;
+}
+
+.classic .site-logo,
+.classic .card,
+.classic .gallery-item,
+.classic .roadmap-current-card,
+.classic .timeline-dot,
+.classic .avatar-button,
+.classic .network-badge,
+.classic .devnet-banner {
+    animation: none !important;
+    box-shadow: none !important;
+}
+
+.classic h1,
+.classic h2,
+.classic h3,
+.classic h4,
+.classic .dropdown-item span,
+.classic .avatar-info > div:first-child {
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    -webkit-text-fill-color: currentColor !important;
+    color: var(--text-classic) !important;
+    text-shadow: none !important;
+    animation: none !important;
+}
+
+.classic .card,
+.classic .profile-card,
+.classic .doc-section,
+.classic .collapsible-section,
+.classic .network-badge {
+    border-color: var(--text-classic) !important;
+    background: rgba(var(--c-accent-rgb), 0.05) !important;
+}
+
+.classic .avatar-dropdown-menu {
+    background: var(--c-surface) !important;
+    border: 1px solid var(--text-classic) !important;
+    color: var(--text-classic) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85) !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+}
+
+.future .avatar-dropdown-menu {
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+}
+
+.classic .avatar-dropdown-menu .dropdown-item {
+    background: transparent !important;
+    color: var(--text-classic) !important;
+}
+
+.classic .avatar-dropdown-menu .dropdown-item:hover {
+    background: rgba(var(--c-accent-rgb), 0.12) !important;
+}
+
+.avatar-dropdown-menu .dropdown-item,
+.avatar-dropdown-menu .network-switcher-btn,
+.avatar-dropdown-menu button[onclick*="resetWalletConnection"] {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    font-size: 0.875rem !important;
+    line-height: 1.25 !important;
+    text-decoration: none !important;
+}
+
+.avatar-dropdown-menu .dropdown-item span,
+.avatar-dropdown-menu .network-switcher-btn span,
+.avatar-dropdown-menu button[onclick*="resetWalletConnection"] span {
+    display: inline !important;
+    min-width: 0;
+}
+
+.avatar-dropdown-menu #connectBtn,
+.avatar-dropdown-menu .btn-main#connectBtn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 0.75rem !important;
+    border-radius: 0.5rem !important;
+    clip-path: none !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+.avatar-dropdown-menu #connectBtn span {
+    display: inline !important;
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    -webkit-text-fill-color: currentColor !important;
+    color: inherit !important;
+    text-shadow: none !important;
+    animation: none !important;
+}
+
+.classic .avatar-dropdown-menu #connectBtn {
+    background: var(--text-classic) !important;
+    border: 1px solid var(--text-classic) !important;
+    color: var(--bg-classic) !important;
+    box-shadow: none !important;
+}
+
+.classic .avatar-dropdown-menu #connectBtn:hover {
+    background: var(--c-surface) !important;
+    color: var(--text-classic) !important;
+}
+
+.future .avatar-dropdown-menu #connectBtn {
+    background: linear-gradient(135deg, var(--accent-future) 0%, var(--neon-purple) 100%) !important;
+    border: 1px solid rgba(var(--c-accent-rgb), 0.52) !important;
+    color: #020611 !important;
+    box-shadow: 0 0 14px rgba(var(--c-accent-rgb), 0.28) !important;
+}
+
+.future .avatar-dropdown-menu #connectBtn:hover {
+    filter: brightness(1.12);
+}
+
+.classic .avatar-dropdown-menu button[onclick*="resetWalletConnection"],
+.classic .avatar-dropdown-menu .network-switcher-btn {
+    color: var(--text-classic) !important;
+}
+
+/* Shared header/menu contract: keep logo, context, and wallet zones stable across pages. */
+header {
+    overflow: visible !important;
+}
+
+body.classic header {
+    background: rgba(1, 1, 1, 0.95);
+    border-bottom: 1px solid var(--text-classic);
+}
+
+body.future header {
+    background: rgba(0, 0, 0, 0.8);
+    border-bottom: 1px solid rgba(var(--c-accent-rgb), 0.3);
+    box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
+}
+
+header .container {
+    display: block !important;
+    overflow: visible !important;
+}
+
+header > .container > .flex {
+    display: grid !important;
+    grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) minmax(190px, 240px);
+    align-items: center !important;
+    gap: 1rem !important;
+    flex-wrap: nowrap !important;
+}
+
+header > .container > .flex > :first-child {
+    justify-self: start;
+    min-width: 190px;
+}
+
+header > .container > .flex > :nth-child(2) {
+    justify-self: center;
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+}
+
+header > .container > .flex > :nth-child(2):not(.page-context) {
+    display: flex;
+    justify-content: center;
+}
+
+header > .container > .flex > .page-context {
+    display: block;
+}
+
+header > .container > .flex > :last-child {
+    justify-self: end;
+    min-width: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+#networkBadge,
+#navButtons {
+    flex-shrink: 0;
+}
+
+#navButtons {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    overflow: visible !important;
+}
+
+#navButtons .avatar-dropdown-container {
+    position: relative;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: auto;
+    max-width: 100%;
+    min-height: 52px;
+}
+
+.avatar-button {
+    opacity: 1 !important;
+    min-height: 52px !important;
+    background: var(--c-surface) !important;
+    border-color: var(--c-border) !important;
+    color: var(--c-text) !important;
+}
+
+#navButtons .avatar-button {
+    width: auto;
+    max-width: 100%;
+    justify-content: center !important;
+}
+
+#navButtons .avatar-info {
+    min-width: 0;
+}
+
+#navButtons .avatar-info > div {
+    max-width: 128px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.classic .avatar-button {
+    background: var(--c-surface) !important;
+    border-color: var(--c-border) !important;
+    color: var(--text-classic) !important;
+}
+
+.future .avatar-button {
+    background: rgba(2, 6, 17, 0.92) !important;
+    border-color: rgba(var(--c-accent-rgb), 0.52) !important;
+    color: var(--accent-future) !important;
+}
+
+.avatar-dropdown-menu {
+    position: absolute !important;
+    top: calc(100% + 0.5rem) !important;
+    right: 0 !important;
+    width: min(260px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 40px) !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+}
+
+@media (min-width: 769px) {
+    header {
+        min-height: 105px !important;
+    }
+
+    header .container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+
+    header > .container > .flex {
+        grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) minmax(240px, 320px) !important;
+        min-height: 72px !important;
+    }
+
+    header > .container > .flex > :first-child,
+    header > .container > .flex > :last-child {
+        width: 100% !important;
+        min-width: 240px !important;
+        max-width: 320px !important;
+    }
+
+    header > .container > .flex > :nth-child(2) {
+        min-height: 52px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    header > .container > .flex > .page-context {
+        flex-direction: column !important;
+        justify-content: center !important;
+        min-height: 52px !important;
+    }
+
+    header .devnet-banner {
+        min-height: 52px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+}
+
+/* Dropdown Menu Items Gradient Text in Future Mode */
+.future .dropdown-item span {
+    background: linear-gradient(90deg, var(--accent-future), var(--neon-purple), var(--accent-future));
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientFlow 3s linear infinite;
+}
+
+.future .dropdown-item:hover span {
+    animation-duration: 1.5s;
+}
+
+/* Shared docs/action close button behavior. Page-local rules may define shape; this keeps color/glow consistent. */
+.classic .close-button,
+.classic .close-button:hover {
+    border-color: var(--text-classic) !important;
+    color: var(--text-classic) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+}
+
+.future .close-button {
+    border-color: var(--accent-future) !important;
+    color: var(--accent-future) !important;
+    box-shadow: 0 0 12px rgba(var(--c-accent-rgb), 0.35), 0 0 24px rgba(var(--c-accent-2-rgb), 0.16) !important;
+    text-shadow: 0 0 8px rgba(var(--c-accent-rgb), 0.5) !important;
+    animation: closeButtonFuturePulse 2.4s ease-in-out infinite !important;
+}
+
+.future .close-button:hover {
+    animation-duration: 1.4s !important;
+    transform: scale(1.08) !important;
+    filter: brightness(1.12) !important;
+}
+
+@keyframes closeButtonFuturePulse {
+    0%, 100% {
+        border-color: var(--accent-future);
+        color: var(--accent-future);
+        box-shadow: 0 0 12px rgba(var(--c-accent-rgb), 0.35), 0 0 24px rgba(var(--c-accent-2-rgb), 0.16);
+        text-shadow: 0 0 8px rgba(var(--c-accent-rgb), 0.5);
+    }
+    50% {
+        border-color: var(--neon-purple);
+        color: var(--neon-purple);
+        box-shadow: 0 0 18px rgba(var(--c-accent-2-rgb), 0.42), 0 0 32px rgba(var(--c-accent-rgb), 0.22);
+        text-shadow: 0 0 10px rgba(var(--c-accent-2-rgb), 0.55);
+    }
+}
+
+/* Network icon should not have gradient effect or glow */
+.future .network-switcher-btn img,
+.classic .network-switcher-btn img {
+    filter: none !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+
+@media (max-width: 768px) {
+    .future .avatar-dropdown-menu .avatar-theme-switch {
+        box-shadow: inset 0 0 12px rgba(var(--c-accent-rgb), 0.1) !important;
+    }
+
+    header .container {
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+    }
+
+    header > .container > .flex {
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "logo . actions"
+            "context context context";
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem 0.75rem !important;
+        min-height: 72px;
+    }
+
+    header > .container > .flex > :first-child {
+        grid-area: logo;
+        min-width: 0;
+    }
+
+    header > .container > .flex > :nth-child(2) {
+        grid-area: context;
+        width: 100%;
+        justify-self: center;
+        justify-content: center;
+        text-align: center;
+    }
+
+    header > .container > .flex > :last-child {
+        grid-area: actions;
+        min-width: 0;
+        justify-self: end;
+    }
+
+    .logo-link {
+        flex-shrink: 0;
+    }
+
+    #navButtons {
+        margin-left: auto;
+        width: auto;
+        max-width: none;
+        min-width: 52px;
+        min-height: 52px;
+    }
+
+    #navButtons .avatar-dropdown-container,
+    #navButtons .avatar-button {
+        width: auto;
+    }
+
+    #navButtons .avatar-button {
+        min-height: 48px !important;
+        padding: 0.45rem 0.65rem !important;
+    }
+
+    #navButtons .avatar-button img {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    .avatar-dropdown-menu {
+        max-width: calc(100vw - 24px) !important;
+    }
+
+    .page-context {
+        min-width: 0;
+        max-width: 100%;
+        order: initial;
+        flex-basis: auto;
+    }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .btn-main,
+    .btn-secondary {
+        padding: 0.375rem 1rem;
+        font-size: 0.875rem;
+    }
+
+    .network-badge {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    /* Fix devnet banner on mobile */
+    .devnet-banner {
+        position: static !important;
+        transform: none !important;
+        margin: 0.5rem auto;
+        display: block;
+        text-align: center;
+    }
+}

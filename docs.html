@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('artsoul_theme') || 'classic';
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+            } catch (error) {
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add('classic');
+            }
+        })();
+    </script>
+    <title>ArtSoul Docs</title>
+    <meta name="description" content="Learn how ArtSoul brings discovery-first auctions, delayed minting, creator royalties, trust signals, and curated digital art drops into one collector-ready protocol.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ArtSoul">
+    <meta property="og:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
+    <meta property="og:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:url" content="https://artsoul.vercel.app/docs.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta name="twitter:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
+    <meta name="twitter:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="design-system.css?v=1">
+    <link rel="stylesheet" href="unified-styles.css?v=13">
+    <link rel="stylesheet" href="button-effects.css?v=5">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        (function() {
+            const theme = localStorage.getItem('artsoul_theme') || 'classic';
+            document.documentElement.classList.remove('classic', 'future');
+            document.documentElement.classList.add(theme);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.body.classList.remove('classic', 'future');
+                    document.body.classList.add(theme);
+                });
+            } else {
+                document.body.classList.remove('classic', 'future');
+                    document.body.classList.add(theme);
+            }
+        })();
+    </script>
+    <script src="src/ui/theme-manager.js"></script>
+    <script src="src/ui/status-banner-system.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            if (window.StatusBannerSystem) {
+                console.log('🚦 Status Banners disabled on docs page');
+            }
+        });
+    </script>
+    <script src="modal-system.js"></script>
+    <script type="module" src="supabase-auth.js"></script>
+    <script type="module" src="supabase-client.js"></script>
+    <script src="avatar-dropdown.js?v=11"></script>
+    <script type="module" src="appkit-init.js?v=14"></script>
+    <style>
+* {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body.classic {
+            background: var(--bg-classic);
+            color: var(--text-classic);
+        }
+
+        .classic header {
+            background: rgba(1, 1, 1, 0.95);
+            border-bottom: 1px solid var(--accent-classic);
+        }
+
+        body.future {
+            background: var(--c-bg);
+            color: var(--accent-future);
+        }
+
+        .future header {
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--accent-future);
+            box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
+        }
+
+header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(12px);
+        }
+
+        header .container {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .future .timeline-line {
+            background: linear-gradient(90deg, var(--accent-future) 0%, var(--neon-purple) 25%, var(--accent-future) 50%, var(--neon-purple) 75%, var(--accent-future) 100%);
+            background-size: 200% 100%;
+            animation: lineGlow 3s linear infinite;
+        }
+
+        @keyframes lineGlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        .future .timeline-dot {
+            animation: dotPulse 2s ease-in-out infinite;
+            transform-origin: center center;
+        }
+
+        @keyframes dotPulse {
+            0%, 100% { box-shadow: 0 0 10px var(--accent-future), 0 0 20px var(--neon-purple); }
+            50% { box-shadow: 0 0 20px var(--accent-future), 0 0 40px var(--neon-purple); }
+        }
+
+        .future .relative.mb-12:nth-child(2) { animation: floatItem1 8s ease-in-out infinite; }
+        .future .relative.mb-12:nth-child(3) { animation: floatItem2 10s ease-in-out infinite; }
+        .future .relative.mb-12:nth-child(4) { animation: floatItem3 12s ease-in-out infinite; }
+        .future .relative:nth-child(5) { animation: floatItem4 9s ease-in-out infinite; }
+
+        @keyframes floatItem1 {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(-15px) translateX(10px); }
+            50% { transform: translateY(-8px) translateX(-5px); }
+            75% { transform: translateY(-20px) translateX(8px); }
+        }
+        @keyframes floatItem2 {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(-12px) translateX(-8px); }
+            50% { transform: translateY(-18px) translateX(12px); }
+            75% { transform: translateY(-5px) translateX(-10px); }
+        }
+        @keyframes floatItem3 {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(-10px) translateX(15px); }
+            50% { transform: translateY(-22px) translateX(-8px); }
+            75% { transform: translateY(-12px) translateX(10px); }
+        }
+        @keyframes floatItem4 {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            25% { transform: translateY(-18px) translateX(-12px); }
+            50% { transform: translateY(-10px) translateX(15px); }
+            75% { transform: translateY(-15px) translateX(-5px); }
+        }
+
+        .network-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .classic .network-badge {
+            background: rgba(232, 227, 213, 0.1);
+            border: 1px solid var(--accent-classic);
+        }
+
+        .future .network-badge {
+            background: rgba(var(--c-accent-rgb), 0.1);
+            border: 1px solid var(--accent-future);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .future .network-badge::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(var(--c-accent-rgb), 0.3), transparent);
+            animation: scanning 3s linear infinite;
+        }
+
+        @keyframes scanning {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        @media (max-width: 640px) {
+            .network-badge {
+                padding: 0.375rem 0.75rem;
+                font-size: 0.75rem;
+            }
+        }
+
+        .tooltip-wrap {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .classic .tooltip-text {
+            background: var(--text-classic);
+            color: var(--bg-classic);
+        }
+
+        .future .tooltip-text {
+            background: var(--accent-future);
+            color: var(--c-bg);
+        }
+
+        .tooltip-wrap:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .icon-svg {
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fadeIn {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        html {
+            scroll-behavior: auto;
+        }
+
+        @keyframes neonPulse {
+            0%, 100% {
+                box-shadow: 0 0 10px var(--accent-future), 0 0 20px var(--accent-future);
+                opacity: 1;
+            }
+            50% {
+                box-shadow: 0 0 20px var(--accent-future), 0 0 40px var(--neon-purple);
+                opacity: 0.8;
+            }
+        }
+
+        @keyframes lineGlow {
+            0%, 100% {
+                background: linear-gradient(180deg, var(--accent-future) 0%, var(--neon-purple) 100%);
+            }
+            50% {
+                background: linear-gradient(180deg, var(--neon-purple) 0%, var(--accent-future) 100%);
+            }
+        }
+
+        .future .roadmap-dot {
+            animation: neonPulse 2s ease-in-out infinite;
+        }
+
+        .future .roadmap-line {
+            animation: lineGlow 3s ease-in-out infinite;
+        }
+
+        .devnet-banner {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .classic .devnet-banner {
+            background: rgba(var(--c-accent-rgb), 0.15);
+            border: 1px solid var(--accent-classic);
+            color: var(--accent-classic);
+        }
+
+        .classic .devnet-banner:hover {
+            background: rgba(var(--c-accent-rgb), 0.25);
+            border-color: var(--text-classic);
+        }
+
+        .future .devnet-banner {
+            background: rgba(var(--c-accent-rgb), 0.15);
+            border: 1px solid var(--accent-future);
+            color: var(--accent-future);
+        }
+
+        .future .devnet-banner:hover {
+            background: rgba(var(--c-accent-rgb), 0.25);
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 15px rgba(var(--c-accent-rgb), 0.3);
+        }
+
+        .close-button {
+            transition: all 0.3s;
+        }
+
+        .classic .close-button,
+        .classic .close-button:hover {
+            border-color: var(--accent-classic) !important;
+            color: var(--accent-classic) !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            filter: none !important;
+            animation: none !important;
+            text-shadow: none !important;
+        }
+
+        .future .close-button {
+            border-color: var(--accent-future);
+            color: var(--accent-future);
+            box-shadow: 0 0 10px rgba(var(--c-accent-rgb), 0.3);
+            animation: closeButtonPulse 2s ease-in-out infinite;
+        }
+
+        .future .close-button:hover {
+            box-shadow: 0 0 20px var(--accent-future), 0 0 40px var(--neon-purple);
+            animation: buttonGlow 1.5s ease-in-out infinite;
+        }
+
+        @keyframes closeButtonPulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(var(--c-accent-rgb), 0.3); }
+            50% { box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.5), 0 0 30px rgba(var(--c-accent-2-rgb), 0.3); }
+        }
+
+        @keyframes buttonGlow {
+            0%, 100% {
+                box-shadow: 0 0 20px var(--accent-future), 0 0 40px var(--neon-purple);
+                border-color: var(--accent-future);
+            }
+            50% {
+                box-shadow: 0 0 30px var(--neon-purple), 0 0 60px var(--accent-future);
+                border-color: var(--neon-purple);
+            }
+        }
+
+        .doc-section {
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .doc-section h2 {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+            padding: 1rem 1.5rem;
+        }
+
+        .doc-section .toggle-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1rem;
+            height: 1rem;
+            flex: 0 0 auto;
+            transition: transform 0.3s;
+            font-size: 1rem;
+        }
+
+        .doc-section .content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, opacity 0.3s, padding 0.3s;
+            opacity: 0;
+            padding: 0 1.5rem;
+        }
+
+        .doc-section.open .content {
+            max-height: 2000px;
+            opacity: 1;
+            padding: 0 1.5rem 1.5rem 1.5rem;
+        }
+
+        .doc-section.open .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .classic .doc-section {
+            background: rgba(var(--c-accent-rgb), 0.05);
+            border: 1px solid rgba(var(--c-accent-rgb), 0.2);
+        }
+        .classic .doc-section.open {
+            border-color: var(--accent-classic);
+            background: rgba(var(--c-accent-rgb), 0.1);
+        }
+
+        .future .doc-section {
+            background: rgba(var(--c-accent-rgb), 0.05);
+            border: 1px solid rgba(var(--c-accent-rgb), 0.2);
+        }
+        .future .doc-section.open {
+            border-color: var(--accent-future);
+            background: rgba(var(--c-accent-rgb), 0.1);
+            box-shadow: 0 0 15px rgba(var(--c-accent-rgb), 0.2);
+        }
+
+        .roadmap-card {
+            position: relative;
+        }
+
+        .roadmap-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .roadmap-marker {
+            width: 0.7rem;
+            height: 0.7rem;
+            border-radius: 9999px;
+            flex: 0 0 auto;
+        }
+
+        .classic .roadmap-marker {
+            background: var(--accent-classic);
+        }
+
+        .future .roadmap-card {
+            overflow: hidden;
+            animation: roadmapFloat 6s ease-in-out infinite;
+        }
+
+        .future .roadmap-card:nth-child(2) {
+            animation-delay: 0.4s;
+        }
+
+        .future .roadmap-card:nth-child(3) {
+            animation-delay: 0.8s;
+        }
+
+        .future .roadmap-card:nth-child(4) {
+            animation-delay: 1.2s;
+        }
+
+        .future .roadmap-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, transparent 20%, rgba(var(--c-accent-rgb), 0.18), transparent 80%);
+            transform: translateX(-120%);
+            animation: roadmapScan 4.5s linear infinite;
+            pointer-events: none;
+        }
+
+        .future .roadmap-marker {
+            background: var(--accent-future);
+            box-shadow: 0 0 12px var(--accent-future), 0 0 24px var(--neon-purple);
+            animation: neonPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes roadmapFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        @keyframes roadmapScan {
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(120%); }
+        }
+
+        .check-mark {
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .classic .check-mark.yes {
+            color: var(--accent-classic);
+        }
+
+        .classic .check-mark.no {
+            color: #ff6b6b;
+        }
+
+        .future .check-mark.yes {
+            color: var(--accent-future);
+            text-shadow: 0 0 10px var(--accent-future);
+        }
+
+        .future .check-mark.no {
+            color: var(--neon-purple);
+            text-shadow: 0 0 10px var(--neon-purple);
+        }
+    </style>
+</head>
+<body>
+    <header style="position: sticky; top: 0; z-index: 50; backdrop-filter: blur(12px);">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <a href="index.html" class="logo-link">
+                        <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                    </a>
+                </div>
+                <div class="page-context">
+                    <div class="page-context-title">Docs</div>
+                    <div class="page-context-subtitle">Everything you need to know about ArtSoul</div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="networkBadge"></div>
+                    <div class="flex items-center gap-3" id="navButtons"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="app"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function DocSection({ section, isOpen, toggle, isClassic }) {
+            let formattedContent = section.content.replace(/\\n/g, '<br>');
+            formattedContent = formattedContent.replace(
+                /(https?:\/\/[^\\s<]+)/g,
+                '<a href="$1" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; opacity: 1;">$1</a>'
+            );
+
+            return (
+                <div
+                    id={section.id}
+                    className={`doc-section ${isOpen ? 'open' : ''} animate-fadeIn`}
+                    onClick={toggle}
+                >
+                    <h2 className="heading-3">
+                        <span>{section.title}</span>
+                        <span className="toggle-icon">{'▾'}</span>
+                    </h2>
+                    <div className="content">
+                        {section.link ? (
+                            <div>
+                                <p className="body-text opacity-80 leading-relaxed" dangerouslySetInnerHTML={{__html: formattedContent}}></p>
+                                <div className="mt-4">
+                                    <a href={section.link} className="btn-main inline-block">
+                                        {section.linkText || 'Learn More →'}
+                                    </a>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="body-text opacity-80 leading-relaxed" dangerouslySetInnerHTML={{__html: formattedContent}}></p>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function DocsApp() {
+            const [isClassic, setIsClassic] = useState(true);
+            const [openSections, setOpenSections] = useState({});
+
+            useEffect(() => {
+                const savedTheme = window.ThemeSync?.getTheme() || 'classic';
+                setIsClassic(savedTheme === 'classic');
+            }, []);
+
+            useEffect(() => {
+                window.scrollTo(0, 0);
+            }, []);
+
+            const toggleSection = (title) => {
+                setOpenSections(prev => ({
+                    ...prev,
+                    [title]: !prev[title]
+                }));
+            };
+
+            const sections = [
+                {
+                    title: 'What is ArtSoul?',
+                    content: 'ArtSoul is a discovery-first auction protocol for digital art. Artists can publish work without minting immediately, collectors can discover and support pieces before they become NFTs, and the final token is created only after a successful auction settlement.\n\nThe result is a cleaner market: fewer empty mints, stronger price discovery, protected resale floors, and a platform built around real collector intent instead of raw listing volume.',
+                    category: 'general'
+                },
+                {
+                    title: 'Auction-First Model',
+                    content: 'ArtSoul starts with the artwork, not the token. A creator publishes an artwork, chooses a supported test network, sets a starting price, and launches a 24, 36, or 48 hour auction. Bidders place a deposit-backed bid, and the highest bidder receives a 24 hour settlement window after the auction ends.\n\nIf settlement succeeds, the NFT is minted and transferred to the winner. If settlement fails, the NFT is not minted and no resale floor is created. This keeps the market honest: the floor is based on completed payment, not speculation.',
+                    link: 'auction-system.html',
+                    linkText: 'View Auction Protocol',
+                    category: 'general'
+                },
+                {
+                    title: 'Deposit-Based Bidding',
+                    content: 'Bids are backed by a deposit instead of requiring the full bid upfront. The required deposit is the greater of 10% of the bid or 0.01 ETH. To move the auction forward, the next bid must exceed the current highest bid by at least 0.01 ETH or 2.5%, whichever is higher.\n\nOutbid collectors do not lose their deposits. They can withdraw safely through the contract. The winning deposit only becomes at risk if the winner fails to complete settlement within the settlement window.',
+                    category: 'general'
+                },
+                {
+                    title: 'Delayed Mint Lifecycle',
+                    content: 'An artwork can be discovered, liked, watched, and auctioned before it is minted. The NFT is born only after the winning bidder pays the remaining balance during settlement.\n\nThis matters because it keeps blockchain supply tied to real collector commitment. Artists can build demand before minting, and collectors receive an NFT only when the sale actually completes.',
+                    category: 'general'
+                },
+                {
+                    title: 'Discovery Signals',
+                    content: 'ArtSoul discovery uses more than likes. The product direction combines Likes, Would Buy signals, Watching, auction activity, settlement history, creator momentum, Genesis status, and trust-weighted engagement.\n\nThese signals influence visibility only. They do not decide auction winners, set floor prices, change royalties, create mint rights, or alter contract economics.',
+                    category: 'general'
+                },
+                {
+                    title: 'Getting Started',
+                    content: 'Anyone can explore as a guest. Connect a wallet when you want to bid, settle, list, buy, publish artwork, update your profile, or save wallet-linked discovery signals. A profile helps collectors understand the creator behind the work, and it supports future Genesis eligibility.',
+                    category: 'guide'
+                },
+                {
+                    title: 'Publishing Artwork',
+                    content: 'Creators publish artwork metadata and media first. Publishing is not automatically minting an NFT. From there, the creator can prepare an auction with a supported duration and starting price. This separation keeps the creative catalog open while minting remains tied to successful collector settlement.',
+                    category: 'guide'
+                },
+                {
+                    title: 'Resale and Floor Protection',
+                    content: 'A resale floor exists only after a successful auction settlement. Once the NFT is minted, the owner can list it for resale, but the resale price must be at or above the completed auction price. Failed settlement does not create a floor.\n\nThis protects collectors and creators from artificial floors while preserving room for future value growth.',
+                    category: 'guide'
+                },
+                {
+                    title: 'Platform Fees',
+                    content: 'Platform fee: 2.5% on completed sales.\nCreator royalty: 7.5% on resale.\nBid deposit: max(10% of bid, 0.01 ETH).\n\nIf a winner defaults, the locked deposit is split 80% to the artist and 20% to the platform. The NFT is not minted, and the artwork can be relaunched or handled through a future supported sale path.',
+                    category: 'guide'
+                },
+                {
+                    title: 'Trust Without Auto-Bans',
+                    content: 'ArtSoul uses trust as a discovery signal, not a blunt punishment system. Low-trust users can still explore, interact, and participate when contract rules allow, but suspicious or low-quality engagement should carry less influence in ranking.\n\nSuccessful settlement is the strongest trust signal because it proves real collector commitment.',
+                    category: 'tech'
+                },
+                {
+                    title: 'Supported Networks',
+                    content: 'ArtSoul launches on Base. The prepared testnet path uses Base Sepolia and Ethereum Sepolia. Network switching is available from the wallet menu after a wallet is connected.',
+                    category: 'tech'
+                },
+                {
+                    title: 'Genesis Status',
+                    content: 'Genesis is the status NFT for the first 100 eligible ecosystem participants. Eligibility is based on real activity such as profile creation, artwork publishing, auction participation, successful settlement, and artwork interactions.\n\nGenesis is designed as a status and discovery layer, not a pay-to-win governance token.',
+                    category: 'tech'
+                }
+            ];
+
+            const contentSections = sections;
+            const midpoint = Math.ceil(contentSections.length / 2);
+            const leftSections = contentSections.slice(0, midpoint);
+            const rightSections = contentSections.slice(midpoint);
+
+            return (
+                <main className="container mx-auto px-4 pt-8 md:pt-10 pb-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+                        <div className="space-y-4">
+                            {leftSections.map((section) => (
+                                <DocSection
+                                    key={section.title}
+                                    section={section}
+                                    isOpen={openSections[section.title]}
+                                    toggle={() => toggleSection(section.title)}
+                                    isClassic={isClassic}
+                                />
+                            ))}
+                        </div>
+                        <div className="space-y-4">
+                            {rightSections.map((section) => (
+                                <DocSection
+                                    key={section.title}
+                                    section={section}
+                                    isOpen={openSections[section.title]}
+                                    toggle={() => toggleSection(section.title)}
+                                    isClassic={isClassic}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="max-w-5xl mx-auto mt-16 animate-fadeIn">
+                        <h2 className="text-3xl font-light text-center mb-8">Platform Direction</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                {
+                                    title: 'Discovery First',
+                                    content: 'The homepage is a curated showcase. The gallery is the discovery hub. Rankings should reflect meaningful collector interest, not raw likes alone.'
+                                },
+                                {
+                                    title: 'Auction-Led Value',
+                                    content: 'Primary auctions establish commitment. Settlement creates the NFT and the protected resale floor only after the final price is actually paid.'
+                                },
+                                {
+                                    title: 'Creator Ownership',
+                                    content: 'Creators keep attribution and resale royalties while collectors receive clear lifecycle states: artwork, auction, settlement, NFT, and resale.'
+                                },
+                                {
+                                    title: 'Curated Expansion',
+                                    content: 'Collections and drops are separated from normal user artwork feeds, keeping partner launches and Genesis-style drops distinct from open discovery.'
+                                }
+                            ].map((item) => (
+                                <div className={`doc-section open roadmap-card ${isClassic ? '' : 'future-roadmap-card'}`} key={item.title}>
+                                    <h2 className="heading-3">
+                                        <span className="roadmap-title">
+                                            <span className="roadmap-marker"></span>
+                                            <span>{item.title}</span>
+                                        </span>
+                                    </h2>
+                                    <div className="content">
+                                        <p className="body-text opacity-80 leading-relaxed">{item.content}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="text-center mt-16">
+                        <a href="index.html" className="inline-flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all hover:scale-110 close-button">
+                            <span style={{ fontSize: '24px', lineHeight: '1' }}>&times;</span>
+                        </a>
+                    </div>
+                </main>
+            );
+        }
+
+        ReactDOM.render(<DocsApp />, document.getElementById('app'));
+    </script>
+</body>
+</html>

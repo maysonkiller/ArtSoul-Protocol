@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('artsoul_theme') || 'classic';
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+            } catch (error) {
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add('classic');
+            }
+        })();
+    </script>
+    <title>ArtSoul — Discovery-First Art Auctions</title>
+    <meta name="description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ArtSoul">
+    <meta property="og:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
+    <meta property="og:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:url" content="https://artsoul.vercel.app/index.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta name="twitter:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
+    <meta name="twitter:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="design-system.css?v=1">
+    <link rel="stylesheet" href="unified-styles.css?v=14">
+    <link rel="stylesheet" href="button-effects.css?v=5">
+    <link rel="stylesheet" href="ai-ui-styles.css?v=1">
+    <link rel="stylesheet" href="simplified-ui.css?v=1">
+    <link rel="stylesheet" href="ui-core.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="src/ui/theme-manager.js"></script>
+    <script src="src/ui/theme-validator.js"></script>
+    <script src="src/ui/navigation-manager.js?v=4"></script>
+    <script src="src/ui/system-logger.js"></script>
+    <script src="src/ui/log-viewer-ui.js"></script>
+    <script src="src/ui/admin-control-panel.js"></script>
+    <script src="src/ui/status-banner-system.js"></script>
+    <script>
+        // Initialize UI systems after page load
+        window.addEventListener('load', () => {
+            if (window.SystemLogger && window.LogViewerUI) {
+                window.logViewer = new LogViewerUI(window.SystemLogger);
+                console.log(' Log Viewer ready (Ctrl+L to toggle)');
+            }
+
+            if (window.AdminControlPanel) {
+                window.adminPanel = new AdminControlPanel();
+                console.log(' Admin Panel ready (Ctrl+A to toggle)');
+            }
+
+            if (window.StatusBannerSystem) {
+                window.statusBanners = new StatusBannerSystem();
+                console.log('🚦 Status Banners ready');
+            }
+        });
+    </script>
+    <script src="modal-system.js"></script>
+    <script type="module" src="supabase-auth.js"></script>
+    <script type="module" src="supabase-client.js"></script>
+    <script src="src/features/discovery/discovery-service.js?v=1"></script>
+    <script src="src/ui/components/artwork-card.js?v=1"></script>
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+* {
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+        }
+
+        body.classic {
+            background: var(--bg-classic);
+            color: var(--text-classic);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body.future {
+            background: var(--c-bg);
+            color: var(--accent-future);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body.future::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-color: var(--c-bg);
+            background-image:
+                radial-gradient(2px 2px at 20% 30%, white, transparent),
+                radial-gradient(2px 2px at 60% 70%, white, transparent),
+                radial-gradient(1px 1px at 50% 50%, white, transparent),
+                radial-gradient(1px 1px at 80% 10%, white, transparent),
+                radial-gradient(2px 2px at 90% 60%, white, transparent),
+                radial-gradient(1px 1px at 33% 80%, white, transparent),
+                radial-gradient(1px 1px at 15% 90%, white, transparent);
+            background-size: 200% 200%;
+            animation: starsMove 120s linear infinite;
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes starsMove {
+            from { background-position: 0% 0%; }
+            to { background-position: 100% 100%; }
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(12px);
+        }
+
+        .classic header {
+            background: rgba(1, 1, 1, 0.95);
+            border-bottom: 1px solid var(--accent-classic);
+        }
+
+        .future header {
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--accent-future);
+            box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
+        }
+
+        .classic .card {
+            background: rgba(var(--c-accent-rgb), 0.05);
+            border: 1px solid var(--accent-classic);
+        }
+
+        .future .card {
+            background: rgba(var(--c-accent-rgb), 0.05);
+            border: 1px solid var(--accent-future);
+            backdrop-filter: blur(10px);
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0.75rem;
+            max-width: 1400px;
+            margin: 0 auto 200px;
+        }
+
+        .gallery .card .aspect-square {
+            aspect-ratio: 1;
+            width: 100%;
+        }
+
+        .artwork-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        @media (max-width: 1024px) {
+            .gallery {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .gallery {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 480px) {
+            .gallery {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        .site-logo {
+            height: 72px;
+            width: auto;
+            display: block;
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
+
+        .classic .site-logo {
+            filter: drop-shadow(0 0 8px rgba(var(--c-accent-rgb), 0.4));
+        }
+
+        .future .site-logo {
+            filter: drop-shadow(0 0 12px rgba(var(--c-accent-rgb), 0.6)) drop-shadow(0 0 20px rgba(var(--c-accent-2-rgb), 0.4));
+        }
+.devnet-banner {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0.68rem 1.65rem;
+            border-radius: 9999px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            letter-spacing: 0;
+            transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .classic .devnet-banner {
+            background: var(--c-bg);
+            border: 1px solid var(--c-accent);
+            color: var(--c-accent);
+            box-shadow: none;
+        }
+
+        .future .devnet-banner {
+            background:
+                linear-gradient(#020611, #020611) padding-box,
+                linear-gradient(110deg, var(--c-accent), var(--c-accent-2), var(--c-accent)) border-box;
+            border: 1px solid transparent;
+            color: var(--c-accent);
+            box-shadow: 0 0 18px rgba(var(--c-accent-rgb), 0.22), inset 0 0 18px rgba(var(--c-accent-2-rgb), 0.12);
+        }
+
+        .future .devnet-banner:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.15);
+        }
+
+        .classic .devnet-banner:hover {
+            transform: none;
+            filter: none;
+        }
+
+        @media (max-width: 768px) {
+            .site-logo {
+                height: 56px;
+            }
+
+            .devnet-banner {
+                font-size: 0.75rem;
+                padding: 0.5rem 1rem;
+                min-height: 40px;
+            }
+        }
+    </style>
+    <script src="avatar-dropdown.js?v=11"></script>
+    <script src="contracts-config.js?v=1"></script>
+    <script type="module" src="contracts-integration.js?v=3"></script>
+    <script type="module" src="appkit-init.js?v=14"></script>
+</head>
+<body>
+    <header>
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <!-- Left: Logo -->
+                <div class="flex items-center gap-4">
+                    <a href="index.html" class="logo-link">
+                        <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                    </a>
+                </div>
+
+                <!-- Center: header spacer / status-banner zone -->
+                <div class="flex-1 flex items-center justify-center"></div>
+
+                <!-- Right: Buttons -->
+                <div class="flex items-center gap-4">
+                    <div id="networkBadge"></div>
+                    <div class="flex items-center gap-3" id="navButtons"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Morph Backdrop -->
+    <div id="morphBackdrop" class="morph-backdrop"></div>
+
+    <!-- Home Section -->
+    <main id="homeSection" class="section active container mx-auto px-4 relative z-10" style="padding-top: 1.25rem; padding-bottom: 3rem;">
+
+        <!-- Hero Section -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-5xl font-bold mb-3">
+                Discovery-First Auctions<br/>for Digital Art
+            </h1>
+            <p class="text-base md:text-xl font-light opacity-90 mb-5 max-w-2xl mx-auto">
+                Publish artwork, build collector demand, and mint only after settlement.
+            </p>
+            <div class="flex flex-wrap gap-4 justify-center">
+                <a href="gallery.html" class="btn-main text-lg px-7 py-3">
+                    Explore Art
+                </a>
+                <a href="upload.html" class="btn-secondary text-lg px-7 py-3">
+                    Publish Artwork
+                </a>
+            </div>
+        </div>
+
+        <!-- Discovery Spotlight -->
+        <div class="mb-12">
+            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center">Discovery Spotlight</h2>
+            <div class="gallery" id="artworkGallery">
+                <!-- Dynamic discovery spotlight cards will be loaded here -->
+                <div class="col-span-full text-center py-12 opacity-50">
+                    <p class="text-xl">Loading featured artworks...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-16 pt-8 pb-6 border-t" style="border-color: currentColor; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(10px);">
+            <div class="content-container">
+                <div class="footer-grid">
+                    <!-- About -->
+                    <div class="footer-column">
+                        <h3>About ArtSoul</h3>
+                        <p>A discovery-first art platform where auctions, settlement, royalties, and trust signals help creators build durable collector demand.</p>
+                    </div>
+                    <!-- Contact -->
+                    <div class="footer-column">
+                        <h3>Contact</h3>
+                        <a href="https://x.com/maysonkiller23" target="_blank" class="hover:opacity-100">X (Twitter)</a>
+                        <a href="https://github.com/maysonkiller/ArtSoul" target="_blank" class="hover:opacity-100">GitHub</a>
+                        <a href="mailto:maysonkiller@gmail.com" class="hover:opacity-100">maysonkiller@gmail.com</a>
+                    </div>
+                    <!-- Networks -->
+                    <div class="footer-column">
+                        <h3>Supported Networks</h3>
+                        <p>Base Sepolia (testnet)</p>
+                        <p>Ethereum Sepolia (testnet)</p>
+                        <p>Future production networks</p>
+                    </div>
+                </div>
+                <div class="text-center text-sm pt-4 border-t" style="border-color: currentColor; opacity: 0.5;">
+                    <p style="opacity: 0.9; margin-bottom: 0.25rem;">&copy; 2026 ArtSoul Protocol | Built for digital artists</p>
+                    <p style="opacity: 0.9;">
+                        Built by <a href="https://twitter.com/maysonkiller23" target="_blank" class="hover:underline">@maysonkiller23</a>
+                    </p>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- Profile Section -->
+    <section id="profileSection" class="section container mx-auto px-4 py-12 relative z-10">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-4xl font-light">Profile</h2>
+                <button onclick="showSection('home')" class="btn-secondary">Back to Explore</button>
+            </div>
+
+            <div class="profile-tabs">
+                <button class="profile-tab active" onclick="switchProfileTab('edit')">Edit Profile</button>
+                <button class="profile-tab" onclick="switchProfileTab('myworks')">My Artworks</button>
+                <button class="profile-tab" onclick="switchProfileTab('allworks')">All Artworks</button>
+            </div>
+
+            <!-- Edit Profile Tab -->
+            <div id="editTab" class="profile-tab-content">
+                <div class="profile-card">
+                    <div class="avatar-upload" onclick="document.getElementById('avatarInput').click()">
+                        <img id="avatarPreview" src="https://via.placeholder.com/120" alt="Avatar">
+                        <input type="file" id="avatarInput" accept="image/*" style="display: none;" onchange="handleAvatarUpload(event)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" id="profileUsername" class="form-control" placeholder="Your username">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Bio</label>
+                        <textarea id="profileBio" class="form-control" rows="4" placeholder="Tell us about yourself"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">X (Twitter)</label>
+                        <input type="text" id="profileTwitter" class="form-control" placeholder="@username">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Discord</label>
+                        <input type="text" id="profileDiscord" class="form-control" placeholder="username#0000">
+                    </div>
+
+                    <button onclick="saveProfile()" class="btn-main w-full">Save Profile</button>
+                </div>
+            </div>
+
+            <!-- My Artworks Tab -->
+            <div id="myworksTab" class="profile-tab-content" style="display: none;">
+                <div class="upload-area mb-8" onclick="document.getElementById('artworkInput').click()">
+                    <input type="file" id="artworkInput" accept="image/*,video/*,audio/*,.gif" style="display: none;" onchange="handleArtworkSelect(event)">
+                    <svg viewBox="0 0 24 24" fill="none" class="w-16 h-16 mx-auto mb-4 opacity-50">
+                        <path d="M12 3L12 21M12 3L6 9M12 3L18 9M3 15L3 21L21 21L21 15" stroke="currentColor" class="icon-svg"/>
+                    </svg>
+                    <p class="text-lg opacity-70 mb-2">Publish New Artwork</p>
+                    <p class="text-sm opacity-40">Images, Videos, Music, GIFs (Max 100MB)</p>
+                </div>
+
+                <div id="myArtworksGrid" class="artwork-grid"></div>
+            </div>
+
+            <!-- All Artworks Tab -->
+            <div id="allworksTab" class="profile-tab-content" style="display: none;">
+                <div id="allArtworksGrid" class="artwork-grid"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center;">
+        <div class="profile-card" style="max-width: 500px; width: 90%;">
+            <h3 class="text-2xl font-light mb-6">Publish Artwork</h3>
+
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" id="artworkTitle" class="form-control" placeholder="Artwork title">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea id="artworkDescription" class="form-control" rows="3" placeholder="Describe your artwork"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Starting Price (ETH)</label>
+                <input type="number" id="artworkPrice" class="form-control" step="0.01" placeholder="0.5">
+            </div>
+
+            <div class="flex gap-4">
+                <button onclick="uploadArtwork()" class="btn-main flex-1">Publish</button>
+                <button onclick="closeUploadModal()" class="btn-secondary flex-1">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme Functions -->
+    <script>
+        let morphActive = false;
+        let originalPositions = [];
+
+        // Theme is now handled by ThemeManager
+
+        function viewArt(id) {
+            if (morphActive) return;
+            alert(`Opening artwork #${id}.`);
+        }
+
+        function showSuccessWave() {
+            const wave = document.createElement('div');
+            wave.className = 'success-wave';
+            document.body.appendChild(wave);
+            setTimeout(() => wave.remove(), 1000);
+        }
+
+        function morphToAnagram() {
+            // Only work in Future mode
+            if (!document.body.classList.contains('future')) return;
+            if (morphActive) return;
+            morphActive = true;
+
+            const cards = document.querySelectorAll('.card');
+            const backdrop = document.getElementById('morphBackdrop');
+
+            // Pause sliding animation
+            cards.forEach(card => {
+                card.style.animation = 'none';
+            });
+
+            backdrop.classList.add('active');
+
+            // Save original positions
+            originalPositions = [];
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                originalPositions.push({
+                    top: rect.top,
+                    left: rect.left,
+                    width: rect.width,
+                    height: rect.height
+                });
+            });
+
+            // Calculate center positions for ARTSOL
+            const cardWidth = 150;
+            const cardHeight = 150;
+            const gap = 20;
+            const totalWidth = (cardWidth * 6) + (gap * 5);
+            const startX = (window.innerWidth - totalWidth) / 2;
+            const centerY = (window.innerHeight - cardHeight) / 2;
+
+            cards.forEach((card, index) => {
+                card.classList.add('card-morph');
+                const targetX = startX + (index * (cardWidth + gap));
+
+                card.style.width = cardWidth + 'px';
+                card.style.height = cardHeight + 'px';
+                card.style.left = targetX + 'px';
+                card.style.top = centerY + 'px';
+            });
+        }
+
+        function resetMorph() {
+            if (!morphActive) return;
+            morphActive = false;
+
+            const cards = document.querySelectorAll('.card');
+            const backdrop = document.getElementById('morphBackdrop');
+
+            backdrop.classList.remove('active');
+
+            cards.forEach((card, index) => {
+                const original = originalPositions[index];
+
+                card.style.width = original.width + 'px';
+                card.style.height = original.height + 'px';
+                card.style.left = original.left + 'px';
+                card.style.top = original.top + 'px';
+
+                setTimeout(() => {
+                    card.classList.remove('card-morph');
+                    card.style.width = '';
+                    card.style.height = '';
+                    card.style.left = '';
+                    card.style.top = '';
+                    card.style.animation = ''; // Restore sliding animation
+                }, 800);
+            });
+        }
+
+        // Theme is now handled by ThemeManager - removed duplicate initialization
+
+        // Profile Section Functions
+        let selectedArtworkFile = null;
+        let selectedAvatarFile = null;
+
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            if (section === 'home') {
+                document.getElementById('homeSection').classList.add('active');
+            } else if (section === 'profile') {
+                document.getElementById('profileSection').classList.add('active');
+                loadProfileData();
+            }
+        }
+
+        function switchProfileTab(tab) {
+            document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.profile-tab-content').forEach(c => c.style.display = 'none');
+
+            if (tab === 'edit') {
+                document.querySelector('.profile-tab:nth-child(1)').classList.add('active');
+                document.getElementById('editTab').style.display = 'block';
+            } else if (tab === 'myworks') {
+                document.querySelector('.profile-tab:nth-child(2)').classList.add('active');
+                document.getElementById('myworksTab').style.display = 'block';
+                loadMyArtworks();
+            } else if (tab === 'allworks') {
+                document.querySelector('.profile-tab:nth-child(3)').classList.add('active');
+                document.getElementById('allworksTab').style.display = 'block';
+                loadAllArtworks();
+            }
+        }
+
+        async function loadProfileData() {
+            const walletAddress = window.getCurrentWalletAddress?.();
+            if (!walletAddress) return;
+
+            try {
+                const profile = await window.ArtSoulDB.getProfile(walletAddress);
+                if (profile) {
+                    document.getElementById('profileUsername').value = profile.username || '';
+                    document.getElementById('profileBio').value = profile.bio || '';
+                    document.getElementById('profileTwitter').value = profile.twitter_handle || '';
+                    document.getElementById('profileDiscord').value = profile.discord_username || '';
+                    if (profile.avatar_url) {
+                        document.getElementById('avatarPreview').src = profile.avatar_url;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        async function handleAvatarUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            selectedAvatarFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('avatarPreview').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function saveProfile() {
+            const walletAddress = window.getCurrentWalletAddress?.();
+            if (!walletAddress) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            // Ensure user is authenticated before saving
+            const isAuthenticated = await window.ensureAuthenticated();
+            if (!isAuthenticated) {
+                return;
+            }
+
+            try {
+                let avatarUrl = document.getElementById('avatarPreview').src;
+
+                if (selectedAvatarFile) {
+                    const fileName = `avatar_${walletAddress}_${Date.now()}.${selectedAvatarFile.name.split('.').pop()}`;
+                    avatarUrl = await window.ArtSoulDB.uploadFile(selectedAvatarFile, fileName);
+                }
+
+                const profileData = {
+                    username: document.getElementById('profileUsername').value,
+                    bio: document.getElementById('profileBio').value,
+                    twitter_handle: document.getElementById('profileTwitter').value,
+                    discord_username: document.getElementById('profileDiscord').value,
+                    avatar_url: avatarUrl
+                };
+
+                await window.ArtSoulDB.updateProfile(walletAddress, profileData);
+                alert('Profile saved successfully!');
+            } catch (error) {
+                console.error('Error saving profile:', error);
+                alert('Error saving profile: ' + error.message);
+            }
+        }
+
+        function handleArtworkSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            selectedArtworkFile = file;
+            const modal = document.getElementById('uploadModal');
+            modal.style.display = 'flex';
+        }
+
+        function closeUploadModal() {
+            const modal = document.getElementById('uploadModal');
+            modal.style.display = 'none';
+            selectedArtworkFile = null;
+            document.getElementById('artworkTitle').value = '';
+            document.getElementById('artworkDescription').value = '';
+            document.getElementById('artworkPrice').value = '';
+        }
+
+        async function uploadArtwork() {
+            const walletAddress = window.getCurrentWalletAddress?.();
+            if (!walletAddress || !selectedArtworkFile) return;
+
+            alert('Homepage quick upload is disabled for public testnet. Please use the Publish Artwork page so on-chain registration stays canonical.');
+            window.location.href = 'upload.html';
+            return;
+
+            const title = document.getElementById('artworkTitle').value;
+            const description = document.getElementById('artworkDescription').value;
+            const price = document.getElementById('artworkPrice').value;
+
+            if (!title || !price) {
+                alert('Please fill in title and price');
+                return;
+            }
+
+            try {
+                const profile = await window.ArtSoulDB.getProfile(walletAddress);
+                if (!profile) {
+                    alert('Profile not found');
+                    return;
+                }
+
+                const fileName = `artwork_${walletAddress}_${Date.now()}.${selectedArtworkFile.name.split('.').pop()}`;
+                const fileUrl = await window.ArtSoulDB.uploadFile(selectedArtworkFile, fileName);
+
+                const fileType = selectedArtworkFile.type.startsWith('image/') ? 'image' :
+                                selectedArtworkFile.type.startsWith('video/') ? 'video' :
+                                selectedArtworkFile.type.startsWith('audio/') ? 'music' : 'gif';
+
+                const artwork = await window.ArtSoulDB.createArtwork({
+                    title,
+                    description,
+                    file_url: fileUrl,
+                    file_type: fileType,
+                    creator_id: profile.id,
+                    creator_estimated_value: parseFloat(price)
+                });
+
+                await window.ArtSoulDB.createAuction(artwork.id);
+
+                closeUploadModal();
+                alert('Artwork published successfully!');
+                loadMyArtworks();
+            } catch (error) {
+                console.error('Error uploading artwork:', error);
+                alert('Error uploading artwork: ' + error.message);
+            }
+        }
+
+        async function loadMyArtworks() {
+            const walletAddress = window.getCurrentWalletAddress?.();
+            if (!walletAddress) return;
+
+            try {
+                const profile = await window.ArtSoulDB.getProfile(walletAddress);
+                if (!profile) return;
+
+                const artworks = filterPublicDisplayArtworks(await window.ArtSoulDB.getArtworksByCreator(profile.id));
+                renderArtworks(artworks, 'myArtworksGrid');
+            } catch (error) {
+                console.error('Error loading artworks:', error);
+            }
+        }
+
+        async function loadAllArtworks() {
+            try {
+                const artworks = filterPublicDisplayArtworks(await window.ArtSoulDB.getArtworks());
+                renderArtworks(artworks, 'allArtworksGrid');
+            } catch (error) {
+                console.error('Error loading all artworks:', error);
+            }
+        }
+
+        function filterPublicDisplayArtworks(artworks) {
+            if (window.ArtSoulDiscovery?.filterPublicTestnetArtworks) {
+                return window.ArtSoulDiscovery.filterPublicTestnetArtworks(artworks);
+            }
+            return Array.isArray(artworks) ? artworks : [];
+        }
+
+        function renderArtworks(artworks, containerId) {
+            const container = document.getElementById(containerId);
+            if (!artworks || artworks.length === 0) {
+                container.textContent = 'No artworks published yet';
+                container.className = 'text-center opacity-50';
+                return;
+            }
+
+            // Clear container safely
+            container.innerHTML = '';
+
+            // Create elements safely without innerHTML
+            artworks.forEach(art => {
+                const hasSafeMedia = window.ArtSoulSecurity?.isValidStorageUrl(art.file_url);
+
+                // Validate URL for legacy rows. V4.1 rows may intentionally render a protocol placeholder.
+                if (!hasSafeMedia && art.source !== 'v41_projection') {
+                    console.warn('Invalid artwork URL:', art.id);
+                    return;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'artwork-card';
+                card.onclick = () => viewArtwork(art.id);
+
+                // Image container with media type detection
+                const imgContainer = document.createElement('div');
+                imgContainer.style.cssText = 'position: relative; width: 100%; aspect-ratio: 1;';
+
+                const fileType = art.file_type?.toLowerCase() || '';
+
+                // Fallback: detect file type from URL if file_type is not set
+                let detectedType = fileType;
+                if (!detectedType && art.file_url) {
+                    const url = art.file_url.toLowerCase();
+                    if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('.ogg')) {
+                        detectedType = 'video';
+                    } else if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg')) {
+                        detectedType = 'music';
+                    }
+                }
+
+                const isVideo = detectedType === 'video' || ['mp4', 'webm', 'mov', 'ogg'].includes(detectedType);
+                const isAudio = detectedType === 'audio' || detectedType === 'music' || ['mp3', 'wav', 'ogg', 'aac', 'm4a'].includes(detectedType) ||
+                               (!detectedType && art.file_url && (art.file_url.toLowerCase().includes('.mp3') || art.file_url.toLowerCase().includes('.wav') || art.file_url.toLowerCase().includes('.ogg') || art.file_url.toLowerCase().includes('.aac')));
+
+                if (isVideo && hasSafeMedia) {
+                    const video = document.createElement('video');
+                    video.src = art.file_url;
+                    video.className = 'artwork-image';
+                    video.setAttribute('preload', 'metadata');
+                    video.setAttribute('playsinline', '');
+                    video.muted = true;
+                    video.style.cssText = 'pointer-events: none;';
+
+                    // Add error handler for video
+                    video.onerror = () => {
+                        console.warn('Video failed to load:', art.file_url);
+                    };
+
+                    imgContainer.appendChild(video);
+                } else if (isAudio && hasSafeMedia) {
+                    const audioPreview = document.createElement('div');
+                    audioPreview.style.cssText = 'width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(6, 182, 212, 0.3)); position: relative;';
+
+                    const logoImg = document.createElement('img');
+                    logoImg.src = 'ARTSOULlogo.png';
+                    logoImg.alt = 'Music';
+                    logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 3s linear infinite; animation-play-state: paused; margin-bottom: 1rem;';
+
+                    // Add error handler for logo
+                    logoImg.onerror = () => {
+                        console.warn('Logo failed to load');
+                        logoImg.style.display = 'none';
+                    };
+
+                    audioPreview.appendChild(logoImg);
+
+                    const audioPlayer = document.createElement('audio');
+                    audioPlayer.src = art.file_url;
+                    audioPlayer.controls = true;
+                    audioPlayer.crossOrigin = 'anonymous';
+                    audioPlayer.style.cssText = 'width: 90%; max-width: 300px; position: relative; z-index: 10;';
+
+                    // Prevent card click when interacting with audio controls
+                    audioPlayer.addEventListener('click', (e) => e.stopPropagation());
+                    audioPlayer.addEventListener('touchstart', (e) => e.stopPropagation());
+
+                    // Control logo spin with play state
+                    audioPlayer.onplay = () => {
+                        logoImg.style.animationPlayState = 'running';
+                    };
+                    audioPlayer.onpause = () => {
+                        logoImg.style.animationPlayState = 'paused';
+                    };
+                    audioPlayer.onended = () => {
+                        logoImg.style.animationPlayState = 'paused';
+                    };
+
+                    // Add error handler for audio
+                    audioPlayer.onerror = () => {
+                        console.warn('Audio failed to load:', art.file_url);
+                    };
+
+                    audioPreview.appendChild(audioPlayer);
+
+                    imgContainer.appendChild(audioPreview);
+                } else if (hasSafeMedia) {
+                    const img = document.createElement('img');
+                    img.src = art.file_url;
+                    img.alt = window.ArtSoulSecurity?.sanitizeText(art.title) || 'Artwork';
+                    img.className = 'artwork-image';
+                    imgContainer.appendChild(img);
+                } else {
+                    const placeholder = document.createElement('div');
+                    placeholder.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--c-bg);';
+                    const text = document.createElement('p');
+                    text.className = 'text-2xl font-light opacity-30';
+                    text.textContent = 'Protocol Artwork';
+                    placeholder.appendChild(text);
+                    imgContainer.appendChild(placeholder);
+                }
+
+                const info = document.createElement('div');
+                info.className = 'artwork-info';
+
+                const title = document.createElement('h4');
+                title.className = 'font-medium mb-1';
+                title.textContent = art.title;
+
+                const desc = document.createElement('p');
+                desc.className = 'text-sm opacity-70 mb-2';
+                desc.textContent = art.description || '';
+
+                const price = document.createElement('p');
+                price.className = 'text-sm font-medium';
+                price.textContent = `${art.creator_estimated_value} ETH`;
+
+                // Vote count
+                const voteCount = document.createElement('p');
+                voteCount.className = 'text-xs opacity-60 mt-1';
+                voteCount.textContent = `${art.vote_count || 0} votes`;
+
+                info.appendChild(title);
+                info.appendChild(desc);
+                info.appendChild(price);
+                info.appendChild(voteCount);
+                card.appendChild(imgContainer);
+                card.appendChild(info);
+                container.appendChild(card);
+            });
+        }
+
+        function viewArtwork(id) {
+            window.location.href = `artwork.html?id=${id}`;
+        }
+
+        function normalizeProtocolArtworkId(value) {
+            const text = String(value || '').trim();
+            if (!text || text === '0' || text.toLowerCase() === 'none') return '';
+            return /^\d+$/.test(text) ? text : '';
+        }
+
+        function resolvePendingArtworkChainId(art = {}) {
+            const rawChainId = art.chain_id || art.chainId || art.network_chain_id;
+            const parsed = Number(rawChainId);
+            if (parsed === 84532 || parsed === 11155111) {
+                return parsed;
+            }
+
+            const network = String(art.network || art.chain || art.chain_name || '').toLowerCase();
+            if (network.includes('base')) return 84532;
+            if (network.includes('sepolia')) return 11155111;
+            return 84532;
+        }
+
+        function canonicalV41IdForPendingArtwork(art = {}) {
+            const artworkId = normalizeProtocolArtworkId(art.artwork_id);
+            const chainId = resolvePendingArtworkChainId(art);
+            return art.register_tx_hash && chainId && artworkId ? `v41:${chainId}:${artworkId}` : '';
+        }
+
+        function artworkIdentityKeys(art = {}) {
+            const keys = new Set();
+            const add = (value) => {
+                const text = String(value || '').trim();
+                if (text) keys.add(text.toLowerCase());
+            };
+
+            add(art.register_tx_hash);
+            add(art.transaction_hash);
+            add(art.canonical_v41_id);
+            if (String(art.id || '').startsWith('v41:')) {
+                add(art.id);
+            }
+
+            const chainId = resolvePendingArtworkChainId(art);
+            const artworkId = normalizeProtocolArtworkId(art.artwork_id || art.blockchain_id);
+            if (chainId && artworkId) {
+                add(`v41:${chainId}:${artworkId}`);
+                add(`${chainId}:${artworkId}`);
+            }
+
+            return keys;
+        }
+
+        function hasAnyArtworkIdentity(art, indexedKeys) {
+            return [...artworkIdentityKeys(art)].some(key => indexedKeys.has(key));
+        }
+
+        function hasConfirmedRegisterTx(art) {
+            return Boolean(String(art?.register_tx_hash || '').trim());
+        }
+
+        function isBadPendingArtwork(art = {}) {
+            if (hasConfirmedRegisterTx(art)) return false;
+            const state = [
+                art.status,
+                art.stage,
+                art.error_code,
+                art.error_message
+            ].join(' ').toLowerCase();
+            return !hasConfirmedRegisterTx(art) ||
+                state.includes('fail') ||
+                state.includes('error') ||
+                state.includes('reject') ||
+                state.includes('revert') ||
+                state.includes('nonce');
+        }
+
+        window.ArtSoulCleanupBadPendingCards = function ArtSoulCleanupBadPendingCards() {
+            try {
+                const key = 'artsoul_pending_indexer_artworks';
+                const current = JSON.parse(localStorage.getItem(key) || '[]');
+                const list = Array.isArray(current) ? current : [];
+                const kept = list.filter(art => !isBadPendingArtwork(art));
+                localStorage.setItem(key, JSON.stringify(kept));
+                const result = { removed: list.length - kept.length, kept: kept.length };
+                console.info('ArtSoul pending-card cleanup complete:', result);
+                return result;
+            } catch (error) {
+                console.warn('ArtSoul pending-card cleanup failed:', error);
+                return { removed: 0, kept: 0, error: error.message };
+            }
+        };
+
+        function hasRenderableArtworkMedia(art) {
+            const mediaUrl = art?.file_url || art?.media_url || art?.image_url || art?.image;
+            const hasSafeMedia = Boolean(mediaUrl) && (
+                typeof window.ArtSoulSecurity?.isValidStorageUrl !== 'function' ||
+                window.ArtSoulSecurity.isValidStorageUrl(mediaUrl)
+            );
+            const placeholdersEnabled = (() => {
+                try {
+                    const params = new URLSearchParams(window.location.search || '');
+                    return params.get('showPlaceholders') === '1' ||
+                        params.get('debugProtocol') === '1' ||
+                        localStorage.getItem('artsoul_show_protocol_placeholders') === 'true';
+                } catch {
+                    return false;
+                }
+            })();
+
+            return Boolean(
+                art &&
+                art.id &&
+                art.title &&
+                (
+                    hasSafeMedia ||
+                    (art.source === 'v41_projection' && placeholdersEnabled)
+                )
+            );
+        }
+
+        function readPendingIndexerArtworks() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem('artsoul_pending_indexer_artworks') || '[]');
+                if (!Array.isArray(parsed)) return [];
+                return parsed
+                    .filter(art => art?.status === 'pending_indexer')
+                    .filter(hasConfirmedRegisterTx)
+                    .filter(art => Boolean(art.auction_tx_hash))
+                    .filter(hasRenderableArtworkMedia)
+                    .map(art => {
+                        const canonicalV41Id = canonicalV41IdForPendingArtwork(art);
+                        const mediaUrl = art.file_url || art.media_url || '';
+                        const missingIndexedMedia = Boolean(canonicalV41Id && !mediaUrl);
+                        const auctionConfirmed = Boolean(art.auction_tx_hash);
+
+                        return {
+                            ...art,
+                            id: canonicalV41Id || art.id || `pending:${art.temp_id}`,
+                            pending_id: art.id || `pending:${art.temp_id}`,
+                            canonical_v41_id: canonicalV41Id,
+                            source: 'pending_indexer',
+                            status: canonicalV41Id ? 'indexed_missing_metadata' : 'pending_indexer',
+                            lifecycle_label: missingIndexedMedia ? 'Metadata unavailable' : 'Finalizing...',
+                            lifecycle_message: missingIndexedMedia
+                                ? 'This artwork is on-chain, but its media is unavailable.'
+                                : auctionConfirmed
+                                ? 'Registration and auction are confirmed. Public display will update shortly.'
+                                : 'Submitted on-chain. Public display will update shortly.',
+                            discovery_lifecycle: {
+                                key: canonicalV41Id ? 'indexed_missing_metadata' : 'pending_indexer',
+                                label: missingIndexedMedia ? 'Metadata unavailable' : 'Finalizing...',
+                                isLiveAuction: Boolean(art.auction_tx_hash),
+                                isMarketplace: false,
+                                isCollection: false
+                            }
+                        };
+                    });
+            } catch {
+                return [];
+            }
+        }
+
+        function showMediaUnavailable(container, message = 'Media unavailable') {
+            if (!container) return;
+            container.innerHTML = '';
+            container.className = `${container.className || ''} flex items-center justify-center bg-black`.trim();
+            const text = document.createElement('p');
+            text.className = 'text-lg font-light opacity-40 text-center px-4';
+            text.textContent = message;
+            container.appendChild(text);
+        }
+
+        function showAwaitingLiveTestnetArtworks(container) {
+            if (!container) return;
+            container.innerHTML = '';
+            container.className = 'text-center py-20';
+
+            const title = document.createElement('div');
+            title.className = 'text-xl opacity-50';
+            title.textContent = 'Awaiting live testnet artworks';
+
+            const detail = document.createElement('div');
+            detail.className = 'text-sm opacity-30 mt-2';
+            detail.textContent = 'Media-backed protocol artworks will appear here after creators publish them.';
+
+            container.appendChild(title);
+            container.appendChild(detail);
+        }
+
+        // Load artworks on page load
+        async function loadHomeArtworks() {
+            const gallery = document.getElementById('artworkGallery');
+            if (!gallery) return;
+
+            try {
+                let artworks = await window.ArtSoulDB.getPublicProjectionArtworks({ limit: 100 });
+                const indexedKeys = new Set();
+                (artworks || []).forEach(art => {
+                    artworkIdentityKeys(art).forEach(key => indexedKeys.add(key));
+                });
+                const pendingArtworks = readPendingIndexerArtworks()
+                    .filter(art => !hasAnyArtworkIdentity(art, indexedKeys))
+                    .filter(art => !window.ArtSoulArtworkCard?.isHidden?.(art));
+                artworks = [...pendingArtworks, ...(artworks || [])]
+                    .filter(art => art?.source === 'v41_projection' || art?.source === 'pending_indexer')
+                    .filter(art => !window.ArtSoulArtworkCard?.isHidden?.(art));
+
+                // Homepage = top works by Discovery Rank (canon). Render ONLY real
+                // works that have data — no curated "Awaiting…" placeholder slots.
+                const spotlight = window.ArtSoulDiscovery?.buildHomepageSpotlights(artworks, 12);
+                const rankedWorks = (spotlight?.ranked && spotlight.ranked.length
+                    ? spotlight.ranked
+                    : artworks.filter(hasRenderableArtworkMedia)
+                ).slice(0, 12);
+                const slots = rankedWorks.map(artwork => ({
+                    label: 'Discovery Spotlight',
+                    reason: window.ArtSoulDiscovery?.classifyLifecycle?.(artwork)?.label || 'Community signal',
+                    artwork
+                }));
+
+                gallery.innerHTML = '';
+
+                if (slots.length === 0) {
+                    showAwaitingLiveTestnetArtworks(gallery);
+                    return;
+                }
+
+                for (const slot of slots) {
+                        const art = slot.artwork;
+                        const sharedCard = window.ArtSoulArtworkCard?.createCardElement?.(art, {
+                            slotLabel: slot.label,
+                            reason: slot.reason
+                        });
+                        if (sharedCard) {
+                            gallery.appendChild(sharedCard);
+                            continue;
+                        }
+                        const socialSignals = window.ArtSoulDiscovery?.getSocialSignals?.(art) || {
+                            likes: art.vote_count || 0,
+                            wouldBuy: 0,
+                            watching: 0
+                        };
+                        const lifecycle = window.ArtSoulDiscovery?.classifyLifecycle?.(art);
+
+                        const mediaUrl = art.file_url || art.media_url || '';
+                        const hasSafeMedia = Boolean(mediaUrl) && (
+                            typeof window.ArtSoulSecurity?.isValidStorageUrl !== 'function' ||
+                            window.ArtSoulSecurity.isValidStorageUrl(mediaUrl)
+                        );
+
+                        if (!hasSafeMedia && art.source !== 'v41_projection') {
+                            console.warn('Invalid artwork URL:', art.id);
+                            continue;
+                        }
+
+                        const canonicalV41Id = art.canonical_v41_id || canonicalV41IdForPendingArtwork(art);
+                        const card = document.createElement(art.source === 'pending_indexer' && !canonicalV41Id ? 'div' : 'a');
+                        if (art.source !== 'pending_indexer' || canonicalV41Id) {
+                            card.href = `artwork.html?id=${canonicalV41Id || art.id}`;
+                        }
+                        card.className = 'card rounded-xl overflow-hidden';
+
+                        const imageContainer = document.createElement('div');
+                        imageContainer.className = 'aspect-square overflow-hidden bg-black relative';
+
+                        if (mediaUrl && hasSafeMedia) {
+                            const fileType = art.file_type?.toLowerCase() || '';
+
+                            // Check if video
+                            if (fileType === 'video' || ['mp4', 'webm', 'ogg', 'mov'].includes(fileType)) {
+                                const video = document.createElement('video');
+                                video.src = art.file_url;
+                                video.className = 'w-full h-full object-contain';
+                                video.controls = true;
+                                video.preload = 'metadata';
+                                video.onclick = (e) => e.stopPropagation();
+                                video.onerror = () => {
+                                    console.warn('Video failed to load:', art.file_url);
+                                    showMediaUnavailable(imageContainer);
+                                };
+                                imageContainer.appendChild(video);
+                            }
+                            // Check if audio/music
+                            else if (fileType === 'audio' || fileType === 'music' || ['mp3', 'wav', 'ogg', 'aac', 'm4a'].includes(fileType)) {
+                                // Show spinning logo with audio player
+                                const audioContainer = document.createElement('div');
+                                audioContainer.className = 'w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black';
+
+                                const logoImg = document.createElement('img');
+                                logoImg.src = 'ARTSOULlogo.png';
+                                logoImg.alt = 'Music';
+                                logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 8s linear infinite; margin-bottom: 1rem; transition: animation-duration 0.3s;';
+                                logoImg.onerror = function() {
+                                    console.warn('Failed to load logo for music preview');
+                                    this.style.display = 'none';
+                                };
+
+                                const audio = document.createElement('audio');
+                                audio.src = art.file_url;
+                                audio.className = 'w-full px-4';
+                                audio.controls = true;
+                                audio.crossOrigin = 'anonymous';
+                                audio.preload = 'metadata';
+                                audio.onclick = (e) => e.stopPropagation();
+
+                                // Make logo spin faster when playing
+                                audio.onplay = () => {
+                                    logoImg.style.animation = 'spin 2s linear infinite';
+                                };
+                                audio.onpause = () => {
+                                    logoImg.style.animation = 'spin 8s linear infinite';
+                                };
+                                audio.onended = () => {
+                                    logoImg.style.animation = 'spin 8s linear infinite';
+                                };
+
+                                audio.onerror = function() {
+                                    console.error('Failed to load audio:', art.file_url);
+                                    showMediaUnavailable(imageContainer);
+                                };
+
+                                audioContainer.appendChild(logoImg);
+                                audioContainer.appendChild(audio);
+                                imageContainer.appendChild(audioContainer);
+                            }
+                            // Default: image
+                            else {
+                                const img = document.createElement('img');
+                                img.src = art.file_url;
+                                img.alt = window.ArtSoulSecurity?.sanitizeText(art.title) || 'Artwork';
+                                img.className = 'w-full h-full object-contain';
+                                img.onerror = () => {
+                                    console.warn('Image failed to load:', art.file_url);
+                                    showMediaUnavailable(imageContainer);
+                                };
+                                imageContainer.appendChild(img);
+                            }
+                        } else {
+                            const placeholder = document.createElement('div');
+                            placeholder.className = 'w-full h-full flex items-center justify-center';
+                            placeholder.style.background = 'var(--c-bg)';
+                            const text = document.createElement('p');
+                            text.className = 'text-2xl font-light opacity-30 text-center px-4';
+                            text.textContent = 'Metadata unavailable';
+                            placeholder.appendChild(text);
+                            imageContainer.appendChild(placeholder);
+                        }
+
+                        const info = document.createElement('div');
+                        info.className = 'p-4';
+
+                        const slotLabel = document.createElement('p');
+                        slotLabel.className = 'text-xs uppercase tracking-wide opacity-60 mb-1';
+                        slotLabel.textContent = art.source === 'pending_indexer'
+                            ? (art.lifecycle_label || (art.canonical_v41_id ? 'Metadata unavailable' : 'Finalizing...'))
+                            : slot.label;
+
+                        const title = document.createElement('h3');
+                        title.className = 'font-semibold text-lg mb-1 truncate';
+                        title.textContent = art.title;
+
+                        const desc = document.createElement('p');
+                        desc.className = 'text-sm opacity-70 mb-2 line-clamp-2';
+                        desc.textContent = art.description || '';
+
+                        const price = document.createElement('p');
+                        price.className = 'text-sm font-bold';
+                        price.textContent = `${art.creator_value || '0'} ETH`;
+
+                        const signalLine = document.createElement('p');
+                        signalLine.className = 'text-xs opacity-60 mt-2 truncate';
+                        if (art.source === 'pending_indexer') {
+                            signalLine.textContent = 'Finalizing...';
+                        } else {
+                            const parts = [];
+                            if (socialSignals.likes) parts.push(`${socialSignals.likes} ♥`);
+                            if (socialSignals.wouldBuy) parts.push(`${socialSignals.wouldBuy} would buy`);
+                            if (socialSignals.watching) parts.push(`${socialSignals.watching} watching`);
+                            signalLine.textContent = parts.length
+                                ? parts.join('  ·  ')
+                                : (lifecycle?.label || slot.reason);
+                        }
+
+                        info.appendChild(slotLabel);
+                        info.appendChild(title);
+                        info.appendChild(desc);
+                        info.appendChild(price);
+                        info.appendChild(signalLine);
+                        card.appendChild(imageContainer);
+                        card.appendChild(info);
+                        gallery.appendChild(card);
+                }
+
+            } catch (error) {
+                console.error('Failed to load artworks:', error);
+                showAwaitingLiveTestnetArtworks(gallery);
+            }
+        }
+
+        // Load artworks when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadHomeArtworks);
+        } else {
+            loadHomeArtworks();
+        }
+
+        window.showSection = showSection;
+    </script>
+
+    <!-- Theme Validation (Development Mode) -->
+    <script>
+        // Run theme validation after page load
+        if (window.ThemeManager && window.ThemeValidator) {
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    const validator = new ThemeValidator(window.ThemeManager);
+                    const passed = validator.validate();
+
+                    if (!passed) {
+                        console.warn('🔍 Theme validation failed. Run validator.autoFix() to fix issues.');
+                        // Store validator for manual inspection
+                        window.themeValidator = validator;
+                    }
+                }, 1000); // Wait 1s for all components to load
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+// Services Index - Initialize and export all services
+// This file sets up the service layer for the entire application
+
+import AuctionService from './auction-service.js';
+import FileService from './file-service.js';
+import ArtworkService from './artwork-service.js';
+
+/**
+ * Initialize all services
+ * Call this after contracts and supabase are initialized
+ */
+function initializeServices() {
+    console.log(' Initializing services...');
+
+    // Check dependencies
+    if (!window.ArtSoulContracts) {
+        console.error('ArtSoulContracts not found. Load contracts-integration.js first.');
+        return false;
+    }
+
+    if (!window.ArtSoulDB) {
+        console.error('ArtSoulDB not found. Load supabase-client.js first.');
+        return false;
+    }
+
+    try {
+        // Initialize FileService (no dependencies)
+        window.FileService = new FileService();
+        console.log('FileService initialized');
+
+        // Initialize AuctionService (depends on contracts)
+        window.AuctionService = new AuctionService(window.ArtSoulContracts);
+        console.log('AuctionService initialized');
+
+        // Initialize ArtworkService (depends on supabase and auction service)
+        window.ArtworkService = new ArtworkService(
+            window.ArtSoulDB,
+            window.AuctionService
+        );
+        console.log('ArtworkService initialized');
+
+        console.log('All services initialized successfully');
+        return true;
+    } catch (error) {
+        console.error('Failed to initialize services:', error);
+        return false;
+    }
+}
+
+// Auto-initialize when DOM is ready
+if (typeof window !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wait a bit for other scripts to load
+            setTimeout(initializeServices, 100);
+        });
+    } else {
+        // DOM already loaded
+        setTimeout(initializeServices, 100);
+    }
+}
+
+// Export for manual initialization if needed
+export { initializeServices, AuctionService, FileService, ArtworkService };

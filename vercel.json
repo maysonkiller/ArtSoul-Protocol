@@ -1,0 +1,40 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/auth/:route*",
+      "destination": "/api/[...route]?route=auth/:route*"
+    },
+    {
+      "source": "/api/discovery/:route*",
+      "destination": "/api/[...route]?route=discovery/:route*"
+    },
+    {
+      "source": "/api/public/:route*",
+      "destination": "/api/[...route]?route=public/:route*"
+    },
+    {
+      "source": "/api/upload/:route*",
+      "destination": "/api/[...route]?route=upload/:route*"
+    },
+    {
+      "source": "/api/functions/:route*",
+      "destination": "/api/[...route]?route=functions/:route*"
+    },
+    {
+      "source": "/api/ai/:route*",
+      "destination": "/api/[...route]?route=ai/:route*"
+    },
+    {
+      "source": "/api/profile",
+      "destination": "/api/[...route]?route=profile"
+    },
+    {
+      "source": "/api/artworks",
+      "destination": "/api/[...route]?route=artworks"
+    },
+    {
+      "source": "/api/auctions",
+      "destination": "/api/[...route]?route=auctions"
+    }
+  ]
+}

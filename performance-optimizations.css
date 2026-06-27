@@ -1,0 +1,203 @@
+/* Performance Optimizations */
+/* Improves page load speed and reduces lag */
+
+/* ===================================
+   1. LAZY LOADING IMAGES/VIDEOS
+   =================================== */
+
+/* Placeholder while loading */
+img[loading="lazy"] {
+    background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ===================================
+   2. OPTIMIZE ANIMATIONS
+   =================================== */
+
+/* Use GPU acceleration only for an explicit animation class. */
+.animate-fadeIn {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Optimize Future mode animations */
+.future .neon-glow,
+.future .neon-border {
+    will-change: box-shadow, text-shadow;
+    transform: translateZ(0);
+}
+
+/* Limit animation complexity on mobile */
+@media (max-width: 640px) {
+    /* Disable complex animations on mobile */
+    body.future::before {
+        animation: none !important;
+    }
+
+    /* Simplify hover effects */
+    .gallery-item:hover {
+        transform: translateY(-4px) !important;
+    }
+}
+
+/* ===================================
+   3. DEBOUNCE RAPID INTERACTIONS
+   =================================== */
+
+/* Prevent double-click issues */
+button,
+a,
+[role="button"] {
+    user-select: none;
+}
+
+/* ===================================
+   4. OPTIMIZE RENDERING
+   =================================== */
+
+/* Optimize text rendering */
+body {
+    text-rendering: optimizeSpeed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================================
+   5. REDUCE REPAINTS
+   =================================== */
+
+/* Optimize scrolling */
+* {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ===================================
+   6. OPTIMIZE IMAGES
+   =================================== */
+
+/* Prevent layout shift */
+img,
+video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Keep normal UI imagery smooth; scope crisp rendering to explicit pixel-art assets only. */
+img {
+    image-rendering: auto;
+    -ms-interpolation-mode: bicubic;
+}
+
+.pixel-art,
+img.pixel-art,
+[data-rendering="pixel-art"] {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* ===================================
+   7. REDUCE JAVASCRIPT BLOCKING
+   =================================== */
+
+/* Defer non-critical CSS */
+@media print {
+    /* Print styles won't block rendering */
+}
+
+/* ===================================
+   8. OPTIMIZE GRID LAYOUTS
+   =================================== */
+
+/* Use CSS Grid efficiently */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    contain: layout;
+}
+
+@media (max-width: 640px) {
+    .grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+
+/* ===================================
+   9. OPTIMIZE BACKDROP FILTERS
+   =================================== */
+
+/* Backdrop filters are expensive, optimize them */
+header,
+.modal,
+[class*="backdrop-blur"] {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+@media (max-width: 640px) {
+    /* Reduce blur on mobile for better performance */
+    header,
+    .modal,
+    [class*="backdrop-blur"] {
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+}
+
+/* ===================================
+   10. OPTIMIZE SHADOWS
+   =================================== */
+
+/* Box shadows are expensive; keep the default neutral so theme glows can win. */
+.card,
+.btn-main,
+.btn-secondary {
+    box-shadow: none;
+}
+
+/* Remove shadows on mobile for better performance */
+@media (max-width: 640px) {
+    .card:not(:hover),
+    .btn-main:not(:active),
+    .btn-secondary:not(:active) {
+        box-shadow: none;
+    }
+}
+
+.classic .avatar-dropdown-menu #connectBtn {
+    box-shadow: none !important;
+}
+
+.future .avatar-dropdown-menu #connectBtn {
+    box-shadow: 0 0 14px rgba(var(--c-accent-rgb), 0.28) !important;
+}
+
+/* ===================================
+   12. OPTIMIZE FONTS
+   =================================== */
+
+/* Prevent font loading from blocking render */
+@font-face {
+    font-display: swap;
+}

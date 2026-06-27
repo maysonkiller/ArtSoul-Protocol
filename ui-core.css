@@ -1,0 +1,302 @@
+/* --- ROADMAP & PROFILE STYLES --- */
+
+/* Roadmap Timeline */
+.timeline-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+}
+
+.classic .timeline-line {
+    background: var(--accent-classic);
+}
+
+.future .timeline-line {
+    background: linear-gradient(90deg,
+        var(--accent-future) 0%,
+        var(--neon-purple) 25%,
+        var(--accent-future) 50%,
+        var(--neon-purple) 75%,
+        var(--accent-future) 100%);
+    background-size: 200% 100%;
+    animation: lineGlow 3s linear infinite;
+}
+
+@keyframes lineGlow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+.timeline-dot {
+    position: absolute;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-classic);
+    transform: translateX(-50%);
+    z-index: 2;
+}
+
+.future .timeline-dot {
+    background: var(--accent-future);
+    animation: dotPulse 2s ease-in-out infinite;
+    transform-origin: center center;
+}
+
+@keyframes dotPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--accent-future), 0 0 20px var(--neon-purple);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--accent-future), 0 0 40px var(--neon-purple);
+    }
+}
+
+/* Roadmap Item Animations (Future) */
+.future .relative.mb-12:nth-child(2) { animation: floatItem1 8s ease-in-out infinite; }
+.future .relative.mb-12:nth-child(3) { animation: floatItem2 10s ease-in-out infinite; }
+.future .relative.mb-12:nth-child(4) { animation: floatItem3 12s ease-in-out infinite; }
+.future .relative:nth-child(5) { animation: floatItem4 9s ease-in-out infinite; }
+
+@keyframes floatItem1 {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    25% { transform: translateY(-15px) translateX(10px); }
+    50% { transform: translateY(-8px) translateX(-5px); }
+    75% { transform: translateY(-20px) translateX(8px); }
+}
+
+@keyframes floatItem2 {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    25% { transform: translateY(-12px) translateX(-8px); }
+    50% { transform: translateY(-18px) translateX(12px); }
+    75% { transform: translateY(-5px) translateX(-10px); }
+}
+
+@keyframes floatItem3 {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    25% { transform: translateY(-10px) translateX(15px); }
+    50% { transform: translateY(-22px) translateX(-8px); }
+    75% { transform: translateY(-12px) translateX(10px); }
+}
+
+@keyframes floatItem4 {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    25% { transform: translateY(-18px) translateX(-12px); }
+    50% { transform: translateY(-10px) translateX(15px); }
+    75% { transform: translateY(-15px) translateX(-5px); }
+}
+
+/* Profile Section */
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
+}
+
+.profile-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid;
+}
+
+.classic .profile-tabs {
+    border-color: var(--accent-classic);
+}
+
+.future .profile-tabs {
+    border-color: var(--accent-future);
+}
+
+.profile-tab {
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: inherit;
+    opacity: 0.5;
+    transition: all 0.3s;
+    border-bottom: 2px solid transparent;
+}
+
+.profile-tab.active {
+    opacity: 1;
+}
+
+.classic .profile-tab.active {
+    border-bottom-color: var(--text-classic);
+}
+
+.future .profile-tab.active {
+    border-bottom-color: var(--accent-future);
+}
+
+.profile-card {
+    padding: 2rem;
+    border-radius: 1rem;
+    margin-bottom: 2rem;
+}
+
+.classic .profile-card {
+    background: rgba(232, 227, 213, 0.03);
+    border: 1px solid var(--accent-classic);
+}
+
+.future .profile-card {
+    background: rgba(0, 245, 255, 0.05);
+    border: 1px solid var(--accent-future);
+}
+
+.avatar-upload {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    margin: 0 auto 2rem;
+}
+
+.classic .avatar-upload {
+    border: 2px solid var(--accent-classic);
+}
+
+.future .avatar-upload {
+    border: 2px solid var(--accent-future);
+}
+
+.avatar-upload img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-upload:hover::after {
+    content: 'Change';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    font-size: 0.875rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid;
+    background: transparent;
+    color: inherit;
+    transition: all 0.3s;
+}
+
+.classic .form-control {
+    border-color: var(--accent-classic);
+}
+
+.classic .form-control:focus {
+    outline: none;
+    border-color: var(--text-classic);
+    background: rgba(232, 227, 213, 0.05);
+}
+
+.future .form-control {
+    border-color: var(--accent-future);
+}
+
+.future .form-control:focus {
+    outline: none;
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 15px rgba(191, 0, 255, 0.3);
+}
+
+.artwork-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.artwork-card {
+    border-radius: 0.75rem;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.classic .artwork-card {
+    background: rgba(232, 227, 213, 0.03);
+    border: 1px solid var(--accent-classic);
+}
+
+.classic .artwork-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 10px 30px rgba(169, 221, 211, 0.3);
+}
+
+.future .artwork-card {
+    background: rgba(0, 245, 255, 0.05);
+    border: 1px solid var(--accent-future);
+}
+
+.future .artwork-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 0 20px rgba(0, 245, 255, 0.5);
+}
+
+.artwork-image {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+}
+
+.artwork-info {
+    padding: 1rem;
+}
+
+.upload-area {
+    border: 2px dashed;
+    border-radius: 1rem;
+    padding: 3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.classic .upload-area {
+    border-color: var(--accent-classic);
+    background: rgba(232, 227, 213, 0.03);
+}
+
+.classic .upload-area:hover {
+    border-color: var(--text-classic);
+    background: rgba(232, 227, 213, 0.08);
+}
+
+.future .upload-area {
+    border-color: var(--accent-future);
+    background: rgba(0, 245, 255, 0.05);
+}
+
+.future .upload-area:hover {
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 20px rgba(191, 0, 255, 0.3);
+}

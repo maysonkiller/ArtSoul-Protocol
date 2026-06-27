@@ -1,0 +1,121 @@
+/* ArtSoul - Universal Button Effects for Future Mode */
+/* Apply to all pages: index.html, docs.html, profile.html, upload.html */
+
+/* Neon Pulse Animation */
+@keyframes neonPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--accent-future), 0 0 20px var(--neon-purple);
+        opacity: 1;
+    }
+    50% {
+        box-shadow: 0 0 20px var(--accent-future), 0 0 40px var(--neon-purple);
+        opacity: 0.8;
+    }
+}
+
+/* Glitch Button Animation */
+@keyframes glitchButton {
+    0%, 100% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(2px, -2px); }
+    60% { transform: translate(-2px, -2px); }
+    80% { transform: translate(2px, 2px); }
+}
+
+/* Main Buttons - Future Mode */
+.future .btn-main:hover {
+    animation: neonPulse 0.3s infinite, glitchButton 0.5s ease-in-out;
+    transform: scale(1.05);
+    filter: brightness(1.3);
+}
+
+.future .btn-main:active {
+    animation: glitchButton 0.3s;
+}
+
+/* Secondary Buttons - Future Mode */
+.future .btn-secondary {
+    position: relative;
+    overflow: hidden;
+}
+
+.future .btn-secondary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 245, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+.future .btn-secondary:hover {
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 15px var(--accent-future), 0 0 30px var(--neon-purple);
+    animation: neonPulse 0.3s infinite, glitchButton 0.5s ease-in-out;
+}
+
+.future .btn-secondary:hover::before {
+    left: 100%;
+}
+
+/* Logo Hover Effect - Future Mode */
+.future .logo-link:hover .site-logo {
+    filter: drop-shadow(0 0 18px rgba(0, 245, 255, 0.8)) drop-shadow(0 0 30px rgba(191, 0, 255, 0.6));
+    /* No glitch animation - logo should only levitate smoothly */
+}
+
+/* Network Badge - Future Mode */
+.future .network-badge:hover {
+    animation: neonPulse 0.3s infinite, glitchButton 0.5s ease-in-out;
+    cursor: pointer;
+}
+
+/* Theme Toggle Buttons - Future Mode */
+.future .theme-btn:hover {
+    animation: glitchButton 0.5s ease-in-out;
+    box-shadow: 0 0 10px var(--accent-future);
+}
+
+/* Devnet Banner - Future Mode (neon glow only, no glitch) */
+.future .devnet-banner {
+    transition: all 0.3s ease;
+}
+
+.future .devnet-banner:hover {
+    background: rgba(0, 245, 255, 0.25);
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 15px rgba(0, 245, 255, 0.5), 0 0 30px rgba(191, 0, 255, 0.3);
+    /* No glitch animation */
+}
+
+/* Profile Link/Button - Future Mode */
+.future a[href="profile.html"]:hover,
+.future button[onclick*="profile"]:hover {
+    animation: neonPulse 0.3s infinite, glitchButton 0.5s ease-in-out;
+}
+
+/* All clickable elements in Future mode (except devnet-banner and logo) */
+.future button:hover:not(.devnet-banner):not(.close-button),
+.future a:hover:not(.devnet-banner):not(.logo-link):not(.close-button) {
+    animation: glitchButton 0.5s ease-in-out;
+}
+
+/* Wallet Address Button - Future Mode */
+.future #navButtons button:hover {
+    animation: neonPulse 0.3s infinite, glitchButton 0.5s ease-in-out;
+}
+
+/* Gallery Cards - Future Mode (for profile.html) */
+.future .gallery-item:hover {
+    animation: glitchButton 0.5s ease-in-out;
+    box-shadow: 0 0 15px var(--neon-purple), 0 0 30px var(--neon-purple);
+}
+
+/* Classic Mode - Subtle Effects */
+.classic .btn-main:hover,
+.classic .btn-secondary:hover,
+.classic .logo-link:hover .site-logo {
+    transition: all 0.3s ease;
+}

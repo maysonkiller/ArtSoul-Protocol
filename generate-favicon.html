@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Favicon</title>
+</head>
+<body>
+    <h2>Favicon Generator</h2>
+    <canvas id="canvas" width="128" height="128"></canvas>
+    <br>
+    <button onclick="download()">Download Favicon</button>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Fill with dark background
+        ctx.fillStyle = '#010101';
+        ctx.fillRect(0, 0, 128, 128);
+
+        // Load and draw logo
+        const img = new Image();
+        img.onload = function() {
+            // Calculate size to fit logo with padding
+            const padding = 10;
+            const maxSize = 128 - (padding * 2);
+            const scale = Math.min(maxSize / img.width, maxSize / img.height);
+            const width = img.width * scale;
+            const height = img.height * scale;
+            const x = (128 - width) / 2;
+            const y = (128 - height) / 2;
+
+            ctx.drawImage(img, x, y, width, height);
+        };
+        img.src = 'ARTSOULlogo.png';
+
+        function download() {
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'favicon.png';
+                a.click();
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "artsoul-marketplace",
+  "version": "1.0.0",
+  "description": "NFT Marketplace with AI Liquidity Engine",
+  "scripts": {
+    "dev": "npx serve -l 3000",
+    "start": "npx serve -l 3000"
+  },
+  "keywords": ["nft", "marketplace", "web3"],
+  "author": "ArtSoul Team",
+  "license": "UNLICENSED"
+}

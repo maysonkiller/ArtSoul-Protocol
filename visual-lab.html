@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en" class="classic">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('artsoul_visual_lab_theme') || localStorage.getItem('artsoul_theme') || 'classic';
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+            } catch (error) {
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add('classic');
+            }
+        })();
+    </script>
+    <title>ArtSoul Visual Lab - Homepage Mirror</title>
+    <meta name="robots" content="noindex,nofollow">
+    <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="design-system.css?v=1">
+    <link rel="stylesheet" href="unified-styles.css?v=13">
+    <link rel="stylesheet" href="button-effects.css?v=5">
+    <link rel="stylesheet" href="ai-ui-styles.css?v=1">
+    <link rel="stylesheet" href="simplified-ui.css?v=1">
+    <link rel="stylesheet" href="ui-core.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('artsoul_visual_lab_theme') || localStorage.getItem('artsoul_theme') || 'classic';
+            document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.body.classList.remove('classic', 'future');
+                    document.body.classList.add(theme === 'future' ? 'future' : 'classic', 'visual-lab');
+                });
+            } else {
+                document.body.classList.remove('classic', 'future');
+                    document.body.classList.add(theme === 'future' ? 'future' : 'classic', 'visual-lab');
+            }
+        })();
+    </script>
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+* {
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+        }
+
+        body.classic {
+            background: var(--bg-classic);
+            color: var(--text-classic);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body.future {
+            background: var(--c-bg);
+            color: var(--accent-future);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body.future::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-color: var(--c-bg);
+            background-image:
+                radial-gradient(2px 2px at 20% 30%, white, transparent),
+                radial-gradient(2px 2px at 60% 70%, white, transparent),
+                radial-gradient(1px 1px at 50% 50%, white, transparent),
+                radial-gradient(1px 1px at 80% 10%, white, transparent),
+                radial-gradient(2px 2px at 90% 60%, white, transparent),
+                radial-gradient(1px 1px at 33% 80%, white, transparent),
+                radial-gradient(1px 1px at 15% 90%, white, transparent);
+            background-size: 200% 200%;
+            animation: starsMove 120s linear infinite;
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes starsMove {
+            from { background-position: 0% 0%; }
+            to { background-position: 100% 100%; }
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(12px);
+        }
+
+        .classic header {
+            background: rgba(1, 1, 1, 0.95);
+            border-bottom: 1px solid var(--accent-classic);
+        }
+
+        .future header {
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--accent-future);
+            box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
+        }
+
+        .classic .card {
+            background: rgba(var(--c-accent-rgb), 0.05);
+            border: 1px solid var(--accent-classic);
+        }
+
+        .future .card {
+            background: rgba(var(--c-accent-rgb), 0.05);
+            border: 1px solid var(--accent-future);
+            backdrop-filter: blur(10px);
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0.75rem;
+            max-width: 1400px;
+            margin: 0 auto 200px;
+        }
+
+        .gallery .card .aspect-square {
+            aspect-ratio: 1;
+            width: 100%;
+        }
+
+        .artwork-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .site-logo {
+            height: 72px;
+            width: auto;
+            display: block;
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
+
+        .classic .site-logo {
+            filter: drop-shadow(0 0 8px rgba(var(--c-accent-rgb), 0.4));
+        }
+
+        .future .site-logo {
+            filter: drop-shadow(0 0 12px rgba(var(--c-accent-rgb), 0.6)) drop-shadow(0 0 20px rgba(var(--c-accent-2-rgb), 0.4));
+        }
+.devnet-banner {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0.68rem 1.65rem;
+            border-radius: 9999px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            letter-spacing: 0;
+            transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .classic .devnet-banner {
+            background: var(--c-bg);
+            border: 1px solid var(--c-accent);
+            color: var(--c-accent);
+            box-shadow: none;
+        }
+
+        .future .devnet-banner {
+            background:
+                linear-gradient(#020611, #020611) padding-box,
+                linear-gradient(110deg, var(--c-accent), var(--c-accent-2), var(--c-accent)) border-box;
+            border: 1px solid transparent;
+            color: var(--c-accent);
+            box-shadow: 0 0 18px rgba(var(--c-accent-rgb), 0.22), inset 0 0 18px rgba(var(--c-accent-2-rgb), 0.12);
+        }
+
+        .future .devnet-banner:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.15);
+        }
+
+        .classic .devnet-banner:hover {
+            transform: none;
+            filter: none;
+        }
+
+        .visual-lab .lab-toolbar {
+            position: relative;
+            z-index: 80;
+            border-bottom: 1px solid rgba(var(--c-accent-rgb), 0.28);
+            background: rgba(0, 0, 0, 0.88);
+            backdrop-filter: blur(12px);
+        }
+
+        .visual-lab.future .lab-toolbar {
+            border-color: rgba(var(--c-accent-rgb), 0.3);
+            box-shadow: 0 0 18px rgba(var(--c-accent-rgb), 0.12);
+        }
+
+        .visual-lab .lab-toolbar-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .visual-lab .lab-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+            line-height: 1.35;
+        }
+
+        .visual-lab .lab-title strong {
+            display: block;
+            font-size: 1rem;
+        }
+
+        .visual-lab .lab-title span {
+            display: block;
+            opacity: 0.65;
+        }
+
+        .visual-lab .lab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 2rem;
+            padding: 0 0.75rem;
+            border: 1px solid currentColor;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .visual-lab .lab-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .visual-lab .lab-control-group {
+            display: inline-flex;
+            padding: 0.25rem;
+            gap: 0.25rem;
+            border: 1px solid currentColor;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .visual-lab .lab-control-btn {
+            min-height: 2rem;
+            padding: 0 0.75rem;
+            border: 0;
+            border-radius: 9999px;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .visual-lab .lab-control-btn[aria-pressed="true"] {
+            background: currentColor;
+            box-shadow: 0 0 14px rgba(var(--c-accent-rgb), 0.22);
+        }
+
+        .visual-lab.classic .lab-control-btn[aria-pressed="true"] {
+            color: var(--c-bg);
+        }
+
+        .visual-lab.future .lab-control-btn[aria-pressed="true"] {
+            color: var(--c-bg);
+            box-shadow: 0 0 16px rgba(var(--c-accent-rgb), 0.35);
+        }
+
+        .visual-lab .lab-control-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .visual-lab .lab-header-compact header .container {
+            padding-top: 0.65rem;
+            padding-bottom: 0.65rem;
+        }
+
+        .visual-lab .lab-header-compact .site-logo {
+            height: 56px;
+        }
+
+        .visual-lab .lab-banner-compact .devnet-banner {
+            min-height: 34px;
+            padding: 0.42rem 1rem;
+            font-size: 0.75rem;
+        }
+
+        .visual-lab .avatar-dropdown-container {
+            position: relative;
+        }
+
+        .visual-lab .avatar-button {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            background: transparent;
+            color: inherit;
+        }
+
+        .visual-lab.classic .avatar-button {
+            border-color: var(--c-accent);
+            box-shadow: none;
+        }
+
+        .visual-lab.future .avatar-button {
+            border-color: var(--c-accent);
+            box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.6), 0 0 40px rgba(var(--c-accent-2-rgb), 0.4);
+        }
+
+        .visual-lab .avatar-button img {
+            width: 40px;
+            height: 40px;
+            border-radius: 9999px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .visual-lab .avatar-info {
+            text-align: left;
+        }
+
+        .visual-lab .dropdown-arrow {
+            transition: transform 0.3s;
+            flex-shrink: 0;
+        }
+
+        .visual-lab .avatar-dropdown-container.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .visual-lab .avatar-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            right: 0;
+            min-width: 240px;
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 10002;
+        }
+
+        .visual-lab .avatar-dropdown-container.open .avatar-dropdown-menu {
+            display: block;
+        }
+
+        .visual-lab.classic .avatar-dropdown-menu {
+            background: #1a1a1a;
+            border: 1px solid var(--c-accent);
+        }
+
+        .visual-lab.future .avatar-dropdown-menu {
+            background: rgba(0, 20, 40, 0.95);
+            border: 1px solid rgba(var(--c-accent-rgb), 0.3);
+            box-shadow: 0 0 30px rgba(var(--c-accent-rgb), 0.2);
+        }
+
+        .visual-lab .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: inherit;
+            text-align: left;
+            text-decoration: none;
+        }
+
+        .visual-lab.classic .dropdown-item:hover {
+            background: rgba(var(--c-accent-rgb), 0.1);
+        }
+
+        .visual-lab.future .dropdown-item:hover {
+            background: rgba(var(--c-accent-rgb), 0.1);
+            box-shadow: 0 0 10px rgba(var(--c-accent-rgb), 0.3);
+        }
+
+        .visual-lab .lab-nav-divider {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 0.25rem 0;
+        }
+
+        .visual-lab .lab-spotlight-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .visual-lab .lab-spotlight-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .visual-lab .lab-artwork-preview {
+            background:
+                linear-gradient(135deg, rgba(var(--c-accent-rgb), 0.22), transparent 48%),
+                linear-gradient(225deg, rgba(255, 255, 255, 0.07), transparent 55%),
+                var(--c-bg);
+        }
+
+        .visual-lab.future .lab-artwork-preview {
+            background:
+                linear-gradient(135deg, rgba(var(--c-accent-rgb), 0.26), transparent 48%),
+                linear-gradient(225deg, rgba(var(--c-accent-2-rgb), 0.22), transparent 55%),
+                var(--c-bg);
+        }
+
+        .visual-lab .lab-card-pattern {
+            position: absolute;
+            inset: 15%;
+            border: 1px solid currentColor;
+            opacity: 0.22;
+            transform: rotate(-8deg);
+        }
+
+        .visual-lab .lab-card-pattern::before {
+            content: '';
+            position: absolute;
+            inset: 16%;
+            border: 1px solid currentColor;
+        }
+
+        .visual-lab .lab-layout-compact .gallery {
+            gap: 0.5rem;
+            margin-bottom: 120px;
+        }
+
+        .visual-lab .lab-layout-compact .lab-card-copy {
+            padding: 0.75rem;
+        }
+
+        .visual-lab .lab-layout-compact .lab-card-copy .text-lg {
+            font-size: 0.95rem;
+        }
+
+        .visual-lab .lab-layout-premium .gallery {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(1),
+        .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(4) {
+            grid-column: span 2;
+        }
+
+        .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(1) .aspect-square,
+        .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(4) .aspect-square {
+            aspect-ratio: 2 / 1;
+        }
+
+        .visual-lab .lab-only-note {
+            display: inline-flex;
+            margin-top: 1rem;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border: 1px solid currentColor;
+            border-radius: 9999px;
+            padding: 0.45rem 0.9rem;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 1024px) {
+            .gallery,
+            .visual-lab .lab-layout-premium .gallery {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .site-logo {
+                height: 56px;
+            }
+
+            .devnet-banner {
+                font-size: 0.75rem;
+                padding: 0.5rem 1rem;
+                min-height: 40px;
+            }
+
+            .gallery,
+            .visual-lab .lab-layout-premium .gallery {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(1),
+            .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(4) {
+                grid-column: span 1;
+            }
+
+            .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(1) .aspect-square,
+            .visual-lab .lab-layout-premium .lab-spotlight-card:nth-child(4) .aspect-square {
+                aspect-ratio: 1;
+            }
+
+            .visual-lab .avatar-info {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .gallery,
+            .visual-lab .lab-layout-premium .gallery {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body class="classic visual-lab">
+    <div class="lab-toolbar">
+        <div class="lab-toolbar-inner">
+            <div class="lab-title">
+                <span class="lab-badge">Visual Lab</span>
+                <div>
+                    <strong>Homepage Mirror / Mock State</strong>
+                    <span>Uses the same homepage structure with local-only visual controls.</span>
+                </div>
+            </div>
+            <div class="lab-controls" aria-label="Visual lab comparison controls">
+                <div class="lab-control-group" role="group" aria-label="Theme mode">
+                    <button class="lab-control-btn" type="button" data-theme="classic" aria-pressed="true">Classic</button>
+                    <button class="lab-control-btn" type="button" data-theme="future" aria-pressed="false">Future</button>
+                </div>
+                <div class="lab-control-group" role="group" aria-label="Header size">
+                    <button class="lab-control-btn" type="button" data-header-size="current" aria-pressed="true">Header Current</button>
+                    <button class="lab-control-btn" type="button" data-header-size="compact" aria-pressed="false">Compact</button>
+                </div>
+                <div class="lab-control-group" role="group" aria-label="Banner density">
+                    <button class="lab-control-btn" type="button" data-banner-size="normal" aria-pressed="true">Banner Normal</button>
+                    <button class="lab-control-btn" type="button" data-banner-size="compact" aria-pressed="false">Compact</button>
+                </div>
+                <div class="lab-control-group" role="group" aria-label="Spotlight layout">
+                    <button class="lab-control-btn" type="button" data-layout="current" aria-pressed="true">Current</button>
+                    <button class="lab-control-btn" type="button" data-layout="compact" aria-pressed="false">Compact</button>
+                    <button class="lab-control-btn" type="button" data-layout="premium" aria-pressed="false">Premium</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="labFrame" class="lab-layout-current">
+        <header>
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="logo-link" aria-label="ArtSoul visual lab home">
+                            <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                        </a>
+                    </div>
+
+                    <div class="flex-1 flex items-center justify-center">
+                        <a href="#rialo-preview" class="devnet-banner devnet-banner-js">Rialo Future Network</a>
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <div id="networkBadge">
+                            <span class="lab-badge">Base Sepolia Mock</span>
+                        </div>
+                        <div class="flex items-center gap-3" id="navButtons">
+                            <div class="avatar-dropdown-container" id="labAvatarDropdown">
+                                <button class="avatar-button" type="button" id="labAvatarButton" aria-expanded="false">
+                                    <img src="ARTSOULlogo.png?v=3" alt="ArtSoul Guest">
+                                    <div class="avatar-info">
+                                        <div style="font-weight: 600; font-size: 0.875rem;">ArtSoul Guest</div>
+                                        <div style="font-size: 0.75rem; opacity: 0.6; font-family: monospace;">Mock State</div>
+                                    </div>
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow" aria-hidden="true">
+                                        <path d="M4 6l4 4 4-4"></path>
+                                    </svg>
+                                </button>
+
+                                <div id="avatarDropdownMenu" class="avatar-dropdown-menu">
+                                    <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                                        <div class="avatar-theme-label">Theme Mode</div>
+                                        <div class="theme-toggle avatar-theme-switch" style="width: 100%;">
+                                            <button type="button" class="theme-btn" data-theme="classic" style="flex: 1;">Classic</button>
+                                            <button type="button" class="theme-btn" data-theme="future" style="flex: 1;">Future</button>
+                                        </div>
+                                    </div>
+
+                                    <div style="padding: 0.25rem 0;">
+                                        <a href="#" class="dropdown-item"><span>Explore Art</span></a>
+                                        <a href="#" class="dropdown-item"><span>Publish Artwork</span></a>
+                                        <a href="#" class="dropdown-item"><span>Auctions</span></a>
+                                        <a href="#" class="dropdown-item"><span>Marketplace</span></a>
+                                        <a href="#" class="dropdown-item"><span>Collections</span></a>
+                                        <a href="#" class="dropdown-item"><span>Docs</span></a>
+                                        <a href="#" class="dropdown-item"><span>Profile</span></a>
+
+                                        <div class="lab-nav-divider"></div>
+
+                                        <button type="button" id="connectBtn" class="dropdown-item btn-main" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;padding:0.75rem;border-radius:0.5rem;cursor:pointer;width:100%;text-align:center;">
+                                            <span>Connect Wallet</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div id="morphBackdrop" class="morph-backdrop"></div>
+
+        <main id="homeSection" class="section active container mx-auto px-4 relative z-10" style="padding-top: 2rem; padding-bottom: 3rem;">
+            <div class="text-center mb-16">
+                <h1 class="text-5xl md:text-6xl font-bold mb-6">
+                    Discovery-First Auctions<br/>for Digital Art
+                </h1>
+                <p class="text-2xl md:text-3xl font-light opacity-90 mb-8 max-w-3xl mx-auto">
+                    Publish artwork, build collector demand, and mint only after settlement.
+                </p>
+                <div class="flex flex-wrap gap-4 justify-center">
+                    <a href="#" class="btn-main text-xl px-8 py-4">
+                        Explore Art
+                    </a>
+                    <a href="#" class="btn-secondary text-xl px-8 py-4">
+                        Publish Artwork
+                    </a>
+                </div>
+                <div class="lab-only-note">Visual Lab / Mock State - no wallet, no contracts, no AppKit</div>
+            </div>
+
+            <div class="mb-16">
+                <h2 class="text-3xl font-bold mb-8 text-center">Discovery Spotlight</h2>
+                <div class="gallery" id="artworkGallery"></div>
+            </div>
+
+            <footer class="mt-16 pt-8 pb-6 border-t" style="border-color: currentColor; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(10px);">
+                <div class="content-container">
+                    <div class="footer-grid">
+                        <div class="footer-column">
+                            <h3>About ArtSoul</h3>
+                            <p>A discovery-first art platform where auctions, settlement, royalties, and trust signals help creators build durable collector demand.</p>
+                        </div>
+                        <div class="footer-column">
+                            <h3>Contact</h3>
+                            <a href="https://x.com/maysonkiller23" target="_blank" class="hover:opacity-100">X (Twitter)</a>
+                            <a href="https://github.com/maysonkiller/ArtSoul" target="_blank" class="hover:opacity-100">GitHub</a>
+                            <a href="mailto:maysonkiller@gmail.com" class="hover:opacity-100">maysonkiller@gmail.com</a>
+                        </div>
+                        <div class="footer-column">
+                            <h3>Supported Networks</h3>
+                            <p>Base Sepolia (testnet)</p>
+                            <p>Ethereum Sepolia (testnet)</p>
+                            <p>Future production networks</p>
+                        </div>
+                    </div>
+                    <div class="text-center text-sm pt-4 border-t" style="border-color: currentColor; opacity: 0.5;">
+                        <p style="opacity: 0.9; margin-bottom: 0.25rem;">&copy; 2026 ArtSoul Protocol | Built for digital artists</p>
+                        <p style="opacity: 0.9;">
+                            Built by <a href="https://twitter.com/maysonkiller23" target="_blank" class="hover:underline">@maysonkiller23</a>
+                        </p>
+                    </div>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        (function() {
+            var frame = document.getElementById('labFrame');
+            var gallery = document.getElementById('artworkGallery');
+            var avatarWrap = document.getElementById('labAvatarDropdown');
+            var avatarButton = document.getElementById('labAvatarButton');
+            var spotlightLabels = ['Featured Auction', 'Trending Artwork', 'Featured Collection', 'Marketplace Highlight'];
+            var mockArtworks = [
+                ['Nocturne Vault', '24h auction preview', '0.08 ETH'],
+                ['Signal Bloom', 'Trust-weighted discovery', '2.4k views'],
+                ['Glass Archive', 'Approved collection preview', '100 supply'],
+                ['Afterimage 01', 'Minted resale preview', 'Floor 0.12 ETH'],
+                ['Blue Hour Study', 'Ending soon mock state', '18m left'],
+                ['Memory Frame', 'Settlement completed', 'Winner set'],
+                ['Static Garden', 'Would-buy signal preview', '41 signals'],
+                ['Quiet Circuit', 'Watching signal preview', '126 watching'],
+                ['Silver Index', 'Floor growth preview', '+14%'],
+                ['Mira V.', 'Trending creator preview', 'Established'],
+                ['First Light', 'Unminted discovery', 'Published'],
+                ['Soft Geometry', 'Guidance preview', 'High confidence']
+            ];
+
+            function renderSpotlights() {
+                if (!gallery) return;
+                gallery.innerHTML = '';
+
+                mockArtworks.forEach(function(item, index) {
+                    var label = spotlightLabels[index] || 'Discovery Spotlight';
+                    var card = document.createElement('a');
+                    card.href = '#';
+                    card.className = 'card rounded-xl overflow-hidden lab-spotlight-card';
+
+                    var imageContainer = document.createElement('div');
+                    imageContainer.className = 'aspect-square overflow-hidden bg-black relative lab-artwork-preview';
+
+                    var pattern = document.createElement('div');
+                    pattern.className = 'lab-card-pattern';
+
+                    var imageText = document.createElement('p');
+                    imageText.className = 'text-2xl font-light opacity-30';
+                    imageText.textContent = index < 4 ? label : 'Mock Artwork';
+                    imageText.style.cssText = 'position:absolute;left:1rem;bottom:1rem;right:1rem;';
+
+                    imageContainer.appendChild(pattern);
+                    imageContainer.appendChild(imageText);
+
+                    var info = document.createElement('div');
+                    info.className = 'p-4 lab-card-copy';
+
+                    var slotLabel = document.createElement('p');
+                    slotLabel.className = 'text-xs uppercase tracking-wide opacity-60 mb-1';
+                    slotLabel.textContent = label;
+
+                    var title = document.createElement('h3');
+                    title.className = 'font-semibold text-lg mb-1 truncate';
+                    title.textContent = item[0];
+
+                    var desc = document.createElement('p');
+                    desc.className = 'text-sm opacity-70 mb-2 line-clamp-2';
+                    desc.textContent = item[1];
+
+                    var price = document.createElement('p');
+                    price.className = 'text-sm font-bold';
+                    price.textContent = item[2];
+
+                    var signalLine = document.createElement('p');
+                    signalLine.className = 'text-xs opacity-60 mt-2';
+                    signalLine.textContent = 'Mock signals - no live data';
+
+                    info.appendChild(slotLabel);
+                    info.appendChild(title);
+                    info.appendChild(desc);
+                    info.appendChild(price);
+                    info.appendChild(signalLine);
+                    card.appendChild(imageContainer);
+                    card.appendChild(info);
+                    gallery.appendChild(card);
+                });
+            }
+
+            function setTheme(theme) {
+                var next = theme === 'future' ? 'future' : 'classic';
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add(next);
+                document.body.classList.toggle('classic', next === 'classic');
+                document.body.classList.toggle('future', next === 'future');
+                document.body.classList.add('visual-lab');
+                localStorage.setItem('artsoul_visual_lab_theme', next);
+                document.querySelectorAll('[data-theme]').forEach(function(button) {
+                    button.setAttribute('aria-pressed', String(button.dataset.theme === next));
+                });
+            }
+
+            function setHeaderSize(size) {
+                var compact = size === 'compact';
+                if (frame) frame.classList.toggle('lab-header-compact', compact);
+                document.querySelectorAll('[data-header-size]').forEach(function(button) {
+                    button.setAttribute('aria-pressed', String(button.dataset.headerSize === (compact ? 'compact' : 'current')));
+                });
+            }
+
+            function setBannerSize(size) {
+                var compact = size === 'compact';
+                if (frame) frame.classList.toggle('lab-banner-compact', compact);
+                document.querySelectorAll('[data-banner-size]').forEach(function(button) {
+                    button.setAttribute('aria-pressed', String(button.dataset.bannerSize === (compact ? 'compact' : 'normal')));
+                });
+            }
+
+            function setLayout(layout) {
+                var next = ['compact', 'premium'].includes(layout) ? layout : 'current';
+                if (frame) {
+                    frame.classList.remove('lab-layout-current', 'lab-layout-compact', 'lab-layout-premium');
+                    frame.classList.add('lab-layout-' + next);
+                }
+                document.querySelectorAll('[data-layout]').forEach(function(button) {
+                    button.setAttribute('aria-pressed', String(button.dataset.layout === next));
+                });
+            }
+
+            document.querySelectorAll('[data-theme]').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    setTheme(button.dataset.theme);
+                });
+            });
+
+            document.querySelectorAll('[data-header-size]').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    setHeaderSize(button.dataset.headerSize);
+                });
+            });
+
+            document.querySelectorAll('[data-banner-size]').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    setBannerSize(button.dataset.bannerSize);
+                });
+            });
+
+            document.querySelectorAll('[data-layout]').forEach(function(button) {
+                button.addEventListener('click', function() {
+                    setLayout(button.dataset.layout);
+                });
+            });
+
+            if (avatarButton && avatarWrap) {
+                avatarButton.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                    var isOpen = avatarWrap.classList.toggle('open');
+                    avatarButton.setAttribute('aria-expanded', String(isOpen));
+                });
+            }
+
+            document.addEventListener('click', function(event) {
+                if (!avatarWrap || !avatarWrap.classList.contains('open')) return;
+                if (avatarWrap.contains(event.target)) return;
+                avatarWrap.classList.remove('open');
+                if (avatarButton) avatarButton.setAttribute('aria-expanded', 'false');
+            });
+
+            renderSpotlights();
+            setTheme(document.documentElement.classList.contains('future') ? 'future' : 'classic');
+            setHeaderSize('current');
+            setBannerSize('normal');
+            setLayout('current');
+        })();
+    </script>
+</body>
+</html>

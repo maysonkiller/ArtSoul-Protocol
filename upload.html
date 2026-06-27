@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('artsoul_theme') || 'classic';
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+            } catch (error) {
+                document.documentElement.classList.remove('classic', 'future');
+                document.documentElement.classList.add('classic');
+            }
+        })();
+    </script>
+    <title>Publish Artwork - ArtSoul</title>
+    <meta name="description" content="Publish artwork to ArtSoul, prepare an auction, and keep minting tied to successful collector settlement.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ArtSoul">
+    <meta property="og:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
+    <meta property="og:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:url" content="https://artsoul.vercel.app/upload.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta name="twitter:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
+    <meta name="twitter:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="unified-styles.css?v=14">
+    <link rel="stylesheet" href="button-effects.css?v=5">
+    <link rel="stylesheet" href="mobile-responsive.css?v=5">
+    <link rel="stylesheet" href="performance-optimizations.css?v=2">
+    <link rel="stylesheet" href="ai-ui-styles.css?v=1">
+    <link rel="stylesheet" href="simplified-ui.css?v=1">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="src/ui/theme-manager.js"></script>
+    <script src="src/ui/theme-validator.js"></script>
+    <script src="src/ui/navigation-manager.js?v=4"></script>
+    <script src="src/ui/status-banner-system.js"></script>
+    <script src="src/ui/system-logger.js"></script>
+    <script src="src/ui/log-viewer-ui.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            if (window.SystemLogger && window.LogViewerUI) {
+                window.logViewer = new LogViewerUI(window.SystemLogger);
+            }
+            if (window.StatusBannerSystem) {
+                window.statusBanners = new StatusBannerSystem();
+                console.log('🚦 Status Banners ready');
+            }
+        });
+    </script>
+    <script src="modal-system.js"></script>
+    <script type="module" src="supabase-auth.js"></script>
+    <script type="module" src="supabase-client.js"></script>
+    <script src="avatar-dropdown.js?v=11"></script>
+    <script type="module" src="appkit-init.js?v=14"></script>
+    <script type="module" src="ipfs-client.js"></script>
+    <script src="contracts-config.js?v=1"></script>
+    <script type="module" src="contracts-integration.js?v=3"></script>
+
+    <!-- AI Integration -->
+
+    <!-- Core Engines -->
+    <script src="src/core/auction-engine-final.js"></script>
+    <script src="src/core/economy-engine.js"></script>
+    <script src="src/core/app-controller.js"></script>
+
+    <!-- AI Event Handlers -->
+
+    <!-- Token UI Components -->
+
+    <script type="module" src="src/index.js"></script>
+    <style>
+* {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body.classic {
+            background: var(--bg-classic);
+            color: var(--text-classic);
+        }
+
+        .classic header {
+            background: rgba(1, 1, 1, 0.95);
+            border-bottom: 1px solid var(--accent-classic);
+        }
+
+        /* Button styles moved to unified-styles.css */
+
+        body.future {
+            background: var(--c-bg);
+            color: var(--accent-future);
+        }
+
+        .future header {
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--accent-future);
+            box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
+        }
+
+        /* Button hover effects moved to button-effects.css */
+        /* Animation keyframes moved to button-effects.css */
+
+header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(12px);
+        }
+
+        header .container {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        /* Button effects for Future mode moved to button-effects.css */
+
+        /* Glitch animation moved to button-effects.css */
+
+        /* Gradient flow animation moved to unified-styles.css */
+
+        /* Theme toggle styles moved to unified-styles.css */
+
+        .network-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .classic .network-badge {
+            background: rgba(232, 227, 213, 0.1);
+            border: 1px solid var(--accent-classic);
+        }
+
+        .future .network-badge {
+            background: rgba(var(--c-accent-rgb), 0.1);
+            border: 1px solid var(--accent-future);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .future .network-badge::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(var(--c-accent-rgb), 0.3), transparent);
+            animation: scanning 3s linear infinite;
+        }
+
+        @keyframes scanning {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        @media (max-width: 640px) {
+            .network-badge {
+                padding: 0.375rem 0.75rem;
+                font-size: 0.75rem;
+            }
+        }
+
+        .upload-zone {
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .classic .upload-zone {
+            border: 2px dashed var(--accent-classic);
+            background: rgba(232, 227, 213, 0.03);
+        }
+
+        .classic .upload-zone:hover {
+            border-color: var(--text-classic);
+            background: rgba(232, 227, 213, 0.08);
+        }
+
+        .future .upload-zone {
+            border: 2px dashed var(--accent-future);
+            background: rgba(var(--c-accent-rgb), 0.05);
+        }
+
+        .future .upload-zone:hover {
+            border-color: var(--neon-purple);
+            background: rgba(var(--c-accent-rgb), 0.1);
+            box-shadow: 0 0 20px rgba(var(--c-accent-2-rgb), 0.3);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            color: inherit;
+            transition: all 0.3s;
+        }
+
+        .classic .form-input {
+            background: rgba(232, 227, 213, 0.05);
+            border: 1px solid var(--accent-classic);
+        }
+
+        .classic .form-input:focus {
+            outline: none;
+            border-color: var(--text-classic);
+            background: rgba(232, 227, 213, 0.1);
+        }
+
+        .future .form-input {
+            background: rgba(var(--c-accent-rgb), 0.05);
+            border: 1px solid var(--accent-future);
+        }
+
+        .future .form-input:focus {
+            outline: none;
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 15px rgba(var(--c-accent-2-rgb), 0.3);
+        }
+
+        .icon-svg {
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .tooltip-wrap {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            margin-bottom: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .classic .tooltip-text {
+            background: var(--text-classic);
+            color: var(--bg-classic);
+        }
+
+        .future .tooltip-text {
+            background: var(--accent-future);
+            color: var(--c-bg);
+        }
+
+        .tooltip-wrap:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .network-badge {
+                font-size: 0.75rem;
+                padding: 0.375rem 0.75rem;
+            }
+            .balance-amount {
+                display: none;
+            }
+        }
+
+        /* Username gradient in Future mode */
+        @keyframes gradientFlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        .future .avatar-info > div:first-child {
+            background: linear-gradient(90deg, var(--accent-future), var(--neon-purple), var(--accent-future));
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientFlow 3s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <!-- Left: Logo -->
+                <div class="flex items-center gap-4">
+                    <a href="index.html" class="logo-link">
+                        <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                    </a>
+                </div>
+
+                <div class="page-context">
+                    <div class="page-context-title">Publish Artwork</div>
+                    <div class="page-context-subtitle">Prepare artwork for auction discovery</div>
+                </div>
+
+                <!-- Right: Buttons -->
+                <div class="flex items-center gap-4">
+                    <div id="networkBadge"></div>
+                    <div class="flex items-center gap-3" id="navButtons"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-12 max-w-3xl">
+        <h1 class="text-4xl font-light mb-8">Publish Artwork</h1>
+
+        <div class="space-y-8">
+            <div class="upload-zone rounded-xl p-12 text-center" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.gif" style="display: none;" onchange="handleFileSelect(event)">
+
+                <!-- Upload prompt (hidden when file selected) -->
+                <div id="uploadPrompt">
+                    <svg viewBox="0 0 24 24" fill="none" class="w-16 h-16 mx-auto mb-4 opacity-50">
+                        <path d="M12 3L12 21M12 3L6 9M12 3L18 9M3 15L3 21L21 21L21 15" stroke="currentColor" class="icon-svg"/>
+                    </svg>
+                    <p class="text-xl opacity-70 mb-2">Select the artwork you want collectors to discover</p>
+                    <p class="text-sm opacity-40">Supports JPG, PNG, MP4, GIF, MP3 (Max 100MB)</p>
+                </div>
+
+                <!-- File info and preview (shown when file selected) -->
+                <div id="fileInfo" style="display: none;">
+                    <p id="fileName" class="text-sm mb-4 opacity-70"></p>
+                    <div id="filePreview" style="display: none;" class="rounded-xl overflow-hidden border-2 border-current opacity-50">
+                        <img id="previewImage" alt="Preview" class="w-full h-auto max-h-96 object-contain bg-black">
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block opacity-70 mb-2 font-medium">Title</label>
+                    <input type="text" id="artTitle" class="form-input" placeholder="Name of your piece" required>
+                </div>
+                <div>
+                    <label class="block opacity-70 mb-2 font-medium">Starting Price (ETH)</label>
+                    <input type="number" id="artPrice" step="0.01" class="form-input" placeholder="0.5" required>
+                </div>
+            </div>
+
+            <div>
+                <label class="block opacity-70 mb-2 font-medium">Description</label>
+                <textarea id="artDescription" class="form-input h-32" placeholder="Share the story, medium, and collector context..."></textarea>
+            </div>
+
+            <button id="publishBtn" onclick="handleUpload()" class="btn-main w-full">Publish Artwork</button>
+        </div>
+    </main>
+
+    <script>
+        let selectedFile = null;
+        let uploading = false;
+
+        const PLACEHOLDER_TITLES = new Set([
+            'test',
+            'testing',
+            'screenshot',
+            'screen shot',
+            'image',
+            'img',
+            'photo',
+            'picture',
+            'untitled',
+            'new artwork',
+            'artwork',
+            'video',
+            'audio'
+        ]);
+
+        function normalizeArtworkTitle(value) {
+            return (value || '').trim().replace(/\s+/g, ' ');
+        }
+
+        function simplifyArtworkTitle(value) {
+            return normalizeArtworkTitle(value)
+                .toLowerCase()
+                .replace(/\.[a-z0-9]{2,5}$/i, '')
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function isPlaceholderArtworkTitle(value) {
+            const simplified = simplifyArtworkTitle(value);
+            if (PLACEHOLDER_TITLES.has(simplified)) return true;
+            return /^(screenshot|screen shot|img|image|photo|picture|untitled)\b/i.test(simplified);
+        }
+
+        function validateArtworkDetails({ title, description, price }) {
+            const cleanTitle = normalizeArtworkTitle(title);
+            const cleanDescription = (description || '').trim().replace(/\s+/g, ' ');
+
+            if (Array.from(cleanTitle).length < 3) {
+                return 'Use a clear artwork title with at least 3 characters.';
+            }
+
+            if (isPlaceholderArtworkTitle(cleanTitle)) {
+                return 'Use a clear artwork title, not a placeholder like test, screenshot, image, or untitled.';
+            }
+
+            if (!cleanDescription || Array.from(cleanDescription).length < 12) {
+                return 'Add a short meaningful description with the story, medium, or collector context.';
+            }
+
+            if (!price || parseFloat(price) <= 0) {
+                return 'Price must be greater than 0.';
+            }
+
+            return '';
+        }
+
+        function describePublishError(error) {
+            const code = error?.code || '';
+            if (code === 'SERVICE_ROLE_KEY_NOT_SERVICE_ROLE') {
+                return 'Upload service is using the wrong Supabase key. SUPABASE_SERVICE_ROLE_KEY must be the service_role key, not the anon key.';
+            }
+            if (code === 'MISSING_SERVICE_ROLE_KEY') {
+                return 'Upload service is missing SUPABASE_SERVICE_ROLE_KEY.';
+            }
+            if (code === 'STORAGE_SIGNED_UPLOAD_RLS_DENIED') {
+                return 'Upload storage authorization was denied. Please verify the server uses the Supabase service_role key.';
+            }
+            if (code === 'STORAGE_BUCKET_NOT_FOUND') {
+                return 'Upload storage bucket "artworks" was not found.';
+            }
+            if (code === 'INVALID_UPLOAD_PAYLOAD') {
+                return error.message || 'Upload an image, video, or audio file under the supported size limit.';
+            }
+            return error?.message || 'Unknown error';
+        }
+
+        function mapPublishError(error) {
+            const code = String(error?.code || '').toUpperCase();
+            const message = String(error?.shortMessage || error?.reason || error?.message || '');
+            const lower = message.toLowerCase();
+
+            if (code === 'ACTION_REJECTED' || code === '4001' || lower.includes('user rejected') || lower.includes('user denied')) {
+                return { code: 'USER_REJECTED', message: 'Transaction was rejected in the wallet.' };
+            }
+            if (lower.includes('nonce too low')) {
+                return { code: 'NONCE_TOO_LOW', message: 'Wallet nonce is out of sync. Reset the account nonce or retry after pending transactions clear.' };
+            }
+            if (lower.includes('insufficient funds') || lower.includes('insufficient gas') || lower.includes('not enough funds')) {
+                return { code: 'INSUFFICIENT_FUNDS', message: 'The wallet does not have enough testnet ETH for gas or the transaction value.' };
+            }
+            if (code === 'CALL_EXCEPTION' || lower.includes('reverted') || lower.includes('execution reverted')) {
+                return { code: 'TRANSACTION_REVERTED', message: 'The transaction reverted on-chain. No new artwork was created for a failed register transaction.' };
+            }
+            if (lower.includes('unsupported network') || lower.includes('wrong network')) {
+                return { code: 'UNSUPPORTED_NETWORK', message: 'Please switch to Base Sepolia and try again.' };
+            }
+            if (lower.includes('duplicate artwork')) {
+                return { code: 'DUPLICATE_ARTWORK', message: 'This file has already been published.' };
+            }
+
+            return { code: code || 'PUBLISH_FAILED', message: describePublishError(error) };
+        }
+
+        const PENDING_ARTWORKS_KEY = 'artsoul_pending_indexer_artworks';
+
+        function readPendingArtworks() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(PENDING_ARTWORKS_KEY) || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        }
+
+        function savePendingArtwork(record) {
+            if (!record?.temp_id) return record;
+            const now = new Date().toISOString();
+            const nextRecord = {
+                ...record,
+                source: 'pending_indexer',
+                status: 'pending_indexer',
+                updated_at: now
+            };
+            const existing = readPendingArtworks()
+                .filter(item => item?.temp_id !== nextRecord.temp_id)
+                .filter(item => item?.register_tx_hash !== nextRecord.register_tx_hash || !nextRecord.register_tx_hash);
+            localStorage.setItem(PENDING_ARTWORKS_KEY, JSON.stringify([nextRecord, ...existing].slice(0, 20)));
+            return nextRecord;
+        }
+
+        function hasRegisterTx(record) {
+            return Boolean(String(record?.register_tx_hash || '').trim());
+        }
+
+        function isBadPendingArtwork(record) {
+            if (hasRegisterTx(record)) return false;
+            const state = [
+                record?.status,
+                record?.stage,
+                record?.error_code,
+                record?.error_message
+            ].join(' ').toLowerCase();
+            return !hasRegisterTx(record) ||
+                state.includes('fail') ||
+                state.includes('error') ||
+                state.includes('reject') ||
+                state.includes('revert') ||
+                state.includes('nonce');
+        }
+
+        function cleanupBadPendingCards() {
+            const current = readPendingArtworks();
+            const kept = current.filter(record => !isBadPendingArtwork(record));
+            localStorage.setItem(PENDING_ARTWORKS_KEY, JSON.stringify(kept));
+            const result = { removed: current.length - kept.length, kept: kept.length };
+            console.info('ArtSoul pending-card cleanup complete:', result);
+            return result;
+        }
+
+        window.ArtSoulCleanupBadPendingCards = cleanupBadPendingCards;
+
+        function createPendingArtworkDraft({ walletAddress, title, description, price, fileHash, fileUpload }) {
+            const now = new Date().toISOString();
+            return {
+                temp_id: crypto.randomUUID?.() || `pending-${Date.now()}`,
+                id: `pending:${Date.now()}`,
+                chain_id: window.ArtSoulContracts?.currentNetwork?.chainId || 84532,
+                network: window.ArtSoulContracts?.currentNetwork?.key || 'baseSepolia',
+                wallet_address: walletAddress.toLowerCase(),
+                creator: walletAddress,
+                creator_id: walletAddress,
+                title,
+                description,
+                creator_value: price,
+                file_hash: fileHash,
+                file_url: fileUpload.url,
+                media_url: fileUpload.url,
+                file_type: selectedFile?.type?.split('/')[0] || 'image',
+                media_type: selectedFile?.type || '',
+                storage_path: fileUpload.path || fileUpload.storagePath || '',
+                upload_hash: fileUpload.ipfsHash || '',
+                stage: 'media_uploaded',
+                created_at: now,
+                updated_at: now
+            };
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                document.getElementById('fileName').textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+
+                // Hide upload prompt, show file info
+                document.getElementById('uploadPrompt').style.display = 'none';
+                document.getElementById('fileInfo').style.display = 'block';
+
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('filePreview');
+                    const previewImg = document.getElementById('previewImage');
+
+                    if (file.type.startsWith('image/')) {
+                        previewImg.src = e.target.result;
+                        preview.style.display = 'block';
+                    } else if (file.type.startsWith('video/')) {
+                        // For video, show first frame or placeholder
+                        previewImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbzwvdGV4dD48L3N2Zz4=';
+                        preview.style.display = 'block';
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function handleUpload() {
+            if (uploading) return;
+
+            const title = normalizeArtworkTitle(document.getElementById('artTitle').value);
+            const price = document.getElementById('artPrice').value;
+            const description = document.getElementById('artDescription').value.trim();
+
+            // Validation
+            if (!selectedFile) {
+                alert('Please select an artwork file to publish');
+                return;
+            }
+
+            const validationError = validateArtworkDetails({ title, description, price });
+            if (validationError) {
+                alert(validationError);
+                return;
+            }
+
+            // Check wallet connection
+            const walletAddress = window.getCurrentWalletAddress?.();
+            if (!walletAddress) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            // Check authentication
+            const isAuth = await window.SupabaseAuth?.isAuthenticated();
+            if (!isAuth) {
+                const authenticated = await window.ensureAuthenticated?.();
+                if (!authenticated) return;
+            }
+
+            uploading = true;
+            const uploadBtn = document.getElementById('publishBtn');
+            const originalText = uploadBtn.textContent;
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Publishing...';
+            let pendingArtwork = null;
+
+            try {
+                // Step 1: Generate file hash for duplicate detection
+                uploadBtn.textContent = 'Preparing artwork fingerprint...';
+                const fileHash = await window.IPFSClient.generateFileHash(selectedFile);
+                console.log('📝 File hash:', fileHash);
+
+                // Step 2: Prepare media storage
+                uploadBtn.textContent = 'Preparing media...';
+                const fileUpload = await window.IPFSClient.uploadFile(selectedFile);
+                pendingArtwork = createPendingArtworkDraft({
+                    walletAddress,
+                    title,
+                    description,
+                    price,
+                    fileHash,
+                    fileUpload
+                });
+                console.log('📤 File uploaded:', fileUpload.ipfsHash);
+
+                // Step 3: Create artwork details
+                uploadBtn.textContent = 'Preparing artwork details...';
+                const metadata = window.IPFSClient.createMetadata({
+                    title: title,
+                    description: description,
+                    imageUrl: fileUpload.url,
+                    mediaType: selectedFile.type,
+                    creator: walletAddress,
+                    creatorValue: price,
+                    createdAt: new Date().toISOString()
+                });
+
+                // Step 4: Store artwork metadata
+                const metadataUpload = await window.IPFSClient.uploadMetadata(metadata);
+                if (!metadataUpload?.url) {
+                    throw new Error('Metadata upload failed before on-chain registration.');
+                }
+                if (metadataUpload.debug_mock) {
+                    console.warn('Debug mock metadata URI enabled for this upload.');
+                }
+                pendingArtwork = {
+                    ...pendingArtwork,
+                    stage: 'metadata_prepared',
+                    metadata_uri: metadataUpload.url,
+                    metadata_hash: metadataUpload.ipfsHash || '',
+                    metadata_path: metadataUpload.path || ''
+                };
+                console.log('📤 Metadata uploaded:', metadataUpload.ipfsHash);
+
+                // Step 5: Initialize contracts
+                uploadBtn.textContent = 'Connecting wallet...';
+                if (!window.ArtSoulContracts.marketplaceContract) {
+                    const provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider) throw new Error('No wallet provider');
+                    await window.ArtSoulContracts.init(provider);
+                }
+
+                // Step 6: Register artwork with the protocol
+                uploadBtn.textContent = 'Registering artwork...';
+                const result = await window.ArtSoulContracts.uploadArtwork(
+                    fileUpload.ipfsHash,
+                    metadataUpload.url,
+                    fileHash,
+                    price
+                );
+
+                console.log(' Artwork created! ID:', result.artworkId);
+                if (!result?.txHash || !result?.artworkId) {
+                    throw new Error('Register transaction did not return a confirmed artwork id.');
+                }
+                pendingArtwork = savePendingArtwork({
+                    ...pendingArtwork,
+                    id: `pending:${result.artworkId || pendingArtwork.temp_id}`,
+                    artwork_id: result.artworkId ? String(result.artworkId) : '',
+                    blockchain_id: result.artworkId ? String(result.artworkId) : '',
+                    register_tx_hash: result.txHash || '',
+                    register_receipt_status: 1,
+                    stage: 'registered',
+                    lifecycle_label: 'Finalizing...',
+                    lifecycle_message: 'Register transaction confirmed. Waiting for the public artwork page to update.'
+                });
+
+                // Step 8: Indexer projection replaces legacy browser writes.
+                uploadBtn.textContent = 'Finalizing...';
+                console.log('Legacy artwork DB write skipped; v41 indexer will project registration.', {
+                    artworkId: result.artworkId,
+                    txHash: result.txHash,
+                    network: window.ArtSoulContracts.currentNetwork
+                });
+
+                // Step 7: Create the initial auction immediately (24h)
+                uploadBtn.textContent = 'Launching auction...';
+                let auctionCreated = false;
+                let dbSynced = false;
+                try {
+                    const auctionTxHash = await window.ArtSoulContracts.createAuction(
+                        result.artworkId,
+                        price,
+                        24 // Supported auction durations are 24h / 36h / 48h
+                    );
+                    auctionCreated = true;
+                    pendingArtwork = savePendingArtwork({
+                        ...pendingArtwork,
+                        auction_tx_hash: auctionTxHash || '',
+                        auction_receipt_status: 1,
+                        stage: 'auction_created',
+                        lifecycle_label: 'Finalizing...',
+                        lifecycle_message: 'Register and auction transactions confirmed. Waiting for the public artwork page to update.'
+                    });
+                    console.log(' Auction created on blockchain');
+
+                    dbSynced = true;
+                    console.log('Legacy auction DB sync skipped; v41 indexer will project auction state.');
+                } catch (auctionError) {
+                    console.error(' Auction creation error:', auctionError);
+                    const mappedAuctionError = mapPublishError(auctionError);
+                    pendingArtwork = savePendingArtwork({
+                        ...pendingArtwork,
+                        stage: 'auction_failed',
+                        lifecycle_label: 'Artwork registered - auction failed',
+                        lifecycle_message: 'The artwork is registered on-chain, but auction creation failed. You can retry auction from your profile.',
+                        auction_error_code: mappedAuctionError.code,
+                        auction_error_message: mappedAuctionError.message
+                    });
+
+                    if (auctionCreated && !dbSynced) {
+                        // Blockchain succeeded but database failed after retries
+                        await alert('Auction created on blockchain but database sync failed.\n\nYour artwork is live on the blockchain!\nPlease go to your profile and the status will sync automatically.');
+                        window.location.href = 'profile.html';
+                        return;
+                    } else if (!auctionCreated) {
+                        // Blockchain creation failed - artwork stays as draft
+                        await alert(`Artwork registered - auction failed.\n\n${mappedAuctionError.message}\n\nYou can retry auction from your profile.`);
+                        window.location.href = 'profile.html';
+                        return;
+                    }
+                }
+
+                // Success - redirect to the new artwork detail page.
+                const chainId = window.getCurrentChainId?.() || window.ArtSoulContracts?.chainId || 84532;
+                window.location.href = `artwork.html?id=v41:${chainId}:${result.artworkId}`;
+
+            } catch (error) {
+                console.error('Publish failed:', error);
+                const mapped = mapPublishError(error);
+                const errorMessage = `Publish failed: ${mapped.message}`;
+
+                alert(errorMessage);
+            } finally {
+                uploading = false;
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = originalText;
+            }
+        }
+    </script>
+
+    <!-- AppKit and wallet connection is now handled by appkit-init.js -->
+</body>
+</html>

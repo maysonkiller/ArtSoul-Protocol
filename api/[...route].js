@@ -1,0 +1,58 @@
+import logoutHandler from '../src/api/routes/auth/logout.js';
+import nonceHandler from '../src/api/routes/auth/nonce.js';
+import sessionHandler from '../src/api/routes/auth/session.js';
+import verifyHandler from '../src/api/routes/auth/verify.js';
+import likeHandler from '../src/api/routes/discovery/like.js';
+import signalHandler from '../src/api/routes/discovery/signal.js';
+import functionsAiAnalyzeHandler from '../src/api/routes/functions/ai/analyze.js';
+import functionsArtworksHandler from '../src/api/routes/functions/artworks.js';
+import functionsAuctionsHandler from '../src/api/routes/functions/auctions.js';
+import profileHandler from '../src/api/routes/profile.js';
+import publicArtworksHandler from '../src/api/routes/public/artworks.js';
+import publicConfigHandler from '../src/api/routes/public/config.js';
+import publicIndexerStatusHandler from '../src/api/routes/public/indexer-status.js';
+import uploadFileHandler from '../src/api/routes/upload/file.js';
+
+const ROUTES = new Map([
+  ['auth/logout', logoutHandler],
+  ['auth/nonce', nonceHandler],
+  ['auth/session', sessionHandler],
+  ['auth/verify', verifyHandler],
+  ['profile', profileHandler],
+  ['discovery/like', likeHandler],
+  ['discovery/signal', signalHandler],
+  ['public/artworks', publicArtworksHandler],
+  ['public/config', publicConfigHandler],
+  ['public/indexer-status', publicIndexerStatusHandler],
+  ['upload/file', uploadFileHandler],
+  ['functions/ai/analyze', functionsAiAnalyzeHandler],
+  ['functions/artworks', functionsArtworksHandler],
+  ['functions/auctions', functionsAuctionsHandler],
+  ['ai/analyze', functionsAiAnalyzeHandler],
+  ['artworks', functionsArtworksHandler],
+  ['auctions', functionsAuctionsHandler]
+]);
+
+function routeFromRequest(req) {
+  const value = req.query?.route;
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join('/');
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return value.split('/').filter(Boolean).join('/');
+  }
+
+  const path = String(req.url || '').split('?')[0].replace(/^\/api\/?/, '');
+  return path.split('/').filter(Boolean).join('/');
+}
+
+export default async function handler(req, res) {
+  const route = routeFromRequest(req);
+  const routeHandler = ROUTES.get(route);
+
+  if (!routeHandler) {
+    return res.status(404).json({ error: 'NOT_FOUND' });
+  }
+
+  return routeHandler(req, res);
+}
