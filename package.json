@@ -8,16 +8,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/maysonkiller/ArtSoul-Protocol-.git"
+    "url": "git+https://github.com/maysonkiller/ArtSoul-Protocol.git"
   },
   "keywords": [],
   "author": "",
   "license": "UNLICENSED",
   "type": "module",
   "bugs": {
-    "url": "https://github.com/maysonkiller/ArtSoul-Protocol-/issues"
+    "url": "https://github.com/maysonkiller/ArtSoul-Protocol/issues"
   },
-  "homepage": "https://github.com/maysonkiller/ArtSoul-Protocol-#readme",
+  "homepage": "https://github.com/maysonkiller/ArtSoul-Protocol#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts": "^5.0.0",
