@@ -126,9 +126,30 @@ async function fetchInlineMedia(mediaUrl) {
   }
 }
 
+function readInlineMediaData(dataUrl) {
+  const value = String(dataUrl || '').trim();
+  if (!value || value.length > (MAX_INLINE_MEDIA_BYTES * 1.5) + 256) return null;
+
+  const match = value.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\r\n]+)$/i);
+  if (!match) return null;
+
+  try {
+    const buffer = Buffer.from(match[2], 'base64');
+    if (!buffer.length || buffer.byteLength > MAX_INLINE_MEDIA_BYTES) return null;
+    return {
+      inlineData: {
+        mimeType: match[1].toLowerCase(),
+        data: buffer.toString('base64')
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function callGemini({ apiKey, model, payload, wallet }) {
   const mediaUrl = payload.media_url || payload.file_url || payload.image || payload.animation_url || '';
-  const inlineMedia = await fetchInlineMedia(mediaUrl);
+  const inlineMedia = readInlineMediaData(payload.media_data_url) || await fetchInlineMedia(mediaUrl);
   const parts = [{ text: buildPrompt(payload, wallet) }];
   if (inlineMedia) parts.push(inlineMedia);
 

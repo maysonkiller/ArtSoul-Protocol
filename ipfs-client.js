@@ -122,6 +122,11 @@ class IPFSClient {
             metadata.animation_url = artworkData.imageUrl;
         }
 
+        if (artworkData.aiGuidance && typeof artworkData.aiGuidance === 'object') {
+            metadata.ai_value_guidance = artworkData.aiGuidance;
+            metadata.properties.ai_value_guidance = artworkData.aiGuidance;
+        }
+
         return metadata;
     }
 

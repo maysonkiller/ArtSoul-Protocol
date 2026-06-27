@@ -237,6 +237,76 @@ header {
             box-shadow: 0 0 15px rgba(var(--c-accent-2-rgb), 0.3);
         }
 
+        .publish-panel {
+            padding: 1rem;
+            border: 1px solid var(--c-border-soft);
+            border-radius: 8px;
+            background: var(--c-surface);
+            color: var(--c-text);
+        }
+
+        .duration-options {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+
+        .duration-option {
+            min-height: 48px;
+            border: 1px solid var(--c-border-soft);
+            border-radius: 8px;
+            background: var(--c-surface-muted);
+            color: var(--c-text);
+            font-weight: 600;
+        }
+
+        .duration-option[aria-pressed="true"] {
+            border-color: var(--c-border);
+            color: var(--c-accent);
+            background: rgba(var(--c-accent-rgb), 0.12);
+        }
+
+        .future .duration-option {
+            transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        }
+
+        .future .duration-option:hover,
+        .future .duration-option:focus-visible,
+        .future .duration-option[aria-pressed="true"] {
+            box-shadow: 0 0 16px var(--c-glow);
+        }
+
+        .future .duration-option:hover {
+            transform: translateY(-1px);
+        }
+
+        .validation-message {
+            margin-top: 0.5rem;
+            color: var(--c-accent-3);
+            font-size: 0.875rem;
+        }
+
+        .ai-guidance-value {
+            color: var(--c-accent);
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .original-work-confirmation {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            cursor: pointer;
+        }
+
+        .original-work-confirmation input {
+            width: 1.125rem;
+            height: 1.125rem;
+            margin-top: 0.125rem;
+            accent-color: var(--c-accent);
+            flex: 0 0 auto;
+        }
+
         .icon-svg {
             stroke-width: 2;
             stroke-linecap: round;
@@ -364,6 +434,22 @@ header {
                 </div>
             </div>
 
+            <section id="aiValuationPanel" class="publish-panel" aria-live="polite">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="font-semibold">AI Value Guidance</h2>
+                        <p id="aiValuationStatus" class="text-sm opacity-70 mt-1">Select an artwork file to request an estimate.</p>
+                    </div>
+                    <button id="aiValuationRetry" type="button" class="btn-secondary" onclick="requestAIValuation()" style="display: none;">Retry</button>
+                </div>
+                <div id="aiValuationContent" class="mt-3" style="display: none;">
+                    <div id="aiValuationRange" class="ai-guidance-value"></div>
+                    <div id="aiValuationSuggestion" class="text-sm mt-1"></div>
+                    <div id="aiValuationRationale" class="text-sm opacity-70 mt-2"></div>
+                    <div class="text-xs opacity-60 mt-2">Guidance only. It never changes settlement, floor, royalties, ownership, or minting.</div>
+                </div>
+            </section>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block opacity-70 mb-2 font-medium">Title</label>
@@ -380,6 +466,31 @@ header {
                 <textarea id="artDescription" class="form-input h-32" placeholder="Share the story, medium, and collector context..."></textarea>
             </div>
 
+            <section class="publish-panel" aria-labelledby="auctionDurationLabel">
+                <div id="auctionDurationLabel" class="font-medium mb-3">Auction Duration <span aria-hidden="true">*</span></div>
+                <div class="duration-options" role="group" aria-label="Auction duration">
+                    <button type="button" class="duration-option" data-duration="24" aria-pressed="false" onclick="selectAuctionDuration(24)">24 hours</button>
+                    <button type="button" class="duration-option" data-duration="36" aria-pressed="false" onclick="selectAuctionDuration(36)">36 hours</button>
+                    <button type="button" class="duration-option" data-duration="48" aria-pressed="false" onclick="selectAuctionDuration(48)">48 hours</button>
+                </div>
+                <p id="auctionDurationError" class="validation-message" style="display: none;">Choose an auction duration before publishing.</p>
+            </section>
+
+            <section class="publish-panel" aria-labelledby="beforePublishTitle">
+                <h2 id="beforePublishTitle" class="font-semibold mb-3">Before you publish</h2>
+                <ul class="text-sm opacity-80 space-y-1 mb-4">
+                    <li>Publish only your own original work.</li>
+                    <li>Do not upload screenshots or unrelated random files.</li>
+                    <li>Do not publish duplicates or use fake titles.</li>
+                    <li>Your NFT is minted only after a successful auction settlement.</li>
+                </ul>
+                <label class="original-work-confirmation">
+                    <input id="originalWorkConfirm" type="checkbox" onchange="clearOriginalWorkError()">
+                    <span>I confirm this is my original work.</span>
+                </label>
+                <p id="originalWorkError" class="validation-message" style="display: none;">Confirm that this is your original work before publishing.</p>
+            </section>
+
             <button id="publishBtn" onclick="handleUpload()" class="btn-main w-full">Publish Artwork</button>
         </div>
     </main>
@@ -387,6 +498,13 @@ header {
     <script>
         let selectedFile = null;
         let uploading = false;
+        let selectedAuctionDuration = null;
+        let latestAIValuation = null;
+        let aiValuationRequestId = 0;
+        let aiValuationController = null;
+
+        const AI_ANALYSIS_TIMEOUT_MS = 20000;
+        const AI_PREVIEW_MAX_DATA_URL_LENGTH = 1800000;
 
         function getTransactionErrorMessage(error, fallback) {
             return window.ArtSoulTransactionErrors?.message?.(error, fallback) ||
@@ -600,6 +718,169 @@ header {
             };
         }
 
+        function selectAuctionDuration(hours) {
+            selectedAuctionDuration = [24, 36, 48].includes(Number(hours)) ? Number(hours) : null;
+            document.querySelectorAll('.duration-option').forEach(button => {
+                button.setAttribute('aria-pressed', String(Number(button.dataset.duration) === selectedAuctionDuration));
+            });
+            document.getElementById('auctionDurationError').style.display = 'none';
+        }
+
+        function clearOriginalWorkError() {
+            document.getElementById('originalWorkError').style.display = 'none';
+        }
+
+        function formatEthEstimate(value) {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return '0';
+            return numeric.toLocaleString(undefined, { maximumFractionDigits: 6 });
+        }
+
+        function setAIValuationState(state, details = {}) {
+            const status = document.getElementById('aiValuationStatus');
+            const content = document.getElementById('aiValuationContent');
+            const retry = document.getElementById('aiValuationRetry');
+            const range = document.getElementById('aiValuationRange');
+            const suggestion = document.getElementById('aiValuationSuggestion');
+            const rationale = document.getElementById('aiValuationRationale');
+
+            if (state === 'loading') {
+                status.textContent = 'Analyzing the artwork...';
+                content.style.display = 'none';
+                retry.style.display = 'none';
+                retry.disabled = true;
+                return;
+            }
+
+            retry.disabled = false;
+            if (state === 'ready' && details.valuation) {
+                const valuation = details.valuation;
+                status.textContent = details.logged
+                    ? 'Estimate ready.'
+                    : 'Estimate ready. The guidance log is temporarily unavailable.';
+                range.textContent = `${formatEthEstimate(valuation.estimated_value_min_eth)} - ${formatEthEstimate(valuation.estimated_value_max_eth)} ETH`;
+                suggestion.textContent = `Suggested starting price: ${formatEthEstimate(valuation.suggested_start_price_eth)} ETH - ${valuation.confidence || 'medium'} confidence`;
+                rationale.textContent = valuation.rationale || '';
+                content.style.display = 'block';
+                retry.style.display = 'inline-flex';
+                return;
+            }
+
+            status.textContent = details.message || 'Estimate unavailable. You can still publish normally.';
+            content.style.display = 'none';
+            retry.style.display = selectedFile ? 'inline-flex' : 'none';
+        }
+
+        async function createAIImagePreview(file) {
+            if (!file?.type?.startsWith('image/')) return '';
+
+            const objectUrl = URL.createObjectURL(file);
+            try {
+                const image = await new Promise((resolve, reject) => {
+                    const element = new Image();
+                    element.onload = () => resolve(element);
+                    element.onerror = reject;
+                    element.src = objectUrl;
+                });
+
+                let maxDimension = 1024;
+                for (let attempt = 0; attempt < 3; attempt += 1) {
+                    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+                    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+                    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/webp', 0.78);
+                    if (dataUrl.length <= AI_PREVIEW_MAX_DATA_URL_LENGTH) return dataUrl;
+                    maxDimension = Math.round(maxDimension * 0.7);
+                }
+            } catch (error) {
+                console.warn('[AI Guidance] Could not prepare image preview:', error);
+            } finally {
+                URL.revokeObjectURL(objectUrl);
+            }
+
+            return '';
+        }
+
+        async function requestAIValuation(file = selectedFile) {
+            if (!file) {
+                setAIValuationState('unavailable', { message: 'Select an artwork file to request an estimate.' });
+                return;
+            }
+
+            const requestId = ++aiValuationRequestId;
+            latestAIValuation = null;
+            aiValuationController?.abort();
+            const controller = new AbortController();
+            aiValuationController = controller;
+            const timeout = setTimeout(() => controller.abort(), AI_ANALYSIS_TIMEOUT_MS);
+            setAIValuationState('loading');
+
+            try {
+                const walletAddress = window.getCurrentWalletAddress?.();
+                if (!walletAddress) {
+                    throw new Error('Connect your wallet to request an estimate. Publishing remains available after you connect.');
+                }
+
+                const isAuthenticated = await window.SupabaseAuth?.isAuthenticated();
+                if (!isAuthenticated) {
+                    const authenticated = await window.ensureAuthenticated?.();
+                    if (!authenticated) {
+                        throw new Error('Sign in with your wallet to request an estimate. You can still publish without one.');
+                    }
+                }
+
+                const mediaDataUrl = await createAIImagePreview(file);
+                if (requestId !== aiValuationRequestId) return;
+
+                const response = await fetch('/api/ai/analyze', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        title: normalizeArtworkTitle(document.getElementById('artTitle').value),
+                        description: document.getElementById('artDescription').value.trim(),
+                        creator_value: document.getElementById('artPrice').value,
+                        media_type: file.type,
+                        creator: walletAddress,
+                        chain_id: window.getCurrentChainId?.() || 84532,
+                        media_data_url: mediaDataUrl || undefined
+                    })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data?.valuation) {
+                    throw new Error(data?.message || 'Estimate unavailable. You can still publish normally.');
+                }
+                if (requestId !== aiValuationRequestId) return;
+
+                latestAIValuation = {
+                    ...data.valuation,
+                    model: data.model || 'gemini-2.5-flash-lite',
+                    guidance_only: true,
+                    generated_at: new Date().toISOString()
+                };
+                if (!data.valuation_logged) {
+                    console.warn('[AI Guidance] Estimate returned but ai_valuations logging was unavailable.');
+                }
+                setAIValuationState('ready', {
+                    valuation: latestAIValuation,
+                    logged: Boolean(data.valuation_logged)
+                });
+            } catch (error) {
+                if (requestId !== aiValuationRequestId) return;
+                const message = error?.name === 'AbortError'
+                    ? 'Estimate unavailable because the request took too long. You can still publish normally.'
+                    : (error?.message || 'Estimate unavailable. You can still publish normally.');
+                console.warn('[AI Guidance] Analysis unavailable:', error);
+                setAIValuationState('unavailable', { message });
+            } finally {
+                clearTimeout(timeout);
+                if (aiValuationController === controller) aiValuationController = null;
+            }
+        }
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (file) {
@@ -626,6 +907,7 @@ header {
                     }
                 };
                 reader.readAsDataURL(file);
+                requestAIValuation(file);
             }
         }
 
@@ -639,6 +921,20 @@ header {
             // Validation
             if (!selectedFile) {
                 alert('Please select an artwork file to publish');
+                return;
+            }
+
+            if (!selectedAuctionDuration) {
+                document.getElementById('auctionDurationError').style.display = 'block';
+                document.getElementById('auctionDurationLabel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                alert('Choose a 24, 36, or 48 hour auction duration before publishing.');
+                return;
+            }
+
+            if (!document.getElementById('originalWorkConfirm').checked) {
+                document.getElementById('originalWorkError').style.display = 'block';
+                document.getElementById('beforePublishTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                alert('Confirm that this is your original work before publishing.');
                 return;
             }
 
@@ -696,6 +992,7 @@ header {
                     mediaType: selectedFile.type,
                     creator: walletAddress,
                     creatorValue: price,
+                    aiGuidance: latestAIValuation,
                     createdAt: new Date().toISOString()
                 });
 
@@ -757,7 +1054,7 @@ header {
                     network: window.ArtSoulContracts.currentNetwork
                 });
 
-                // Step 7: Create the initial auction immediately (24h)
+                // Step 7: Create the initial auction using the required creator-selected duration.
                 setTransactionButtonProcessing(uploadBtn, 'Launching auction...');
                 let auctionCreated = false;
                 let dbSynced = false;
@@ -765,7 +1062,7 @@ header {
                     const auctionTxHash = await window.ArtSoulContracts.createAuction(
                         result.artworkId,
                         price,
-                        24 // Supported auction durations are 24h / 36h / 48h
+                        selectedAuctionDuration
                     );
                     auctionCreated = true;
                     pendingArtwork = savePendingArtwork({

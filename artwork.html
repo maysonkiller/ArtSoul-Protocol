@@ -1053,7 +1053,7 @@ body.classic {
                         wouldBuy: 0,
                         watching: 0
                     });
-                    setAiGuidance(window.ArtSoulDiscovery?.getAIGuidance?.(data) || null);
+                    setAiGuidance(data.ai_guidance || window.ArtSoulDiscovery?.getAIGuidance?.(data) || null);
 
                     // Keep share previews branded; artwork-specific data stays in the page content.
                     const pageUrl = window.location.href;
@@ -2041,9 +2041,24 @@ body.classic {
                                     </div>
 
                                     {aiGuidance && (
-                                        <div className={`mt-4 p-3 rounded-lg text-sm ${isClassic ? 'bg-gray-700/50' : 'bg-purple-900/20 border border-purple-500/20'}`}>
+                                        <div
+                                            className="mt-4 p-3 rounded-lg text-sm"
+                                            style={{
+                                                background: 'var(--c-surface-muted)',
+                                                border: '1px solid var(--c-border-soft)',
+                                                color: 'var(--c-text)'
+                                            }}
+                                        >
                                             <div className="font-semibold mb-1">Value Guidance</div>
-                                            {aiGuidance.range ? (
+                                            {Number.isFinite(Number(aiGuidance.estimated_value_min_eth)) && Number.isFinite(Number(aiGuidance.estimated_value_max_eth)) ? (
+                                                <div className="opacity-80">
+                                                    Estimated range: {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} - {Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                    <div className="mt-1">
+                                                        Suggested starting price: {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH - {aiGuidance.confidence || 'medium'} confidence
+                                                    </div>
+                                                    {aiGuidance.rationale && <div className="mt-1 opacity-80">{aiGuidance.rationale}</div>}
+                                                </div>
+                                            ) : aiGuidance.range ? (
                                                 <div className="opacity-80">
                                                     Estimated range: {aiGuidance.range.low} - {aiGuidance.range.high} ETH - Confidence {aiGuidance.confidence}%
                                                 </div>
