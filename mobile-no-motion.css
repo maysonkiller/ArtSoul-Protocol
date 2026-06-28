@@ -1,0 +1,59 @@
+/*
+ * Global mobile/touch motion guard.
+ * Keep this stylesheet last so later component styles cannot restore motion.
+ * Theme colors, borders, shadows, and static glow remain owned by the theme CSS.
+ */
+@media (hover: none),
+       (pointer: coarse),
+       (any-pointer: coarse),
+       (max-width: 768px),
+       (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto !important;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        animation-delay: 0s !important;
+        animation-duration: 0s !important;
+        animation-iteration-count: 1 !important;
+        transition: none !important;
+        transition-delay: 0s !important;
+        transition-duration: 0s !important;
+        scroll-behavior: auto !important;
+        will-change: auto !important;
+    }
+
+    :where(
+        a,
+        button,
+        label,
+        summary,
+        input,
+        select,
+        textarea,
+        [role="button"],
+        [tabindex],
+        [class*="action"],
+        [class*="banner"],
+        [class*="btn"],
+        [class*="button"],
+        [class*="card"],
+        [class*="filter"],
+        [class*="item"],
+        [class*="logo"],
+        [class*="tab"],
+        [class*="tile"]
+    ):is(:hover, :active, :focus-visible) {
+        transform: none !important;
+    }
+
+    [class*="parallax"],
+    [data-parallax],
+    [data-motion] {
+        transform: none !important;
+        background-attachment: scroll !important;
+    }
+}
