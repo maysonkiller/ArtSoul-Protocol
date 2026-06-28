@@ -27,12 +27,9 @@ class StatusBannerSystem {
      * Check if current user is admin
      */
     isAdmin() {
-        const ADMIN_WALLETS = [
-            '0x742d35cc6634c0532925a3b844bc9e7595f0beb2',
-            '0xccb4f41c302141a22169543dffa5298ea8a08058'
-        ];
-        const currentWallet = window.getCurrentWalletAddress?.()?.toLowerCase();
-        return currentWallet && ADMIN_WALLETS.includes(currentWallet);
+        // Frontend wallet allowlists are intentionally disabled. Administrative
+        // access must come from an authenticated server-side role registry.
+        return false;
     }
 
     /**
