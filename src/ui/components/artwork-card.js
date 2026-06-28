@@ -154,6 +154,27 @@
         return placeholder;
     }
 
+    function prepareVideoPreview(video) {
+        if (!video || video.dataset.artsoulPreviewPrepared === 'true') return;
+        video.dataset.artsoulPreviewPrepared = 'true';
+
+        const renderFirstFrame = () => {
+            const duration = Number(video.duration);
+            if (!Number.isFinite(duration) || duration <= 0) return;
+            const target = Math.min(0.1, Math.max(0, duration - 0.05));
+            if (Math.abs(video.currentTime - target) < 0.01) return;
+            try {
+                video.currentTime = target;
+            } catch {
+                // The poster remains visible when a browser cannot seek before playback.
+            }
+        };
+
+        if (video.readyState >= 1) renderFirstFrame();
+        video.addEventListener('loadedmetadata', renderFirstFrame, { once: true });
+        video.addEventListener('loadeddata', renderFirstFrame, { once: true });
+    }
+
     function createMediaElement(artwork = {}) {
         const url = mediaUrl(artwork);
         const container = document.createElement('div');
@@ -171,7 +192,10 @@
             video.className = 'artsoul-card-media-object';
             video.controls = true;
             video.preload = 'metadata';
+            video.poster = 'ARTSOULlogo-clean.png';
+            video.muted = true;
             video.playsInline = true;
+            prepareVideoPreview(video);
             video.addEventListener('click', event => event.stopPropagation());
             container.appendChild(video);
             const badge = document.createElement('span');
@@ -280,8 +304,11 @@
                     src: url,
                     className: 'artsoul-card-media-object',
                     preload: 'metadata',
+                    poster: 'ARTSOULlogo-clean.png',
+                    muted: true,
                     controls: true,
                     playsInline: true,
+                    onLoadedMetadata: event => prepareVideoPreview(event.currentTarget),
                     onClick: event => event.stopPropagation()
                 }),
                 h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO')
@@ -354,6 +381,7 @@
         mediaType,
         hasSafeMedia,
         detailHref,
+        prepareVideoPreview,
         toTimestamp
     };
 })();

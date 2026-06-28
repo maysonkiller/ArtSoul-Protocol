@@ -39,7 +39,7 @@
     <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=14">
+    <link rel="stylesheet" href="unified-styles.css?v=15">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -249,13 +249,7 @@ body.classic {
         // Media Viewer Component - supports images, videos, audio, GIFs
         function MediaViewer({ url, fileType, title }) {
             const [mediaError, setMediaError] = React.useState(false);
-            const [audioContext, setAudioContext] = React.useState(null);
-            const [analyser, setAnalyser] = React.useState(null);
             const [isPlaying, setIsPlaying] = React.useState(false);
-            const audioRef = React.useRef(null);
-            const logoRef = React.useRef(null);
-            const animationRef = React.useRef(null);
-            const isClassic = localStorage.getItem('artsoul_theme') !== 'future';
 
             const getMediaType = () => {
                 const type = fileType?.toLowerCase() || '';
@@ -285,17 +279,6 @@ body.classic {
                 setMediaError(false);
             }, [url]);
 
-            React.useEffect(() => {
-                return () => {
-                    if (animationRef.current) {
-                        cancelAnimationFrame(animationRef.current);
-                    }
-                    if (audioContext) {
-                        audioContext.close();
-                    }
-                };
-            }, [audioContext]);
-
             const renderMediaFallback = (message = 'Media unavailable') => (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-black p-8 text-center">
                     <div className="text-2xl mb-3 opacity-60">{message}</div>
@@ -304,6 +287,19 @@ body.classic {
                     </div>
                 </div>
             );
+
+            const renderFirstVideoFrame = (event) => {
+                const video = event.currentTarget;
+                const duration = Number(video.duration);
+                if (!Number.isFinite(duration) || duration <= 0) return;
+                const target = Math.min(0.1, Math.max(0, duration - 0.05));
+                if (Math.abs(video.currentTime - target) < 0.01) return;
+                try {
+                    video.currentTime = target;
+                } catch {
+                    // The poster remains visible when early seeking is unavailable.
+                }
+            };
 
             if (!isSafeMediaUrl || mediaError) {
                 return renderMediaFallback();
@@ -316,8 +312,10 @@ body.classic {
                         controls
                         loop
                         playsInline
-                        className="w-full h-full object-contain bg-black"
-                        style={{ maxHeight: '100%' }}
+                        preload="metadata"
+                        poster="ARTSOULlogo-clean.png"
+                        className="artwork-detail-media-object artwork-detail-video"
+                        onLoadedMetadata={renderFirstVideoFrame}
                         onError={() => setMediaError(true)}
                     >
                         Your browser does not support video playback.
@@ -326,115 +324,33 @@ body.classic {
             }
 
             if (mediaType === 'audio') {
-                const setupAudioAnalyser = () => {
-                    if (!audioRef.current || audioContext) return;
-
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    const analyserNode = ctx.createAnalyser();
-                    analyserNode.fftSize = 256;
-
-                    const source = ctx.createMediaElementSource(audioRef.current);
-                    source.connect(analyserNode);
-                    analyserNode.connect(ctx.destination);
-
-                    setAudioContext(ctx);
-                    setAnalyser(analyserNode);
-
-                    // Start animation immediately after setup (works in both modes)
-                    if (logoRef.current) {
-                        const animate = () => {
-                            if (!analyserNode || !logoRef.current) return;
-
-                            const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-                            analyserNode.getByteFrequencyData(dataArray);
-
-                            const bass = dataArray.slice(0, 10).reduce((a, b) => a + b, 0) / 10;
-                            const mid = dataArray.slice(10, 50).reduce((a, b) => a + b, 0) / 40;
-                            const high = dataArray.slice(50, 100).reduce((a, b) => a + b, 0) / 50;
-
-                            const bassIntensity = bass / 255;
-                            const midIntensity = mid / 255;
-                            const highIntensity = high / 255;
-
-                            if (!isClassic) {
-                                // Future mode: reactive effects
-                                const rotationSpeed = 3 + (bassIntensity * 10);
-                                const cyan = Math.floor(bassIntensity * 255);
-                                const purple = Math.floor(midIntensity * 255);
-
-                                logoRef.current.style.animationDuration = `${20 / rotationSpeed}s`;
-                                logoRef.current.style.filter = `drop-shadow(0 0 ${20 + bassIntensity * 60}px rgba(${cyan}, 245, 255, ${0.7 + bassIntensity * 0.3})) drop-shadow(0 0 ${40 + midIntensity * 80}px rgba(${purple}, 0, 255, ${0.5 + midIntensity * 0.5})) drop-shadow(0 0 ${60 + highIntensity * 100}px rgba(255, ${Math.floor(highIntensity * 100)}, 255, ${0.3 + highIntensity * 0.4}))`;
-                                logoRef.current.style.transform = `scale(${1 + bassIntensity * 0.3})`;
-                            }
-
-                            animationRef.current = requestAnimationFrame(animate);
-                        };
-                        animate();
-                    }
-                };
-
-                const handlePlay = () => {
-                    if (!audioContext) {
-                        setupAudioAnalyser();
-                    }
-                    setIsPlaying(true);
-                };
-
-                const handlePause = () => {
-                    setIsPlaying(false);
-                    if (animationRef.current) {
-                        cancelAnimationFrame(animationRef.current);
-                    }
-                    // Pause animation without resetting position
-                    if (logoRef.current) {
-                        logoRef.current.style.animationPlayState = 'paused';
-                    }
-                };
-
                 return (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-black p-8">
-                        <div className="mb-8 text-center">
-                            <div className="relative w-48 h-48 mx-auto mb-6">
+                    <div className="artwork-detail-audio">
+                        <div className="artwork-detail-audio-visual">
+                            <div className="artwork-detail-audio-logo-wrap">
                                 <img
-                                    ref={logoRef}
                                     src="ARTSOULlogo.png"
                                     alt="Music"
-                                    className="w-full h-full object-contain"
-                                    style={{
-                                        animation: 'spin 3s linear infinite',
-                                        animationPlayState: isPlaying ? 'running' : 'paused',
-                                        filter: isClassic
-                                            ? 'drop-shadow(0 0 8px rgba(var(--c-accent-rgb), 0.4))'
-                                            : 'drop-shadow(0 0 20px rgba(var(--c-accent-rgb), 0.6)) drop-shadow(0 0 40px rgba(var(--c-accent-2-rgb), 0.4))',
-                                        transition: 'filter 0.1s ease-out, transform 0.1s ease-out'
-                                    }}
+                                    className={`artwork-detail-audio-logo ${isPlaying ? 'is-playing' : ''}`}
                                 />
-                                <style>{`
-                                    @keyframes spin {
-                                        from { transform: rotate(0deg); }
-                                        to { transform: rotate(360deg); }
-                                    }
-                                `}</style>
                             </div>
-                            <div className="text-xl opacity-70">{sanitizedTitle}</div>
+                            <div className="artwork-detail-audio-title">{sanitizedTitle}</div>
                         </div>
-                        <audio
-                            ref={audioRef}
-                            src={url}
-                            controls
-                            crossOrigin="anonymous"
-                            onPlay={handlePlay}
-                            onPause={handlePause}
-                            onEnded={handlePause}
-                            onError={() => setMediaError(true)}
-                            className="w-full max-w-md"
-                            style={{
-                                filter: 'invert(1) hue-rotate(180deg)',
-                                borderRadius: '0.5rem'
-                            }}
-                        >
-                            Your browser does not support audio playback.
-                        </audio>
+                        <div className="artwork-detail-audio-controls">
+                            <audio
+                                src={url}
+                                controls
+                                preload="metadata"
+                                crossOrigin="anonymous"
+                                onPlay={() => setIsPlaying(true)}
+                                onPause={() => setIsPlaying(false)}
+                                onEnded={() => setIsPlaying(false)}
+                                onError={() => setMediaError(true)}
+                                className="artwork-detail-audio-player"
+                            >
+                                Your browser does not support audio playback.
+                            </audio>
+                        </div>
                     </div>
                 );
             }
@@ -444,7 +360,7 @@ body.classic {
                 <img
                     src={url}
                     alt={sanitizedTitle}
-                    className="w-full h-full object-contain bg-black"
+                    className="artwork-detail-media-object artwork-detail-image"
                     onError={() => setMediaError(true)}
                 />
             );
@@ -1675,17 +1591,8 @@ body.classic {
                     <main className="py-0 lg:py-12">
                         <div className="grid grid-cols-1 lg:grid-cols-[1fr_500px] gap-0">
                             {/* Artwork Media Viewer */}
-                            <div className="w-full h-[60vh] lg:h-screen lg:sticky lg:top-0 bg-black flex items-center justify-center p-4 lg:p-8">
-                                <div className={`relative w-full h-full rounded-xl overflow-hidden ${
-                                    isClassic
-                                        ? 'border-2 border-gray-700 shadow-2xl'
-                                        : 'border-2 border-cyan-500/30 shadow-2xl shadow-cyan-500/20'
-                                }`}
-                                style={!isClassic ? {
-                                    boxShadow: '0 0 40px rgba(var(--c-accent-rgb), 0.3), 0 0 80px rgba(var(--c-accent-2-rgb), 0.2)',
-                                    animation: 'glow-pulse 3s ease-in-out infinite'
-                                } : {}}
-                                >
+                            <div className="artwork-detail-stage w-full h-[60vh] lg:h-screen lg:sticky lg:top-0 flex items-center justify-center p-4 lg:p-8">
+                                <div className="artwork-detail-frame relative w-full h-full rounded-xl overflow-hidden">
                                     {safeMediaUrl ? (
                                         <MediaViewer
                                             url={safeMediaUrl}
