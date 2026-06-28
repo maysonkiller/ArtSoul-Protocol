@@ -61,9 +61,78 @@
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
     <script src="src/ui/components/artwork-card.js?v=1"></script>
     <style>
-        @keyframes spin {
+        @keyframes profileAudioRotation {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
+        }
+
+        .profile-artwork-grid {
+            align-items: stretch;
+        }
+
+        .profile-artwork-card {
+            cursor: pointer;
+        }
+
+        .profile-artwork-card .artsoul-card-body {
+            min-height: 104px;
+        }
+
+        .profile-audio-thumbnail,
+        .profile-media-fallback {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(var(--c-accent-rgb), 0.08), rgba(var(--c-accent-2-rgb), 0.08));
+        }
+
+        .profile-audio-logo,
+        .profile-media-fallback img {
+            width: 58%;
+            height: 58%;
+            object-fit: contain;
+        }
+
+        .profile-card-skeleton {
+            pointer-events: none;
+        }
+
+        .profile-skeleton-media,
+        .profile-skeleton-line {
+            background: var(--c-surface-muted);
+            border: 1px solid var(--c-border-soft);
+        }
+
+        .profile-skeleton-media {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        .profile-skeleton-line {
+            height: 14px;
+            border-radius: 4px;
+        }
+
+        .profile-connect-state,
+        .profile-empty-state {
+            border: 1px solid var(--c-border-soft);
+            border-radius: 8px;
+            background: var(--c-surface);
+            color: var(--c-text);
+        }
+
+        @media (min-width: 769px) {
+            body.future .profile-audio-logo {
+                animation: profileAudioRotation 14s linear infinite;
+            }
+        }
+
+        @media (max-width: 768px), (prefers-reduced-motion: reduce) {
+            .profile-audio-logo {
+                animation: none !important;
+            }
         }
     </style>
     <script src="avatar-dropdown.js?v=11"></script>
@@ -237,12 +306,14 @@
             const [selectedGallery, setSelectedGallery] = useState('created');
             const [myArtworks, setMyArtworks] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [artworksLoading, setArtworksLoading] = useState(true);
             const [isOwnProfile, setIsOwnProfile] = useState(true);
             const [pendingPayments, setPendingPayments] = useState([]);
             const [discoveryProfile, setDiscoveryProfile] = useState(null);
             const fileInputRef = useRef(null);
             const profileSignalRef = useRef({ address: null, chainId: null });
             const profileRequestRef = useRef(0);
+            const artworksRequestRef = useRef(0);
             const transactionActionsRef = useRef(new Set());
             const [transactionActions, setTransactionActions] = useState({});
 
@@ -544,8 +615,139 @@
                 return result;
             }
 
-            function getArtworkStatusLabel(artwork = {}) {
-                return window.ArtSoulArtworkCard?.statusInfo?.(artwork)?.label || 'Not yet minted';
+            function getProfileArtworkStatus(artwork = {}) {
+                const rawStatus = String(artwork.status || artwork.auction_state || '').toLowerCase();
+                const sharedStatus = window.ArtSoulArtworkCard?.statusInfo?.(artwork) || {};
+
+                if (isMintedArtwork(artwork) || sharedStatus.key === 'sold' || sharedStatus.key === 'minted') {
+                    return { key: 'sold', label: 'Sold' };
+                }
+                if (sharedStatus.key === 'ended_no_bids' || rawStatus.includes('no_bids')) {
+                    return { key: 'ended_no_bids', label: 'Ended — no bids' };
+                }
+                if (
+                    sharedStatus.key === 'unsettled' ||
+                    sharedStatus.key === 'ended' ||
+                    rawStatus.includes('default') ||
+                    rawStatus.includes('settlement') ||
+                    rawStatus === 'awaiting_end'
+                ) {
+                    return { key: 'unsettled', label: 'Auction unsettled' };
+                }
+                if (sharedStatus.key === 'live') {
+                    return { key: 'live', label: 'Live Auction' };
+                }
+                return { key: 'not_minted', label: 'Not yet minted' };
+            }
+
+            function getProfileArtworkPrice(artwork = {}) {
+                const minted = isMintedArtwork(artwork);
+                const candidates = minted
+                    ? [artwork.listing_price, artwork.resale_price, artwork.sale_price, artwork.price, artwork.floor_price, artwork.canonical_floor]
+                    : [artwork.start_price, artwork.creator_value, artwork.price];
+
+                for (const value of candidates) {
+                    const numeric = Number(value);
+                    if (Number.isFinite(numeric) && numeric > 0) {
+                        return `${numeric.toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH`;
+                    }
+                }
+                return '';
+            }
+
+            function getProfileArtworkHref(artwork = {}) {
+                const sharedHref = window.ArtSoulArtworkCard?.detailHref?.(artwork) || '';
+                if (!sharedHref || sharedHref.includes('id=pending%3A')) return '';
+                return sharedHref;
+            }
+
+            function ProfileArtworkMedia({ artwork }) {
+                const [mediaFailed, setMediaFailed] = useState(false);
+                const mediaUrl = window.ArtSoulArtworkCard?.mediaUrl?.(artwork) || artwork.file_url || artwork.media_url || '';
+                const mediaType = window.ArtSoulArtworkCard?.mediaType?.(artwork) || 'image';
+                const safeMedia = window.ArtSoulArtworkCard?.hasSafeMedia?.(artwork) !== false;
+
+                if (mediaType === 'audio') {
+                    return (
+                        <div className="artsoul-card-media">
+                            <div className="profile-audio-thumbnail">
+                                <img className="profile-audio-logo" src="ARTSOULlogo.png" alt="Audio artwork" />
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (!mediaUrl || !safeMedia || mediaFailed) {
+                    return (
+                        <div className="artsoul-card-media">
+                            <div className="profile-media-fallback">
+                                <img src="ARTSOULlogo-clean.png" alt="ArtSoul artwork" />
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (mediaType === 'video') {
+                    return (
+                        <div className="artsoul-card-media">
+                            <video
+                                src={mediaUrl}
+                                className="artsoul-card-media-object"
+                                preload="metadata"
+                                muted
+                                playsInline
+                                onError={() => setMediaFailed(true)}
+                            />
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="artsoul-card-media">
+                        <img
+                            src={mediaUrl}
+                            alt={artwork.title || 'Artwork'}
+                            className="artsoul-card-media-object"
+                            onError={() => setMediaFailed(true)}
+                        />
+                    </div>
+                );
+            }
+
+            function ProfileArtworkCard({ artwork }) {
+                const status = getProfileArtworkStatus(artwork);
+                const price = getProfileArtworkPrice(artwork);
+                const href = getProfileArtworkHref(artwork);
+                const CardElement = href ? 'a' : 'div';
+
+                return (
+                    <CardElement
+                        href={href || undefined}
+                        className="artsoul-artwork-card profile-artwork-card"
+                        aria-label={href ? `Open ${artwork.title || 'artwork'}` : undefined}
+                    >
+                        <ProfileArtworkMedia artwork={artwork} />
+                        <div className="artsoul-card-body">
+                            <h4 className="artsoul-card-title">{artwork.title || 'Untitled Artwork'}</h4>
+                            <div className="artsoul-card-meta">
+                                <span className={`artsoul-card-status artsoul-card-status-${status.key}`}>{status.label}</span>
+                                {price && <span className="artsoul-card-price">{price}</span>}
+                            </div>
+                        </div>
+                    </CardElement>
+                );
+            }
+
+            function ProfileArtworkSkeleton({ index }) {
+                return (
+                    <div className="artsoul-artwork-card profile-card-skeleton" aria-hidden="true" key={`profile-skeleton-${index}`}>
+                        <div className="profile-skeleton-media"></div>
+                        <div className="artsoul-card-body">
+                            <div className="profile-skeleton-line" style={{ width: '72%' }}></div>
+                            <div className="profile-skeleton-line" style={{ width: '48%', marginTop: 'auto' }}></div>
+                        </div>
+                    </div>
+                );
             }
 
             function canCreateNewAuction(artwork = {}, walletAddress = '') {
@@ -784,6 +986,7 @@
 
             async function loadProfile(walletAddressOverride = null) {
                 const requestId = ++profileRequestRef.current;
+                setArtworksLoading(true);
 
                 // Check if viewing another user's profile
                 const viewAddress = getViewAddress();
@@ -793,6 +996,7 @@
                     if (requestId !== profileRequestRef.current) return;
                     setProfile(null);
                     setMyArtworks([]);
+                    setArtworksLoading(false);
                     setPendingPayments([]);
                     setDiscoveryProfile(null);
                     setIsOwnProfile(false);
@@ -845,8 +1049,14 @@
             }
 
             async function loadMyArtworks() {
+                const requestId = ++artworksRequestRef.current;
+                setArtworksLoading(true);
+
                 if (!profile?.wallet_address) {
-                    setMyArtworks([]);
+                    if (requestId === artworksRequestRef.current) {
+                        setMyArtworks([]);
+                        setArtworksLoading(false);
+                    }
                     return;
                 }
 
@@ -888,10 +1098,20 @@
 
                     const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, selectedGallery);
                     const nextArtworks = sortNewestFirst(mergePendingIndexerArtworks(filtered || [], pendingIndexerArtworks));
+                    if (requestId !== artworksRequestRef.current) return;
                     setMyArtworks(nextArtworks);
-                    await refreshDiscoveryProfile(profile, nextArtworks);
+                    refreshDiscoveryProfile(profile, nextArtworks).catch(error => {
+                        console.warn('Discovery profile refresh skipped:', error);
+                    });
                 } catch (error) {
                     console.error('Error loading artworks:', error);
+                    if (requestId === artworksRequestRef.current) {
+                        setMyArtworks([]);
+                    }
+                } finally {
+                    if (requestId === artworksRequestRef.current) {
+                        setArtworksLoading(false);
+                    }
                 }
             }
 
@@ -1000,6 +1220,14 @@
 
             function handleQuickUpload() {
                 window.location.href = 'upload.html';
+            }
+
+            async function handleProfileConnect() {
+                if (typeof window.safeConnectWallet === 'function') {
+                    await window.safeConnectWallet();
+                    return;
+                }
+                await window.web3Modal?.open?.();
             }
 
             function getTransactionActionKey(action, artwork) {
@@ -1236,74 +1464,33 @@
                 }
             }
 
-            function renderArtworkActions(artwork) {
-                if (!isOwnProfile) return null;
-
-                const buttonClass = 'artsoul-card-action-btn';
-                const createAuctionPending = isTransactionActionPending('create-auction', artwork);
-                const resalePending = isTransactionActionPending('list-resale', artwork);
-
-                if (
-                    artwork.source === 'pending_indexer' &&
-                    artwork.stage === 'auction_failed' &&
-                    canCreateNewAuction(artwork, connectedWalletAddress)
-                ) {
-                    return (
-                        <button
-                            onClick={() => handleCreateAuction(artwork)}
-                            className={buttonClass}
-                            disabled={createAuctionPending}
-                            aria-busy={createAuctionPending}
-                        >
-                            {createAuctionPending ? <TransactionProcessingLabel /> : 'Retry Auction'}
-                        </button>
-                    );
-                }
-
-                if (artwork.source === 'pending_indexer') return null;
-
-                return (
-                    <>
-                        {canCreateNewAuction(artwork, connectedWalletAddress) && (
-                            <button
-                                onClick={() => handleCreateAuction(artwork)}
-                                className={buttonClass}
-                                disabled={createAuctionPending}
-                                aria-busy={createAuctionPending}
-                            >
-                                {createAuctionPending ? <TransactionProcessingLabel /> : 'Create New Auction'}
-                            </button>
-                        )}
-                        {hasActiveAuction(artwork) && (
-                            <button onClick={() => window.location.href = `artwork.html?id=${artwork.id}`} className={buttonClass}>
-                                View Auction
-                            </button>
-                        )}
-                        {canListForResale(artwork, connectedWalletAddress) && (
-                            <button
-                                onClick={() => handleListForResale(artwork)}
-                                className={buttonClass}
-                                disabled={resalePending}
-                                aria-busy={resalePending}
-                            >
-                                {resalePending ? <TransactionProcessingLabel /> : 'List for resale'}
-                            </button>
-                        )}
-                    </>
-                );
-            }
+            const bgClass = isClassic ? 'bg-gray-900 text-gray-100' : 'bg-black text-cyan-100';
+            const viewAddress = getViewAddress();
+            const connectedWalletAddress = getActiveWalletAddress();
 
             if (loading) {
                 return (
-                    <div className="flex items-center justify-center min-h-screen">
-                        <div className="text-2xl">Loading...</div>
+                    <div className={`flex items-center justify-center min-h-screen ${bgClass}`}>
+                        <div className="text-lg" style={{ color: 'var(--c-text)' }}>Loading profile...</div>
                     </div>
                 );
             }
 
-            const bgClass = isClassic ? 'bg-gray-900 text-gray-100' : 'bg-black text-cyan-100';
-            const profileAddress = profile?.wallet_address || getViewAddress() || getActiveWalletAddress();
-            const connectedWalletAddress = getActiveWalletAddress();
+            if (!viewAddress && !connectedWalletAddress) {
+                return (
+                    <div className={`min-h-screen ${bgClass}`}>
+                        <main className="container mx-auto px-4 py-12">
+                            <section className="profile-connect-state max-w-xl mx-auto p-8 text-center">
+                                <h1 className="text-2xl font-semibold mb-3">Connect your wallet to view your profile</h1>
+                                <p className="text-sm opacity-70 mb-6">Your creator, auction, sales, and collected artwork sections will appear after connection.</p>
+                                <button type="button" onClick={handleProfileConnect} className="btn-main">Connect Wallet</button>
+                            </section>
+                        </main>
+                    </div>
+                );
+            }
+
+            const profileAddress = profile?.wallet_address || viewAddress || connectedWalletAddress;
             const resolvedProfileName = getProfileDisplayName(profile, profileAddress);
             const resolvedAvatarUrl = getProfileAvatarUrl(profile);
 
@@ -1579,7 +1766,12 @@
                                 {GALLERY_TYPES.map(gallery => (
                                     <button
                                         key={gallery.id}
-                                        onClick={() => setSelectedGallery(gallery.id)}
+                                        onClick={() => {
+                                            if (gallery.id !== selectedGallery) {
+                                                setArtworksLoading(true);
+                                                setSelectedGallery(gallery.id);
+                                            }
+                                        }}
                                         className={`px-6 py-3 rounded-lg font-medium transform hover:scale-105 transition-all ${
                                             selectedGallery === gallery.id
                                                 ? isClassic
@@ -1611,13 +1803,13 @@
                                 <span className={`text-sm ${
                                     isClassic ? 'text-gray-400' : 'text-purple-300'
                                 }`}>
-                                    {myArtworks.length} items
+                                    {artworksLoading ? 'Loading artworks...' : `${myArtworks.length} items`}
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 items-start">
+                            <div className="profile-artwork-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" aria-busy={artworksLoading}>
                                 {/* Add New Button */}
-                                <button
+                                {isOwnProfile && <button
                                     type="button"
                                     onClick={handleQuickUpload}
                                     className="artsoul-artwork-card text-left self-stretch"
@@ -1638,238 +1830,21 @@
                                             <span className="artsoul-card-status">Open publisher</span>
                                         </div>
                                     </div>
-                                </button>
+                                </button>}
 
                                 {/* Existing Artworks */}
-                                {myArtworks.map(artwork => {
-                                    const SharedArtworkCard = window.ArtSoulArtworkCard?.ReactCard;
-                                    if (SharedArtworkCard) {
-                                        return (
-                                            <SharedArtworkCard
-                                                key={artwork.id}
-                                                artwork={artwork}
-                                                slotLabel={getArtworkStatusLabel(artwork)}
-                                                onOpen={() => {
-                                                    if (artwork.source !== 'pending_indexer' || artwork.canonical_v41_id) {
-                                                        window.location.href = `artwork.html?id=${artwork.canonical_v41_id || artwork.id}`;
-                                                    }
-                                                }}
-                                                actions={renderArtworkActions(artwork)}
-                                                respectHidden={false}
-                                            />
-                                        );
-                                    }
-                                    return (
-                                    <div
-                                        key={artwork.id}
-                                        className={`rounded-lg overflow-hidden gallery-item border ${
-                                            isClassic ? 'bg-gray-700 border-gray-600' : 'bg-gray-800/50 backdrop-blur-sm border-cyan-500/20'
-                                        }`}
-                                    >
-                                        {/* Artwork Image */}
-                                        <div
-                                            className={`aspect-square bg-black ${artwork.source !== 'pending_indexer' || artwork.canonical_v41_id ? 'cursor-pointer' : ''}`}
-                                            onClick={() => {
-                                                if (artwork.source !== 'pending_indexer' || artwork.canonical_v41_id) {
-                                                    window.location.href = `artwork.html?id=${artwork.canonical_v41_id || artwork.id}`;
-                                                }
-                                            }}
-                                        >
-                                            {artwork.file_url ? (
-                                                (() => {
-                                                    const fileType = artwork.file_type?.toLowerCase() || '';
-                                                    const url = artwork.file_url.toLowerCase();
+                                {artworksLoading
+                                    ? [...Array(isOwnProfile ? 5 : 6)].map((_, index) => (
+                                        <ProfileArtworkSkeleton index={index} key={`profile-skeleton-${index}`} />
+                                    ))
+                                    : myArtworks.map(artwork => (
+                                        <ProfileArtworkCard key={artwork.id} artwork={artwork} />
+                                    ))}
 
-                                                    // Detect media type
-                                                    const isVideo = fileType === 'video' || url.includes('.mp4') || url.includes('.webm') || url.includes('.mov');
-                                                    const isAudio = fileType === 'audio' || fileType === 'music' || url.includes('.mp3') || url.includes('.wav');
-
-                                                    if (isVideo) {
-                                                        return (
-                                                            <video
-                                                                src={artwork.file_url}
-                                                                className="w-full h-full object-contain"
-                                                                preload="metadata"
-                                                                muted
-                                                                playsInline
-                                                                style={{pointerEvents: 'none'}}
-                                                            />
-                                                        );
-                                                    } else if (isAudio) {
-                                                        return (
-                                                            <div className="w-full h-full flex flex-col items-center justify-center" style={{background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(6, 182, 212, 0.3))', position: 'relative'}}>
-                                                                <img
-                                                                    id={`music-logo-${artwork.id}`}
-                                                                    src="ARTSOULlogo.png"
-                                                                    alt="Music"
-                                                                    style={{
-                                                                        width: '50%',
-                                                                        height: '50%',
-                                                                        objectFit: 'contain',
-                                                                        animation: 'spin 3s linear infinite',
-                                                                        animationPlayState: 'paused',
-                                                                        marginBottom: '1rem'
-                                                                    }}
-                                                                />
-                                                                <audio
-                                                                    src={artwork.file_url}
-                                                                    controls
-                                                                    crossOrigin="anonymous"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    onTouchStart={(e) => e.stopPropagation()}
-                                                                    onPlay={(e) => {
-                                                                        const logo = document.getElementById(`music-logo-${artwork.id}`);
-                                                                        if (logo) logo.style.animationPlayState = 'running';
-                                                                    }}
-                                                                    onPause={(e) => {
-                                                                        const logo = document.getElementById(`music-logo-${artwork.id}`);
-                                                                        if (logo) logo.style.animationPlayState = 'paused';
-                                                                    }}
-                                                                    onEnded={(e) => {
-                                                                        const logo = document.getElementById(`music-logo-${artwork.id}`);
-                                                                        if (logo) logo.style.animationPlayState = 'paused';
-                                                                    }}
-                                                                    style={{width: '90%', maxWidth: '300px'}}
-                                                                />
-                                                            </div>
-                                                        );
-                                                    } else {
-                                                        return <img src={artwork.file_url} alt={artwork.title} className="w-full h-full object-contain" />;
-                                                    }
-                                                })()
-                                            ) : (
-                                                <div className={`w-full h-full flex items-center justify-center ${
-                                                    isClassic ? 'bg-gray-700' : 'bg-gradient-to-br from-purple-900/50 to-cyan-900/50'
-                                                }`}>
-                                                    <div className="text-center p-4">
-                                                        <div className={`text-6xl mb-2 ${
-                                                            isClassic ? 'text-gray-400' : 'text-cyan-400'
-                                                        }`}>
-                                                            +
-                                                        </div>
-                                                        <div className={`text-xs ${
-                                                            isClassic ? 'text-gray-400' : 'text-purple-300'
-                                                        }`}>
-                                                            {artwork.title}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Artwork Info & Actions */}
-                                        <div className={`p-3 ${isClassic ? 'bg-gray-800' : 'bg-gray-900/50'}`}>
-                                            <div className="text-sm font-semibold mb-2 truncate">{artwork.title}</div>
-                                            <div className="text-xs opacity-70 mb-3">{artwork.creator_value || '0'} ETH</div>
-                                            {artwork.source === 'pending_indexer' && (
-                                                <div className="text-xs opacity-70 mb-3 truncate">
-                                                    {artwork.lifecycle_label || 'Finalizing...'}
-                                                </div>
-                                            )}
-                                            {artwork.source !== 'pending_indexer' && (
-                                                <div className={`text-xs font-medium mb-3 ${
-                                                    isClassic ? 'text-gray-300' : 'text-cyan-300'
-                                                }`}>
-                                                    {getArtworkStatusLabel(artwork)}
-                                                </div>
-                                            )}
-
-                                            {/* Action Buttons */}
-                                            {isOwnProfile &&
-                                                artwork.source === 'pending_indexer' &&
-                                                artwork.stage === 'auction_failed' &&
-                                                canCreateNewAuction(artwork, connectedWalletAddress) && (
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => handleCreateAuction(artwork)}
-                                                        disabled={isTransactionActionPending('create-auction', artwork)}
-                                                        aria-busy={isTransactionActionPending('create-auction', artwork)}
-                                                        className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-all ${
-                                                            isClassic
-                                                                ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
-                                                                : 'bg-purple-900/30 hover:bg-purple-900/50 text-purple-400 border border-purple-500/30'
-                                                        }`}
-                                                    >
-                                                        {isTransactionActionPending('create-auction', artwork)
-                                                            ? <TransactionProcessingLabel />
-                                                            : 'Retry Auction'}
-                                                    </button>
-                                                </div>
-                                            )}
-                                            {isOwnProfile && artwork.source !== 'pending_indexer' && (
-                                                <div className="flex gap-2">
-                                                    {canCreateNewAuction(artwork, connectedWalletAddress) && (
-                                                        <button
-                                                            onClick={() => handleCreateAuction(artwork)}
-                                                            disabled={isTransactionActionPending('create-auction', artwork)}
-                                                            aria-busy={isTransactionActionPending('create-auction', artwork)}
-                                                            className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-all ${
-                                                                isClassic
-                                                                    ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
-                                                                : 'bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 border border-cyan-500/30'
-                                                            }`}
-                                                        >
-                                                            {isTransactionActionPending('create-auction', artwork)
-                                                                ? <TransactionProcessingLabel />
-                                                                : 'Create New Auction'}
-                                                        </button>
-                                                    )}
-                                                    {hasActiveAuction(artwork) && (
-                                                        <button
-                                                            onClick={() => window.location.href = `artwork.html?id=${artwork.id}`}
-                                                            className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-all ${
-                                                                isClassic
-                                                                    ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
-                                                                    : 'bg-purple-900/30 hover:bg-purple-900/50 text-purple-400 border border-purple-500/30'
-                                                            }`}
-                                                        >
-                                                            View Auction
-                                                        </button>
-                                                    )}
-                                                    {canListForResale(artwork, connectedWalletAddress) && (
-                                                        <button
-                                                            onClick={() => handleListForResale(artwork)}
-                                                            disabled={isTransactionActionPending('list-resale', artwork)}
-                                                            aria-busy={isTransactionActionPending('list-resale', artwork)}
-                                                            className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-all ${
-                                                                isClassic
-                                                                    ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'
-                                                                : 'bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 border border-cyan-500/30'
-                                                            }`}
-                                                        >
-                                                            {isTransactionActionPending('list-resale', artwork)
-                                                                ? <TransactionProcessingLabel />
-                                                                : 'List for resale'}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
+                                {!artworksLoading && myArtworks.length === 0 && (
+                                    <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
+                                        No artworks in this section yet.
                                     </div>
-                                    );
-                                })}
-
-                                {/* Empty Placeholders */}
-                                {myArtworks.length === 0 && (
-                                    <>
-                                        {[...Array(7)].map((_, i) => (
-                                            <div
-                                                key={i}
-                                                onClick={handleQuickUpload}
-                                                className={`aspect-square rounded-lg flex items-center justify-center cursor-pointer gallery-item border ${
-                                                    isClassic
-                                                        ? 'bg-gray-700/30 border-gray-600 hover:bg-gray-700'
-                                                        : 'bg-gray-800/30 border-cyan-500/10 hover:bg-gray-700/50'
-                                                }`}
-                                            >
-                                                <div className={`text-6xl ${
-                                                    isClassic ? 'text-gray-600' : 'text-cyan-400/30'
-                                                }`}>
-                                                    +
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </>
                                 )}
                             </div>
                         </div>
