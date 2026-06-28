@@ -44,8 +44,7 @@ function normalizeWalletAddress(value) {
 function getActiveWalletAddress() {
     return normalizeWalletAddress(
         window.getCurrentWalletAddress?.() ||
-        window.currentWalletAddress ||
-        localStorage.getItem('artsoul_wallet')
+        window.currentWalletAddress
     );
 }
 
@@ -72,10 +71,6 @@ function setBackendSession(wallet) {
     authenticatedWallet = normalizedWallet;
     localStorage.setItem('artsoul_authenticated_wallet', normalizedWallet);
     localStorage.setItem('artsoul_auth_method', 'siwe');
-
-    if (!getActiveWalletAddress()) {
-        localStorage.setItem('artsoul_wallet', normalizedWallet);
-    }
 
     return backendSessionCache;
 }
@@ -206,6 +201,21 @@ async function authenticateWithWallet(walletAddress, provider) {
             throw new Error('No wallet address provided for authentication');
         }
 
+        if (!activeProvider?.request) {
+            throw new Error('No wallet provider available for authentication');
+        }
+
+        const providerAccounts = await activeProvider.request({ method: 'eth_accounts' });
+        const providerWallets = (Array.isArray(providerAccounts) ? providerAccounts : [])
+            .map(normalizeWalletAddress);
+        const selectedProviderWallet = normalizeWalletAddress(activeProvider.selectedAddress);
+        const providerActiveWallet = selectedProviderWallet && providerWallets.includes(selectedProviderWallet)
+            ? selectedProviderWallet
+            : providerWallets[0];
+        if (providerActiveWallet !== normalizedWallet) {
+            throw new Error('The selected wallet account changed. Please try the protected action again.');
+        }
+
         await invalidateSessionForWalletMismatch(normalizedWallet);
 
         if (authenticatedWallet?.toLowerCase() === normalizedWallet && backendSessionCache) {
@@ -253,6 +263,16 @@ async function authenticateWithWallet(walletAddress, provider) {
         });
 
         const verifiedWallet = normalizeWalletAddress(verified.wallet || normalizedWallet);
+        const activeWalletAfterSignature = getActiveWalletAddress();
+        if (activeWalletAfterSignature !== verifiedWallet) {
+            try {
+                await fetchBackendAuth('/logout', { method: 'POST' });
+            } catch (logoutError) {
+                console.warn('Stale SIWE session cleanup failed:', logoutError.message);
+            }
+            clearBackendSessionCache();
+            throw new Error('The active wallet changed during sign-in. Please try again with the current account.');
+        }
         return setBackendSession(verifiedWallet);
     } catch (error) {
         console.error(' Backend SIWE auth failed:', error);
@@ -469,7 +489,7 @@ function getAuthenticatedWallet() {
  * Get wallet address from session or localStorage
  */
 function getWalletAddress() {
-    return localStorage.getItem('artsoul_wallet');
+    return getActiveWalletAddress();
 }
 
 // ============================================
