@@ -142,6 +142,46 @@ body.classic {
                 box-shadow: 0 0 30px rgba(var(--c-accent-rgb), 0.6), 0 0 40px rgba(var(--c-accent-2-rgb), 0.4);
             }
         }
+
+        .auction-detail-panel,
+        .bid-activity-panel {
+            background: var(--c-surface);
+            border: 1px solid var(--c-border-soft);
+            color: var(--c-text);
+        }
+
+        .live-auction-pill {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--c-border);
+            background: rgba(var(--c-accent-rgb), 0.12);
+            color: var(--c-accent);
+        }
+
+        .bid-activity-row {
+            background: var(--c-surface-muted);
+            border: 1px solid var(--c-border-soft);
+        }
+
+        .bid-activity-row + .bid-activity-row {
+            margin-top: 0.5rem;
+        }
+
+        .bidder-profile-link,
+        .bid-activity-amount {
+            color: var(--c-accent);
+        }
+
+        .bidder-profile-link:hover,
+        .bidder-profile-link:focus-visible {
+            color: var(--c-accent-2);
+        }
+
+        .bid-activity-empty {
+            background: rgba(var(--c-accent-rgb), 0.06);
+            border: 1px dashed var(--c-border-soft);
+            color: var(--c-text);
+        }
     </style>
     <link rel="stylesheet" href="mobile-no-motion.css?v=1">
 </head>
@@ -386,6 +426,8 @@ body.classic {
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [bidAmount, setBidAmount] = useState('');
+            const [bidActivity, setBidActivity] = useState([]);
+            const [bidderProfiles, setBidderProfiles] = useState({});
             const [timeLeft, setTimeLeft] = useState('');
             const [userVote, setUserVote] = useState(null);
             const [votes, setVotes] = useState([]);
@@ -400,6 +442,8 @@ body.classic {
                 watching: 0
             });
             const [aiGuidance, setAiGuidance] = useState(null);
+            const bidPollInFlightRef = useRef(false);
+            const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
             const [transactionActions, setTransactionActions] = useState({});
 
@@ -747,6 +791,122 @@ body.classic {
                 );
             }
 
+            function projectedAuctionFromArtwork(projection) {
+                const auctionId = firstDefined(projection?.auction_id, projection?.active_auction_id);
+                if (!projection || !auctionId) return null;
+
+                const projectionStatus = String(projection.status || '').toLowerCase();
+                const remainsActive = projectionStatus === 'auction' || projectionStatus === 'awaiting_end';
+                const stateByStatus = {
+                    auction: 'PRIMARY_ACTIVE',
+                    awaiting_end: 'PRIMARY_ACTIVE',
+                    settlement_pending: 'WAITING_PAYMENT',
+                    sold: 'SOLD',
+                    defaulted: 'DEFAULTED'
+                };
+
+                return {
+                    auctionId,
+                    artworkId: projection.artwork_id || projection.blockchain_id,
+                    seller: projection.creator_id || projection.creator,
+                    startingPrice: firstDefined(projection.start_price, projection.creator_value, '0'),
+                    startPrice: firstDefined(projection.start_price, projection.creator_value, '0'),
+                    highestBid: firstDefined(projection.highest_bid, projection.current_bid, '0'),
+                    currentBid: firstDefined(projection.current_bid, projection.highest_bid, '0'),
+                    highestBidder: projection.current_bidder || ZERO_ADDRESS,
+                    current_bidder: projection.current_bidder || ZERO_ADDRESS,
+                    endTime: projection.auction_end_time,
+                    status: remainsActive ? 'active' : projectionStatus,
+                    state: stateByStatus[projectionStatus] || String(projectionStatus || 'registered').toUpperCase(),
+                    ended: !remainsActive && projectionStatus !== 'registered',
+                    settled: projectionStatus === 'sold',
+                    defaulted: projectionStatus === 'defaulted',
+                    winnerDeadline: projection.settlement_deadline,
+                    depositAmount: 0
+                };
+            }
+
+            function mergeProjectedAuction(currentAuction, projection) {
+                const projectedAuction = projectedAuctionFromArtwork(projection);
+                if (!projectedAuction) return currentAuction;
+                if (!currentAuction) return projectedAuction;
+
+                const projectedBidWei = parseEthToWei(projectedAuction.highestBid) || 0n;
+                const currentBidWei = getAuctionHighestBidWei(currentAuction);
+                const projectionHasLatestBid = projectedBidWei >= currentBidWei;
+
+                return {
+                    ...projectedAuction,
+                    ...currentAuction,
+                    status: projectedAuction.status,
+                    state: projectedAuction.state,
+                    ended: projectedAuction.ended,
+                    settled: projectedAuction.settled,
+                    defaulted: projectedAuction.defaulted,
+                    endTime: projectedAuction.endTime || currentAuction.endTime,
+                    winnerDeadline: projectedAuction.winnerDeadline || currentAuction.winnerDeadline,
+                    highestBid: projectionHasLatestBid ? projectedAuction.highestBid : currentAuction.highestBid,
+                    currentBid: projectionHasLatestBid ? projectedAuction.currentBid : currentAuction.currentBid,
+                    highestBidder: projectionHasLatestBid ? projectedAuction.highestBidder : currentAuction.highestBidder,
+                    current_bidder: projectionHasLatestBid ? projectedAuction.current_bidder : currentAuction.current_bidder
+                };
+            }
+
+            async function hydrateBidderProfiles(bids) {
+                const addresses = [...new Set((bids || [])
+                    .map(bid => String(bid.bidder || '').toLowerCase())
+                    .filter(Boolean))];
+                const missingAddresses = addresses.filter(address => !bidderProfileCacheRef.current.has(address));
+
+                if (missingAddresses.length > 0) {
+                    await Promise.all(missingAddresses.map(async address => {
+                        try {
+                            const profile = await window.ArtSoulDB.getProfile(address);
+                            bidderProfileCacheRef.current.set(address, profile || null);
+                        } catch (error) {
+                            console.warn('Could not load bidder profile:', error);
+                            bidderProfileCacheRef.current.set(address, null);
+                        }
+                    }));
+                }
+
+                setBidderProfiles(current => {
+                    const next = { ...current };
+                    addresses.forEach(address => {
+                        next[address] = bidderProfileCacheRef.current.get(address) || null;
+                    });
+                    return next;
+                });
+            }
+
+            async function applyLiveAuctionProjection(projection) {
+                const nextBids = Array.isArray(projection?.bids) ? projection.bids : [];
+                setBidActivity(nextBids);
+                setAuction(current => mergeProjectedAuction(current, projection));
+                await hydrateBidderProfiles(nextBids);
+            }
+
+            async function refreshLiveBidActivity() {
+                if (!isV41CompositeId || bidPollInFlightRef.current) return;
+
+                bidPollInFlightRef.current = true;
+                try {
+                    const projection = await window.ArtSoulDB.getPublicProjectionArtwork(artworkId);
+                    if (projection) {
+                        await applyLiveAuctionProjection(projection);
+                    }
+                } catch (error) {
+                    console.warn('Could not refresh live bid activity:', error);
+                } finally {
+                    bidPollInFlightRef.current = false;
+                }
+            }
+
+            function getBidderDisplayName(address) {
+                const profile = bidderProfiles[String(address || '').toLowerCase()] || null;
+                return getProfileDisplayName(profile, address);
+            }
+
             function calculateMinimumBidDetails(auctionData) {
                 const contractMinimumWei = parseEthToWei(firstDefined(
                     auctionData?.minimumBid,
@@ -936,6 +1096,7 @@ body.classic {
 
             useEffect(() => {
                 if (auction && !isAuctionClosedForBidding(auction)) {
+                    updateTimeLeft();
                     const interval = setInterval(updateTimeLeft, 1000);
                     return () => clearInterval(interval);
                 }
@@ -955,6 +1116,29 @@ body.classic {
                 });
             }, [auction]);
 
+            useEffect(() => {
+                if (!isV41CompositeId || !auction || isAuctionClosedForBidding(auction)) return;
+
+                let cancelled = false;
+                const interval = setInterval(async () => {
+                    if (cancelled) return;
+
+                    const endTimeMs = normalizeAuctionTimestamp(auction.endTime);
+                    if (endTimeMs > 0 && Date.now() >= endTimeMs) {
+                        clearInterval(interval);
+                        await refreshLiveBidActivity();
+                        return;
+                    }
+
+                    await refreshLiveBidActivity();
+                }, 4000);
+
+                return () => {
+                    cancelled = true;
+                    clearInterval(interval);
+                };
+            }, [artworkId, isV41CompositeId, auction?.status, auction?.state, auction?.endTime]);
+
             async function loadArtwork() {
                 try {
                     console.log('[Artwork] Loading artwork:', artworkId);
@@ -962,6 +1146,11 @@ body.classic {
                     const data = await window.ArtSoulDB.getArtwork(artworkId);
                     console.log('[Artwork] Loaded data:', data);
                     setArtwork(data);
+                    if (isV41CompositeId) {
+                        await applyLiveAuctionProjection(data);
+                    } else {
+                        setBidActivity([]);
+                    }
                     setCreatorProfile(null);
                     setAuctionWinnerProfile(null);
                     setCurrentOwnerProfile(null);
@@ -1061,7 +1250,8 @@ body.classic {
                                 // Load auction data directly (contract doesn't store artwork data)
                                 const auctionData = await window.ArtSoulContracts.getAuction(auctionActionId);
                                 if (auctionData && auctionData.seller !== '0x0000000000000000000000000000000000000000') {
-                                    setAuction({
+                                    setAuction(current => ({
+                                        ...current,
                                         ...auctionData,
                                         winnerDeadline: firstPositiveTimestamp(
                                             auctionData.winnerDeadline,
@@ -1070,7 +1260,7 @@ body.classic {
                                             auctionData.settlement_deadline,
                                             data.settlement_deadline
                                         )
-                                    });
+                                    }));
                                 }
                             }
                         } catch (error) {
@@ -1214,7 +1404,7 @@ body.classic {
                     }
 
                     alert('Bid placed successfully!');
-                    loadArtwork(); // Reload to show new bid
+                    await refreshLiveBidActivity();
                 } catch (error) {
                     console.error('Bid failed:', error);
                     const message = formatBidFailureMessage(error, bidContext);
@@ -1573,6 +1763,10 @@ body.classic {
             // Check if auction has ended (using service when available)
             const auctionEnded = auction ? isAuctionClosedForBidding(auction) : false;
             const canEndAuction = auction ? isAuctionEndActionAvailable(auction) : false;
+            const currentHighestBidWei = auction ? getAuctionHighestBidWei(auction) : 0n;
+            const currentHighestBid = formatWeiToEth(currentHighestBidWei);
+            const hasAuctionBids = currentHighestBidWei > 0n || bidActivity.length > 0;
+            const currentHighestBidder = auction ? getAuctionHighestBidder(auction) : null;
             const minimumBidDetails = auction ? calculateMinimumBidDetails(auction) : { wei: 0n, eth: '0' };
             const settlementDeadlineValue = auction
                 ? firstPositiveTimestamp(
@@ -1690,13 +1884,17 @@ body.classic {
 
                                 {/* Auction Info */}
                                 {auction && (
-                                    <div className={`p-6 rounded-xl ${isClassic ? 'bg-gray-800' : 'bg-cyan-900/20 border border-cyan-500/30'}`}>
+                                    <div className="auction-detail-panel p-6 rounded-xl">
                                         {/* State Badge */}
                                         <div className="flex items-center justify-between mb-4">
                                             <h3 className="text-2xl font-bold">
                                                 {auctionEnded ? 'Auction Ended' : 'Live Auction'}
                                             </h3>
-                                            {auction.state && (
+                                            {!auctionEnded ? (
+                                                <span className="live-auction-pill px-3 py-1 rounded-full text-xs font-bold">
+                                                    Live Auction
+                                                </span>
+                                            ) : auction.state && (
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                                     auction.state === 'WAITING_PAYMENT' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500' :
                                                     auction.state === 'SOLD' ? 'bg-green-500/20 text-green-400 border border-green-500' :
@@ -1718,20 +1916,25 @@ body.classic {
                                                 <span className="opacity-70">
                                                     {auctionEnded ? 'Final Bid:' : 'Current Bid:'}
                                                 </span>
-                                                <span className="font-bold text-2xl">{auction.highestBid === '0.0' ? 'No bids' : `${auction.highestBid} ETH`}</span>
+                                                <span className="font-bold text-2xl" data-testid="live-auction-current-bid">
+                                                    {hasAuctionBids ? `${currentHighestBid} ETH` : 'No bids yet'}
+                                                </span>
                                             </div>
-                                            {auction.highestBidder !== '0x0000000000000000000000000000000000000000' && (
+                                            {!isZeroAddress(currentHighestBidder) && (
                                                 <div className="flex justify-between">
                                                     <span className="opacity-70">
                                                         {auctionEnded ? 'Winner:' : 'Highest Bidder:'}
                                                     </span>
-                                                    <span className="font-mono text-sm">{auction.highestBidder.slice(0, 10)}...</span>
+                                                    <span className="font-mono text-sm">{getProfileDisplayName(
+                                                        bidderProfiles[String(currentHighestBidder).toLowerCase()] || null,
+                                                        currentHighestBidder
+                                                    )}</span>
                                                 </div>
                                             )}
                                             {!auctionEnded && (
                                                 <div className="flex justify-between">
                                                     <span className="opacity-70">Time Left:</span>
-                                                    <span className="font-bold">{timeLeft}</span>
+                                                    <span className="font-bold" data-testid="live-auction-countdown">{timeLeft}</span>
                                                 </div>
                                             )}
 
@@ -1773,6 +1976,46 @@ body.classic {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {!auctionEnded && (
+                                            <section
+                                                className="bid-activity-panel mt-6 rounded-lg p-4"
+                                                aria-live="polite"
+                                                data-testid="live-auction-bid-feed"
+                                            >
+                                                <div className="flex items-center justify-between gap-3 mb-3">
+                                                    <h4 className="font-bold">Bid Activity</h4>
+                                                    <span className="text-xs opacity-70">
+                                                        {bidActivity.length} {bidActivity.length === 1 ? 'bid' : 'bids'}
+                                                    </span>
+                                                </div>
+
+                                                {bidActivity.length > 0 ? (
+                                                    <div>
+                                                        {bidActivity.map(bid => (
+                                                            <div
+                                                                key={`${bid.transaction_hash || bid.block_number}:${bid.log_index}`}
+                                                                className="bid-activity-row flex items-center justify-between gap-4 rounded-lg px-3 py-3"
+                                                            >
+                                                                <a
+                                                                    href={`profile.html?address=${encodeURIComponent(bid.bidder)}`}
+                                                                    className="bidder-profile-link min-w-0 truncate font-semibold"
+                                                                >
+                                                                    {getBidderDisplayName(bid.bidder)}
+                                                                </a>
+                                                                <span className="bid-activity-amount whitespace-nowrap font-bold">
+                                                                    {bid.bid_amount} ETH
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="bid-activity-empty rounded-lg px-4 py-5 text-center text-sm">
+                                                        No bids yet — be the first
+                                                    </div>
+                                                )}
+                                            </section>
+                                        )}
 
                                         {/* Bid Input (during auction) */}
                                         {!auctionEnded && (
