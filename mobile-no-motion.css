@@ -12,9 +12,9 @@
         scroll-behavior: auto !important;
     }
 
-    *,
-    *::before,
-    *::after {
+    :root:not(#artsoul-motion-enabled) *,
+    :root:not(#artsoul-motion-enabled) *::before,
+    :root:not(#artsoul-motion-enabled) *::after {
         animation: none !important;
         animation-delay: 0s !important;
         animation-duration: 0s !important;
@@ -26,7 +26,7 @@
         will-change: auto !important;
     }
 
-    :where(
+    :root:not(#artsoul-motion-enabled) :where(
         a,
         button,
         label,
@@ -50,9 +50,9 @@
         transform: none !important;
     }
 
-    [class*="parallax"],
-    [data-parallax],
-    [data-motion] {
+    :root:not(#artsoul-motion-enabled) [class*="parallax"],
+    :root:not(#artsoul-motion-enabled) [data-parallax],
+    :root:not(#artsoul-motion-enabled) [data-motion] {
         transform: none !important;
         background-attachment: scroll !important;
     }
