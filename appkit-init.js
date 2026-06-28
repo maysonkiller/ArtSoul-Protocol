@@ -1679,8 +1679,13 @@ async function handleSupabaseOAuthOnBoot() {
 }
 
 async function bootAppKit() {
-    await handleSupabaseOAuthOnBoot();
-    initializeAppKit();
+    try {
+        await handleSupabaseOAuthOnBoot();
+    } catch (error) {
+        console.warn('OAuth bootstrap unavailable; continuing with wallet initialization:', error);
+        walletDebugLog('OAuth bootstrap skipped', { message: error?.message || String(error) });
+    }
+    await initializeAppKit();
 }
 
 if (document.readyState === 'loading') {
