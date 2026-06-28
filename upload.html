@@ -440,8 +440,9 @@ header {
                         <h2 class="font-semibold">AI Value Guidance</h2>
                         <p id="aiValuationStatus" class="text-sm opacity-70 mt-1">Select an artwork file to request an estimate.</p>
                     </div>
-                    <button id="aiValuationRetry" type="button" class="btn-secondary" onclick="requestAIValuation()" style="display: none;">Retry</button>
+                    <button id="aiValuationRetry" type="button" class="btn-secondary" onclick="retryAIValuation()" style="display: none;">Retry</button>
                 </div>
+                <p id="aiValuationRetryNote" class="text-xs opacity-60 mt-2" style="display: none;">Estimate limit reached for this upload session.</p>
                 <div id="aiValuationContent" class="mt-3" style="display: none;">
                     <div id="aiValuationRange" class="ai-guidance-value"></div>
                     <div id="aiValuationSuggestion" class="text-sm mt-1"></div>
@@ -502,9 +503,11 @@ header {
         let latestAIValuation = null;
         let aiValuationRequestId = 0;
         let aiValuationController = null;
+        let aiValuationManualRetryCount = 0;
 
         const AI_ANALYSIS_TIMEOUT_MS = 20000;
         const AI_PREVIEW_MAX_DATA_URL_LENGTH = 1800000;
+        const AI_MANUAL_RETRY_LIMIT = 2;
 
         function getTransactionErrorMessage(error, fallback) {
             return window.ArtSoulTransactionErrors?.message?.(error, fallback) ||
@@ -736,6 +739,16 @@ header {
             return numeric.toLocaleString(undefined, { maximumFractionDigits: 6 });
         }
 
+        function updateAIValuationRetryState() {
+            const retry = document.getElementById('aiValuationRetry');
+            const note = document.getElementById('aiValuationRetryNote');
+            const limitReached = aiValuationManualRetryCount >= AI_MANUAL_RETRY_LIMIT;
+
+            retry.disabled = limitReached || Boolean(aiValuationController);
+            retry.style.display = selectedFile ? 'inline-flex' : 'none';
+            note.style.display = limitReached ? 'block' : 'none';
+        }
+
         function setAIValuationState(state, details = {}) {
             const status = document.getElementById('aiValuationStatus');
             const content = document.getElementById('aiValuationContent');
@@ -752,7 +765,6 @@ header {
                 return;
             }
 
-            retry.disabled = false;
             if (state === 'ready' && details.valuation) {
                 const valuation = details.valuation;
                 status.textContent = details.logged
@@ -762,13 +774,13 @@ header {
                 suggestion.textContent = `Suggested starting price: ${formatEthEstimate(valuation.suggested_start_price_eth)} ETH - ${valuation.confidence || 'medium'} confidence`;
                 rationale.textContent = valuation.rationale || '';
                 content.style.display = 'block';
-                retry.style.display = 'inline-flex';
+                updateAIValuationRetryState();
                 return;
             }
 
             status.textContent = details.message || 'Estimate unavailable. You can still publish normally.';
             content.style.display = 'none';
-            retry.style.display = selectedFile ? 'inline-flex' : 'none';
+            updateAIValuationRetryState();
         }
 
         async function createAIImagePreview(file) {
@@ -803,9 +815,23 @@ header {
             return '';
         }
 
-        async function requestAIValuation(file = selectedFile) {
+        function retryAIValuation() {
+            if (!selectedFile || aiValuationController) return;
+            if (aiValuationManualRetryCount >= AI_MANUAL_RETRY_LIMIT) {
+                updateAIValuationRetryState();
+                return;
+            }
+            requestAIValuation(selectedFile, { manual: true });
+        }
+
+        async function requestAIValuation(file = selectedFile, options = {}) {
             if (!file) {
                 setAIValuationState('unavailable', { message: 'Select an artwork file to request an estimate.' });
+                return;
+            }
+
+            if (options.manual && aiValuationManualRetryCount >= AI_MANUAL_RETRY_LIMIT) {
+                updateAIValuationRetryState();
                 return;
             }
 
@@ -833,6 +859,10 @@ header {
 
                 const mediaDataUrl = await createAIImagePreview(file);
                 if (requestId !== aiValuationRequestId) return;
+
+                if (options.manual) {
+                    aiValuationManualRetryCount += 1;
+                }
 
                 const response = await fetch('/api/ai/analyze', {
                     method: 'POST',
@@ -877,7 +907,10 @@ header {
                 setAIValuationState('unavailable', { message });
             } finally {
                 clearTimeout(timeout);
-                if (aiValuationController === controller) aiValuationController = null;
+                if (aiValuationController === controller) {
+                    aiValuationController = null;
+                    updateAIValuationRetryState();
+                }
             }
         }
 
