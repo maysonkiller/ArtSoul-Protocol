@@ -352,6 +352,38 @@ function socialSignalsByArtwork(signals = []) {
   return map;
 }
 
+function bidsByAuction(bids = []) {
+  const map = new Map();
+
+  for (const bid of bids) {
+    const chain = chainId(bid.chain_id);
+    const auctionId = protocolId(bid.auction_id);
+    const bidder = addressOrNull(bid.bidder);
+    if (!chain || !auctionId || !bidder) continue;
+
+    const key = keyFor(chain, auctionId);
+    const auctionBids = map.get(key) || [];
+    auctionBids.push({
+      auction_id: auctionId,
+      artwork_id: protocolId(bid.artwork_id),
+      bidder,
+      bid_amount: weiToEth(bid.bid_amount),
+      bid_amount_wei: normalizeText(bid.bid_amount),
+      block_number: toNumber(bid.block_number),
+      log_index: toNumber(bid.log_index),
+      transaction_hash: normalizeText(bid.transaction_hash),
+      indexed_at: bid.indexed_at || null
+    });
+    map.set(key, auctionBids);
+  }
+
+  for (const auctionBids of map.values()) {
+    auctionBids.sort((left, right) => compareProjectionOrder(right, left));
+  }
+
+  return map;
+}
+
 async function toPublicCard(artwork, maps) {
   const chain = chainId(artwork.chain_id);
   const artworkId = protocolId(artwork.artwork_id);
@@ -488,7 +520,11 @@ export default async function handler(req, res) {
         `select=*&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
         warnings
       ),
-      v41_bids: await queryTable('v41_bids', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
+      v41_bids: await queryTable(
+        'v41_bids',
+        `select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
+        warnings
+      ),
       v41_settlements: await queryTable('v41_settlements', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
       v41_resale_listings: await queryTable('v41_resale_listings', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
       v41_resale_history: await queryTable(
@@ -511,7 +547,8 @@ export default async function handler(req, res) {
       resales: resaleByToken(tableData.v41_resale_listings),
       resaleHistory: latestResaleByToken(tableData.v41_resale_history),
       floors: floorByArtwork(tableData.v41_floor_history),
-      socialSignals: socialSignalsByArtwork(tableData.artwork_social_signals)
+      socialSignals: socialSignalsByArtwork(tableData.artwork_social_signals),
+      bids: bidsByAuction(tableData.v41_bids)
     };
 
     const cards = await Promise.all(tableData.v41_artworks.map(artwork => toPublicCard(artwork, maps)));
@@ -525,7 +562,15 @@ export default async function handler(req, res) {
     const visibleCards = isDirectLookup
       ? cards
       : cards.filter(card => !HIDDEN_ARTWORK_IDS.has(card.id));
-    const data = filterCards(visibleCards, requestQuery);
+    const filteredCards = filterCards(visibleCards, requestQuery);
+    const includeBidActivity = Boolean(validateArtworkId(requestQuery.id)) ||
+      Boolean(protocolId(requestQuery.artwork_id));
+    const data = includeBidActivity
+      ? filteredCards.map(card => ({
+          ...card,
+          bids: maps.bids.get(keyFor(card.chain_id, card.auction_id)) || []
+        }))
+      : filteredCards;
     const diagnostics = TABLES.reduce((acc, table) => {
       acc[table] = {
         rowsByChain: countByChain(tableData[table] || []),
