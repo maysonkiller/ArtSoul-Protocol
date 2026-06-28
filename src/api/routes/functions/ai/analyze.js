@@ -4,6 +4,62 @@ const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MAX_INLINE_MEDIA_BYTES = 4 * 1024 * 1024;
 const MEDIA_FETCH_TIMEOUT_MS = 5000;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 4;
+const rateLimitBuckets = new Map();
+
+function readClientIp(req) {
+  const forwarded = req.headers?.['x-forwarded-for'];
+  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const candidate = String(
+    forwardedValue ||
+    req.headers?.['x-real-ip'] ||
+    req.socket?.remoteAddress ||
+    ''
+  ).split(',')[0].trim();
+
+  return candidate.slice(0, 80);
+}
+
+function activeRateLimitBucket(key, now) {
+  const existing = rateLimitBuckets.get(key);
+  if (existing && existing.resetAt > now) return existing;
+  return { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+}
+
+function consumeAnalyzeRateLimit(req, wallet) {
+  const now = Date.now();
+  const ip = readClientIp(req);
+  const keys = [`wallet:${wallet}`];
+  if (ip) keys.push(`ip:${ip}`);
+
+  let retryAfterMs = 0;
+  const buckets = keys.map(key => ({ key, bucket: activeRateLimitBucket(key, now) }));
+  for (const { bucket } of buckets) {
+    if (bucket.count >= RATE_LIMIT_MAX_REQUESTS) {
+      retryAfterMs = Math.max(retryAfterMs, bucket.resetAt - now);
+    }
+  }
+
+  if (retryAfterMs > 0) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000))
+    };
+  }
+
+  for (const { key, bucket } of buckets) {
+    rateLimitBuckets.set(key, { ...bucket, count: bucket.count + 1 });
+  }
+
+  if (rateLimitBuckets.size > 1000) {
+    for (const [key, bucket] of rateLimitBuckets) {
+      if (bucket.resetAt <= now) rateLimitBuckets.delete(key);
+    }
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
 
 function readGeminiKey() {
   return (process.env.GEMINI_API_KEY || '').trim();
@@ -274,6 +330,17 @@ export default async function handler(req, res) {
 
   try {
     const wallet = requireWallet(req);
+    const rateLimit = consumeAnalyzeRateLimit(req, wallet);
+    if (!rateLimit.allowed) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds));
+      return res.status(429).json({
+        error: 'AI_ANALYSIS_RATE_LIMITED',
+        message: 'AI estimate limit reached. Wait a moment and try again. You can still publish normally.',
+        retry_after_seconds: rateLimit.retryAfterSeconds
+      });
+    }
+
     const apiKey = readGeminiKey();
     if (!apiKey) {
       return res.status(503).json({
