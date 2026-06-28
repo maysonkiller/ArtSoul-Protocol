@@ -100,9 +100,15 @@ let lastConfirmedWalletAt = 0;
 let activeNetworkSwitchChainId = null;
 let networkModalIntentUntil = 0;
 let connectModalIntentUntil = 0;
+let activeWalletProvider = null;
+let walletResumeTimer = null;
+let walletResumeListenersBound = false;
 const boundRuntimeProviders = new WeakSet();
 const WALLET_HYDRATION_TIMEOUT = 2500;
 const POST_CONNECT_DISCONNECT_GUARD = 1200;
+const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
+const WALLET_CONNECT_TIMEOUT_MOBILE = 90000;
+const WALLET_CONFIRMATION_INTERVAL = 400;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
@@ -257,6 +263,15 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function normalizeWalletAddress(value) {
+    return value ? String(value).toLowerCase() : '';
+}
+
+function maskWalletAddress(value) {
+    const address = normalizeWalletAddress(value);
+    return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null;
+}
+
 function getSupportedNetworkTarget(chainId) {
     const normalizedChainId = parseChainId(chainId);
     return normalizedChainId ? SUPPORTED_NETWORKS[normalizedChainId] || null : null;
@@ -296,6 +311,117 @@ async function getAppKitWalletProvider() {
         console.warn('Unable to get AppKit wallet provider:', error);
         return null;
     }
+}
+
+async function requestProviderAccounts(provider) {
+    if (!provider?.request) return [];
+
+    try {
+        const accounts = await provider.request({ method: 'eth_accounts' });
+        const normalizedAccounts = (Array.isArray(accounts) ? accounts : [])
+            .map(normalizeWalletAddress)
+            .filter(Boolean);
+        const selectedAddress = normalizeWalletAddress(provider.selectedAddress);
+        if (selectedAddress && normalizedAccounts.includes(selectedAddress)) {
+            return [selectedAddress, ...normalizedAccounts.filter((address) => address !== selectedAddress)];
+        }
+        return normalizedAccounts;
+    } catch (error) {
+        console.warn('Unable to read provider accounts:', error);
+        return [];
+    }
+}
+
+async function getWalletProviderCandidates({ allowInjectedFallback = true } = {}) {
+    const appKitProvider = await getAppKitWalletProvider();
+    const providers = [activeWalletProvider, appKitProvider];
+    if (allowInjectedFallback) providers.push(window.ethereum);
+    return [...new Set(providers.filter(Boolean))];
+}
+
+async function getProviderForWallet(walletAddress) {
+    const normalizedWallet = normalizeWalletAddress(walletAddress);
+    if (!normalizedWallet) return null;
+
+    const providers = await getWalletProviderCandidates();
+    for (const provider of providers) {
+        const accounts = await requestProviderAccounts(provider);
+        if (accounts[0] === normalizedWallet) {
+            activeWalletProvider = provider;
+            return provider;
+        }
+    }
+
+    return null;
+}
+
+async function reconcileActiveWalletFromProviders(source = 'provider reconciliation', options = {}) {
+    const providers = await getWalletProviderCandidates(options);
+
+    for (const provider of providers) {
+        const accounts = await requestProviderAccounts(provider);
+        if (!accounts.length) continue;
+
+        activeWalletProvider = provider;
+        await handleProviderAccountsChanged(accounts, source, provider);
+        const chainId = await requestProviderChainId(provider);
+        if (chainId) await handleProviderChainConfirmed(chainId, source);
+
+        return {
+            address: accounts[0],
+            chainId: chainId || normalizeChainId(),
+            isConnected: true,
+            provider
+        };
+    }
+
+    return null;
+}
+
+function scheduleWalletReconciliation(source, delay = 150, options = {}) {
+    if (walletResumeTimer) clearTimeout(walletResumeTimer);
+    walletResumeTimer = setTimeout(async () => {
+        walletResumeTimer = null;
+        walletDebugLog('wallet state reconciliation', { source });
+        await reconcileActiveWalletFromProviders(source, options);
+    }, delay);
+}
+
+function bindWalletResumeListeners() {
+    if (walletResumeListenersBound) return;
+    walletResumeListenersBound = true;
+
+    window.addEventListener('pageshow', () => scheduleWalletReconciliation('pageshow'));
+    window.addEventListener('focus', () => scheduleWalletReconciliation('window focus'));
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            scheduleWalletReconciliation('visibility return');
+        }
+    });
+}
+
+async function waitForConfirmedWallet(timeoutMs) {
+    const startedAt = Date.now();
+    let modalWasOpen = false;
+    let modalClosedAt = null;
+
+    while (Date.now() - startedAt < timeoutMs) {
+        const restored = await reconcileActiveWalletFromProviders('connect confirmation');
+        if (restored?.address) return restored;
+
+        const modalIsOpen = Boolean(modal?.getState?.()?.open || window.web3Modal?.getState?.()?.open);
+        if (modalIsOpen) {
+            modalWasOpen = true;
+            modalClosedAt = null;
+        } else if (modalWasOpen && document.visibilityState === 'visible') {
+            modalClosedAt ||= Date.now();
+            if (Date.now() - modalClosedAt > 5000) return null;
+        }
+
+        await sleep(WALLET_CONFIRMATION_INTERVAL);
+    }
+
+    return null;
 }
 
 async function getSwitchProvider() {
@@ -449,11 +575,11 @@ async function handleProviderChainConfirmed(chainId, source = 'provider') {
     return normalizedChainId;
 }
 
-async function handleProviderAccountsChanged(accounts, source = 'provider') {
+async function handleProviderAccountsChanged(accounts, source = 'provider', provider = null) {
     const list = Array.isArray(accounts) ? accounts : (accounts ? [accounts] : []);
-    const nextAddress = list[0] ? String(list[0]).toLowerCase() : null;
-    console.log(`Provider accountsChanged from ${source}:`, nextAddress || 'none');
-    walletDebugLog('accountsChanged', { source, address: nextAddress || null });
+    const nextAddress = normalizeWalletAddress(list[0]) || null;
+    console.log(`Provider accountsChanged from ${source}:`, maskWalletAddress(nextAddress) || 'none');
+    walletDebugLog('accountsChanged', { source, address: maskWalletAddress(nextAddress) });
 
     // All accounts revoked at the provider (wallet locked / disconnected).
     if (!nextAddress) {
@@ -464,6 +590,7 @@ async function handleProviderAccountsChanged(accounts, source = 'provider') {
 
         lastProcessedAddress = null;
         lastProcessedChainId = null;
+        activeWalletProvider = null;
         window.currentWalletAddress = null;
         localStorage.removeItem('artsoul_wallet');
         try {
@@ -478,7 +605,10 @@ async function handleProviderAccountsChanged(accounts, source = 'provider') {
         return;
     }
 
-    if (nextAddress === lastProcessedAddress) return;
+    if (nextAddress === lastProcessedAddress) {
+        if (provider) activeWalletProvider = provider;
+        return;
+    }
 
     // Active address changed → clear any session tied to the previous address.
     // Always check the backend SIWE session; lastProcessedAddress can be empty
@@ -489,13 +619,14 @@ async function handleProviderAccountsChanged(accounts, source = 'provider') {
     lastProcessedAddress = nextAddress;
     lastProcessedChainId = chainId;
     lastConfirmedWalletAt = Date.now();
+    if (provider) activeWalletProvider = provider;
     window.currentWalletAddress = nextAddress;
     localStorage.setItem('artsoul_wallet', nextAddress);
 
     updateNavButtons({ address: nextAddress, chainId });
     updateNetworkBadge({ address: nextAddress, chainId });
     dispatchWalletStateChanged({ address: nextAddress, chainId, isConnected: true });
-    walletDebugLog('wallet active address accepted', { source, address: nextAddress, chainId });
+    walletDebugLog('wallet active address accepted', { source, address: maskWalletAddress(nextAddress), chainId });
 }
 
 function bindRuntimeProviderEvents(provider, source = 'provider') {
@@ -516,7 +647,7 @@ function bindRuntimeProviderEvents(provider, source = 'provider') {
     // Single global account listener → one app-wide event that the header,
     // detail and profile views all react to (no per-page provider listeners).
     const accountsHandler = (accounts) => {
-        handleProviderAccountsChanged(accounts, source);
+        handleProviderAccountsChanged(accounts, source, provider);
     };
 
     provider.on?.('chainChanged', chainHandler);
@@ -582,6 +713,14 @@ function applyConfirmedNetwork(chainId) {
 }
 
 function getAuthoritativeWalletState() {
+    if (window.currentWalletAddress) {
+        return {
+            address: normalizeWalletAddress(window.currentWalletAddress),
+            chainId: normalizeChainId(),
+            isConnected: true
+        };
+    }
+
     try {
         const account = modal?.getAccount?.() || window.web3Modal?.getAccount?.();
         const accountAddress = account?.address || account?.allAccounts?.[0]?.address || null;
@@ -623,14 +762,14 @@ function getProviderWalletState() {
 }
 
 function getRestoredWalletState() {
-    const authoritativeState = getAuthoritativeWalletState();
-    if (authoritativeState?.isConnected && authoritativeState.address) {
-        return authoritativeState;
-    }
-
     const providerState = getProviderWalletState();
     if (providerState?.isConnected && providerState.address) {
         return providerState;
+    }
+
+    const authoritativeState = getAuthoritativeWalletState();
+    if (authoritativeState?.isConnected && authoritativeState.address) {
+        return authoritativeState;
     }
 
     return authoritativeState;
@@ -835,29 +974,45 @@ window.safeConnectWallet = async () => {
                     throw new Error('Injected wallet connection timed out');
                 })
             ]);
-            await handleProviderAccountsChanged(accounts, 'mobile injected provider');
+            await handleProviderAccountsChanged(accounts, 'mobile injected provider', window.ethereum);
             const chainId = await requestProviderChainId(window.ethereum);
             if (chainId) await handleProviderChainConfirmed(chainId, 'mobile injected provider');
             clearModalIntent();
+            const connectedAddress = normalizeWalletAddress(Array.isArray(accounts) ? accounts[0] : accounts);
             walletDebugLog('mobile injected connect complete', {
-                address: Array.isArray(accounts) ? accounts[0] : accounts
+                address: maskWalletAddress(connectedAddress)
             });
-            return;
+            return connectedAddress || null;
         }
 
         if (window.web3Modal) {
             walletDebugLog('walletconnect/appkit modal open requested', { mobile: isMobileDevice() });
-            await Promise.race([
-                window.web3Modal.open(),
-                sleep(20000).then(() => {
-                    walletDebugLog('walletconnect/appkit modal still pending after timeout');
-                    safeCloseModal('wallet connect timeout');
-                    scheduleModalCloseRetries('wallet connect timeout');
-                    return null;
-                })
-            ]);
+            let modalOpenError = null;
+            Promise.resolve(window.web3Modal.open()).catch((error) => {
+                modalOpenError = error;
+            });
+
+            walletDebugLog('waiting for wallet confirmation', { mobile: isMobileDevice() });
+            const confirmed = await waitForConfirmedWallet(
+                isMobileDevice() ? WALLET_CONNECT_TIMEOUT_MOBILE : WALLET_CONNECT_TIMEOUT_DESKTOP
+            );
+            if (modalOpenError) throw modalOpenError;
+            if (!confirmed?.address) {
+                await safeCloseModal('wallet connect timeout');
+                clearModalIntent();
+                throw new Error('Wallet connection timed out. Reopen your wallet and try again.');
+            }
+
+            clearModalIntent();
+            await safeCloseModal('wallet connected');
+            walletDebugLog('wallet connection confirmed', {
+                address: maskWalletAddress(confirmed.address),
+                chainId: confirmed.chainId
+            });
+            return confirmed.address;
         } else {
             alert('Please wait, the app is still loading...');
+            return null;
         }
     } catch (err) {
         console.error('Connection error:', err);
@@ -868,6 +1023,8 @@ window.safeConnectWallet = async () => {
             await clearWalletConnectionCache();
             updateNavButtons(null);
         }
+        alert(err?.message || 'Wallet connection was not completed. Please try again.');
+        return null;
     } finally {
         walletDebugLog('wallet connect flow finished');
         if (btn) btn.disabled = false;
@@ -1027,10 +1184,10 @@ window.resetWalletConnection = async () => {
  */
 window.ensureAuthenticated = async () => {
     // Check if wallet is connected
-    const walletAddress = window.getCurrentWalletAddress?.();
+    let walletAddress = window.getCurrentWalletAddress?.();
     if (!walletAddress) {
-        alert('Please connect your wallet first');
-        return false;
+        walletAddress = await window.safeConnectWallet?.();
+        if (!walletAddress) return false;
     }
 
     // Check if already authenticated for this exact wallet. A SIWE session
@@ -1052,24 +1209,18 @@ window.ensureAuthenticated = async () => {
     try {
         console.log('🔐 Requesting signature for authentication...');
 
-        walletDebugLog('SIWE signature requested', { address: walletAddress.toLowerCase() });
+        walletDebugLog('SIWE signature requested', { address: maskWalletAddress(walletAddress) });
 
-        // Get provider - works with both WagmiAdapter and EthersAdapter
-        let provider;
-        if (window.ethereum) {
-            provider = window.ethereum;
-        } else if (modal?.getWalletProvider) {
-            provider = await modal.getWalletProvider();
-        } else {
-            throw new Error('No wallet provider available');
-        }
+        // Sign only with the provider that currently controls the active address.
+        const provider = await getProviderForWallet(walletAddress);
+        if (!provider) throw new Error('The active wallet account is not available in the connected provider.');
 
         const authResult = await window.SupabaseAuth.authenticateWithWallet(
             walletAddress,
             provider
         );
         console.log('Authenticated:', authResult.user.id);
-        walletDebugLog('SIWE signature verified', { address: walletAddress.toLowerCase() });
+        walletDebugLog('SIWE signature verified', { address: maskWalletAddress(walletAddress) });
         return true;
     } catch (error) {
         console.error('Authentication failed:', error);
@@ -1083,6 +1234,10 @@ window.ensureAuthenticated = async () => {
  * Get current wallet address
  */
 window.getCurrentWalletAddress = () => {
+    if (window.currentWalletAddress) {
+        return normalizeWalletAddress(window.currentWalletAddress);
+    }
+
     const authoritativeState = getAuthoritativeWalletState();
     if (authoritativeState?.isConnected && authoritativeState.address) {
         return authoritativeState.address.toLowerCase();
@@ -1106,15 +1261,7 @@ function isMobileDevice() {
 function isInjectedWalletBrowser() {
     const provider = window.ethereum;
     if (!provider?.request || !isMobileDevice()) return false;
-
-    return Boolean(
-        provider.isMetaMask ||
-        provider.isRabby ||
-        provider.isCoinbaseWallet ||
-        provider.isTrust ||
-        provider.isFrame ||
-        provider.selectedAddress
-    );
+    return true;
 }
 
 // ============================================
@@ -1161,10 +1308,10 @@ async function initializeAppKit() {
             });
         };
 
-        const clearStaleWalletState = () => {
-            const restoredWalletState = getRestoredWalletState();
+        const clearStaleWalletState = async () => {
+            const restoredWalletState = await reconcileActiveWalletFromProviders('wallet hydration timeout');
             if (restoredWalletState?.isConnected && restoredWalletState.address) {
-                applyConfirmedWalletState(restoredWalletState);
+                finishWalletHydration();
                 return;
             }
 
@@ -1249,7 +1396,9 @@ async function initializeAppKit() {
         window.web3Modal = modal;
         walletDebugLog('appkit modal created', { origin: appOrigin });
 
-        const initialWalletState = getRestoredWalletState();
+        // Accept only synchronous provider truth here. AppKit's cached account can
+        // still point at the account that originally opened the connector.
+        const initialWalletState = storedWalletAtBoot ? null : getProviderWalletState();
         if (initialWalletState?.isConnected) {
             applyConfirmedWalletState(initialWalletState);
         } else if (initialWalletState && !initialWalletState.isConnected) {
@@ -1316,8 +1465,9 @@ async function initializeAppKit() {
 
             if (accountIsConnected) {
                 // Prevent duplicate processing
-                const normalizedAddress = account.address.toLowerCase();
                 const provider = await getAppKitWalletProvider();
+                const providerAccounts = await requestProviderAccounts(provider);
+                const normalizedAddress = providerAccounts[0] || normalizeWalletAddress(account.address);
                 const providerChainId = await getProviderTruthChainId(provider);
                 const normalizedChainId = setCurrentChainId(providerChainId || account);
                 finishWalletHydration();
@@ -1328,13 +1478,12 @@ async function initializeAppKit() {
 
                 // Active address changed under us → drop any session tied to the
                 // previous address before adopting the new one.
-                if (lastProcessedAddress && lastProcessedAddress !== normalizedAddress) {
-                    await signOutMismatchedSession(normalizedAddress);
-                }
+                await signOutMismatchedSession(normalizedAddress);
 
                 lastProcessedAddress = normalizedAddress;
                 lastProcessedChainId = normalizedChainId;
                 lastConfirmedWalletAt = Date.now();
+                if (provider) activeWalletProvider = provider;
 
                 window.currentWalletAddress = normalizedAddress;
                 localStorage.setItem('artsoul_wallet', normalizedAddress);
@@ -1362,7 +1511,7 @@ async function initializeAppKit() {
                 safeCloseModal('wallet connected');
                 scheduleModalCloseRetries('wallet connected');
                 walletDebugLog('wallet connected via appkit', {
-                    address: normalizedAddress,
+                    address: maskWalletAddress(normalizedAddress),
                     chainId: normalizedChainId
                 });
 
@@ -1378,6 +1527,7 @@ async function initializeAppKit() {
                 console.log(' Wallet disconnected (was connected before)');
                 lastProcessedAddress = null;
                 lastProcessedChainId = null;
+                activeWalletProvider = null;
                 window.currentWalletAddress = null;
 
                 // Clear all authentication data
@@ -1474,6 +1624,10 @@ async function initializeAppKit() {
             modal.subscribeProvider((providerState) => {
                 const provider = providerState?.walletProvider || providerState?.provider || providerState;
                 bindRuntimeProviderEvents(provider, 'appkit provider subscription');
+                if (provider?.request) {
+                    activeWalletProvider = provider;
+                    scheduleWalletReconciliation('appkit provider available');
+                }
 
                 const providerChainId = parseChainId(
                     providerState?.chainId ||
@@ -1488,6 +1642,20 @@ async function initializeAppKit() {
         }
 
         bindRuntimeProviderEvents(window.ethereum, 'injected provider');
+        bindWalletResumeListeners();
+
+        const restoredProviderState = await reconcileActiveWalletFromProviders('appkit boot', {
+            allowInjectedFallback: !storedWalletAtBoot
+        });
+        if (restoredProviderState?.address) {
+            finishWalletHydration();
+        } else if (!walletHydrationPending) {
+            await clearStaleWalletState();
+        } else {
+            scheduleWalletReconciliation('delayed appkit hydration', 600, {
+                allowInjectedFallback: false
+            });
+        }
 
         console.log('AppKit initialized');
     } catch (error) {
@@ -1506,17 +1674,18 @@ async function handleSupabaseOAuthOnBoot() {
     if (!oauthResult) return;
 
     console.log('OAuth callback handled:', oauthResult.provider);
-    // Update UI with social login info
-    if (oauthResult.user.user_metadata?.wallet_address) {
-        const normalizedAddress = oauthResult.user.user_metadata.wallet_address.toLowerCase();
-        window.currentWalletAddress = normalizedAddress;
-        localStorage.setItem('artsoul_wallet', normalizedAddress);
-    }
+    // OAuth profile metadata is identity context, not provider truth. The active
+    // wallet is restored independently from the connected EIP-1193 provider.
 }
 
 async function bootAppKit() {
-    await handleSupabaseOAuthOnBoot();
-    initializeAppKit();
+    try {
+        await handleSupabaseOAuthOnBoot();
+    } catch (error) {
+        console.warn('OAuth bootstrap unavailable; continuing with wallet initialization:', error);
+        walletDebugLog('OAuth bootstrap skipped', { message: error?.message || String(error) });
+    }
+    await initializeAppKit();
 }
 
 if (document.readyState === 'loading') {
