@@ -978,10 +978,10 @@ header {
             }
 
             // Check wallet connection
-            const walletAddress = window.getCurrentWalletAddress?.();
+            let walletAddress = window.getCurrentWalletAddress?.();
             if (!walletAddress) {
-                alert('Please connect your wallet first');
-                return;
+                walletAddress = await window.safeConnectWallet?.();
+                if (!walletAddress) return;
             }
 
             uploading = true;
