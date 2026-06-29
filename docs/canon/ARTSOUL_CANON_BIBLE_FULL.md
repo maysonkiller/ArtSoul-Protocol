@@ -25,6 +25,14 @@ The internal codename is V4.1. Do not expose the version label in user-facing UI
 9. Minted NFTs can later be listed on the whitelisted marketplace.
 10. Resales update current owner and preserve provenance.
 
+### Future Contract Requirement: Automatic No-Bid Finalization
+
+> **FUTURE / MAINNET REDEPLOY ONLY - NOT CURRENT TESTNET BEHAVIOR**
+
+Expired auctions that received NO bids should auto-finalize on-chain - the protocol should NOT require a separate manual "End Expired Auction" transaction before the work can be re-auctioned. After an auction's time expires with no bids, the work should automatically return to a re-auctionable state. (The current testnet contract requires a manual finalize step; this is to be removed in the next contract version.)
+
+This requirement does not change the no-bid economic outcome: no NFT is minted and no floor is created. It is a contract-state transition requirement for the next mainnet contract version, not a description of the deployed testnet contract.
+
 ## 3. Frozen Economics
 
 These values are frozen unless the canon is formally amended before deployment:

@@ -32,6 +32,12 @@ Publish media and metadata, register artwork, create auction, bid, settle, lazy-
 
 No NFT exists before successful settlement.
 
+### Future Contract Requirement: Automatic No-Bid Finalization
+
+> **FUTURE / MAINNET REDEPLOY ONLY - NOT CURRENT TESTNET BEHAVIOR**
+
+Expired auctions that received NO bids should auto-finalize on-chain - the protocol should NOT require a separate manual "End Expired Auction" transaction before the work can be re-auctioned. After an auction's time expires with no bids, the work should automatically return to a re-auctionable state. (The current testnet contract requires a manual finalize step; this is to be removed in the next contract version.)
+
 ## Public Security Boundaries
 
 Hidden anti-sybil implementation details are not stored in this repository. Public docs may state that anti-sybil checks exist, but must not publish private scoring logic, abuse heuristics, manual review thresholds, or operational bypass rules.
