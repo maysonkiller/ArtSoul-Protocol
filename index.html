@@ -72,7 +72,7 @@
     <script type="module" src="supabase-auth.js"></script>
     <script type="module" src="supabase-client.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=2"></script>
+    <script src="src/ui/components/artwork-card.js?v=3"></script>
     <style>
         @keyframes spin {
             from { transform: rotate(0deg); }
@@ -1133,8 +1133,7 @@
                 for (const slot of slots) {
                         const art = slot.artwork;
                         const sharedCard = window.ArtSoulArtworkCard?.createCardElement?.(art, {
-                            slotLabel: slot.label,
-                            reason: slot.reason
+                            minimal: true
                         });
                         if (sharedCard) {
                             gallery.appendChild(sharedCard);

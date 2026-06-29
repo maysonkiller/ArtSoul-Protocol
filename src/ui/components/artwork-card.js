@@ -104,11 +104,41 @@
         return { key: minted ? 'minted' : 'not_minted', label: minted ? 'Minted' : 'Not yet minted' };
     }
 
+    function discoveryStatusInfo(artwork = {}) {
+        const status = statusInfo(artwork);
+        const rawStatus = normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state || artwork.nft_status);
+
+        if (status.key === 'live') return { key: 'live', label: 'Live Auction' };
+        if (isMinted(artwork)) return { key: 'minted', label: 'NFT' };
+        if (
+            ['ended', 'ended_no_bids', 'unsettled'].includes(status.key) ||
+            rawStatus.includes('ended') ||
+            rawStatus.includes('default') ||
+            rawStatus.includes('settlement') ||
+            rawStatus === 'awaiting_end'
+        ) {
+            return { key: 'ended', label: 'Ended' };
+        }
+        return { key: 'art', label: 'Art' };
+    }
+
     function formatPrice(artwork = {}) {
         const price = artwork.current_bid || artwork.highest_bid || artwork.creator_value || artwork.start_price || artwork.price || '';
         const numeric = toNumber(price, NaN);
         if (!Number.isFinite(numeric) || numeric <= 0) return '';
         return `${price} ETH`;
+    }
+
+    function formatDiscoveryPrice(artwork = {}) {
+        const candidates = isMinted(artwork)
+            ? [artwork.sale_price, artwork.resale_price, artwork.listing_price, artwork.floor_price, artwork.canonical_floor, artwork.price]
+            : [artwork.current_bid, artwork.highest_bid, artwork.start_price, artwork.creator_value, artwork.price];
+
+        for (const value of candidates) {
+            const numeric = toNumber(value, NaN);
+            if (Number.isFinite(numeric) && numeric > 0) return `${value} ETH`;
+        }
+        return '';
     }
 
     function signalsText(artwork = {}) {
@@ -223,11 +253,12 @@
 
         const href = options.href === false ? '' : (options.href || detailHref(artwork));
         const card = document.createElement(href ? 'a' : 'div');
-        card.className = 'artsoul-artwork-card';
+        const minimal = options.minimal === true;
+        card.className = `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}`;
         if (href) card.href = href;
         if (options.onClick) card.addEventListener('click', options.onClick);
 
-        const status = statusInfo(artwork);
+        const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
         const body = document.createElement('div');
         body.className = 'artsoul-card-body';
 
@@ -250,7 +281,7 @@
         badge.textContent = status.label;
         meta.appendChild(badge);
 
-        const price = formatPrice(artwork);
+        const price = minimal ? formatDiscoveryPrice(artwork) : formatPrice(artwork);
         if (price) {
             const priceEl = document.createElement('span');
             priceEl.className = 'artsoul-card-price';
@@ -262,11 +293,11 @@
         signal.className = 'artsoul-card-signals';
         signal.textContent = signalsText(artwork) || options.reason || '';
 
-        body.appendChild(eyebrow);
+        if (!minimal) body.appendChild(eyebrow);
         body.appendChild(title);
-        body.appendChild(desc);
+        if (!minimal) body.appendChild(desc);
         body.appendChild(meta);
-        if (signal.textContent) body.appendChild(signal);
+        if (!minimal && signal.textContent) body.appendChild(signal);
 
         card.appendChild(createMediaElement(artwork));
         card.appendChild(body);
@@ -321,16 +352,16 @@
         );
     }
 
-    function ReactCard({ artwork = {}, slotLabel = '', reason = '', onOpen = null, actions = null, respectHidden = true }) {
+    function ReactCard({ artwork = {}, slotLabel = '', reason = '', onOpen = null, actions = null, respectHidden = true, minimal = false }) {
         const React = window.React;
         const h = React.createElement;
         if (respectHidden !== false && isHidden(artwork)) return null;
 
-        const status = statusInfo(artwork);
-        const price = formatPrice(artwork);
+        const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
+        const price = minimal ? formatDiscoveryPrice(artwork) : formatPrice(artwork);
         const signals = signalsText(artwork);
         return h('div', {
-            className: 'artsoul-artwork-card',
+            className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}`,
             onClick: onOpen || undefined,
             role: onOpen ? 'button' : undefined,
             tabIndex: onOpen ? 0 : undefined,
@@ -343,14 +374,14 @@
         },
             h(ReactMedia, { artwork }),
             h('div', { className: 'artsoul-card-body' },
-                h('div', { className: 'artsoul-card-eyebrow' }, slotLabel || status.label),
+                minimal ? null : h('div', { className: 'artsoul-card-eyebrow' }, slotLabel || status.label),
                 h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
-                h('p', { className: 'artsoul-card-description' }, artwork.description || ''),
+                minimal ? null : h('p', { className: 'artsoul-card-description' }, artwork.description || ''),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
                 ),
-                (signals || reason) ? h('p', { className: 'artsoul-card-signals' }, signals || reason) : null,
+                !minimal && (signals || reason) ? h('p', { className: 'artsoul-card-signals' }, signals || reason) : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             )
         );
@@ -360,6 +391,7 @@
         createCardElement,
         ReactCard,
         statusInfo,
+        discoveryStatusInfo,
         isHidden,
         identityKeys,
         mediaUrl,
