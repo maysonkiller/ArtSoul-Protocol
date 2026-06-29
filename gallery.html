@@ -59,7 +59,7 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=3"></script>
+    <script src="src/ui/components/artwork-card.js?v=4"></script>
     <script src="avatar-dropdown.js?v=11"></script>
     <script type="module" src="appkit-init.js?v=14"></script>
     <style>
@@ -133,10 +133,10 @@
         const { useState, useEffect, useRef } = React;
 
         const GALLERY_TABS = [
-            { id: 'discover', label: 'Discover' },
             { id: 'live_auctions', label: 'Auctions' },
             { id: 'marketplace', label: 'Marketplace' },
-            { id: 'collections', label: 'Collections' }
+            { id: 'collections', label: 'Collections' },
+            { id: 'discover', label: 'Discover' }
         ];
         const GALLERY_TAB_ALIASES = {
             auctions: 'live_auctions'
@@ -145,7 +145,7 @@
         function getInitialGalleryTab() {
             const hash = (window.location.hash || '').replace('#', '');
             const tabId = GALLERY_TAB_ALIASES[hash] || hash;
-            return GALLERY_TABS.some(tab => tab.id === tabId) ? tabId : 'discover';
+            return GALLERY_TABS.some(tab => tab.id === tabId) ? tabId : 'live_auctions';
         }
 
         function GalleryPage() {
@@ -163,7 +163,7 @@
             const [searchQuery, setSearchQuery] = useState('');
             const [filtersOpen, setFiltersOpen] = useState(false);
             const [debouncedFilters, setDebouncedFilters] = useState({
-                activeTab: 'discover',
+                activeTab: getInitialGalleryTab(),
                 statusFilter: 'all',
                 sortBy: 'discovery',
                 minPrice: '',
@@ -175,6 +175,8 @@
 
             function selectGalleryTab(tabId) {
                 setActiveTab(tabId);
+                setStatusFilter('all');
+                setSortBy('discovery');
                 if (window.history?.replaceState) {
                     window.history.replaceState(null, '', `#${tabId}`);
                 }
@@ -248,8 +250,6 @@
             }
 
             function publicViewForTab(tabId) {
-                if (tabId === 'live_auctions') return 'auctions';
-                if (tabId === 'marketplace') return 'marketplace';
                 if (tabId === 'collections') return 'collections';
                 return '';
             }
@@ -328,6 +328,7 @@
 
             function applyPublicGalleryFilters(artworks, filters = debouncedFilters) {
                 const {
+                    activeTab,
                     statusFilter,
                     sortBy,
                     minPrice,
@@ -347,10 +348,14 @@
                 let result = (Array.isArray(artworks) ? artworks : []).map(prepareGalleryArtwork);
 
                 result = result.filter(artwork =>
+                    artwork.moderation_hidden !== true &&
                     artwork.is_hidden !== true &&
                     artwork.is_blocked !== true &&
                     artwork.is_deleted !== true
                 );
+                if (window.ArtSoulDiscovery?.filterForGalleryTab) {
+                    result = window.ArtSoulDiscovery.filterForGalleryTab(result, activeTab);
+                }
                 if (statusFilter !== 'all') {
                     result = result.filter(artwork => normalize(artwork.status) === normalize(statusFilter));
                 }
@@ -437,7 +442,7 @@
             }
 
             function clearFilters() {
-                setActiveTab('discover');
+                selectGalleryTab('live_auctions');
                 setStatusFilter('all');
                 setSortBy('discovery');
                 setMinPrice('');
@@ -640,6 +645,7 @@
                                                 key={artwork.id}
                                                 artwork={artwork}
                                                 minimal={true}
+                                                showSignals={activeTab === 'discover'}
                                                 onOpen={() => window.location.href = `artwork.html?id=${artwork.id}`}
                                             />
                                         );

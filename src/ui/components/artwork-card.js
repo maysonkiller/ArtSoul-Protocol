@@ -141,11 +141,14 @@
         return '';
     }
 
-    function signalsText(artwork = {}) {
+    function signalsText(artwork = {}, includeZero = false) {
         const signals = window.ArtSoulDiscovery?.getSocialSignals?.(artwork) || {};
         const likes = toNumber(signals.likes ?? artwork.like_count ?? artwork.vote_count);
         const wouldBuy = toNumber(signals.wouldBuy ?? artwork.would_buy_count);
         const watching = toNumber(signals.watching ?? artwork.watching_count);
+        if (includeZero) {
+            return `${likes} likes · ${wouldBuy} would buy · ${watching} watching`;
+        }
         const parts = [];
         if (likes) parts.push(`${likes} likes`);
         if (wouldBuy) parts.push(`${wouldBuy} would buy`);
@@ -291,13 +294,14 @@
 
         const signal = document.createElement('p');
         signal.className = 'artsoul-card-signals';
-        signal.textContent = signalsText(artwork) || options.reason || '';
+        const showSignals = options.showSignals === true;
+        signal.textContent = signalsText(artwork, showSignals) || options.reason || '';
 
         if (!minimal) body.appendChild(eyebrow);
         body.appendChild(title);
         if (!minimal) body.appendChild(desc);
         body.appendChild(meta);
-        if (!minimal && signal.textContent) body.appendChild(signal);
+        if ((!minimal || showSignals) && signal.textContent) body.appendChild(signal);
 
         card.appendChild(createMediaElement(artwork));
         card.appendChild(body);
@@ -352,14 +356,14 @@
         );
     }
 
-    function ReactCard({ artwork = {}, slotLabel = '', reason = '', onOpen = null, actions = null, respectHidden = true, minimal = false }) {
+    function ReactCard({ artwork = {}, slotLabel = '', reason = '', onOpen = null, actions = null, respectHidden = true, minimal = false, showSignals = false }) {
         const React = window.React;
         const h = React.createElement;
         if (respectHidden !== false && isHidden(artwork)) return null;
 
         const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
         const price = minimal ? formatDiscoveryPrice(artwork) : formatPrice(artwork);
-        const signals = signalsText(artwork);
+        const signals = signalsText(artwork, showSignals);
         return h('div', {
             className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}`,
             onClick: onOpen || undefined,
@@ -381,7 +385,9 @@
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
                 ),
-                !minimal && (signals || reason) ? h('p', { className: 'artsoul-card-signals' }, signals || reason) : null,
+                (!minimal || showSignals) && (signals || reason)
+                    ? h('p', { className: 'artsoul-card-signals' }, signals || reason)
+                    : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             )
         );
@@ -399,6 +405,7 @@
         hasSafeMedia,
         detailHref,
         prepareVideoPreview,
+        signalsText,
         toTimestamp
     };
 })();

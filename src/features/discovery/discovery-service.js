@@ -263,7 +263,8 @@
     }
 
     function isPublicArtwork(artwork = {}) {
-        return artwork.is_hidden !== true &&
+        return artwork.moderation_hidden !== true &&
+            artwork.is_hidden !== true &&
             artwork.is_blocked !== true &&
             artwork.is_deleted !== true;
     }
@@ -525,25 +526,81 @@
         return classifyLifecycle(artwork).label;
     }
 
+    function isGalleryCollection(artwork = {}) {
+        return artwork.is_collection === true ||
+            hasPositiveProtocolId(artwork.collection_id || artwork.collectionId) ||
+            hasPositiveProtocolId(artwork.collection_address || artwork.collectionAddress) ||
+            hasPositiveProtocolId(artwork.project_id || artwork.projectId) ||
+            ['collection', 'partner_collection', 'project_collection'].includes(normalize(
+                artwork.content_type || artwork.artwork_type || artwork.source_type
+            ));
+    }
+
+    function isGalleryMinted(artwork = {}) {
+        return artwork.minted === true ||
+            hasPositiveNumericProtocolId(artwork.token_id || artwork.tokenId);
+    }
+
+    function isGalleryLiveAuction(artwork = {}) {
+        const status = normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state);
+        const endTime = getAuctionEndTimestamp(artwork);
+        const auctionId = artwork.active_auction_id || artwork.activeAuctionId || artwork.auction_id;
+
+        return !isGalleryMinted(artwork) &&
+            status === 'auction' &&
+            hasPositiveNumericProtocolId(auctionId) &&
+            endTime > Date.now();
+    }
+
+    function isGalleryResale(artwork = {}) {
+        const status = normalize(artwork.status || artwork.listing_status || artwork.resale_status);
+        const price = firstNumber(artwork, [
+            'sale_price',
+            'resale_price',
+            'listing_price'
+        ]);
+
+        return isGalleryMinted(artwork) &&
+            ['for_sale', 'listed', 'resale_listed', 'active'].includes(status) &&
+            price > 0;
+    }
+
+    function galleryTabForArtwork(artwork = {}) {
+        if (isGalleryCollection(artwork)) return 'collections';
+        if (isGalleryLiveAuction(artwork)) return 'live_auctions';
+        if (isGalleryResale(artwork)) return 'marketplace';
+        if (isGalleryMinted(artwork)) return '';
+
+        const status = normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state);
+        const activeAuctionId = artwork.active_auction_id || artwork.activeAuctionId;
+        const waitingStatuses = new Set([
+            '',
+            'registered',
+            'draft',
+            'unminted',
+            'not_yet_minted',
+            'ended',
+            'ended_no_bids',
+            'defaulted',
+            'defaulted_no_bids',
+            'failed'
+        ]);
+
+        if (!waitingStatuses.has(status) || hasPositiveNumericProtocolId(activeAuctionId)) {
+            return '';
+        }
+
+        // TODO: Once the canonical project wallet is configured, route its works only
+        // through Collections instead of guessing an address here.
+        return 'discover';
+    }
+
     function filterForGalleryTab(artworks = [], tab = 'discover') {
         const normalizedTab = normalize(tab);
         const list = (Array.isArray(artworks) ? artworks : [])
-            .filter(isPublicTestnetArtwork)
+            .filter(isPublicArtwork)
             .map(normalizeArtwork);
-
-        if (normalizedTab === 'live_auctions') {
-            return list.filter(artwork => artwork.discovery_lifecycle.isLiveAuction);
-        }
-
-        if (normalizedTab === 'marketplace') {
-            return list.filter(artwork => artwork.discovery_lifecycle.isMarketplace);
-        }
-
-        if (normalizedTab === 'collections') {
-            return list.filter(artwork => artwork.discovery_lifecycle.isCollection);
-        }
-
-        return list;
+        return list.filter(artwork => galleryTabForArtwork(artwork) === normalizedTab);
     }
 
     function searchArtworks(artworks = [], query = '') {
@@ -811,6 +868,7 @@
         computeTrustProfile,
         filterPublicTestnetArtworks,
         filterForGalleryTab,
+        galleryTabForArtwork,
         getAIGuidance,
         getGenesisProgress,
         getInteractionState,
