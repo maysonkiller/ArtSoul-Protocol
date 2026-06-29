@@ -15,6 +15,11 @@ Work must proceed one contained task at a time. Do not mix protocol, visual, sec
 9. Public beta readiness.
 10. Mainnet readiness.
 
+## Future Mainnet Contract Requirements
+
+- [ ] Replace the current testnet's manual no-bid auction finalization with an automatic on-chain transition: once an auction expires with no bids, the artwork must return to a re-auctionable state without a separate "End Expired Auction" transaction.
+- This item requires a new contract version and mainnet redeploy. It must not be treated as current deployed testnet behavior or implemented as a frontend-only shortcut.
+
 ## Rules
 
 - One backlog item equals one task.

@@ -19,6 +19,7 @@
 
 - Finish legal and founder tasks.
 - Review contracts and storage layout.
+- Implement and test automatic on-chain finalization for expired no-bid auctions in the next contract version, removing the current testnet requirement for a separate manual finalize transaction before re-auction.
 - Finalize treasury operations.
 - Complete RLS and API security checks.
 - Confirm persistent infrastructure.
