@@ -267,6 +267,10 @@ body.future .artwork-detail-frame {
     padding: 14px;
 }
 
+.artsoul-artwork-card-minimal .artsoul-card-body {
+    min-height: 86px;
+}
+
 .artsoul-card-eyebrow {
     min-height: 16px;
     color: var(--c-accent);
@@ -335,6 +339,7 @@ body.future .artwork-detail-frame {
 }
 
 .artsoul-card-status-ended_no_bids,
+.artsoul-card-status-ended,
 .artsoul-card-status-unsettled {
     background: rgba(var(--c-accent-3-rgb), 0.12);
     color: var(--c-accent-3);

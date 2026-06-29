@@ -21,14 +21,14 @@ const metadata = encodeURIComponent(JSON.stringify({
 let activeRole = 'admin';
 let rpcCalls = [];
 
-const artworks = [1, 2, 3, 4].map(id => ({
+const artworks = [1, 2, 3, 4, 5, 6, 7].map(id => ({
   chain_id: 84532,
   artwork_id: String(id),
   creator: creatorWallet,
   metadata_uri: `data:application/json,${metadata}`,
-  minted: id === 3,
-  active_auction_id: id === 3 ? '0' : String(id),
-  token_id: id === 3 ? '3' : '0',
+  minted: id === 3 || id === 6,
+  active_auction_id: [3, 5, 6].includes(id) ? '0' : String(id),
+  token_id: id === 3 || id === 6 ? String(id) : '0',
   indexed_at: '2026-06-29T00:00:00Z',
   last_updated_at: '2026-06-29T00:00:00Z',
   block_number: 100 + id,
@@ -65,6 +65,16 @@ const auctions = [
     start_price: '1000000000000000',
     current_bid: '0',
     current_bidder: '0x0000000000000000000000000000000000000000'
+  },
+  {
+    chain_id: 84532,
+    auction_id: '7',
+    artwork_id: '7',
+    status: 'settlement_pending',
+    end_time: '2026-06-29T00:00:00Z',
+    start_price: '1000000000000000',
+    current_bid: '2000000000000000',
+    current_bidder: staffWallet
   }
 ];
 
@@ -156,16 +166,34 @@ async function callPublic(query, cookie = '') {
   return response;
 }
 
-test('public discovery includes only live auctions and active resale listings', async () => {
+test('Discover includes every published lifecycle state except moderator-hidden works', async () => {
   const response = await callPublic({ limit: '100' });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body.data.map(row => row.artwork_id), ['1', '3']);
+  assert.deepEqual(response.body.data.map(row => row.artwork_id), ['1', '2', '3', '5', '6', '7']);
+});
+
+test('Auctions includes only live auctions', async () => {
+  const response = await callPublic({ view: 'auctions', limit: '100' });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body.data.map(row => row.artwork_id), ['1']);
+});
+
+test('Marketplace includes only minted active resale listings', async () => {
+  const response = await callPublic({ view: 'marketplace', limit: '100' });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body.data.map(row => row.artwork_id), ['3']);
+});
+
+test('Collections remains unchanged', async () => {
+  const response = await callPublic({ view: 'collections', limit: '100' });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body.data, []);
 });
 
 test('creator profile includes inactive lifecycle rows but excludes moderator-hidden rows', async () => {
   const response = await callPublic({ creator: creatorWallet, limit: '100' });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body.data.map(row => row.artwork_id), ['1', '2', '3']);
+  assert.deepEqual(response.body.data.map(row => row.artwork_id), ['1', '2', '3', '5', '6', '7']);
   assert.deepEqual(response.body.suppressed_artwork_ids, ['v41:84532:4']);
 });
 
