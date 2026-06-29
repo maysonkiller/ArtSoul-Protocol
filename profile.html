@@ -135,8 +135,8 @@
             }
         }
     </style>
-    <script src="avatar-dropdown.js?v=11"></script>
-    <script type="module" src="appkit-init.js?v=14"></script>
+    <script src="avatar-dropdown.js?v=12"></script>
+    <script type="module" src="appkit-init.js?v=15"></script>
     <script src="contracts-config.js?v=1"></script>
     <script type="module" src="contracts-integration.js?v=3"></script>
 
@@ -309,19 +309,19 @@
             const [loading, setLoading] = useState(true);
             const [artworksLoading, setArtworksLoading] = useState(true);
             const [isOwnProfile, setIsOwnProfile] = useState(true);
+            const [walletStateSettled, setWalletStateSettled] = useState(() => (
+                Boolean(getViewAddress()) || window.artsoulWalletStateSettled === true
+            ));
             const [pendingPayments, setPendingPayments] = useState([]);
             const [discoveryProfile, setDiscoveryProfile] = useState(null);
             const fileInputRef = useRef(null);
-            const profileSignalRef = useRef({ address: null, chainId: null });
+            const profileSignalRef = useRef({ address: null, chainId: null, initialized: false });
             const profileRequestRef = useRef(0);
             const artworksRequestRef = useRef(0);
             const transactionActionsRef = useRef(new Set());
             const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
-            const WALLET_BOOTSTRAP_TIMEOUT = 2500;
-            const WALLET_BOOTSTRAP_INTERVAL = 150;
-
             // Keep React-rendered theme classes aligned with ThemeManager.
             useEffect(() => {
                 const syncTheme = (newTheme) => setTheme(newTheme);
@@ -342,25 +342,11 @@
                 handleOAuthCallback();
 
                 let disposed = false;
-                let walletBootstrapResolved = Boolean(getViewAddress());
-                let walletBootstrapTimer = null;
-                let walletBootstrapInterval = null;
-
-                const clearWalletBootstrap = () => {
-                    if (walletBootstrapTimer) {
-                        clearTimeout(walletBootstrapTimer);
-                        walletBootstrapTimer = null;
-                    }
-
-                    if (walletBootstrapInterval) {
-                        clearInterval(walletBootstrapInterval);
-                        walletBootstrapInterval = null;
-                    }
-                };
+                let walletBootstrapResolved = Boolean(getViewAddress()) || window.artsoulWalletStateSettled === true;
 
                 const resolveWalletBootstrap = () => {
                     walletBootstrapResolved = true;
-                    clearWalletBootstrap();
+                    setWalletStateSettled(true);
                 };
 
                 const refreshProfileState = (event = null, options = {}) => {
@@ -368,68 +354,36 @@
 
                     const signal = getProfileSignal(event?.detail);
                     const previous = profileSignalRef.current;
-                    const forceRefresh = event?.type === 'artsoul:wallet-state-changed';
-                    const isDisconnectEvent = event?.detail?.isConnected === false;
-                    const isCurrentWalletProfile = !getViewAddress() && signal.address;
 
                     if (!walletBootstrapResolved) {
-                        if (signal.address || options.finalizeGuest) {
+                        if (getViewAddress() || window.artsoulWalletStateSettled === true) {
                             resolveWalletBootstrap();
                         } else {
                             return;
                         }
                     }
 
-                    if (isDisconnectEvent && !walletBootstrapResolved) {
-                        return;
-                    }
-
-                    if (forceRefresh || options.force || signal.address !== previous.address || signal.chainId !== previous.chainId) {
-                        profileSignalRef.current = signal;
+                    const addressChanged = signal.address !== previous.address;
+                    const meaningfulChainChange = Boolean(previous.chainId && signal.chainId && signal.chainId !== previous.chainId);
+                    if (!previous.initialized || options.force || addressChanged || meaningfulChainChange) {
+                        profileSignalRef.current = { ...signal, initialized: true };
                         loadProfile(signal.address);
-
-                        if (!forceRefresh && isCurrentWalletProfile) {
-                            window.dispatchEvent(new CustomEvent('artsoul:wallet-state-changed', {
-                                detail: {
-                                    address: signal.address.toLowerCase(),
-                                    chainId: signal.chainId,
-                                    isConnected: true
-                                }
-                            }));
-                        }
                     }
                 };
 
                 refreshProfileState();
 
-                if (!walletBootstrapResolved) {
-                    walletBootstrapInterval = setInterval(refreshProfileState, WALLET_BOOTSTRAP_INTERVAL);
-                    walletBootstrapTimer = setTimeout(() => {
-                        refreshProfileState(null, {
-                            force: true,
-                            finalizeGuest: true
-                        });
-                    }, WALLET_BOOTSTRAP_TIMEOUT);
-                }
-
-                const provider = window.ethereum;
-
                 window.addEventListener('storage', refreshProfileState);
                 window.addEventListener('artsoul:wallet-state-changed', refreshProfileState);
                 window.addEventListener('focus', refreshProfileState);
                 document.addEventListener('visibilitychange', refreshProfileState);
-                provider?.on?.('accountsChanged', refreshProfileState);
-                provider?.on?.('chainChanged', refreshProfileState);
 
                 return () => {
                     disposed = true;
-                    clearWalletBootstrap();
                     window.removeEventListener('storage', refreshProfileState);
                     window.removeEventListener('artsoul:wallet-state-changed', refreshProfileState);
                     window.removeEventListener('focus', refreshProfileState);
                     document.removeEventListener('visibilitychange', refreshProfileState);
-                    provider?.removeListener?.('accountsChanged', refreshProfileState);
-                    provider?.removeListener?.('chainChanged', refreshProfileState);
                 };
             }, []);
 
@@ -1479,6 +1433,14 @@
             const bgClass = isClassic ? 'bg-gray-900 text-gray-100' : 'bg-black text-cyan-100';
             const viewAddress = getViewAddress();
             const connectedWalletAddress = getActiveWalletAddress();
+
+            if (!viewAddress && !walletStateSettled) {
+                return (
+                    <div className={`flex items-center justify-center min-h-screen ${bgClass}`}>
+                        <div className="text-lg" style={{ color: 'var(--c-text)' }}>Initializing wallet...</div>
+                    </div>
+                );
+            }
 
             if (loading) {
                 return (
