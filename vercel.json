@@ -21,6 +21,10 @@
       "destination": "/api/[...route]?route=functions/:route*"
     },
     {
+      "source": "/api/moderation/:route*",
+      "destination": "/api/[...route]?route=moderation/:route*"
+    },
+    {
       "source": "/api/ai/:route*",
       "destination": "/api/[...route]?route=ai/:route*"
     },

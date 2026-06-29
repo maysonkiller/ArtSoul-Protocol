@@ -1,35 +1,9 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
+import { getModerationAccess } from '../../moderation-access.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-// ---------------------------------------------------------------------------
-// HIDDEN ARTWORKS — public visibility curation (NOT deletion).
-//
-// Artwork IDs listed here are omitted ONLY from public DISCOVERY/LIST surfaces
-// (gallery / discover / homepage spotlight / auctions / marketplace). They are
-// deliberately NOT hidden from:
-//   - the single-artwork by-id lookup, so the detail page still loads via a
-//     direct link (artwork.html?id=...);
-//   - the by-owner lookup, so the work still appears (with its real status) in
-//     the owner's profile.
-// The underlying on-chain data and indexer rows are left completely untouched;
-// removing an ID from this list immediately makes the work public again.
-//
-// IDs use the public card format: `v41:<chainId>:<artworkId>`
-// (e.g. Base Sepolia artwork #6 is `v41:84532:6`).
-//
-// EDIT THIS LIST to hide or show specific works. Order does not matter.
-// ---------------------------------------------------------------------------
-const HIDDEN_ARTWORK_IDS = new Set([
-  // Test / placeholder works hidden from public discovery (data preserved;
-  // still reachable by direct link and in the owner's profile).
-  'v41:84532:3',  // "Rialo"           — Rialo logo placeholder
-  'v41:84532:6',  // "RIALO"           — Rialo logo placeholder
-  'v41:84532:7',  // "Rialo VIDEO CAT" — Rialo test work
-  'v41:84532:10', // "GIF Banned"      — broken-image test card
-  'v41:84532:13'  // "Rialo tesnetn"   — Rialo test work
-]);
 const TABLES = [
   'v41_artworks',
   'v41_auctions',
@@ -39,7 +13,8 @@ const TABLES = [
   'v41_resale_history',
   'v41_floor_history',
   'v41_trust_signals',
-  'artwork_social_signals'
+  'artwork_social_signals',
+  'artwork_moderation_visibility'
 ];
 
 function normalizeText(value) {
@@ -352,6 +327,16 @@ function socialSignalsByArtwork(signals = []) {
   return map;
 }
 
+function moderationVisibilityByArtwork(rows = []) {
+  const map = new Map();
+  for (const row of rows) {
+    const artworkId = protocolId(row.artwork_id);
+    if (!artworkId) continue;
+    map.set(keyFor(chainId(row.chain_id), artworkId), row);
+  }
+  return map;
+}
+
 function bidsByAuction(bids = []) {
   const map = new Map();
 
@@ -402,6 +387,7 @@ async function toPublicCard(artwork, maps) {
     would_buy: 0,
     watching: 0
   };
+  const moderation = maps.moderation.get(keyFor(chain, artworkId));
   const metadata = await loadMetadata(artwork.metadata_uri);
   const rawMediaUrl = getMediaUrl(metadata);
   const mediaUrl = toHttpUri(rawMediaUrl) || rawMediaUrl;
@@ -458,14 +444,27 @@ async function toPublicCard(artwork, maps) {
     created_at: artwork.indexed_at,
     updated_at: artwork.last_updated_at,
     block_number: artwork.block_number,
-    transaction_hash: artwork.transaction_hash
+    transaction_hash: artwork.transaction_hash,
+    moderation_hidden: moderation?.hidden === true
   };
+}
+
+function isActionableDiscoveryCard(card) {
+  if (card.status === 'auction') return true;
+  return card.status === 'for_sale' && card.minted === true && toNumber(card.sale_price) > 0;
 }
 
 function filterCards(cards, query) {
   const id = validateArtworkId(query.id);
   const view = normalizeText(query.view).toLowerCase();
   let result = cards;
+  const isDirectArtworkLookup = Boolean(id) || Boolean(protocolId(query.artwork_id));
+  const isProfileLookup = Boolean(normalizeText(query.creator || query.creator_id)) ||
+    Boolean(normalizeText(query.owner));
+
+  if (!isDirectArtworkLookup && !isProfileLookup) {
+    result = result.filter(isActionableDiscoveryCard);
+  }
 
   if (id) {
     result = result.filter(card => card.id === id || `${card.chain_id}:${card.artwork_id}` === id);
@@ -538,6 +537,11 @@ export default async function handler(req, res) {
         'artwork_social_signals',
         `select=chain_id,artwork_id,wallet_address,signal_type&chain_id=${chainFilter}&limit=5000`,
         warnings
+      ),
+      artwork_moderation_visibility: await queryTable(
+        'artwork_moderation_visibility',
+        `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&limit=1000`,
+        warnings
       )
     };
 
@@ -548,20 +552,23 @@ export default async function handler(req, res) {
       resaleHistory: latestResaleByToken(tableData.v41_resale_history),
       floors: floorByArtwork(tableData.v41_floor_history),
       socialSignals: socialSignalsByArtwork(tableData.artwork_social_signals),
+      moderation: moderationVisibilityByArtwork(tableData.artwork_moderation_visibility),
       bids: bidsByAuction(tableData.v41_bids)
     };
 
     const cards = await Promise.all(tableData.v41_artworks.map(artwork => toPublicCard(artwork, maps)));
     const requestQuery = req.query || {};
-    // Curate public visibility: owner-hidden works are dropped from discovery /
-    // list results, but a direct by-id lookup (detail page) and a by-owner
-    // lookup (owner's profile) intentionally bypass the hide so the work still
-    // loads via direct link and still shows in the owner's profile.
-    const isDirectLookup = Boolean(validateArtworkId(requestQuery.id)) ||
-      Boolean(normalizeText(requestQuery.owner));
-    const visibleCards = isDirectLookup
-      ? cards
-      : cards.filter(card => !HIDDEN_ARTWORK_IDS.has(card.id));
+    const suppressedArtworkIds = cards
+      .filter(card => card.moderation_hidden === true)
+      .map(card => card.id);
+    const isDirectArtworkLookup = Boolean(validateArtworkId(requestQuery.id)) ||
+      Boolean(protocolId(requestQuery.artwork_id));
+    const moderationAccess = isDirectArtworkLookup
+      ? await getModerationAccess(req)
+      : { canModerate: false };
+    const visibleCards = cards.filter(card =>
+      card.moderation_hidden !== true || (isDirectArtworkLookup && moderationAccess.canModerate)
+    );
     const filteredCards = filterCards(visibleCards, requestQuery);
     const includeBidActivity = Boolean(validateArtworkId(requestQuery.id)) ||
       Boolean(protocolId(requestQuery.artwork_id));
@@ -584,6 +591,7 @@ export default async function handler(req, res) {
       source: 'v41_projection',
       data,
       count: data.length,
+      suppressed_artwork_ids: suppressedArtworkIds,
       diagnostics,
       warnings
     });
