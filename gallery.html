@@ -262,17 +262,6 @@
                 );
             }
 
-            function showMetadataUnavailableCards() {
-                try {
-                    const params = new URLSearchParams(window.location.search || '');
-                    return params.get('showPlaceholders') === '1' ||
-                        params.get('debugProtocol') === '1' ||
-                        localStorage.getItem('artsoul_show_protocol_placeholders') === 'true';
-                } catch {
-                    return false;
-                }
-            }
-
             // Plain-English labels for the contract-y projection statuses.
             // Display only — does NOT change the underlying status logic.
             const GALLERY_STATUS_LABELS = {
@@ -362,10 +351,6 @@
                     artwork.is_blocked !== true &&
                     artwork.is_deleted !== true
                 );
-                result = result.filter(artwork =>
-                    !artwork.gallery_metadata_missing || showMetadataUnavailableCards()
-                );
-
                 if (statusFilter !== 'all') {
                     result = result.filter(artwork => normalize(artwork.status) === normalize(statusFilter));
                 }
