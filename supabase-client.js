@@ -184,7 +184,11 @@ async function backendRead(path) {
 async function getPublicProjectionArtworks(options = {}) {
     try {
         const result = await backendRead(`/api/public/artworks${buildQuery(options)}`);
-        return result.data || [];
+        const rows = Array.isArray(result.data) ? result.data : [];
+        rows.suppressed_artwork_ids = Array.isArray(result.suppressed_artwork_ids)
+            ? result.suppressed_artwork_ids
+            : [];
+        return rows;
     } catch (error) {
         console.warn('[ArtSoulDB] V4.1 projection feed unavailable:', error.message);
         return [];
