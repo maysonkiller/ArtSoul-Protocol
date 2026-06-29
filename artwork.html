@@ -182,6 +182,46 @@ body.classic {
             border: 1px dashed var(--c-border-soft);
             color: var(--c-text);
         }
+
+        .moderation-panel {
+            background: var(--c-surface);
+            border: 1px solid var(--c-border-soft);
+            color: var(--c-text);
+        }
+
+        .moderation-state {
+            background: rgba(var(--c-accent-rgb), 0.08);
+            border: 1px solid var(--c-border-soft);
+            color: var(--c-accent);
+        }
+
+        .moderation-reason {
+            background: var(--c-surface-muted);
+            border: 1px solid var(--c-border-soft);
+            color: var(--c-text);
+        }
+
+        .moderation-reason:focus {
+            border-color: var(--c-border);
+            box-shadow: 0 0 0 2px var(--c-glow);
+        }
+
+        .moderation-action {
+            background: rgba(var(--c-accent-rgb), 0.12);
+            border: 1px solid var(--c-border);
+            color: var(--c-accent);
+        }
+
+        .moderation-action:hover:not(:disabled),
+        .moderation-action:focus-visible:not(:disabled) {
+            background: rgba(var(--c-accent-rgb), 0.2);
+            box-shadow: 0 0 18px var(--c-glow);
+        }
+
+        .moderation-action:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
     </style>
     <link rel="stylesheet" href="mobile-no-motion.css?v=1">
 </head>
@@ -428,6 +468,10 @@ body.classic {
             const [bidAmount, setBidAmount] = useState('');
             const [bidActivity, setBidActivity] = useState([]);
             const [bidderProfiles, setBidderProfiles] = useState({});
+            const [moderationAccess, setModerationAccess] = useState(null);
+            const [moderationReason, setModerationReason] = useState('');
+            const [moderationBusy, setModerationBusy] = useState(false);
+            const [moderationMessage, setModerationMessage] = useState('');
             const [timeLeft, setTimeLeft] = useState('');
             const [userVote, setUserVote] = useState(null);
             const [votes, setVotes] = useState([]);
@@ -907,6 +951,98 @@ body.classic {
                 return getProfileDisplayName(profile, address);
             }
 
+            async function loadModerationVisibility(projection = artwork, options = {}) {
+                if (!projection?.chain_id || !projection?.artwork_id) return false;
+
+                if (options.interactive) {
+                    const authenticated = await window.ensureAuthenticated?.();
+                    if (!authenticated) {
+                        setModerationMessage('Sign in with your staff wallet to continue.');
+                        return false;
+                    }
+                }
+
+                try {
+                    const query = new URLSearchParams({
+                        chain_id: String(projection.chain_id),
+                        artwork_id: String(projection.artwork_id)
+                    });
+                    const response = await fetch(`/api/moderation/artwork-visibility?${query}`, {
+                        method: 'GET',
+                        credentials: 'include'
+                    });
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        if (options.interactive) {
+                            setModerationMessage(result.message || 'This wallet does not have staff moderation access.');
+                        }
+                        return false;
+                    }
+
+                    setModerationAccess({
+                        ...result.access,
+                        ...(result.data || {})
+                    });
+                    setModerationReason(result.data?.hidden_reason || '');
+                    setModerationMessage('');
+                    return true;
+                } catch (error) {
+                    console.warn('Could not load moderation visibility:', error);
+                    if (options.interactive) {
+                        setModerationMessage('Moderation controls are temporarily unavailable.');
+                    }
+                    return false;
+                }
+            }
+
+            async function handleModerationVisibility(hidden) {
+                if (!artwork?.chain_id || !artwork?.artwork_id || moderationBusy) return;
+                if (hidden && !moderationReason.trim()) {
+                    setModerationMessage('Add a reason before hiding this artwork.');
+                    return;
+                }
+
+                const authenticated = await window.ensureAuthenticated?.();
+                if (!authenticated) return;
+
+                setModerationBusy(true);
+                setModerationMessage('');
+                try {
+                    const response = await fetch('/api/moderation/artwork-visibility', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chain_id: artwork.chain_id,
+                            artwork_id: artwork.artwork_id,
+                            hidden,
+                            reason: hidden ? moderationReason.trim() : null
+                        })
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Moderation update failed');
+                    }
+
+                    setModerationAccess(current => ({
+                        ...(current || {}),
+                        ...(result.access || {}),
+                        ...(result.data || {}),
+                        hidden
+                    }));
+                    if (!hidden) setModerationReason('');
+                    setModerationMessage(hidden
+                        ? 'Artwork is hidden from public surfaces.'
+                        : 'Artwork is visible again where its auction state allows.');
+                } catch (error) {
+                    console.error('Moderation visibility update failed:', error);
+                    setModerationMessage(error.message || 'Moderation update failed.');
+                } finally {
+                    setModerationBusy(false);
+                }
+            }
+
             function calculateMinimumBidDetails(auctionData) {
                 const contractMinimumWei = parseEthToWei(firstDefined(
                     auctionData?.minimumBid,
@@ -1146,6 +1282,7 @@ body.classic {
                     const data = await window.ArtSoulDB.getArtwork(artworkId);
                     console.log('[Artwork] Loaded data:', data);
                     setArtwork(data);
+                    loadModerationVisibility(data);
                     if (isV41CompositeId) {
                         await applyLiveAuctionProjection(data);
                     } else {
@@ -1834,6 +1971,83 @@ body.classic {
                                     <h1 className="text-4xl font-bold mb-2">{artwork.title}</h1>
                                     <p className="opacity-70">{artwork.description}</p>
                                 </div>
+
+                                {moderationAccess?.canModerate ? (
+                                    <section className="moderation-panel rounded-xl p-5" aria-label="Staff moderation">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                            <div>
+                                                <h3 className="text-lg font-bold">Staff moderation</h3>
+                                                <p className="text-xs opacity-70">Signed in as {moderationAccess.role}</p>
+                                            </div>
+                                            <span className="moderation-state rounded-full px-3 py-1 text-xs font-bold">
+                                                {moderationAccess.hidden ? 'Hidden' : 'Visible'}
+                                            </span>
+                                        </div>
+
+                                        {moderationAccess.hidden ? (
+                                            <div className="space-y-3">
+                                                {moderationAccess.hidden_reason && (
+                                                    <p className="text-sm opacity-80">
+                                                        Reason: {moderationAccess.hidden_reason}
+                                                    </p>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    className="moderation-action w-full rounded-lg px-4 py-3 font-bold"
+                                                    disabled={moderationBusy}
+                                                    onClick={() => handleModerationVisibility(false)}
+                                                >
+                                                    {moderationBusy ? 'Updating...' : 'Unhide Artwork'}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <label className="block text-sm font-semibold" htmlFor="moderationReason">
+                                                    Hide reason
+                                                </label>
+                                                <textarea
+                                                    id="moderationReason"
+                                                    className="moderation-reason min-h-[96px] w-full rounded-lg px-3 py-2"
+                                                    maxLength="500"
+                                                    placeholder="Explain why this artwork must be removed from public surfaces"
+                                                    value={moderationReason}
+                                                    onChange={event => setModerationReason(event.target.value)}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="moderation-action w-full rounded-lg px-4 py-3 font-bold"
+                                                    disabled={moderationBusy || !moderationReason.trim()}
+                                                    onClick={() => handleModerationVisibility(true)}
+                                                >
+                                                    {moderationBusy ? 'Updating...' : 'Hide Artwork'}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {moderationMessage && (
+                                            <p className="mt-3 text-sm" role="status">{moderationMessage}</p>
+                                        )}
+                                    </section>
+                                ) : (
+                                    <details className="moderation-panel rounded-xl p-4">
+                                        <summary className="cursor-pointer text-sm font-semibold">Staff moderation</summary>
+                                        <div className="mt-3 space-y-3">
+                                            <p className="text-xs opacity-70">
+                                                Authorized staff can verify access to hide or restore this artwork.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                className="moderation-action w-full rounded-lg px-4 py-3 text-sm font-bold"
+                                                onClick={() => loadModerationVisibility(artwork, { interactive: true })}
+                                            >
+                                                Verify Staff Access
+                                            </button>
+                                            {moderationMessage && (
+                                                <p className="text-sm" role="status">{moderationMessage}</p>
+                                            )}
+                                        </div>
+                                    </details>
+                                )}
 
                                 {/* Ownership Info - Three Roles */}
                                 <div className={`p-6 rounded-xl ${isClassic ? 'bg-gray-800' : 'bg-cyan-900/20 border border-cyan-500/30'}`}>

@@ -1095,12 +1095,16 @@
 
             try {
                 let artworks = await window.ArtSoulDB.getPublicProjectionArtworks({ limit: 100 });
+                const suppressedArtworkIds = new Set(
+                    (artworks?.suppressed_artwork_ids || []).map(value => String(value).toLowerCase())
+                );
                 const indexedKeys = new Set();
                 (artworks || []).forEach(art => {
                     artworkIdentityKeys(art).forEach(key => indexedKeys.add(key));
                 });
                 const pendingArtworks = readPendingIndexerArtworks()
                     .filter(art => !hasAnyArtworkIdentity(art, indexedKeys))
+                    .filter(art => ![...artworkIdentityKeys(art)].some(key => suppressedArtworkIds.has(key)))
                     .filter(art => !window.ArtSoulArtworkCard?.isHidden?.(art));
                 artworks = [...pendingArtworks, ...(artworks || [])]
                     .filter(art => art?.source === 'v41_projection' || art?.source === 'pending_indexer')
