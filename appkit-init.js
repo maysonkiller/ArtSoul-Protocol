@@ -113,7 +113,10 @@ const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
 const MODAL_CLOSE_RETRY_DELAYS = [250, 700, 1400];
-window.artsoulWalletHydrating = false;
+let lastDispatchedWalletStateKey = null;
+window.artsoulWalletHydrating = true;
+window.artsoulWalletStateSettled = false;
+window.artsoulSettledWalletState = null;
 
 function walletDebugEnabled() {
     try {
@@ -775,20 +778,41 @@ function getRestoredWalletState() {
     return authoritativeState;
 }
 
-function dispatchWalletStateChanged(state = {}) {
+function dispatchWalletStateChanged(state = {}, options = {}) {
     const address = state.address ? state.address.toLowerCase() : null;
     const hasExplicitEmptyChain = Object.prototype.hasOwnProperty.call(state, 'chainId') &&
         (state.chainId === null || state.chainId === undefined || state.chainId === '');
     const chainId = hasExplicitEmptyChain ? null : normalizeChainId(state.chainId ?? state);
     const isConnected = Boolean(address && state.isConnected !== false);
+    const detail = { address, chainId, isConnected };
+    let didSettleInitialState = false;
+
+    // AppKit emits several empty account snapshots while restoring providers.
+    // Do not expose those snapshots to the UI. The first connected state, or an
+    // explicitly finalized guest state after reconciliation, opens the gate.
+    if (!window.artsoulWalletStateSettled) {
+        if (!isConnected && options.settled !== true) return false;
+
+        window.artsoulWalletStateSettled = true;
+        window.artsoulSettledWalletState = detail;
+        didSettleInitialState = true;
+    } else {
+        window.artsoulSettledWalletState = detail;
+    }
+
+    const stateKey = `${address || 'guest'}:${chainId || 'none'}:${isConnected ? 'connected' : 'disconnected'}`;
+    if (stateKey === lastDispatchedWalletStateKey) return false;
+    lastDispatchedWalletStateKey = stateKey;
 
     window.dispatchEvent(new CustomEvent('artsoul:wallet-state-changed', {
-        detail: {
-            address,
-            chainId,
-            isConnected
-        }
+        detail
     }));
+
+    if (didSettleInitialState) {
+        window.dispatchEvent(new CustomEvent('artsoul:wallet-state-settled', { detail }));
+    }
+
+    return true;
 }
 
 async function clearWalletConnectionCache() {
@@ -903,6 +927,11 @@ window.updateNavButtons = function updateNavButtons(state) {
 
     const normalizedChainId = setCurrentChainId(state);
     const normalizedAddress = state?.address ? state.address.toLowerCase() : null;
+
+    if (window.artsoulWalletStateSettled !== true) {
+        window.AvatarDropdown?.renderInitializingState?.();
+        return;
+    }
 
     if (normalizedAddress) {
         localStorage.setItem('artsoul_wallet', normalizedAddress);
@@ -1286,9 +1315,9 @@ async function initializeAppKit() {
         }
 
         const storedWalletAtBoot = localStorage.getItem('artsoul_wallet');
-        let walletHydrationPending = Boolean(storedWalletAtBoot && !explicitDisconnectRequested);
+        let walletHydrationPending = true;
         let walletHydrationTimer = null;
-        window.artsoulWalletHydrating = walletHydrationPending;
+        window.artsoulWalletHydrating = true;
 
         const applyConfirmedWalletState = (walletState) => {
             const normalizedAddress = walletState.address.toLowerCase();
@@ -1315,16 +1344,16 @@ async function initializeAppKit() {
                 return;
             }
 
+            dispatchWalletStateChanged({
+                address: null,
+                chainId: null,
+                isConnected: false
+            }, { settled: true });
             finishWalletHydration();
             localStorage.removeItem('artsoul_wallet');
             window.currentWalletAddress = null;
             updateNavButtons(null);
             updateNetworkBadge(null);
-            dispatchWalletStateChanged({
-                address: null,
-                chainId: null,
-                isConnected: false
-            });
         };
 
         const finishWalletHydration = () => {
@@ -1336,12 +1365,10 @@ async function initializeAppKit() {
             }
         };
 
-        if (walletHydrationPending) {
-            walletHydrationTimer = setTimeout(() => {
-                if (!walletHydrationPending) return;
-                clearStaleWalletState();
-            }, WALLET_HYDRATION_TIMEOUT);
-        }
+        walletHydrationTimer = setTimeout(() => {
+            if (!walletHydrationPending) return;
+            clearStaleWalletState();
+        }, WALLET_HYDRATION_TIMEOUT);
 
         // Create Wagmi adapter for better browser extension support
         const wagmiAdapter = new WagmiAdapter({
@@ -1402,11 +1429,7 @@ async function initializeAppKit() {
         if (initialWalletState?.isConnected) {
             applyConfirmedWalletState(initialWalletState);
         } else if (initialWalletState && !initialWalletState.isConnected) {
-            if (walletHydrationPending) {
-                console.log('Deferring initial disconnected account state during wallet hydration');
-            } else {
-                clearStaleWalletState();
-            }
+            console.log('Deferring initial disconnected account state during wallet hydration');
         }
 
         // Subscribe to account changes with detailed logging
@@ -1427,9 +1450,14 @@ async function initializeAppKit() {
             });
 
             // AppKit can emit transient disconnected while restoring a saved wallet.
+            if (!account?.address && walletHydrationPending) {
+                console.log('Skipping transient disconnected state during wallet hydration');
+                return;
+            }
+
             if (!account?.address && subscriptionCount < 5) {
                 const connectIntentActive = Date.now() < connectModalIntentUntil;
-                if (walletHydrationPending || connectIntentActive) {
+                if (connectIntentActive) {
                     console.log('Skipping transient disconnected state during wallet hydration');
                     return;
                 }
@@ -1438,6 +1466,10 @@ async function initializeAppKit() {
                 const recentlyConfirmed = Date.now() - lastConfirmedWalletAt < POST_CONNECT_DISCONNECT_GUARD;
                 if (lastProcessedAddress && !explicitDisconnectInProgress && recentlyConfirmed) {
                     console.log('Skipping transient empty account after confirmed wallet');
+                    return;
+                }
+
+                if (!lastProcessedAddress && window.artsoulWalletStateSettled) {
                     return;
                 }
 
@@ -1660,6 +1692,12 @@ async function initializeAppKit() {
         console.log('AppKit initialized');
     } catch (error) {
         console.error('AppKit init failed:', error);
+        dispatchWalletStateChanged({
+            address: null,
+            chainId: null,
+            isConnected: false
+        }, { settled: true });
+        updateNavButtons(null);
     }
 }
 

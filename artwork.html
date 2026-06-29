@@ -63,8 +63,8 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="avatar-dropdown.js?v=11"></script>
-    <script type="module" src="appkit-init.js?v=14"></script>
+    <script src="avatar-dropdown.js?v=12"></script>
+    <script type="module" src="appkit-init.js?v=15"></script>
     <script src="contracts-config.js?v=1"></script>
     <script type="module" src="contracts-integration.js?v=3"></script>
 
@@ -499,6 +499,10 @@ body.classic {
             const [moderationReason, setModerationReason] = useState('');
             const [moderationBusy, setModerationBusy] = useState(false);
             const [moderationMessage, setModerationMessage] = useState('');
+            const [walletRenderState, setWalletRenderState] = useState(() => ({
+                settled: window.artsoulWalletStateSettled === true,
+                address: window.artsoulSettledWalletState?.address || window.currentWalletAddress || null
+            }));
             const [timeLeft, setTimeLeft] = useState('');
             const [userVote, setUserVote] = useState(null);
             const [votes, setVotes] = useState([]);
@@ -573,6 +577,22 @@ body.classic {
                         delete window.setThemeReact;
                     }
                 };
+            }, []);
+
+            useEffect(() => {
+                const syncWalletRenderState = (event) => {
+                    const detail = event?.detail || window.artsoulSettledWalletState || {};
+                    setWalletRenderState({
+                        settled: window.artsoulWalletStateSettled === true,
+                        address: detail.isConnected === false ? null : (detail.address || window.currentWalletAddress || null)
+                    });
+                };
+
+                if (window.artsoulWalletStateSettled === true) {
+                    syncWalletRenderState();
+                }
+                window.addEventListener('artsoul:wallet-state-changed', syncWalletRenderState);
+                return () => window.removeEventListener('artsoul:wallet-state-changed', syncWalletRenderState);
             }, []);
 
             function getAuctionHelper(name) {
@@ -2059,8 +2079,8 @@ body.classic {
                 : null;
             const settlementDeadlineMs = normalizeTimestampMs(settlementDeadlineValue);
             const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(artwork.file_url) ? artwork.file_url : '';
-            const connectedWalletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
-            const canCreateNewAuction = canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
+            const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
+            const canCreateNewAuction = walletRenderState.settled && canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
 
             return (
                 <div className="min-h-screen">
@@ -2401,7 +2421,7 @@ body.classic {
                                         )}
 
                                         {/* Settlement button (24h window) */}
-                                        {auction.state === 'WAITING_PAYMENT' && window.currentWalletAddress?.toLowerCase() === auction.highestBidder?.toLowerCase() && (
+                                        {walletRenderState.settled && auction.state === 'WAITING_PAYMENT' && connectedWalletAddress?.toLowerCase() === auction.highestBidder?.toLowerCase() && (
                                             <div className="mt-6 space-y-3">
                                                 <div className={`p-4 rounded-lg border-2 ${
                                                     isClassic ? 'bg-yellow-500/20 border-yellow-500' : 'bg-yellow-400/20 border-yellow-400'
@@ -2435,7 +2455,7 @@ body.classic {
                                         )}
 
                                         {/* Settlement pending state (creator/viewer perspective) */}
-                                        {auction.state === 'WAITING_PAYMENT' && window.currentWalletAddress?.toLowerCase() !== auction.highestBidder?.toLowerCase() && (
+                                        {walletRenderState.settled && auction.state === 'WAITING_PAYMENT' && connectedWalletAddress?.toLowerCase() !== auction.highestBidder?.toLowerCase() && (
                                             <div className="mt-6">
                                                 <div className={`p-4 rounded-lg border ${
                                                     isClassic ? 'bg-gray-700/50 border-gray-600' : 'bg-cyan-900/10 border-cyan-500/30'

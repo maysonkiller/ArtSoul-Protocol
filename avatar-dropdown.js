@@ -138,27 +138,18 @@
             return selectedAddress.toLowerCase() === normalizedAddress;
         }
 
-        shouldDeferGuestRender(options = {}) {
-            if (options.confirmed === false) return false;
-            if (sessionStorage.getItem('artsoul_disconnecting')) return false;
-            if (!localStorage.getItem('artsoul_wallet')) return false;
-            if (window.currentWalletAddress) return false;
-
-            return !window.web3Modal || window.artsoulWalletHydrating === true;
-        }
-
         sync(walletAddress = null, options = {}) {
             const container = this.getNavContainer();
             if (!container) return false;
+
+            if (window.artsoulWalletStateSettled !== true) {
+                return this.renderInitializingState();
+            }
 
             const normalizedAddress = walletAddress ? walletAddress.toLowerCase() : null;
             const confirmedAddress = this.isWalletConnectionConfirmed(normalizedAddress, options)
                 ? normalizedAddress
                 : null;
-
-            if (!confirmedAddress && this.shouldDeferGuestRender(options)) {
-                return false;
-            }
 
             const renderKey = this.getRenderKey(confirmedAddress, options);
             const hasMenuButton = !!container.querySelector('.avatar-button');
@@ -646,6 +637,25 @@
             return this.sync(walletAddress, { force: true });
         }
 
+        renderInitializingState() {
+            const container = this.getNavContainer();
+            if (!container) return false;
+            if (container.dataset.avatarRenderKey === 'initializing') return true;
+
+            container.dataset.avatarRenderKey = 'initializing';
+            container.innerHTML = `
+                <div
+                    class="wallet-initializing-state"
+                    role="status"
+                    aria-live="polite"
+                    style="display:flex;align-items:center;min-height:48px;padding:0 0.75rem;opacity:0.7;"
+                >
+                    <span class="text-sm">Initializing...</span>
+                </div>
+            `;
+            return true;
+        }
+
         /**
          * Render connect button when wallet not connected
          */
@@ -948,17 +958,6 @@
     } else {
         syncCurrentMenu();
     }
-
-    let guestInitAttempts = 0;
-    const guestInitTimer = setInterval(() => {
-        guestInitAttempts++;
-        if (syncCurrentMenu() || guestInitAttempts >= 24) {
-            if (guestInitAttempts >= 24) {
-                syncCurrentMenu({ force: true, confirmed: false });
-            }
-            clearInterval(guestInitTimer);
-        }
-    }, 250);
 
     window.addEventListener('artsoul:nav-ready', () => syncCurrentMenu({ force: true }));
 
