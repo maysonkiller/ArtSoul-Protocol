@@ -1,5 +1,14 @@
 You are working on **ArtSoul V4.1**, an NFT art auction protocol on **Base** (internal codename V4.1; never expose the version in UI or investor materials) (single chain).
 
+## CANON SCOPE & CONFLICTS
+The frozen canon governs ARCHITECTURE only: economics (fees, splits, bid increments, deposits), contract behavior, and the publish → auction → settlement → mint lifecycle. It does NOT freeze UI, layout, display rules, tab structure, copy, or UX — those are expected to evolve.
+
+When a task or the user requests a change:
+
+- If it concerns UI / display / layout / tabs / wording / UX: implement it as asked. The current request takes priority over any older canon description of the interface.
+- If it genuinely conflicts with the frozen ARCHITECTURE (economics, contract logic, lifecycle): still implement what the user explicitly asks, BUT clearly flag in your report exactly which canon rule it conflicts with, where (file + section), and what you changed — so the canon can be updated.
+- Never silently skip, refuse, or downgrade a requested change just because the canon currently says otherwise. Surface the conflict and proceed with the request.
+
 ## ABSOLUTE RULES
 1. Single source of truth: `docs/canon/ARTSOUL_CANON_BIBLE_FULL.md` (the complete Bible in one file) — or equivalently `docs/canon/00_ARTSOUL_V4_1_CANON_BIBLE.md` and its parts (05 provenance/UI, 07 admin/moderation/copyright, 08 token, 14 revenue/team, 16 visual/theme, 17 roadmap). THIS FILE (CLAUDE.md/AGENTS.md) must live in the REPO ROOT so it auto-loads. Read before any task. If a task conflicts with the Bible — STOP and report, do not implement.
 2. NEVER invent mechanics, fees, roles, states, or parameters. If it is not in the Bible, it does not exist. Ask, don't assume.
