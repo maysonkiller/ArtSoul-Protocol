@@ -449,22 +449,10 @@ async function toPublicCard(artwork, maps) {
   };
 }
 
-function isActionableDiscoveryCard(card) {
-  if (card.status === 'auction') return true;
-  return card.status === 'for_sale' && card.minted === true && toNumber(card.sale_price) > 0;
-}
-
 function filterCards(cards, query) {
   const id = validateArtworkId(query.id);
   const view = normalizeText(query.view).toLowerCase();
   let result = cards;
-  const isDirectArtworkLookup = Boolean(id) || Boolean(protocolId(query.artwork_id));
-  const isProfileLookup = Boolean(normalizeText(query.creator || query.creator_id)) ||
-    Boolean(normalizeText(query.owner));
-
-  if (!isDirectArtworkLookup && !isProfileLookup) {
-    result = result.filter(isActionableDiscoveryCard);
-  }
 
   if (id) {
     result = result.filter(card => card.id === id || `${card.chain_id}:${card.artwork_id}` === id);
@@ -493,7 +481,11 @@ function filterCards(cards, query) {
   if (view === 'auctions') {
     result = result.filter(card => card.status === 'auction');
   } else if (view === 'marketplace') {
-    result = result.filter(card => card.status === 'for_sale');
+    result = result.filter(card =>
+      card.status === 'for_sale' &&
+      card.minted === true &&
+      toNumber(card.sale_price) > 0
+    );
   } else if (view === 'collections') {
     result = [];
   }

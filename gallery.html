@@ -59,7 +59,7 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=2"></script>
+    <script src="src/ui/components/artwork-card.js?v=3"></script>
     <script src="avatar-dropdown.js?v=11"></script>
     <script type="module" src="appkit-init.js?v=14"></script>
     <style>
@@ -262,17 +262,6 @@
                 );
             }
 
-            function showMetadataUnavailableCards() {
-                try {
-                    const params = new URLSearchParams(window.location.search || '');
-                    return params.get('showPlaceholders') === '1' ||
-                        params.get('debugProtocol') === '1' ||
-                        localStorage.getItem('artsoul_show_protocol_placeholders') === 'true';
-                } catch {
-                    return false;
-                }
-            }
-
             // Plain-English labels for the contract-y projection statuses.
             // Display only — does NOT change the underlying status logic.
             const GALLERY_STATUS_LABELS = {
@@ -362,10 +351,6 @@
                     artwork.is_blocked !== true &&
                     artwork.is_deleted !== true
                 );
-                result = result.filter(artwork =>
-                    !artwork.gallery_metadata_missing || showMetadataUnavailableCards()
-                );
-
                 if (statusFilter !== 'all') {
                     result = result.filter(artwork => normalize(artwork.status) === normalize(statusFilter));
                 }
@@ -654,8 +639,7 @@
                                             <SharedArtworkCard
                                                 key={artwork.id}
                                                 artwork={artwork}
-                                                slotLabel="Discovery"
-                                                reason={window.ArtSoulDiscovery?.classifyLifecycle?.(artwork)?.label || ''}
+                                                minimal={true}
                                                 onOpen={() => window.location.href = `artwork.html?id=${artwork.id}`}
                                             />
                                         );
