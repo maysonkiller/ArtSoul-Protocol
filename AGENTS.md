@@ -9,6 +9,20 @@ When a task or the user requests a change:
 - If it genuinely conflicts with the frozen ARCHITECTURE (economics, contract logic, lifecycle): still implement what the user explicitly asks, BUT clearly flag in your report exactly which canon rule it conflicts with, where (file + section), and what you changed — so the canon can be updated.
 - Never silently skip, refuse, or downgrade a requested change just because the canon currently says otherwise. Surface the conflict and proceed with the request.
 
+## IMPLEMENTATION DISCIPLINE
+Before writing new code, prefer the simplest solution:
+
+- Check whether the project ALREADY has a function / component / util that does this - reuse it instead of duplicating.
+- Prefer the standard library / platform built-ins over adding a new dependency. Do NOT add a new dependency unless there is no reasonable built-in or existing option; if you must add one, state why.
+- Write the MINIMUM code needed - avoid new abstractions or layers for a small change.
+
+Apply changes CONSISTENTLY:
+
+- If a change concerns a TYPE of UI element (e.g. media previews, cards, status badges, play controls), apply it to EVERY surface where that element appears (gallery, homepage, profile, artwork detail) - never fix it on one page and leave the others inconsistent.
+- If the request scopes a fix to one specific element, change ONLY that element and do not touch unrelated ones.
+
+When you notice an obvious closely-related bug in the same area you are editing, fix it too - or, if it is out of scope, clearly flag it in your report. Never leave an area half-correct.
+
 ## ABSOLUTE RULES
 1. Single source of truth: `docs/canon/ARTSOUL_CANON_BIBLE_FULL.md` (the complete Bible in one file) — or equivalently `docs/canon/00_ARTSOUL_V4_1_CANON_BIBLE.md` and its parts (05 provenance/UI, 07 admin/moderation/copyright, 08 token, 14 revenue/team, 16 visual/theme, 17 roadmap). THIS FILE (CLAUDE.md/AGENTS.md) must live in the REPO ROOT so it auto-loads. Read before any task. If a task conflicts with the Bible — STOP and report, do not implement.
 2. NEVER invent mechanics, fees, roles, states, or parameters. If it is not in the Bible, it does not exist. Ask, don't assume.
