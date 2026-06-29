@@ -144,10 +144,37 @@ body.classic {
         }
 
         .auction-detail-panel,
-        .bid-activity-panel {
+        .bid-activity-panel,
+        .new-auction-panel {
             background: var(--c-surface);
             border: 1px solid var(--c-border-soft);
             color: var(--c-text);
+        }
+
+        .new-auction-input {
+            width: 100%;
+            background: var(--c-surface-muted);
+            border: 1px solid var(--c-border-soft);
+            color: var(--c-text);
+        }
+
+        .new-auction-input:focus {
+            border-color: var(--c-border);
+            box-shadow: 0 0 0 2px var(--c-glow);
+            outline: none;
+        }
+
+        .auction-duration-option {
+            background: var(--c-surface-muted);
+            border: 1px solid var(--c-border-soft);
+            color: var(--c-text);
+        }
+
+        .auction-duration-option.is-active {
+            background: rgba(var(--c-accent-rgb), 0.14);
+            border-color: var(--c-border);
+            color: var(--c-accent);
+            box-shadow: 0 0 14px var(--c-glow);
         }
 
         .live-auction-pill {
@@ -486,6 +513,8 @@ body.classic {
                 watching: 0
             });
             const [aiGuidance, setAiGuidance] = useState(null);
+            const [newAuctionPrice, setNewAuctionPrice] = useState('');
+            const [newAuctionDuration, setNewAuctionDuration] = useState(24);
             const bidPollInFlightRef = useRef(false);
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
@@ -525,6 +554,13 @@ body.classic {
                     fallback;
             }
 
+            async function confirmAuctionAction(message, title = 'Confirm Auction Action') {
+                const confirmation = window.ArtSoulModal?.confirm
+                    ? window.ArtSoulModal.confirm(message, title)
+                    : window.confirm(message);
+                return Boolean(await confirmation);
+            }
+
             useEffect(() => {
                 const syncTheme = (newTheme) => setTheme(newTheme);
                 syncTheme(window.ThemeManager?.getTheme?.() || window.ThemeSync?.getTheme?.() || 'classic');
@@ -559,6 +595,22 @@ body.classic {
                 }
 
                 return '';
+            }
+
+            function hasProtocolId(value) {
+                const normalized = String(value ?? '').trim().toLowerCase();
+                return Boolean(normalized && normalized !== '0' && normalized !== 'none' && normalized !== 'null');
+            }
+
+            function isArtworkMinted(artworkData = artwork) {
+                return Boolean(artworkData?.minted) || hasProtocolId(artworkData?.token_id || artworkData?.tokenId);
+            }
+
+            function canCreateNewAuctionForWallet(artworkData, walletAddress) {
+                const creatorAddress = artworkData?.creator_id || artworkData?.creator;
+                return isSameAddress(creatorAddress, walletAddress) &&
+                    !isArtworkMinted(artworkData) &&
+                    !hasProtocolId(artworkData?.active_auction_id || artworkData?.activeAuctionId);
             }
 
             function v41InteractionKey(walletAddress) {
@@ -1282,6 +1334,11 @@ body.classic {
                     const data = await window.ArtSoulDB.getArtwork(artworkId);
                     console.log('[Artwork] Loaded data:', data);
                     setArtwork(data);
+                    setNewAuctionPrice(current => current || String(firstDefined(
+                        data.start_price,
+                        data.creator_value,
+                        ''
+                    )));
                     loadModerationVisibility(data);
                     if (isV41CompositeId) {
                         await applyLiveAuctionProjection(data);
@@ -1506,7 +1563,10 @@ body.classic {
                         };
 
                         // Ask user to switch network
-                        if (confirm(`This artwork is on ${networkNames[artworkNetwork] || artworkNetwork}.\n\nSwitch to ${networkNames[artworkNetwork] || artworkNetwork} network?`)) {
+                        if (await confirmAuctionAction(
+                            `This artwork is on ${networkNames[artworkNetwork] || artworkNetwork}.\n\nSwitch to ${networkNames[artworkNetwork] || artworkNetwork} network?`,
+                            'Switch Network'
+                        )) {
                             try {
                                 const networkChainIds = {
                                     'sepolia': 11155111,
@@ -1550,6 +1610,76 @@ body.classic {
                 }
             }
 
+            async function handleCreateNewAuction() {
+                if (!beginTransactionAction('create-auction')) return;
+
+                try {
+                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
+                    if (!walletAddress) {
+                        alert('Please connect your wallet');
+                        return;
+                    }
+
+                    if (!canCreateNewAuctionForWallet(artwork, walletAddress)) {
+                        alert('A new primary auction is available only to the creator while the artwork is unminted and has no active auction.');
+                        return;
+                    }
+
+                    const startingPriceWei = parseEthToWei(newAuctionPrice);
+                    if (!startingPriceWei || startingPriceWei <= 0n) {
+                        alert('Enter a valid starting price greater than 0 ETH.');
+                        return;
+                    }
+
+                    if (![24, 36, 48].includes(Number(newAuctionDuration))) {
+                        alert('Choose a 24h, 36h, or 48h auction duration.');
+                        return;
+                    }
+
+                    const confirmed = await confirmAuctionAction(
+                        `Create a new ${newAuctionDuration}-hour auction with a starting price of ${newAuctionPrice} ETH?`,
+                        'Create New Auction'
+                    );
+                    if (!confirmed) return;
+
+                    const provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider) {
+                        alert('Please connect your wallet');
+                        return;
+                    }
+
+                    await window.ArtSoulContracts.init(provider);
+
+                    const blockchainArtwork = await window.ArtSoulContracts.getArtwork(artwork.blockchain_id);
+                    if (!isSameAddress(blockchainArtwork.creator, walletAddress)) {
+                        throw new Error('Only the artwork creator can create a new primary auction.');
+                    }
+                    if (blockchainArtwork.minted || hasProtocolId(blockchainArtwork.tokenId)) {
+                        throw new Error('This NFT is already minted. The current owner must use the resale flow instead.');
+                    }
+                    if (hasProtocolId(blockchainArtwork.activeAuctionId)) {
+                        throw new Error('This artwork already has an active auction.');
+                    }
+
+                    const txHash = await window.ArtSoulContracts.createAuction(
+                        artwork.blockchain_id,
+                        newAuctionPrice,
+                        Number(newAuctionDuration)
+                    );
+                    console.log('New auction transaction:', txHash);
+
+                    await alert('New auction created successfully. Public auction data will update shortly.');
+                    window.location.assign('gallery.html#auctions');
+                } catch (error) {
+                    console.error('Create new auction failed:', error);
+                    const message = getTransactionErrorMessage(error, 'The new auction could not be created. Please try again.');
+                    console.log('Create new auction error shown to user:', message);
+                    alert(`New auction could not be created: ${message}`);
+                } finally {
+                    finishTransactionAction('create-auction');
+                }
+            }
+
             async function handleEndAuction() {
                 if (!beginTransactionAction('end-auction')) return;
 
@@ -1561,7 +1691,11 @@ body.classic {
             }
 
             async function endAuctionOnce() {
-                if (!confirm('End this auction?')) return;
+                const confirmed = await confirmAuctionAction(
+                    'Finalize this expired auction? If it has bids, the winner settlement window will open. If it has no bids, the creator can create a new auction.',
+                    'End Expired Auction'
+                );
+                if (!confirmed) return;
                 const auctionActionId = getAuctionActionId();
                 if (!auctionActionId) {
                     alert('Auction ID is unavailable');
@@ -1601,7 +1735,10 @@ body.classic {
                         console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
                     }
 
-                    alert('Auction ended. Settlement window is now open. The indexer will update public state.');
+                    const hasWinner = !isZeroAddress(auctionData.highestBidder);
+                    alert(hasWinner
+                        ? 'Auction ended. The winner settlement window is now open. Public state will update shortly.'
+                        : 'Auction ended with no bids. The creator can create a new auction after public state updates.');
                     loadArtwork();
                 } catch (error) {
                     console.error('End auction failed:', error);
@@ -1729,6 +1866,19 @@ body.classic {
                 }
 
                 try {
+                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
+                    const auctionWinner = getAuctionHighestBidder(auction);
+                    if (!walletAddress || !isSameAddress(walletAddress, auctionWinner)) {
+                        alert('Only the auction winner can complete settlement');
+                        return;
+                    }
+
+                    const confirmed = await confirmAuctionAction(
+                        `Complete settlement for ${auction.highestBid} ETH? Successful settlement mints the NFT to your wallet.`,
+                        'Complete Settlement & Mint NFT'
+                    );
+                    if (!confirmed) return;
+
                     const provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
                         alert('Please connect your wallet');
@@ -1736,13 +1886,6 @@ body.classic {
                     }
 
                     await window.ArtSoulContracts.init(provider);
-
-                    // Check if user is the winner
-                    const walletAddress = window.currentWalletAddress;
-                    if (!walletAddress || walletAddress.toLowerCase() !== auction.auctionWinner.toLowerCase()) {
-                        alert('Only the auction winner can complete settlement');
-                        return;
-                    }
 
                     // Complete settlement; the NFT mints only after this succeeds.
                     const txHash = await window.ArtSoulContracts.completeSettlement(auctionActionId);
@@ -1916,6 +2059,8 @@ body.classic {
                 : null;
             const settlementDeadlineMs = normalizeTimestampMs(settlementDeadlineValue);
             const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(artwork.file_url) ? artwork.file_url : '';
+            const connectedWalletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
+            const canCreateNewAuction = canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
 
             return (
                 <div className="min-h-screen">
@@ -1972,7 +2117,7 @@ body.classic {
                                     <p className="opacity-70">{artwork.description}</p>
                                 </div>
 
-                                {moderationAccess?.canModerate ? (
+                                {moderationAccess?.canModerate && (
                                     <section className="moderation-panel rounded-xl p-5" aria-label="Staff moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                             <div>
@@ -2028,25 +2173,6 @@ body.classic {
                                             <p className="mt-3 text-sm" role="status">{moderationMessage}</p>
                                         )}
                                     </section>
-                                ) : (
-                                    <details className="moderation-panel rounded-xl p-4">
-                                        <summary className="cursor-pointer text-sm font-semibold">Staff moderation</summary>
-                                        <div className="mt-3 space-y-3">
-                                            <p className="text-xs opacity-70">
-                                                Authorized staff can verify access to hide or restore this artwork.
-                                            </p>
-                                            <button
-                                                type="button"
-                                                className="moderation-action w-full rounded-lg px-4 py-3 text-sm font-bold"
-                                                onClick={() => loadModerationVisibility(artwork, { interactive: true })}
-                                            >
-                                                Verify Staff Access
-                                            </button>
-                                            {moderationMessage && (
-                                                <p className="text-sm" role="status">{moderationMessage}</p>
-                                            )}
-                                        </div>
-                                    </details>
                                 )}
 
                                 {/* Ownership Info - Three Roles */}
@@ -2270,7 +2396,7 @@ body.classic {
                                             >
                                                 {isTransactionActionPending('end-auction')
                                                     ? <TransactionProcessingLabel />
-                                                    : 'End Auction'}
+                                                    : 'End Expired Auction'}
                                             </button>
                                         )}
 
@@ -2303,7 +2429,7 @@ body.classic {
                                                 >
                                                     {isTransactionActionPending('settlement')
                                                         ? <TransactionProcessingLabel />
-                                                        : `Complete Settlement - ${auction.highestBid} ETH`}
+                                                        : `Complete Settlement & Mint NFT - ${auction.highestBid} ETH`}
                                                 </button>
                                             </div>
                                         )}
@@ -2354,6 +2480,59 @@ body.classic {
                                             </div>
                                         )}
                                     </div>
+                                )}
+
+                                {canCreateNewAuction && (
+                                    <section className="new-auction-panel rounded-xl p-6" aria-label="Create a new auction">
+                                        <h3 className="text-2xl font-bold mb-2">Create New Auction</h3>
+                                        <p className="text-sm opacity-70 mb-5">
+                                            This artwork is unminted and has no active auction. Choose a starting price and duration for a new primary auction.
+                                        </p>
+
+                                        <label className="block text-sm font-semibold mb-2" htmlFor="newAuctionPrice">
+                                            Starting price (ETH)
+                                        </label>
+                                        <input
+                                            id="newAuctionPrice"
+                                            className="new-auction-input rounded-lg px-4 py-3"
+                                            type="number"
+                                            min="0.000001"
+                                            step="0.000001"
+                                            value={newAuctionPrice}
+                                            onChange={event => setNewAuctionPrice(event.target.value)}
+                                            disabled={isTransactionActionPending('create-auction')}
+                                        />
+
+                                        <fieldset className="mt-5">
+                                            <legend className="text-sm font-semibold mb-2">Duration</legend>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {[24, 36, 48].map(duration => (
+                                                    <button
+                                                        key={duration}
+                                                        type="button"
+                                                        className={`auction-duration-option rounded-lg px-3 py-3 font-bold ${newAuctionDuration === duration ? 'is-active' : ''}`}
+                                                        aria-pressed={newAuctionDuration === duration}
+                                                        onClick={() => setNewAuctionDuration(duration)}
+                                                        disabled={isTransactionActionPending('create-auction')}
+                                                    >
+                                                        {duration}h
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </fieldset>
+
+                                        <button
+                                            type="button"
+                                            className="btn-main w-full mt-5"
+                                            onClick={handleCreateNewAuction}
+                                            disabled={isTransactionActionPending('create-auction')}
+                                            aria-busy={isTransactionActionPending('create-auction')}
+                                        >
+                                            {isTransactionActionPending('create-auction')
+                                                ? <TransactionProcessingLabel />
+                                                : 'Create New Auction'}
+                                        </button>
+                                    </section>
                                 )}
 
                                 {/* Discovery Signals */}
