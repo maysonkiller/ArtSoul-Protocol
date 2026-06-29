@@ -3,13 +3,6 @@
 
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     const RECENT_PENDING_MS = 30 * 60 * 1000;
-    const DEFAULT_HIDDEN_ARTWORK_IDS = [
-        'v41:84532:3',
-        'v41:84532:6',
-        'v41:84532:7',
-        'v41:84532:10',
-        'v41:84532:13'
-    ];
 
     function normalize(value) {
         return (value || '').toString().trim().toLowerCase();
@@ -49,19 +42,11 @@
         return [...keys].filter(Boolean);
     }
 
-    function hiddenIds() {
-        const values = [
-            ...DEFAULT_HIDDEN_ARTWORK_IDS,
-            ...(Array.isArray(window.HIDDEN_ARTWORK_IDS) ? window.HIDDEN_ARTWORK_IDS : []),
-            ...(Array.isArray(window.ArtSoulHiddenArtworkIds) ? window.ArtSoulHiddenArtworkIds : [])
-        ];
-        return Array.isArray(values) ? values.map(normalize) : [];
-    }
-
     function isHidden(artwork) {
-        const hidden = new Set(hiddenIds());
-        if (!hidden.size) return false;
-        return identityKeys(artwork).some(key => hidden.has(key));
+        return artwork?.moderation_hidden === true ||
+            artwork?.is_hidden === true ||
+            artwork?.is_blocked === true ||
+            artwork?.is_deleted === true;
     }
 
     function mediaUrl(artwork = {}) {

@@ -1067,39 +1067,48 @@
                     const walletAddress = profile.wallet_address;
 
                     let filtered = [];
+                    const suppressedArtworkIds = new Set();
+                    const rememberSuppressedArtworks = (rows = []) => {
+                        (rows.suppressed_artwork_ids || []).forEach(value => {
+                            suppressedArtworkIds.add(String(value).toLowerCase());
+                        });
+                        return rows;
+                    };
 
                     if (selectedGallery === 'created') {
                         const db = await waitForArtSoulDB();
-                        const projected = await db?.getPublicProjectionArtworks?.({
+                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
                             creator: walletAddress,
                             limit: 200
-                        });
+                        }) || []);
                         filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'created');
                     } else if (selectedGallery === 'auction') {
                         const db = await waitForArtSoulDB();
-                        const projected = await db?.getPublicProjectionArtworks?.({
+                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
                             creator: walletAddress,
                             view: 'auctions',
                             limit: 200
-                        });
+                        }) || []);
                         filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'auction');
                     } else if (selectedGallery === 'sold') {
                         const db = await waitForArtSoulDB();
-                        const projected = await db?.getPublicProjectionArtworks?.({
+                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
                             creator: walletAddress,
                             limit: 200
-                        });
+                        }) || []);
                         filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'sold');
                     } else if (selectedGallery === 'collected') {
                         const db = await waitForArtSoulDB();
-                        const projected = await db?.getPublicProjectionArtworks?.({
+                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
                             owner: walletAddress,
                             limit: 200
-                        });
+                        }) || []);
                         filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'owned');
                     }
 
-                    const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, selectedGallery);
+                    const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, selectedGallery)
+                        .filter(artwork => ![...artworkIdentityKeys(artwork)]
+                            .some(key => suppressedArtworkIds.has(key)));
                     const nextArtworks = sortNewestFirst(mergePendingIndexerArtworks(filtered || [], pendingIndexerArtworks));
                     if (requestId !== artworksRequestRef.current) return;
                     setMyArtworks(nextArtworks);
