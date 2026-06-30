@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'components', 'artwork-card.js'), 'utf8');
 const window = { ArtSoulSecurity: { isValidStorageUrl: () => true } };
 vm.runInNewContext(source, { window, document: {} });
-const { mediaType, mediaUrl, posterUrl } = window.ArtSoulArtworkCard;
+const { mediaType, mediaUrl, posterUrl, mediaDescriptor } = window.ArtSoulArtworkCard;
 
 test('video evidence wins over stale audio metadata without selecting the audio URL', () => {
     const artwork = {
@@ -35,4 +35,23 @@ test('extensionless video keeps the explicitly typed media URL', () => {
     const artwork = { file_type: 'video/mp4', file_url: 'https://storage.example.test/object?id=42' };
     assert.equal(mediaType(artwork), 'video');
     assert.equal(mediaUrl(artwork), artwork.file_url);
+});
+
+test('video metadata wins over stale audio metadata before first paint', () => {
+    const artwork = {
+        file_type: 'audio/mpeg',
+        media_type: 'video/mp4',
+        file_url: 'https://storage.example.test/object?id=video'
+    };
+    assert.equal(mediaType(artwork), 'video');
+    assert.deepEqual(
+        { ...mediaDescriptor(artwork) },
+        { type: 'video', url: artwork.file_url, poster: '', known: true }
+    );
+});
+
+test('unresolved media remains unknown instead of defaulting to image or audio', () => {
+    const artwork = { file_url: 'https://storage.example.test/object?id=unknown' };
+    assert.equal(mediaType(artwork), 'unknown');
+    assert.equal(mediaDescriptor(artwork).known, false);
 });

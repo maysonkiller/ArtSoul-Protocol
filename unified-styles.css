@@ -28,6 +28,7 @@
     --c-accent-3: var(--accent-classic);
     --c-border: rgba(169, 221, 211, 0.72);
     --c-border-soft: rgba(169, 221, 211, 0.3);
+    --c-card-border: rgba(169, 221, 211, 0.52);
     --c-glow: rgba(169, 221, 211, 0.28);
     --c-glow-strong: rgba(169, 221, 211, 0.55);
     --c-accent-rgb: 169, 221, 211;
@@ -45,6 +46,7 @@
     --c-accent-3: var(--accent-future-2);
     --c-border: rgba(0, 245, 255, 0.64);
     --c-border-soft: rgba(0, 245, 255, 0.3);
+    --c-card-border: rgba(0, 245, 255, 0.48);
     --c-glow: rgba(0, 245, 255, 0.28);
     --c-glow-strong: rgba(191, 0, 255, 0.42);
     --c-accent-rgb: 0, 245, 255;
@@ -61,7 +63,8 @@
     overflow: hidden;
     border-radius: 8px;
     background: var(--c-surface);
-    border: 1px solid var(--c-border-soft);
+    /* TODO: Use an iridescent ownership border after the canonical project wallet is defined. */
+    border: 1px solid var(--c-card-border);
     color: var(--c-text);
     text-decoration: none;
     transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
@@ -103,6 +106,33 @@ body.future .artsoul-artwork-card:focus-visible {
 .artsoul-card-media video.artsoul-card-media-object {
     background: var(--c-bg);
     color-scheme: dark;
+}
+
+.artsoul-media-loading,
+.artsoul-video-poster {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.artsoul-media-loading {
+    background: var(--c-surface-muted);
+    border: 1px solid var(--c-border-soft);
+}
+
+.artsoul-video-poster {
+    display: block;
+    object-fit: cover;
+    background: var(--c-surface-muted);
+}
+
+.artwork-detail-video-shell {
+    position: relative;
+    width: 100%;
+    height: 100%;
 }
 
 .artsoul-card-media-controls {
@@ -615,6 +645,22 @@ body.future .artwork-detail-frame {
     text-overflow: ellipsis;
 }
 
+.future .artsoul-artwork-card-gallery .artsoul-card-title,
+.future .profile-artwork-card .artsoul-card-title,
+.future .artwork-detail-title {
+    background: none !important;
+    color: var(--c-text) !important;
+    -webkit-text-fill-color: currentColor !important;
+    text-shadow: none !important;
+    animation: none !important;
+}
+
+.artsoul-add-new-card .artsoul-card-body,
+.artsoul-add-new-card .artsoul-card-title {
+    align-items: center;
+    text-align: center;
+}
+
 .artsoul-card-description {
     min-height: 36px;
     margin: 0;
@@ -641,17 +687,19 @@ body.future .artwork-detail-frame {
     display: inline-flex;
     min-height: 24px;
     align-items: center;
+    justify-content: center;
     border-radius: 6px;
     padding: 3px 8px;
     font-size: 12px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1;
 }
 
 .artsoul-card-status {
     border: 1px solid var(--c-border-soft);
     background: rgba(var(--c-accent-rgb), 0.1);
     color: var(--c-accent);
+    text-align: center;
 }
 
 .artsoul-card-status-sold,
