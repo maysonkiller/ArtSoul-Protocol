@@ -134,9 +134,10 @@
 
         const GALLERY_TABS = [
             { id: 'live_auctions', label: 'Auctions' },
+            { id: 'nft', label: 'NFT' },
+            { id: 'discover', label: 'Discovery' },
             { id: 'marketplace', label: 'Marketplace' },
-            { id: 'collections', label: 'Collections' },
-            { id: 'discover', label: 'Discover' }
+            { id: 'collections', label: 'Collections' }
         ];
         const GALLERY_TAB_ALIASES = {
             auctions: 'live_auctions'
@@ -307,6 +308,22 @@
                         title: 'No resale listings yet',
                         detail: 'Collector resale listings will appear here after settled NFTs are listed.',
                         cta: false
+                    };
+                }
+
+                if (tabId === 'nft') {
+                    return {
+                        title: 'No collected NFTs yet',
+                        detail: 'Settled and minted artworks that are not listed for resale will appear here.',
+                        cta: false
+                    };
+                }
+
+                if (tabId === 'discover') {
+                    return {
+                        title: 'No artworks awaiting auction',
+                        detail: 'Published artworks waiting to be auctioned or re-auctioned will appear here.',
+                        cta: true
                     };
                 }
 
@@ -639,6 +656,8 @@
                                     .map(artwork => {
                                     const SharedArtworkCard = window.ArtSoulArtworkCard?.ReactCard;
                                     if (SharedArtworkCard) {
+                                        // TODO: Add a "Make an offer" action to NFT cards here once
+                                        // contract-level offers are supported.
                                         return (
                                             <SharedArtworkCard
                                                 key={artwork.id}
