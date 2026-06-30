@@ -12,6 +12,12 @@ vm.runInContext(
 
 const { discoveryStatusInfo } = context.window.ArtSoulArtworkCard;
 
+test('artwork detail uses the shared card status resolver', () => {
+  const detail = fs.readFileSync('artwork.html', 'utf8');
+  assert.match(detail, /ArtSoulArtworkCard\?\.statusInfo\?\.\(auction \? \{/);
+  assert.match(detail, /\{presentationStatus\.label\}/);
+});
+
 test('cards use one consistent human-readable label per lifecycle state', () => {
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'registered' }) },
@@ -19,7 +25,7 @@ test('cards use one consistent human-readable label per lifecycle state', () => 
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'auction', active_auction_id: '1', auction_end_time: '2099-01-01T00:00:00Z' }) },
-    { key: 'live', label: 'Live Auction' }
+    { key: 'live', label: 'Live' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'sold', minted: true, token_id: '1' }) },
@@ -27,23 +33,23 @@ test('cards use one consistent human-readable label per lifecycle state', () => 
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'defaulted_no_bids' }) },
-    { key: 'ended_no_bids', label: 'Ended — no bids' }
+    { key: 'ended_no_bids', label: 'No bids' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'awaiting_end', current_bid: '0' }) },
-    { key: 'ended_no_bids', label: 'Ended — no bids' }
+    { key: 'ended_no_bids', label: 'No bids' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'awaiting_end', current_bid: '1' }) },
-    { key: 'ended', label: 'Auction Ended' }
+    { key: 'awaiting_settlement', label: 'Awaiting payment' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'settlement_pending', current_bid: '1' }) },
-    { key: 'awaiting_settlement', label: 'Awaiting settlement' }
+    { key: 'awaiting_settlement', label: 'Awaiting payment' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'settlement_defaulted', current_bid: '1' }) },
-    { key: 'unsettled', label: 'Auction unsettled' }
+    { key: 'unsettled', label: 'Unsettled' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({
@@ -52,6 +58,6 @@ test('cards use one consistent human-readable label per lifecycle state', () => 
       token_id: '1',
       sale_price: '1.5'
     }) },
-    { key: 'listed', label: 'Listed for sale' }
+    { key: 'listed', label: 'For sale' }
   );
 });
