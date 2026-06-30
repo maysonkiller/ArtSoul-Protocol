@@ -39,7 +39,7 @@
     <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=16">
+    <link rel="stylesheet" href="unified-styles.css?v=17">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -62,6 +62,7 @@
     <script src="modal-system.js"></script>
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
+    <script src="src/features/artwork/ai-valuation-client.js?v=1"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
     <script src="src/ui/components/artwork-card.js?v=6"></script>
     <script src="avatar-dropdown.js?v=12"></script>
@@ -526,9 +527,13 @@ body.classic {
             const [aiGuidance, setAiGuidance] = useState(null);
             const [newAuctionPrice, setNewAuctionPrice] = useState('');
             const [newAuctionDuration, setNewAuctionDuration] = useState(24);
+            const [isNewAuctionModalOpen, setIsNewAuctionModalOpen] = useState(false);
+            const [reauctionEstimateState, setReauctionEstimateState] = useState('idle');
+            const [reauctionEstimate, setReauctionEstimate] = useState(null);
             const bidPollInFlightRef = useRef(false);
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
+            const reauctionValuationControllerRef = useRef(null);
             const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
@@ -602,6 +607,25 @@ body.classic {
                 return () => window.removeEventListener('artsoul:wallet-state-changed', syncWalletRenderState);
             }, []);
 
+            useEffect(() => {
+                if (!isNewAuctionModalOpen) return undefined;
+                const previousOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                const closeOnEscape = event => {
+                    if (event.key === 'Escape' && !transactionActionsRef.current.has('create-auction')) {
+                        reauctionValuationControllerRef.current?.abort();
+                        setIsNewAuctionModalOpen(false);
+                    }
+                };
+                window.addEventListener('keydown', closeOnEscape);
+                return () => {
+                    window.removeEventListener('keydown', closeOnEscape);
+                    document.body.style.overflow = previousOverflow;
+                };
+            }, [isNewAuctionModalOpen]);
+
+            useEffect(() => () => reauctionValuationControllerRef.current?.abort(), []);
+
             function getAuctionHelper(name) {
                 const helper = window.AuctionService?.[name];
                 return typeof helper === 'function' ? helper.bind(window.AuctionService) : null;
@@ -635,7 +659,17 @@ body.classic {
 
             function canCreateNewAuctionForWallet(artworkData, walletAddress) {
                 const creatorAddress = artworkData?.creator_id || artworkData?.creator;
+                const rawStatus = String(
+                    artworkData?.status || artworkData?.auction_state || artworkData?.lifecycle_state || ''
+                ).toLowerCase();
+                const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(artworkData)?.key;
+                const eligibleLifecycle = presentationStatus === 'ended_no_bids' ||
+                    presentationStatus === 'unsettled' ||
+                    rawStatus.includes('no_bid') ||
+                    rawStatus.includes('default') ||
+                    rawStatus.includes('unsettled');
                 return isSameAddress(creatorAddress, walletAddress) &&
+                    eligibleLifecycle &&
                     !isArtworkMinted(artworkData) &&
                     !hasProtocolId(artworkData?.active_auction_id || artworkData?.activeAuctionId);
             }
@@ -1637,7 +1671,60 @@ body.classic {
                 }
             }
 
-            async function handleCreateNewAuction() {
+            async function requestFreshReauctionValuation() {
+                reauctionValuationControllerRef.current?.abort();
+                const controller = new AbortController();
+                reauctionValuationControllerRef.current = controller;
+                const timeout = setTimeout(() => controller.abort(), 20000);
+                setReauctionEstimate(null);
+                setReauctionEstimateState('loading');
+
+                try {
+                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
+                    const mediaUrl = window.ArtSoulArtworkCard?.mediaUrl?.(artwork) ||
+                        artwork.file_url || artwork.media_url || artwork.animation_url || '';
+                    const result = await window.ArtSoulAIValuation.request({
+                        title: artwork.title || '',
+                        description: artwork.description || '',
+                        creator_value: newAuctionPrice || artwork.start_price || artwork.creator_value || '',
+                        media_type: artwork.file_type || artwork.media_type || '',
+                        media_url: mediaUrl || undefined,
+                        artwork_id: artwork.blockchain_id || artwork.artwork_id || artwork.id,
+                        creator: walletAddress,
+                        chain_id: artwork.chain_id || window.getCurrentChainId?.() || 84532,
+                        like_count: socialSignals.likes || votes.length || 0,
+                        would_buy_count: socialSignals.wouldBuy || 0,
+                        watching_count: socialSignals.watching || 0
+                    }, { signal: controller.signal, promptAuthentication: false });
+
+                    if (reauctionValuationControllerRef.current !== controller) return;
+                    setReauctionEstimate(result.valuation);
+                    setReauctionEstimateState('ready');
+                } catch (error) {
+                    if (reauctionValuationControllerRef.current !== controller) return;
+                    console.warn('[Re-auction AI Guidance] Estimate unavailable:', error);
+                    setReauctionEstimateState('unavailable');
+                } finally {
+                    clearTimeout(timeout);
+                    if (reauctionValuationControllerRef.current === controller) {
+                        reauctionValuationControllerRef.current = null;
+                    }
+                }
+            }
+
+            function openNewAuctionModal() {
+                setIsNewAuctionModalOpen(true);
+                void requestFreshReauctionValuation();
+            }
+
+            function closeNewAuctionModal() {
+                if (isTransactionActionPending('create-auction')) return;
+                reauctionValuationControllerRef.current?.abort();
+                reauctionValuationControllerRef.current = null;
+                setIsNewAuctionModalOpen(false);
+            }
+
+            async function handleConfirmNewAuction() {
                 if (!beginTransactionAction('create-auction')) return;
 
                 try {
@@ -1648,7 +1735,7 @@ body.classic {
                     }
 
                     if (!canCreateNewAuctionForWallet(artwork, walletAddress)) {
-                        alert('A new primary auction is available only to the creator while the artwork is unminted and has no active auction.');
+                        alert('Re-auction is available only to the creator for an ended-no-bids or defaulted artwork that is unminted and has no active auction.');
                         return;
                     }
 
@@ -1662,12 +1749,6 @@ body.classic {
                         alert('Choose a 24h, 36h, or 48h auction duration.');
                         return;
                     }
-
-                    const confirmed = await confirmAuctionAction(
-                        `Create a new ${newAuctionDuration}-hour auction with a starting price of ${newAuctionPrice} ETH?`,
-                        'Create New Auction'
-                    );
-                    if (!confirmed) return;
 
                     const provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
@@ -2103,6 +2184,116 @@ body.classic {
 
             return (
                 <div className="min-h-screen">
+                    {isNewAuctionModalOpen && (
+                        <div
+                            className="reauction-modal-backdrop"
+                            role="presentation"
+                            onMouseDown={event => {
+                                if (event.target === event.currentTarget) closeNewAuctionModal();
+                            }}
+                        >
+                            <section
+                                className="reauction-modal"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="reauction-modal-title"
+                            >
+                                <div className="reauction-modal-header">
+                                    <div>
+                                        <p className="reauction-modal-eyebrow">Re-list artwork</p>
+                                        <h2 id="reauction-modal-title">Create New Auction</h2>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="reauction-modal-close"
+                                        aria-label="Close new auction setup"
+                                        onClick={closeNewAuctionModal}
+                                        disabled={isTransactionActionPending('create-auction')}
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+
+                                <label className="reauction-field-label" htmlFor="newAuctionPrice">
+                                    New starting price (ETH)
+                                </label>
+                                <input
+                                    id="newAuctionPrice"
+                                    className="new-auction-input rounded-lg px-4 py-3"
+                                    type="number"
+                                    min="0.000001"
+                                    step="0.000001"
+                                    value={newAuctionPrice}
+                                    onChange={event => setNewAuctionPrice(event.target.value)}
+                                    disabled={isTransactionActionPending('create-auction')}
+                                    autoFocus
+                                />
+
+                                <fieldset className="reauction-fieldset">
+                                    <legend className="reauction-field-label">Duration</legend>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[24, 36, 48].map(duration => (
+                                            <button
+                                                key={duration}
+                                                type="button"
+                                                className={`auction-duration-option rounded-lg px-3 py-3 font-bold ${newAuctionDuration === duration ? 'is-active' : ''}`}
+                                                aria-pressed={newAuctionDuration === duration}
+                                                onClick={() => setNewAuctionDuration(duration)}
+                                                disabled={isTransactionActionPending('create-auction')}
+                                            >
+                                                {duration}h
+                                            </button>
+                                        ))}
+                                    </div>
+                                </fieldset>
+
+                                <div className="reauction-estimate" aria-live="polite">
+                                    <div className="reauction-estimate-title">Fresh AI valuation</div>
+                                    {reauctionEstimateState === 'loading' && (
+                                        <p>Refreshing the guidance for this artwork…</p>
+                                    )}
+                                    {reauctionEstimateState === 'ready' && reauctionEstimate && (
+                                        <div>
+                                            <p className="reauction-estimate-range">
+                                                {Number(reauctionEstimate.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                                                {' – '}
+                                                {Number(reauctionEstimate.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                            </p>
+                                            <p>
+                                                Suggested start: {Number(reauctionEstimate.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                {' · '}{reauctionEstimate.confidence || 'medium'} confidence
+                                            </p>
+                                            {reauctionEstimate.rationale && <p className="reauction-estimate-rationale">{reauctionEstimate.rationale}</p>}
+                                        </div>
+                                    )}
+                                    {reauctionEstimateState === 'unavailable' && <p>estimate unavailable</p>}
+                                    <p className="reauction-estimate-note">Guidance only. It never affects settlement, floor, ownership, or royalties.</p>
+                                </div>
+
+                                <div className="reauction-modal-actions">
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={closeNewAuctionModal}
+                                        disabled={isTransactionActionPending('create-auction')}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn-main"
+                                        onClick={handleConfirmNewAuction}
+                                        disabled={isTransactionActionPending('create-auction')}
+                                        aria-busy={isTransactionActionPending('create-auction')}
+                                    >
+                                        {isTransactionActionPending('create-auction')
+                                            ? <TransactionProcessingLabel />
+                                            : 'Confirm'}
+                                    </button>
+                                </div>
+                            </section>
+                        </div>
+                    )}
                     {/* Content */}
                     <main className="py-0 lg:py-12">
                         <div className="grid grid-cols-1 lg:grid-cols-[1fr_500px] gap-0">
@@ -2510,52 +2701,16 @@ body.classic {
                                 {canCreateNewAuction && (
                                     <section className="new-auction-panel rounded-xl p-6" aria-label="Create a new auction">
                                         <h3 className="text-2xl font-bold mb-2">Create New Auction</h3>
-                                        <p className="text-sm opacity-70 mb-5">
-                                            This artwork is unminted and has no active auction. Choose a starting price and duration for a new primary auction.
+                                        <p className="text-sm opacity-70 mb-4">
+                                            Re-list this eligible artwork with a fresh starting price, duration, and updated value guidance.
                                         </p>
-
-                                        <label className="block text-sm font-semibold mb-2" htmlFor="newAuctionPrice">
-                                            Starting price (ETH)
-                                        </label>
-                                        <input
-                                            id="newAuctionPrice"
-                                            className="new-auction-input rounded-lg px-4 py-3"
-                                            type="number"
-                                            min="0.000001"
-                                            step="0.000001"
-                                            value={newAuctionPrice}
-                                            onChange={event => setNewAuctionPrice(event.target.value)}
-                                            disabled={isTransactionActionPending('create-auction')}
-                                        />
-
-                                        <fieldset className="mt-5">
-                                            <legend className="text-sm font-semibold mb-2">Duration</legend>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {[24, 36, 48].map(duration => (
-                                                    <button
-                                                        key={duration}
-                                                        type="button"
-                                                        className={`auction-duration-option rounded-lg px-3 py-3 font-bold ${newAuctionDuration === duration ? 'is-active' : ''}`}
-                                                        aria-pressed={newAuctionDuration === duration}
-                                                        onClick={() => setNewAuctionDuration(duration)}
-                                                        disabled={isTransactionActionPending('create-auction')}
-                                                    >
-                                                        {duration}h
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </fieldset>
-
                                         <button
                                             type="button"
-                                            className="btn-main w-full mt-5"
-                                            onClick={handleCreateNewAuction}
+                                            className="btn-main w-full"
+                                            onClick={openNewAuctionModal}
                                             disabled={isTransactionActionPending('create-auction')}
-                                            aria-busy={isTransactionActionPending('create-auction')}
                                         >
-                                            {isTransactionActionPending('create-auction')
-                                                ? <TransactionProcessingLabel />
-                                                : 'Create New Auction'}
+                                            Create New Auction
                                         </button>
                                     </section>
                                 )}

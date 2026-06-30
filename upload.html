@@ -62,6 +62,7 @@
     <script src="modal-system.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script type="module" src="supabase-client.js"></script>
+    <script src="src/features/artwork/ai-valuation-client.js?v=1"></script>
     <script src="avatar-dropdown.js?v=12"></script>
     <script type="module" src="appkit-init.js?v=15"></script>
     <script type="module" src="ipfs-client.js"></script>
@@ -846,18 +847,6 @@ header {
 
             try {
                 const walletAddress = window.getCurrentWalletAddress?.();
-                if (!walletAddress) {
-                    throw new Error('Connect your wallet to request an estimate. Publishing remains available after you connect.');
-                }
-
-                const isAuthenticated = await window.SupabaseAuth?.isAuthenticated();
-                if (!isAuthenticated) {
-                    const authenticated = await window.ensureAuthenticated?.();
-                    if (!authenticated) {
-                        throw new Error('Sign in with your wallet to request an estimate. You can still publish without one.');
-                    }
-                }
-
                 const mediaDataUrl = await createAIImagePreview(file);
                 if (requestId !== aiValuationRequestId) return;
 
@@ -865,12 +854,7 @@ header {
                     aiValuationManualRetryCount += 1;
                 }
 
-                const response = await fetch('/api/ai/analyze', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: controller.signal,
-                    body: JSON.stringify({
+                const result = await window.ArtSoulAIValuation.request({
                         title: normalizeArtworkTitle(document.getElementById('artTitle').value),
                         description: document.getElementById('artDescription').value.trim(),
                         creator_value: document.getElementById('artPrice').value,
@@ -878,26 +862,16 @@ header {
                         creator: walletAddress,
                         chain_id: window.getCurrentChainId?.() || 84532,
                         media_data_url: mediaDataUrl || undefined
-                    })
-                });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok || !data?.valuation) {
-                    throw new Error(data?.message || 'Estimate unavailable. You can still publish normally.');
-                }
+                    }, { signal: controller.signal });
                 if (requestId !== aiValuationRequestId) return;
 
-                latestAIValuation = {
-                    ...data.valuation,
-                    model: data.model || 'gemini-2.5-flash-lite',
-                    guidance_only: true,
-                    generated_at: new Date().toISOString()
-                };
-                if (!data.valuation_logged) {
+                latestAIValuation = result.valuation;
+                if (!result.logged) {
                     console.warn('[AI Guidance] Estimate returned but ai_valuations logging was unavailable.');
                 }
                 setAIValuationState('ready', {
                     valuation: latestAIValuation,
-                    logged: Boolean(data.valuation_logged)
+                    logged: result.logged
                 });
             } catch (error) {
                 if (requestId !== aiValuationRequestId) return;
