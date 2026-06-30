@@ -127,7 +127,7 @@
         ) {
             return {
                 key: 'settlement_pending',
-                label: 'Settlement Pending',
+                label: 'Awaiting settlement',
                 isLiveAuction: false,
                 isMarketplace: false,
                 isCollection: false
@@ -145,7 +145,7 @@
         ) {
             return {
                 key: hasSalePrice ? 'marketplace' : 'minted',
-                label: hasSalePrice ? 'Marketplace' : 'Minted NFT',
+                label: hasSalePrice ? 'Listed for sale' : 'Sold',
                 isLiveAuction: false,
                 isMarketplace: true,
                 isCollection: false
@@ -154,7 +154,7 @@
 
         return {
             key: 'unminted',
-            label: 'Unminted Artwork',
+            label: 'Not yet minted',
             isLiveAuction: false,
             isMarketplace: false,
             isCollection: false
