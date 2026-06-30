@@ -37,12 +37,12 @@ export const NFTStatus = {
 export function getStatusLabel(status) {
     const labels = {
         [NFTStatus.DRAFT]: 'Draft',
-        [NFTStatus.AUCTION]: 'On Auction',
-        [NFTStatus.SETTLEMENT_PENDING]: 'Settlement Pending',
-        [NFTStatus.SETTLEMENT_DEFAULTED]: 'Settlement Defaulted',
-        [NFTStatus.DIRECT_SALE]: 'For Sale',
+        [NFTStatus.AUCTION]: 'Live Auction',
+        [NFTStatus.SETTLEMENT_PENDING]: 'Awaiting settlement',
+        [NFTStatus.SETTLEMENT_DEFAULTED]: 'Auction unsettled',
+        [NFTStatus.DIRECT_SALE]: 'Listed for sale',
         [NFTStatus.SOLD]: 'Sold',
-        [NFTStatus.UNLISTED]: 'Unlisted',
+        [NFTStatus.UNLISTED]: 'Not listed',
         [NFTStatus.HIDDEN]: 'Hidden'
     };
     return labels[status] || status;
