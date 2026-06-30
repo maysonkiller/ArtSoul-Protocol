@@ -569,26 +569,7 @@
         if (isGalleryCollection(artwork)) return 'collections';
         if (isGalleryLiveAuction(artwork)) return 'live_auctions';
         if (isGalleryResale(artwork)) return 'marketplace';
-        if (isGalleryMinted(artwork)) return '';
-
-        const status = normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state);
-        const activeAuctionId = artwork.active_auction_id || artwork.activeAuctionId;
-        const waitingStatuses = new Set([
-            '',
-            'registered',
-            'draft',
-            'unminted',
-            'not_yet_minted',
-            'ended',
-            'ended_no_bids',
-            'defaulted',
-            'defaulted_no_bids',
-            'failed'
-        ]);
-
-        if (!waitingStatuses.has(status) || hasPositiveNumericProtocolId(activeAuctionId)) {
-            return '';
-        }
+        if (isGalleryMinted(artwork)) return 'nft';
 
         // TODO: Once the canonical project wallet is configured, route its works only
         // through Collections instead of guessing an address here.
