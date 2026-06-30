@@ -101,7 +101,7 @@ test('Discovery cards can show all three persisted signal counts', () => {
     assert.equal(emptyCard.signalsText({}, true), '0 likes · 0 would buy · 0 watching');
 });
 
-test('gallery markup keeps the requested order, default, and Discover-only signals', () => {
+test('gallery markup keeps the requested order and default without card signals', () => {
     const gallery = fs.readFileSync('gallery.html', 'utf8');
     const auctions = gallery.indexOf("{ id: 'live_auctions', label: 'Auctions' }");
     const nft = gallery.indexOf("{ id: 'nft', label: 'NFT' }");
@@ -111,7 +111,8 @@ test('gallery markup keeps the requested order, default, and Discover-only signa
 
     assert.ok(auctions < nft && nft < discover && discover < marketplace && marketplace < collections);
     assert.match(gallery, /\? tabId : 'live_auctions'/);
-    assert.match(gallery, /showSignals=\{activeTab === 'discover'\}/);
+    assert.doesNotMatch(gallery, /showSignals=/);
+    assert.match(gallery, /ArtSoulArtworkCard\?\.hasSafeMedia/);
     assert.match(gallery, /TODO: Add a "Make an offer" action to NFT cards/);
     assert.match(
         fs.readFileSync('src/features/discovery/discovery-service.js', 'utf8'),

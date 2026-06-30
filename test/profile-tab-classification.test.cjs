@@ -24,6 +24,19 @@ test('Add New is Created-only and loading uses one neutral state', () => {
   assert.doesNotMatch(profile, /profile-card-skeleton/);
   assert.match(profile, /artworksLoading \? \([\s\S]*Loading artworks\.\.\.[\s\S]*\) : \(/);
   assert.match(profile, /!artworksLoading && \([\s\S]*myArtworks\.length\} items/);
+  assert.doesNotMatch(profile, /Creator action|Prepare a new auction|Open publisher/);
+});
+
+test('trust is computed once from the complete creator corpus, independent of tabs', () => {
+  assert.match(profile, /refreshDiscoveryProfile\(profileData\)/);
+  assert.match(profile, /creator: profileData\.wallet_address/);
+  assert.match(profile, /computeTrustProfile\(profileData, fullArtworkCorpus/);
+  assert.doesNotMatch(profile, /refreshDiscoveryProfile\(profile, nextArtworks\)/);
+});
+
+test('profile omits missing and failed media cards', () => {
+  assert.match(profile, /filter\(artwork => window\.ArtSoulArtworkCard\?\.hasSafeMedia/);
+  assert.match(profile, /onUnavailable=\{\(\) => setMediaUnavailable\(true\)\}/);
 });
 
 test('empty states render only after loading for all four tabs', () => {
