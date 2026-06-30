@@ -1114,7 +1114,10 @@
                 for (const slot of slots) {
                         const art = slot.artwork;
                         if (window.ArtSoulArtworkCard?.createCardElement) {
-                            const sharedCard = window.ArtSoulArtworkCard.createCardElement(art, { minimal: true });
+                            const sharedCard = window.ArtSoulArtworkCard.createCardElement(art, {
+                                minimal: true,
+                                surface: 'homepage'
+                            });
                             if (sharedCard) gallery.appendChild(sharedCard);
                             continue;
                         }
