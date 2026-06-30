@@ -357,42 +357,21 @@ body.classic {
         }
 
         // Media Viewer Component - supports images, videos, audio, GIFs
-        function MediaViewer({ url, fileType, title, artworkData = {} }) {
+        function MediaViewer({ media, title }) {
             const [mediaError, setMediaError] = React.useState(false);
             const [isPlaying, setIsPlaying] = React.useState(false);
-
-            const getMediaType = () => {
-                const type = fileType?.toLowerCase() || '';
-                const urlLower = url?.toLowerCase() || '';
-                const sharedType = window.ArtSoulArtworkCard?.mediaType?.({
-                    ...artworkData,
-                    file_url: url,
-                    file_type: fileType || artworkData.file_type || artworkData.media_type || artworkData.mime_type
-                });
-                if (sharedType) return sharedType;
-
-                // Video formats
-                if (type === 'video' || ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(type) ||
-                    urlLower.includes('.mp4') || urlLower.includes('.webm') || urlLower.includes('.mov')) {
-                    return 'video';
-                }
-
-                // Audio formats
-                if (type === 'audio' || type === 'music' || ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'].includes(type) ||
-                    urlLower.includes('.mp3') || urlLower.includes('.wav') || urlLower.includes('.ogg') || urlLower.includes('.aac')) {
-                    return 'audio';
-                }
-
-                // Image formats (including GIF)
-                return 'image';
-            };
-
-            const mediaType = getMediaType();
+            const [videoLoaded, setVideoLoaded] = React.useState(false);
+            const [posterFailed, setPosterFailed] = React.useState(false);
+            const mediaType = media?.type || 'unknown';
+            const url = media?.url || '';
+            const poster = media?.poster || '';
             const sanitizedTitle = window.ArtSoulSecurity?.sanitizeText(title) || 'Artwork';
             const isSafeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(url);
 
             React.useEffect(() => {
                 setMediaError(false);
+                setVideoLoaded(false);
+                setPosterFailed(false);
             }, [url]);
 
             const renderMediaFallback = (message = 'Media unavailable') => (
@@ -421,21 +400,38 @@ body.classic {
                 return renderMediaFallback();
             }
 
+            if (mediaType === 'unknown') {
+                return <div className="artsoul-media-loading" role="status" aria-label="Loading media"></div>;
+            }
+
             if (mediaType === 'video') {
                 return (
-                    <video
-                        src={url}
-                        controls
-                        loop
-                        playsInline
-                        preload="metadata"
-                        poster="ARTSOULlogo-clean.png"
-                        className="artwork-detail-media-object artwork-detail-video"
-                        onLoadedMetadata={renderFirstVideoFrame}
-                        onError={() => setMediaError(true)}
-                    >
-                        Your browser does not support video playback.
-                    </video>
+                    <div className="artwork-detail-video-shell">
+                        <video
+                            src={url}
+                            controls
+                            loop
+                            playsInline
+                            preload="metadata"
+                            poster={poster || undefined}
+                            className="artwork-detail-media-object artwork-detail-video"
+                            style={{ visibility: videoLoaded ? 'visible' : 'hidden' }}
+                            onLoadedMetadata={renderFirstVideoFrame}
+                            onLoadedData={() => setVideoLoaded(true)}
+                            onError={() => setMediaError(true)}
+                        >
+                            Your browser does not support video playback.
+                        </video>
+                        {!videoLoaded && <div className="artsoul-media-loading" role="status" aria-label="Loading media"></div>}
+                        {poster && !posterFailed && !videoLoaded && (
+                            <img
+                                src={poster}
+                                alt=""
+                                className="artsoul-video-poster"
+                                onError={() => setPosterFailed(true)}
+                            />
+                        )}
+                    </div>
                 );
             }
 
@@ -471,7 +467,7 @@ body.classic {
                 );
             }
 
-            // Default: image (including GIF)
+            // Images and GIFs use the same contained artwork surface.
             return (
                 <img
                     src={url}
@@ -2166,8 +2162,12 @@ body.classic {
                 )
                 : null;
             const settlementDeadlineMs = normalizeTimestampMs(settlementDeadlineValue);
-            const resolvedMediaUrl = window.ArtSoulArtworkCard?.mediaUrl?.(artwork) || artwork.file_url || artwork.media_url || artwork.animation_url || '';
-            const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(resolvedMediaUrl) ? resolvedMediaUrl : '';
+            const resolvedMedia = window.ArtSoulArtworkCard?.mediaDescriptor?.(artwork) || {
+                type: 'unknown',
+                url: artwork.file_url || artwork.media_url || artwork.animation_url || '',
+                poster: ''
+            };
+            const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(resolvedMedia.url) ? resolvedMedia.url : '';
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
             const canCreateNewAuction = walletRenderState.settled && canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
             const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(auction ? {
@@ -2302,10 +2302,8 @@ body.classic {
                                 <div className="artwork-detail-frame relative w-full h-full rounded-xl overflow-hidden">
                                     {safeMediaUrl ? (
                                         <MediaViewer
-                                            url={safeMediaUrl}
-                                            fileType={artwork.file_type || artwork.media_type || artwork.mime_type}
+                                            media={{ ...resolvedMedia, url: safeMediaUrl }}
                                             title={artwork.title}
-                                            artworkData={artwork}
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-black p-6">
@@ -2345,7 +2343,7 @@ body.classic {
                                 {/* Title & Description */}
                                 <div className={`p-6 rounded-xl ${isClassic ? 'bg-gray-800' : 'bg-cyan-900/20 border border-cyan-500/30'}`}>
                                     <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                                        <h1 className="text-4xl font-bold">{artwork.title}</h1>
+                                        <h1 className="artwork-detail-title text-4xl font-bold">{artwork.title}</h1>
                                         <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
                                             {presentationStatus.label}
                                         </span>
