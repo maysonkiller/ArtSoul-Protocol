@@ -107,6 +107,53 @@
         });
     }
 
+    function isolateMediaControl(element) {
+        element.addEventListener('click', stopCardActivation);
+        element.addEventListener('pointerdown', stopCardPropagation);
+        element.addEventListener('mousedown', stopCardPropagation);
+        element.addEventListener('touchstart', stopCardPropagation, { passive: true });
+        element.addEventListener('dragstart', stopCardActivation);
+        element.draggable = false;
+    }
+
+    function syncPlaybackButton(button, media, label) {
+        const playing = !media.paused && !media.ended;
+        button.dataset.state = playing ? 'playing' : 'paused';
+        button.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${label}`);
+    }
+
+    function createPlaybackButton(media, label) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'artsoul-media-toggle';
+        button.dataset.state = 'paused';
+        button.setAttribute('aria-label', `Play ${label}`);
+        isolateMediaControl(button);
+        button.addEventListener('click', () => {
+            if (media.paused) media.play().catch(() => syncPlaybackButton(button, media, label));
+            else media.pause();
+        });
+        return button;
+    }
+
+    function syncMuteButton(button, media, label) {
+        button.dataset.muted = String(media.muted);
+        button.setAttribute('aria-label', `${media.muted ? 'Unmute' : 'Mute'} ${label}`);
+    }
+
+    function createMuteButton(media, label) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'artsoul-media-mute';
+        isolateMediaControl(button);
+        button.addEventListener('click', () => {
+            media.muted = !media.muted;
+            syncMuteButton(button, media, label);
+        });
+        syncMuteButton(button, media, label);
+        return button;
+    }
+
     function hasWinnerOrBid(artwork = {}) {
         const winner = normalize(artwork.winner || artwork.auction_winner_address || artwork.current_bidder || artwork.highest_bidder);
         return Boolean(winner && winner !== ZERO_ADDRESS) ||
@@ -251,55 +298,35 @@
 
         const type = mediaType(artwork);
         if (type === 'video') {
+            container.classList.add('artsoul-card-media-video');
+            container.dataset.playing = 'false';
             const video = document.createElement('video');
             video.src = url;
             video.className = 'artsoul-card-media-object';
             video.preload = 'auto';
             video.poster = posterUrl(artwork) || 'ARTSOULlogo-clean.png';
             video.playsInline = true;
+            video.muted = true;
             video.style.pointerEvents = 'none';
             prepareVideoPreview(video, artwork);
-            const frame = document.createElement('div');
-            frame.className = 'artsoul-card-video-frame';
-            frame.appendChild(video);
             const badge = document.createElement('span');
             badge.className = 'artsoul-card-media-badge';
             badge.textContent = 'VIDEO';
-            frame.appendChild(badge);
             const controls = document.createElement('div');
             controls.className = 'artsoul-card-media-controls';
-            const toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.className = 'artsoul-media-toggle';
-            toggle.dataset.state = 'paused';
-            toggle.setAttribute('aria-label', 'Play video preview');
-            const progress = document.createElement('input');
-            progress.type = 'range';
-            progress.className = 'artsoul-media-progress';
-            progress.min = '0'; progress.max = '1'; progress.step = '0.01'; progress.value = '0'; progress.disabled = true;
-            progress.setAttribute('aria-label', 'Video progress');
-            [controls, toggle, progress].forEach(control => {
-                control.addEventListener('click', stopCardActivation);
-                control.addEventListener('pointerdown', stopCardPropagation);
-                control.addEventListener('touchstart', stopCardPropagation);
-            });
-            toggle.addEventListener('click', () => video.paused ? video.play().catch(() => {}) : video.pause());
+            isolateMediaControl(controls);
+            const toggle = createPlaybackButton(video, 'video preview');
+            const mute = createMuteButton(video, 'video preview');
             const sync = () => {
-                const playing = !video.paused && !video.ended;
-                toggle.dataset.state = playing ? 'playing' : 'paused';
-                toggle.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} video preview`);
+                container.dataset.playing = String(!video.paused && !video.ended);
+                syncPlaybackButton(toggle, video, 'video preview');
             };
             video.addEventListener('play', () => { pauseOtherMedia(video); sync(); });
             video.addEventListener('pause', sync);
             video.addEventListener('ended', sync);
-            video.addEventListener('loadedmetadata', () => {
-                if (Number.isFinite(video.duration) && video.duration > 0) { progress.max = String(video.duration); progress.disabled = false; }
-            });
-            video.addEventListener('timeupdate', () => { progress.value = String(video.currentTime || 0); });
-            progress.addEventListener('input', () => { video.currentTime = Number(progress.value) || 0; });
-            controls.append(toggle, progress);
-            container.classList.add('artsoul-card-media-video');
-            container.append(frame, controls);
+            video.addEventListener('volumechange', () => syncMuteButton(mute, video, 'video preview'));
+            controls.append(toggle, mute);
+            container.append(video, badge, controls);
             return container;
         }
 
@@ -318,29 +345,24 @@
             audio.src = url;
             audio.preload = 'metadata';
             audio.className = 'artsoul-card-audio-element';
-            const toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.className = 'artsoul-media-toggle';
-            toggle.dataset.state = 'paused';
-            toggle.setAttribute('aria-label', 'Play audio preview');
-            [toggle].forEach(control => {
-                control.addEventListener('click', stopCardActivation);
-                control.addEventListener('pointerdown', stopCardPropagation);
-                control.addEventListener('touchstart', stopCardPropagation);
-            });
-            toggle.addEventListener('click', () => audio.paused ? audio.play().catch(() => {}) : audio.pause());
+            const controls = document.createElement('div');
+            controls.className = 'artsoul-card-media-controls';
+            isolateMediaControl(controls);
+            const toggle = createPlaybackButton(audio, 'audio preview');
+            const mute = createMuteButton(audio, 'audio preview');
             const sync = () => {
                 const playing = !audio.paused && !audio.ended;
                 avatar.dataset.playing = String(playing);
-                toggle.dataset.state = playing ? 'playing' : 'paused';
-                toggle.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} audio preview`);
+                syncPlaybackButton(toggle, audio, 'audio preview');
             };
             audio.addEventListener('play', () => { pauseOtherMedia(audio); sync(); });
             audio.addEventListener('pause', sync);
             audio.addEventListener('ended', sync);
+            audio.addEventListener('volumechange', () => syncMuteButton(mute, audio, 'audio preview'));
+            controls.append(toggle, mute);
             audioWrap.appendChild(label);
             audioWrap.appendChild(avatar);
-            audioWrap.appendChild(toggle);
+            audioWrap.appendChild(controls);
             audioWrap.appendChild(audio);
             container.appendChild(audioWrap);
             return container;
@@ -440,31 +462,39 @@
         const h = React.createElement;
         const ref = React.useRef(null);
         const [playing, setPlaying] = React.useState(false);
-        const [duration, setDuration] = React.useState(0);
-        const [time, setTime] = React.useState(0);
+        const [muted, setMuted] = React.useState(true);
         React.useEffect(() => () => ref.current?.pause(), [url]);
         const toggle = event => {
             stopCardActivation(event);
             const video = ref.current;
             if (video) video.paused ? video.play().catch(() => setPlaying(false)) : video.pause();
         };
-        return h('div', { className: 'artsoul-card-media artsoul-card-media-video' },
-            h('div', { className: 'artsoul-card-video-frame' },
-                h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'auto', playsInline: true,
-                    poster: posterUrl(artwork) || 'ARTSOULlogo-clean.png', style: { pointerEvents: 'none' },
-                    onLoadedMetadata: event => { prepareVideoPreview(event.currentTarget, artwork); setDuration(event.currentTarget.duration || 0); },
-                    onTimeUpdate: event => setTime(event.currentTarget.currentTime || 0),
-                    onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
-                    onPause: () => setPlaying(false), onEnded: () => setPlaying(false) }),
-                h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO')
-            ),
-            h('div', { className: 'artsoul-card-media-controls', onClick: stopCardActivation, onPointerDown: stopCardPropagation, onTouchStart: stopCardPropagation },
+        const toggleMute = event => {
+            stopCardActivation(event);
+            const video = ref.current;
+            if (!video) return;
+            video.muted = !video.muted;
+            setMuted(video.muted);
+        };
+        return h('div', { className: 'artsoul-card-media artsoul-card-media-video', 'data-playing': String(playing) },
+            h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'auto', playsInline: true,
+                poster: posterUrl(artwork) || 'ARTSOULlogo-clean.png', muted, style: { pointerEvents: 'none' },
+                onLoadedMetadata: event => prepareVideoPreview(event.currentTarget, artwork),
+                onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
+                onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
+                onVolumeChange: event => setMuted(event.currentTarget.muted) }),
+            h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO'),
+            h('div', { className: 'artsoul-card-media-controls', draggable: false,
+                onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
+                onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
                 h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-state': playing ? 'playing' : 'paused',
-                    'aria-label': `${playing ? 'Pause' : 'Play'} video preview`, onClick: toggle }),
-                h('input', { type: 'range', className: 'artsoul-media-progress', min: 0, max: duration || 1, step: 0.01,
-                    value: Math.min(time, duration || 1), disabled: !duration, 'aria-label': 'Video progress',
-                    onChange: event => { event.stopPropagation(); if (ref.current) ref.current.currentTime = Number(event.currentTarget.value) || 0; },
-                    onClick: stopCardActivation, onPointerDown: stopCardPropagation, onTouchStart: stopCardPropagation })
+                    'aria-label': `${playing ? 'Pause' : 'Play'} video preview`, draggable: false,
+                    onClick: toggle, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
+                    onTouchStart: stopCardPropagation, onDragStart: stopCardActivation }),
+                h('button', { type: 'button', className: 'artsoul-media-mute', 'data-muted': String(muted),
+                    'aria-label': `${muted ? 'Unmute' : 'Mute'} video preview`, draggable: false,
+                    onClick: toggleMute, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
+                    onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
             )
         );
     }
@@ -474,22 +504,40 @@
         const h = React.createElement;
         const ref = React.useRef(null);
         const [playing, setPlaying] = React.useState(false);
+        const [muted, setMuted] = React.useState(false);
         React.useEffect(() => () => ref.current?.pause(), [url]);
         const toggle = event => {
             stopCardActivation(event);
             const audio = ref.current;
             if (audio) audio.paused ? audio.play().catch(() => setPlaying(false)) : audio.pause();
         };
+        const toggleMute = event => {
+            stopCardActivation(event);
+            const audio = ref.current;
+            if (!audio) return;
+            audio.muted = !audio.muted;
+            setMuted(audio.muted);
+        };
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
                 h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
                 h('img', { src: 'ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', 'data-playing': String(playing) }),
-                h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-state': playing ? 'playing' : 'paused',
-                    'aria-label': `${playing ? 'Pause' : 'Play'} audio preview`, onClick: toggle,
-                    onPointerDown: stopCardPropagation, onTouchStart: stopCardPropagation }),
-                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'metadata',
+                h('div', { className: 'artsoul-card-media-controls', draggable: false,
+                    onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
+                    onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
+                    h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-state': playing ? 'playing' : 'paused',
+                        'aria-label': `${playing ? 'Pause' : 'Play'} audio preview`, draggable: false,
+                        onClick: toggle, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
+                        onTouchStart: stopCardPropagation, onDragStart: stopCardActivation }),
+                    h('button', { type: 'button', className: 'artsoul-media-mute', 'data-muted': String(muted),
+                        'aria-label': `${muted ? 'Unmute' : 'Mute'} audio preview`, draggable: false,
+                        onClick: toggleMute, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
+                        onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
+                ),
+                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'metadata', muted,
                     onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
-                    onPause: () => setPlaying(false), onEnded: () => setPlaying(false) })
+                    onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
+                    onVolumeChange: event => setMuted(event.currentTarget.muted) })
             )
         );
     }
