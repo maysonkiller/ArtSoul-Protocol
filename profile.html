@@ -298,6 +298,7 @@
             const profileSignalRef = useRef({ address: null, chainId: null, initialized: false });
             const profileRequestRef = useRef(0);
             const artworksRequestRef = useRef(0);
+            const discoveryRequestRef = useRef(0);
             const transactionActionsRef = useRef(new Set());
             const [transactionActions, setTransactionActions] = useState({});
 
@@ -589,12 +590,18 @@
                 return sharedHref;
             }
 
-            function ProfileArtworkMedia({ artwork }) {
+            function ProfileArtworkMedia({ artwork, onUnavailable }) {
                 const SharedMedia = window.ArtSoulArtworkCard?.ReactMedia;
-                return SharedMedia ? <SharedMedia artwork={artwork} /> : null;
+                return SharedMedia ? <SharedMedia artwork={artwork} onUnavailable={onUnavailable} /> : null;
             }
 
             function ProfileArtworkCard({ artwork }) {
+                const [mediaUnavailable, setMediaUnavailable] = useState(false);
+                const sharedCards = window.ArtSoulArtworkCard;
+                const mediaKey = sharedCards?.mediaUrl?.(artwork) || '';
+                useEffect(() => setMediaUnavailable(false), [mediaKey]);
+                if (!sharedCards?.hasSafeMedia?.(artwork) || mediaUnavailable) return null;
+
                 const status = getProfileArtworkStatus(artwork);
                 const price = getProfileArtworkPrice(artwork);
                 const href = getProfileArtworkHref(artwork);
@@ -606,7 +613,7 @@
                         className="artsoul-artwork-card profile-artwork-card"
                         aria-label={href ? `Open ${artwork.title || 'artwork'}` : undefined}
                     >
-                        <ProfileArtworkMedia artwork={artwork} />
+                        <ProfileArtworkMedia artwork={artwork} onUnavailable={() => setMediaUnavailable(true)} />
                         <div className="artsoul-card-body">
                             <h4 className="artsoul-card-title">{artwork.title || 'Untitled Artwork'}</h4>
                             <div className="artsoul-card-meta">
@@ -813,17 +820,31 @@
                 }
             }
 
-            async function refreshDiscoveryProfile(profileData, artworks) {
+            async function refreshDiscoveryProfile(profileData) {
+                const requestId = ++discoveryRequestRef.current;
                 if (!profileData?.wallet_address || !window.ArtSoulDiscovery) {
                     setDiscoveryProfile(null);
                     return;
                 }
 
+                const db = await waitForArtSoulDB();
+                const projected = await db?.getPublicProjectionArtworks?.({
+                    creator: profileData.wallet_address,
+                    limit: 200
+                }) || [];
+                const creatorArtworks = filterCanonicalProfileArtworks(
+                    projected,
+                    profileData.wallet_address,
+                    'created'
+                );
+                const pendingArtworks = loadPendingIndexerArtworks(profileData.wallet_address, 'created');
+                const fullArtworkCorpus = mergePendingIndexerArtworks(creatorArtworks, pendingArtworks);
                 const genesisState = await getGenesisState(profileData.wallet_address);
-                const trust = window.ArtSoulDiscovery.computeTrustProfile(profileData, artworks, {
+                if (requestId !== discoveryRequestRef.current) return;
+                const trust = window.ArtSoulDiscovery.computeTrustProfile(profileData, fullArtworkCorpus, {
                     genesisOwned: genesisState.owned
                 });
-                const genesisProgress = window.ArtSoulDiscovery.getGenesisProgress(profileData, artworks, {
+                const genesisProgress = window.ArtSoulDiscovery.getGenesisProgress(profileData, fullArtworkCorpus, {
                     genesisOwned: genesisState.owned,
                     auctionParticipations: trust.signals.auctionParticipations,
                     successfulSettlements: trust.signals.successfulSettlements,
@@ -902,6 +923,9 @@
 
                     if (requestId !== profileRequestRef.current) return;
                     setProfile(profileData);
+                    refreshDiscoveryProfile(profileData).catch(error => {
+                        console.warn('Discovery profile refresh skipped:', error);
+                    });
 
                     // Disable edit mode if viewing someone else's profile
                     if (!isOwn) {
@@ -973,12 +997,10 @@
                     const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, selectedGallery)
                         .filter(artwork => ![...artworkIdentityKeys(artwork)]
                             .some(key => suppressedArtworkIds.has(key)));
-                    const nextArtworks = sortNewestFirst(mergePendingIndexerArtworks(filtered || [], pendingIndexerArtworks));
+                    const nextArtworks = sortNewestFirst(mergePendingIndexerArtworks(filtered || [], pendingIndexerArtworks))
+                        .filter(artwork => window.ArtSoulArtworkCard?.hasSafeMedia?.(artwork) === true);
                     if (requestId !== artworksRequestRef.current) return;
                     setMyArtworks(nextArtworks);
-                    refreshDiscoveryProfile(profile, nextArtworks).catch(error => {
-                        console.warn('Discovery profile refresh skipped:', error);
-                    });
                 } catch (error) {
                     console.error('Error loading artworks:', error);
                     if (requestId === artworksRequestRef.current) {
@@ -1720,12 +1742,7 @@
                                                     </div>
                                                 </div>
                                                 <div className="artsoul-card-body">
-                                                    <div className="artsoul-card-eyebrow">Creator action</div>
                                                     <h4 className="artsoul-card-title">Publish Artwork</h4>
-                                                    <p className="artsoul-card-description">Prepare a new auction</p>
-                                                    <div className="artsoul-card-meta">
-                                                        <span className="artsoul-card-status">Open publisher</span>
-                                                    </div>
                                                 </div>
                                             </button>
                                         )}

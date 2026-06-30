@@ -20,11 +20,13 @@ class FakeElement {
         this.paused = true;
         this.ended = false;
         this.muted = false;
+        this.removed = false;
         if (tagName === 'audio' || tagName === 'video') mediaElements.push(this);
     }
     appendChild(child) { this.children.push(child); return child; }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
+    remove() { this.removed = true; }
     setAttribute(name, value) { this[name] = String(value); }
     addEventListener(name, listener) { (this.listeners[name] ||= []).push(listener); }
     dispatch(name) {
@@ -111,4 +113,22 @@ test('DOM cards render two isolated overlay buttons and keep only one media play
     const dragEvent = audioControls.dispatch('dragstart');
     assert.equal(dragEvent.defaultPrevented, true);
     assert.equal(dragEvent.propagationStopped, true);
+});
+
+test('cards omit unsafe media and remove themselves when media loading fails', () => {
+    const { api } = loadDomCardRuntime();
+    assert.equal(api.createCardElement({ id: 'missing', title: 'Missing' }), null);
+
+    const card = api.createCardElement({ id: 'image', title: 'Image', file_url: 'image.jpg' });
+    card.children[0].children[0].onerror();
+    assert.equal(card.removed, true);
+});
+
+test('card bodies contain only title and status-price metadata', () => {
+    const { api } = loadDomCardRuntime();
+    const card = api.createCardElement({ id: 'image', title: 'Image', file_url: 'image.jpg', creator_value: '1' });
+    const body = card.children[1];
+    assert.equal(body.children.length, 2);
+    assert.equal(body.children[0].className, 'artsoul-card-title');
+    assert.equal(body.children[1].className, 'artsoul-card-meta');
 });

@@ -194,17 +194,17 @@
         const recentPending = artwork.source === 'pending_indexer' && (!pendingCreated || Date.now() - pendingCreated <= RECENT_PENDING_MS);
 
         if (recentPending) return { key: 'finalizing', label: 'Finalizing...' };
-        if (isListedForSale(artwork)) return { key: 'listed', label: 'Listed for sale' };
+        if (isListedForSale(artwork)) return { key: 'listed', label: 'For sale' };
         if (minted || status === 'sold' || status === 'settled') return { key: 'sold', label: 'Sold' };
-        if (awaitingSettlement) return { key: 'awaiting_settlement', label: 'Awaiting settlement' };
+        if (awaitingSettlement) return { key: 'awaiting_settlement', label: 'Awaiting payment' };
         if (noBids || ((expired || ended || defaulted) && !hasBid)) {
-            return { key: 'ended_no_bids', label: 'Ended — no bids' };
+            return { key: 'ended_no_bids', label: 'No bids' };
         }
-        if (defaulted) return { key: 'unsettled', label: 'Auction unsettled' };
+        if (defaulted) return { key: 'unsettled', label: 'Unsettled' };
         if ((expired || ended) && hasBid) {
-            return { key: 'ended', label: 'Auction Ended' };
+            return { key: 'awaiting_settlement', label: 'Awaiting payment' };
         }
-        if (activeAuctionId(artwork) && !expired && !minted) return { key: 'live', label: 'Live Auction' };
+        if (activeAuctionId(artwork) && !expired && !minted) return { key: 'live', label: 'Live' };
         return { key: 'not_minted', label: 'Not yet minted' };
     }
 
@@ -255,13 +255,6 @@
         return id ? `artwork.html?id=${encodeURIComponent(id)}` : '';
     }
 
-    function mediaPlaceholderElement(label = 'Media unavailable') {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'artsoul-card-media-placeholder';
-        placeholder.textContent = label;
-        return placeholder;
-    }
-
     function prepareVideoPreview(video, artwork = {}) {
         if (!video || video.dataset.artsoulPreviewPrepared === 'true') return;
         video.dataset.artsoulPreviewPrepared = 'true';
@@ -286,15 +279,10 @@
         video.addEventListener('loadeddata', renderFirstFrame, { once: true });
     }
 
-    function createMediaElement(artwork = {}) {
+    function createMediaElement(artwork = {}, onUnavailable = null) {
         const url = mediaUrl(artwork);
         const container = document.createElement('div');
         container.className = 'artsoul-card-media';
-
-        if (!url || !hasSafeMedia(artwork)) {
-            container.appendChild(mediaPlaceholderElement('Media unavailable'));
-            return container;
-        }
 
         const type = mediaType(artwork);
         if (type === 'video') {
@@ -324,6 +312,7 @@
             video.addEventListener('play', () => { pauseOtherMedia(video); sync(); });
             video.addEventListener('pause', sync);
             video.addEventListener('ended', sync);
+            video.addEventListener('error', () => onUnavailable?.());
             video.addEventListener('volumechange', () => syncMuteButton(mute, video, 'video preview'));
             controls.append(toggle, mute);
             container.append(video, badge, controls);
@@ -358,6 +347,7 @@
             audio.addEventListener('play', () => { pauseOtherMedia(audio); sync(); });
             audio.addEventListener('pause', sync);
             audio.addEventListener('ended', sync);
+            audio.addEventListener('error', () => onUnavailable?.());
             audio.addEventListener('volumechange', () => syncMuteButton(mute, audio, 'audio preview'));
             controls.append(toggle, mute);
             audioWrap.appendChild(label);
@@ -372,15 +362,14 @@
         img.src = url;
         img.alt = artwork.title || 'Artwork';
         img.className = 'artsoul-card-media-object';
-        img.onerror = () => {
-            container.replaceChildren(mediaPlaceholderElement('Media unavailable'));
-        };
+        img.onerror = () => onUnavailable?.();
         container.appendChild(img);
         return container;
     }
 
     function createCardElement(artwork = {}, options = {}) {
         if (options.respectHidden !== false && isHidden(artwork)) return null;
+        if (!hasSafeMedia(artwork)) return null;
 
         const href = options.href === false ? '' : (options.href || detailHref(artwork));
         const card = document.createElement(href ? 'a' : 'div');
@@ -393,17 +382,9 @@
         const body = document.createElement('div');
         body.className = 'artsoul-card-body';
 
-        const eyebrow = document.createElement('div');
-        eyebrow.className = 'artsoul-card-eyebrow';
-        eyebrow.textContent = options.slotLabel || status.label;
-
         const title = document.createElement('h3');
         title.className = 'artsoul-card-title';
         title.textContent = artwork.title || 'Untitled Artwork';
-
-        const desc = document.createElement('p');
-        desc.className = 'artsoul-card-description';
-        desc.textContent = artwork.description || '';
 
         const meta = document.createElement('div');
         meta.className = 'artsoul-card-meta';
@@ -420,44 +401,33 @@
             meta.appendChild(priceEl);
         }
 
-        const signal = document.createElement('p');
-        signal.className = 'artsoul-card-signals';
-        const showSignals = options.showSignals === true;
-        signal.textContent = signalsText(artwork, showSignals) || options.reason || '';
-
-        if (!minimal) body.appendChild(eyebrow);
         body.appendChild(title);
-        if (!minimal) body.appendChild(desc);
         body.appendChild(meta);
-        if ((!minimal || showSignals) && signal.textContent) body.appendChild(signal);
 
-        card.appendChild(createMediaElement(artwork));
+        card.appendChild(createMediaElement(artwork, () => card.remove()));
         card.appendChild(body);
         return card;
     }
 
-    function ReactMedia({ artwork }) {
+    function ReactMedia({ artwork, onUnavailable = null }) {
         const React = window.React;
         const h = React.createElement;
         const url = mediaUrl(artwork);
-        if (!url || !hasSafeMedia(artwork)) {
-            return h('div', { className: 'artsoul-card-media' },
-                h('div', { className: 'artsoul-card-media-placeholder' }, 'Media unavailable')
-            );
-        }
+        if (!url || !hasSafeMedia(artwork)) return null;
         const type = mediaType(artwork);
-        if (type === 'video') return h(ReactVideoPreview, { artwork, url });
-        if (type === 'audio') return h(ReactAudioPreview, { artwork, url });
+        if (type === 'video') return h(ReactVideoPreview, { artwork, url, onUnavailable });
+        if (type === 'audio') return h(ReactAudioPreview, { artwork, url, onUnavailable });
         return h('div', { className: 'artsoul-card-media' },
             h('img', {
                 src: url,
                 alt: artwork.title || 'Artwork',
-                className: 'artsoul-card-media-object'
+                className: 'artsoul-card-media-object',
+                onError: onUnavailable || undefined
             })
         );
     }
 
-    function ReactVideoPreview({ artwork, url }) {
+    function ReactVideoPreview({ artwork, url, onUnavailable = null }) {
         const React = window.React;
         const h = React.createElement;
         const ref = React.useRef(null);
@@ -482,6 +452,7 @@
                 onLoadedMetadata: event => prepareVideoPreview(event.currentTarget, artwork),
                 onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
                 onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
+                onError: onUnavailable || undefined,
                 onVolumeChange: event => setMuted(event.currentTarget.muted) }),
             h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO'),
             h('div', { className: 'artsoul-card-media-controls', draggable: false,
@@ -499,7 +470,7 @@
         );
     }
 
-    function ReactAudioPreview({ artwork, url }) {
+    function ReactAudioPreview({ artwork, url, onUnavailable = null }) {
         const React = window.React;
         const h = React.createElement;
         const ref = React.useRef(null);
@@ -537,19 +508,22 @@
                 h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'metadata', muted,
                     onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
                     onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
+                    onError: onUnavailable || undefined,
                     onVolumeChange: event => setMuted(event.currentTarget.muted) })
             )
         );
     }
 
-    function ReactCard({ artwork = {}, slotLabel = '', reason = '', onOpen = null, actions = null, respectHidden = true, minimal = false, showSignals = false }) {
+    function ReactCard({ artwork = {}, onOpen = null, actions = null, respectHidden = true, minimal = false }) {
         const React = window.React;
         const h = React.createElement;
+        const [mediaUnavailable, setMediaUnavailable] = React.useState(false);
+        React.useEffect(() => setMediaUnavailable(false), [mediaUrl(artwork)]);
         if (respectHidden !== false && isHidden(artwork)) return null;
+        if (!hasSafeMedia(artwork) || mediaUnavailable) return null;
 
         const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
         const price = minimal ? formatDiscoveryPrice(artwork) : formatPrice(artwork);
-        const signals = signalsText(artwork, showSignals);
         return h('div', {
             className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}`,
             onClick: onOpen || undefined,
@@ -562,18 +536,13 @@
                 }
             } : undefined
         },
-            h(ReactMedia, { artwork }),
+            h(ReactMedia, { artwork, onUnavailable: () => setMediaUnavailable(true) }),
             h('div', { className: 'artsoul-card-body' },
-                minimal ? null : h('div', { className: 'artsoul-card-eyebrow' }, slotLabel || status.label),
                 h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
-                minimal ? null : h('p', { className: 'artsoul-card-description' }, artwork.description || ''),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
                 ),
-                (!minimal || showSignals) && (signals || reason)
-                    ? h('p', { className: 'artsoul-card-signals' }, signals || reason)
-                    : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             )
         );
