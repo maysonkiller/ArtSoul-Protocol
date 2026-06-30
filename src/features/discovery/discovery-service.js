@@ -855,6 +855,7 @@
         getInteractionState,
         getSocialSignals,
         isEndingSoon,
+        isLiveAuction: isGalleryLiveAuction,
         isPublicTestnetArtwork,
         normalizeArtwork,
         recordSignal,
