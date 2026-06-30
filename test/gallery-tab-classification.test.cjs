@@ -58,10 +58,10 @@ test('gallery lifecycle states map to one mutually exclusive tab', () => {
         [{ ...baseArtwork, status: 'defaulted' }, 'discover'],
         [{ ...baseArtwork, status: 'ended_no_bids' }, 'discover'],
         [{ ...baseArtwork, status: 'registered', is_collection: true }, 'collections'],
-        [{ ...baseArtwork, status: 'sold', minted: true, token_id: '3' }, ''],
-        [{ ...baseArtwork, status: 'settlement_pending', active_auction_id: '4' }, '']
+        [{ ...baseArtwork, status: 'sold', minted: true, token_id: '3' }, 'nft'],
+        [{ ...baseArtwork, status: 'settlement_pending', active_auction_id: '4' }, 'discover']
     ];
-    const tabs = ['live_auctions', 'marketplace', 'collections', 'discover'];
+    const tabs = ['live_auctions', 'nft', 'discover', 'marketplace', 'collections'];
 
     for (const [artwork, expected] of cases) {
         assert.equal(discovery.galleryTabForArtwork(artwork), expected);
@@ -70,7 +70,7 @@ test('gallery lifecycle states map to one mutually exclusive tab', () => {
     }
 });
 
-test('expired active auctions do not remain in Auctions or enter Discover before finalization', () => {
+test('expired active auctions enter Discovery even before on-chain finalization', () => {
     const discovery = loadDiscoveryService();
     const expired = {
         ...baseArtwork,
@@ -79,20 +79,21 @@ test('expired active auctions do not remain in Auctions or enter Discover before
         auction_end_time: new Date(Date.now() - 60 * 1000).toISOString()
     };
 
-    assert.equal(discovery.galleryTabForArtwork(expired), '');
+    assert.equal(discovery.galleryTabForArtwork(expired), 'discover');
+    assert.equal(discovery.filterForGalleryTab([expired], 'discover').length, 1);
 });
 
 test('moderation-hidden works are excluded from every gallery tab', () => {
     const discovery = loadDiscoveryService();
     const hidden = { ...baseArtwork, status: 'registered', moderation_hidden: true };
-    const tabs = ['live_auctions', 'marketplace', 'collections', 'discover'];
+    const tabs = ['live_auctions', 'nft', 'discover', 'marketplace', 'collections'];
 
     for (const tab of tabs) {
         assert.equal(discovery.filterForGalleryTab([hidden], tab).length, 0);
     }
 });
 
-test('Discover cards can show all three persisted signal counts', () => {
+test('Discovery cards can show all three persisted signal counts', () => {
     const card = loadArtworkCard({ likes: 2, wouldBuy: 3, watching: 4 });
     assert.equal(card.signalsText({}, true), '2 likes · 3 would buy · 4 watching');
 
@@ -103,13 +104,15 @@ test('Discover cards can show all three persisted signal counts', () => {
 test('gallery markup keeps the requested order, default, and Discover-only signals', () => {
     const gallery = fs.readFileSync('gallery.html', 'utf8');
     const auctions = gallery.indexOf("{ id: 'live_auctions', label: 'Auctions' }");
+    const nft = gallery.indexOf("{ id: 'nft', label: 'NFT' }");
+    const discover = gallery.indexOf("{ id: 'discover', label: 'Discovery' }");
     const marketplace = gallery.indexOf("{ id: 'marketplace', label: 'Marketplace' }");
     const collections = gallery.indexOf("{ id: 'collections', label: 'Collections' }");
-    const discover = gallery.indexOf("{ id: 'discover', label: 'Discover' }");
 
-    assert.ok(auctions < marketplace && marketplace < collections && collections < discover);
+    assert.ok(auctions < nft && nft < discover && discover < marketplace && marketplace < collections);
     assert.match(gallery, /\? tabId : 'live_auctions'/);
     assert.match(gallery, /showSignals=\{activeTab === 'discover'\}/);
+    assert.match(gallery, /TODO: Add a "Make an offer" action to NFT cards/);
     assert.match(
         fs.readFileSync('src/features/discovery/discovery-service.js', 'utf8'),
         /TODO: Once the canonical project wallet is configured/
