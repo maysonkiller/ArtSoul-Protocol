@@ -95,26 +95,6 @@
             object-fit: contain;
         }
 
-        .profile-card-skeleton {
-            pointer-events: none;
-        }
-
-        .profile-skeleton-media,
-        .profile-skeleton-line {
-            background: var(--c-surface-muted);
-            border: 1px solid var(--c-border-soft);
-        }
-
-        .profile-skeleton-media {
-            width: 100%;
-            aspect-ratio: 1 / 1;
-        }
-
-        .profile-skeleton-line {
-            height: 14px;
-            border-radius: 4px;
-        }
-
         .profile-connect-state,
         .profile-empty-state {
             border: 1px solid var(--c-border-soft);
@@ -544,6 +524,17 @@
                 return isMintedArtwork(artwork) || status === 'sold' || status === 'for_sale' || status === 'settled';
             }
 
+            function isLiveAuctionArtwork(artwork = {}) {
+                return window.ArtSoulDiscovery?.isLiveAuction?.(artwork) === true;
+            }
+
+            function isCollectedArtwork(artwork = {}, ownerAddress = '') {
+                const owner = normalizeAddress(ownerAddress);
+                return isMintedArtwork(artwork) &&
+                    normalizeAddress(artwork.current_owner_address) === owner &&
+                    normalizeAddress(artwork.creator_id || artwork.creator) !== owner;
+            }
+
             function filterCanonicalProfileArtworks(artworks, walletAddress, galleryType = 'created') {
                 const owner = normalizeAddress(walletAddress);
                 let result = Array.isArray(artworks) ? [...artworks] : [];
@@ -556,12 +547,12 @@
                 );
 
                 if (galleryType === 'owned' || galleryType === 'collected') {
-                    result = result.filter(artwork => normalizeAddress(artwork.current_owner_address) === owner);
+                    result = result.filter(artwork => isCollectedArtwork(artwork, owner));
                 } else {
                     result = result.filter(artwork => normalizeAddress(artwork.creator_id || artwork.creator) === owner);
 
                     if (galleryType === 'auction') {
-                        result = result.filter(artwork => String(artwork.status || '').toLowerCase() === 'auction');
+                        result = result.filter(isLiveAuctionArtwork);
                     } else if (galleryType === 'sold') {
                         result = result.filter(isSoldOrSettledArtwork);
                     }
@@ -677,18 +668,6 @@
                 );
             }
 
-            function ProfileArtworkSkeleton({ index }) {
-                return (
-                    <div className="artsoul-artwork-card profile-card-skeleton" aria-hidden="true" key={`profile-skeleton-${index}`}>
-                        <div className="profile-skeleton-media"></div>
-                        <div className="artsoul-card-body">
-                            <div className="profile-skeleton-line" style={{ width: '72%' }}></div>
-                            <div className="profile-skeleton-line" style={{ width: '48%', marginTop: 'auto' }}></div>
-                        </div>
-                    </div>
-                );
-            }
-
             function canCreateNewAuction(artwork = {}, walletAddress = '') {
                 return normalizeAddress(artwork.creator_id || artwork.creator) === normalizeAddress(walletAddress) &&
                     !isMintedArtwork(artwork) &&
@@ -709,7 +688,7 @@
             }
 
             function loadPendingIndexerArtworks(walletAddress, galleryType = 'created') {
-                if (!walletAddress || (galleryType !== 'created' && galleryType !== 'auction')) {
+                if (!walletAddress || galleryType !== 'created') {
                     return [];
                 }
 
@@ -721,7 +700,6 @@
                     return parsed
                         .filter(artwork => artwork?.wallet_address?.toLowerCase() === owner || artwork?.creator_id?.toLowerCase() === owner)
                         .filter(hasConfirmedRegisterTx)
-                        .filter(artwork => galleryType !== 'auction' || Boolean(artwork.auction_tx_hash))
                         .map(artwork => {
                             const chainId = resolvePendingArtworkChainId(artwork);
                             const artworkId = normalizeProtocolArtworkId(artwork.artwork_id);
@@ -1039,7 +1017,7 @@
                             owner: walletAddress,
                             limit: 200
                         }) || []);
-                        filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'owned');
+                        filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'collected');
                     }
 
                     const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, selectedGallery)
@@ -1756,51 +1734,65 @@
                                 }`}>
                                     {GALLERY_TYPES.find(g => g.id === selectedGallery)?.label}
                                 </h3>
-                                <span className={`text-sm ${
-                                    isClassic ? 'text-gray-400' : 'text-purple-300'
-                                }`}>
-                                    {artworksLoading ? 'Loading artworks...' : `${myArtworks.length} items`}
-                                </span>
+                                {!artworksLoading && (
+                                    <span className={`text-sm ${
+                                        isClassic ? 'text-gray-400' : 'text-purple-300'
+                                    }`}>
+                                        {myArtworks.length} items
+                                    </span>
+                                )}
                             </div>
 
                             <div className="profile-artwork-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" aria-busy={artworksLoading}>
-                                {/* Add New Button */}
-                                {isOwnProfile && <button
-                                    type="button"
-                                    onClick={handleQuickUpload}
-                                    className="artsoul-artwork-card text-left self-stretch"
-                                    style={{ borderStyle: 'dashed', cursor: 'pointer' }}
-                                    aria-label="Publish a new artwork"
-                                >
-                                    <div className="artsoul-card-media">
-                                        <div className="text-center" style={{ color: 'var(--c-accent)' }}>
-                                            <div className="text-5xl leading-none mb-3" aria-hidden="true">+</div>
-                                            <div className="text-sm font-semibold">Add New</div>
-                                        </div>
+                                {artworksLoading ? (
+                                    <div
+                                        className="profile-empty-state col-span-full p-8 text-center text-sm"
+                                        role="status"
+                                        aria-live="polite"
+                                    >
+                                        Loading artworks...
                                     </div>
-                                    <div className="artsoul-card-body">
-                                        <div className="artsoul-card-eyebrow">Creator action</div>
-                                        <h4 className="artsoul-card-title">Publish Artwork</h4>
-                                        <p className="artsoul-card-description">Prepare a new auction</p>
-                                        <div className="artsoul-card-meta">
-                                            <span className="artsoul-card-status">Open publisher</span>
-                                        </div>
-                                    </div>
-                                </button>}
+                                ) : (
+                                    <>
+                                        {/* Add New is a Created Artworks action only. */}
+                                        {isOwnProfile && selectedGallery === 'created' && (
+                                            <button
+                                                type="button"
+                                                onClick={handleQuickUpload}
+                                                className="artsoul-artwork-card text-left self-stretch"
+                                                style={{ borderStyle: 'dashed', cursor: 'pointer' }}
+                                                aria-label="Publish a new artwork"
+                                            >
+                                                <div className="artsoul-card-media">
+                                                    <div className="text-center" style={{ color: 'var(--c-accent)' }}>
+                                                        <div className="text-5xl leading-none mb-3" aria-hidden="true">+</div>
+                                                        <div className="text-sm font-semibold">Add New</div>
+                                                    </div>
+                                                </div>
+                                                <div className="artsoul-card-body">
+                                                    <div className="artsoul-card-eyebrow">Creator action</div>
+                                                    <h4 className="artsoul-card-title">Publish Artwork</h4>
+                                                    <p className="artsoul-card-description">Prepare a new auction</p>
+                                                    <div className="artsoul-card-meta">
+                                                        <span className="artsoul-card-status">Open publisher</span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        )}
 
-                                {/* Existing Artworks */}
-                                {artworksLoading
-                                    ? [...Array(isOwnProfile ? 5 : 6)].map((_, index) => (
-                                        <ProfileArtworkSkeleton index={index} key={`profile-skeleton-${index}`} />
-                                    ))
-                                    : myArtworks.map(artwork => (
-                                        <ProfileArtworkCard key={artwork.id} artwork={artwork} />
-                                    ))}
+                                        {myArtworks.map(artwork => (
+                                            <ProfileArtworkCard key={artwork.id} artwork={artwork} />
+                                        ))}
 
-                                {!artworksLoading && myArtworks.length === 0 && (
-                                    <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
-                                        No artworks in this section yet.
-                                    </div>
+                                        {myArtworks.length === 0 && (
+                                            <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
+                                                {selectedGallery === 'created' && 'No created artworks yet.'}
+                                                {selectedGallery === 'auction' && 'No live auctions right now.'}
+                                                {selectedGallery === 'sold' && 'No completed sales yet.'}
+                                                {selectedGallery === 'collected' && 'No collected NFTs yet.'}
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
