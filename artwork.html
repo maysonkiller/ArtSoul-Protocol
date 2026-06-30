@@ -63,6 +63,7 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
+    <script src="src/ui/components/artwork-card.js?v=5"></script>
     <script src="avatar-dropdown.js?v=12"></script>
     <script type="module" src="appkit-init.js?v=15"></script>
     <script src="contracts-config.js?v=1"></script>
@@ -2081,6 +2082,17 @@ body.classic {
             const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(artwork.file_url) ? artwork.file_url : '';
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
             const canCreateNewAuction = walletRenderState.settled && canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
+            const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(auction ? {
+                ...artwork,
+                auction_state: auction.state,
+                active_auction_id: firstDefined(artwork.active_auction_id, auction.auctionId),
+                auction_end_time: firstDefined(artwork.auction_end_time, auction.endTime),
+                current_bid: hasAuctionBids && currentHighestBidWei === 0n ? '0.000000000000000001' : currentHighestBid,
+                highest_bidder: currentHighestBidder || bidActivity[0]?.bidder
+            } : artwork) || {
+                key: isArtworkMinted(artwork) ? 'sold' : 'not_minted',
+                label: isArtworkMinted(artwork) ? 'Sold' : 'Not yet minted'
+            };
 
             return (
                 <div className="min-h-screen">
@@ -2133,7 +2145,12 @@ body.classic {
                             <div className="space-y-6 px-4 lg:px-8 py-6 lg:py-12 overflow-y-auto">
                                 {/* Title & Description */}
                                 <div className={`p-6 rounded-xl ${isClassic ? 'bg-gray-800' : 'bg-cyan-900/20 border border-cyan-500/30'}`}>
-                                    <h1 className="text-4xl font-bold mb-2">{artwork.title}</h1>
+                                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                                        <h1 className="text-4xl font-bold">{artwork.title}</h1>
+                                        <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
+                                            {presentationStatus.label}
+                                        </span>
+                                    </div>
                                     <p className="opacity-70">{artwork.description}</p>
                                 </div>
 
@@ -2245,27 +2262,7 @@ body.classic {
                                 {/* Auction Info */}
                                 {auction && (
                                     <div className="auction-detail-panel p-6 rounded-xl">
-                                        {/* State Badge */}
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-2xl font-bold">
-                                                {auctionEnded ? 'Auction Ended' : 'Live Auction'}
-                                            </h3>
-                                            {!auctionEnded ? (
-                                                <span className="live-auction-pill px-3 py-1 rounded-full text-xs font-bold">
-                                                    Live Auction
-                                                </span>
-                                            ) : auction.state && (
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                    auction.state === 'WAITING_PAYMENT' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500' :
-                                                    auction.state === 'SOLD' ? 'bg-green-500/20 text-green-400 border border-green-500' :
-                                                    auction.state === 'DEFAULTED' || auction.state === 'SETTLEMENT_DEFAULTED' ? 'bg-red-500/20 text-red-400 border border-red-500' :
-                                                    auction.state === 'PRIMARY_ACTIVE' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500' :
-                                                    'bg-gray-500/20 text-gray-400 border border-gray-500'
-                                                }`}>
-                                                    {auction.state.replace(/_/g, ' ')}
-                                                </span>
-                                            )}
-                                        </div>
+                                        <h3 className="text-2xl font-bold mb-4">Auction</h3>
 
                                         <div className="space-y-3">
                                             <div className="flex justify-between">

@@ -12,10 +12,10 @@ vm.runInContext(
 
 const { discoveryStatusInfo } = context.window.ArtSoulArtworkCard;
 
-test('discovery cards collapse lifecycle states into one minimal badge', () => {
+test('cards use one consistent human-readable label per lifecycle state', () => {
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'registered' }) },
-    { key: 'art', label: 'Art' }
+    { key: 'not_minted', label: 'Not yet minted' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'auction', active_auction_id: '1', auction_end_time: '2099-01-01T00:00:00Z' }) },
@@ -23,10 +23,35 @@ test('discovery cards collapse lifecycle states into one minimal badge', () => {
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'sold', minted: true, token_id: '1' }) },
-    { key: 'minted', label: 'NFT' }
+    { key: 'sold', label: 'Sold' }
   );
   assert.deepEqual(
     { ...discoveryStatusInfo({ status: 'defaulted_no_bids' }) },
-    { key: 'ended', label: 'Ended' }
+    { key: 'ended_no_bids', label: 'Ended — no bids' }
+  );
+  assert.deepEqual(
+    { ...discoveryStatusInfo({ status: 'awaiting_end', current_bid: '0' }) },
+    { key: 'ended_no_bids', label: 'Ended — no bids' }
+  );
+  assert.deepEqual(
+    { ...discoveryStatusInfo({ status: 'awaiting_end', current_bid: '1' }) },
+    { key: 'ended', label: 'Auction Ended' }
+  );
+  assert.deepEqual(
+    { ...discoveryStatusInfo({ status: 'settlement_pending', current_bid: '1' }) },
+    { key: 'awaiting_settlement', label: 'Awaiting settlement' }
+  );
+  assert.deepEqual(
+    { ...discoveryStatusInfo({ status: 'settlement_defaulted', current_bid: '1' }) },
+    { key: 'unsettled', label: 'Auction unsettled' }
+  );
+  assert.deepEqual(
+    { ...discoveryStatusInfo({
+      status: 'for_sale',
+      minted: true,
+      token_id: '1',
+      sale_price: '1.5'
+    }) },
+    { key: 'listed', label: 'Listed for sale' }
   );
 });

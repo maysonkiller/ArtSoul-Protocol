@@ -72,7 +72,7 @@
     <script type="module" src="supabase-auth.js"></script>
     <script type="module" src="supabase-client.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=3"></script>
+    <script src="src/ui/components/artwork-card.js?v=5"></script>
     <style>
         @keyframes spin {
             from { transform: rotate(0deg); }
@@ -1144,8 +1144,6 @@
                             wouldBuy: 0,
                             watching: 0
                         };
-                        const lifecycle = window.ArtSoulDiscovery?.classifyLifecycle?.(art);
-
                         const mediaUrl = art.file_url || art.media_url || '';
                         const hasSafeMedia = Boolean(mediaUrl) && (
                             typeof window.ArtSoulSecurity?.isValidStorageUrl !== 'function' ||
@@ -1253,11 +1251,10 @@
                         const info = document.createElement('div');
                         info.className = 'p-4';
 
+                        const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(art);
                         const slotLabel = document.createElement('p');
                         slotLabel.className = 'text-xs uppercase tracking-wide opacity-60 mb-1';
-                        slotLabel.textContent = art.source === 'pending_indexer'
-                            ? (art.lifecycle_label || (art.canonical_v41_id ? 'Metadata unavailable' : 'Finalizing...'))
-                            : slot.label;
+                        slotLabel.textContent = presentationStatus?.label || 'Not yet minted';
 
                         const title = document.createElement('h3');
                         title.className = 'font-semibold text-lg mb-1 truncate';
@@ -1280,9 +1277,7 @@
                             if (socialSignals.likes) parts.push(`${socialSignals.likes} ♥`);
                             if (socialSignals.wouldBuy) parts.push(`${socialSignals.wouldBuy} would buy`);
                             if (socialSignals.watching) parts.push(`${socialSignals.watching} watching`);
-                            signalLine.textContent = parts.length
-                                ? parts.join('  ·  ')
-                                : (lifecycle?.label || slot.reason);
+                            signalLine.textContent = parts.length ? parts.join('  ·  ') : '';
                         }
 
                         info.appendChild(slotLabel);

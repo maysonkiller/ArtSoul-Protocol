@@ -59,7 +59,7 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=4"></script>
+    <script src="src/ui/components/artwork-card.js?v=5"></script>
     <script src="avatar-dropdown.js?v=12"></script>
     <script type="module" src="appkit-init.js?v=15"></script>
     <style>
@@ -267,11 +267,11 @@
             const GALLERY_STATUS_LABELS = {
                 auction: 'Live Auction',
                 awaiting_end: 'Auction Ended',
-                settlement_pending: 'Auction Ended',
+                settlement_pending: 'Awaiting settlement',
                 defaulted: 'Auction unsettled',
-                defaulted_no_bids: 'Ended - no bids',
-                ended_no_bids: 'Ended - no bids',
-                for_sale: 'For Sale',
+                defaulted_no_bids: 'Ended — no bids',
+                ended_no_bids: 'Ended — no bids',
+                for_sale: 'Listed for sale',
                 sold: 'Sold'
             };
 
@@ -281,13 +281,12 @@
 
             function prepareGalleryArtwork(artwork = {}) {
                 const metadataMissing = artwork.source === 'v41_projection' && !hasSafeMedia(artwork);
+                const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(artwork);
                 return {
                     ...artwork,
                     file_url: artwork.file_url || artwork.media_url || '',
                     gallery_metadata_missing: metadataMissing,
-                    gallery_status_label: metadataMissing
-                        ? 'Metadata unavailable'
-                        : friendlyStatusLabel(artwork.status),
+                    gallery_status_label: presentationStatus?.label || friendlyStatusLabel(artwork.status),
                     gallery_message: metadataMissing
                         ? 'This artwork is on-chain, but its media URL is unavailable.'
                         : ''
