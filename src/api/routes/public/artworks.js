@@ -152,33 +152,77 @@ async function loadMetadata(metadataUri) {
   }
 }
 
-function getMediaUrl(metadata = {}) {
+function getMediaType(metadata = {}, mediaUrl = '') {
+  const explicitTypes = [
+    metadata.media_type,
+    metadata.file_type,
+    metadata.mime_type,
+    metadata.properties?.media_type,
+    metadata.properties?.mime_type
+  ].map(value => normalizeText(value).toLowerCase()).filter(Boolean);
+  const urls = [
+    mediaUrl,
+    metadata.animation_url,
+    metadata.media_url,
+    metadata.file_url,
+    metadata.image,
+    metadata.image_url,
+    metadata.properties?.animation_url,
+    metadata.properties?.media_url,
+    metadata.properties?.image
+  ].map(value => normalizeText(value).toLowerCase()).filter(Boolean);
+
+  if (explicitTypes.some(type => type.includes('video')) || urls.some(url => /\.(mp4|webm|mov)(\?|$)/.test(url))) return 'video';
+  if (explicitTypes.some(type => type.includes('audio') || type.includes('music')) || urls.some(url => /\.(mp3|wav|ogg|aac|m4a)(\?|$)/.test(url))) return 'audio';
+  if (explicitTypes.some(type => type.includes('gif')) || urls.some(url => /\.gif(\?|$)/.test(url))) return 'gif';
+  if (explicitTypes.some(type => type.includes('image')) || metadata.image || metadata.image_url || metadata.properties?.image) return 'image';
+  return 'unknown';
+}
+
+function getMediaTypeFromUrl(value = '') {
+  const url = normalizeText(value).toLowerCase();
+  if (/\.(mp4|webm|mov)(\?|$)/.test(url)) return 'video';
+  if (/\.(mp3|wav|ogg|aac|m4a)(\?|$)/.test(url)) return 'audio';
+  if (/\.gif(\?|$)/.test(url)) return 'gif';
+  if (/\.(jpg|jpeg|png|webp|avif|svg)(\?|$)/.test(url)) return 'image';
+  return 'unknown';
+}
+
+function getMediaUrl(metadata = {}, mediaType = getMediaType(metadata)) {
+  if (mediaType === 'video' || mediaType === 'audio') {
+    const playbackCandidates = [
+      metadata.animation_url,
+      metadata.media_url,
+      metadata.file_url,
+      metadata.properties?.animation_url,
+      metadata.properties?.media_url
+    ].map(normalizeText).filter(Boolean);
+    return playbackCandidates.find(url => getMediaTypeFromUrl(url) === mediaType) ||
+      playbackCandidates.find(url => getMediaTypeFromUrl(url) === 'unknown') || '';
+  }
+
   return normalizeText(
     metadata.image ||
     metadata.image_url ||
+    metadata.file_url ||
     metadata.media_url ||
-    metadata.animation_url ||
     metadata.properties?.image ||
-    metadata.properties?.media_url
+    metadata.properties?.media_url ||
+    metadata.animation_url ||
+    metadata.properties?.animation_url
   );
 }
 
-function getMediaType(metadata = {}, mediaUrl = '') {
-  const explicit = normalizeText(
-    metadata.media_type ||
-    metadata.file_type ||
-    metadata.mime_type ||
-    metadata.properties?.media_type ||
-    metadata.properties?.mime_type
-  ).toLowerCase();
-  if (explicit.includes('video')) return 'video';
-  if (explicit.includes('audio') || explicit.includes('music')) return 'audio';
-  if (explicit.includes('image')) return 'image';
-
-  const url = mediaUrl.toLowerCase();
-  if (/\.(mp4|webm|mov)(\?|$)/.test(url)) return 'video';
-  if (/\.(mp3|wav|ogg|aac|m4a)(\?|$)/.test(url)) return 'audio';
-  return 'image';
+function getPosterUrl(metadata = {}, mediaUrl = '') {
+  const poster = normalizeText(
+    metadata.image ||
+    metadata.image_url ||
+    metadata.poster_url ||
+    metadata.thumbnail_url ||
+    metadata.properties?.image ||
+    metadata.properties?.poster_url
+  );
+  return poster && poster !== mediaUrl ? poster : '';
 }
 
 function getAIValueGuidance(metadata = {}) {
@@ -389,8 +433,11 @@ async function toPublicCard(artwork, maps) {
   };
   const moderation = maps.moderation.get(keyFor(chain, artworkId));
   const metadata = await loadMetadata(artwork.metadata_uri);
-  const rawMediaUrl = getMediaUrl(metadata);
+  const mediaType = getMediaType(metadata);
+  const rawMediaUrl = getMediaUrl(metadata, mediaType);
   const mediaUrl = toHttpUri(rawMediaUrl) || rawMediaUrl;
+  const rawPosterUrl = getPosterUrl(metadata, rawMediaUrl);
+  const posterUrl = toHttpUri(rawPosterUrl) || rawPosterUrl;
   const status = statusFromProjection(artwork, auction, resale);
   const title = normalizeText(metadata.name || metadata.title) || `Artwork #${artworkId}`;
   const description = normalizeText(metadata.description) || 'Protocol-backed ArtSoul testnet artwork.';
@@ -417,8 +464,12 @@ async function toPublicCard(artwork, maps) {
     creator_id: artwork.creator,
     media_url: mediaUrl,
     file_url: mediaUrl,
-    media_type: getMediaType(metadata, mediaUrl),
-    file_type: getMediaType(metadata, mediaUrl),
+    animation_url: ['video', 'audio'].includes(mediaType) ? mediaUrl : null,
+    image: posterUrl || (['image', 'gif'].includes(mediaType) ? mediaUrl : null),
+    image_url: posterUrl || null,
+    poster_url: posterUrl || null,
+    media_type: mediaType,
+    file_type: mediaType,
     ai_guidance: getAIValueGuidance(metadata),
     metadata_uri: artwork.metadata_uri,
     status,
