@@ -84,42 +84,46 @@
         return Boolean(artwork.minted) || Boolean(artwork.token_id || artwork.tokenId);
     }
 
+    function isListedForSale(artwork = {}) {
+        const listingStatus = normalize(artwork.listing_status || artwork.resale_status || artwork.status);
+        const listingPrice = toNumber(artwork.sale_price || artwork.resale_price || artwork.listing_price);
+        const discoveryTab = window.ArtSoulDiscovery?.galleryTabForArtwork?.(artwork);
+        return isMinted(artwork) && listingPrice > 0 && (
+            discoveryTab === 'marketplace' ||
+            ['for_sale', 'listed', 'resale_listed', 'active'].includes(listingStatus)
+        );
+    }
+
     function statusInfo(artwork = {}) {
         const status = normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state || artwork.nft_status);
         const endTime = toTimestamp(artwork.auction_end_time || artwork.end_time || artwork.endTime);
         const expired = Boolean(endTime && endTime <= Date.now());
         const hasBid = hasWinnerOrBid(artwork);
         const minted = isMinted(artwork);
+        const noBids = status.includes('no_bid');
+        const ended = status === 'awaiting_end' || status === 'auction_ended' || status === 'ended';
+        const defaulted = status.includes('default') || status.includes('unsettled');
+        const awaitingSettlement = status.includes('settlement_pending') || status === 'waiting_payment';
         const pendingCreated = toTimestamp(artwork.created_at || artwork.createdAt || artwork.saved_at || artwork.savedAt);
         const recentPending = artwork.source === 'pending_indexer' && (!pendingCreated || Date.now() - pendingCreated <= RECENT_PENDING_MS);
 
         if (recentPending) return { key: 'finalizing', label: 'Finalizing...' };
-        if (status.includes('default') || status.includes('unsettled')) return { key: 'unsettled', label: 'Auction unsettled' };
+        if (isListedForSale(artwork)) return { key: 'listed', label: 'Listed for sale' };
         if (minted || status === 'sold' || status === 'settled') return { key: 'sold', label: 'Sold' };
-        if ((status.includes('settlement') || status === 'awaiting_end' || status === 'auction_ended') && hasBid) {
+        if (awaitingSettlement) return { key: 'awaiting_settlement', label: 'Awaiting settlement' };
+        if (noBids || ((expired || ended || defaulted) && !hasBid)) {
+            return { key: 'ended_no_bids', label: 'Ended — no bids' };
+        }
+        if (defaulted) return { key: 'unsettled', label: 'Auction unsettled' };
+        if ((expired || ended) && hasBid) {
             return { key: 'ended', label: 'Auction Ended' };
         }
-        if (expired && !hasBid) return { key: 'ended_no_bids', label: 'Ended - no bids' };
         if (activeAuctionId(artwork) && !expired && !minted) return { key: 'live', label: 'Live Auction' };
-        return { key: minted ? 'minted' : 'not_minted', label: minted ? 'Minted' : 'Not yet minted' };
+        return { key: 'not_minted', label: 'Not yet minted' };
     }
 
     function discoveryStatusInfo(artwork = {}) {
-        const status = statusInfo(artwork);
-        const rawStatus = normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state || artwork.nft_status);
-
-        if (status.key === 'live') return { key: 'live', label: 'Live Auction' };
-        if (isMinted(artwork)) return { key: 'minted', label: 'NFT' };
-        if (
-            ['ended', 'ended_no_bids', 'unsettled'].includes(status.key) ||
-            rawStatus.includes('ended') ||
-            rawStatus.includes('default') ||
-            rawStatus.includes('settlement') ||
-            rawStatus === 'awaiting_end'
-        ) {
-            return { key: 'ended', label: 'Ended' };
-        }
-        return { key: 'art', label: 'Art' };
+        return statusInfo(artwork);
     }
 
     function formatPrice(artwork = {}) {
@@ -398,6 +402,7 @@
         ReactCard,
         statusInfo,
         discoveryStatusInfo,
+        isListedForSale,
         isHidden,
         identityKeys,
         mediaUrl,

@@ -59,7 +59,7 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=2"></script>
+    <script src="src/ui/components/artwork-card.js?v=5"></script>
     <style>
         @keyframes profileAudioRotation {
             from { transform: rotate(0deg); }
@@ -571,28 +571,10 @@
             }
 
             function getProfileArtworkStatus(artwork = {}) {
-                const rawStatus = String(artwork.status || artwork.auction_state || '').toLowerCase();
-                const sharedStatus = window.ArtSoulArtworkCard?.statusInfo?.(artwork) || {};
-
-                if (isMintedArtwork(artwork) || sharedStatus.key === 'sold' || sharedStatus.key === 'minted') {
-                    return { key: 'sold', label: 'Sold' };
-                }
-                if (sharedStatus.key === 'ended_no_bids' || rawStatus.includes('no_bids')) {
-                    return { key: 'ended_no_bids', label: 'Ended — no bids' };
-                }
-                if (
-                    sharedStatus.key === 'unsettled' ||
-                    sharedStatus.key === 'ended' ||
-                    rawStatus.includes('default') ||
-                    rawStatus.includes('settlement') ||
-                    rawStatus === 'awaiting_end'
-                ) {
-                    return { key: 'unsettled', label: 'Auction unsettled' };
-                }
-                if (sharedStatus.key === 'live') {
-                    return { key: 'live', label: 'Live Auction' };
-                }
-                return { key: 'not_minted', label: 'Not yet minted' };
+                return window.ArtSoulArtworkCard?.statusInfo?.(artwork) || {
+                    key: 'not_minted',
+                    label: 'Not yet minted'
+                };
             }
 
             function getProfileArtworkPrice(artwork = {}) {
