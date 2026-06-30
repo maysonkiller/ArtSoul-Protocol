@@ -992,30 +992,11 @@
         };
 
         function hasRenderableArtworkMedia(art) {
-            const mediaUrl = art?.file_url || art?.media_url || art?.image_url || art?.image;
-            const hasSafeMedia = Boolean(mediaUrl) && (
-                typeof window.ArtSoulSecurity?.isValidStorageUrl !== 'function' ||
-                window.ArtSoulSecurity.isValidStorageUrl(mediaUrl)
-            );
-            const placeholdersEnabled = (() => {
-                try {
-                    const params = new URLSearchParams(window.location.search || '');
-                    return params.get('showPlaceholders') === '1' ||
-                        params.get('debugProtocol') === '1' ||
-                        localStorage.getItem('artsoul_show_protocol_placeholders') === 'true';
-                } catch {
-                    return false;
-                }
-            })();
-
             return Boolean(
                 art &&
                 art.id &&
                 art.title &&
-                (
-                    hasSafeMedia ||
-                    (art.source === 'v41_projection' && placeholdersEnabled)
-                )
+                window.ArtSoulArtworkCard?.hasSafeMedia?.(art)
             );
         }
 
@@ -1132,11 +1113,9 @@
 
                 for (const slot of slots) {
                         const art = slot.artwork;
-                        const sharedCard = window.ArtSoulArtworkCard?.createCardElement?.(art, {
-                            minimal: true
-                        });
-                        if (sharedCard) {
-                            gallery.appendChild(sharedCard);
+                        if (window.ArtSoulArtworkCard?.createCardElement) {
+                            const sharedCard = window.ArtSoulArtworkCard.createCardElement(art, { minimal: true });
+                            if (sharedCard) gallery.appendChild(sharedCard);
                             continue;
                         }
                         const socialSignals = window.ArtSoulDiscovery?.getSocialSignals?.(art) || {

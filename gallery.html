@@ -266,13 +266,13 @@
             // Plain-English labels for the contract-y projection statuses.
             // Display only — does NOT change the underlying status logic.
             const GALLERY_STATUS_LABELS = {
-                auction: 'Live Auction',
-                awaiting_end: 'Auction Ended',
-                settlement_pending: 'Awaiting settlement',
-                defaulted: 'Auction unsettled',
-                defaulted_no_bids: 'Ended — no bids',
-                ended_no_bids: 'Ended — no bids',
-                for_sale: 'Listed for sale',
+                auction: 'Live',
+                awaiting_end: 'Awaiting payment',
+                settlement_pending: 'Awaiting payment',
+                defaulted: 'Unsettled',
+                defaulted_no_bids: 'No bids',
+                ended_no_bids: 'No bids',
+                for_sale: 'For sale',
                 sold: 'Sold'
             };
 
@@ -369,6 +369,9 @@
                     artwork.is_blocked !== true &&
                     artwork.is_deleted !== true
                 );
+                result = result.filter(artwork => (
+                    window.ArtSoulArtworkCard?.hasSafeMedia?.(artwork) ?? hasSafeMedia(artwork)
+                ));
                 if (window.ArtSoulDiscovery?.filterForGalleryTab) {
                     result = window.ArtSoulDiscovery.filterForGalleryTab(result, activeTab);
                 }
@@ -537,7 +540,7 @@
                                 >
                                     <option value="all">All Status</option>
                                     <option value="draft">Draft</option>
-                                    <option value="auction">Live Auction</option>
+                                    <option value="auction">Live</option>
                                     <option value="sold">Sold</option>
                                 </select>
 
@@ -663,7 +666,6 @@
                                                 key={artwork.id}
                                                 artwork={artwork}
                                                 minimal={true}
-                                                showSignals={activeTab === 'discover'}
                                                 onOpen={() => window.location.href = `artwork.html?id=${artwork.id}`}
                                             />
                                         );

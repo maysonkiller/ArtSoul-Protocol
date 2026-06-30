@@ -671,6 +671,7 @@
             const isUploadPage = currentPath.includes('upload.html');
             const isDocsPage = currentPath.includes('docs.html');
             const isProfilePage = currentPath.includes('profile.html');
+            const guestAvatarFallback = this.getDefaultAvatar();
 
             container.innerHTML = `
                 <div class="avatar-dropdown-container" style="position: relative;">
@@ -691,8 +692,9 @@
                         "
                     >
                         <img
-                            src="${this.getDefaultAvatar()}"
+                            src="/default-avatar.png"
                             alt="ArtSoul"
+                            onerror="this.onerror=null;this.src='${guestAvatarFallback}'"
                             style="width: 40px; height: 40px; border-radius: 9999px; object-fit: cover; flex-shrink: 0;"
                         />
                         <div class="avatar-info" style="text-align: left;">
