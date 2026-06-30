@@ -49,8 +49,40 @@
             artwork?.is_deleted === true;
     }
 
+    function mediaCandidates(artwork = {}) {
+        return [artwork.animation_url, artwork.file_url, artwork.media_url, artwork.image, artwork.image_url]
+            .filter(Boolean)
+            .map(String);
+    }
+
+    function mediaTypeFromUrl(value = '') {
+        const url = normalize(value);
+        if (/\.(mp4|webm|mov|avi|mkv)(\?|$)/.test(url)) return 'video';
+        if (/\.(mp3|wav|ogg|aac|m4a|flac)(\?|$)/.test(url)) return 'audio';
+        return '';
+    }
+
+    function mediaType(artwork = {}) {
+        const type = normalize(artwork.file_type || artwork.media_type || artwork.mime_type);
+        const urlTypes = mediaCandidates(artwork).map(mediaTypeFromUrl);
+        if (type.includes('video') || ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(type) || urlTypes.includes('video')) return 'video';
+        if (type.includes('audio') || type === 'music' || ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'].includes(type) || urlTypes.includes('audio')) return 'audio';
+        return 'image';
+    }
+
     function mediaUrl(artwork = {}) {
-        return artwork.file_url || artwork.media_url || artwork.image || artwork.animation_url || '';
+        const type = mediaType(artwork);
+        const candidates = mediaCandidates(artwork);
+        if (type === 'video' || type === 'audio') {
+            return candidates.find(candidate => mediaTypeFromUrl(candidate) === type) || candidates[0] || '';
+        }
+        return artwork.image || artwork.image_url || artwork.file_url || artwork.media_url || artwork.animation_url || '';
+    }
+
+    function posterUrl(artwork = {}) {
+        const media = normalize(mediaUrl(artwork));
+        const candidate = artwork.poster_url || artwork.thumbnail_url || artwork.preview_image || artwork.image || artwork.image_url || '';
+        return candidate && normalize(candidate) !== media ? candidate : '';
     }
 
     function hasSafeMedia(artwork = {}) {
@@ -60,12 +92,19 @@
             window.ArtSoulSecurity.isValidStorageUrl(url);
     }
 
-    function mediaType(artwork = {}) {
-        const type = normalize(artwork.file_type || artwork.media_type || artwork.mime_type);
-        const url = normalize(mediaUrl(artwork));
-        if (type.includes('video') || ['mp4', 'webm', 'mov'].includes(type) || /\.(mp4|webm|mov)(\?|$)/.test(url)) return 'video';
-        if (type.includes('audio') || type === 'music' || ['mp3', 'wav', 'ogg', 'aac', 'm4a'].includes(type) || /\.(mp3|wav|ogg|aac|m4a)(\?|$)/.test(url)) return 'audio';
-        return 'image';
+    function stopCardActivation(event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    function stopCardPropagation(event) {
+        event.stopPropagation();
+    }
+
+    function pauseOtherMedia(currentMedia) {
+        document.querySelectorAll('audio, video').forEach(media => {
+            if (media !== currentMedia && !media.paused) media.pause();
+        });
     }
 
     function hasWinnerOrBid(artwork = {}) {
@@ -176,9 +215,12 @@
         return placeholder;
     }
 
-    function prepareVideoPreview(video) {
+    function prepareVideoPreview(video, artwork = {}) {
         if (!video || video.dataset.artsoulPreviewPrepared === 'true') return;
         video.dataset.artsoulPreviewPrepared = 'true';
+
+        const poster = posterUrl(artwork);
+        if (poster) video.poster = poster;
 
         const renderFirstFrame = () => {
             const duration = Number(video.duration);
@@ -212,18 +254,52 @@
             const video = document.createElement('video');
             video.src = url;
             video.className = 'artsoul-card-media-object';
-            video.controls = true;
-            video.preload = 'metadata';
-            video.poster = 'ARTSOULlogo-clean.png';
-            video.muted = true;
+            video.preload = 'auto';
+            video.poster = posterUrl(artwork) || 'ARTSOULlogo-clean.png';
             video.playsInline = true;
-            prepareVideoPreview(video);
-            video.addEventListener('click', event => event.stopPropagation());
-            container.appendChild(video);
+            video.style.pointerEvents = 'none';
+            prepareVideoPreview(video, artwork);
+            const frame = document.createElement('div');
+            frame.className = 'artsoul-card-video-frame';
+            frame.appendChild(video);
             const badge = document.createElement('span');
             badge.className = 'artsoul-card-media-badge';
             badge.textContent = 'VIDEO';
-            container.appendChild(badge);
+            frame.appendChild(badge);
+            const controls = document.createElement('div');
+            controls.className = 'artsoul-card-media-controls';
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'artsoul-media-toggle';
+            toggle.dataset.state = 'paused';
+            toggle.setAttribute('aria-label', 'Play video preview');
+            const progress = document.createElement('input');
+            progress.type = 'range';
+            progress.className = 'artsoul-media-progress';
+            progress.min = '0'; progress.max = '1'; progress.step = '0.01'; progress.value = '0'; progress.disabled = true;
+            progress.setAttribute('aria-label', 'Video progress');
+            [controls, toggle, progress].forEach(control => {
+                control.addEventListener('click', stopCardActivation);
+                control.addEventListener('pointerdown', stopCardPropagation);
+                control.addEventListener('touchstart', stopCardPropagation);
+            });
+            toggle.addEventListener('click', () => video.paused ? video.play().catch(() => {}) : video.pause());
+            const sync = () => {
+                const playing = !video.paused && !video.ended;
+                toggle.dataset.state = playing ? 'playing' : 'paused';
+                toggle.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} video preview`);
+            };
+            video.addEventListener('play', () => { pauseOtherMedia(video); sync(); });
+            video.addEventListener('pause', sync);
+            video.addEventListener('ended', sync);
+            video.addEventListener('loadedmetadata', () => {
+                if (Number.isFinite(video.duration) && video.duration > 0) { progress.max = String(video.duration); progress.disabled = false; }
+            });
+            video.addEventListener('timeupdate', () => { progress.value = String(video.currentTime || 0); });
+            progress.addEventListener('input', () => { video.currentTime = Number(progress.value) || 0; });
+            controls.append(toggle, progress);
+            container.classList.add('artsoul-card-media-video');
+            container.append(frame, controls);
             return container;
         }
 
@@ -233,12 +309,38 @@
             const label = document.createElement('div');
             label.className = 'artsoul-card-audio-label';
             label.textContent = 'AUDIO';
+            const avatar = document.createElement('img');
+            avatar.className = 'artsoul-card-audio-avatar';
+            avatar.src = 'ARTSOULlogo.png';
+            avatar.alt = '';
+            avatar.dataset.playing = 'false';
             const audio = document.createElement('audio');
             audio.src = url;
-            audio.controls = true;
             audio.preload = 'metadata';
-            audio.addEventListener('click', event => event.stopPropagation());
+            audio.className = 'artsoul-card-audio-element';
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'artsoul-media-toggle';
+            toggle.dataset.state = 'paused';
+            toggle.setAttribute('aria-label', 'Play audio preview');
+            [toggle].forEach(control => {
+                control.addEventListener('click', stopCardActivation);
+                control.addEventListener('pointerdown', stopCardPropagation);
+                control.addEventListener('touchstart', stopCardPropagation);
+            });
+            toggle.addEventListener('click', () => audio.paused ? audio.play().catch(() => {}) : audio.pause());
+            const sync = () => {
+                const playing = !audio.paused && !audio.ended;
+                avatar.dataset.playing = String(playing);
+                toggle.dataset.state = playing ? 'playing' : 'paused';
+                toggle.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} audio preview`);
+            };
+            audio.addEventListener('play', () => { pauseOtherMedia(audio); sync(); });
+            audio.addEventListener('pause', sync);
+            audio.addEventListener('ended', sync);
             audioWrap.appendChild(label);
+            audioWrap.appendChild(avatar);
+            audioWrap.appendChild(toggle);
             audioWrap.appendChild(audio);
             container.appendChild(audioWrap);
             return container;
@@ -322,41 +424,73 @@
             );
         }
         const type = mediaType(artwork);
-        if (type === 'video') {
-            return h('div', { className: 'artsoul-card-media' },
-                h('video', {
-                    src: url,
-                    className: 'artsoul-card-media-object',
-                    preload: 'metadata',
-                    poster: 'ARTSOULlogo-clean.png',
-                    muted: true,
-                    controls: true,
-                    playsInline: true,
-                    onLoadedMetadata: event => prepareVideoPreview(event.currentTarget),
-                    onClick: event => event.stopPropagation()
-                }),
-                h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO')
-            );
-        }
-        if (type === 'audio') {
-            return h('div', { className: 'artsoul-card-media' },
-                h('div', { className: 'artsoul-card-audio' },
-                    h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
-                    h('audio', {
-                        src: url,
-                        controls: true,
-                        preload: 'metadata',
-                        onClick: event => event.stopPropagation()
-                    })
-                )
-            );
-        }
+        if (type === 'video') return h(ReactVideoPreview, { artwork, url });
+        if (type === 'audio') return h(ReactAudioPreview, { artwork, url });
         return h('div', { className: 'artsoul-card-media' },
             h('img', {
                 src: url,
                 alt: artwork.title || 'Artwork',
                 className: 'artsoul-card-media-object'
             })
+        );
+    }
+
+    function ReactVideoPreview({ artwork, url }) {
+        const React = window.React;
+        const h = React.createElement;
+        const ref = React.useRef(null);
+        const [playing, setPlaying] = React.useState(false);
+        const [duration, setDuration] = React.useState(0);
+        const [time, setTime] = React.useState(0);
+        React.useEffect(() => () => ref.current?.pause(), [url]);
+        const toggle = event => {
+            stopCardActivation(event);
+            const video = ref.current;
+            if (video) video.paused ? video.play().catch(() => setPlaying(false)) : video.pause();
+        };
+        return h('div', { className: 'artsoul-card-media artsoul-card-media-video' },
+            h('div', { className: 'artsoul-card-video-frame' },
+                h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'auto', playsInline: true,
+                    poster: posterUrl(artwork) || 'ARTSOULlogo-clean.png', style: { pointerEvents: 'none' },
+                    onLoadedMetadata: event => { prepareVideoPreview(event.currentTarget, artwork); setDuration(event.currentTarget.duration || 0); },
+                    onTimeUpdate: event => setTime(event.currentTarget.currentTime || 0),
+                    onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
+                    onPause: () => setPlaying(false), onEnded: () => setPlaying(false) }),
+                h('span', { className: 'artsoul-card-media-badge' }, 'VIDEO')
+            ),
+            h('div', { className: 'artsoul-card-media-controls', onClick: stopCardActivation, onPointerDown: stopCardPropagation, onTouchStart: stopCardPropagation },
+                h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-state': playing ? 'playing' : 'paused',
+                    'aria-label': `${playing ? 'Pause' : 'Play'} video preview`, onClick: toggle }),
+                h('input', { type: 'range', className: 'artsoul-media-progress', min: 0, max: duration || 1, step: 0.01,
+                    value: Math.min(time, duration || 1), disabled: !duration, 'aria-label': 'Video progress',
+                    onChange: event => { event.stopPropagation(); if (ref.current) ref.current.currentTime = Number(event.currentTarget.value) || 0; },
+                    onClick: stopCardActivation, onPointerDown: stopCardPropagation, onTouchStart: stopCardPropagation })
+            )
+        );
+    }
+
+    function ReactAudioPreview({ artwork, url }) {
+        const React = window.React;
+        const h = React.createElement;
+        const ref = React.useRef(null);
+        const [playing, setPlaying] = React.useState(false);
+        React.useEffect(() => () => ref.current?.pause(), [url]);
+        const toggle = event => {
+            stopCardActivation(event);
+            const audio = ref.current;
+            if (audio) audio.paused ? audio.play().catch(() => setPlaying(false)) : audio.pause();
+        };
+        return h('div', { className: 'artsoul-card-media' },
+            h('div', { className: 'artsoul-card-audio' },
+                h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
+                h('img', { src: 'ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', 'data-playing': String(playing) }),
+                h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-state': playing ? 'playing' : 'paused',
+                    'aria-label': `${playing ? 'Pause' : 'Play'} audio preview`, onClick: toggle,
+                    onPointerDown: stopCardPropagation, onTouchStart: stopCardPropagation }),
+                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'metadata',
+                    onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
+                    onPause: () => setPlaying(false), onEnded: () => setPlaying(false) })
+            )
         );
     }
 
@@ -400,12 +534,14 @@
     window.ArtSoulArtworkCard = {
         createCardElement,
         ReactCard,
+        ReactMedia,
         statusInfo,
         discoveryStatusInfo,
         isListedForSale,
         isHidden,
         identityKeys,
         mediaUrl,
+        posterUrl,
         mediaType,
         hasSafeMedia,
         detailHref,

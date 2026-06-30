@@ -39,7 +39,7 @@
     <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=15">
+    <link rel="stylesheet" href="unified-styles.css?v=16">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -63,7 +63,7 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=5"></script>
+    <script src="src/ui/components/artwork-card.js?v=6"></script>
     <script src="avatar-dropdown.js?v=12"></script>
     <script type="module" src="appkit-init.js?v=15"></script>
     <script src="contracts-config.js?v=1"></script>
@@ -356,13 +356,19 @@ body.classic {
         }
 
         // Media Viewer Component - supports images, videos, audio, GIFs
-        function MediaViewer({ url, fileType, title }) {
+        function MediaViewer({ url, fileType, title, artworkData = {} }) {
             const [mediaError, setMediaError] = React.useState(false);
             const [isPlaying, setIsPlaying] = React.useState(false);
 
             const getMediaType = () => {
                 const type = fileType?.toLowerCase() || '';
                 const urlLower = url?.toLowerCase() || '';
+                const sharedType = window.ArtSoulArtworkCard?.mediaType?.({
+                    ...artworkData,
+                    file_url: url,
+                    file_type: fileType || artworkData.file_type || artworkData.media_type || artworkData.mime_type
+                });
+                if (sharedType) return sharedType;
 
                 // Video formats
                 if (type === 'video' || ['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(type) ||
@@ -2079,7 +2085,8 @@ body.classic {
                 )
                 : null;
             const settlementDeadlineMs = normalizeTimestampMs(settlementDeadlineValue);
-            const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(artwork.file_url) ? artwork.file_url : '';
+            const resolvedMediaUrl = window.ArtSoulArtworkCard?.mediaUrl?.(artwork) || artwork.file_url || artwork.media_url || artwork.animation_url || '';
+            const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(resolvedMediaUrl) ? resolvedMediaUrl : '';
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
             const canCreateNewAuction = walletRenderState.settled && canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
             const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(auction ? {
@@ -2105,8 +2112,9 @@ body.classic {
                                     {safeMediaUrl ? (
                                         <MediaViewer
                                             url={safeMediaUrl}
-                                            fileType={artwork.file_type}
+                                            fileType={artwork.file_type || artwork.media_type || artwork.mime_type}
                                             title={artwork.title}
+                                            artworkData={artwork}
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-black p-6">

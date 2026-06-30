@@ -35,7 +35,7 @@
     <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=15">
+    <link rel="stylesheet" href="unified-styles.css?v=16">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -59,7 +59,7 @@
     <script type="module" src="supabase-client.js"></script>
     <script type="module" src="supabase-auth.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="src/ui/components/artwork-card.js?v=5"></script>
+    <script src="src/ui/components/artwork-card.js?v=6"></script>
     <style>
         @keyframes profileAudioRotation {
             from { transform: rotate(0deg); }
@@ -590,58 +590,8 @@
             }
 
             function ProfileArtworkMedia({ artwork }) {
-                const [mediaFailed, setMediaFailed] = useState(false);
-                const mediaUrl = window.ArtSoulArtworkCard?.mediaUrl?.(artwork) || artwork.file_url || artwork.media_url || '';
-                const mediaType = window.ArtSoulArtworkCard?.mediaType?.(artwork) || 'image';
-                const safeMedia = window.ArtSoulArtworkCard?.hasSafeMedia?.(artwork) !== false;
-
-                if (mediaType === 'audio') {
-                    return (
-                        <div className="artsoul-card-media">
-                            <div className="profile-audio-thumbnail">
-                                <img className="profile-audio-logo" src="ARTSOULlogo.png" alt="Audio artwork" />
-                            </div>
-                        </div>
-                    );
-                }
-
-                if (!mediaUrl || !safeMedia || mediaFailed) {
-                    return (
-                        <div className="artsoul-card-media">
-                            <div className="profile-media-fallback">
-                                <img src="ARTSOULlogo-clean.png" alt="ArtSoul artwork" />
-                            </div>
-                        </div>
-                    );
-                }
-
-                if (mediaType === 'video') {
-                    return (
-                        <div className="artsoul-card-media">
-                            <video
-                                src={mediaUrl}
-                                className="artsoul-card-media-object"
-                                preload="metadata"
-                                poster="ARTSOULlogo-clean.png"
-                                muted
-                                playsInline
-                                onLoadedMetadata={(event) => window.ArtSoulArtworkCard?.prepareVideoPreview?.(event.currentTarget)}
-                                onError={() => setMediaFailed(true)}
-                            />
-                        </div>
-                    );
-                }
-
-                return (
-                    <div className="artsoul-card-media">
-                        <img
-                            src={mediaUrl}
-                            alt={artwork.title || 'Artwork'}
-                            className="artsoul-card-media-object"
-                            onError={() => setMediaFailed(true)}
-                        />
-                    </div>
-                );
+                const SharedMedia = window.ArtSoulArtworkCard?.ReactMedia;
+                return SharedMedia ? <SharedMedia artwork={artwork} /> : null;
             }
 
             function ProfileArtworkCard({ artwork }) {
