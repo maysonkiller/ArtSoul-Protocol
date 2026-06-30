@@ -400,6 +400,144 @@ body.future .artwork-detail-frame {
     padding: 14px;
 }
 
+.reauction-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: color-mix(in srgb, var(--c-bg) 84%, transparent);
+    overflow-y: auto;
+}
+
+.reauction-modal {
+    width: min(100%, 560px);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: clamp(20px, 4vw, 32px);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    box-shadow: 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
+}
+
+.future .reauction-modal {
+    box-shadow: 0 0 28px var(--c-glow), 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
+}
+
+.reauction-modal-header,
+.reauction-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.reauction-modal-header {
+    margin-bottom: 24px;
+}
+
+.reauction-modal-header h2 {
+    margin: 2px 0 0;
+    color: var(--c-text);
+    font-size: clamp(24px, 5vw, 32px);
+    line-height: 1.15;
+}
+
+.reauction-modal-eyebrow,
+.reauction-estimate-title {
+    color: var(--c-accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.reauction-modal-close {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 50%;
+    background: var(--c-surface-muted);
+    color: var(--c-text);
+    font-size: 24px;
+    line-height: 1;
+}
+
+.reauction-field-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--c-text);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.reauction-fieldset {
+    margin-top: 20px;
+}
+
+.reauction-estimate {
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 12px;
+    background: var(--c-surface-muted);
+    color: var(--c-text);
+}
+
+.reauction-estimate p {
+    margin: 8px 0 0;
+}
+
+.reauction-estimate-range {
+    color: var(--c-accent);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.reauction-estimate-rationale,
+.reauction-estimate-note {
+    opacity: 0.72;
+}
+
+.reauction-estimate-note {
+    font-size: 12px;
+}
+
+.reauction-modal-actions {
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+.reauction-modal-actions .btn-main,
+.reauction-modal-actions .btn-secondary {
+    min-width: 128px;
+}
+
+@media (max-width: 600px) {
+    .reauction-modal-backdrop {
+        align-items: flex-end;
+        padding: 12px;
+    }
+
+    .reauction-modal {
+        width: 100%;
+        max-height: calc(100vh - 24px);
+        border-radius: 14px;
+    }
+
+    .reauction-modal-actions .btn-main,
+    .reauction-modal-actions .btn-secondary {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
 .artsoul-artwork-card-minimal .artsoul-card-body {
     min-height: 86px;
 }
