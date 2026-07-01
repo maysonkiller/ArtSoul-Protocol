@@ -1,4 +1,4 @@
-import React from 'react';
+import { React } from './react-runtime.js';
 
 function SkeletonBlock({ className = '' }) {
     return <div className={`artsoul-skeleton ${className}`.trim()} aria-hidden="true"></div>;
