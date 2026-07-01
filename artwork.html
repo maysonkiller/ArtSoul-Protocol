@@ -39,7 +39,7 @@
     <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=19">
+    <link rel="stylesheet" href="unified-styles.css?v=20">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -2404,12 +2404,16 @@ body.classic {
                                         <div><strong>{socialSignals.wouldBuy || 0}</strong><span>Would Buy</span></div>
                                         <div><strong>{socialSignals.watching || 0}</strong><span>Watching</span></div>
                                     </div>
-                                    {userVote ? <p className="artwork-page-saved">You voted</p> : <button onClick={handleVote} className="btn-main w-full">Like</button>}
                                     <div className="artwork-page-discovery-actions">
-                                        <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'} disabled={interactionState.would_buy}>
+                                        {userVote ? (
+                                            <p className="artwork-page-saved artwork-page-action-control">You voted</p>
+                                        ) : (
+                                            <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
+                                        )}
+                                        <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.would_buy}>
                                             {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
                                         </button>
-                                        <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'} disabled={interactionState.watching}>
+                                        <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.watching}>
                                             {interactionState.watching ? 'Watching Saved' : 'Watching'}
                                         </button>
                                     </div>
@@ -2429,17 +2433,6 @@ body.classic {
 
                             {/* Artwork Info */}
                             <aside className="artwork-page-right">
-                                {/* Title & Description */}
-                                <div className="artwork-page-legacy-summary" aria-hidden="true">
-                                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                                        <h1 className="artwork-detail-title text-4xl font-bold">{artwork.title}</h1>
-                                        <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
-                                            {presentationStatus.label}
-                                        </span>
-                                    </div>
-                                    <p className="opacity-70">{artwork.description}</p>
-                                </div>
-
                                 {moderationAccess?.canModerate && (
                                     <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -2534,7 +2527,7 @@ body.classic {
                                                 const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
                                                 window.open(twitterUrl, '_blank', 'width=550,height=420');
                                             }}
-                                            className={`btn-main w-full flex items-center justify-center gap-2`}
+                                            className="btn-secondary artwork-page-compact-action artwork-page-share flex items-center justify-center gap-2"
                                             title="Share on X"
                                         >
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -2548,12 +2541,7 @@ body.classic {
                                 {/* Auction Info */}
                                 {auction && (
                                     <div className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">
-                                        <div className="artwork-page-panel-heading">
-                                            <h3 className="text-2xl font-bold">Auction</h3>
-                                            <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
-                                                {presentationStatus.label}
-                                            </span>
-                                        </div>
+                                        <h3 className="text-2xl font-bold mb-4">Auction</h3>
 
                                         <div className="space-y-3">
                                             <div className="flex justify-between">
@@ -2681,7 +2669,7 @@ body.classic {
                                                 </div>
                                                 <button
                                                     onClick={handlePlaceBid}
-                                                    className="btn-main w-full"
+                                                    className="btn-main w-full artwork-page-primary-action"
                                                     disabled={isTransactionActionPending('bid')}
                                                     aria-busy={isTransactionActionPending('bid')}
                                                 >
@@ -2696,7 +2684,7 @@ body.classic {
                                         {canEndAuction && (
                                             <button
                                                 onClick={handleEndAuction}
-                                                className="btn-secondary w-full mt-4"
+                                                className="btn-secondary w-full mt-4 artwork-page-primary-action"
                                                 disabled={isTransactionActionPending('end-auction')}
                                                 aria-busy={isTransactionActionPending('end-auction')}
                                             >
@@ -2887,7 +2875,7 @@ body.classic {
                                 {/* Back Button */}
                                 <button
                                     onClick={() => window.history.back()}
-                                    className="btn-secondary w-full artwork-mobile-back"
+                                    className="btn-secondary artwork-page-compact-action artwork-mobile-back"
                                 >
                                     ← Back
                                 </button>
