@@ -3,8 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const artwork = fs.readFileSync(path.join(__dirname, '..', 'artwork.html'), 'utf8');
-const upload = fs.readFileSync(path.join(__dirname, '..', 'upload.html'), 'utf8');
+const artwork = fs.readFileSync(path.join(__dirname, '..', 'artwork.html'), 'utf8') +
+  fs.readFileSync(path.join(__dirname, '..', 'src', 'entries', 'artwork.jsx'), 'utf8');
+const upload = fs.readFileSync(path.join(__dirname, '..', 'upload.html'), 'utf8') +
+  fs.readFileSync(path.join(__dirname, '..', 'src', 'entries', 'upload.js'), 'utf8');
 
 function between(start, end) {
     const from = artwork.indexOf(start);
