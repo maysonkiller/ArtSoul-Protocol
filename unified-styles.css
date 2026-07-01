@@ -18,6 +18,311 @@
     --accent-future-2: #ff00bf;
 }
 
+/* Artwork detail page composition */
+.artwork-page-shell {
+    width: min(100%, 1500px);
+    margin: 0 auto;
+    padding: clamp(20px, 3vw, 48px);
+}
+
+.artwork-page-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+    gap: clamp(24px, 3vw, 48px);
+    align-items: start;
+}
+
+.artwork-page-left {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.8fr);
+    grid-template-areas:
+        "header header"
+        "media ai"
+        "media description"
+        "trust trust"
+        "extra extra";
+    gap: 20px;
+    min-width: 0;
+}
+
+.artwork-page-right {
+    position: sticky;
+    top: 92px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--c-border) transparent;
+}
+
+.artwork-page-header { grid-area: header; }
+.artwork-page-left .artwork-detail-stage { grid-area: media; }
+.artwork-page-ai { grid-area: ai; }
+.artwork-page-description { grid-area: description; }
+.artwork-page-trust { grid-area: trust; }
+.artwork-page-extra { grid-area: extra; }
+
+.artwork-page-header .artwork-detail-title {
+    margin: 0;
+    font-size: clamp(2.25rem, 4vw, 4.75rem);
+    line-height: 0.98;
+    letter-spacing: -0.04em;
+}
+
+.artwork-page-title-row,
+.artwork-page-panel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.artwork-page-title-row {
+    align-items: center;
+}
+
+.artwork-page-byline,
+.artwork-page-copy,
+.artwork-page-note {
+    margin: 0;
+    opacity: 0.76;
+}
+
+.artwork-page-byline {
+    margin-top: 8px;
+    font-size: 1.05rem;
+}
+
+.artwork-page-panel,
+.artwork-page-left .artwork-detail-frame {
+    border: 1px solid var(--c-border-soft);
+    border-radius: 14px;
+    background: var(--c-surface);
+}
+
+.artwork-page-panel {
+    padding: clamp(18px, 2vw, 26px);
+}
+
+.artwork-page-panel h2,
+.artwork-page-panel h3 {
+    margin: 0;
+}
+
+.artwork-page-kicker {
+    margin: 0 0 7px;
+    color: var(--c-accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.artwork-page-panel-heading {
+    margin-bottom: 16px;
+}
+
+.artwork-page-left .artwork-detail-stage {
+    display: flex;
+    width: 100%;
+    height: clamp(380px, 56vh, 610px);
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    background: var(--c-bg);
+}
+
+.artwork-page-left .artwork-detail-frame {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+body.future .artwork-page-left .artwork-detail-frame {
+    border-color: var(--c-border);
+    box-shadow: 0 0 30px var(--c-glow), 0 0 56px rgba(var(--c-accent-2-rgb), 0.15);
+}
+
+body.classic .artwork-page-left .artwork-detail-frame {
+    box-shadow: 0 0 20px var(--c-glow);
+}
+
+.artwork-page-ai {
+    border-color: var(--c-border);
+    background: linear-gradient(145deg, var(--c-surface), var(--c-surface-muted));
+}
+
+.artwork-page-ai-range {
+    margin: 10px 0 14px;
+    color: var(--c-accent);
+    font-size: clamp(1.7rem, 3vw, 2.6rem);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.artwork-page-copy + .artwork-page-copy {
+    margin-top: 10px;
+}
+
+.artwork-page-note {
+    margin-top: 14px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.artwork-page-chip {
+    flex: 0 0 auto;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    padding: 5px 9px;
+    background: var(--c-surface-muted);
+    color: var(--c-accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.artwork-page-signal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 18px 0 12px;
+}
+
+.artwork-page-signal-grid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 9px;
+    background: var(--c-surface-muted);
+    text-align: center;
+}
+
+.artwork-page-signal-grid strong {
+    font-size: 1.25rem;
+}
+
+.artwork-page-signal-grid span {
+    font-size: 0.72rem;
+    opacity: 0.7;
+}
+
+.artwork-page-discovery-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.artwork-page-saved {
+    margin: 8px 0;
+    text-align: center;
+    opacity: 0.72;
+}
+
+.artwork-page-detail-list {
+    display: grid;
+    grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
+    gap: 9px 18px;
+    margin: 18px 0 0;
+}
+
+.artwork-page-detail-list dt {
+    opacity: 0.62;
+}
+
+.artwork-page-detail-list dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+.artwork-page-right .artwork-mobile-auction { order: 1; }
+.artwork-page-right .artwork-mobile-auction-action { order: 2; }
+.artwork-page-right .artwork-mobile-people { order: 3; }
+.artwork-page-right .artwork-mobile-moderation { order: 4; }
+.artwork-page-right .artwork-mobile-back { order: 5; }
+
+.artwork-page-legacy-summary,
+.artwork-page-legacy-discovery {
+    display: none;
+}
+
+@media (max-width: 1180px) {
+    .artwork-page-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 390px);
+    }
+
+    .artwork-page-left {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "header"
+            "media"
+            "ai"
+            "description"
+            "trust"
+            "extra";
+    }
+
+    .artwork-page-left .artwork-detail-stage {
+        height: clamp(360px, 52vh, 540px);
+    }
+}
+
+@media (max-width: 900px) {
+    .artwork-page-shell {
+        padding: 16px;
+    }
+
+    .artwork-page-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .artwork-page-left,
+    .artwork-page-right {
+        display: contents;
+    }
+
+    .artwork-mobile-header { order: 1; }
+    .artwork-mobile-media { order: 2; }
+    .artwork-mobile-auction { order: 3; }
+    .artwork-mobile-auction-action { order: 4; }
+    .artwork-mobile-ai { order: 5; }
+    .artwork-mobile-description { order: 6; }
+    .artwork-mobile-people { order: 7; }
+    .artwork-mobile-trust { order: 8; }
+    .artwork-mobile-extra { order: 9; }
+    .artwork-mobile-moderation { order: 10; }
+    .artwork-mobile-back { order: 11; }
+
+    .artwork-page-left .artwork-detail-stage {
+        width: 100%;
+        height: auto;
+        min-height: 280px;
+        max-height: 68vh;
+        aspect-ratio: 4 / 3;
+    }
+
+    .artwork-page-header .artwork-detail-title {
+        font-size: clamp(2.1rem, 11vw, 3.4rem);
+    }
+
+    .artwork-page-title-row {
+        align-items: flex-start;
+    }
+
+    .artwork-page-discovery-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
 .classic {
     --c-bg: var(--bg-classic);
     --c-surface: #010101;
