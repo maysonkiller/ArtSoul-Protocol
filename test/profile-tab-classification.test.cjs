@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const profile = fs.readFileSync('profile.html', 'utf8');
+const profile = fs.readFileSync('profile.html', 'utf8') + fs.readFileSync('src/entries/profile.jsx', 'utf8');
 
 test('profile tabs use strict lifecycle and ownership predicates', () => {
   assert.match(profile, /isLiveAuction\?\.\(artwork\) === true/);
@@ -18,11 +18,11 @@ test('local pending artworks appear only in Created Artworks', () => {
   assert.doesNotMatch(profile, /galleryType !== 'auction' \|\| Boolean\(artwork\.auction_tx_hash\)/);
 });
 
-test('Add New is Created-only and loading uses one neutral state', () => {
+test('Add New is Created-only and loading uses one neutral skeleton state', () => {
   assert.match(profile, /isOwnProfile && selectedGallery === 'created'/);
   assert.doesNotMatch(profile, /ProfileArtworkSkeleton/);
   assert.doesNotMatch(profile, /profile-card-skeleton/);
-  assert.match(profile, /artworksLoading \? \([\s\S]*Loading artworks\.\.\.[\s\S]*\) : \(/);
+  assert.match(profile, /artworksLoading \? \([\s\S]*CardGridSkeleton count=\{6\}[\s\S]*\) : \(/);
   assert.match(profile, /!artworksLoading && \([\s\S]*myArtworks\.length\} items/);
   assert.doesNotMatch(profile, /Creator action|Prepare a new auction|Open publisher/);
 });

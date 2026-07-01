@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const artworkPage = fs.readFileSync('artwork.html', 'utf8');
-const uploadPage = fs.readFileSync('upload.html', 'utf8');
+const artworkPage = fs.readFileSync('artwork.html', 'utf8') + fs.readFileSync('src/entries/artwork.jsx', 'utf8');
+const uploadPage = fs.readFileSync('upload.html', 'utf8') + fs.readFileSync('src/entries/upload.js', 'utf8');
 
 function functionSource(name, nextName) {
     const start = artworkPage.indexOf(`async function ${name}`);
@@ -25,9 +25,18 @@ function assertConfirmGatesProviderAndTransaction(source, transactionCall) {
     assert.ok(transactionIndex > providerIndex, 'the transaction must start only after wallet access');
 }
 
+function assertProviderPrecedesTransaction(source, transactionCall) {
+    const providerIndex = source.indexOf('getWalletProvider');
+    const transactionIndex = source.indexOf(transactionCall, providerIndex);
+
+    assert.ok(providerIndex >= 0, 'wallet access must exist');
+    assert.ok(transactionIndex > providerIndex, 'the transaction must start only after wallet access');
+}
+
 test('auction confirmations gate every affected wallet transaction', () => {
-    assertConfirmGatesProviderAndTransaction(
-        functionSource('handleCreateNewAuction', 'handleEndAuction'),
+    // The re-auction modal's explicit Confirm button is the confirmation gate.
+    assertProviderPrecedesTransaction(
+        functionSource('handleConfirmNewAuction', 'handleEndAuction'),
         'ArtSoulContracts.createAuction('
     );
     assertConfirmGatesProviderAndTransaction(
@@ -39,7 +48,7 @@ test('auction confirmations gate every affected wallet transaction', () => {
         'ArtSoulContracts.completeSettlement('
     );
 
-    const bidSource = functionSource('placeBidOnce', 'handleCreateNewAuction');
+    const bidSource = functionSource('placeBidOnce', 'requestFreshReauctionValuation');
     const networkConfirmIndex = bidSource.indexOf('await confirmAuctionAction(');
     const networkSwitchIndex = bidSource.indexOf('switchArtSoulNetwork(', networkConfirmIndex);
     const switchedBidIndex = bidSource.indexOf('ArtSoulContracts.placeBid(', networkSwitchIndex);
@@ -49,7 +58,7 @@ test('auction confirmations gate every affected wallet transaction', () => {
 });
 
 test('new auction action is explicit, eligible, and redirects only after success', () => {
-    const createSource = functionSource('handleCreateNewAuction', 'handleEndAuction');
+    const createSource = functionSource('handleConfirmNewAuction', 'handleEndAuction');
 
     assert.match(createSource, /canCreateNewAuctionForWallet\(artwork, walletAddress\)/);
     assert.match(createSource, /blockchainArtwork\.minted/);
@@ -69,7 +78,7 @@ test('normal artwork re-auctions have no attempt cap and use one createAuction t
     const eligibilityStart = artworkPage.indexOf('function canCreateNewAuctionForWallet');
     const eligibilityEnd = artworkPage.indexOf('function v41InteractionKey', eligibilityStart);
     const eligibilitySource = artworkPage.slice(eligibilityStart, eligibilityEnd);
-    const createSource = functionSource('handleCreateNewAuction', 'handleEndAuction');
+    const createSource = functionSource('handleConfirmNewAuction', 'handleEndAuction');
     const createCalls = createSource.match(/ArtSoulContracts\.createAuction\(/g) || [];
 
     assert.equal(createCalls.length, 1, 'an already-registered artwork needs one createAuction transaction');

@@ -4,10 +4,10 @@ const test = require('node:test');
 
 const source = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
 const css = fs.readFileSync('unified-styles.css', 'utf8');
-const detail = fs.readFileSync('artwork.html', 'utf8');
-const gallery = fs.readFileSync('gallery.html', 'utf8');
-const homepage = fs.readFileSync('index.html', 'utf8');
-const profile = fs.readFileSync('profile.html', 'utf8');
+const detail = fs.readFileSync('artwork.html', 'utf8') + fs.readFileSync('src/entries/artwork.jsx', 'utf8');
+const gallery = fs.readFileSync('gallery.html', 'utf8') + fs.readFileSync('src/entries/gallery.jsx', 'utf8');
+const homepage = fs.readFileSync('index.html', 'utf8') + fs.readFileSync('src/entries/index.js', 'utf8');
+const profile = fs.readFileSync('profile.html', 'utf8') + fs.readFileSync('src/entries/profile.jsx', 'utf8');
 
 test('all card surfaces use the shared first-paint media descriptor', () => {
   assert.match(source, /const descriptor = mediaDescriptor\(artwork\)/);

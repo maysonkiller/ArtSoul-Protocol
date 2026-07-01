@@ -13,7 +13,7 @@ vm.runInContext(
 const { discoveryStatusInfo } = context.window.ArtSoulArtworkCard;
 
 test('artwork detail uses the shared card status resolver', () => {
-  const detail = fs.readFileSync('artwork.html', 'utf8');
+  const detail = fs.readFileSync('artwork.html', 'utf8') + fs.readFileSync('src/entries/artwork.jsx', 'utf8');
   assert.match(detail, /ArtSoulArtworkCard\?\.statusInfo\?\.\(auction \? \{/);
   assert.match(detail, /\{presentationStatus\.label\}/);
 });

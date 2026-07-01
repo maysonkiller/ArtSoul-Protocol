@@ -19,6 +19,126 @@
 }
 
 /* Artwork detail page composition */
+.artsoul-skeleton,
+.artsoul-skeleton-card {
+    border: 1px solid var(--c-border-soft);
+    background: var(--c-surface-muted);
+}
+
+.artsoul-skeleton {
+    border-radius: 8px;
+}
+
+.artsoul-skeleton-card {
+    min-width: 0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.artsoul-skeleton-media {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 0;
+}
+
+.artsoul-skeleton-card-copy {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+}
+
+.artsoul-skeleton-line {
+    width: 100%;
+    height: 12px;
+}
+
+.artsoul-skeleton-line-title { width: 72%; height: 16px; }
+.artsoul-skeleton-line-short { width: 44%; }
+.artsoul-skeleton-heading { width: min(68%, 520px); height: clamp(30px, 4vw, 58px); }
+.artsoul-skeleton-button { width: min(100%, 220px); height: 44px; margin-top: 12px; }
+
+.artwork-page-skeleton-media {
+    height: 100%;
+    aspect-ratio: auto;
+}
+
+.profile-skeleton-header,
+.profile-skeleton-tabs {
+    border: 1px solid var(--c-border-soft);
+    background: var(--c-surface);
+}
+
+.profile-skeleton-identity {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.profile-skeleton-avatar {
+    width: 112px;
+    height: 112px;
+    flex: 0 0 112px;
+    border-radius: 50%;
+}
+
+.profile-skeleton-copy {
+    display: grid;
+    flex: 1;
+    gap: 12px;
+}
+
+.profile-skeleton-tab-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+body.future .artsoul-skeleton,
+body.future .artsoul-skeleton-card {
+    box-shadow: 0 0 14px var(--c-glow);
+}
+
+@media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
+    body.future .artsoul-skeleton,
+    body.future .artsoul-skeleton-card {
+        background-image: linear-gradient(
+            100deg,
+            var(--c-surface-muted) 20%,
+            var(--c-glow) 42%,
+            var(--c-surface-muted) 64%
+        );
+        background-size: 220% 100%;
+        animation: artsoulSkeletonSweep 1.8s linear infinite;
+    }
+}
+
+@keyframes artsoulSkeletonSweep {
+    to { background-position: -220% 0; }
+}
+
+@media (max-width: 768px), (prefers-reduced-motion: reduce) {
+    .artsoul-skeleton,
+    .artsoul-skeleton-card {
+        animation: none !important;
+    }
+
+    .profile-skeleton-identity {
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .profile-skeleton-avatar {
+        width: 80px;
+        height: 80px;
+        flex-basis: 80px;
+    }
+
+    .profile-skeleton-tab-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .artwork-page-shell {
     width: min(100%, 1500px);
     margin: 0 auto;

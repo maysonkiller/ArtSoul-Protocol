@@ -102,7 +102,7 @@ test('Discovery cards can show all three persisted signal counts', () => {
 });
 
 test('gallery markup keeps the requested order and default without card signals', () => {
-    const gallery = fs.readFileSync('gallery.html', 'utf8');
+    const gallery = fs.readFileSync('gallery.html', 'utf8') + fs.readFileSync('src/entries/gallery.jsx', 'utf8');
     const auctions = gallery.indexOf("{ id: 'live_auctions', label: 'Auctions' }");
     const nft = gallery.indexOf("{ id: 'nft', label: 'NFT' }");
     const discover = gallery.indexOf("{ id: 'discover', label: 'Discovery' }");
