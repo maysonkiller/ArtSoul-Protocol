@@ -1,5 +1,6 @@
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
+import './react-runtime.js';
 
 let morphActive = false;
         let originalPositions = [];
@@ -627,12 +628,12 @@ let morphActive = false;
             if (!gallery) return;
 
             try {
-                for (let attempt = 0; !window.ArtSoulDB && attempt < 40; attempt++) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                const db = window.ArtSoulDB;
+                if (typeof db?.getPublicProjectionArtworks !== 'function') {
+                    throw new Error('ArtSoulDB is not ready');
                 }
-                if (!window.ArtSoulDB) throw new Error('ArtSoulDB is not ready');
 
-                let artworks = await window.ArtSoulDB.getPublicProjectionArtworks({ limit: 100 });
+                let artworks = await db.getPublicProjectionArtworks({ limit: 100 });
                 const suppressedArtworkIds = new Set(
                     (artworks?.suppressed_artwork_ids || []).map(value => String(value).toLowerCase())
                 );

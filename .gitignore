@@ -4,6 +4,7 @@ out/
 build/
 dist/
 .vite/
+.queue-wal/
 artifacts/
 cache/
 coverage/
