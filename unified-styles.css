@@ -47,12 +47,18 @@
 
 .artwork-page-right {
     position: sticky;
-    top: 92px;
+    top: 96px;
+    align-self: start;
     display: flex;
     flex-direction: column;
     gap: 16px;
     max-height: calc(100vh - 112px);
+    max-height: calc(100dvh - 112px);
+    min-height: 0;
+    padding-right: 4px;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: var(--c-border) transparent;
 }
@@ -214,15 +220,73 @@ body.classic .artwork-page-left .artwork-detail-frame {
 
 .artwork-page-discovery-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 12px;
 }
 
 .artwork-page-saved {
-    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
     text-align: center;
-    opacity: 0.72;
+}
+
+.artwork-page-trust .btn-main.artwork-page-action-control,
+.artwork-page-trust .btn-secondary.artwork-page-action-control,
+.artwork-page-saved.artwork-page-action-control {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px !important;
+    padding: 0.45rem 0.7rem !important;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface-muted);
+    color: var(--c-accent);
+    box-shadow: none;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.15;
+    white-space: normal;
+}
+
+body.future .artwork-page-trust .btn-main.artwork-page-action-control,
+body.future .artwork-page-trust .btn-secondary.artwork-page-action-control {
+    box-shadow: 0 0 10px var(--c-glow);
+}
+
+.artwork-page-compact-action {
+    width: auto !important;
+    min-height: 38px !important;
+    padding: 0.45rem 0.9rem !important;
+    border-color: var(--c-border) !important;
+    background: var(--c-surface-muted) !important;
+    color: var(--c-accent) !important;
+    box-shadow: none !important;
+    font-size: 0.82rem;
+    line-height: 1.15;
+}
+
+body.future .artwork-page-compact-action {
+    box-shadow: 0 0 10px var(--c-glow) !important;
+}
+
+.artwork-page-share,
+.artwork-page-right > .artwork-mobile-back {
+    align-self: flex-start;
+}
+
+.artwork-page-right .btn-main,
+.artwork-page-right .btn-secondary {
+    min-height: 42px !important;
+    padding: 0.55rem 0.9rem !important;
+    font-size: 0.88rem;
+    line-height: 1.15;
+}
+
+.artwork-page-right .artwork-page-primary-action {
+    min-height: 44px !important;
 }
 
 .artwork-page-detail-list {
@@ -290,15 +354,15 @@ body.classic .artwork-page-left .artwork-detail-frame {
         display: contents;
     }
 
-    .artwork-mobile-header { order: 1; }
-    .artwork-mobile-media { order: 2; }
+    .artwork-mobile-media { order: 1; }
+    .artwork-mobile-header { order: 2; }
     .artwork-mobile-auction { order: 3; }
     .artwork-mobile-auction-action { order: 4; }
-    .artwork-mobile-ai { order: 5; }
-    .artwork-mobile-description { order: 6; }
-    .artwork-mobile-people { order: 7; }
-    .artwork-mobile-trust { order: 8; }
-    .artwork-mobile-extra { order: 9; }
+    .artwork-mobile-description { order: 5; }
+    .artwork-mobile-ai { order: 6; }
+    .artwork-mobile-trust { order: 7; }
+    .artwork-mobile-extra { order: 8; }
+    .artwork-mobile-people { order: 9; }
     .artwork-mobile-moderation { order: 10; }
     .artwork-mobile-back { order: 11; }
 
@@ -318,8 +382,35 @@ body.classic .artwork-page-left .artwork-detail-frame {
         align-items: flex-start;
     }
 
+    .artwork-page-layout {
+        gap: 14px;
+    }
+
+    .artwork-page-panel,
+    .auction-detail-panel,
+    .new-auction-panel,
+    .moderation-panel {
+        padding: 18px;
+    }
+
+    .artwork-page-action-control,
+    .artwork-page-compact-action,
+    .artwork-page-right .btn-main,
+    .artwork-page-right .btn-secondary {
+        min-height: 44px !important;
+    }
+
     .artwork-page-discovery-actions {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .artwork-page-layout *,
+    .artwork-page-layout *::before,
+    .artwork-page-layout *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
     }
 }
 
