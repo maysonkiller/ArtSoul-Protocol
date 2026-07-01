@@ -66,11 +66,11 @@ const metadata = {
     name: 'ArtSoul Marketplace',
     description: 'Decentralized Art Marketplace',
     url: appOrigin,
-    icons: ['https://artsoul.vercel.app/artwork-sample.jpg'],
+    icons: [`${appOrigin}/ARTSOULlogo-clean.png`],
     // Tell WalletConnect where to send the user back after they approve in the
-    // wallet app — without this the mobile round-trip can fail to resume.
+    // wallet app. A browser dApp has no native URL scheme, so advertise only
+    // the live HTTPS origin instead of an invalid empty native redirect.
     redirect: {
-        native: '',
         universal: appOrigin
     }
 };
@@ -103,11 +103,13 @@ let connectModalIntentUntil = 0;
 let activeWalletProvider = null;
 let walletResumeTimer = null;
 let walletResumeListenersBound = false;
+let activeMobileConnect = false;
+const walletResumeWaiters = new Set();
 const boundRuntimeProviders = new WeakSet();
 const WALLET_HYDRATION_TIMEOUT = 2500;
 const POST_CONNECT_DISCONNECT_GUARD = 1200;
 const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
-const WALLET_CONNECT_TIMEOUT_MOBILE = 90000;
+const WALLET_CONNECT_TIMEOUT_MOBILE = 240000;
 const WALLET_CONFIRMATION_INTERVAL = 400;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
@@ -390,20 +392,44 @@ function scheduleWalletReconciliation(source, delay = 150, options = {}) {
     }, delay);
 }
 
+function notifyWalletResume(source) {
+    const waiters = [...walletResumeWaiters];
+    walletResumeWaiters.clear();
+    waiters.forEach((resolve) => resolve(source));
+    scheduleWalletReconciliation(source, 0);
+}
+
+function waitForWalletResumeOrDelay(delay) {
+    return new Promise((resolve) => {
+        let settled = false;
+        let timer = null;
+        const finish = (source = null) => {
+            if (settled) return;
+            settled = true;
+            if (timer) clearTimeout(timer);
+            walletResumeWaiters.delete(finish);
+            resolve(source);
+        };
+
+        timer = setTimeout(() => finish(), delay);
+        walletResumeWaiters.add(finish);
+    });
+}
+
 function bindWalletResumeListeners() {
     if (walletResumeListenersBound) return;
     walletResumeListenersBound = true;
 
-    window.addEventListener('pageshow', () => scheduleWalletReconciliation('pageshow'));
-    window.addEventListener('focus', () => scheduleWalletReconciliation('window focus'));
+    window.addEventListener('pageshow', () => notifyWalletResume('pageshow'));
+    window.addEventListener('focus', () => notifyWalletResume('window focus'));
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            scheduleWalletReconciliation('visibility return');
+            notifyWalletResume('visibility return');
         }
     });
 }
 
-async function waitForConfirmedWallet(timeoutMs) {
+async function waitForConfirmedDesktopWallet(timeoutMs) {
     const startedAt = Date.now();
     let modalWasOpen = false;
     let modalClosedAt = null;
@@ -425,6 +451,113 @@ async function waitForConfirmedWallet(timeoutMs) {
     }
 
     return null;
+}
+
+function createForegroundDeadline(timeoutMs) {
+    let remainingMs = timeoutMs;
+    let visibleSince = document.visibilityState === 'visible' ? Date.now() : null;
+
+    const updateRemaining = () => {
+        if (visibleSince === null) return;
+        const now = Date.now();
+        remainingMs = Math.max(0, remainingMs - (now - visibleSince));
+        visibleSince = now;
+    };
+
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            visibleSince = Date.now();
+        } else {
+            updateRemaining();
+            visibleSince = null;
+        }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return {
+        hasExpired() {
+            if (document.visibilityState !== 'visible') return false;
+            updateRemaining();
+            return remainingMs <= 0;
+        },
+        remaining() {
+            if (document.visibilityState === 'visible') updateRemaining();
+            return remainingMs;
+        },
+        dispose() {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }
+    };
+}
+
+async function waitForConfirmedMobileWallet(timeoutMs) {
+    const deadline = createForegroundDeadline(timeoutMs);
+
+    try {
+        while (!deadline.hasExpired()) {
+            if (document.visibilityState !== 'visible') {
+                await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
+                continue;
+            }
+
+            const restored = await reconcileActiveWalletFromProviders('mobile connect confirmation');
+            if (restored?.address) return restored;
+
+            await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
+        }
+
+        // Approval and the browser visibility event can arrive in either order.
+        // Re-check provider/session truth once more before presenting a timeout.
+        const restored = await reconcileActiveWalletFromProviders('mobile connect final confirmation');
+        if (restored?.address) return restored;
+
+        walletDebugLog('mobile wallet confirmation expired', {
+            foregroundTimeoutMs: timeoutMs,
+            remainingMs: deadline.remaining()
+        });
+        return null;
+    } finally {
+        deadline.dispose();
+    }
+}
+
+async function waitForConfirmedWallet(timeoutMs, options = {}) {
+    return options.mobile
+        ? waitForConfirmedMobileWallet(timeoutMs)
+        : waitForConfirmedDesktopWallet(timeoutMs);
+}
+
+async function requestInjectedMobileAccounts() {
+    const deadline = createForegroundDeadline(WALLET_CONNECT_TIMEOUT_MOBILE);
+    const requestOutcome = Promise.resolve(window.ethereum.request({ method: 'eth_requestAccounts' }))
+        .then((accounts) => ({ accounts }))
+        .catch((error) => ({ error }));
+
+    try {
+        while (!deadline.hasExpired()) {
+            if (document.visibilityState !== 'visible') {
+                await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
+                continue;
+            }
+
+            const outcome = await Promise.race([
+                requestOutcome,
+                waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL).then(() => null)
+            ]);
+            if (outcome?.error) throw outcome.error;
+            if (outcome?.accounts) return outcome.accounts;
+
+            const restoredAccounts = await requestProviderAccounts(window.ethereum);
+            if (restoredAccounts.length) return restoredAccounts;
+        }
+
+        const restoredAccounts = await requestProviderAccounts(window.ethereum);
+        if (restoredAccounts.length) return restoredAccounts;
+        throw new Error('Injected wallet connection timed out');
+    } finally {
+        deadline.dispose();
+    }
 }
 
 async function getSwitchProvider() {
@@ -451,6 +584,7 @@ function hasNetworkModalIntent() {
     const now = Date.now();
     return Boolean(
         activeNetworkSwitchChainId ||
+        activeMobileConnect ||
         now < networkModalIntentUntil ||
         now < connectModalIntentUntil
     );
@@ -987,6 +1121,8 @@ function renderNetworkBadge() {
 window.safeConnectWallet = async () => {
     const btn = document.getElementById('connectBtn');
     if (btn) btn.disabled = true;
+    const mobileConnect = isMobileDevice();
+    if (mobileConnect) activeMobileConnect = true;
 
     try {
         sessionStorage.removeItem('artsoul_disconnecting');
@@ -997,12 +1133,7 @@ window.safeConnectWallet = async () => {
                 rabby: Boolean(window.ethereum?.isRabby)
             });
             bindRuntimeProviderEvents(window.ethereum, 'mobile injected provider');
-            const accounts = await Promise.race([
-                window.ethereum.request({ method: 'eth_requestAccounts' }),
-                sleep(20000).then(() => {
-                    throw new Error('Injected wallet connection timed out');
-                })
-            ]);
+            const accounts = await requestInjectedMobileAccounts();
             await handleProviderAccountsChanged(accounts, 'mobile injected provider', window.ethereum);
             const chainId = await requestProviderChainId(window.ethereum);
             if (chainId) await handleProviderChainConfirmed(chainId, 'mobile injected provider');
@@ -1021,9 +1152,10 @@ window.safeConnectWallet = async () => {
                 modalOpenError = error;
             });
 
-            walletDebugLog('waiting for wallet confirmation', { mobile: isMobileDevice() });
+            walletDebugLog('waiting for wallet confirmation', { mobile: mobileConnect });
             const confirmed = await waitForConfirmedWallet(
-                isMobileDevice() ? WALLET_CONNECT_TIMEOUT_MOBILE : WALLET_CONNECT_TIMEOUT_DESKTOP
+                mobileConnect ? WALLET_CONNECT_TIMEOUT_MOBILE : WALLET_CONNECT_TIMEOUT_DESKTOP,
+                { mobile: mobileConnect }
             );
             if (modalOpenError) throw modalOpenError;
             if (!confirmed?.address) {
@@ -1056,6 +1188,7 @@ window.safeConnectWallet = async () => {
         return null;
     } finally {
         walletDebugLog('wallet connect flow finished');
+        activeMobileConnect = false;
         if (btn) btn.disabled = false;
     }
 };
@@ -1456,7 +1589,7 @@ async function initializeAppKit() {
             }
 
             if (!account?.address && subscriptionCount < 5) {
-                const connectIntentActive = Date.now() < connectModalIntentUntil;
+                const connectIntentActive = activeMobileConnect || Date.now() < connectModalIntentUntil;
                 if (connectIntentActive) {
                     console.log('Skipping transient disconnected state during wallet hydration');
                     return;
