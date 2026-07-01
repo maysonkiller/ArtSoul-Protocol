@@ -592,15 +592,23 @@
             const haystack = [
                 artwork.title,
                 artwork.description,
+                typeof artwork.creator === 'string' ? artwork.creator : '',
                 artwork.creator_id,
                 artwork.creator?.username,
+                artwork.creator?.display_name,
                 artwork.creator?.wallet_address,
+                artwork.creator_name,
+                artwork.creator_username,
+                artwork.creator_display_name,
+                artwork.artist_name,
                 artwork.category,
                 artwork.file_type,
                 artwork.status,
                 artwork.network,
                 artwork.chain,
                 artwork.collection_name,
+                artwork.collection?.name,
+                artwork.collection_title,
                 artwork.drop_name,
                 ...(Array.isArray(artwork.tags) ? artwork.tags : [])
             ].map(normalize).join(' ');
