@@ -7,7 +7,8 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'src', 'ui', 'components', 'artwork-card.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'unified-styles.css'), 'utf8');
-const detail = fs.readFileSync(path.join(root, 'artwork.html'), 'utf8');
+const detail = fs.readFileSync(path.join(root, 'artwork.html'), 'utf8') +
+  fs.readFileSync(path.join(root, 'src', 'entries', 'artwork.jsx'), 'utf8');
 
 class FakeElement {
     constructor(tagName, mediaElements) {
