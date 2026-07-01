@@ -3,7 +3,7 @@ import { CardGridSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 
         const GALLERY_TABS = [
             { id: 'live_auctions', label: 'Auctions' },
@@ -24,7 +24,7 @@ const { useState, useEffect, useRef } = React;
 
         function GalleryPage() {
             const [theme, setTheme] = useState('classic');
-            const [filteredArtworks, setFilteredArtworks] = useState([]);
+            const [artworkCorpus, setArtworkCorpus] = useState([]);
             const [loading, setLoading] = useState(true);
             const loadSequenceRef = useRef(0);
 
@@ -35,17 +35,24 @@ const { useState, useEffect, useRef } = React;
             const [minPrice, setMinPrice] = useState('');
             const [maxPrice, setMaxPrice] = useState('');
             const [searchQuery, setSearchQuery] = useState('');
+            const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
             const [filtersOpen, setFiltersOpen] = useState(false);
-            const [debouncedFilters, setDebouncedFilters] = useState({
-                activeTab: getInitialGalleryTab(),
-                statusFilter: 'all',
-                sortBy: 'discovery',
-                minPrice: '',
-                maxPrice: '',
-                searchQuery: ''
-            });
 
             const isClassic = theme === 'classic';
+            const isGlobalSearch = debouncedSearchQuery.trim() !== '';
+            const isSearchPending = searchQuery.trim() !== debouncedSearchQuery.trim();
+            const activeFilters = useMemo(() => ({
+                activeTab,
+                statusFilter,
+                sortBy,
+                minPrice,
+                maxPrice,
+                searchQuery: debouncedSearchQuery
+            }), [activeTab, statusFilter, sortBy, minPrice, maxPrice, debouncedSearchQuery]);
+            const filteredArtworks = useMemo(
+                () => applyPublicGalleryFilters(artworkCorpus, activeFilters),
+                [artworkCorpus, activeFilters]
+            );
 
             function selectGalleryTab(tabId) {
                 setActiveTab(tabId);
@@ -77,27 +84,16 @@ const { useState, useEffect, useRef } = React;
             }, []);
 
             useEffect(() => {
-                const nextFilters = { activeTab, statusFilter, sortBy, minPrice, maxPrice, searchQuery };
                 const debounceTimer = setTimeout(() => {
-                    setDebouncedFilters(current => {
-                        const unchanged =
-                            current.activeTab === nextFilters.activeTab &&
-                            current.statusFilter === nextFilters.statusFilter &&
-                            current.sortBy === nextFilters.sortBy &&
-                            current.minPrice === nextFilters.minPrice &&
-                            current.maxPrice === nextFilters.maxPrice &&
-                            current.searchQuery === nextFilters.searchQuery;
-
-                        return unchanged ? current : nextFilters;
-                    });
-                }, 250);
+                    setDebouncedSearchQuery(searchQuery);
+                }, 300);
 
                 return () => clearTimeout(debounceTimer);
-            }, [activeTab, statusFilter, sortBy, minPrice, maxPrice, searchQuery]);
+            }, [searchQuery]);
 
             useEffect(() => {
-                loadArtworks(debouncedFilters);
-            }, [debouncedFilters]);
+                loadArtworks();
+            }, []);
 
             function sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
@@ -121,11 +117,6 @@ const { useState, useEffect, useRef } = React;
                     await sleep(delay);
                 }
                 return null;
-            }
-
-            function publicViewForTab(tabId) {
-                if (tabId === 'collections') return 'collections';
-                return '';
             }
 
             function hasSafeMedia(artwork = {}) {
@@ -153,6 +144,11 @@ const { useState, useEffect, useRef } = React;
                 return GALLERY_STATUS_LABELS[status] || 'Not yet minted';
             }
 
+            function categoryLabelForArtwork(artwork) {
+                const categoryId = window.ArtSoulDiscovery?.galleryTabForArtwork?.(artwork) || 'discover';
+                return GALLERY_TABS.find(tab => tab.id === categoryId)?.label || 'Discovery';
+            }
+
             function prepareGalleryArtwork(artwork = {}) {
                 const metadataMissing = artwork.source === 'v41_projection' && !hasSafeMedia(artwork);
                 const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(artwork);
@@ -168,6 +164,14 @@ const { useState, useEffect, useRef } = React;
             }
 
             function emptyStateForTab(tabId, hasFilters) {
+                if (tabId === 'search') {
+                    return {
+                        title: 'No artworks match this search',
+                        detail: 'Try another title, creator, or collection name.',
+                        cta: false
+                    };
+                }
+
                 if (hasFilters) {
                     return {
                         title: 'No public testnet artworks match this view',
@@ -215,7 +219,7 @@ const { useState, useEffect, useRef } = React;
                 };
             }
 
-            function applyPublicGalleryFilters(artworks, filters = debouncedFilters) {
+            function applyPublicGalleryFilters(artworks, filters) {
                 const {
                     activeTab,
                     statusFilter,
@@ -235,6 +239,7 @@ const { useState, useEffect, useRef } = React;
                 };
 
                 let result = (Array.isArray(artworks) ? artworks : []).map(prepareGalleryArtwork);
+                const globalSearch = searchQuery.trim() !== '';
 
                 result = result.filter(artwork =>
                     artwork.moderation_hidden !== true &&
@@ -245,7 +250,7 @@ const { useState, useEffect, useRef } = React;
                 result = result.filter(artwork => (
                     window.ArtSoulArtworkCard?.hasSafeMedia?.(artwork) ?? hasSafeMedia(artwork)
                 ));
-                if (window.ArtSoulDiscovery?.filterForGalleryTab) {
+                if (!globalSearch && window.ArtSoulDiscovery?.filterForGalleryTab) {
                     result = window.ArtSoulDiscovery.filterForGalleryTab(result, activeTab);
                 }
                 if (statusFilter !== 'all') {
@@ -272,16 +277,25 @@ const { useState, useEffect, useRef } = React;
                     } else {
                         const query = normalize(searchQuery.trim());
                         result = result.filter(artwork =>
-                            normalize(artwork.title).includes(query) ||
-                            normalize(artwork.description).includes(query) ||
-                            normalize(artwork.artwork_id).includes(query) ||
-                            normalize(artwork.auction_id).includes(query)
+                            [
+                                artwork.title,
+                                artwork.description,
+                                artwork.creator,
+                                artwork.creator_id,
+                                artwork.creator_name,
+                                artwork.creator_username,
+                                artwork.collection_name,
+                                artwork.collection?.name,
+                                artwork.collection_title,
+                                artwork.artwork_id,
+                                artwork.auction_id
+                            ].some(value => normalize(value).includes(query))
                         );
                     }
                 }
 
                 if (window.ArtSoulDiscovery?.sortArtworks) {
-                    result = window.ArtSoulDiscovery.sortArtworks(result, sortBy);
+                    result = window.ArtSoulDiscovery.sortArtworks(result, globalSearch ? 'discovery' : sortBy);
                 } else if (sortBy === 'newest') {
                     result.sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at));
                 } else if (sortBy === 'oldest') {
@@ -299,7 +313,7 @@ const { useState, useEffect, useRef } = React;
                 return result.slice(0, 200);
             }
 
-            async function loadArtworks(filters = debouncedFilters) {
+            async function loadArtworks() {
                 const loadId = ++loadSequenceRef.current;
 
                 try {
@@ -312,23 +326,21 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     data = await db.getPublicProjectionArtworks({
-                        view: publicViewForTab(filters.activeTab),
                         limit: 200
                     });
-                    data = applyPublicGalleryFilters(data, filters);
 
                     if (loadId !== loadSequenceRef.current) {
                         return;
                     }
 
-                    setFilteredArtworks(data || []);
+                    setArtworkCorpus(data || []);
                     setLoading(false);
                 } catch (error) {
                     if (loadId !== loadSequenceRef.current) {
                         return;
                     }
                     console.error('Error loading artworks:', error);
-                    setFilteredArtworks([]);
+                    setArtworkCorpus([]);
                     setLoading(false);
                 }
             }
@@ -411,8 +423,10 @@ const { useState, useEffect, useRef } = React;
 
                                 {/* Sort */}
                                 <select
-                                    value={sortBy}
+                                    value={isGlobalSearch ? 'discovery' : sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
+                                    disabled={searchQuery.trim() !== ''}
+                                    title={searchQuery.trim() !== '' ? 'Search results use Discovery Rank' : 'Sort artworks'}
                                     className="px-4 py-2 rounded-lg"
                                     style={{
                                         background: isClassic ? 'rgba(232, 227, 213, 0.05)' : 'rgba(var(--c-accent-rgb), 0.05)',
@@ -487,6 +501,10 @@ const { useState, useEffect, useRef } = React;
                             <div className="mt-4 text-sm opacity-70" aria-live="polite">
                                 {loading
                                     ? 'Loading artworks...'
+                                    : isSearchPending
+                                    ? 'Searching across all categories...'
+                                    : isGlobalSearch
+                                    ? `Showing ${filteredArtworks.length} results across all categories for “${debouncedSearchQuery.trim()}”`
                                     : `Showing ${filteredArtworks.length} artworks in ${GALLERY_TABS.find(tab => tab.id === activeTab)?.label || 'Discover'}`}
                             </div>
                         </div>
@@ -500,7 +518,7 @@ const { useState, useEffect, useRef } = React;
                                 border: isClassic ? '1px solid rgba(var(--c-accent-rgb), 0.35)' : '1px solid rgba(var(--c-accent-rgb), 0.22)'
                             }}>
                                 {(() => {
-                                    const emptyState = emptyStateForTab(activeTab, hasActiveFilters());
+                                    const emptyState = emptyStateForTab(isGlobalSearch ? 'search' : activeTab, hasActiveFilters());
                                     return (
                                         <>
                                 <div className="text-xl opacity-50">
@@ -537,6 +555,18 @@ const { useState, useEffect, useRef } = React;
                                                 minimal={true}
                                                 surface="gallery"
                                                 onOpen={() => window.location.href = `artwork.html?id=${artwork.id}`}
+                                                actions={isGlobalSearch ? (
+                                                    <span
+                                                        className="inline-flex rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide"
+                                                        style={{
+                                                            color: 'var(--c-accent)',
+                                                            border: '1px solid var(--c-border-soft)',
+                                                            background: 'var(--c-surface-muted)'
+                                                        }}
+                                                    >
+                                                        {categoryLabelForArtwork(artwork)}
+                                                    </span>
+                                                ) : null}
                                             />
                                         );
                                     }
@@ -567,6 +597,18 @@ const { useState, useEffect, useRef } = React;
                                             }
                                         }}
                                     >
+                                        {isGlobalSearch && (
+                                            <div
+                                                className="px-3 py-2 text-xs font-semibold uppercase tracking-wide"
+                                                style={{
+                                                    color: 'var(--c-accent)',
+                                                    borderBottom: '1px solid var(--c-border-soft)',
+                                                    background: 'var(--c-surface-muted)'
+                                                }}
+                                            >
+                                                {categoryLabelForArtwork(artwork)}
+                                            </div>
+                                        )}
                                         {/* Image */}
                                         <div className="aspect-square overflow-hidden bg-black relative">
                                             {artwork.file_url && hasSafeMedia(artwork) ? (
