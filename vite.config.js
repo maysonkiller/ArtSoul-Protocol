@@ -7,16 +7,17 @@ import { defineConfig } from 'vite';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(root, 'dist');
 
-const legacyPages = [
-    'index.html',
-    'gallery.html',
-    'artwork.html',
-    'profile.html',
-    'upload.html',
-    'auction-system.html',
-    'visual-lab.html',
-    'generate-favicon.html'
-];
+const pageInputs = {
+    index: 'index.html',
+    gallery: 'gallery.html',
+    artwork: 'artwork.html',
+    profile: 'profile.html',
+    upload: 'upload.html',
+    docs: 'docs.html',
+    'auction-system': 'auction-system.html',
+    'visual-lab': 'visual-lab.html',
+    'generate-favicon': 'generate-favicon.html'
+};
 
 const legacyRootAssets = [
     '1080x360.png',
@@ -69,61 +70,50 @@ async function copyRelative(relativePath) {
     await copyFile(source, destination);
 }
 
-const pilotLegacyModules = [
-    'supabase-auth.js',
-    'supabase-client.js',
-    'appkit-init.js'
-];
-
-function keepPilotLegacyModulesSeparate() {
+function keepLegacyRuntimeModulesSeparate() {
     return {
-        name: 'keep-pilot-legacy-modules-separate',
+        name: 'keep-legacy-runtime-modules-separate',
         apply: 'build',
         transformIndexHtml: {
             order: 'pre',
             handler(html) {
-                for (const moduleName of pilotLegacyModules) {
-                    html = html.replace(
-                        new RegExp(`<script type="module" src="(${moduleName.replace('.', '\\.')}(?:\\?[^\"]*)?)"><\\/script>`),
-                        '<script type="application/x-artsoul-module" data-artsoul-legacy-module src="$1"></script>'
-                    );
-                }
-                return html;
+                return html.replace(
+                    /<script type="module"(?![^>]*\/src\/entries\/)([^>]*)><\/script>/g,
+                    '<script type="application/x-artsoul-module" data-artsoul-legacy-module$1></script>'
+                );
             }
         },
         async closeBundle() {
-            const docsOutputPath = path.join(outDir, 'docs.html');
-            const docsOutput = await readFile(docsOutputPath, 'utf8');
-            await writeFile(
-                docsOutputPath,
-                docsOutput.replaceAll(
-                    'type="application/x-artsoul-module" data-artsoul-legacy-module',
-                    'type="module"'
-                )
-            );
+            await Promise.all(Object.values(pageInputs).map(async (page) => {
+                const outputPath = path.join(outDir, page);
+                const output = await readFile(outputPath, 'utf8');
+                await writeFile(
+                    outputPath,
+                    output.replaceAll(
+                        'type="application/x-artsoul-module" data-artsoul-legacy-module',
+                        'type="module"'
+                    )
+                );
+            }));
         }
     };
 }
 
-function preserveUnmigratedPages() {
+function copyLegacyRuntimeAssets() {
     return {
-        name: 'preserve-unmigrated-pages',
+        name: 'copy-legacy-runtime-assets',
         apply: 'build',
         async closeBundle() {
-            await Promise.all([...legacyPages, ...legacyRootAssets, ...legacyClientFiles].map(copyRelative));
+            await Promise.all([...legacyRootAssets, ...legacyClientFiles].map(copyRelative));
             await Promise.all(legacyClientTrees.map(async (relativePath) => {
                 const destination = path.join(outDir, relativePath);
                 await mkdir(path.dirname(destination), { recursive: true });
                 await cp(path.join(root, relativePath), destination, { recursive: true });
             }));
 
-            // Fail early if a future page adds a new root-level browser asset that the
-            // preservation list does not deploy. This keeps the mixed migration explicit.
             const outputPages = new Set(await readdir(outDir));
-            for (const page of legacyPages) {
-                if (!outputPages.has(page)) {
-                    throw new Error(`Missing preserved page: ${page}`);
-                }
+            for (const page of Object.values(pageInputs)) {
+                if (!outputPages.has(page)) throw new Error(`Missing built page: ${page}`);
             }
         }
     };
@@ -131,7 +121,7 @@ function preserveUnmigratedPages() {
 
 export default defineConfig({
     appType: 'mpa',
-    plugins: [react(), keepPilotLegacyModulesSeparate(), preserveUnmigratedPages()],
+    plugins: [react(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()],
     build: {
         outDir,
         emptyOutDir: true,
@@ -139,8 +129,15 @@ export default defineConfig({
         sourcemap: false,
         target: 'es2020',
         rollupOptions: {
-            input: {
-                docs: path.join(root, 'docs.html')
+            input: Object.fromEntries(
+                Object.entries(pageInputs).map(([name, page]) => [name, path.join(root, page)])
+            ),
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+                        return 'vendor-react';
+                    }
+                }
             },
             onwarn(warning, warn) {
                 if (warning.message.includes('can\'t be bundled without type="module" attribute')) return;
