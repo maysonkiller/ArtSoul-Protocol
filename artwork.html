@@ -39,7 +39,7 @@
     <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=18">
+    <link rel="stylesheet" href="unified-styles.css?v=19">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -2181,6 +2181,9 @@ body.classic {
                 key: isArtworkMinted(artwork) ? 'sold' : 'not_minted',
                 label: isArtworkMinted(artwork) ? 'Sold' : 'Not yet minted'
             };
+            const normalizedArtwork = window.ArtSoulDiscovery?.normalizeArtwork?.(artwork) || artwork;
+            const trustScore = Math.round(Number(normalizedArtwork.trust_score || 0));
+            const creatorName = getProfileDisplayName(creatorProfile, artwork.creator_id || artwork.creator);
 
             return (
                 <div className="min-h-screen">
@@ -2295,10 +2298,22 @@ body.classic {
                         </div>
                     )}
                     {/* Content */}
-                    <main className="py-0 lg:py-12">
-                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_500px] gap-0">
+                    <main className="artwork-page-shell">
+                        <div className="artwork-page-layout">
                             {/* Artwork Media Viewer */}
-                            <div className="artwork-detail-stage w-full h-[60vh] lg:h-screen lg:sticky lg:top-0 flex items-center justify-center p-4 lg:p-8">
+                            <div className="artwork-page-left">
+                                <header className="artwork-page-header artwork-mobile-header">
+                                    <p className="artwork-page-kicker">Artwork</p>
+                                    <div className="artwork-page-title-row">
+                                        <h1 className="artwork-detail-title">{artwork.title}</h1>
+                                        <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
+                                            {presentationStatus.label}
+                                        </span>
+                                    </div>
+                                    <p className="artwork-page-byline">By {creatorName}</p>
+                                </header>
+
+                                <section className="artwork-detail-stage artwork-mobile-media" aria-label="Artwork media">
                                 <div className="artwork-detail-frame relative w-full h-full rounded-xl overflow-hidden">
                                     {safeMediaUrl ? (
                                         <MediaViewer
@@ -2336,12 +2351,86 @@ body.classic {
                                         </div>
                                     )}
                                 </div>
+                                </section>
+
+                                <section className="artwork-page-panel artwork-page-description artwork-mobile-description">
+                                    <p className="artwork-page-kicker">About the work</p>
+                                    <h2>Description</h2>
+                                    <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
+                                </section>
+
+                                <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai">
+                                    <div className="artwork-page-panel-heading">
+                                        <div>
+                                            <p className="artwork-page-kicker">Gemini analysis</p>
+                                            <h2>Value Guidance</h2>
+                                        </div>
+                                        {aiGuidance?.confidence != null && (
+                                            <span className="artwork-page-chip">
+                                                {Number.isFinite(Number(aiGuidance.confidence)) ? `${Number(aiGuidance.confidence)}%` : String(aiGuidance.confidence)} confidence
+                                            </span>
+                                        )}
+                                    </div>
+                                    {aiGuidance?.estimated_value_min_eth != null && aiGuidance?.estimated_value_max_eth != null && Number.isFinite(Number(aiGuidance.estimated_value_min_eth)) && Number.isFinite(Number(aiGuidance.estimated_value_max_eth)) ? (
+                                        <>
+                                            <p className="artwork-page-ai-range">
+                                                {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })}–{Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                            </p>
+                                            <p className="artwork-page-copy">Suggested starting price: {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH</p>
+                                            {aiGuidance.rationale && <p className="artwork-page-copy">{aiGuidance.rationale}</p>}
+                                        </>
+                                    ) : aiGuidance?.range ? (
+                                        <>
+                                            <p className="artwork-page-ai-range">{aiGuidance.range.low}–{aiGuidance.range.high} ETH</p>
+                                            {aiGuidance.reason && <p className="artwork-page-copy">{aiGuidance.reason}</p>}
+                                        </>
+                                    ) : (
+                                        <p className="artwork-page-copy">{aiGuidance?.reason || 'AI analysis is unavailable for this artwork.'}</p>
+                                    )}
+                                    <p className="artwork-page-note">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</p>
+                                </section>
+
+                                <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust">
+                                    <div className="artwork-page-panel-heading">
+                                        <div>
+                                            <p className="artwork-page-kicker">Community context</p>
+                                            <h2>Trust & Discovery</h2>
+                                        </div>
+                                        {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
+                                    </div>
+                                    <p className="artwork-page-note">Trust affects discovery only. It never affects price, floor, ownership, or settlement.</p>
+                                    <div className="artwork-page-signal-grid">
+                                        <div><strong>{socialSignals.likes || votes.length}</strong><span>Likes</span></div>
+                                        <div><strong>{socialSignals.wouldBuy || 0}</strong><span>Would Buy</span></div>
+                                        <div><strong>{socialSignals.watching || 0}</strong><span>Watching</span></div>
+                                    </div>
+                                    {userVote ? <p className="artwork-page-saved">You voted</p> : <button onClick={handleVote} className="btn-main w-full">Like</button>}
+                                    <div className="artwork-page-discovery-actions">
+                                        <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'} disabled={interactionState.would_buy}>
+                                            {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
+                                        </button>
+                                        <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'} disabled={interactionState.watching}>
+                                            {interactionState.watching ? 'Watching Saved' : 'Watching'}
+                                        </button>
+                                    </div>
+                                </section>
+
+                                <section className="artwork-page-panel artwork-page-extra artwork-mobile-extra">
+                                    <p className="artwork-page-kicker">Artwork details</p>
+                                    <h2>Additional Information</h2>
+                                    <dl className="artwork-page-detail-list">
+                                        {resolvedMedia.type && <><dt>Media</dt><dd>{resolvedMedia.type}</dd></>}
+                                        {artwork.network && <><dt>Network</dt><dd>{artwork.network}</dd></>}
+                                        {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
+                                        {artwork.token_id && <><dt>Token ID</dt><dd>{artwork.token_id}</dd></>}
+                                    </dl>
+                                </section>
                             </div>
 
                             {/* Artwork Info */}
-                            <div className="space-y-6 px-4 lg:px-8 py-6 lg:py-12 overflow-y-auto">
+                            <aside className="artwork-page-right">
                                 {/* Title & Description */}
-                                <div className={`p-6 rounded-xl ${isClassic ? 'bg-gray-800' : 'bg-cyan-900/20 border border-cyan-500/30'}`}>
+                                <div className="artwork-page-legacy-summary" aria-hidden="true">
                                     <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
                                         <h1 className="artwork-detail-title text-4xl font-bold">{artwork.title}</h1>
                                         <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
@@ -2352,7 +2441,7 @@ body.classic {
                                 </div>
 
                                 {moderationAccess?.canModerate && (
-                                    <section className="moderation-panel rounded-xl p-5" aria-label="Staff moderation">
+                                    <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                             <div>
                                                 <h3 className="text-lg font-bold">Staff moderation</h3>
@@ -2410,7 +2499,7 @@ body.classic {
                                 )}
 
                                 {/* Ownership Info - Three Roles */}
-                                <div className={`p-6 rounded-xl ${isClassic ? 'bg-gray-800' : 'bg-cyan-900/20 border border-cyan-500/30'}`}>
+                                <div className="artwork-page-panel artwork-page-people artwork-mobile-people">
                                     <h3 className="text-xl font-bold mb-4">Ownership</h3>
 
                                     <div className="space-y-4">
@@ -2458,8 +2547,13 @@ body.classic {
 
                                 {/* Auction Info */}
                                 {auction && (
-                                    <div className="auction-detail-panel p-6 rounded-xl">
-                                        <h3 className="text-2xl font-bold mb-4">Auction</h3>
+                                    <div className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">
+                                        <div className="artwork-page-panel-heading">
+                                            <h3 className="text-2xl font-bold">Auction</h3>
+                                            <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
+                                                {presentationStatus.label}
+                                            </span>
+                                        </div>
 
                                         <div className="space-y-3">
                                             <div className="flex justify-between">
@@ -2531,8 +2625,7 @@ body.classic {
                                             )}
                                         </div>
 
-                                        {!auctionEnded && (
-                                            <section
+                                        <section
                                                 className="bid-activity-panel mt-6 rounded-lg p-4"
                                                 aria-live="polite"
                                                 data-testid="live-auction-bid-feed"
@@ -2568,8 +2661,7 @@ body.classic {
                                                         No bids yet — be the first
                                                     </div>
                                                 )}
-                                            </section>
-                                        )}
+                                        </section>
 
                                         {/* Bid Input (during auction) */}
                                         {!auctionEnded && (
@@ -2697,7 +2789,7 @@ body.classic {
                                 )}
 
                                 {canCreateNewAuction && (
-                                    <section className="new-auction-panel rounded-xl p-6" aria-label="Create a new auction">
+                                    <section className="new-auction-panel artwork-mobile-auction-action rounded-xl p-6" aria-label="Create a new auction">
                                         <h3 className="text-2xl font-bold mb-2">Create New Auction</h3>
                                         <p className="text-sm opacity-70 mb-4">
                                             Re-list this eligible artwork with a fresh starting price, duration, and updated value guidance.
@@ -2714,7 +2806,7 @@ body.classic {
                                 )}
 
                                 {/* Discovery Signals */}
-                                <div className={`p-4 rounded-xl ${isClassic ? 'bg-gray-800' : 'bg-cyan-900/20 border border-cyan-500/30'}`}>
+                                <div className="artwork-page-legacy-discovery" aria-hidden="true">
                                     <div className="flex justify-between items-center mb-3">
                                         <h3 className="text-lg font-bold">Discovery Signals</h3>
                                         <span className="text-sm opacity-70">{window.ArtSoulDiscovery?.classifyLifecycle?.(artwork)?.label || 'Artwork'}</span>
@@ -2795,11 +2887,11 @@ body.classic {
                                 {/* Back Button */}
                                 <button
                                     onClick={() => window.history.back()}
-                                    className="btn-secondary w-full"
+                                    className="btn-secondary w-full artwork-mobile-back"
                                 >
                                     ← Back
                                 </button>
-                            </div>
+                            </aside>
                         </div>
                     </main>
                 </div>
