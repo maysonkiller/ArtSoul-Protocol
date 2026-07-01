@@ -19,12 +19,25 @@ test('desktop wallet timeout and modal-close behavior stay unchanged', () => {
     assert.match(source, /options\.mobile\s*\? waitForConfirmedMobileWallet\(timeoutMs\)\s*:\s*waitForConfirmedDesktopWallet\(timeoutMs\)/);
 });
 
-test('focus and visibility return wake confirmation and reconcile provider truth', () => {
+test('focus and visibility return wake confirmation and reconcile the approved AppKit session', () => {
     assert.match(source, /window\.addEventListener\('focus', \(\) => notifyWalletResume\('window focus'\)\)/);
     assert.match(source, /notifyWalletResume\('visibility return'\)/);
-    assert.match(source, /reconcileActiveWalletFromProviders\('mobile connect confirmation'\)/);
-    assert.match(source, /reconcileActiveWalletFromProviders\('mobile connect final confirmation'\)/);
+    assert.match(source, /reconcileMobileAppKitSession\('mobile connect confirmation'\)/);
+    assert.match(source, /reconcileMobileAppKitSession\('mobile connect final confirmation'\)/);
+    assert.match(source, /acceptMobileAppKitWalletState\(account, 'AppKit account update'\)/);
+    assert.match(source, /readAppKitAccountSnapshot\(\)/);
+    assert.match(source, /appKitAccountRevision > mobileConnectStartRevision/);
+    assert.match(source, /accountKey !== mobileConnectInitialAccountKey/);
     assert.match(source, /activeMobileConnect \|\| Date\.now\(\) < connectModalIntentUntil/);
+});
+
+test('external mobile connect finalizes without a provider RPC and defers SIWE', () => {
+    const mobileWaiter = source.match(/async function waitForConfirmedMobileWallet[\s\S]*?\n}/)?.[0] || '';
+    assert.match(mobileWaiter, /reconcileMobileAppKitSession/);
+    assert.doesNotMatch(mobileWaiter, /reconcileActiveWalletFromProviders/);
+    assert.match(source, /connectedDuringThisRequest \|\| deferMobileAuthenticationThisTurn/);
+    assert.match(source, /setTimeout\(\(\) => \{\s*deferMobileAuthenticationThisTurn = false;/);
+    assert.match(source, /SIWE deferred after external mobile wallet connect/);
 });
 
 test('mobile injected providers use the same resumable confirmation window', () => {
