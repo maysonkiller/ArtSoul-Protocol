@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
+import { React, createRoot } from './react-runtime.js';
+
+const { useEffect, useState } = React;
 
 function DocSection({ section, isOpen, toggle }) {
     let formattedContent = section.content.replace(/\\n/g, '<br>');

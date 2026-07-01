@@ -551,41 +551,64 @@ export default async function handler(req, res) {
   try {
     const warnings = [];
     const chainFilter = `in.(${PUBLIC_CHAIN_IDS.join(',')})`;
-    const tableData = {
-      v41_artworks: await queryTable(
+    const [
+      v41Artworks,
+      v41Auctions,
+      v41Bids,
+      v41Settlements,
+      v41ResaleListings,
+      v41ResaleHistory,
+      v41FloorHistory,
+      v41TrustSignals,
+      artworkSocialSignals,
+      artworkModerationVisibility
+    ] = await Promise.all([
+      queryTable(
         'v41_artworks',
         `select=*&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
         warnings
       ),
-      v41_auctions: await queryTable(
+      queryTable(
         'v41_auctions',
         `select=*&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
         warnings
       ),
-      v41_bids: await queryTable(
+      queryTable(
         'v41_bids',
         `select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
         warnings
       ),
-      v41_settlements: await queryTable('v41_settlements', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
-      v41_resale_listings: await queryTable('v41_resale_listings', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
-      v41_resale_history: await queryTable(
+      queryTable('v41_settlements', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
+      queryTable('v41_resale_listings', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
+      queryTable(
         'v41_resale_history',
         `select=chain_id,token_id,buyer,seller,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=1000`,
         warnings
       ),
-      v41_floor_history: await queryTable('v41_floor_history', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
-      v41_trust_signals: await queryTable('v41_trust_signals', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
-      artwork_social_signals: await queryTable(
+      queryTable('v41_floor_history', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
+      queryTable('v41_trust_signals', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
+      queryTable(
         'artwork_social_signals',
         `select=chain_id,artwork_id,wallet_address,signal_type&chain_id=${chainFilter}&limit=5000`,
         warnings
       ),
-      artwork_moderation_visibility: await queryTable(
+      queryTable(
         'artwork_moderation_visibility',
         `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&limit=1000`,
         warnings
       )
+    ]);
+    const tableData = {
+      v41_artworks: v41Artworks,
+      v41_auctions: v41Auctions,
+      v41_bids: v41Bids,
+      v41_settlements: v41Settlements,
+      v41_resale_listings: v41ResaleListings,
+      v41_resale_history: v41ResaleHistory,
+      v41_floor_history: v41FloorHistory,
+      v41_trust_signals: v41TrustSignals,
+      artwork_social_signals: artworkSocialSignals,
+      artwork_moderation_visibility: artworkModerationVisibility
     };
 
     const maps = {

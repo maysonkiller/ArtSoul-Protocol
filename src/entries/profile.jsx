@@ -1,5 +1,4 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
+import { React, createRoot } from './react-runtime.js';
 import { CardGridSkeleton, ProfilePageSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
@@ -778,7 +777,7 @@ const { useState, useEffect, useRef } = React;
                     // Get artwork details for each pending auction
                     const pendingWithArtworks = await Promise.all(
                         pending.map(async (auction) => {
-                            const artwork = await window.ArtSoulDB.getArtwork(auction.artwork_id);
+                            const artwork = auction.artwork || await window.ArtSoulDB.getArtwork(auction.artwork_id);
                             return { auction, artwork };
                         })
                     );
