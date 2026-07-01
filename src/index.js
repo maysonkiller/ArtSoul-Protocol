@@ -74,22 +74,34 @@ function initializeServices() {
     }
 }
 
+async function initializeServicesWhenReady(maxWaitMs = 10000, pollMs = 50) {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+        if (window.ArtSoulContracts && window.ArtSoulDB) {
+            return initializeServices();
+        }
+        await new Promise(resolve => setTimeout(resolve, pollMs));
+    }
+
+    console.error('ArtSoul runtime dependencies did not initialize in time.');
+    return false;
+}
+
 // Auto-initialize when DOM is ready
 if (typeof window !== 'undefined') {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            // Wait a bit for other scripts to load
-            setTimeout(initializeServices, 100);
+            void initializeServicesWhenReady();
         });
     } else {
-        // DOM already loaded
-        setTimeout(initializeServices, 100);
+        void initializeServicesWhenReady();
     }
 }
 
 // Export for manual initialization if needed
 export {
     initializeServices,
+    initializeServicesWhenReady,
     AuctionService,
     FileService,
     ArtworkService,

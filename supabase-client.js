@@ -517,6 +517,40 @@ async function getActiveAuctions() {
     return data;
 }
 
+function projectionAuctionState(status) {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'settlement_pending') return 'WAITING_PAYMENT';
+    if (normalized === 'auction') return 'ACTIVE';
+    if (normalized === 'awaiting_end') return 'AWAITING_END';
+    if (normalized === 'sold') return 'SETTLED';
+    if (normalized === 'defaulted') return 'DEFAULTED';
+    return normalized ? normalized.toUpperCase() : 'UNKNOWN';
+}
+
+async function getAuctions(options = {}) {
+    const artworks = await getPublicProjectionArtworks({
+        limit: options.limit || 200,
+        chain_id: options.chain_id
+    });
+
+    return artworks
+        .filter(artwork => artwork.auction_id)
+        .map(artwork => ({
+            id: artwork.auction_id,
+            auction_id: artwork.auction_id,
+            artwork_id: artwork.id,
+            blockchain_artwork_id: artwork.blockchain_id,
+            chain_id: artwork.chain_id,
+            state: projectionAuctionState(artwork.status),
+            status: artwork.status,
+            highestBidder: artwork.auction_winner_address || artwork.current_bidder || null,
+            highest_bidder: artwork.auction_winner_address || artwork.current_bidder || null,
+            current_bid: artwork.current_bid,
+            settlement_deadline: artwork.settlement_deadline,
+            artwork
+        }));
+}
+
 async function getAuction(auctionId) {
     const supabase = await initSupabase();
 
@@ -891,6 +925,7 @@ window.ArtSoulDB = {
     uploadMetadata,
     // Auctions
     createAuction,
+    getAuctions,
     getActiveAuctions,
     getAuction,
     updateAuction,
