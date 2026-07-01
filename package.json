@@ -4,6 +4,10 @@
   "description": "Auction-first NFT art discovery protocol on Base.",
   "main": "appkit-init.js",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build && npm run verify:build",
+    "preview": "vite preview --host 0.0.0.0",
+    "verify:build": "node scripts/verify-build.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,7 +25,9 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts": "^5.0.0",
-    "hardhat": "^2.28.6"
+    "@vitejs/plugin-react": "6.0.3",
+    "hardhat": "^2.28.6",
+    "vite": "8.1.2"
   },
   "directories": {
     "doc": "docs",
@@ -298,6 +304,8 @@
     "queue-microtask": "^1.2.3",
     "randombytes": "^2.1.0",
     "raw-body": "^2.5.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "readable-stream": "^3.6.2",
     "readdirp": "^4.1.2",
     "rechoir": "^0.6.2",
