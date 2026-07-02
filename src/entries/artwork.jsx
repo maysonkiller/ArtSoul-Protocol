@@ -489,21 +489,21 @@ const { useState, useEffect, useRef } = React;
             }
 
             function formatAuctionTimeRemaining(endTime) {
+                const endTimeMs = normalizeAuctionTimestamp(endTime);
+                if (!endTimeMs) {
+                    return 'Syncing end time';
+                }
+
                 const helper = getAuctionHelper('formatTimeRemaining');
                 if (helper) {
                     try {
                         const formatted = helper(endTime);
-                        if (formatted) {
+                        if (formatted && String(formatted).toLowerCase() !== 'unknown') {
                             return formatted;
                         }
                     } catch (error) {
                         console.warn('Auction time helper failed; using local fallback.', error.message);
                     }
-                }
-
-                const endTimeMs = normalizeAuctionTimestamp(endTime);
-                if (!endTimeMs) {
-                    return 'Unknown';
                 }
 
                 const remaining = Math.max(0, endTimeMs - Date.now());
@@ -691,7 +691,13 @@ const { useState, useEffect, useRef } = React;
                     currentBid: firstDefined(projection.current_bid, projection.highest_bid, '0'),
                     highestBidder: projection.current_bidder || ZERO_ADDRESS,
                     current_bidder: projection.current_bidder || ZERO_ADDRESS,
-                    endTime: projection.auction_end_time,
+                    endTime: firstPositiveTimestamp(
+                        projection.auction_end_time,
+                        projection.end_time,
+                        projection.endTime,
+                        projection.auction?.end_time,
+                        projection.auction?.endTime
+                    ),
                     status: remainsActive ? 'active' : projectionStatus,
                     state: stateByStatus[projectionStatus] || String(projectionStatus || 'registered').toUpperCase(),
                     ended: !remainsActive && projectionStatus !== 'registered',
@@ -2081,10 +2087,6 @@ const { useState, useEffect, useRef } = React;
                         <div className="artwork-page-layout">
                             {/* Artwork Media Viewer */}
                             <div className="artwork-page-left">
-                                <header className="artwork-page-header artwork-mobile-header">
-                                    <h1 className="artwork-detail-title">{artwork.title}</h1>
-                                </header>
-
                                 <section className="artwork-detail-stage artwork-mobile-media" aria-label="Artwork media">
                                 <div className={`artwork-detail-frame artwork-detail-frame-${resolvedMedia.type} relative w-full h-full rounded-xl overflow-hidden`}>
                                     {safeMediaUrl ? (
@@ -2125,86 +2127,87 @@ const { useState, useEffect, useRef } = React;
                                 </div>
                                 </section>
 
-                                <section className="artwork-page-panel artwork-page-description artwork-mobile-description">
-                                    <h2>Description</h2>
-                                    <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
+                                <section className="artwork-page-panel artwork-page-context artwork-mobile-context">
+                                    <header className="artwork-page-header">
+                                        <h1 className="artwork-detail-title">{artwork.title}</h1>
+                                    </header>
+                                    <div className="artwork-page-description">
+                                        <h2>Description</h2>
+                                        <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
+                                    </div>
+                                    <div className="artwork-page-extra">
+                                        <h2>Artwork details</h2>
+                                        <dl className="artwork-page-detail-list">
+                                            {resolvedMedia.type && <><dt>Media</dt><dd>{resolvedMedia.type}</dd></>}
+                                            {artwork.network && <><dt>Network</dt><dd>{artwork.network}</dd></>}
+                                            {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
+                                            {artwork.token_id && (
+                                                <>
+                                                    <dt>Token ID</dt>
+                                                    <dd>
+                                                        {tokenExplorerUrl ? (
+                                                            <a href={tokenExplorerUrl} target="_blank" rel="noopener noreferrer">{artwork.token_id}</a>
+                                                        ) : artwork.token_id}
+                                                    </dd>
+                                                </>
+                                            )}
+                                        </dl>
+                                    </div>
                                 </section>
 
-                                <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai">
-                                    <div className="artwork-page-panel-heading">
-                                        <div>
+                                <section className="artwork-page-insights artwork-mobile-insights" aria-label="Artwork analysis and community signals">
+                                    <div className="artwork-page-panel artwork-page-trust">
+                                        <div className="artwork-page-panel-heading">
+                                            <h2>Community</h2>
+                                            {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
+                                        </div>
+                                        <div className="artwork-page-signal-grid">
+                                            <div><strong>{socialSignals.likes || votes.length}</strong><span>Likes</span></div>
+                                            <div><strong>{socialSignals.wouldBuy || 0}</strong><span>Would Buy</span></div>
+                                            <div><strong>{socialSignals.watching || 0}</strong><span>Watching</span></div>
+                                        </div>
+                                        <div className="artwork-page-discovery-actions">
+                                            {userVote ? (
+                                                <p className="artwork-page-saved artwork-page-action-control">You voted</p>
+                                            ) : (
+                                                <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
+                                            )}
+                                            <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.would_buy}>
+                                                {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
+                                            </button>
+                                            <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.watching}>
+                                                {interactionState.watching ? 'Watching Saved' : 'Watching'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="artwork-page-panel artwork-page-ai">
+                                        <div className="artwork-page-panel-heading">
                                             <h2>Gemini Analysis</h2>
+                                            {aiGuidance?.confidence != null && (
+                                                <span className="artwork-page-chip">
+                                                    {Number.isFinite(Number(aiGuidance.confidence)) ? `${Number(aiGuidance.confidence)}%` : String(aiGuidance.confidence)} confidence
+                                                </span>
+                                            )}
                                         </div>
-                                        {aiGuidance?.confidence != null && (
-                                            <span className="artwork-page-chip">
-                                                {Number.isFinite(Number(aiGuidance.confidence)) ? `${Number(aiGuidance.confidence)}%` : String(aiGuidance.confidence)} confidence
-                                            </span>
-                                        )}
-                                    </div>
-                                    {aiGuidance?.estimated_value_min_eth != null && aiGuidance?.estimated_value_max_eth != null && Number.isFinite(Number(aiGuidance.estimated_value_min_eth)) && Number.isFinite(Number(aiGuidance.estimated_value_max_eth)) ? (
-                                        <>
-                                            <p className="artwork-page-ai-range">
-                                                {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} to {Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
-                                            </p>
-                                            <p className="artwork-page-copy">Suggested starting price: {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH</p>
-                                            {aiGuidance.rationale && <p className="artwork-page-copy">{aiGuidance.rationale}</p>}
-                                        </>
-                                    ) : aiGuidance?.range ? (
-                                        <>
-                                            <p className="artwork-page-ai-range">{aiGuidance.range.low} to {aiGuidance.range.high} ETH</p>
-                                            {aiGuidance.reason && <p className="artwork-page-copy">{aiGuidance.reason}</p>}
-                                        </>
-                                    ) : (
-                                        <p className="artwork-page-copy">{aiGuidance?.reason || 'AI analysis is unavailable for this artwork.'}</p>
-                                    )}
-                                    <p className="artwork-page-note">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</p>
-                                </section>
-
-                                <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust">
-                                    <div className="artwork-page-panel-heading">
-                                        <div>
-                                            <h2>Trust & Discovery</h2>
-                                        </div>
-                                        {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
-                                    </div>
-                                    <p className="artwork-page-note">Trust affects discovery only. It never affects price, floor, ownership, or settlement.</p>
-                                    <div className="artwork-page-signal-grid">
-                                        <div><strong>{socialSignals.likes || votes.length}</strong><span>Likes</span></div>
-                                        <div><strong>{socialSignals.wouldBuy || 0}</strong><span>Would Buy</span></div>
-                                        <div><strong>{socialSignals.watching || 0}</strong><span>Watching</span></div>
-                                    </div>
-                                    <div className="artwork-page-discovery-actions">
-                                        {userVote ? (
-                                            <p className="artwork-page-saved artwork-page-action-control">You voted</p>
-                                        ) : (
-                                            <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
-                                        )}
-                                        <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.would_buy}>
-                                            {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
-                                        </button>
-                                        <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.watching}>
-                                            {interactionState.watching ? 'Watching Saved' : 'Watching'}
-                                        </button>
-                                    </div>
-                                </section>
-
-                                <section className="artwork-page-panel artwork-page-extra artwork-mobile-extra">
-                                    <h2>Artwork details</h2>
-                                    <dl className="artwork-page-detail-list">
-                                        {resolvedMedia.type && <><dt>Media</dt><dd>{resolvedMedia.type}</dd></>}
-                                        {artwork.network && <><dt>Network</dt><dd>{artwork.network}</dd></>}
-                                        {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
-                                        {artwork.token_id && (
+                                        {aiGuidance?.estimated_value_min_eth != null && aiGuidance?.estimated_value_max_eth != null && Number.isFinite(Number(aiGuidance.estimated_value_min_eth)) && Number.isFinite(Number(aiGuidance.estimated_value_max_eth)) ? (
                                             <>
-                                                <dt>Token ID</dt>
-                                                <dd>
-                                                    {tokenExplorerUrl ? (
-                                                        <a href={tokenExplorerUrl} target="_blank" rel="noopener noreferrer">{artwork.token_id}</a>
-                                                    ) : artwork.token_id}
-                                                </dd>
+                                                <p className="artwork-page-ai-range">
+                                                    {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} to {Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                </p>
+                                                <p className="artwork-page-copy">Suggested starting price: {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH</p>
+                                                {aiGuidance.rationale && <p className="artwork-page-copy">{aiGuidance.rationale}</p>}
                                             </>
+                                        ) : aiGuidance?.range ? (
+                                            <>
+                                                <p className="artwork-page-ai-range">{aiGuidance.range.low} to {aiGuidance.range.high} ETH</p>
+                                                {aiGuidance.reason && <p className="artwork-page-copy">{aiGuidance.reason}</p>}
+                                            </>
+                                        ) : (
+                                            <p className="artwork-page-copy">{aiGuidance?.reason || 'AI analysis is unavailable for this artwork.'}</p>
                                         )}
-                                    </dl>
+                                        <p className="artwork-page-note">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</p>
+                                    </div>
                                 </section>
                             </div>
 
@@ -2274,13 +2277,13 @@ const { useState, useEffect, useRef } = React;
 
                                     <div className="artwork-page-people-list">
                                         {renderOwnershipRole({
-                                            label: awaitingPayment && isSameAddress(creatorAddress, winnerAddress) ? 'Creator / Winner' : 'Creator',
+                                            label: 'Creator',
                                             address: creatorAddress,
                                             profile: creatorProfile
                                         })}
 
                                         {awaitingPayment && !isSameAddress(creatorAddress, winnerAddress) && renderOwnershipRole({
-                                            label: 'Winner',
+                                            label: 'Highest Bidder',
                                             address: winnerAddress,
                                             profile: bidderProfiles[String(winnerAddress || '').toLowerCase()] || auctionWinnerProfile
                                         })}
@@ -2302,6 +2305,26 @@ const { useState, useEffect, useRef } = React;
                                                 profile: currentOwnerProfile
                                             })}
                                     </div>
+
+                                    <div className="artwork-ownership-actions">
+                                        <button
+                                            onClick={() => {
+                                                const text = `Check out "${artwork.title}" by ${creatorName || 'artist'} on ArtSoul Protocol!`;
+                                                const url = window.location.href;
+                                                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=550,height=420');
+                                            }}
+                                            className="btn-secondary artwork-page-compact-action artwork-page-share"
+                                            title="Share on X"
+                                        >
+                                            Share on X
+                                        </button>
+                                        <button
+                                            onClick={() => window.history.back()}
+                                            className="btn-secondary artwork-page-compact-action artwork-mobile-back"
+                                        >
+                                            Back
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Auction Info */}
@@ -2314,7 +2337,13 @@ const { useState, useEffect, useRef } = React;
                                         </div>
 
                                         <div className="space-y-3">
-                                            {!liveAuction && !awaitingPayment && !mintedArtwork && (
+                                            {getAuctionActionId() && (
+                                            <div className="flex justify-between artwork-auction-fact artwork-auction-id">
+                                                <span className="opacity-70">Auction ID:</span>
+                                                <span className="font-mono">{getAuctionActionId()}</span>
+                                            </div>
+                                            )}
+                                            {startingPrice && Number(startingPrice) >= 0 && (
                                             <div className="flex justify-between artwork-auction-fact">
                                                 <span className="opacity-70">Starting Price:</span>
                                                 <span className="font-bold">{startingPrice} ETH</span>
@@ -2340,6 +2369,12 @@ const { useState, useEffect, useRef } = React;
                                                 <div className="flex justify-between artwork-auction-fact">
                                                     <span className="opacity-70">Time Left:</span>
                                                     <span className="font-bold" data-testid="live-auction-countdown">{timeLeft}</span>
+                                                </div>
+                                            )}
+                                            {liveAuction && (
+                                                <div className="flex justify-between artwork-auction-fact">
+                                                    <span className="opacity-70">Next Bid:</span>
+                                                    <span className="font-bold">{minimumBidDetails.eth} ETH</span>
                                                 </div>
                                             )}
 
@@ -2450,27 +2485,33 @@ const { useState, useEffect, useRef } = React;
 
                                         {/* End Auction Button (for anyone after time expires) */}
                                         {canEndAuction && (
-                                            <button
-                                                onClick={handleEndAuction}
-                                                className="btn-secondary w-full mt-4 artwork-page-primary-action"
-                                                disabled={isTransactionActionPending('end-auction')}
-                                                aria-busy={isTransactionActionPending('end-auction')}
-                                            >
-                                                {isTransactionActionPending('end-auction')
-                                                    ? <TransactionProcessingLabel />
-                                                    : 'End Expired Auction'}
-                                            </button>
+                                            <div className="artwork-auction-next-step mt-4">
+                                                <p>Confirm the expired auction first. After it closes on-chain, the creator can start a new auction.</p>
+                                                <button
+                                                    onClick={handleEndAuction}
+                                                    className="btn-secondary w-full artwork-page-primary-action"
+                                                    disabled={isTransactionActionPending('end-auction')}
+                                                    aria-busy={isTransactionActionPending('end-auction')}
+                                                >
+                                                    {isTransactionActionPending('end-auction')
+                                                        ? <TransactionProcessingLabel />
+                                                        : 'End Expired Auction'}
+                                                </button>
+                                            </div>
                                         )}
 
                                         {canCreateNewAuction && (
-                                            <button
-                                                type="button"
-                                                className="btn-main w-full mt-4 artwork-page-primary-action"
-                                                onClick={openNewAuctionModal}
-                                                disabled={isTransactionActionPending('create-auction')}
-                                            >
-                                                Create New Auction
-                                            </button>
+                                            <div className="artwork-auction-next-step mt-4">
+                                                <p>The previous auction is closed. Create a new auction when you are ready.</p>
+                                                <button
+                                                    type="button"
+                                                    className="btn-main w-full artwork-page-primary-action"
+                                                    onClick={openNewAuctionModal}
+                                                    disabled={isTransactionActionPending('create-auction')}
+                                                >
+                                                    Create New Auction
+                                                </button>
+                                            </div>
                                         )}
 
                                         {/* Settlement button (24h window) */}
@@ -2478,7 +2519,7 @@ const { useState, useEffect, useRef } = React;
                                             <div className="mt-6 space-y-3">
                                                 <div className="artwork-settlement-notice p-4 rounded-lg border-2">
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <p className="text-sm font-bold">You Won This Auction!</p>
+                                                        <p className="text-sm font-bold">Settlement requires wallet confirmation</p>
                                                     </div>
                                                     <p className="text-xs opacity-70 mb-2">
                                                         Complete settlement within the 24h window to mint and claim this NFT.
@@ -2602,25 +2643,6 @@ const { useState, useEffect, useRef } = React;
                                     )}
                                 </div>
 
-                                <div className="artwork-page-navigation artwork-mobile-navigation">
-                                    <button
-                                        onClick={() => {
-                                            const text = `Check out "${artwork.title}" by ${creatorName || 'artist'} on ArtSoul Protocol!`;
-                                            const url = window.location.href;
-                                            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=550,height=420');
-                                        }}
-                                        className="btn-secondary artwork-page-compact-action artwork-page-share"
-                                        title="Share on X"
-                                    >
-                                        Share on X
-                                    </button>
-                                    <button
-                                        onClick={() => window.history.back()}
-                                        className="btn-secondary artwork-page-compact-action artwork-mobile-back"
-                                    >
-                                        Back
-                                    </button>
-                                </div>
                             </aside>
                         </div>
                     </main>
