@@ -104,6 +104,11 @@ let activeWalletProvider = null;
 let walletResumeTimer = null;
 let walletResumeListenersBound = false;
 let activeMobileConnect = false;
+let latestAppKitAccountSnapshot = null;
+let appKitAccountRevision = 0;
+let mobileConnectStartRevision = 0;
+let mobileConnectInitialAccountKey = '';
+let deferMobileAuthenticationThisTurn = false;
 const walletResumeWaiters = new Set();
 const boundRuntimeProviders = new WeakSet();
 const WALLET_HYDRATION_TIMEOUT = 2500;
@@ -383,11 +388,86 @@ async function reconcileActiveWalletFromProviders(source = 'provider reconciliat
     return null;
 }
 
+function getAppKitAccountKey(account) {
+    const address = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
+    return address ? `${address}:${normalizeChainId(account) || 'none'}` : '';
+}
+
+function readAppKitAccountSnapshot() {
+    try {
+        return modal?.getAccount?.() || window.web3Modal?.getAccount?.() || latestAppKitAccountSnapshot;
+    } catch (error) {
+        console.warn('Unable to read AppKit account session:', error);
+        return latestAppKitAccountSnapshot;
+    }
+}
+
+function getFreshMobileAppKitWalletState(account = readAppKitAccountSnapshot()) {
+    if (!activeMobileConnect) return null;
+
+    const accountKey = getAppKitAccountKey(account);
+    const hasFreshAccountEvent = appKitAccountRevision > mobileConnectStartRevision;
+    const sessionChangedSinceConnect = Boolean(accountKey && accountKey !== mobileConnectInitialAccountKey);
+    if (!hasFreshAccountEvent && !sessionChangedSinceConnect) return null;
+
+    const address = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
+    const isConnected = Boolean(address) &&
+        account?.isConnected !== false &&
+        account?.status !== 'disconnected';
+    if (!isConnected) return null;
+
+    return {
+        address,
+        chainId: normalizeChainId(account),
+        isConnected: true
+    };
+}
+
+function acceptMobileAppKitWalletState(account, source = 'mobile AppKit session') {
+    const walletState = getFreshMobileAppKitWalletState(account);
+    if (!walletState) return null;
+
+    const { address, chainId } = walletState;
+    lastProcessedAddress = address;
+    lastProcessedChainId = chainId;
+    lastConfirmedWalletAt = Date.now();
+    window.currentWalletAddress = address;
+    localStorage.setItem('artsoul_wallet', address);
+
+    // AppKit has already confirmed this WalletConnect session. Update the UI
+    // before making any provider RPC that could be suspended by a mobile app switch.
+    dispatchWalletStateChanged({ address, chainId, isConnected: true });
+    updateNavButtons({ address, chainId });
+    updateNetworkBadge({ address, chainId });
+
+    // Session cleanup does not request a signature and is repeated by protected
+    // actions before authorization, so it does not need to hold up mobile connect.
+    Promise.resolve(signOutMismatchedSession(address)).catch((error) => {
+        console.warn('Stale session cleanup after mobile connect failed:', error);
+    });
+
+    clearModalIntent();
+    safeCloseModal('mobile wallet connected');
+    scheduleModalCloseRetries('mobile wallet connected');
+    walletDebugLog('mobile wallet accepted from AppKit session', {
+        source,
+        address: maskWalletAddress(address),
+        chainId
+    });
+
+    return walletState;
+}
+
+function reconcileMobileAppKitSession(source = 'mobile session reconciliation') {
+    return acceptMobileAppKitWalletState(readAppKitAccountSnapshot(), source);
+}
+
 function scheduleWalletReconciliation(source, delay = 150, options = {}) {
     if (walletResumeTimer) clearTimeout(walletResumeTimer);
     walletResumeTimer = setTimeout(async () => {
         walletResumeTimer = null;
         walletDebugLog('wallet state reconciliation', { source });
+        if (activeMobileConnect && reconcileMobileAppKitSession(source)) return;
         await reconcileActiveWalletFromProviders(source, options);
     }, delay);
 }
@@ -501,7 +581,7 @@ async function waitForConfirmedMobileWallet(timeoutMs) {
                 continue;
             }
 
-            const restored = await reconcileActiveWalletFromProviders('mobile connect confirmation');
+            const restored = reconcileMobileAppKitSession('mobile connect confirmation');
             if (restored?.address) return restored;
 
             await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
@@ -509,7 +589,7 @@ async function waitForConfirmedMobileWallet(timeoutMs) {
 
         // Approval and the browser visibility event can arrive in either order.
         // Re-check provider/session truth once more before presenting a timeout.
-        const restored = await reconcileActiveWalletFromProviders('mobile connect final confirmation');
+        const restored = reconcileMobileAppKitSession('mobile connect final confirmation');
         if (restored?.address) return restored;
 
         walletDebugLog('mobile wallet confirmation expired', {
@@ -1122,7 +1202,11 @@ window.safeConnectWallet = async () => {
     const btn = document.getElementById('connectBtn');
     if (btn) btn.disabled = true;
     const mobileConnect = isMobileDevice();
-    if (mobileConnect) activeMobileConnect = true;
+    if (mobileConnect) {
+        activeMobileConnect = true;
+        mobileConnectStartRevision = appKitAccountRevision;
+        mobileConnectInitialAccountKey = getAppKitAccountKey(readAppKitAccountSnapshot());
+    }
 
     try {
         sessionStorage.removeItem('artsoul_disconnecting');
@@ -1170,6 +1254,15 @@ window.safeConnectWallet = async () => {
                 address: maskWalletAddress(confirmed.address),
                 chainId: confirmed.chainId
             });
+            if (mobileConnect) {
+                // Let callers finish this user gesture as connect-only. The flag
+                // survives promise continuations in this turn, then clears before
+                // a later protected-action gesture can request normal SIWE.
+                deferMobileAuthenticationThisTurn = true;
+                setTimeout(() => {
+                    deferMobileAuthenticationThisTurn = false;
+                }, 0);
+            }
             return confirmed.address;
         } else {
             alert('Please wait, the app is still loading...');
@@ -1347,9 +1440,27 @@ window.resetWalletConnection = async () => {
 window.ensureAuthenticated = async () => {
     // Check if wallet is connected
     let walletAddress = window.getCurrentWalletAddress?.();
+    const connectedDuringThisRequest = !walletAddress;
     if (!walletAddress) {
         walletAddress = await window.safeConnectWallet?.();
         if (!walletAddress) return false;
+    }
+
+    // A protected action may be the first thing a visitor taps. On an external
+    // mobile browser, finish that deep-link round trip as connect-only; asking
+    // for SIWE immediately would launch a second wallet request whose response
+    // can be lost when the browser is backgrounded. The next protected action
+    // performs the normal SIWE flow with the already-connected session.
+    if (
+        isMobileDevice() &&
+        !isInjectedWalletBrowser() &&
+        (connectedDuringThisRequest || deferMobileAuthenticationThisTurn)
+    ) {
+        deferMobileAuthenticationThisTurn = false;
+        walletDebugLog('SIWE deferred after external mobile wallet connect', {
+            address: maskWalletAddress(walletAddress)
+        });
+        return false;
     }
 
     // Check if already authenticated for this exact wallet. A SIWE session
@@ -1569,6 +1680,8 @@ async function initializeAppKit() {
         let subscriptionCount = 0;
         modal.subscribeAccount(async (account) => {
             subscriptionCount++;
+            latestAppKitAccountSnapshot = account || null;
+            appKitAccountRevision++;
             console.log(` [${subscriptionCount}] Account update:`, {
                 address: account?.address ? account.address.slice(0, 10) + '...' : 'none',
                 status: account?.status || 'undefined',
@@ -1629,6 +1742,14 @@ async function initializeAppKit() {
                 account?.status !== 'disconnected';
 
             if (accountIsConnected) {
+                // External mobile browsers can suspend WalletConnect provider
+                // requests during the wallet-app round trip. The fresh AppKit
+                // account event is the completed session, so accept it directly.
+                if (activeMobileConnect && !isInjectedWalletBrowser()) {
+                    const restored = acceptMobileAppKitWalletState(account, 'AppKit account update');
+                    if (restored?.address) return;
+                }
+
                 // Prevent duplicate processing
                 const provider = await getAppKitWalletProvider();
                 const providerAccounts = await requestProviderAccounts(provider);
