@@ -558,47 +558,17 @@ const { useState, useEffect, useRef } = React;
             function renderOwnershipRole({ label, address, profile }) {
                 if (!address || isZeroAddress(address)) return null;
 
-                const roleCardStyle = !isClassic ? {
-                    boxShadow: '0 0 15px rgba(var(--c-accent-rgb), 0.2)',
-                    border: '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                    animation: 'glow-pulse 3s ease-in-out infinite'
-                } : {};
-
-                const avatarStyle = !isClassic ? {
-                    boxShadow: '0 0 10px rgba(var(--c-accent-rgb), 0.5)',
-                    animation: 'colorShift 8s ease-in-out infinite'
-                } : {};
-
-                const nameStyle = !isClassic ? {
-                    background: 'linear-gradient(90deg, var(--c-accent), var(--c-accent-2))',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    animation: 'colorShift 8s ease-in-out infinite'
-                } : {};
-
                 return (
-                    <div className="flex items-center gap-3">
-                        <a
-                            href={`profile.html?address=${encodeURIComponent(address)}`}
-                            className={`flex items-center gap-3 flex-1 min-w-0 p-3 rounded-lg transition-all ${
-                                isClassic ? 'hover:bg-gray-700/50' : 'hover:bg-cyan-900/30'
-                            }`}
-                            style={roleCardStyle}
-                        >
+                    <div className="artwork-person-row">
+                        <a href={`profile.html?address=${encodeURIComponent(address)}`} className="artwork-person-link">
                             <img
                                 src={getProfileAvatarUrl(profile, address)}
                                 alt={label}
-                                className={`w-12 h-12 rounded-full border-2 flex-shrink-0 ${
-                                    isClassic ? 'border-current' : 'border-cyan-400'
-                                }`}
-                                style={avatarStyle}
+                                className="artwork-person-avatar"
                             />
-                            <div className="min-w-0 flex-1">
-                                <div className={`text-xs ${isClassic ? 'opacity-70' : 'opacity-90'}`}>{label}</div>
-                                <div className="font-semibold truncate" style={nameStyle}>
-                                    {getProfileDisplayName(profile, address)}
-                                </div>
+                            <div className="artwork-person-copy">
+                                <span>{label}</span>
+                                <strong>{getProfileDisplayName(profile, address)}</strong>
                             </div>
                         </a>
                     </div>
@@ -1807,7 +1777,7 @@ const { useState, useEffect, useRef } = React;
 
             if (loading) {
                 return (
-                    <div className="min-h-screen">
+                    <div className="artwork-page-root">
                         <ArtworkPageSkeleton />
                     </div>
                 );
@@ -1907,9 +1877,28 @@ const { useState, useEffect, useRef } = React;
             const normalizedArtwork = window.ArtSoulDiscovery?.normalizeArtwork?.(artwork) || artwork;
             const trustScore = Math.round(Number(normalizedArtwork.trust_score || 0));
             const creatorName = getProfileDisplayName(creatorProfile, artwork.creator_id || artwork.creator);
+            const mintedArtwork = isArtworkMinted(artwork) || auction?.state === 'SOLD';
+            const awaitingPayment = auction?.state === 'WAITING_PAYMENT';
+            const liveAuction = Boolean(auction && !auctionEnded && !awaitingPayment && !mintedArtwork);
+            const resalePrice = Number(artwork.sale_price || 0);
+            const listedForResale = mintedArtwork && resalePrice > 0 && artwork.status === 'for_sale';
+            const startingPrice = firstDefined(auction?.startingPrice, artwork.start_price, artwork.creator_value, '0');
+            const finalPrice = hasAuctionBids
+                ? currentHighestBid
+                : firstDefined(artwork.final_price, artwork.floor_price, '0');
+            const winnerAddress = currentHighestBidder || artwork.auction_winner_address;
+            const creatorAddress = artwork.creator_id || artwork.creator;
+            const ownerAddress = artwork.current_owner_address;
+            const statusForState = mintedArtwork
+                ? { key: 'sold', label: 'Sold' }
+                : awaitingPayment
+                    ? { key: 'awaiting_settlement', label: 'Awaiting payment' }
+                    : liveAuction
+                        ? { key: 'live', label: 'Live' }
+                        : presentationStatus;
 
             return (
-                <div className="min-h-screen">
+                <div className="artwork-page-root">
                     {isNewAuctionModalOpen && (
                         <div
                             className="reauction-modal-backdrop"
@@ -1982,7 +1971,7 @@ const { useState, useEffect, useRef } = React;
                                         <div>
                                             <p className="reauction-estimate-range">
                                                 {Number(reauctionEstimate.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                                                {' – '}
+                                                {' to '}
                                                 {Number(reauctionEstimate.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
                                             </p>
                                             <p>
@@ -2025,19 +2014,8 @@ const { useState, useEffect, useRef } = React;
                         <div className="artwork-page-layout">
                             {/* Artwork Media Viewer */}
                             <div className="artwork-page-left">
-                                <header className="artwork-page-header artwork-mobile-header">
-                                    <p className="artwork-page-kicker">Artwork</p>
-                                    <div className="artwork-page-title-row">
-                                        <h1 className="artwork-detail-title">{artwork.title}</h1>
-                                        <span className={`artsoul-card-status artsoul-card-status-${presentationStatus.key}`}>
-                                            {presentationStatus.label}
-                                        </span>
-                                    </div>
-                                    <p className="artwork-page-byline">By {creatorName}</p>
-                                </header>
-
                                 <section className="artwork-detail-stage artwork-mobile-media" aria-label="Artwork media">
-                                <div className="artwork-detail-frame relative w-full h-full rounded-xl overflow-hidden">
+                                <div className={`artwork-detail-frame artwork-detail-frame-${resolvedMedia.type} relative rounded-xl overflow-hidden`}>
                                     {safeMediaUrl ? (
                                         <MediaViewer
                                             media={{ ...resolvedMedia, url: safeMediaUrl }}
@@ -2047,7 +2025,7 @@ const { useState, useEffect, useRef } = React;
                                         <div className="w-full h-full flex items-center justify-center bg-black p-6">
                                             <div className="max-w-lg text-center">
                                                 <div className="text-xs uppercase tracking-wide opacity-60 mb-3">
-                                                    Indexed — metadata unavailable
+                                                        Indexed metadata unavailable
                                                 </div>
                                                 <h2 className="text-2xl font-semibold mb-3">{artwork.title || 'Indexed artwork'}</h2>
                                                 <p className="text-sm opacity-70 mb-5">
@@ -2076,18 +2054,182 @@ const { useState, useEffect, useRef } = React;
                                 </div>
                                 </section>
 
-                                <section className="artwork-page-panel artwork-page-description artwork-mobile-description">
-                                    <p className="artwork-page-kicker">About the work</p>
-                                    <h2>Description</h2>
-                                    <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
+                                <header className="artwork-page-header artwork-mobile-header">
+                                    <h1 className="artwork-detail-title">{artwork.title}</h1>
+                                    <p className="artwork-page-byline">By {creatorName}</p>
+                                </header>
+
+                            </div>
+
+                            {/* Artwork Info */}
+                            <aside className="artwork-page-right">
+                                <section className="artwork-page-panel artwork-state-card artwork-mobile-state" aria-label="Auction and ownership status">
+                                    <div className="artwork-state-header">
+                                        <div>
+                                            <p className="artwork-page-kicker">Current state</p>
+                                            <h2>{mintedArtwork ? 'NFT ownership' : awaitingPayment ? 'Settlement' : 'Auction'}</h2>
+                                        </div>
+                                        <span className={`artsoul-card-status artsoul-card-status-${statusForState.key}`}>
+                                            {statusForState.label}
+                                        </span>
+                                    </div>
+
+                                    <dl className="artwork-state-metrics">
+                                        {liveAuction && (
+                                            <>
+                                                <dt>Current highest bid</dt>
+                                                <dd data-testid="live-auction-current-bid">{hasAuctionBids ? `${currentHighestBid} ETH` : 'No bids'}</dd>
+                                                <dt>Time remaining</dt>
+                                                <dd data-testid="live-auction-countdown">{timeLeft}</dd>
+                                            </>
+                                        )}
+                                        {awaitingPayment && (
+                                            <>
+                                                <dt>Final bid</dt>
+                                                <dd>{finalPrice} ETH</dd>
+                                                {settlementDeadlineMs > 0 && (
+                                                    <>
+                                                        <dt>Settlement window</dt>
+                                                        <dd><SettlementCountdown deadline={settlementDeadlineMs} /></dd>
+                                                        <dt>Deadline</dt>
+                                                        <dd>{new Date(settlementDeadlineMs).toLocaleString()}</dd>
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                        {mintedArtwork && (
+                                            <>
+                                                <dt>Final price</dt>
+                                                <dd>{finalPrice} ETH</dd>
+                                                {artwork.floor_price && parseFloat(artwork.floor_price) > 0 && (
+                                                    <><dt>Floor</dt><dd>{artwork.floor_price} ETH</dd></>
+                                                )}
+                                                {listedForResale && (
+                                                    <><dt>For sale</dt><dd>{artwork.sale_price} ETH</dd></>
+                                                )}
+                                            </>
+                                        )}
+                                        {!liveAuction && !awaitingPayment && !mintedArtwork && (
+                                            <><dt>Starting price</dt><dd>{startingPrice} ETH</dd></>
+                                        )}
+                                    </dl>
+
+                                    {liveAuction && (
+                                        <div className="artwork-state-action">
+                                            <label htmlFor="artworkBidAmount">Your bid</label>
+                                            <div className="artwork-bid-controls">
+                                                <input
+                                                    id="artworkBidAmount"
+                                                    type="number"
+                                                    step="0.000001"
+                                                    min={minimumBidDetails.eth}
+                                                    placeholder={`${minimumBidDetails.eth} ETH minimum`}
+                                                    value={bidAmount}
+                                                    onChange={(event) => setBidAmount(event.target.value)}
+                                                    disabled={isTransactionActionPending('bid')}
+                                                />
+                                                <button
+                                                    onClick={handlePlaceBid}
+                                                    className="btn-main artwork-page-primary-action"
+                                                    disabled={isTransactionActionPending('bid')}
+                                                    aria-busy={isTransactionActionPending('bid')}
+                                                >
+                                                    {isTransactionActionPending('bid') ? <TransactionProcessingLabel /> : 'Place Bid'}
+                                                </button>
+                                            </div>
+                                            <p>Minimum bid {minimumBidDetails.eth} ETH. A 10% deposit is required.</p>
+                                        </div>
+                                    )}
+
+                                    {canEndAuction && (
+                                        <button
+                                            onClick={handleEndAuction}
+                                            className="btn-secondary artwork-page-primary-action artwork-state-single-action"
+                                            disabled={isTransactionActionPending('end-auction')}
+                                            aria-busy={isTransactionActionPending('end-auction')}
+                                        >
+                                            {isTransactionActionPending('end-auction') ? <TransactionProcessingLabel /> : 'End Expired Auction'}
+                                        </button>
+                                    )}
+
+                                    {walletRenderState.settled && awaitingPayment && isSameAddress(connectedWalletAddress, winnerAddress) && (
+                                        <button
+                                            onClick={handleWinnerPurchase}
+                                            className="btn-main artwork-page-primary-action artwork-state-single-action"
+                                            disabled={isTransactionActionPending('settlement')}
+                                            aria-busy={isTransactionActionPending('settlement')}
+                                        >
+                                            {isTransactionActionPending('settlement') ? <TransactionProcessingLabel /> : `Complete Settlement and Mint NFT for ${finalPrice} ETH`}
+                                        </button>
+                                    )}
+
+                                    {listedForResale && (
+                                        <button
+                                            onClick={handleDirectPurchase}
+                                            className="btn-main artwork-page-primary-action artwork-state-single-action"
+                                            disabled={isTransactionActionPending('resale-purchase')}
+                                            aria-busy={isTransactionActionPending('resale-purchase')}
+                                        >
+                                            {isTransactionActionPending('resale-purchase') ? <TransactionProcessingLabel /> : `Buy for ${artwork.sale_price} ETH`}
+                                        </button>
+                                    )}
+
+                                    {canCreateNewAuction && (
+                                        <button
+                                            type="button"
+                                            className="btn-main artwork-page-primary-action artwork-state-single-action"
+                                            onClick={openNewAuctionModal}
+                                            disabled={isTransactionActionPending('create-auction')}
+                                        >
+                                            Create New Auction
+                                        </button>
+                                    )}
+
+                                    <div className="artwork-state-people">
+                                        {mintedArtwork && <h3>Provenance</h3>}
+                                        {awaitingPayment && renderOwnershipRole({
+                                            label: 'Winner',
+                                            address: winnerAddress,
+                                            profile: bidderProfiles[String(winnerAddress || '').toLowerCase()] || auctionWinnerProfile
+                                        })}
+                                        {(!awaitingPayment || !isSameAddress(creatorAddress, winnerAddress)) &&
+                                            renderOwnershipRole({ label: 'Creator', address: creatorAddress, profile: creatorProfile })}
+                                        {mintedArtwork && renderOwnershipRole({
+                                            label: 'First Collector',
+                                            address: artwork.auction_winner_address,
+                                            profile: auctionWinnerProfile
+                                        })}
+                                        {ownerAddress && !isZeroAddress(ownerAddress) && !isSameAddress(ownerAddress, creatorAddress) &&
+                                            (!awaitingPayment || !isSameAddress(ownerAddress, winnerAddress)) &&
+                                            (!mintedArtwork || !isSameAddress(ownerAddress, artwork.auction_winner_address)) &&
+                                            renderOwnershipRole({ label: 'Owner', address: ownerAddress, profile: currentOwnerProfile })}
+                                    </div>
                                 </section>
+
+                                {liveAuction && (
+                                    <section className="artwork-page-panel bid-activity-panel artwork-mobile-bids" aria-live="polite" data-testid="live-auction-bid-feed">
+                                        <div className="artwork-page-panel-heading">
+                                            <h2>Live bid feed</h2>
+                                            <span className="artwork-page-chip">{bidActivity.length} {bidActivity.length === 1 ? 'bid' : 'bids'}</span>
+                                        </div>
+                                        {bidActivity.length > 0 && (
+                                            <div className="artwork-bid-list">
+                                                {bidActivity.map(bid => (
+                                                    <div key={`${bid.transaction_hash || bid.block_number}:${bid.log_index}`} className="bid-activity-row">
+                                                        <a href={`profile.html?address=${encodeURIComponent(bid.bidder)}`} className="bidder-profile-link">
+                                                            {getBidderDisplayName(bid.bidder)}
+                                                        </a>
+                                                        <strong className="bid-activity-amount">{bid.bid_amount} ETH</strong>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
 
                                 <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai">
                                     <div className="artwork-page-panel-heading">
-                                        <div>
-                                            <p className="artwork-page-kicker">Gemini analysis</p>
-                                            <h2>Value Guidance</h2>
-                                        </div>
+                                        <h2>Gemini value guidance</h2>
                                         {aiGuidance?.confidence != null && (
                                             <span className="artwork-page-chip">
                                                 {Number.isFinite(Number(aiGuidance.confidence)) ? `${Number(aiGuidance.confidence)}%` : String(aiGuidance.confidence)} confidence
@@ -2097,14 +2239,14 @@ const { useState, useEffect, useRef } = React;
                                     {aiGuidance?.estimated_value_min_eth != null && aiGuidance?.estimated_value_max_eth != null && Number.isFinite(Number(aiGuidance.estimated_value_min_eth)) && Number.isFinite(Number(aiGuidance.estimated_value_max_eth)) ? (
                                         <>
                                             <p className="artwork-page-ai-range">
-                                                {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })}–{Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} to {Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
                                             </p>
-                                            <p className="artwork-page-copy">Suggested starting price: {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH</p>
+                                            <p className="artwork-page-copy">Suggested start {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH</p>
                                             {aiGuidance.rationale && <p className="artwork-page-copy">{aiGuidance.rationale}</p>}
                                         </>
                                     ) : aiGuidance?.range ? (
                                         <>
-                                            <p className="artwork-page-ai-range">{aiGuidance.range.low}–{aiGuidance.range.high} ETH</p>
+                                            <p className="artwork-page-ai-range">{aiGuidance.range.low} to {aiGuidance.range.high} ETH</p>
                                             {aiGuidance.reason && <p className="artwork-page-copy">{aiGuidance.reason}</p>}
                                         </>
                                     ) : (
@@ -2115,24 +2257,16 @@ const { useState, useEffect, useRef } = React;
 
                                 <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust">
                                     <div className="artwork-page-panel-heading">
-                                        <div>
-                                            <p className="artwork-page-kicker">Community context</p>
-                                            <h2>Trust & Discovery</h2>
-                                        </div>
+                                        <h2>Trust and Community</h2>
                                         {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
                                     </div>
-                                    <p className="artwork-page-note">Trust affects discovery only. It never affects price, floor, ownership, or settlement.</p>
                                     <div className="artwork-page-signal-grid">
                                         <div><strong>{socialSignals.likes || votes.length}</strong><span>Likes</span></div>
                                         <div><strong>{socialSignals.wouldBuy || 0}</strong><span>Would Buy</span></div>
                                         <div><strong>{socialSignals.watching || 0}</strong><span>Watching</span></div>
                                     </div>
                                     <div className="artwork-page-discovery-actions">
-                                        {userVote ? (
-                                            <p className="artwork-page-saved artwork-page-action-control">You voted</p>
-                                        ) : (
-                                            <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
-                                        )}
+                                        {userVote ? <p className="artwork-page-saved artwork-page-action-control">You voted</p> : <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>}
                                         <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.would_buy}>
                                             {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
                                         </button>
@@ -2140,22 +2274,36 @@ const { useState, useEffect, useRef } = React;
                                             {interactionState.watching ? 'Watching Saved' : 'Watching'}
                                         </button>
                                     </div>
+                                    <p className="artwork-page-note">Trust affects discovery only, never price, ownership, or settlement.</p>
+                                </section>
+
+                                <section className="artwork-page-panel artwork-page-description artwork-mobile-description">
+                                    <h2>Description</h2>
+                                    <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
                                 </section>
 
                                 <section className="artwork-page-panel artwork-page-extra artwork-mobile-extra">
-                                    <p className="artwork-page-kicker">Artwork details</p>
-                                    <h2>Additional Information</h2>
+                                    <h2>Artwork details</h2>
                                     <dl className="artwork-page-detail-list">
                                         {resolvedMedia.type && <><dt>Media</dt><dd>{resolvedMedia.type}</dd></>}
                                         {artwork.network && <><dt>Network</dt><dd>{artwork.network}</dd></>}
                                         {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
                                         {artwork.token_id && <><dt>Token ID</dt><dd>{artwork.token_id}</dd></>}
                                     </dl>
+                                    <div className="artwork-page-share-row">
+                                        <button
+                                            onClick={() => {
+                                                const text = `Check out "${artwork.title}" by ${creatorName || 'artist'} on ArtSoul Protocol!`;
+                                                const url = window.location.href;
+                                                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=550,height=420');
+                                            }}
+                                            className="btn-secondary artwork-page-compact-action artwork-page-share"
+                                            title="Share on X"
+                                        >
+                                            Share on X
+                                        </button>
+                                    </div>
                                 </section>
-                            </div>
-
-                            {/* Artwork Info */}
-                            <aside className="artwork-page-right">
                                 {moderationAccess?.canModerate && (
                                     <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -2214,56 +2362,9 @@ const { useState, useEffect, useRef } = React;
                                     </section>
                                 )}
 
-                                {/* Ownership Info - Three Roles */}
-                                <div className="artwork-page-panel artwork-page-people artwork-mobile-people">
-                                    <h3 className="text-xl font-bold mb-4">Ownership</h3>
-
-                                    <div className="space-y-4">
-                                        {renderOwnershipRole({
-                                            label: 'Creator',
-                                            address: artwork.creator_id,
-                                            profile: creatorProfile
-                                        })}
-
-                                        {renderOwnershipRole({
-                                            label: 'First Collector',
-                                            address: artwork.auction_winner_address,
-                                            profile: auctionWinnerProfile
-                                        })}
-
-                                        {artwork.current_owner_address &&
-                                            !isZeroAddress(artwork.current_owner_address) &&
-                                            !isSameAddress(artwork.current_owner_address, artwork.auction_winner_address) &&
-                                            renderOwnershipRole({
-                                                label: 'Owner',
-                                                address: artwork.current_owner_address,
-                                                profile: currentOwnerProfile
-                                            })}
-                                    </div>
-
-                                    {/* Share Button */}
-                                    <div className="mt-4 pt-4 border-t border-current/20">
-                                        <button
-                                            onClick={() => {
-                                                const text = `Check out "${artwork.title}" by ${getProfileDisplayName(creatorProfile, artwork.creator_id) || 'artist'} on ArtSoul Protocol!`;
-                                                const url = window.location.href;
-                                                const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
-                                                window.open(twitterUrl, '_blank', 'width=550,height=420');
-                                            }}
-                                            className="btn-secondary artwork-page-compact-action artwork-page-share flex items-center justify-center gap-2"
-                                            title="Share on X"
-                                        >
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                            </svg>
-                                            <span>Share on X</span>
-                                        </button>
-                                    </div>
-                                </div>
-
                                 {/* Auction Info */}
                                 {auction && (
-                                    <div className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">
+                                    <div className="auction-detail-panel artwork-mobile-auction artwork-page-legacy-summary p-6 rounded-xl" aria-hidden="true">
                                         <h3 className="text-2xl font-bold mb-4">Auction</h3>
 
                                         <div className="space-y-3">
@@ -2276,7 +2377,7 @@ const { useState, useEffect, useRef } = React;
                                                     {auctionEnded ? 'Final Bid:' : 'Current Bid:'}
                                                 </span>
                                                 <span className="font-bold text-2xl" data-testid="live-auction-current-bid">
-                                                    {hasAuctionBids ? `${currentHighestBid} ETH` : 'No bids yet'}
+                                                    {hasAuctionBids ? `${currentHighestBid} ETH` : 'No bids'}
                                                 </span>
                                             </div>
                                             {!isZeroAddress(currentHighestBidder) && (
@@ -2369,7 +2470,7 @@ const { useState, useEffect, useRef } = React;
                                                     </div>
                                                 ) : (
                                                     <div className="bid-activity-empty rounded-lg px-4 py-5 text-center text-sm">
-                                                        No bids yet — be the first
+                                                        No bids recorded
                                                     </div>
                                                 )}
                                         </section>
@@ -2500,7 +2601,7 @@ const { useState, useEffect, useRef } = React;
                                 )}
 
                                 {canCreateNewAuction && (
-                                    <section className="new-auction-panel artwork-mobile-auction-action rounded-xl p-6" aria-label="Create a new auction">
+                                    <section className="new-auction-panel artwork-mobile-auction-action artwork-page-legacy-summary rounded-xl p-6" aria-hidden="true">
                                         <h3 className="text-2xl font-bold mb-2">Create New Auction</h3>
                                         <p className="text-sm opacity-70 mb-4">
                                             Re-list this eligible artwork with a fresh starting price, duration, and updated value guidance.

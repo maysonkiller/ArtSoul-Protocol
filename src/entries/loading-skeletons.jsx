@@ -25,15 +25,26 @@ export function ArtworkPageSkeleton() {
         <main className="artwork-page-shell" role="status" aria-label="Loading artwork" aria-busy="true">
             <div className="artwork-page-layout">
                 <div className="artwork-page-left">
+                    <section className="artwork-detail-stage artwork-mobile-media">
+                        <SkeletonBlock className="artsoul-skeleton-media artwork-page-skeleton-media" />
+                    </section>
                     <header className="artwork-page-header artwork-mobile-header">
                         <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-heading" />
                         <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-short" />
                     </header>
-                    <section className="artwork-detail-stage artwork-mobile-media">
-                        <SkeletonBlock className="artsoul-skeleton-media artwork-page-skeleton-media" />
+                </div>
+                <aside className="artwork-page-right">
+                    <section className="artwork-page-panel artwork-mobile-state">
+                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
+                        <SkeletonBlock className="artsoul-skeleton-line" />
+                        <SkeletonBlock className="artsoul-skeleton-button" />
                     </section>
                     <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai">
                         <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-short" />
+                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
+                        <SkeletonBlock className="artsoul-skeleton-line" />
+                    </section>
+                    <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust">
                         <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
                         <SkeletonBlock className="artsoul-skeleton-line" />
                     </section>
@@ -42,23 +53,11 @@ export function ArtworkPageSkeleton() {
                         <SkeletonBlock className="artsoul-skeleton-line" />
                         <SkeletonBlock className="artsoul-skeleton-line" />
                     </section>
-                    <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust">
+                    <section className="artwork-page-panel artwork-page-extra artwork-mobile-extra">
                         <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
                         <SkeletonBlock className="artsoul-skeleton-line" />
                     </section>
-                </div>
-                <aside className="artwork-page-right">
-                    <section className="artwork-page-panel artwork-mobile-auction">
-                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
-                        <SkeletonBlock className="artsoul-skeleton-line" />
-                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-short" />
-                        <SkeletonBlock className="artsoul-skeleton-button" />
-                    </section>
-                    <section className="artwork-page-panel artwork-mobile-people">
-                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
-                        <SkeletonBlock className="artsoul-skeleton-line" />
-                        <SkeletonBlock className="artsoul-skeleton-line" />
-                    </section>
+                    <SkeletonBlock className="artsoul-skeleton-button artwork-mobile-back" />
                 </aside>
             </div>
         </main>
