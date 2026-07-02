@@ -169,7 +169,6 @@ const { useState, useEffect, useRef } = React;
                                     className={`artwork-detail-audio-logo ${isPlaying ? 'is-playing' : ''}`}
                                 />
                             </div>
-                            <div className="artwork-detail-audio-title">{sanitizedTitle}</div>
                         </div>
                         <div className="artwork-detail-audio-controls">
                             <audio
@@ -2155,8 +2154,7 @@ const { useState, useEffect, useRef } = React;
                                     </div>
                                 </section>
 
-                                <section className="artwork-page-insights artwork-mobile-insights" aria-label="Artwork analysis and community signals">
-                                    <div className="artwork-page-panel artwork-page-trust">
+                                <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust" aria-label="Community signals">
                                         <div className="artwork-page-panel-heading">
                                             <h2>Community</h2>
                                             {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
@@ -2179,9 +2177,9 @@ const { useState, useEffect, useRef } = React;
                                                 {interactionState.watching ? 'Watching Saved' : 'Watching'}
                                             </button>
                                         </div>
-                                    </div>
+                                </section>
 
-                                    <div className="artwork-page-panel artwork-page-ai">
+                                <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai" aria-label="Gemini analysis">
                                         <div className="artwork-page-panel-heading">
                                             <h2>Gemini Analysis</h2>
                                             {aiGuidance?.confidence != null && (
@@ -2207,7 +2205,6 @@ const { useState, useEffect, useRef } = React;
                                             <p className="artwork-page-copy">{aiGuidance?.reason || 'AI analysis is unavailable for this artwork.'}</p>
                                         )}
                                         <p className="artwork-page-note">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</p>
-                                    </div>
                                 </section>
                             </div>
 

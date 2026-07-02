@@ -34,16 +34,14 @@ export function ArtworkPageSkeleton() {
                         <SkeletonBlock className="artsoul-skeleton-line" />
                         <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
                     </section>
-                    <section className="artwork-page-insights artwork-mobile-insights">
-                        <div className="artwork-page-panel artwork-page-trust">
-                            <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
-                            <SkeletonBlock className="artsoul-skeleton-line" />
-                        </div>
-                        <div className="artwork-page-panel artwork-page-ai">
-                            <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-short" />
-                            <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
-                            <SkeletonBlock className="artsoul-skeleton-line" />
-                        </div>
+                    <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust">
+                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
+                        <SkeletonBlock className="artsoul-skeleton-line" />
+                    </section>
+                    <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai">
+                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-short" />
+                        <SkeletonBlock className="artsoul-skeleton-line artsoul-skeleton-line-title" />
+                        <SkeletonBlock className="artsoul-skeleton-line" />
                     </section>
                 </div>
                 <aside className="artwork-page-right">

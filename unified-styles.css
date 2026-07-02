@@ -908,12 +908,6 @@ body.future .artwork-detail-frame {
     filter: drop-shadow(0 0 12px var(--c-glow));
 }
 
-.artwork-detail-audio-title {
-    color: var(--c-text);
-    font-size: 18px;
-    font-weight: 600;
-}
-
 .artwork-detail-audio-controls {
     display: flex;
     flex: 0 0 auto;
@@ -989,6 +983,40 @@ body.future .artwork-detail-frame {
 }
 
 /* Artwork detail V3 */
+.artwork-header-row {
+    width: 100%;
+}
+
+.artwork-header-spacer {
+    min-width: 0;
+}
+
+.artwork-header-actions {
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.artwork-header-initializing-button {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--c-border);
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--c-text);
+    opacity: 0.72;
+}
+
+.artwork-header-initializing-avatar {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border-radius: 9999px;
+    object-fit: cover;
+}
+
 .artwork-page-root,
 .artwork-page-shell,
 .artwork-page-layout,
@@ -1029,39 +1057,25 @@ body.future .artwork-detail-frame {
     display: flex;
     min-height: 0;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    padding: 12px 14px 8px !important;
+    background: transparent !important;
 }
 
 .artwork-page-context .artwork-page-header,
 .artwork-page-context .artwork-page-description {
-    padding-bottom: 11px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--c-border-soft);
 }
 
 .artwork-page-context .artwork-page-description {
     min-height: 0;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .artwork-page-context .artwork-page-description h2,
 .artwork-page-context .artwork-page-extra h2 {
     margin-bottom: 7px;
-}
-
-.artwork-page-insights {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.artwork-page-insights > .artwork-page-panel {
-    min-width: 0;
-}
-
-.artwork-page-insights .artwork-page-ai,
-.artwork-page-insights .artwork-page-trust {
-    grid-area: auto;
 }
 
 .artwork-page-card-heading {
@@ -1301,10 +1315,11 @@ body.future .artwork-detail-frame {
         position: sticky;
         top: 0;
         grid-template-columns: minmax(0, 1.28fr) minmax(270px, 0.72fr);
-        grid-template-rows: minmax(0, 1fr) auto;
+        grid-template-rows: auto minmax(0, 1fr) 160px;
         grid-template-areas:
             "media context"
-            "insights insights";
+            "media ai"
+            "trust trust";
         height: 100%;
         min-height: 0;
         gap: 11px;
@@ -1313,12 +1328,24 @@ body.future .artwork-detail-frame {
 
     .artwork-page-left .artwork-detail-stage { grid-area: media; }
     .artwork-page-left .artwork-page-context { grid-area: context; }
-    .artwork-page-left .artwork-page-insights { grid-area: insights; }
+    .artwork-page-left .artwork-page-ai { grid-area: ai; }
+    .artwork-page-left .artwork-page-trust { grid-area: trust; }
 
     .artwork-page-left .artwork-page-context {
         align-self: start;
         height: fit-content;
         max-height: 100%;
+    }
+
+    .artwork-page-left .artwork-page-ai {
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .artwork-page-left .artwork-page-trust {
+        box-sizing: border-box;
+        width: 100%;
+        height: 160px;
     }
 
     .artwork-page-right {
@@ -1356,6 +1383,12 @@ body.future .artwork-detail-frame {
         border-width: 1px;
     }
 
+    body.classic .artwork-page-left .artwork-detail-frame:not(.artwork-detail-frame-audio),
+    body.future .artwork-page-left .artwork-detail-frame:not(.artwork-detail-frame-audio) {
+        border-width: 1px 0;
+        box-shadow: none;
+    }
+
     .artwork-page-left .artwork-detail-frame-audio,
     .artwork-page-left .artwork-detail-frame-unknown {
         width: 100%;
@@ -1370,7 +1403,7 @@ body.future .artwork-detail-frame {
         max-width: 100%;
         max-height: 100%;
         padding: 0;
-        object-fit: contain;
+        object-fit: fill;
     }
 
     .artwork-page-left .artwork-detail-video-shell {
@@ -1387,10 +1420,11 @@ body.future .artwork-detail-frame {
 @media (max-width: 1180px) and (min-width: 901px) {
     .artwork-page-left {
         grid-template-columns: minmax(0, 1.2fr) minmax(230px, 0.8fr);
-        grid-template-rows: minmax(0, 1fr) auto;
+        grid-template-rows: auto minmax(0, 1fr) 160px;
         grid-template-areas:
             "media context"
-            "insights insights";
+            "media ai"
+            "trust trust";
     }
 }
 
@@ -1407,6 +1441,7 @@ body.future .artwork-detail-frame {
     .artwork-page-layout {
         display: flex;
         flex-direction: column;
+        align-items: stretch;
         gap: 10px;
     }
 
@@ -1419,11 +1454,17 @@ body.future .artwork-detail-frame {
     .artwork-page-left .artwork-mobile-context { order: 2; }
     .artwork-page-right .artwork-mobile-auction { order: 3; }
     .artwork-page-right .artwork-mobile-people { order: 4; }
-    .artwork-page-left .artwork-mobile-insights { order: 5; }
-    .artwork-page-right .artwork-mobile-moderation { order: 6; }
+    .artwork-page-left .artwork-mobile-trust { order: 5; }
+    .artwork-page-left .artwork-mobile-ai { order: 6; }
+    .artwork-page-right .artwork-mobile-moderation { order: 7; }
 
-    .artwork-page-insights {
-        grid-template-columns: 1fr;
+    .artwork-mobile-context,
+    .artwork-mobile-auction,
+    .artwork-mobile-people,
+    .artwork-mobile-trust,
+    .artwork-mobile-ai,
+    .artwork-mobile-moderation {
+        width: 100%;
     }
 
     .artwork-page-left .artwork-detail-stage {
@@ -1439,11 +1480,17 @@ body.future .artwork-detail-frame {
     }
 
     .artwork-page-left .artwork-detail-frame {
-        width: fit-content;
+        width: 100%;
         height: fit-content;
         max-width: 100%;
         max-height: 58dvh;
         border-width: 1px;
+    }
+
+    body.classic .artwork-page-left .artwork-detail-frame:not(.artwork-detail-frame-audio),
+    body.future .artwork-page-left .artwork-detail-frame:not(.artwork-detail-frame-audio) {
+        border-width: 1px 0;
+        box-shadow: none;
     }
 
     .artwork-page-left .artwork-detail-frame-audio,
@@ -1455,12 +1502,12 @@ body.future .artwork-detail-frame {
     .artwork-page-left .artwork-detail-media-object,
     .artwork-page-left .artwork-detail-video-shell,
     .artwork-page-left .artwork-detail-video {
-        width: auto;
+        width: 100%;
         height: auto;
         max-width: 100%;
         max-height: 58dvh;
         padding: 0;
-        object-fit: contain;
+        object-fit: fill;
     }
 
     .artwork-page-header {
