@@ -547,6 +547,9 @@ body.future .artwork-page-compact-action {
     --c-card-border: rgba(169, 221, 211, 0.52);
     --c-glow: rgba(169, 221, 211, 0.28);
     --c-glow-strong: rgba(169, 221, 211, 0.55);
+    --c-media-glass: rgba(1, 1, 1, 0.62);
+    --c-media-glass-border: rgba(169, 221, 211, 0.34);
+    --c-media-glass-shadow: rgba(1, 1, 1, 0.48);
     --c-accent-rgb: 169, 221, 211;
     --c-accent-2-rgb: 169, 221, 211;
     --c-accent-3-rgb: 169, 221, 211;
@@ -565,6 +568,9 @@ body.future .artwork-page-compact-action {
     --c-card-border: rgba(0, 245, 255, 0.48);
     --c-glow: rgba(0, 245, 255, 0.28);
     --c-glow-strong: rgba(191, 0, 255, 0.42);
+    --c-media-glass: rgba(2, 6, 17, 0.58);
+    --c-media-glass-border: rgba(0, 245, 255, 0.34);
+    --c-media-glass-shadow: rgba(0, 0, 0, 0.52);
     --c-accent-rgb: 0, 245, 255;
     --c-accent-2-rgb: 191, 0, 255;
     --c-accent-3-rgb: 255, 0, 191;
@@ -985,6 +991,499 @@ body.future .artwork-detail-frame {
     .artsoul-card-media-controls,
     .artsoul-card-media-badge {
         opacity: 1 !important;
+    }
+}
+
+body.classic .page-context-title.artwork-page-context-title,
+body.future .page-context-title.artwork-page-context-title {
+    background: none !important;
+    color: var(--c-text) !important;
+    -webkit-text-fill-color: currentColor !important;
+    animation: none !important;
+}
+
+/* Artwork detail V3 */
+.artwork-page-root,
+.artwork-page-shell,
+.artwork-page-layout,
+.artwork-page-left,
+.artwork-page-right {
+    min-width: 0;
+}
+
+.artwork-page-root {
+    color: var(--c-text);
+}
+
+.artwork-page-context-title {
+    color: var(--c-text) !important;
+    font-family: inherit;
+    font-size: 0.78rem !important;
+    font-weight: 550 !important;
+    letter-spacing: 0.025em !important;
+    line-height: 1.25;
+    opacity: 0.68;
+    text-transform: none !important;
+}
+
+.artwork-page-root .artwork-page-panel,
+.artwork-page-root .auction-detail-panel,
+.artwork-page-root .bid-activity-panel,
+.artwork-page-root .moderation-panel {
+    border-color: var(--c-border-soft);
+    background: var(--c-surface);
+    color: var(--c-text);
+}
+
+.artwork-page-root .artwork-page-panel {
+    padding: 12px 14px;
+}
+
+.artwork-page-root .artwork-page-panel h2,
+.artwork-page-root .artwork-page-panel h3 {
+    font-size: 0.94rem;
+    line-height: 1.25;
+}
+
+.artwork-page-root .artwork-page-panel-heading {
+    align-items: center;
+    margin-bottom: 9px;
+}
+
+.artwork-page-card-heading {
+    position: relative;
+    display: flex;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.artwork-page-card-heading > .artsoul-card-status,
+.artwork-page-card-heading > .text-xs {
+    position: absolute;
+    right: 0;
+}
+
+.artwork-page-card-title {
+    margin: 0;
+    color: var(--c-text);
+    font-size: 0.94rem;
+    font-weight: 750;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.artwork-page-people > .artwork-page-card-title {
+    margin-bottom: 10px;
+}
+
+.artwork-page-people-list {
+    display: grid;
+    gap: 7px;
+}
+
+.artwork-page-root .artwork-page-people .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0;
+}
+
+.artwork-page-root .artwork-page-copy {
+    font-size: 0.78rem;
+    line-height: 1.48;
+}
+
+.artwork-page-root .artwork-page-ai-range {
+    margin: 7px 0 9px;
+    font-size: clamp(1.2rem, 2vw, 1.7rem);
+}
+
+.artwork-page-root .artwork-page-note {
+    margin-top: 8px;
+    font-size: 0.68rem;
+    line-height: 1.4;
+}
+
+.artwork-page-root .artwork-page-signal-grid {
+    gap: 6px;
+    margin: 9px 0 7px;
+}
+
+.artwork-page-root .artwork-page-signal-grid > div {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 7px;
+}
+
+.artwork-page-root .artwork-page-signal-grid strong {
+    font-size: 0.9rem;
+}
+
+.artwork-page-root .artwork-page-signal-grid span {
+    font-size: 0.64rem;
+}
+
+.artwork-page-root .artwork-page-discovery-actions {
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.artwork-page-root .artwork-page-trust .artwork-page-action-control {
+    min-height: 34px !important;
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.68rem;
+}
+
+.artwork-page-root .artwork-page-detail-list {
+    margin-top: 8px;
+    gap: 5px 12px;
+    font-size: 0.68rem;
+    line-height: 1.3;
+}
+
+.artwork-page-root .artwork-page-detail-list a {
+    color: var(--c-accent);
+    text-decoration: underline;
+    text-decoration-color: var(--c-border-soft);
+    text-underline-offset: 2px;
+}
+
+.artwork-auction-fact {
+    align-items: baseline;
+    gap: 16px;
+    font-size: 0.8rem;
+}
+
+.artwork-bid-input,
+.artwork-settlement-window,
+.artwork-settlement-notice {
+    border-color: var(--c-border-soft);
+    background: var(--c-surface-muted);
+    color: var(--c-text);
+}
+
+.artwork-bid-input:focus {
+    border-color: var(--c-border);
+    box-shadow: 0 0 0 2px var(--c-glow);
+}
+
+.artwork-settlement-window,
+.artwork-settlement-notice {
+    box-shadow: inset 0 0 18px var(--c-glow);
+}
+
+.artwork-sale-price {
+    color: var(--c-accent);
+}
+
+.artwork-page-root .auction-detail-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+}
+
+.artwork-page-root .bid-activity-panel {
+    order: 10;
+    padding: 12px;
+}
+
+.artwork-page-root .bid-activity-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.bid-activity-identity {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bid-activity-identity time {
+    color: var(--c-text);
+    font-size: 0.62rem;
+    opacity: 0.58;
+}
+
+.artwork-page-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.artwork-page-navigation .artwork-page-compact-action {
+    min-width: 104px;
+    min-height: 38px !important;
+    align-self: auto;
+}
+
+.artwork-detail-audio-controls {
+    border: 1px solid var(--c-media-glass-border);
+    border-radius: 12px;
+    background: var(--c-media-glass);
+    box-shadow: 0 10px 28px var(--c-media-glass-shadow);
+    -webkit-backdrop-filter: blur(16px) saturate(125%);
+    backdrop-filter: blur(16px) saturate(125%);
+}
+
+.artwork-detail-audio-player::-webkit-media-controls-panel,
+.artwork-detail-video::-webkit-media-controls-panel {
+    border: 1px solid var(--c-media-glass-border);
+    background: var(--c-media-glass);
+    -webkit-backdrop-filter: blur(16px) saturate(125%);
+    backdrop-filter: blur(16px) saturate(125%);
+}
+
+.artwork-detail-video-shell::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    z-index: 2;
+    height: 46px;
+    border: 1px solid var(--c-media-glass-border);
+    border-radius: 10px;
+    background: var(--c-media-glass);
+    box-shadow: 0 8px 24px var(--c-media-glass-shadow);
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(16px) saturate(125%);
+    backdrop-filter: blur(16px) saturate(125%);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .artwork-detail-audio-controls,
+    .artwork-detail-audio-player::-webkit-media-controls-panel,
+    .artwork-detail-video::-webkit-media-controls-panel,
+    .artwork-detail-video-shell::after {
+        background: var(--c-media-glass);
+    }
+}
+
+@media (min-width: 901px) {
+    .artwork-page-root {
+        height: calc(100vh - 105px);
+        height: calc(100dvh - 105px);
+        overflow: hidden;
+    }
+
+    .artwork-page-shell {
+        width: min(100%, 1380px);
+        height: 100%;
+        padding: 12px 18px 16px;
+        overflow: hidden;
+    }
+
+    .artwork-page-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(350px, 400px);
+        gap: clamp(16px, 2vw, 28px);
+        height: 100%;
+        align-items: stretch;
+    }
+
+    .artwork-page-left {
+        position: sticky;
+        top: 0;
+        grid-template-columns: minmax(0, 1.35fr) minmax(250px, 0.72fr);
+        grid-template-areas:
+            "header header"
+            "media ai"
+            "media description"
+            "trust trust"
+            "extra extra";
+        height: 100%;
+        min-height: 0;
+        gap: 11px;
+        overflow: hidden;
+    }
+
+    .artwork-page-right {
+        position: static;
+        display: flex;
+        height: 100%;
+        max-height: none;
+        padding: 0 6px 14px 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .artwork-page-header .artwork-detail-title {
+        font-size: clamp(1.35rem, 2.25vw, 2.15rem);
+        line-height: 1.04;
+        letter-spacing: -0.025em;
+    }
+
+    .artwork-page-left .artwork-detail-stage {
+        display: flex;
+        width: 100%;
+        height: clamp(260px, 38vh, 410px);
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+    }
+
+    .artwork-page-left .artwork-detail-frame {
+        width: fit-content;
+        height: fit-content;
+        max-width: 100%;
+        max-height: 100%;
+        border-width: 1px;
+    }
+
+    .artwork-page-left .artwork-detail-frame-audio,
+    .artwork-page-left .artwork-detail-frame-unknown {
+        width: min(100%, 520px);
+        height: 100%;
+    }
+
+    .artwork-page-left .artwork-detail-media-object,
+    .artwork-page-left .artwork-detail-video-shell,
+    .artwork-page-left .artwork-detail-video {
+        width: auto;
+        height: auto;
+        max-width: 100%;
+        max-height: 100%;
+        padding: 0;
+        object-fit: contain;
+    }
+
+    .artwork-page-left .artwork-detail-video-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .artwork-page-right .artwork-mobile-auction { order: 1; }
+    .artwork-page-right .artwork-mobile-people { order: 2; }
+    .artwork-page-right .artwork-mobile-moderation { order: 3; }
+    .artwork-page-right .artwork-mobile-navigation { order: 4; }
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+    .artwork-page-left {
+        grid-template-columns: minmax(0, 1.2fr) minmax(230px, 0.8fr);
+        grid-template-areas:
+            "header header"
+            "media ai"
+            "media description"
+            "trust trust"
+            "extra extra";
+    }
+
+    .artwork-page-left .artwork-detail-stage {
+        height: clamp(240px, 34vh, 360px);
+    }
+}
+
+@media (max-width: 900px) {
+    .artwork-page-root {
+        min-height: 0;
+    }
+
+    .artwork-page-shell {
+        width: 100%;
+        padding: 10px 12px 18px;
+    }
+
+    .artwork-page-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .artwork-page-left,
+    .artwork-page-right {
+        display: contents;
+    }
+
+    .artwork-mobile-media { order: 1; }
+    .artwork-mobile-header { order: 2; }
+    .artwork-mobile-auction { order: 3; }
+    .artwork-mobile-people { order: 4; }
+    .artwork-mobile-ai { order: 5; }
+    .artwork-mobile-trust { order: 6; }
+    .artwork-mobile-description { order: 7; }
+    .artwork-mobile-extra { order: 8; }
+    .artwork-mobile-moderation { order: 9; }
+    .artwork-mobile-navigation { order: 10; }
+
+    .artwork-page-left .artwork-detail-stage {
+        display: flex;
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+        aspect-ratio: auto;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+    }
+
+    .artwork-page-left .artwork-detail-frame {
+        width: fit-content;
+        height: fit-content;
+        max-width: 100%;
+        max-height: 58dvh;
+        border-width: 1px;
+    }
+
+    .artwork-page-left .artwork-detail-frame-audio,
+    .artwork-page-left .artwork-detail-frame-unknown {
+        width: 100%;
+        height: min(54dvh, 380px);
+    }
+
+    .artwork-page-left .artwork-detail-media-object,
+    .artwork-page-left .artwork-detail-video-shell,
+    .artwork-page-left .artwork-detail-video {
+        width: auto;
+        height: auto;
+        max-width: 100%;
+        max-height: 58dvh;
+        padding: 0;
+        object-fit: contain;
+    }
+
+    .artwork-page-header {
+        padding: 1px 2px 3px;
+    }
+
+    .artwork-page-header .artwork-detail-title {
+        margin: 0;
+        font-size: clamp(1.35rem, 6.8vw, 1.95rem);
+        line-height: 1.06;
+        letter-spacing: -0.025em;
+    }
+
+    .artwork-page-root .artwork-page-panel,
+    .artwork-page-root .auction-detail-panel,
+    .artwork-page-root .moderation-panel {
+        padding: 12px;
+    }
+
+    .artwork-page-navigation {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .artwork-page-navigation .artwork-page-compact-action {
+        min-width: 0;
+        min-height: 44px !important;
+        flex: 1;
+    }
+
+    .artwork-page-root .artwork-page-layout *,
+    .artwork-page-root .artwork-page-layout *::before,
+    .artwork-page-root .artwork-page-layout *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
     }
 }
 

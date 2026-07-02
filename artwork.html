@@ -26,17 +26,17 @@
     <meta property="og:site_name" content="ArtSoul">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:site" content="@ArtSoul">
-    <meta id="og-title" property="og:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta id="og-title" property="og:title" content="ArtSoul: Discovery-First Art Auctions">
     <meta id="og-description" property="og:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
     <meta id="og-image" property="og:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:image:alt" content="ArtSoul: Discovery-First Art Auctions">
     <meta id="og-url" property="og:url" content="https://artsoul.vercel.app/artwork.html">
-    <meta id="twitter-title" name="twitter:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta id="twitter-title" name="twitter:title" content="ArtSoul: Discovery-First Art Auctions">
     <meta id="twitter-description" name="twitter:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
     <meta id="twitter-image" name="twitter:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
-    <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <meta name="twitter:image:alt" content="ArtSoul: Discovery-First Art Auctions">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="unified-styles.css?v=20">
@@ -79,14 +79,10 @@
 
     <script type="module" src="src/index.js"></script>
     <style>
-body.classic {
-            background: var(--bg-classic);
-            color: var(--text-classic);
-        }
-
+body.classic,
         body.future {
             background: var(--c-bg);
-            color: var(--accent-future);
+            color: var(--c-text);
         }
 
         /* Gradient flow animation for Future mode */
@@ -98,7 +94,7 @@ body.classic {
         .future h1,
         .future h2,
         .future h3 {
-            background: linear-gradient(90deg, var(--accent-future), var(--neon-purple), var(--accent-future));
+            background: linear-gradient(90deg, var(--c-accent), var(--c-accent-2), var(--c-accent));
             background-size: 200% 100%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -124,11 +120,7 @@ body.classic {
         }
 
         input:focus, textarea:focus {
-            border-color: var(--accent-future);
-        }
-
-        .classic input:focus, .classic textarea:focus {
-            border-color: var(--accent-classic);
+            border-color: var(--c-border);
         }
 
         /* Glow pulse animation for Future mode */
@@ -260,8 +252,7 @@ body.classic {
                     </a>
                 </div>
                 <div class="page-context">
-                    <div class="page-context-title">Artwork</div>
-                    <div class="page-context-subtitle">Auction, ownership, and provenance</div>
+                    <div class="page-context-title artwork-page-context-title">Artwork / Auction, ownership, and provenance</div>
                 </div>
                 <div class="flex items-center gap-3">
                     <div id="networkBadge"></div>
