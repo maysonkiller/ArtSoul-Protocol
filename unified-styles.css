@@ -2687,9 +2687,9 @@ header > .container > .flex > :last-child {
     display: flex !important;
     align-items: center !important;
     justify-content: flex-end !important;
-    width: 232px;
-    min-width: 232px;
-    max-width: 232px;
+    width: 208px;
+    min-width: 208px;
+    max-width: 208px;
     height: 56px;
     min-height: 56px;
     max-height: 56px;
@@ -2702,9 +2702,9 @@ header > .container > .flex > :last-child {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    width: 232px;
-    min-width: 232px;
-    max-width: 232px;
+    width: 208px;
+    min-width: 208px;
+    max-width: 208px;
     height: 56px;
     min-height: 56px;
     max-height: 56px;
@@ -2742,9 +2742,9 @@ header > .container > .flex > :last-child {
 }
 
 #navButtons .avatar-button {
-    width: 232px !important;
-    min-width: 232px !important;
-    max-width: 232px !important;
+    width: 208px !important;
+    min-width: 208px !important;
+    max-width: 208px !important;
     height: 56px !important;
     min-height: 56px !important;
     max-height: 56px !important;
@@ -2753,16 +2753,20 @@ header > .container > .flex > :last-child {
 }
 
 #navButtons .avatar-info {
-    width: 128px;
-    min-width: 128px;
-    max-width: 128px;
-    flex: 0 0 128px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 108px;
+    min-width: 108px;
+    max-width: 108px;
+    height: 40px;
+    flex: 0 0 108px;
     text-align: left;
 }
 
 #navButtons .avatar-info > div {
-    width: 128px;
-    max-width: 128px;
+    width: 108px;
+    max-width: 108px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

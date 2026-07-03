@@ -49,7 +49,7 @@
                     <img data-avatar-image src="/default-avatar.png" alt="ArtSoul" />
                     <div class="avatar-info">
                         <div data-avatar-name>ArtSoul Guest</div>
-                        <div data-avatar-address aria-hidden="true">&nbsp;</div>
+                        <div data-avatar-address hidden aria-hidden="true"></div>
                     </div>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow" aria-hidden="true">
                         <path d="M4 6l4 4 4-4"></path>
@@ -91,7 +91,8 @@
             }
             if (nameNode) nameNode.textContent = name || 'ArtSoul Guest';
             if (addressNode) {
-                addressNode.textContent = address || '\u00a0';
+                addressNode.hidden = !address;
+                addressNode.textContent = address || '';
                 addressNode.setAttribute('aria-hidden', address ? 'false' : 'true');
             }
 
