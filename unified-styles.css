@@ -1927,6 +1927,14 @@ body {
     min-height: 100%;
 }
 
+/* Keep page width stable while skeletons hydrate into scrollable content. */
+@media (min-width: 769px) {
+    html {
+        overflow-y: scroll;
+        scrollbar-gutter: stable;
+    }
+}
+
 html.classic,
 html.classic body {
     background: var(--bg-classic);
@@ -2500,6 +2508,16 @@ body.classic::before,
     box-shadow: 0 0 10px var(--c-glow-strong) !important;
 }
 
+.avatar-dropdown-menu .dropdown-profile-item {
+    background: var(--c-surface-muted) !important;
+    border-color: var(--c-border-soft) !important;
+    font-weight: 700 !important;
+}
+
+.avatar-dropdown-menu .dropdown-profile-item span {
+    font-weight: 700 !important;
+}
+
 .avatar-network-options {
     display: grid;
     gap: 0.25rem;
@@ -2677,10 +2695,12 @@ header > .container > .flex > :last-child {
     display: flex !important;
     align-items: center !important;
     justify-content: flex-end !important;
-    width: auto;
-    max-width: 100%;
-    min-width: 0;
-    min-height: 38px;
+    width: 208px;
+    min-width: 208px;
+    max-width: 208px;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
     overflow: visible !important;
 }
 
@@ -2690,21 +2710,25 @@ header > .container > .flex > :last-child {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    width: auto;
-    max-width: 100%;
-    min-height: 52px;
+    width: 208px;
+    min-width: 208px;
+    max-width: 208px;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
 }
 
 .avatar-button {
     display: flex !important;
     align-items: center !important;
-    gap: 0.75rem !important;
+    box-sizing: border-box;
+    gap: 0.5rem !important;
     padding: 0.5rem 0.75rem !important;
     border: 2px solid var(--c-border) !important;
     border-radius: 9999px !important;
     cursor: pointer;
     opacity: 1 !important;
-    min-height: 52px !important;
+    transition: none !important;
     background: var(--c-surface) !important;
     border-color: var(--c-border) !important;
     color: var(--c-text) !important;
@@ -2719,24 +2743,55 @@ header > .container > .flex > :last-child {
 }
 
 .avatar-button > .dropdown-arrow {
-    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    transition: none !important;
 }
 
 #navButtons .avatar-button {
-    width: auto;
-    max-width: 100%;
-    justify-content: center !important;
+    width: 208px !important;
+    min-width: 208px !important;
+    max-width: 208px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    justify-content: flex-start !important;
+    overflow: hidden;
 }
 
 #navButtons .avatar-info {
-    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 108px;
+    min-width: 108px;
+    max-width: 108px;
+    height: 40px;
+    flex: 0 0 108px;
+    text-align: left;
 }
 
 #navButtons .avatar-info > div {
-    max-width: 128px;
+    width: 108px;
+    max-width: 108px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+#navButtons [data-avatar-name] {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+#navButtons [data-avatar-address] {
+    min-height: 0.9rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    opacity: 0.6;
 }
 
 .classic .avatar-button {
@@ -2749,6 +2804,13 @@ header > .container > .flex > :last-child {
     background: rgba(2, 6, 17, 0.92) !important;
     border-color: rgba(var(--c-accent-rgb), 0.52) !important;
     color: var(--accent-future) !important;
+    animation: none !important;
+    box-shadow: 0 0 20px var(--c-glow), 0 0 40px var(--c-glow-strong) !important;
+}
+
+.future .avatar-button .avatar-info > div:first-child {
+    animation: none !important;
+    background-size: 100% 100% !important;
 }
 
 .avatar-dropdown-menu {
@@ -2760,6 +2822,43 @@ header > .container > .flex > :last-child {
     max-height: none !important;
     overflow: visible !important;
     overflow-y: visible !important;
+    padding: 0.5rem !important;
+    border-radius: 0.75rem !important;
+    box-sizing: border-box;
+    z-index: 10002 !important;
+}
+
+.avatar-theme-section {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--c-border-soft);
+}
+
+.avatar-theme-section .avatar-theme-switch {
+    width: 100%;
+}
+
+.avatar-theme-section .theme-btn {
+    flex: 1;
+}
+
+.avatar-dropdown-navigation {
+    padding: 0.25rem 0;
+}
+
+.avatar-dropdown-divider {
+    margin: 0.25rem 0;
+    border-top: 1px solid var(--c-border-soft);
+}
+
+.network-switcher-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.network-switcher-copy [data-network-balance] {
+    font-family: monospace;
+    font-size: 0.75rem;
+    opacity: 0.7;
 }
 
 @media (min-width: 769px) {
@@ -2915,25 +3014,43 @@ header > .container > .flex > :last-child {
 
     #navButtons {
         margin-left: auto;
-        width: auto;
-        max-width: none;
-        min-width: 52px;
-        min-height: 52px;
+        width: 80px;
+        min-width: 80px;
+        max-width: 80px;
+        height: 56px;
+        min-height: 56px;
+        max-height: 56px;
     }
 
     #navButtons .avatar-dropdown-container,
     #navButtons .avatar-button {
-        width: auto;
+        width: 80px !important;
+        min-width: 80px !important;
+        max-width: 80px !important;
+        height: 56px !important;
+        min-height: 56px !important;
+        max-height: 56px !important;
     }
 
     #navButtons .avatar-button {
-        min-height: 48px !important;
-        padding: 0.45rem 0.65rem !important;
+        justify-content: center !important;
+        gap: 0.5rem !important;
+        padding: 0.375rem !important;
+    }
+
+    #navButtons .avatar-info {
+        display: none !important;
     }
 
     #navButtons .avatar-button img {
         width: 40px !important;
         height: 40px !important;
+    }
+
+    #navButtons .avatar-button .dropdown-arrow {
+        width: 12px;
+        height: 12px;
+        flex-basis: 12px;
     }
 
     .avatar-dropdown-menu {
