@@ -125,6 +125,7 @@
 
         getNavigationLabels() {
             return window.ArtSoulNavigationLabels || {
+                home: 'Home',
                 explore: 'Explore Art',
                 publish: 'Publish Artwork',
                 auctions: 'Auctions',
@@ -141,6 +142,7 @@
             // (gallery.html), so they are intentionally NOT separate dropdown
             // destinations — one clear path to the gallery.
             return [
+                { href: 'index.html', label: labels.home || 'Home', path: 'index.html', home: true },
                 { href: 'gallery.html', label: labels.explore, path: 'gallery.html' },
                 { href: 'upload.html', label: labels.publish, path: 'upload.html' },
                 { href: 'auction-system.html', label: 'Protocol', path: 'auction-system.html' },
