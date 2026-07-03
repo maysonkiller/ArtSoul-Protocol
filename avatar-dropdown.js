@@ -443,8 +443,9 @@
                 <div id="avatarNetworkOptions" class="avatar-network-options" hidden>
                     <button
                         type="button"
-                        class="dropdown-item avatar-network-option"
+                        class="dropdown-item avatar-network-option is-active"
                         data-allow-rapid
+                        aria-current="true"
                         onclick="window.AvatarDropdown.selectNetwork(84532, event)"
                     >
                         <span class="network-option-indicator" aria-hidden="true"></span>
@@ -457,7 +458,6 @@
                         aria-disabled="true"
                         title="Coming soon"
                     >
-                        <span class="network-option-indicator" aria-hidden="true"></span>
                         <span>Ethereum Sepolia</span>
                         <span class="network-soon-badge">SOON</span>
                     </button>
@@ -465,7 +465,7 @@
             `;
         }
 
-        renderMenuContent({ currentPath, isOwnProfile, networkInfo = null }) {
+        renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false }) {
             const networkSection = networkInfo ? `
                 <button
                     onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
@@ -484,7 +484,12 @@
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
 
-            const accountAction = networkInfo ? `
+            const accountAction = restoring ? `
+                <div class="avatar-dropdown-divider"></div>
+                <div class="dropdown-item is-disabled wallet-restoring-state" role="status" aria-live="polite">
+                    <span>Restoring wallet...</span>
+                </div>
+            ` : networkInfo ? `
                 <div class="avatar-dropdown-divider"></div>
                 <button onclick="window.resetWalletConnection()" class="dropdown-item">
                     <span>Disconnect</span>
@@ -748,8 +753,35 @@
         renderInitializingState() {
             const container = this.getNavContainer();
             if (!container) return false;
-            if (container.dataset.avatarRenderKey === 'initializing' && container.querySelector('#avatarDropdownMenu')) return true;
-            return this.renderConnectButton({ renderKey: 'initializing' });
+
+            const storedWallet = (localStorage.getItem('artsoul_wallet') || '').toLowerCase();
+            const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
+            if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
+            if (container.dataset.avatarRenderKey === 'restoring-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
+
+            const currentPath = window.location.pathname;
+            const isProfilePage = currentPath.includes('profile.html');
+            const shortAddress = `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`;
+            container.dataset.avatarRenderKey = 'restoring-wallet';
+            this.pendingRenderKey = 'restoring-wallet';
+            this.updateStableButton({
+                avatarUrl: '/default-avatar.png',
+                avatarAlt: 'ArtSoul wallet',
+                name: 'Wallet',
+                address: shortAddress,
+                stateKey: 'restoring-wallet'
+            });
+            this.updateStableMenu(
+                this.renderMenuContent({
+                    currentPath,
+                    isOwnProfile: isProfilePage,
+                    restoring: true
+                }),
+                `restoring:${currentPath}:${isProfilePage}`
+            );
+            this.applyThemeStyles();
+            this.bindOutsideCloseOnce();
+            return true;
         }
 
         /**

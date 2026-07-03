@@ -29,6 +29,8 @@ test('profile identities and live bids are linked, named, timed, and newest firs
     assert.doesNotMatch(source, /label: 'Winner'/);
     assert.match(source, /getBidderDisplayName\(bid\.bidder\)/);
     assert.match(source, /formatBidTime\(bid\)/);
+    assert.match(source, /new Intl\.DateTimeFormat\('en-US'/);
+    assert.match(source, /hour12: false/);
     assert.match(source, /Number\(right\.block_number \|\| 0\) - Number\(left\.block_number \|\| 0\)/);
 });
 
@@ -54,7 +56,8 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-left \.artwork-page-context > \* \{[\s\S]*?flex: 0 0 auto;/);
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
-    assert.match(html, /unified-styles\.css\?v=21/);
+    assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
+    assert.match(html, /unified-styles\.css\?v=25/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -80,9 +83,13 @@ test('header keeps a top-right avatar button during wallet initialization', () =
     assert.match(html, /class="artwork-header-spacer flex-1"/);
     assert.match(html, /class="artwork-header-actions flex items-center gap-3"/);
     assert.match(html, /data-avatar-render-key="initializing"/);
-    assert.match(html, /class="avatar-button artwork-header-initializing-button"/);
+    assert.match(html, /class="avatar-button"/);
     assert.match(html, /src="\/default-avatar\.png"/);
+    assert.match(html, /data-avatar-name>ArtSoul<\/div>/);
     assert.match(styles, /\.artwork-header-actions \{[\s\S]*?margin-left: auto;/);
+    assert.match(styles, /body\.classic header \.logo-link > \.site-logo,[\s\S]*?height: 52px !important;[\s\S]*?max-height: 52px !important;/);
+    assert.match(styles, /#navButtons \{[\s\S]*?width: 68px;[\s\S]*?height: 48px;/);
+    assert.match(styles, /#navButtons \.avatar-button img \{[\s\S]*?width: 34px !important;[\s\S]*?height: 34px !important;/);
 });
 
 test('images keep their aspect ratio and support fullscreen while existing video and audio controls remain intact', () => {
