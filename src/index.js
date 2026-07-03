@@ -27,6 +27,8 @@ import './ui/ai-evaluation-panel.js';
  * Call this after contracts and supabase are initialized
  */
 function initializeServices() {
+    if (window.__artsoulServicesInitialized) return true;
+
     console.log('Initializing services...');
 
     // Check dependencies
@@ -66,6 +68,7 @@ function initializeServices() {
         // Initialize UI components
         initializeUIComponents();
 
+        window.__artsoulServicesInitialized = true;
         console.log('All services initialized successfully');
         return true;
     } catch (error) {
