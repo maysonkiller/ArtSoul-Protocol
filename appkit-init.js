@@ -117,6 +117,9 @@ const POST_CONNECT_DISCONNECT_GUARD = 1200;
 const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
 const WALLET_CONNECT_TIMEOUT_MOBILE = 240000;
 const WALLET_CONFIRMATION_INTERVAL = 400;
+const BASE_SEPOLIA_CHAIN_ID = 84532;
+const MOBILE_PROVIDER_REQUEST_TIMEOUT = 2500;
+const MOBILE_NETWORK_SWITCH_TIMEOUT = 120000;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
@@ -126,6 +129,13 @@ let lastAcceptedMobileAccountKey = null;
 let lastObservedAppKitAccountKey = null;
 let modalClosePromise = null;
 let modalCloseRetryTimer = null;
+let mobileSessionFinalizePromise = null;
+let mobileSessionFinalizeKey = '';
+let activeConnectAttempt = null;
+let connectAttemptSequence = 0;
+let walletDebugSequence = 0;
+const walletDebugEntries = [];
+const walletDebugStartedAt = Date.now();
 window.artsoulWalletHydrating = true;
 window.artsoulWalletStateSettled = false;
 window.artsoulSettledWalletState = null;
@@ -134,7 +144,16 @@ function walletDebugEnabled() {
     try {
         const params = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
-        const requested = params.get('walletDebug') === '1' || hashParams.get('walletDebug') === '1';
+        const disabled = ['walletdebug', 'walletDebug'].some((key) => (
+            params.get(key) === '0' || hashParams.get(key) === '0'
+        ));
+        if (disabled) {
+            localStorage.removeItem('artsoul_wallet_debug');
+            return false;
+        }
+        const requested = ['walletdebug', 'walletDebug'].some((key) => (
+            params.get(key) === '1' || hashParams.get(key) === '1'
+        ));
         if (requested) localStorage.setItem('artsoul_wallet_debug', '1');
         return requested || localStorage.getItem('artsoul_wallet_debug') === '1';
     } catch {
@@ -142,15 +161,40 @@ function walletDebugEnabled() {
     }
 }
 
+function sanitizeWalletDebugValue(value, key = '') {
+    if (value === null || value === undefined) return value;
+    if (/signature|private|secret|token|projectid/i.test(key)) return '[redacted]';
+    if (typeof value === 'string') {
+        return value.replace(/0x[a-fA-F0-9]{40}/g, (address) => maskWalletAddress(address));
+    }
+    if (Array.isArray(value)) return value.slice(0, 8).map((item) => sanitizeWalletDebugValue(item));
+    if (typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value)
+                .slice(0, 24)
+                .map(([entryKey, entryValue]) => [entryKey, sanitizeWalletDebugValue(entryValue, entryKey)])
+        );
+    }
+    return value;
+}
+
 function walletDebugLog(step, detail = null) {
+    if (!walletDebugEnabled()) return;
+
     const payload = {
+        sequence: ++walletDebugSequence,
+        elapsedMs: Date.now() - walletDebugStartedAt,
         step,
-        detail,
+        detail: sanitizeWalletDebugValue(detail),
+        attemptId: activeConnectAttempt?.id || null,
+        visibility: document.visibilityState,
+        focused: document.hasFocus?.() ?? null,
+        online: navigator.onLine,
         time: new Date().toISOString()
     };
+    walletDebugEntries.push(payload);
+    if (walletDebugEntries.length > 300) walletDebugEntries.shift();
     console.log('[ArtSoulWalletDebug]', payload);
-
-    if (!walletDebugEnabled()) return;
 
     let panel = document.getElementById('artsoul-wallet-debug');
     if (!panel) {
@@ -167,18 +211,18 @@ function walletDebugLog(step, detail = null) {
             'overflow:auto',
             'padding:10px',
             'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
-            'color:#e9fff9',
-            'background:rgba(0,0,0,0.88)',
-            'border:1px solid rgba(0,245,255,0.5)',
+            'color:var(--c-text)',
+            'background:var(--c-surface)',
+            'border:1px solid var(--c-border)',
             'border-radius:8px',
-            'box-shadow:0 0 18px rgba(0,245,255,0.22)',
+            'box-shadow:0 0 18px var(--c-glow, transparent)',
             'white-space:pre-wrap'
         ].join(';');
         document.documentElement.appendChild(panel);
     }
 
     const line = document.createElement('div');
-    line.textContent = `${payload.time} ${step}${detail ? ` ${JSON.stringify(detail)}` : ''}`;
+    line.textContent = `${payload.time} ${step}${payload.detail ? ` ${JSON.stringify(payload.detail)}` : ''}`;
     panel.appendChild(line);
     panel.scrollTop = panel.scrollHeight;
 }
@@ -192,7 +236,10 @@ window.ArtSoulWalletDebug = {
         localStorage.removeItem('artsoul_wallet_debug');
         document.getElementById('artsoul-wallet-debug')?.remove();
     },
-    log: walletDebugLog
+    log: walletDebugLog,
+    snapshot() {
+        return walletDebugEntries.map((entry) => ({ ...entry }));
+    }
 };
 
 function parseChainId(value) {
@@ -202,19 +249,44 @@ function parseChainId(value) {
     if (typeof value === 'string') {
         const trimmed = value.trim();
         if (!trimmed) return null;
+        const caipMatch = trimmed.match(/^eip155:(\d+)(?::|$)/i);
+        if (caipMatch) return parseInt(caipMatch[1], 10);
         return trimmed.startsWith('0x') ? parseInt(trimmed, 16) : parseInt(trimmed, 10);
+    }
+    return null;
+}
+
+function getStateChainId(state) {
+    if (state === null || state === undefined) return null;
+    if (typeof state !== 'object') return parseChainId(state);
+
+    const candidates = [
+        state.chainId,
+        state.caipAddress,
+        state.chain?.id,
+        state.chain?.chainId,
+        state.selectedNetworkId
+    ];
+    for (const candidate of candidates) {
+        const chainId = parseChainId(candidate);
+        if (chainId) return chainId;
     }
     return null;
 }
 
 function normalizeChainId(...states) {
     for (const state of states) {
-        const chainId = parseChainId(state?.chainId ?? state);
+        const chainId = getStateChainId(state);
         if (chainId) return chainId;
     }
 
-    const injectedChainId = parseChainId(window.ethereum?.chainId || window.ethereum?.networkVersion);
-    if (injectedChainId) return injectedChainId;
+    // Preserve injected-provider precedence for desktop extensions and wallet
+    // in-app browsers. External mobile WalletConnect must not inherit a chain
+    // from an unrelated browser provider.
+    if (!isMobileDevice() || isInjectedWalletBrowser()) {
+        const injectedChainId = parseChainId(window.ethereum?.chainId || window.ethereum?.networkVersion);
+        if (injectedChainId) return injectedChainId;
+    }
 
     try {
         const modalChainId = parseChainId(modal?.getChainId?.() || window.web3Modal?.getChainId?.());
@@ -237,11 +309,6 @@ function normalizeChainId(...states) {
         const modalState = modal?.getState?.() || window.web3Modal?.getState?.();
         const modalChainId = parseChainId(modalState?.chainId);
         if (modalChainId) return modalChainId;
-
-        for (const state of states) {
-            const selectedChainId = parseChainId(state?.selectedNetworkId);
-            if (selectedChainId) return selectedChainId;
-        }
 
         const selectedModalChainId = parseChainId(modalState?.selectedNetworkId);
         if (selectedModalChainId) return selectedModalChainId;
@@ -393,9 +460,29 @@ async function reconcileActiveWalletFromProviders(source = 'provider reconciliat
     return null;
 }
 
+async function getAppKitWalletProviderWithin(timeoutMs = 2500) {
+    const providerPromise = getAppKitWalletProvider();
+    return Promise.race([
+        providerPromise,
+        sleep(timeoutMs).then(() => null)
+    ]);
+}
+
+async function requestProviderValueWithin(provider, method, params = [], timeoutMs = 2500) {
+    if (!provider?.request) return null;
+    const outcome = await Promise.race([
+        Promise.resolve(provider.request({ method, params }))
+            .then((value) => ({ value }))
+            .catch((error) => ({ error })),
+        sleep(timeoutMs).then(() => ({ timedOut: true }))
+    ]);
+    if (outcome?.error) throw outcome.error;
+    return outcome?.timedOut ? null : outcome?.value;
+}
+
 function getAppKitAccountKey(account) {
     const address = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
-    return address ? `${address}:${normalizeChainId(account) || 'none'}` : '';
+    return address ? `${address}:${getStateChainId(account) || 'none'}` : '';
 }
 
 function readAppKitAccountSnapshot() {
@@ -407,13 +494,52 @@ function readAppKitAccountSnapshot() {
     }
 }
 
-function getFreshMobileAppKitWalletState(account = readAppKitAccountSnapshot()) {
+function getWalletDebugSnapshot(account = readAppKitAccountSnapshot()) {
+    let modalState = null;
+    try {
+        modalState = modal?.getState?.() || window.web3Modal?.getState?.() || null;
+    } catch {
+        modalState = null;
+    }
+
+    const address = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
+    return {
+        account: {
+            address: maskWalletAddress(address),
+            status: account?.status || null,
+            isConnected: account?.isConnected ?? null,
+            chainId: account?.chainId ?? null,
+            caipAddress: account?.caipAddress || null,
+            selectedNetworkId: account?.selectedNetworkId ?? null,
+            resolvedChainId: getStateChainId(account),
+            accountCount: Array.isArray(account?.allAccounts) ? account.allAccounts.length : null
+        },
+        modal: {
+            open: modalState?.open ?? null,
+            chainId: modalState?.chainId ?? null,
+            selectedNetworkId: modalState?.selectedNetworkId ?? null
+        },
+        runtime: {
+            currentWallet: maskWalletAddress(window.currentWalletAddress),
+            currentChainId: parseChainId(window.currentChainId),
+            storedChainId: parseChainId(localStorage.getItem('artsoul_chain_id')),
+            accountRevision: appKitAccountRevision,
+            activeMobileConnect
+        }
+    };
+}
+
+function getFreshMobileAppKitWalletState(account = readAppKitAccountSnapshot(), attempt = activeConnectAttempt) {
     if (!activeMobileConnect) return null;
 
     const accountKey = getAppKitAccountKey(account);
     const hasFreshAccountEvent = appKitAccountRevision > mobileConnectStartRevision;
     const sessionChangedSinceConnect = Boolean(accountKey && accountKey !== mobileConnectInitialAccountKey);
-    if (!hasFreshAccountEvent && !sessionChangedSinceConnect) return null;
+    // A WalletConnect approval can land while the browser is suspended. AppKit
+    // may then expose the restored session without emitting another account
+    // event after focus. An explicit connect attempt may reuse that session, but
+    // it still has to pass provider/network confirmation before UI finalization.
+    if (!hasFreshAccountEvent && !sessionChangedSinceConnect && !attempt?.allowExistingSession) return null;
 
     const address = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
     const isConnected = Boolean(address) &&
@@ -423,64 +549,221 @@ function getFreshMobileAppKitWalletState(account = readAppKitAccountSnapshot()) 
 
     return {
         address,
-        chainId: normalizeChainId(account),
-        isConnected: true
+        chainId: getStateChainId(account),
+        isConnected: true,
+        account
     };
 }
 
-function acceptMobileAppKitWalletState(account, source = 'mobile AppKit session') {
-    const walletState = getFreshMobileAppKitWalletState(account);
-    if (!walletState) return null;
-
-    const { address, chainId } = walletState;
-    const accountKey = `${address}:${chainId || 'none'}`;
-    if (accountKey === lastAcceptedMobileAccountKey) return walletState;
-    lastAcceptedMobileAccountKey = accountKey;
-    lastProcessedAddress = address;
-    lastProcessedChainId = chainId;
-    lastConfirmedWalletAt = Date.now();
-    window.currentWalletAddress = address;
-    localStorage.setItem('artsoul_wallet', address);
-
-    // AppKit has already confirmed this WalletConnect session. Update the UI
-    // before making any provider RPC that could be suspended by a mobile app switch.
-    dispatchWalletStateChanged({ address, chainId, isConnected: true });
-    updateNavButtons({ address, chainId });
-    updateNetworkBadge({ address, chainId });
-
-    // Session cleanup does not request a signature and is repeated by protected
-    // actions before authorization, so it does not need to hold up mobile connect.
-    Promise.resolve(signOutMismatchedSession(address)).catch((error) => {
-        console.warn('Stale session cleanup after mobile connect failed:', error);
-    });
-
-    clearModalIntent();
-    safeCloseModal('mobile wallet connected');
-    scheduleModalCloseRetries('mobile wallet connected');
-    walletDebugLog('mobile wallet accepted from AppKit session', {
-        source,
-        address: maskWalletAddress(address),
-        chainId
-    });
-
-    return walletState;
+async function readMobileProviderChainId(provider) {
+    if (!provider?.request) return null;
+    try {
+        const chainId = await requestProviderValueWithin(
+            provider,
+            'eth_chainId',
+            [],
+            MOBILE_PROVIDER_REQUEST_TIMEOUT
+        );
+        return parseChainId(chainId || provider.chainId || provider.networkVersion);
+    } catch (error) {
+        walletDebugLog('mobile provider chain read failed', {
+            code: getWalletErrorCode(error),
+            message: error?.message || String(error)
+        });
+        return parseChainId(provider.chainId || provider.networkVersion);
+    }
 }
 
-function reconcileMobileAppKitSession(source = 'mobile session reconciliation') {
-    return acceptMobileAppKitWalletState(readAppKitAccountSnapshot(), source);
+async function waitForMobileBaseSepolia(provider, switchOutcome, attempt, requireProviderChain = false) {
+    const deadline = createForegroundDeadline(MOBILE_NETWORK_SWITCH_TIMEOUT);
+    let lastReportedChainId = null;
+
+    try {
+        while (!deadline.hasExpired() && !attempt?.cancelled) {
+            if (document.visibilityState !== 'visible') {
+                await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
+                continue;
+            }
+
+            const providerChainId = await readMobileProviderChainId(provider);
+            const appKitChainId = getStateChainId(readAppKitAccountSnapshot());
+            const confirmedChainId = providerChainId || appKitChainId;
+            if (confirmedChainId && confirmedChainId !== lastReportedChainId) {
+                lastReportedChainId = confirmedChainId;
+                walletDebugLog('mobile network switch observed chain', {
+                    providerChainId,
+                    appKitChainId
+                });
+            }
+            const baseSepoliaConfirmed = requireProviderChain
+                ? providerChainId === BASE_SEPOLIA_CHAIN_ID
+                : providerChainId === BASE_SEPOLIA_CHAIN_ID || appKitChainId === BASE_SEPOLIA_CHAIN_ID;
+            if (baseSepoliaConfirmed) {
+                return BASE_SEPOLIA_CHAIN_ID;
+            }
+
+            const outcome = await Promise.race([
+                switchOutcome,
+                waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL).then(() => null)
+            ]);
+            if (outcome?.error && !isPendingRequestError(outcome.error)) throw outcome.error;
+            if (outcome) await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
+        }
+
+        return null;
+    } finally {
+        deadline.dispose();
+    }
+}
+
+async function ensureExternalMobileBaseSepolia(walletState, source, attempt) {
+    const provider = await getAppKitWalletProviderWithin(MOBILE_PROVIDER_REQUEST_TIMEOUT);
+    if (attempt?.cancelled) return null;
+
+    if (provider) {
+        activeWalletProvider = provider;
+        bindRuntimeProviderEvents(provider, 'external mobile WalletConnect provider');
+    }
+
+    const providerChainId = await readMobileProviderChainId(provider);
+    const appKitChainId = getStateChainId(walletState.account);
+    const currentChainId = providerChainId || appKitChainId;
+    walletDebugLog('external mobile session chain resolved', {
+        source,
+        providerAvailable: Boolean(provider),
+        providerChainId,
+        appKitChainId,
+        currentChainId
+    });
+
+    if (currentChainId === BASE_SEPOLIA_CHAIN_ID) {
+        return { ...walletState, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
+    }
+    if (!currentChainId) return null;
+
+    if (attempt?.networkSwitchRequested) return null;
+    if (attempt) attempt.networkSwitchRequested = true;
+
+    const target = getSupportedNetworkTarget(BASE_SEPOLIA_CHAIN_ID);
+    walletDebugLog('external mobile Base Sepolia switch requested', {
+        source,
+        fromChainId: currentChainId,
+        toChainId: BASE_SEPOLIA_CHAIN_ID,
+        via: provider?.request ? 'wallet provider' : 'AppKit'
+    });
+
+    const switchOutcome = Promise.resolve()
+        .then(() => {
+            if (provider?.request) return switchEthereumChain(provider, target);
+            if (window.web3Modal?.switchNetwork) return window.web3Modal.switchNetwork(target.appKitNetwork);
+            throw new Error('Wallet provider is not ready for a network switch.');
+        })
+        .then(() => ({ complete: true }))
+        .catch((error) => ({ error }));
+
+    const confirmedChainId = await waitForMobileBaseSepolia(
+        provider,
+        switchOutcome,
+        attempt,
+        Boolean(providerChainId)
+    );
+    if (confirmedChainId !== BASE_SEPOLIA_CHAIN_ID) {
+        walletDebugLog('external mobile Base Sepolia switch not confirmed', {
+            source,
+            cancelled: Boolean(attempt?.cancelled)
+        });
+        if (attempt && !attempt.cancelled) {
+            attempt.failure = new Error('Switch to Base Sepolia was not confirmed. Tap Connect Wallet to retry.');
+        }
+        return null;
+    }
+
+    walletDebugLog('external mobile Base Sepolia confirmed', { source });
+    return { ...walletState, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
+}
+
+async function acceptMobileAppKitWalletState(account, source = 'mobile AppKit session', attempt = activeConnectAttempt) {
+    const walletState = getFreshMobileAppKitWalletState(account, attempt);
+    if (!walletState || attempt?.cancelled) return null;
+
+    const initialKey = `${walletState.address}:${walletState.chainId || 'none'}:${appKitAccountRevision}`;
+    if (mobileSessionFinalizePromise && mobileSessionFinalizeKey === initialKey) {
+        return mobileSessionFinalizePromise;
+    }
+
+    mobileSessionFinalizeKey = initialKey;
+    mobileSessionFinalizePromise = (async () => {
+        const confirmed = await ensureExternalMobileBaseSepolia(walletState, source, attempt);
+        if (!confirmed || attempt?.cancelled) return null;
+
+        const { address, chainId, provider } = confirmed;
+        const accountKey = `${address}:${chainId}`;
+        if (accountKey === lastAcceptedMobileAccountKey) return confirmed;
+        lastAcceptedMobileAccountKey = accountKey;
+        lastProcessedAddress = address;
+        lastProcessedChainId = chainId;
+        lastConfirmedWalletAt = Date.now();
+        if (provider) activeWalletProvider = provider;
+        window.currentWalletAddress = address;
+        localStorage.setItem('artsoul_wallet', address);
+        setCurrentChainId(chainId);
+
+        // Finalize the UI only after AppKit/provider truth confirms the one live
+        // ArtSoul network. This prevents an address-only session from rendering
+        // as Unsupported while the WalletConnect chain is still restoring.
+        dispatchWalletStateChanged({ address, chainId, isConnected: true });
+        updateNavButtons({ address, chainId });
+        updateNetworkBadge({ address, chainId });
+
+        Promise.resolve(signOutMismatchedSession(address)).catch((error) => {
+            console.warn('Stale session cleanup after mobile connect failed:', error);
+        });
+
+        clearModalIntent();
+        safeCloseModal('mobile wallet connected');
+        scheduleModalCloseRetries('mobile wallet connected');
+        walletDebugLog('mobile wallet accepted from confirmed session', {
+            source,
+            address: maskWalletAddress(address),
+            chainId
+        });
+
+        return confirmed;
+    })().finally(() => {
+        if (mobileSessionFinalizeKey === initialKey) {
+            mobileSessionFinalizePromise = null;
+            mobileSessionFinalizeKey = '';
+        }
+    });
+
+    return mobileSessionFinalizePromise;
+}
+
+async function reconcileMobileAppKitSession(source = 'mobile session reconciliation', attempt = activeConnectAttempt) {
+    return acceptMobileAppKitWalletState(readAppKitAccountSnapshot(), source, attempt);
 }
 
 function scheduleWalletReconciliation(source, delay = 150, options = {}) {
     if (walletResumeTimer) clearTimeout(walletResumeTimer);
     walletResumeTimer = setTimeout(async () => {
         walletResumeTimer = null;
-        walletDebugLog('wallet state reconciliation', { source });
-        if (activeMobileConnect && reconcileMobileAppKitSession(source)) return;
+        walletDebugLog('wallet state reconciliation', {
+            source,
+            snapshot: getWalletDebugSnapshot()
+        });
+        if (activeMobileConnect && !isInjectedWalletBrowser()) {
+            await reconcileMobileAppKitSession(source, activeConnectAttempt);
+            return;
+        }
         await reconcileActiveWalletFromProviders(source, options);
     }, delay);
 }
 
 function notifyWalletResume(source) {
+    walletDebugLog('browser resume signal', {
+        source,
+        snapshot: getWalletDebugSnapshot()
+    });
     const waiters = [...walletResumeWaiters];
     walletResumeWaiters.clear();
     waiters.forEach((resolve) => resolve(source));
@@ -511,6 +794,10 @@ function bindWalletResumeListeners() {
     window.addEventListener('pageshow', () => notifyWalletResume('pageshow'));
     window.addEventListener('focus', () => notifyWalletResume('window focus'));
     document.addEventListener('visibilitychange', () => {
+        walletDebugLog('visibility changed', {
+            state: document.visibilityState,
+            snapshot: getWalletDebugSnapshot()
+        });
         if (document.visibilityState === 'visible') {
             notifyWalletResume('visibility return');
         }
@@ -579,17 +866,28 @@ function createForegroundDeadline(timeoutMs) {
     };
 }
 
-async function waitForConfirmedMobileWallet(timeoutMs) {
+async function waitForConfirmedMobileWallet(timeoutMs, attempt = activeConnectAttempt) {
     const deadline = createForegroundDeadline(timeoutMs);
+    let lastSnapshotKey = '';
 
     try {
-        while (!deadline.hasExpired()) {
+        while (!deadline.hasExpired() && !attempt?.cancelled && !attempt?.failure) {
             if (document.visibilityState !== 'visible') {
                 await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
                 continue;
             }
 
-            const restored = reconcileMobileAppKitSession('mobile connect confirmation');
+            const snapshot = getWalletDebugSnapshot();
+            const snapshotKey = JSON.stringify(snapshot);
+            if (snapshotKey !== lastSnapshotKey) {
+                lastSnapshotKey = snapshotKey;
+                walletDebugLog('mobile confirmation state', {
+                    remainingMs: deadline.remaining(),
+                    snapshot
+                });
+            }
+
+            const restored = await reconcileMobileAppKitSession('mobile connect confirmation', attempt);
             if (restored?.address) return restored;
 
             await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
@@ -597,12 +895,16 @@ async function waitForConfirmedMobileWallet(timeoutMs) {
 
         // Approval and the browser visibility event can arrive in either order.
         // Re-check provider/session truth once more before presenting a timeout.
-        const restored = reconcileMobileAppKitSession('mobile connect final confirmation');
+        const restored = attempt?.cancelled
+            ? null
+            : await reconcileMobileAppKitSession('mobile connect final confirmation', attempt);
         if (restored?.address) return restored;
 
         walletDebugLog('mobile wallet confirmation expired', {
             foregroundTimeoutMs: timeoutMs,
-            remainingMs: deadline.remaining()
+            remainingMs: deadline.remaining(),
+            cancelled: Boolean(attempt?.cancelled),
+            snapshot: getWalletDebugSnapshot()
         });
         return null;
     } finally {
@@ -612,7 +914,7 @@ async function waitForConfirmedMobileWallet(timeoutMs) {
 
 async function waitForConfirmedWallet(timeoutMs, options = {}) {
     return options.mobile
-        ? waitForConfirmedMobileWallet(timeoutMs)
+        ? waitForConfirmedMobileWallet(timeoutMs, options.attempt)
         : waitForConfirmedDesktopWallet(timeoutMs);
 }
 
@@ -1214,14 +1516,53 @@ function renderNetworkBadge() {
 // WALLET CONNECTION
 // ============================================
 
+function setConnectButtonPending(pending, { retryable = false } = {}) {
+    const button = document.getElementById('connectBtn');
+    if (!button) return;
+    const label = button.querySelector('span');
+    button.disabled = Boolean(pending && !retryable);
+    button.setAttribute('aria-busy', String(Boolean(pending)));
+    button.dataset.connectPending = pending ? 'true' : 'false';
+    if (label) label.textContent = pending
+        ? (retryable ? 'Connecting... Tap to retry' : 'Connecting...')
+        : 'Connect Wallet';
+}
+
 /**
  * Safe wallet connection with error handling
  * Prevents duplicate connection attempts
  */
 window.safeConnectWallet = async () => {
-    const btn = document.getElementById('connectBtn');
-    if (btn) btn.disabled = true;
     const mobileConnect = isMobileDevice();
+    const injectedMobileConnect = mobileConnect && isInjectedWalletBrowser();
+    const externalMobileConnect = mobileConnect && !injectedMobileConnect;
+
+    if (externalMobileConnect && activeConnectAttempt && !activeConnectAttempt.cancelled) {
+        walletDebugLog('connect button retry requested', {
+            cancelledAttemptId: activeConnectAttempt.id,
+            snapshot: getWalletDebugSnapshot()
+        });
+        activeConnectAttempt.cancelled = true;
+        notifyWalletResume('connect retry');
+        void safeCloseModal('mobile connect retry', { silent: true });
+    }
+
+    const attempt = {
+        id: ++connectAttemptSequence,
+        cancelled: false,
+        externalMobile: externalMobileConnect,
+        allowExistingSession: externalMobileConnect,
+        startedAt: Date.now()
+    };
+    activeConnectAttempt = attempt;
+    setConnectButtonPending(true, { retryable: externalMobileConnect });
+    walletDebugLog('connect button handler entered', {
+        mobile: mobileConnect,
+        injectedMobile: injectedMobileConnect,
+        externalMobile: externalMobileConnect,
+        snapshot: getWalletDebugSnapshot()
+    });
+
     if (mobileConnect) {
         activeMobileConnect = true;
         lastAcceptedMobileAccountKey = null;
@@ -1232,7 +1573,7 @@ window.safeConnectWallet = async () => {
     try {
         sessionStorage.removeItem('artsoul_disconnecting');
         markConnectModalIntent();
-        if (isInjectedWalletBrowser()) {
+        if (injectedMobileConnect) {
             walletDebugLog('mobile injected connect start', {
                 metaMask: Boolean(window.ethereum?.isMetaMask),
                 rabby: Boolean(window.ethereum?.isRabby)
@@ -1253,15 +1594,27 @@ window.safeConnectWallet = async () => {
         if (window.web3Modal) {
             walletDebugLog('walletconnect/appkit modal open requested', { mobile: isMobileDevice() });
             let modalOpenError = null;
-            Promise.resolve(window.web3Modal.open()).catch((error) => {
-                modalOpenError = error;
-            });
+            Promise.resolve(window.web3Modal.open())
+                .then(() => {
+                    walletDebugLog('walletconnect/appkit modal open resolved', {
+                        snapshot: getWalletDebugSnapshot()
+                    });
+                })
+                .catch((error) => {
+                    modalOpenError = error;
+                    walletDebugLog('walletconnect/appkit modal open failed', {
+                        code: getWalletErrorCode(error),
+                        message: error?.message || String(error)
+                    });
+                });
 
             walletDebugLog('waiting for wallet confirmation', { mobile: mobileConnect });
             const confirmed = await waitForConfirmedWallet(
                 mobileConnect ? WALLET_CONNECT_TIMEOUT_MOBILE : WALLET_CONNECT_TIMEOUT_DESKTOP,
-                { mobile: mobileConnect }
+                { mobile: mobileConnect, attempt }
             );
+            if (attempt.cancelled) return null;
+            if (attempt.failure) throw attempt.failure;
             if (modalOpenError) throw modalOpenError;
             if (!confirmed?.address) {
                 await safeCloseModal('wallet connect timeout');
@@ -1290,6 +1643,13 @@ window.safeConnectWallet = async () => {
             return null;
         }
     } catch (err) {
+        if (attempt.cancelled) {
+            walletDebugLog('wallet connect attempt cancelled for retry', {
+                attemptId: attempt.id,
+                elapsedMs: Date.now() - attempt.startedAt
+            });
+            return null;
+        }
         console.error('Connection error:', err);
         walletDebugLog('wallet connect failed', { message: err?.message || String(err) });
 
@@ -1301,9 +1661,17 @@ window.safeConnectWallet = async () => {
         alert(err?.message || 'Wallet connection was not completed. Please try again.');
         return null;
     } finally {
-        walletDebugLog('wallet connect flow finished');
-        activeMobileConnect = false;
-        if (btn) btn.disabled = false;
+        walletDebugLog('connect button handler exited', {
+            attemptId: attempt.id,
+            cancelled: attempt.cancelled,
+            elapsedMs: Date.now() - attempt.startedAt,
+            snapshot: getWalletDebugSnapshot()
+        });
+        if (activeConnectAttempt === attempt) {
+            activeConnectAttempt = null;
+            activeMobileConnect = false;
+            setConnectButtonPending(false);
+        }
     }
 };
 
@@ -1718,10 +2086,15 @@ async function initializeAppKit() {
             lastObservedAppKitAccountKey = observedAccountKey;
 
             walletDebugLog('appkit account update', {
-                address: observedAddress,
+                address: maskWalletAddress(observedAddress),
                 status: account?.status || 'undefined',
                 chainId: account?.chainId || null,
-                isConnected: account?.isConnected
+                caipAddress: account?.caipAddress || null,
+                selectedNetworkId: account?.selectedNetworkId || null,
+                resolvedChainId: getStateChainId(account),
+                isConnected: account?.isConnected,
+                revision: appKitAccountRevision,
+                snapshot: getWalletDebugSnapshot(account)
             });
 
             // AppKit can emit transient disconnected while restoring a saved wallet.
@@ -1772,11 +2145,20 @@ async function initializeAppKit() {
 
             if (accountIsConnected) {
                 // External mobile browsers can suspend WalletConnect provider
-                // requests during the wallet-app round trip. The fresh AppKit
-                // account event is the completed session, so accept it directly.
+                // requests during the wallet-app round trip. Treat the fresh
+                // AppKit account event as a recovery signal, then confirm the
+                // Base Sepolia session before exposing it to the UI.
                 if (activeMobileConnect && !isInjectedWalletBrowser()) {
-                    const restored = acceptMobileAppKitWalletState(account, 'AppKit account update');
+                    const restored = await acceptMobileAppKitWalletState(
+                        account,
+                        'AppKit account update',
+                        activeConnectAttempt
+                    );
                     if (restored?.address) return;
+                    walletDebugLog('AppKit account waiting for Base Sepolia confirmation', {
+                        snapshot: getWalletDebugSnapshot(account)
+                    });
+                    return;
                 }
 
                 const eventAddress = observedAddress;
@@ -1946,10 +2328,15 @@ async function initializeAppKit() {
             window.switchArtSoulNetwork?.(selectedChainId);
         });
 
-        if (modal.subscribeProvider) {
-            modal.subscribeProvider((providerState) => {
-                const provider = providerState?.walletProvider || providerState?.provider || providerState;
-                bindRuntimeProviderEvents(provider, 'appkit provider subscription');
+            if (modal.subscribeProvider) {
+                modal.subscribeProvider((providerState) => {
+                    const provider = providerState?.walletProvider || providerState?.provider || providerState;
+                    walletDebugLog('appkit provider update', {
+                        providerAvailable: Boolean(provider?.request),
+                        chainId: providerState?.chainId || providerState?.provider?.chainId || provider?.chainId || null,
+                        snapshot: getWalletDebugSnapshot()
+                    });
+                    bindRuntimeProviderEvents(provider, 'appkit provider subscription');
                 if (provider?.request) {
                     activeWalletProvider = provider;
                     scheduleWalletReconciliation('appkit provider available');
