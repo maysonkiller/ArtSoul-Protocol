@@ -13,6 +13,7 @@
             this.pendingRenderKey = null;
             this.profileCache = new Map();
             this.profileRequests = new Map();
+            this.headerIdentityStorageKey = 'artsoul_header_identity';
         }
 
         getNavContainer() {
@@ -142,12 +143,12 @@
             // (gallery.html), so they are intentionally NOT separate dropdown
             // destinations — one clear path to the gallery.
             return [
+                { href: 'profile.html', label: labels.profile, path: 'profile.html', profile: true },
                 { href: 'index.html', label: labels.home || 'Home', path: 'index.html', home: true },
                 { href: 'gallery.html', label: labels.explore, path: 'gallery.html' },
                 { href: 'upload.html', label: labels.publish, path: 'upload.html' },
                 { href: 'auction-system.html', label: 'Protocol', path: 'auction-system.html' },
-                { href: 'docs.html', label: labels.docs, path: 'docs.html' },
-                { href: 'profile.html', label: labels.profile, path: 'profile.html', profile: true }
+                { href: 'docs.html', label: labels.docs, path: 'docs.html' }
             ];
         }
 
@@ -163,12 +164,13 @@
             const currentPath = options.currentPath || window.location.pathname;
             const currentHash = window.location.hash || '';
             return this.getNavigationItems()
-                .filter(item => !(item.profile && options.isOwnProfile))
-                .filter(item => item.profile || !this.isCurrentNavigationItem(item, currentPath, currentHash))
-                .map(item => `
+                .map(item => {
+                    const isCurrent = this.isCurrentNavigationItem(item, currentPath, currentHash);
+                    return `
                     <a
                         href="${item.href}"
                         class="dropdown-item${item.profile ? ' dropdown-profile-item' : ''}"
+                        ${isCurrent ? 'aria-current="page"' : ''}
                         style="
                             display: flex;
                             align-items: center;
@@ -183,8 +185,45 @@
                     >
                         <span>${item.label}</span>
                     </a>
-                `)
+                `;
+                })
                 .join('');
+        }
+
+        getCachedHeaderIdentity(walletAddress) {
+            const normalizedWallet = String(walletAddress || '').toLowerCase();
+            if (!normalizedWallet) return null;
+            try {
+                const cached = JSON.parse(localStorage.getItem(this.headerIdentityStorageKey) || 'null');
+                if (!cached || String(cached.wallet || '').toLowerCase() !== normalizedWallet) return null;
+                if (!cached.name || !cached.avatarUrl) return null;
+                return cached;
+            } catch {
+                return null;
+            }
+        }
+
+        cacheHeaderIdentity(profile, walletAddress) {
+            const wallet = String(walletAddress || profile?.wallet_address || '').toLowerCase();
+            if (!wallet) return;
+            const identity = {
+                wallet,
+                name: this.getProfileDisplayName(profile, wallet),
+                avatarUrl: this.getProfileAvatarUrl(profile)
+            };
+            try {
+                localStorage.setItem(this.headerIdentityStorageKey, JSON.stringify(identity));
+            } catch {
+                // The normal async profile render remains available without storage.
+            }
+        }
+
+        clearCachedHeaderIdentity() {
+            try {
+                localStorage.removeItem(this.headerIdentityStorageKey);
+            } catch {
+                // Ignore unavailable storage in privacy-restricted browsers.
+            }
         }
 
         parseChainId(value) {
@@ -336,6 +375,7 @@
                 .then(profile => {
                     this.profileCache.set(cacheKey, profile || null);
                     if (profile) {
+                        this.cacheHeaderIdentity(profile, walletAddress);
                         console.log('👤 Profile loaded:', profile.username || walletAddress);
                     } else {
                         console.log('👤 No profile found for wallet:', walletAddress);
@@ -440,17 +480,7 @@
 
         renderNetworkOptions() {
             return `
-                <div id="avatarNetworkOptions" class="avatar-network-options" hidden>
-                    <button
-                        type="button"
-                        class="dropdown-item avatar-network-option is-active"
-                        data-allow-rapid
-                        aria-current="true"
-                        onclick="window.AvatarDropdown.selectNetwork(84532, event)"
-                    >
-                        <span class="network-option-indicator" aria-hidden="true"></span>
-                        <span>Base Sepolia</span>
-                    </button>
+                <div class="avatar-network-options avatar-network-future-options">
                     <button
                         type="button"
                         class="dropdown-item avatar-network-option is-disabled"
@@ -467,19 +497,13 @@
 
         renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false }) {
             const networkSection = networkInfo ? `
-                <button
-                    onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
-                    class="dropdown-item network-switcher-btn"
-                    data-allow-rapid
-                    aria-expanded="false"
-                    aria-controls="avatarNetworkOptions"
-                >
+                <div class="dropdown-item network-switcher-btn network-current-row" role="status">
                     <img src="${networkInfo.icon}" alt="${networkInfo.name}" onerror="this.style.display='none'" />
                     <div class="network-switcher-copy">
                         <div><span data-network-name>${networkInfo.name}</span></div>
                         <div data-network-balance>${networkInfo.balance} ${networkInfo.currency}</div>
                     </div>
-                </button>
+                </div>
                 ${this.renderNetworkOptions()}
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
@@ -757,19 +781,22 @@
             const storedWallet = (localStorage.getItem('artsoul_wallet') || '').toLowerCase();
             const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
             if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
-            if (container.dataset.avatarRenderKey === 'restoring-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
+            const cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
+            if (!cachedIdentity) return true;
+            if (container.dataset.avatarRenderKey === 'cached-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
 
             const currentPath = window.location.pathname;
             const isProfilePage = currentPath.includes('profile.html');
             const shortAddress = `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`;
-            container.dataset.avatarRenderKey = 'restoring-wallet';
-            this.pendingRenderKey = 'restoring-wallet';
+            container.dataset.avatarRenderKey = 'cached-wallet';
+            container.dataset.avatarCacheHydrated = 'true';
+            this.pendingRenderKey = 'cached-wallet';
             this.updateStableButton({
-                avatarUrl: '/default-avatar.png',
-                avatarAlt: 'ArtSoul wallet',
-                name: 'Wallet',
+                avatarUrl: cachedIdentity.avatarUrl,
+                avatarAlt: cachedIdentity.name,
+                name: cachedIdentity.name,
                 address: shortAddress,
-                stateKey: 'restoring-wallet'
+                stateKey: 'cached-wallet'
             });
             this.updateStableMenu(
                 this.renderMenuContent({
@@ -777,7 +804,7 @@
                     isOwnProfile: isProfilePage,
                     restoring: true
                 }),
-                `restoring:${currentPath}:${isProfilePage}`
+                `cached-restoring:${currentPath}:${isProfilePage}`
             );
             this.applyThemeStyles();
             this.bindOutsideCloseOnce();
@@ -791,6 +818,7 @@
             let container = this.getNavContainer();
 
             if (!container) return false;
+            this.clearCachedHeaderIdentity();
             if (options.renderKey) {
                 container.dataset.avatarRenderKey = options.renderKey;
                 this.pendingRenderKey = options.renderKey;
@@ -893,22 +921,18 @@
 
     const navObserver = new MutationObserver(() => {
         const container = window.AvatarDropdown.getNavContainer();
-        if (container && !container.querySelector('.avatar-button')) {
+        if (container && window.artsoulWalletStateSettled !== true && container.dataset.avatarCacheHydrated !== 'true') {
+            window.AvatarDropdown.renderInitializingState();
+        } else if (container && !container.querySelector('.avatar-button')) {
             syncCurrentMenu();
         }
     });
 
     const startNavObserver = () => {
-        if (document.body) {
-            navObserver.observe(document.body, { childList: true, subtree: true });
-        }
+        navObserver.observe(document.documentElement, { childList: true, subtree: true });
     };
 
-    if (document.body) {
-        startNavObserver();
-    } else {
-        document.addEventListener('DOMContentLoaded', startNavObserver, { once: true });
-    }
+    startNavObserver();
 
     // Add mobile-responsive CSS
     const style = document.createElement('style');

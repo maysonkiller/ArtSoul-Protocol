@@ -31,14 +31,19 @@ test('focus and visibility return wake confirmation and reconcile the approved A
     assert.match(source, /activeMobileConnect \|\| Date\.now\(\) < connectModalIntentUntil/);
 });
 
-test('external mobile connect confirms Base Sepolia before finalizing and defers SIWE', () => {
+test('external mobile connect finalizes the approved session before a non-blocking Base switch and defers SIWE', () => {
     const mobileWaiter = source.match(/async function waitForConfirmedMobileWallet[\s\S]*?\n}/)?.[0] || '';
     assert.match(mobileWaiter, /reconcileMobileAppKitSession/);
     assert.doesNotMatch(mobileWaiter, /reconcileActiveWalletFromProviders/);
     assert.match(source, /ensureExternalMobileBaseSepolia/);
+    assert.match(source, /requestMobileBaseSepoliaAfterConnect/);
     assert.match(source, /const BASE_SEPOLIA_CHAIN_ID = 84532;/);
     assert.match(source, /switchEthereumChain\(provider, target\)/);
-    assert.match(source, /mobile wallet accepted from confirmed session/);
+    assert.match(source, /mobile wallet accepted before network finalization/);
+    assert.match(source, /mobile network finalized after connected UI/);
+    const acceptSession = source.match(/async function acceptMobileAppKitWalletState[\s\S]*?return mobileSessionFinalizePromise;\n}/)?.[0] || '';
+    assert.ok(acceptSession.indexOf('dispatchWalletStateChanged') < acceptSession.indexOf('requestMobileBaseSepoliaAfterConnect'));
+    assert.doesNotMatch(source, /attempt\.failure = new Error\('Switch to Base Sepolia/);
     assert.match(source, /connectedDuringThisRequest \|\| deferMobileAuthenticationThisTurn/);
     assert.match(source, /setTimeout\(\(\) => \{\s*deferMobileAuthenticationThisTurn = false;/);
     assert.match(source, /SIWE deferred after external mobile wallet connect/);
@@ -70,6 +75,7 @@ test('mobile injected providers use the same resumable confirmation window', () 
 test('WalletConnect metadata uses the live HTTPS origin without an empty native redirect', () => {
     assert.match(source, /url: appOrigin,/);
     assert.match(source, /icons: \[`\$\{appOrigin\}\/ARTSOULlogo-clean\.png`\]/);
-    assert.match(source, /redirect:\s*\{\s*universal: appOrigin\s*\}/);
+    assert.match(source, /const appReturnUrl =/);
+    assert.match(source, /redirect:\s*\{\s*universal: appReturnUrl\s*\}/);
     assert.doesNotMatch(source, /native:\s*''/);
 });

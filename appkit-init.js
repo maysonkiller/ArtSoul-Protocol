@@ -63,16 +63,24 @@ const SUPPORTED_NETWORKS = {
 const appOrigin = (typeof window !== 'undefined' && window.location?.origin)
     ? window.location.origin
     : 'https://artsoul.vercel.app';
+const appReturnUrl = (() => {
+    try {
+        const returnUrl = new URL(window.location.href);
+        returnUrl.hash = '';
+        return returnUrl.toString();
+    } catch {
+        return appOrigin;
+    }
+})();
 const metadata = {
     name: 'ArtSoul Marketplace',
     description: 'Decentralized Art Marketplace',
     url: appOrigin,
     icons: [`${appOrigin}/ARTSOULlogo-clean.png`],
-    // Tell WalletConnect where to send the user back after they approve in the
-    // wallet app. A browser dApp has no native URL scheme, so advertise only
-    // the live HTTPS origin instead of an invalid empty native redirect.
+    // Tell WalletConnect where to send the user back after approval. Preserve
+    // the current artwork/profile route instead of dropping the user at /.
     redirect: {
-        universal: appOrigin
+        universal: appReturnUrl
     }
 };
 
@@ -639,8 +647,6 @@ async function ensureExternalMobileBaseSepolia(walletState, source, attempt) {
     if (currentChainId === BASE_SEPOLIA_CHAIN_ID) {
         return { ...walletState, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
     }
-    if (!currentChainId) return null;
-
     if (attempt?.networkSwitchRequested) return null;
     if (attempt) attempt.networkSwitchRequested = true;
 
@@ -672,14 +678,41 @@ async function ensureExternalMobileBaseSepolia(walletState, source, attempt) {
             source,
             cancelled: Boolean(attempt?.cancelled)
         });
-        if (attempt && !attempt.cancelled) {
-            attempt.failure = new Error('Switch to Base Sepolia was not confirmed. Tap Connect Wallet to retry.');
-        }
         return null;
     }
 
     walletDebugLog('external mobile Base Sepolia confirmed', { source });
     return { ...walletState, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
+}
+
+async function requestMobileBaseSepoliaAfterConnect(walletState, source, attempt) {
+    if (walletState.chainId === BASE_SEPOLIA_CHAIN_ID || attempt?.cancelled) return walletState;
+
+    while (document.visibilityState !== 'visible' && !attempt?.cancelled) {
+        await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
+    }
+    if (attempt?.cancelled || document.visibilityState !== 'visible') return null;
+
+    // Let the approved WalletConnect session close the connect modal and render
+    // first. A network switch is a separate wallet request and must never keep
+    // the Connect button or AppKit modal in a pending state.
+    await sleep(250);
+    const confirmed = await ensureExternalMobileBaseSepolia(walletState, source, attempt);
+    if (!confirmed || attempt?.cancelled) return null;
+
+    const { address, chainId, provider } = confirmed;
+    if (provider) activeWalletProvider = provider;
+    lastProcessedChainId = chainId;
+    setCurrentChainId(chainId);
+    dispatchWalletStateChanged({ address, chainId, isConnected: true });
+    updateNavButtons({ address, chainId });
+    updateNetworkBadge({ address, chainId });
+    walletDebugLog('mobile network finalized after connected UI', {
+        source,
+        address: maskWalletAddress(address),
+        chainId
+    });
+    return confirmed;
 }
 
 async function acceptMobileAppKitWalletState(account, source = 'mobile AppKit session', attempt = activeConnectAttempt) {
@@ -693,12 +726,20 @@ async function acceptMobileAppKitWalletState(account, source = 'mobile AppKit se
 
     mobileSessionFinalizeKey = initialKey;
     mobileSessionFinalizePromise = (async () => {
-        const confirmed = await ensureExternalMobileBaseSepolia(walletState, source, attempt);
-        if (!confirmed || attempt?.cancelled) return null;
+        const provider = await getAppKitWalletProviderWithin(MOBILE_PROVIDER_REQUEST_TIMEOUT);
+        if (attempt?.cancelled) return null;
+        if (provider) {
+            activeWalletProvider = provider;
+            bindRuntimeProviderEvents(provider, 'external mobile WalletConnect provider');
+        }
 
-        const { address, chainId, provider } = confirmed;
-        const accountKey = `${address}:${chainId}`;
-        if (accountKey === lastAcceptedMobileAccountKey) return confirmed;
+        const providerChainId = await readMobileProviderChainId(provider);
+        const appKitChainId = getStateChainId(walletState.account);
+        const chainId = providerChainId || appKitChainId || null;
+        const acceptedState = { ...walletState, chainId, provider };
+        const { address } = acceptedState;
+        const accountKey = `${address}:${chainId || 'pending'}`;
+        if (accountKey === lastAcceptedMobileAccountKey) return acceptedState;
         lastAcceptedMobileAccountKey = accountKey;
         lastProcessedAddress = address;
         lastProcessedChainId = chainId;
@@ -706,11 +747,12 @@ async function acceptMobileAppKitWalletState(account, source = 'mobile AppKit se
         if (provider) activeWalletProvider = provider;
         window.currentWalletAddress = address;
         localStorage.setItem('artsoul_wallet', address);
-        setCurrentChainId(chainId);
+        if (chainId) setCurrentChainId(chainId);
+        else setCurrentChainId(null);
 
-        // Finalize the UI only after AppKit/provider truth confirms the one live
-        // ArtSoul network. This prevents an address-only session from rendering
-        // as Unsupported while the WalletConnect chain is still restoring.
+        // The approved WalletConnect address is enough to finish Connect. Chain
+        // confirmation/switching is handled as a second, non-blocking step so a
+        // mobile deep-link round trip cannot leave the UI on an eternal spinner.
         dispatchWalletStateChanged({ address, chainId, isConnected: true });
         updateNavButtons({ address, chainId });
         updateNetworkBadge({ address, chainId });
@@ -722,13 +764,19 @@ async function acceptMobileAppKitWalletState(account, source = 'mobile AppKit se
         clearModalIntent();
         safeCloseModal('mobile wallet connected');
         scheduleModalCloseRetries('mobile wallet connected');
-        walletDebugLog('mobile wallet accepted from confirmed session', {
+        walletDebugLog('mobile wallet accepted before network finalization', {
             source,
             address: maskWalletAddress(address),
             chainId
         });
 
-        return confirmed;
+        void requestMobileBaseSepoliaAfterConnect(acceptedState, source, attempt).catch((error) => {
+            walletDebugLog('mobile network finalization failed after connect', {
+                source,
+                message: error?.message || String(error)
+            });
+        });
+        return acceptedState;
     })().finally(() => {
         if (mobileSessionFinalizeKey === initialKey) {
             mobileSessionFinalizePromise = null;
@@ -1371,6 +1419,7 @@ async function clearWalletConnectionCache() {
     localStorage.removeItem('artsoul_wallet');
     localStorage.removeItem('artsoul_auth_method');
     localStorage.removeItem('artsoul_chain_id');
+    localStorage.removeItem('artsoul_header_identity');
     window.currentWalletAddress = null;
     window.currentChainId = null;
     lastProcessedAddress = null;
@@ -2144,10 +2193,9 @@ async function initializeAppKit() {
                 account?.status !== 'disconnected';
 
             if (accountIsConnected) {
-                // External mobile browsers can suspend WalletConnect provider
-                // requests during the wallet-app round trip. Treat the fresh
-                // AppKit account event as a recovery signal, then confirm the
-                // Base Sepolia session before exposing it to the UI.
+                // External mobile browsers can suspend provider requests during
+                // the wallet-app round trip. Accept the approved AppKit session
+                // first; Base Sepolia confirmation runs as a separate step.
                 if (activeMobileConnect && !isInjectedWalletBrowser()) {
                     const restored = await acceptMobileAppKitWalletState(
                         account,
@@ -2155,7 +2203,7 @@ async function initializeAppKit() {
                         activeConnectAttempt
                     );
                     if (restored?.address) return;
-                    walletDebugLog('AppKit account waiting for Base Sepolia confirmation', {
+                    walletDebugLog('AppKit account waiting for approved mobile session', {
                         snapshot: getWalletDebugSnapshot(account)
                     });
                     return;

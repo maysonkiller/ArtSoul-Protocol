@@ -14,14 +14,16 @@ test('guest avatar uses the local ArtSoul image with the generated fallback', ()
 
 test('stored wallet hydration never renders a disconnected guest state', () => {
   assert.match(avatarDropdown, /localStorage\.getItem\('artsoul_wallet'\)/);
-  assert.match(avatarDropdown, /name: 'Wallet'/);
+  assert.match(avatarDropdown, /artsoul_header_identity/);
+  assert.match(avatarDropdown, /getCachedHeaderIdentity\(storedWallet\)/);
+  assert.match(avatarDropdown, /name: cachedIdentity\.name/);
   assert.match(avatarDropdown, /Restoring wallet\.\.\./);
-  assert.match(avatarDropdown, /stateKey: 'restoring-wallet'/);
+  assert.match(avatarDropdown, /stateKey: 'cached-wallet'/);
+  assert.doesNotMatch(avatarDropdown, /name: 'Wallet'/);
 });
 
-test('Base is the only selected network and Ethereum Sepolia is visibly future-only', () => {
-  assert.match(avatarDropdown, /avatar-network-option is-active/);
-  assert.match(avatarDropdown, /aria-current="true"/);
+test('Base appears once as current network and Ethereum Sepolia is visibly future-only', () => {
+  assert.match(avatarDropdown, /network-switcher-btn network-current-row/);
   assert.match(avatarDropdown, /Ethereum Sepolia/);
   assert.match(avatarDropdown, /network-soon-badge">SOON/);
   const ethereumStart = avatarDropdown.indexOf('class="dropdown-item avatar-network-option is-disabled"');
@@ -29,4 +31,11 @@ test('Base is the only selected network and Ethereum Sepolia is visibly future-o
     ? avatarDropdown.slice(ethereumStart, avatarDropdown.indexOf('</button>', ethereumStart))
     : '';
   assert.doesNotMatch(ethereumOption, /network-option-indicator/);
+  assert.doesNotMatch(avatarDropdown, /avatar-network-option is-active/);
+});
+
+test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
+  assert.ok(avatarDropdown.indexOf("href: 'profile.html'") < avatarDropdown.indexOf("href: 'index.html'"));
+  assert.doesNotMatch(avatarDropdown, /filter\(item => !\(item\.profile && options\.isOwnProfile\)\)/);
+  assert.doesNotMatch(avatarDropdown, /filter\(item => item\.profile \|\| !this\.isCurrentNavigationItem/);
 });
