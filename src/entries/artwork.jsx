@@ -86,7 +86,6 @@ const { useState, useEffect, useRef } = React;
             const [videoLoaded, setVideoLoaded] = React.useState(false);
             const [posterFailed, setPosterFailed] = React.useState(false);
             const [isImageFullscreen, setIsImageFullscreen] = React.useState(false);
-            const imageShellRef = React.useRef(null);
             const mediaType = media?.type || 'unknown';
             const url = media?.url || '';
             const poster = media?.poster || '';
@@ -100,41 +99,18 @@ const { useState, useEffect, useRef } = React;
             }, [url]);
 
             React.useEffect(() => {
-                const syncFullscreenState = () => {
-                    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
-                    setIsImageFullscreen(fullscreenElement === imageShellRef.current);
+                if (!isImageFullscreen) return undefined;
+                const previousOverflow = document.body.style.overflow;
+                const closeOnEscape = (event) => {
+                    if (event.key === 'Escape') setIsImageFullscreen(false);
                 };
-
-                document.addEventListener('fullscreenchange', syncFullscreenState);
-                document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+                document.body.style.overflow = 'hidden';
+                document.addEventListener('keydown', closeOnEscape);
                 return () => {
-                    document.removeEventListener('fullscreenchange', syncFullscreenState);
-                    document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
+                    document.body.style.overflow = previousOverflow;
+                    document.removeEventListener('keydown', closeOnEscape);
                 };
-            }, []);
-
-            const toggleImageFullscreen = async (event) => {
-                const shell = imageShellRef.current;
-
-                const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
-                if (fullscreenElement) {
-                    event.preventDefault();
-                    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
-                    if (exitFullscreen) await exitFullscreen.call(document);
-                    return;
-                }
-
-                const requestFullscreen = shell && (shell.requestFullscreen || shell.webkitRequestFullscreen);
-                if (requestFullscreen) {
-                    event.preventDefault();
-                    try {
-                        await requestFullscreen.call(shell);
-                    } catch {
-                        // The artwork remains visible when the browser rejects fullscreen mode.
-                    }
-                    return;
-                }
-            };
+            }, [isImageFullscreen]);
 
             const renderMediaFallback = (message = 'Media unavailable') => (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-black p-8 text-center">
@@ -230,26 +206,43 @@ const { useState, useEffect, useRef } = React;
 
             // Images and GIFs share the same aspect-safe artwork surface and fullscreen control.
             return (
-                <div ref={imageShellRef} className="artwork-detail-image-shell">
+                <div className="artwork-detail-image-shell">
                     <img
                         src={url}
                         alt={sanitizedTitle}
-                        className="artwork-detail-media-object artwork-detail-image"
+                        className="artwork-detail-media-object artwork-detail-image artwork-detail-image-zoomable"
+                        role="button"
+                        tabIndex="0"
+                        aria-label="View artwork full size"
+                        onClick={() => setIsImageFullscreen(true)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setIsImageFullscreen(true);
+                            }
+                        }}
                         onError={() => setMediaError(true)}
                     />
-                    <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="artwork-detail-image-fullscreen"
-                        aria-label={isImageFullscreen ? 'Exit fullscreen artwork view' : 'View artwork fullscreen'}
-                        title={isImageFullscreen ? 'Exit fullscreen' : 'View fullscreen'}
-                        onClick={toggleImageFullscreen}
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
-                        </svg>
-                    </a>
+                    {isImageFullscreen && window.ReactDOM?.createPortal?.(
+                        <div
+                            className="artwork-image-lightbox"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label={`${sanitizedTitle} full-size view`}
+                            onClick={() => setIsImageFullscreen(false)}
+                        >
+                            <button
+                                type="button"
+                                className="artwork-image-lightbox-close"
+                                aria-label="Close full-size artwork view"
+                                onClick={() => setIsImageFullscreen(false)}
+                            >
+                                ×
+                            </button>
+                            <img src={url} alt={sanitizedTitle} className="artwork-image-lightbox-media" />
+                        </div>,
+                        document.body
+                    )}
                 </div>
             );
         }
