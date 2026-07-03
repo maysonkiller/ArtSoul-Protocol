@@ -343,7 +343,13 @@ let morphActive = false;
                 const isAudio = detectedType === 'audio' || detectedType === 'music' || ['mp3', 'wav', 'ogg', 'aac', 'm4a'].includes(detectedType) ||
                                (!detectedType && art.file_url && (art.file_url.toLowerCase().includes('.mp3') || art.file_url.toLowerCase().includes('.wav') || art.file_url.toLowerCase().includes('.ogg') || art.file_url.toLowerCase().includes('.aac')));
 
-                if (isVideo && hasSafeMedia) {
+                const sharedMedia = hasSafeMedia
+                    ? window.ArtSoulArtworkCard?.createMediaElement?.(art, () => card.remove())
+                    : null;
+
+                if (sharedMedia) {
+                    imgContainer.appendChild(sharedMedia);
+                } else if (isVideo && hasSafeMedia) {
                     const video = document.createElement('video');
                     video.src = art.file_url;
                     video.className = 'artwork-image';
