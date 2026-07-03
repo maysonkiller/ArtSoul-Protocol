@@ -57,7 +57,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=25/);
+    assert.match(html, /unified-styles\.css\?v=26/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -65,10 +65,10 @@ test('mobile scroll order matches the rebuilt blocks and disables motion', () =>
         ['artwork-page-left \\.artwork-mobile-media', 'artwork-mobile-media', 1],
         ['artwork-page-left \\.artwork-mobile-context', 'artwork-mobile-context', 2],
         ['artwork-page-right \\.artwork-mobile-auction', 'artwork-mobile-auction', 3],
-        ['artwork-page-right \\.artwork-mobile-people', 'artwork-mobile-people', 4],
-        ['artwork-page-left \\.artwork-mobile-ai', 'artwork-mobile-ai', 5],
-        ['artwork-page-left \\.artwork-mobile-trust', 'artwork-mobile-trust', 6],
-        ['artwork-page-right \\.artwork-mobile-moderation', 'artwork-mobile-moderation', 7]
+        ['artwork-page-left \\.artwork-mobile-ai', 'artwork-mobile-ai', 4],
+        ['artwork-page-left \\.artwork-mobile-trust', 'artwork-mobile-trust', 5],
+        ['artwork-page-right \\.artwork-mobile-moderation', 'artwork-mobile-moderation', 6],
+        ['artwork-page-right \\.artwork-mobile-people', 'artwork-mobile-people', 7]
     ];
     orderRules.forEach(([selector, className, order]) => {
         assert.match(styles, new RegExp(`\\.${selector} \\{ order: ${order}; \\}`));
@@ -77,6 +77,8 @@ test('mobile scroll order matches the rebuilt blocks and disables motion', () =>
     assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.artwork-page-layout \{[\s\S]*?align-items: stretch;/);
     assert.match(styles, /\.artwork-mobile-context,[\s\S]*?\.artwork-mobile-ai,[\s\S]*?\.artwork-mobile-moderation \{[\s\S]*?width: 100%;/);
     assert.match(styles, /animation: none !important;[\s\S]*?transition: none !important;/);
+    assert.match(styles, /\.artwork-page-root \.artwork-mobile-auction \{[\s\S]*?padding: 10px;/);
+    assert.match(styles, /max-height: 36dvh;/);
 });
 
 test('header keeps a top-right avatar button during wallet initialization', () => {
@@ -85,20 +87,24 @@ test('header keeps a top-right avatar button during wallet initialization', () =
     assert.match(html, /data-avatar-render-key="initializing"/);
     assert.match(html, /class="avatar-button"/);
     assert.match(html, /src="\/default-avatar\.png"/);
-    assert.match(html, /data-avatar-name>ArtSoul<\/div>/);
+    assert.match(html, /data-avatar-name>ArtSoul Guest<\/div>/);
     assert.match(styles, /\.artwork-header-actions \{[\s\S]*?margin-left: auto;/);
     assert.match(styles, /body\.classic header \.logo-link > \.site-logo,[\s\S]*?height: 52px !important;[\s\S]*?max-height: 52px !important;/);
     assert.match(styles, /#navButtons \{[\s\S]*?width: 68px;[\s\S]*?height: 48px;/);
     assert.match(styles, /#navButtons \.avatar-button img \{[\s\S]*?width: 34px !important;[\s\S]*?height: 34px !important;/);
 });
 
-test('images keep their aspect ratio and support fullscreen while existing video and audio controls remain intact', () => {
+test('images keep their aspect ratio and use an in-page lightbox while video and audio controls remain intact', () => {
     assert.match(styles, /artwork-detail-frame:not\(\.artwork-detail-frame-audio\)[\s\S]*?border-width: 1px 0;[\s\S]*?box-shadow: none;/);
     assert.match(styles, /\.artwork-page-left \.artwork-detail-media-object,[\s\S]*?object-fit: fill;/);
     assert.match(styles, /\.artwork-page-left \.artwork-detail-image \{[\s\S]*?object-fit: contain;/);
-    assert.match(source, /href=\{url\}[\s\S]*?target="_blank"[\s\S]*?className="artwork-detail-image-fullscreen"/);
-    assert.match(source, /shell && \(shell\.requestFullscreen \|\| shell\.webkitRequestFullscreen\)/);
-    assert.match(source, /View artwork fullscreen/);
+    assert.match(source, /className="artwork-detail-media-object artwork-detail-image artwork-detail-image-zoomable"/);
+    assert.match(source, /window\.ReactDOM\?\.createPortal\?/);
+    assert.match(source, /className="artwork-image-lightbox"/);
+    assert.match(source, /className="artwork-image-lightbox-close"/);
+    assert.doesNotMatch(source, /href=\{url\}/);
+    assert.doesNotMatch(source, /requestFullscreen/);
+    assert.match(styles, /\.artwork-image-lightbox \{[\s\S]*?position: fixed;[\s\S]*?object-fit: contain;/);
     assert.doesNotMatch(source, /artwork-detail-audio-title/);
     assert.match(source, /className="artwork-detail-audio-controls"/);
     assert.match(source, /className="artwork-detail-audio-player"/);

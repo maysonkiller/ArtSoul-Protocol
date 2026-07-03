@@ -878,54 +878,57 @@ body.future .artwork-detail-frame {
     background: var(--c-surface);
 }
 
-.artwork-detail-image-fullscreen {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    z-index: 2;
+.artwork-detail-image-zoomable {
+    cursor: zoom-in;
+}
+
+.artwork-detail-image-zoomable:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -3px;
+}
+
+.artwork-image-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vw, 48px);
+    background: color-mix(in srgb, var(--c-bg) 94%, transparent);
+    cursor: zoom-out;
+}
+
+.artwork-image-lightbox-media {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 0;
+    object-fit: contain;
+    object-position: center;
+}
+
+.artwork-image-lightbox-close {
+    position: fixed;
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+    z-index: 1;
     display: inline-flex;
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     align-items: center;
     justify-content: center;
     padding: 0;
     border: 1px solid var(--c-border);
-    border-radius: 10px;
+    border-radius: 50%;
     background: var(--c-surface);
-    color: var(--c-accent);
-    box-shadow: 0 3px 14px var(--c-glow);
+    color: var(--c-text);
+    box-shadow: 0 0 14px var(--c-glow);
+    font-size: 1.8rem;
+    line-height: 1;
     cursor: pointer;
-}
-
-.artwork-detail-image-fullscreen svg {
-    width: 20px;
-    height: 20px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.artwork-detail-image-fullscreen:focus-visible {
-    outline: 2px solid var(--c-accent);
-    outline-offset: 2px;
-}
-
-.artwork-page-left .artwork-detail-image-shell:fullscreen,
-.artwork-page-left .artwork-detail-image-shell:-webkit-full-screen {
-    width: 100vw;
-    height: 100vh;
-    padding: 0;
-    background: var(--c-bg);
-}
-
-.artwork-page-left .artwork-detail-image-shell:fullscreen .artwork-detail-image,
-.artwork-page-left .artwork-detail-image-shell:-webkit-full-screen .artwork-detail-image {
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    object-fit: contain;
 }
 
 .artwork-detail-video {
@@ -1542,10 +1545,10 @@ body.future .artwork-detail-frame {
     .artwork-page-left .artwork-mobile-media { order: 1; }
     .artwork-page-left .artwork-mobile-context { order: 2; }
     .artwork-page-right .artwork-mobile-auction { order: 3; }
-    .artwork-page-right .artwork-mobile-people { order: 4; }
-    .artwork-page-left .artwork-mobile-ai { order: 5; }
-    .artwork-page-left .artwork-mobile-trust { order: 6; }
-    .artwork-page-right .artwork-mobile-moderation { order: 7; }
+    .artwork-page-left .artwork-mobile-ai { order: 4; }
+    .artwork-page-left .artwork-mobile-trust { order: 5; }
+    .artwork-page-right .artwork-mobile-moderation { order: 6; }
+    .artwork-page-right .artwork-mobile-people { order: 7; }
 
     .artwork-mobile-context,
     .artwork-mobile-auction,
@@ -1572,7 +1575,7 @@ body.future .artwork-detail-frame {
         width: 100%;
         height: fit-content;
         max-width: 100%;
-        max-height: 58dvh;
+        max-height: 36dvh;
         border-width: 1px;
     }
 
@@ -1594,14 +1597,14 @@ body.future .artwork-detail-frame {
         width: 100%;
         height: auto;
         max-width: 100%;
-        max-height: 58dvh;
+        max-height: 36dvh;
         padding: 0;
         object-fit: fill;
     }
 
     .artwork-page-left .artwork-detail-image-shell {
         height: auto;
-        max-height: 58dvh;
+        max-height: 36dvh;
     }
 
     .artwork-page-left .artwork-detail-image {
@@ -1623,6 +1626,79 @@ body.future .artwork-detail-frame {
     .artwork-page-root .auction-detail-panel,
     .artwork-page-root .moderation-panel {
         padding: 12px;
+    }
+
+    .artwork-page-root .artwork-mobile-context {
+        gap: 5px;
+        padding: 9px 10px 7px !important;
+    }
+
+    .artwork-mobile-context .artwork-page-header,
+    .artwork-mobile-context .artwork-page-description {
+        padding-bottom: 5px;
+    }
+
+    .artwork-mobile-context .artwork-detail-title {
+        font-size: clamp(1.2rem, 5.8vw, 1.65rem);
+    }
+
+    .artwork-mobile-context .artwork-page-description h2,
+    .artwork-mobile-context .artwork-page-extra h2 {
+        margin-bottom: 4px;
+        font-size: 0.86rem;
+    }
+
+    .artwork-mobile-context .artwork-page-copy {
+        font-size: 0.72rem;
+        line-height: 1.35;
+    }
+
+    .artwork-mobile-context .artwork-page-detail-list {
+        gap: 3px 10px;
+        font-size: 0.64rem;
+        line-height: 1.2;
+    }
+
+    .artwork-page-root .artwork-mobile-auction {
+        padding: 10px;
+    }
+
+    .artwork-mobile-auction > .artwork-page-card-heading {
+        min-height: 24px;
+        margin-bottom: 7px;
+    }
+
+    .artwork-mobile-auction > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 0.4rem;
+    }
+
+    .artwork-mobile-auction .artwork-auction-fact {
+        font-size: 0.74rem;
+        line-height: 1.2;
+    }
+
+    .artwork-mobile-auction [data-testid="live-auction-current-bid"] {
+        font-size: 1.22rem;
+        line-height: 1.05;
+    }
+
+    .artwork-mobile-auction > .mt-6 {
+        margin-top: 0.7rem;
+    }
+
+    .artwork-mobile-auction > .mt-6.space-y-3 > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 0.45rem;
+    }
+
+    .artwork-mobile-auction .artwork-bid-input {
+        min-height: 42px;
+        padding: 0.55rem 0.75rem;
+    }
+
+    .artwork-mobile-auction .artwork-page-primary-action {
+        min-height: 42px !important;
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.82rem;
     }
 
     .artwork-ownership-actions {
@@ -2527,42 +2603,14 @@ body.classic::before,
     box-shadow: 0 0 10px var(--c-glow-strong) !important;
 }
 
-.avatar-dropdown-menu .dropdown-profile-item {
-    background: var(--c-surface-muted) !important;
-    border-color: var(--c-border-soft) !important;
-    font-weight: 700 !important;
-}
-
-.avatar-dropdown-menu .dropdown-profile-item span {
-    font-weight: 700 !important;
-}
-
 .avatar-network-options {
     display: grid;
     gap: 0.25rem;
     padding: 0.25rem 0 0.5rem 1rem;
 }
 
-.avatar-network-options[hidden] {
-    display: none !important;
-}
-
 .avatar-network-option {
     justify-content: flex-start;
-}
-
-.avatar-network-option.is-active {
-    font-weight: 700;
-}
-
-.network-option-indicator {
-    width: 0.5rem;
-    height: 0.5rem;
-    flex: 0 0 0.5rem;
-    border: 1px solid var(--c-border);
-    border-radius: 50%;
-    background: var(--c-accent);
-    box-shadow: 0 0 8px var(--c-glow);
 }
 
 .avatar-network-option.is-disabled {
@@ -2880,6 +2928,10 @@ header > .container > .flex > :last-child {
 .avatar-dropdown-menu .network-switcher-btn {
     min-height: 44px !important;
     padding: 0.5rem 0.65rem !important;
+}
+
+.avatar-dropdown-menu .network-current-row {
+    pointer-events: none;
 }
 
 .avatar-dropdown-menu .network-switcher-btn > img {
