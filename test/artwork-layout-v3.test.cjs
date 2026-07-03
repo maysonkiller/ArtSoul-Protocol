@@ -50,7 +50,11 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(source, /<h2>Community<\/h2>/);
     assert.match(source, /<h2>Gemini Analysis<\/h2>/);
     assert.match(styles, /\.artwork-page-context \{[\s\S]*?gap: 8px;[\s\S]*?padding: 12px 14px 8px !important;[\s\S]*?background: transparent !important;/);
+    assert.match(styles, /\.artwork-page-left \.artwork-page-context \{[\s\S]*?display: flex;[\s\S]*?flex-direction: column;[\s\S]*?justify-content: flex-start;[\s\S]*?gap: 8px;[\s\S]*?padding: 10px 14px 6px !important;/);
+    assert.match(styles, /\.artwork-page-left \.artwork-page-context > \* \{[\s\S]*?flex: 0 0 auto;/);
+    assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
+    assert.match(html, /unified-styles\.css\?v=21/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -59,8 +63,8 @@ test('mobile scroll order matches the rebuilt blocks and disables motion', () =>
         ['artwork-page-left \\.artwork-mobile-context', 'artwork-mobile-context', 2],
         ['artwork-page-right \\.artwork-mobile-auction', 'artwork-mobile-auction', 3],
         ['artwork-page-right \\.artwork-mobile-people', 'artwork-mobile-people', 4],
-        ['artwork-page-left \\.artwork-mobile-trust', 'artwork-mobile-trust', 5],
-        ['artwork-page-left \\.artwork-mobile-ai', 'artwork-mobile-ai', 6],
+        ['artwork-page-left \\.artwork-mobile-ai', 'artwork-mobile-ai', 5],
+        ['artwork-page-left \\.artwork-mobile-trust', 'artwork-mobile-trust', 6],
         ['artwork-page-right \\.artwork-mobile-moderation', 'artwork-mobile-moderation', 7]
     ];
     orderRules.forEach(([selector, className, order]) => {
@@ -81,13 +85,27 @@ test('header keeps a top-right avatar button during wallet initialization', () =
     assert.match(styles, /\.artwork-header-actions \{[\s\S]*?margin-left: auto;/);
 });
 
-test('image and video fill side-borderless detail frames while audio controls remain intact', () => {
+test('images keep their aspect ratio and support fullscreen while existing video and audio controls remain intact', () => {
     assert.match(styles, /artwork-detail-frame:not\(\.artwork-detail-frame-audio\)[\s\S]*?border-width: 1px 0;[\s\S]*?box-shadow: none;/);
     assert.match(styles, /\.artwork-page-left \.artwork-detail-media-object,[\s\S]*?object-fit: fill;/);
+    assert.match(styles, /\.artwork-page-left \.artwork-detail-image \{[\s\S]*?object-fit: contain;/);
+    assert.match(source, /href=\{url\}[\s\S]*?target="_blank"[\s\S]*?className="artwork-detail-image-fullscreen"/);
+    assert.match(source, /shell && \(shell\.requestFullscreen \|\| shell\.webkitRequestFullscreen\)/);
+    assert.match(source, /View artwork fullscreen/);
     assert.doesNotMatch(source, /artwork-detail-audio-title/);
     assert.match(source, /className="artwork-detail-audio-controls"/);
     assert.match(source, /className="artwork-detail-audio-player"/);
     assert.match(source, /onPlay=\{\(\) => setIsPlaying\(true\)\}/);
+});
+
+test('Community aligns one number over each action without duplicate signal labels', () => {
+    assert.match(source, /className="artwork-page-signal-actions"/);
+    assert.equal((source.match(/className="artwork-page-signal-action"/g) || []).length, 3);
+    assert.doesNotMatch(source, /<span>Likes<\/span>/);
+    assert.doesNotMatch(source, /<span>Would Buy<\/span>/);
+    assert.doesNotMatch(source, /<span>Watching<\/span>/);
+    assert.match(styles, /\.artwork-page-signal-action \{[\s\S]*?grid-template-rows: 26px auto;[\s\S]*?align-items: center;/);
+    assert.match(styles, /\.artwork-page-signal-action strong \{[\s\S]*?width: 100%;[\s\S]*?text-align: center;/);
 });
 
 test('Ownership contains Share and Back while the header subtitle and V3 player skin are gone', () => {
