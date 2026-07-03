@@ -194,6 +194,8 @@
             if (typeof value === 'string') {
                 const trimmed = value.trim();
                 if (!trimmed) return null;
+                const caipMatch = trimmed.match(/^eip155:(\d+)(?::|$)/i);
+                if (caipMatch) return parseInt(caipMatch[1], 10);
                 return trimmed.startsWith('0x') ? parseInt(trimmed, 16) : parseInt(trimmed, 10);
             }
             return null;
@@ -203,12 +205,13 @@
             const modalState = window.web3Modal?.getState?.();
             const candidates = [
                 state?.chainId,
-                modalState?.chainId,
-                window.ethereum?.chainId,
+                state?.caipAddress,
+                state?.selectedNetworkId,
                 window.currentChainId,
                 localStorage.getItem('artsoul_chain_id'),
-                state?.selectedNetworkId,
-                modalState?.selectedNetworkId
+                modalState?.chainId,
+                modalState?.selectedNetworkId,
+                window.ethereum?.chainId
             ];
 
             for (const candidate of candidates) {
