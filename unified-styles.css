@@ -2482,6 +2482,72 @@ body.classic::before,
     font-size: 0.875rem !important;
     line-height: 1.25 !important;
     text-decoration: none !important;
+    border: 1px solid transparent !important;
+    border-radius: 0.5rem !important;
+}
+
+.avatar-dropdown-menu .dropdown-item:not(.is-disabled):hover,
+.avatar-dropdown-menu .dropdown-item:not(.is-disabled):focus-visible {
+    background: var(--c-surface-muted) !important;
+    border-color: var(--c-border) !important;
+    box-shadow: 0 0 14px var(--c-glow) !important;
+    outline: none !important;
+}
+
+.avatar-dropdown-menu .dropdown-item:not(.is-disabled):active {
+    background: var(--c-surface-muted) !important;
+    border-color: var(--c-accent) !important;
+    box-shadow: 0 0 10px var(--c-glow-strong) !important;
+}
+
+.avatar-network-options {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.25rem 0 0.5rem 1rem;
+}
+
+.avatar-network-options[hidden] {
+    display: none !important;
+}
+
+.avatar-network-option {
+    justify-content: flex-start;
+}
+
+.network-option-indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex: 0 0 0.5rem;
+    border: 1px solid var(--c-border);
+    border-radius: 50%;
+    background: var(--c-accent);
+    box-shadow: 0 0 8px var(--c-glow);
+}
+
+.avatar-network-option.is-disabled {
+    cursor: not-allowed !important;
+    opacity: 0.46;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.avatar-network-option.is-disabled .network-option-indicator {
+    background: var(--c-text);
+    box-shadow: none;
+}
+
+.network-soon-badge {
+    margin-left: auto;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    color: var(--c-text) !important;
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    -webkit-text-fill-color: currentColor !important;
 }
 
 .avatar-dropdown-menu .dropdown-item span,
@@ -2630,11 +2696,30 @@ header > .container > .flex > :last-child {
 }
 
 .avatar-button {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    padding: 0.5rem 0.75rem !important;
+    border: 2px solid var(--c-border) !important;
+    border-radius: 9999px !important;
+    cursor: pointer;
     opacity: 1 !important;
     min-height: 52px !important;
     background: var(--c-surface) !important;
     border-color: var(--c-border) !important;
     color: var(--c-text) !important;
+}
+
+.avatar-button > img {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border-radius: 9999px;
+    object-fit: cover;
+}
+
+.avatar-button > .dropdown-arrow {
+    flex-shrink: 0;
 }
 
 #navButtons .avatar-button {

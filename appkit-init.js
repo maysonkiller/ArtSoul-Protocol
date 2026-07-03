@@ -27,7 +27,8 @@ const rialoPlayground = {
 // To enable mainnets: uncomment mainnet and base in the array below
 const networks = [
     baseSepolia,          // Base testnet (default)
-    sepolia,              // Ethereum testnet
+    // Ethereum Sepolia remains in SUPPORTED_NETWORKS for future activation,
+    // but is intentionally omitted from selectable AppKit networks for now.
     // rialoPlayground,   // Future target: keep hidden until ArtSoul contracts support it
     // base,              // Base mainnet (uncomment when ready for production)
     // mainnet            // Ethereum mainnet (uncomment when ready for production)
@@ -119,8 +120,12 @@ const WALLET_CONFIRMATION_INTERVAL = 400;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
-const MODAL_CLOSE_RETRY_DELAYS = [250, 700, 1400];
+const MODAL_CLOSE_RETRY_DELAY = 400;
 let lastDispatchedWalletStateKey = null;
+let lastAcceptedMobileAccountKey = null;
+let lastObservedAppKitAccountKey = null;
+let modalClosePromise = null;
+let modalCloseRetryTimer = null;
 window.artsoulWalletHydrating = true;
 window.artsoulWalletStateSettled = false;
 window.artsoulSettledWalletState = null;
@@ -428,6 +433,9 @@ function acceptMobileAppKitWalletState(account, source = 'mobile AppKit session'
     if (!walletState) return null;
 
     const { address, chainId } = walletState;
+    const accountKey = `${address}:${chainId || 'none'}`;
+    if (accountKey === lastAcceptedMobileAccountKey) return walletState;
+    lastAcceptedMobileAccountKey = accountKey;
     lastProcessedAddress = address;
     lastProcessedChainId = chainId;
     lastConfirmedWalletAt = Date.now();
@@ -716,39 +724,52 @@ async function waitForProviderChainId(expectedChainId, timeout = NETWORK_CONFIRM
     return getProviderTruthChainId(preferredProvider);
 }
 
-async function safeCloseModal(reason = 'modal cleanup') {
+async function safeCloseModal(reason = 'modal cleanup', options = {}) {
+    if (modalClosePromise) return modalClosePromise;
+
     const activeModals = [...new Set([modal, window.web3Modal].filter(Boolean))];
-    let attemptedClose = false;
+    const modalStates = activeModals.map((activeModal) => {
+        try {
+            return activeModal.getState?.()?.open;
+        } catch {
+            return undefined;
+        }
+    });
+    if (modalStates.length && modalStates.every((isOpen) => isOpen === false)) return false;
 
-    for (const activeModal of activeModals) {
-        const closeMethods = [
-            activeModal.close,
-            activeModal.closeModal
-        ].filter((method) => typeof method === 'function');
+    modalClosePromise = (async () => {
+        for (const activeModal of activeModals) {
+            const closeMethod = typeof activeModal.close === 'function'
+                ? activeModal.close
+                : activeModal.closeModal;
+            if (typeof closeMethod !== 'function') continue;
 
-        for (const closeMethod of closeMethods) {
             try {
-                attemptedClose = true;
-                console.log(`Closing AppKit modal: ${reason}`);
+                if (!options.silent) console.log(`Closing AppKit modal: ${reason}`);
                 await Promise.race([
                     Promise.resolve(closeMethod.call(activeModal)),
                     sleep(1200)
                 ]);
+                return true;
             } catch (error) {
                 console.warn('AppKit modal close skipped:', error);
             }
         }
-    }
 
-    return attemptedClose;
+        return false;
+    })().finally(() => {
+        modalClosePromise = null;
+    });
+
+    return modalClosePromise;
 }
 
 function scheduleModalCloseRetries(reason = 'modal cleanup') {
-    MODAL_CLOSE_RETRY_DELAYS.forEach((delay) => {
-        setTimeout(() => {
-            safeCloseModal(`${reason} retry`);
-        }, delay);
-    });
+    if (modalCloseRetryTimer) return;
+    modalCloseRetryTimer = setTimeout(() => {
+        modalCloseRetryTimer = null;
+        safeCloseModal(`${reason} retry`, { silent: true });
+    }, MODAL_CLOSE_RETRY_DELAY);
 }
 
 async function closeNetworkModalAfterConfirmedChain(chainId) {
@@ -1158,7 +1179,6 @@ window.updateNavButtons = function updateNavButtons(state) {
     if (window.AvatarDropdown) {
         window.AvatarDropdown.sync(normalizedAddress, {
             chainId: normalizedChainId,
-            force: true,
             confirmed: Boolean(normalizedAddress)
         });
     } else {
@@ -1204,6 +1224,7 @@ window.safeConnectWallet = async () => {
     const mobileConnect = isMobileDevice();
     if (mobileConnect) {
         activeMobileConnect = true;
+        lastAcceptedMobileAccountKey = null;
         mobileConnectStartRevision = appKitAccountRevision;
         mobileConnectInitialAccountKey = getAppKitAccountKey(readAppKitAccountSnapshot());
     }
@@ -1294,12 +1315,17 @@ window.openArtSoulNetworkSelector = async () => {
             alert('Please connect your wallet before switching networks.');
             return false;
         }
-        markNetworkModalIntent();
-        if (window.web3Modal?.open) {
-            await window.web3Modal.open({ view: 'Networks' });
-        } else {
-            alert('Please wait, wallet modal is still loading...');
+        if (window.AvatarDropdown?.openNetworkOptions) {
+            window.AvatarDropdown.openNetworkOptions();
+            return true;
         }
+
+        // Fallback AppKit selector contains Base Sepolia only. Ethereum Sepolia
+        // remains implemented underneath but cannot be selected from the UI.
+        markNetworkModalIntent();
+        if (window.web3Modal?.open) await window.web3Modal.open({ view: 'Networks' });
+        else alert('Please wait, wallet modal is still loading...');
+        return true;
     } catch (error) {
         console.error('Failed to open network selector:', error);
         return false;
@@ -1677,31 +1703,34 @@ async function initializeAppKit() {
         }
 
         // Subscribe to account changes with detailed logging
-        let subscriptionCount = 0;
         modal.subscribeAccount(async (account) => {
-            subscriptionCount++;
             latestAppKitAccountSnapshot = account || null;
             appKitAccountRevision++;
-            console.log(` [${subscriptionCount}] Account update:`, {
-                address: account?.address ? account.address.slice(0, 10) + '...' : 'none',
-                status: account?.status || 'undefined',
-                chainId: account?.chainId,
-                isConnected: account?.isConnected
-            });
+            const observedAddress = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
+            const observedChainId = normalizeChainId(account);
+            const observedConnected = Boolean(observedAddress) &&
+                account?.isConnected !== false &&
+                account?.status !== 'disconnected';
+            const observedAccountKey = `${observedAddress || 'guest'}:${observedChainId || 'none'}:${observedConnected ? 'connected' : 'disconnected'}`;
+
+            const isFreshMobileConnectEvent = activeMobileConnect && appKitAccountRevision > mobileConnectStartRevision;
+            if (observedAccountKey === lastObservedAppKitAccountKey && !isFreshMobileConnectEvent) return;
+            lastObservedAppKitAccountKey = observedAccountKey;
+
             walletDebugLog('appkit account update', {
-                address: account?.address ? account.address.toLowerCase() : null,
+                address: observedAddress,
                 status: account?.status || 'undefined',
                 chainId: account?.chainId || null,
                 isConnected: account?.isConnected
             });
 
             // AppKit can emit transient disconnected while restoring a saved wallet.
-            if (!account?.address && walletHydrationPending) {
+            if (!observedAddress && walletHydrationPending) {
                 console.log('Skipping transient disconnected state during wallet hydration');
                 return;
             }
 
-            if (!account?.address && subscriptionCount < 5) {
+            if (!observedAddress) {
                 const connectIntentActive = activeMobileConnect || Date.now() < connectModalIntentUntil;
                 if (connectIntentActive) {
                     console.log('Skipping transient disconnected state during wallet hydration');
@@ -1737,7 +1766,7 @@ async function initializeAppKit() {
             // address is present and the account is not explicitly disconnected,
             // rather than waiting for status === 'connected' which can leave the
             // UI stale until a manual refresh.
-            const accountIsConnected = Boolean(account?.address) &&
+            const accountIsConnected = Boolean(observedAddress) &&
                 account?.isConnected !== false &&
                 account?.status !== 'disconnected';
 
@@ -1750,10 +1779,21 @@ async function initializeAppKit() {
                     if (restored?.address) return;
                 }
 
+                const eventAddress = observedAddress;
+                const eventChainId = normalizeChainId(account);
+                if (
+                    eventAddress &&
+                    eventAddress === lastProcessedAddress &&
+                    (!eventChainId || !lastProcessedChainId || eventChainId === lastProcessedChainId)
+                ) {
+                    finishWalletHydration();
+                    return;
+                }
+
                 // Prevent duplicate processing
                 const provider = await getAppKitWalletProvider();
                 const providerAccounts = await requestProviderAccounts(provider);
-                const normalizedAddress = providerAccounts[0] || normalizeWalletAddress(account.address);
+                const normalizedAddress = providerAccounts[0] || observedAddress;
                 const providerChainId = await getProviderTruthChainId(provider);
                 const normalizedChainId = setCurrentChainId(providerChainId || account);
                 finishWalletHydration();
@@ -1970,14 +2010,20 @@ async function handleSupabaseOAuthOnBoot() {
     // wallet is restored independently from the connected EIP-1193 provider.
 }
 
-async function bootAppKit() {
-    try {
-        await handleSupabaseOAuthOnBoot();
-    } catch (error) {
-        console.warn('OAuth bootstrap unavailable; continuing with wallet initialization:', error);
-        walletDebugLog('OAuth bootstrap skipped', { message: error?.message || String(error) });
-    }
-    await initializeAppKit();
+function bootAppKit() {
+    if (window.__artsoulAppKitBootPromise) return window.__artsoulAppKitBootPromise;
+
+    window.__artsoulAppKitBootPromise = (async () => {
+        try {
+            await handleSupabaseOAuthOnBoot();
+        } catch (error) {
+            console.warn('OAuth bootstrap unavailable; continuing with wallet initialization:', error);
+            walletDebugLog('OAuth bootstrap skipped', { message: error?.message || String(error) });
+        }
+        await initializeAppKit();
+    })();
+
+    return window.__artsoulAppKitBootPromise;
 }
 
 if (document.readyState === 'loading') {
