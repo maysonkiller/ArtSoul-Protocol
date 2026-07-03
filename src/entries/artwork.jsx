@@ -85,6 +85,8 @@ const { useState, useEffect, useRef } = React;
             const [isPlaying, setIsPlaying] = React.useState(false);
             const [videoLoaded, setVideoLoaded] = React.useState(false);
             const [posterFailed, setPosterFailed] = React.useState(false);
+            const [isImageFullscreen, setIsImageFullscreen] = React.useState(false);
+            const imageShellRef = React.useRef(null);
             const mediaType = media?.type || 'unknown';
             const url = media?.url || '';
             const poster = media?.poster || '';
@@ -96,6 +98,43 @@ const { useState, useEffect, useRef } = React;
                 setVideoLoaded(false);
                 setPosterFailed(false);
             }, [url]);
+
+            React.useEffect(() => {
+                const syncFullscreenState = () => {
+                    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+                    setIsImageFullscreen(fullscreenElement === imageShellRef.current);
+                };
+
+                document.addEventListener('fullscreenchange', syncFullscreenState);
+                document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+                return () => {
+                    document.removeEventListener('fullscreenchange', syncFullscreenState);
+                    document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
+                };
+            }, []);
+
+            const toggleImageFullscreen = async (event) => {
+                const shell = imageShellRef.current;
+
+                const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+                if (fullscreenElement) {
+                    event.preventDefault();
+                    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+                    if (exitFullscreen) await exitFullscreen.call(document);
+                    return;
+                }
+
+                const requestFullscreen = shell && (shell.requestFullscreen || shell.webkitRequestFullscreen);
+                if (requestFullscreen) {
+                    event.preventDefault();
+                    try {
+                        await requestFullscreen.call(shell);
+                    } catch {
+                        // The artwork remains visible when the browser rejects fullscreen mode.
+                    }
+                    return;
+                }
+            };
 
             const renderMediaFallback = (message = 'Media unavailable') => (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-black p-8 text-center">
@@ -189,14 +228,29 @@ const { useState, useEffect, useRef } = React;
                 );
             }
 
-            // Images and GIFs use the same contained artwork surface.
+            // Images and GIFs share the same aspect-safe artwork surface and fullscreen control.
             return (
-                <img
-                    src={url}
-                    alt={sanitizedTitle}
-                    className="artwork-detail-media-object artwork-detail-image"
-                    onError={() => setMediaError(true)}
-                />
+                <div ref={imageShellRef} className="artwork-detail-image-shell">
+                    <img
+                        src={url}
+                        alt={sanitizedTitle}
+                        className="artwork-detail-media-object artwork-detail-image"
+                        onError={() => setMediaError(true)}
+                    />
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="artwork-detail-image-fullscreen"
+                        aria-label={isImageFullscreen ? 'Exit fullscreen artwork view' : 'View artwork fullscreen'}
+                        title={isImageFullscreen ? 'Exit fullscreen' : 'View fullscreen'}
+                        onClick={toggleImageFullscreen}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+                        </svg>
+                    </a>
+                </div>
             );
         }
 
@@ -2159,23 +2213,27 @@ const { useState, useEffect, useRef } = React;
                                             <h2>Community</h2>
                                             {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
                                         </div>
-                                        <div className="artwork-page-signal-grid">
-                                            <div><strong>{socialSignals.likes || votes.length}</strong><span>Likes</span></div>
-                                            <div><strong>{socialSignals.wouldBuy || 0}</strong><span>Would Buy</span></div>
-                                            <div><strong>{socialSignals.watching || 0}</strong><span>Watching</span></div>
-                                        </div>
-                                        <div className="artwork-page-discovery-actions">
-                                            {userVote ? (
-                                                <p className="artwork-page-saved artwork-page-action-control">You voted</p>
-                                            ) : (
-                                                <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
-                                            )}
-                                            <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.would_buy}>
-                                                {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
-                                            </button>
-                                            <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.watching}>
-                                                {interactionState.watching ? 'Watching Saved' : 'Watching'}
-                                            </button>
+                                        <div className="artwork-page-signal-actions">
+                                            <div className="artwork-page-signal-action">
+                                                <strong>{socialSignals.likes || votes.length}</strong>
+                                                {userVote ? (
+                                                    <p className="artwork-page-saved artwork-page-action-control">You voted</p>
+                                                ) : (
+                                                    <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
+                                                )}
+                                            </div>
+                                            <div className="artwork-page-signal-action">
+                                                <strong>{socialSignals.wouldBuy || 0}</strong>
+                                                <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.would_buy}>
+                                                    {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
+                                                </button>
+                                            </div>
+                                            <div className="artwork-page-signal-action">
+                                                <strong>{socialSignals.watching || 0}</strong>
+                                                <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.watching}>
+                                                    {interactionState.watching ? 'Watching Saved' : 'Watching'}
+                                                </button>
+                                            </div>
                                         </div>
                                 </section>
 
