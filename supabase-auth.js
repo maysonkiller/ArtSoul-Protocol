@@ -4,38 +4,6 @@
 let supabaseClient = null;
 let authenticatedWallet = null; // Cache authenticated wallet to prevent repeated signature requests
 let backendSessionCache = null;
-let publicConfigPromise = null;
-
-async function loadSupabasePublicConfig() {
-    if (window.ArtSoulPublicConfig?.load) {
-        return window.ArtSoulPublicConfig.load();
-    }
-
-    if (window.ArtSoulPublicConfigData) {
-        return window.ArtSoulPublicConfigData;
-    }
-
-    if (!publicConfigPromise) {
-        publicConfigPromise = fetch('/api/public/config', {
-            method: 'GET',
-            credentials: 'omit'
-        }).then(async response => {
-            const text = await response.text();
-            const data = text ? JSON.parse(text) : {};
-            if (!response.ok) {
-                throw new Error(data.message || data.error || 'Public Supabase configuration unavailable');
-            }
-            if (!data.supabaseUrl || !data.supabaseAnonKey) {
-                throw new Error('Public Supabase configuration is incomplete');
-            }
-            window.ArtSoulPublicConfigData = data;
-            window.SUPABASE_ANON_KEY = data.supabaseAnonKey;
-            return data;
-        });
-    }
-
-    return publicConfigPromise;
-}
 
 function normalizeWalletAddress(value) {
     return value ? String(value).toLowerCase() : '';
@@ -89,17 +57,11 @@ function clearBackendSessionCache({ preserveActiveWallet = true } = {}) {
 async function initSupabase() {
     if (supabaseClient) return supabaseClient;
 
-    const config = await loadSupabasePublicConfig();
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-    supabaseClient = createClient(config.supabaseUrl, config.supabaseAnonKey, {
-        auth: {
-            autoRefreshToken: true,
-            persistSession: true,
-            detectSessionInUrl: true
-        }
-    });
+    if (typeof window.ArtSoulDB?.initSupabase !== 'function') {
+        throw new Error('Shared ArtSoul Supabase client is unavailable');
+    }
 
-    console.log(' Supabase Auth initialized');
+    supabaseClient = await window.ArtSoulDB.initSupabase();
     return supabaseClient;
 }
 
@@ -320,8 +282,6 @@ async function authenticateWithSocial(provider) {
  * Handle OAuth callback after redirect
  */
 async function handleOAuthCallback() {
-    const supabase = await initSupabase();
-
     try {
         // Check if we're in OAuth callback. Supabase may return either
         // implicit-flow hash tokens or a PKCE ?code= callback.
@@ -337,6 +297,10 @@ async function handleOAuthCallback() {
         }
 
         if (!code && !accessToken) return null;
+
+        // Do not block AppKit/page hydration on Supabase when this is a normal
+        // page load. Only initialize auth when an OAuth callback is present.
+        const supabase = await initSupabase();
 
         let session = null;
 
