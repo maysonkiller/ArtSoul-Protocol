@@ -38,6 +38,8 @@ const { useState, useEffect, useRef } = React;
             const fileInputRef = useRef(null);
             const profileSignalRef = useRef({ address: null, chainId: null, initialized: false });
             const profileRequestRef = useRef(0);
+            const loadedProfileAddressRef = useRef(null);
+            const loadingProfileAddressRef = useRef(null);
             const artworksRequestRef = useRef(0);
             const discoveryRequestRef = useRef(0);
             const transactionActionsRef = useRef(new Set());
@@ -615,21 +617,30 @@ const { useState, useEffect, useRef } = React;
                     const walletAddress = result.walletAddress || getActiveWalletAddress();
                     // Reload profile to show connected account
                     setTimeout(() => {
-                        loadProfile(walletAddress);
+                        loadProfile(walletAddress, { force: true });
                     }, 1000);
                 }
             }
 
-            async function loadProfile(walletAddressOverride = null) {
-                const requestId = ++profileRequestRef.current;
-                setArtworksLoading(true);
-
+            async function loadProfile(walletAddressOverride = null, options = {}) {
                 // Check if viewing another user's profile
                 const viewAddress = getViewAddress();
-
                 const walletAddress = viewAddress || walletAddressOverride || getActiveWalletAddress();
+                const normalizedAddress = walletAddress?.toLowerCase() || null;
+
+                if (normalizedAddress && !options.force && (
+                    loadedProfileAddressRef.current === normalizedAddress ||
+                    loadingProfileAddressRef.current === normalizedAddress
+                )) {
+                    return;
+                }
+
+                const requestId = ++profileRequestRef.current;
+                setArtworksLoading(true);
                 if (!walletAddress) {
                     if (requestId !== profileRequestRef.current) return;
+                    loadedProfileAddressRef.current = null;
+                    loadingProfileAddressRef.current = null;
                     setProfile(null);
                     setMyArtworks([]);
                     setArtworksLoading(false);
@@ -640,6 +651,8 @@ const { useState, useEffect, useRef } = React;
                     setLoading(false);
                     return;
                 }
+
+                loadingProfileAddressRef.current = normalizedAddress;
 
                 // Determine if this is the current user's profile
                 const currentAddress = getActiveWalletAddress();
@@ -671,6 +684,7 @@ const { useState, useEffect, useRef } = React;
 
                     if (requestId !== profileRequestRef.current) return;
                     setProfile(profileData);
+                    loadedProfileAddressRef.current = normalizedAddress;
                     refreshDiscoveryProfile(profileData).catch(error => {
                         console.warn('Discovery profile refresh skipped:', error);
                     });
@@ -684,6 +698,9 @@ const { useState, useEffect, useRef } = React;
                     console.error('Error loading profile:', error);
                 }
                 if (requestId !== profileRequestRef.current) return;
+                if (loadingProfileAddressRef.current === normalizedAddress) {
+                    loadingProfileAddressRef.current = null;
+                }
                 setLoading(false);
             }
 

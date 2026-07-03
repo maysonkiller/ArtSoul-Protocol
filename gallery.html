@@ -58,8 +58,8 @@
     <script src="modal-system.js"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
     <script src="src/ui/components/artwork-card.js?v=7"></script>
-    <script src="avatar-dropdown.js?v=12"></script>
-    <script type="module" src="appkit-init.js?v=15"></script>
+    <script src="avatar-dropdown.js?v=13"></script>
+    <script type="module" src="appkit-init.js?v=16"></script>
     <style>
         @keyframes spin {
             from { transform: rotate(0deg); }
@@ -115,7 +115,15 @@
                 </div>
                 <div class="flex items-center gap-3">
                     <div id="networkBadge"></div>
-                    <div id="navButtons" class="flex items-center gap-3"></div>
+                    <div id="navButtons" class="flex items-center gap-3" data-avatar-render-key="initializing">
+                        <div class="avatar-dropdown-container">
+                            <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
+                                <img src="/default-avatar.png" alt="ArtSoul">
+                                <span class="avatar-info">ArtSoul Guest</span>
+                                <span class="dropdown-arrow" aria-hidden="true">▾</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

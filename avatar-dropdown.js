@@ -11,6 +11,8 @@
             this.container = null;
             this.currentRenderKey = null;
             this.pendingRenderKey = null;
+            this.profileCache = new Map();
+            this.profileRequests = new Map();
         }
 
         getNavContainer() {
@@ -154,7 +156,7 @@
             const renderKey = this.getRenderKey(confirmedAddress, options);
             const hasMenuButton = !!container.querySelector('.avatar-button');
 
-            if (!options.force && hasMenuButton && container.dataset.avatarRenderKey === renderKey) {
+            if (!options.refreshProfile && hasMenuButton && container.dataset.avatarRenderKey === renderKey) {
                 return true;
             }
 
@@ -184,19 +186,17 @@
             if (container) container.dataset.avatarRenderKey = renderKey;
             this.pendingRenderKey = renderKey;
 
-            console.log('👤 Initializing avatar dropdown for wallet:', walletAddress);
-
             try {
-                // Load profile from Supabase
-                this.profile = await window.ArtSoulDB.getProfile(walletAddress);
+                this.profile = await this.loadProfileOnce(walletAddress, {
+                    refresh: options.refreshProfile === true
+                });
 
                 if (!this.profile) {
-                    console.log('👤 No profile found for wallet:', walletAddress);
+                    if (this.pendingRenderKey !== renderKey) return;
                     this.renderWalletInfo(walletAddress, { renderKey });
                     return;
                 }
 
-                console.log('👤 Profile loaded:', this.profile.username || walletAddress);
                 if (this.pendingRenderKey !== renderKey) return;
                 this.render({ renderKey, walletAddress });
             } catch (error) {
@@ -208,10 +208,42 @@
             }
         }
 
+        async loadProfileOnce(walletAddress, options = {}) {
+            const cacheKey = walletAddress.toLowerCase();
+            if (options.refresh) {
+                this.profileCache.delete(cacheKey);
+            }
+            if (this.profileCache.has(cacheKey)) {
+                return this.profileCache.get(cacheKey);
+            }
+            if (this.profileRequests.has(cacheKey)) {
+                return this.profileRequests.get(cacheKey);
+            }
+
+            console.log('👤 Initializing avatar dropdown for wallet:', walletAddress);
+            const request = Promise.resolve()
+                .then(() => window.ArtSoulDB.getProfile(walletAddress))
+                .then(profile => {
+                    this.profileCache.set(cacheKey, profile || null);
+                    if (profile) {
+                        console.log('👤 Profile loaded:', profile.username || walletAddress);
+                    } else {
+                        console.log('👤 No profile found for wallet:', walletAddress);
+                    }
+                    return profile || null;
+                })
+                .finally(() => {
+                    this.profileRequests.delete(cacheKey);
+                });
+
+            this.profileRequests.set(cacheKey, request);
+            return request;
+        }
+
         /**
          * Get current network info with balance
          */
-        async getCurrentNetworkInfo() {
+        async getCurrentNetworkInfo(options = {}) {
             const chainId = this.getNormalizedChainId();
 
             // Network mapping with proper icons (matching AppKit)
@@ -238,7 +270,7 @@
 
             // Get balance
             let balance = '0.0000';
-            if (chainId && window.currentWalletAddress) {
+            if (options.includeBalance !== false && chainId && window.currentWalletAddress) {
                 try {
                     const provider = await window.web3Modal?.getWalletProvider();
                     if (provider && provider.request) {
@@ -264,13 +296,13 @@
                         }
                     }, 500);
                 }
-                return { name: 'Connecting...', icon: '', color: '#888888', currency: 'ETH', balance: '0.0000' };
+                return { name: 'Connecting...', icon: '', color: '#888888', currency: 'ETH', balance: options.includeBalance === false ? '…' : '0.0000' };
             }
 
             const network = networks[chainId];
             if (!network) {
                 // Unsupported network
-                return { name: 'Unsupported', icon: '', color: '#ff6b6b', currency: 'ETH', balance: '0.0000' };
+                return { name: 'Unsupported', icon: '', color: '#ff6b6b', currency: 'ETH', balance: options.includeBalance === false ? '…' : '0.0000' };
             }
 
             return { ...network, balance };
@@ -294,6 +326,71 @@
                 if (name) name.textContent = networkInfo.name;
                 if (balance) balance.textContent = `${networkInfo.balance} ${networkInfo.currency}`;
             }
+        }
+
+        renderNetworkOptions() {
+            return `
+                <div id="avatarNetworkOptions" class="avatar-network-options" hidden>
+                    <button
+                        type="button"
+                        class="dropdown-item avatar-network-option"
+                        data-allow-rapid
+                        onclick="window.AvatarDropdown.selectNetwork(84532, event)"
+                    >
+                        <span class="network-option-indicator" aria-hidden="true"></span>
+                        <span>Base Sepolia</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="dropdown-item avatar-network-option is-disabled"
+                        disabled
+                        aria-disabled="true"
+                        title="Coming soon"
+                    >
+                        <span class="network-option-indicator" aria-hidden="true"></span>
+                        <span>Ethereum Sepolia</span>
+                        <span class="network-soon-badge">SOON</span>
+                    </button>
+                </div>
+            `;
+        }
+
+        toggleNetworkOptions(event) {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
+            const options = document.getElementById('avatarNetworkOptions');
+            const trigger = document.querySelector('.network-switcher-btn');
+            if (!options) return false;
+            const willOpen = options.hidden;
+            options.hidden = !willOpen;
+            trigger?.setAttribute('aria-expanded', String(willOpen));
+            return willOpen;
+        }
+
+        openNetworkOptions() {
+            if (!this.isOpen) this.toggle();
+            const options = document.getElementById('avatarNetworkOptions');
+            const trigger = document.querySelector('.network-switcher-btn');
+            if (!options) return false;
+            options.hidden = false;
+            trigger?.setAttribute('aria-expanded', 'true');
+            return true;
+        }
+
+        closeNetworkOptions() {
+            const options = document.getElementById('avatarNetworkOptions');
+            const trigger = document.querySelector('.network-switcher-btn');
+            if (options) options.hidden = true;
+            trigger?.setAttribute('aria-expanded', 'false');
+        }
+
+        async selectNetwork(chainId, event) {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
+            if (Number(chainId) !== 84532) return false;
+            const switched = await window.switchArtSoulNetwork?.(84532);
+            if (switched) this.closeNetworkOptions();
+            return Boolean(switched);
         }
 
         /**
@@ -323,16 +420,20 @@
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
 
-            // Get current network info with balance
-            const networkInfo = await this.getCurrentNetworkInfo();
+            // Render immediately; balance hydration runs after the menu shell exists.
+            const networkInfo = await this.getCurrentNetworkInfo({ includeBalance: false });
 
             // Create avatar dropdown HTML
+            this.isOpen = false;
             navButtons.innerHTML = `
                 <div class="avatar-dropdown-container" style="position: relative;">
                     <!-- Avatar Button -->
                     <button
                         class="avatar-button"
                         onclick="window.AvatarDropdown.toggle()"
+                        data-allow-rapid
+                        aria-expanded="false"
+                        aria-controls="avatarDropdownMenu"
                         style="
                             display: flex;
                             align-items: center;
@@ -403,8 +504,11 @@
 
                         <!-- Network Switcher -->
                         <button
-                            onclick="window.openArtSoulNetworkSelector?.()"
+                            onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
                             class="dropdown-item network-switcher-btn"
+                            data-allow-rapid
+                            aria-expanded="false"
+                            aria-controls="avatarNetworkOptions"
                             style="
                                 display: flex;
                                 align-items: center;
@@ -426,6 +530,7 @@
                                 <div data-network-balance style="font-size: 0.75rem; opacity: 0.7; font-family: monospace;">${networkInfo.balance} ${networkInfo.currency}</div>
                             </div>
                         </button>
+                        ${this.renderNetworkOptions()}
 
                         <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.25rem 0;"></div>
 
@@ -462,6 +567,7 @@
 
             // Apply theme-specific styles
             this.applyThemeStyles();
+            void this.updateNetworkDisplay();
 
             // Clean up old event listeners before adding new ones
             if (this.closeHandler) {
@@ -501,9 +607,16 @@
          * Toggle dropdown menu
          */
         toggle() {
-            this.isOpen = !this.isOpen;
             const menu = document.getElementById('avatarDropdownMenu');
             const arrow = document.querySelector('.dropdown-arrow');
+            const avatarButton = document.querySelector('.avatar-button');
+            if (!menu) {
+                this.isOpen = false;
+                avatarButton?.setAttribute('aria-expanded', 'false');
+                return false;
+            }
+
+            this.isOpen = !this.isOpen;
 
             if (menu) {
                 menu.style.display = this.isOpen ? 'block' : 'none';
@@ -513,6 +626,9 @@
             if (arrow) {
                 arrow.style.transform = this.isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
             }
+            avatarButton?.setAttribute('aria-expanded', String(this.isOpen));
+            if (!this.isOpen) this.closeNetworkOptions();
+            return this.isOpen;
         }
 
         /**
@@ -522,6 +638,7 @@
             this.isOpen = false;
             const menu = document.getElementById('avatarDropdownMenu');
             const arrow = document.querySelector('.dropdown-arrow');
+            const avatarButton = document.querySelector('.avatar-button');
 
             if (menu) {
                 menu.style.display = 'none';
@@ -531,6 +648,8 @@
             if (arrow) {
                 arrow.style.transform = 'rotate(0deg)';
             }
+            avatarButton?.setAttribute('aria-expanded', 'false');
+            this.closeNetworkOptions();
         }
 
         /**
@@ -634,26 +753,14 @@
          * Update profile (call after profile changes)
          */
         async refresh(walletAddress) {
-            return this.sync(walletAddress, { force: true });
+            return this.sync(walletAddress, { refreshProfile: true, confirmed: true });
         }
 
         renderInitializingState() {
             const container = this.getNavContainer();
             if (!container) return false;
-            if (container.dataset.avatarRenderKey === 'initializing') return true;
-
-            container.dataset.avatarRenderKey = 'initializing';
-            container.innerHTML = `
-                <div
-                    class="wallet-initializing-state"
-                    role="status"
-                    aria-live="polite"
-                    style="display:flex;align-items:center;min-height:48px;padding:0 0.75rem;opacity:0.7;"
-                >
-                    <span class="text-sm">Initializing...</span>
-                </div>
-            `;
-            return true;
+            if (container.dataset.avatarRenderKey === 'initializing' && container.querySelector('#avatarDropdownMenu')) return true;
+            return this.renderConnectButton({ renderKey: 'initializing' });
         }
 
         /**
@@ -673,11 +780,15 @@
             const isProfilePage = currentPath.includes('profile.html');
             const guestAvatarFallback = this.getDefaultAvatar();
 
+            this.isOpen = false;
             container.innerHTML = `
                 <div class="avatar-dropdown-container" style="position: relative;">
                     <button
                         class="avatar-button"
                         onclick="window.AvatarDropdown.toggle()"
+                        data-allow-rapid
+                        aria-expanded="false"
+                        aria-controls="avatarDropdownMenu"
                         style="
                             display: flex;
                             align-items: center;
@@ -782,16 +893,20 @@
             const avatarUrl = this.getDefaultAvatar();
             const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 
-            // Get current network info with balance
-            const networkInfo = await this.getCurrentNetworkInfo();
+            // Render immediately; balance hydration runs after the menu shell exists.
+            const networkInfo = await this.getCurrentNetworkInfo({ includeBalance: false });
 
             // Create avatar dropdown HTML (same as render() but without profile)
+            this.isOpen = false;
             navButtons.innerHTML = `
                 <div class="avatar-dropdown-container" style="position: relative;">
                     <!-- Avatar Button -->
                     <button
                         class="avatar-button"
                         onclick="window.AvatarDropdown.toggle()"
+                        data-allow-rapid
+                        aria-expanded="false"
+                        aria-controls="avatarDropdownMenu"
                         style="
                             display: flex;
                             align-items: center;
@@ -861,8 +976,11 @@
 
                         <!-- Network Switcher -->
                         <button
-                            onclick="window.openArtSoulNetworkSelector?.()"
+                            onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
                             class="dropdown-item network-switcher-btn"
+                            data-allow-rapid
+                            aria-expanded="false"
+                            aria-controls="avatarNetworkOptions"
                             style="
                                 display: flex;
                                 align-items: center;
@@ -884,6 +1002,7 @@
                                 <div data-network-balance style="font-size: 0.75rem; opacity: 0.7; font-family: monospace;">${networkInfo.balance} ${networkInfo.currency}</div>
                             </div>
                         </button>
+                        ${this.renderNetworkOptions()}
 
                         <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.25rem 0;"></div>
 
@@ -920,6 +1039,7 @@
 
             // Apply theme-specific styles
             this.applyThemeStyles();
+            void this.updateNetworkDisplay();
         }
     }
 
@@ -940,7 +1060,6 @@
         if (detail.isConnected && detail.address) {
             window.AvatarDropdown.sync(detail.address, {
                 chainId: detail.chainId,
-                force: true,
                 confirmed: true
             });
             return;
@@ -949,7 +1068,6 @@
         if (detail.isConnected === false) {
             window.AvatarDropdown.sync(null, {
                 chainId: detail.chainId,
-                force: true,
                 confirmed: false
             });
         }
@@ -961,12 +1079,12 @@
         syncCurrentMenu();
     }
 
-    window.addEventListener('artsoul:nav-ready', () => syncCurrentMenu({ force: true }));
+    window.addEventListener('artsoul:nav-ready', () => syncCurrentMenu());
 
     const navObserver = new MutationObserver(() => {
         const container = window.AvatarDropdown.getNavContainer();
         if (container && !container.querySelector('.avatar-button')) {
-            syncCurrentMenu({ force: true });
+            syncCurrentMenu();
         }
     });
 

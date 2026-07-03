@@ -8,6 +8,9 @@ import ProfileButton from './ProfileButton.js';
  * Initialize UI components
  */
 function initializeUIComponents() {
+    if (window.__artsoulUIComponentsInitialized) return true;
+    window.__artsoulUIComponentsInitialized = true;
+
     console.log(' Initializing UI components...');
 
     // Make components globally available
@@ -15,6 +18,7 @@ function initializeUIComponents() {
     window.ProfileButton = ProfileButton;
 
     console.log('UI components initialized');
+    return true;
 }
 
 // Auto-initialize when DOM is ready

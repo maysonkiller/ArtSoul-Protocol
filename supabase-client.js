@@ -2,15 +2,20 @@
 // Created: 2026-04-26
 // Updated: 2026-04-28 - Added authentication support
 
-let publicConfigPromise = null;
+const supabaseSingleton = window.ArtSoulSupabaseSingleton = window.ArtSoulSupabaseSingleton || {
+    client: null,
+    initPromise: null,
+    configPromise: null,
+    initLogged: false
+};
 
 async function loadSupabasePublicConfig() {
     if (window.ArtSoulPublicConfigData) {
         return window.ArtSoulPublicConfigData;
     }
 
-    if (!publicConfigPromise) {
-        publicConfigPromise = fetch('/api/public/config', {
+    if (!supabaseSingleton.configPromise) {
+        supabaseSingleton.configPromise = fetch('/api/public/config', {
             method: 'GET',
             credentials: 'omit'
         }).then(async response => {
@@ -28,7 +33,7 @@ async function loadSupabasePublicConfig() {
         });
     }
 
-    return publicConfigPromise;
+    return supabaseSingleton.configPromise;
 }
 
 // Export for OAuth integration and direct Supabase clients.
@@ -96,25 +101,42 @@ window.ArtSoulProfileDisplay = {
 };
 
 // Initialize Supabase client with auth support
-let supabaseClient = null;
+let supabaseClient = supabaseSingleton.client;
 
 async function initSupabase() {
-    if (supabaseClient) return supabaseClient;
+    if (supabaseSingleton.client) {
+        supabaseClient = supabaseSingleton.client;
+        return supabaseClient;
+    }
 
-    const config = await loadSupabasePublicConfig();
+    if (!supabaseSingleton.initPromise) {
+        supabaseSingleton.initPromise = (async () => {
+            const config = await loadSupabasePublicConfig();
 
-    // Import Supabase from CDN
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            // Import Supabase once for the whole page. Auth and data APIs share
+            // this exact GoTrueClient instance through ArtSoulSupabaseSingleton.
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+                auth: {
+                    autoRefreshToken: true,
+                    persistSession: true,
+                    detectSessionInUrl: true
+                }
+            });
 
-    supabaseClient = createClient(config.supabaseUrl, config.supabaseAnonKey, {
-        auth: {
-            autoRefreshToken: true,
-            persistSession: true,
-            detectSessionInUrl: true
-        }
-    });
+            supabaseSingleton.client = client;
+            if (!supabaseSingleton.initLogged) {
+                supabaseSingleton.initLogged = true;
+                console.log(' Supabase initialized with auth support');
+            }
+            return client;
+        })().catch((error) => {
+            supabaseSingleton.initPromise = null;
+            throw error;
+        });
+    }
 
-    console.log(' Supabase initialized with auth support');
+    supabaseClient = await supabaseSingleton.initPromise;
     return supabaseClient;
 }
 
