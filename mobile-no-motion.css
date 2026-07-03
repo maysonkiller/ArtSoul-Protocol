@@ -56,4 +56,10 @@
         transform: none !important;
         background-attachment: scroll !important;
     }
+
+    /* User-initiated audio playback is the sole mobile motion exception.
+       Idle preview discs remain completely static. */
+    :root:not(#artsoul-motion-enabled) .artsoul-card-audio-avatar[data-playing="true"] {
+        animation: artsoulAudioAvatarSpin 3s linear infinite !important;
+    }
 }

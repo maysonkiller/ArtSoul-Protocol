@@ -828,6 +828,7 @@ body.future .artsoul-artwork-card:focus-visible {
 @media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
     .artsoul-card-audio-avatar {
         animation: artsoulAudioAvatarSpin 12s linear infinite;
+        animation-timing-function: linear;
     }
 
     .artsoul-card-audio-avatar[data-playing="true"] {
@@ -1575,7 +1576,7 @@ body.future .artwork-detail-frame {
         width: 100%;
         height: fit-content;
         max-width: 100%;
-        max-height: 36dvh;
+        max-height: 30svh;
         border-width: 1px;
     }
 
@@ -1588,7 +1589,7 @@ body.future .artwork-detail-frame {
     .artwork-page-left .artwork-detail-frame-audio,
     .artwork-page-left .artwork-detail-frame-unknown {
         width: 100%;
-        height: min(54dvh, 380px);
+        height: min(38svh, 320px);
     }
 
     .artwork-page-left .artwork-detail-media-object,
@@ -1597,14 +1598,14 @@ body.future .artwork-detail-frame {
         width: 100%;
         height: auto;
         max-width: 100%;
-        max-height: 36dvh;
+        max-height: 30svh;
         padding: 0;
         object-fit: fill;
     }
 
     .artwork-page-left .artwork-detail-image-shell {
         height: auto;
-        max-height: 36dvh;
+        max-height: 30svh;
     }
 
     .artwork-page-left .artwork-detail-image {
@@ -2018,11 +2019,9 @@ body {
 }
 
 /* Keep page width stable while skeletons hydrate into scrollable content. */
-@media (min-width: 769px) {
-    html {
-        overflow-y: scroll;
-        scrollbar-gutter: stable;
-    }
+html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
 }
 
 html.classic,
@@ -2931,7 +2930,28 @@ header > .container > .flex > :last-child {
 }
 
 .avatar-dropdown-menu .network-current-row {
-    pointer-events: none;
+    cursor: pointer;
+}
+
+.avatar-dropdown-menu .network-current-row .network-options-arrow {
+    flex: 0 0 auto;
+    color: var(--c-text-muted);
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.avatar-network-options[hidden] {
+    display: none !important;
+}
+
+.avatar-network-options:not([hidden]) {
+    display: block;
+}
+
+.avatar-dropdown-navigation .avatar-disconnect-item {
+    width: 100%;
+    padding: 0.75rem !important;
+    text-align: left;
 }
 
 .avatar-dropdown-menu .network-switcher-btn > img {
@@ -3076,6 +3096,8 @@ header > .container > .flex > :last-child {
     header .container {
         padding-top: 0.5rem !important;
         padding-bottom: 0.5rem !important;
+        width: 100% !important;
+        max-width: 100% !important;
     }
 
     header > .container > .flex {
@@ -3088,6 +3110,9 @@ header > .container > .flex > :last-child {
         flex-wrap: nowrap !important;
         gap: 0.5rem 0.75rem !important;
         min-height: 56px;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
     }
 
     header > .container > .flex > :first-child {
@@ -3111,6 +3136,16 @@ header > .container > .flex > :last-child {
 
     .logo-link {
         flex-shrink: 0;
+    }
+
+    header .site-logo {
+        width: auto !important;
+        height: 48px !important;
+        max-width: 92px !important;
+    }
+
+    header > .container > .flex > :nth-child(2):empty {
+        display: none !important;
     }
 
     #navButtons {
@@ -3164,6 +3199,25 @@ header > .container > .flex > :last-child {
         max-width: 100%;
         order: initial;
         flex-basis: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    #homeSection,
+    #homeSection > *,
+    #artworkGallery,
+    #artworkGallery > * {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    #homeSection {
+        width: 100%;
+        overflow-x: clip;
+    }
+
+    #artworkGallery {
+        width: 100%;
     }
 }
 

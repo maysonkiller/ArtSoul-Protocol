@@ -276,8 +276,8 @@
         return id ? `artwork.html?id=${encodeURIComponent(id)}` : '';
     }
 
-    function prepareVideoPreview(video, artwork = {}) {
-        if (!video || video.dataset.artsoulPreviewPrepared === 'true') return;
+    function prepareVideoPreview(video, artwork = {}, options = {}) {
+        if (!video || (video.dataset.artsoulPreviewPrepared === 'true' && !options.force)) return;
         video.dataset.artsoulPreviewPrepared = 'true';
 
         const poster = posterUrl(artwork);
@@ -298,6 +298,9 @@
         if (video.readyState >= 1) renderFirstFrame();
         video.addEventListener('loadedmetadata', renderFirstFrame, { once: true });
         video.addEventListener('loadeddata', renderFirstFrame, { once: true });
+        video.addEventListener('seeked', () => {
+            video.closest('.artsoul-card-media')?.querySelector('.artsoul-media-loading')?.remove();
+        }, { once: true });
     }
 
     function createMediaLoadingElement() {
@@ -322,12 +325,47 @@
             guard.onerror = () => {
                 guard.className = 'artsoul-media-loading';
                 guard.src = '';
-                video.addEventListener('loadeddata', () => guard.remove(), { once: true });
+                ['loadedmetadata', 'loadeddata', 'seeked'].forEach((eventName) => {
+                    video.addEventListener(eventName, () => guard.remove(), { once: true });
+                });
             };
         } else {
-            video.addEventListener('loadeddata', () => guard.remove(), { once: true });
+            // iOS commonly honours metadata loading but defers loadeddata until
+            // playback. Revealing at metadata/seeked lets the prepared first
+            // frame paint instead of leaving the homepage card covered forever.
+            ['loadedmetadata', 'loadeddata', 'seeked', 'play'].forEach((eventName) => {
+                video.addEventListener(eventName, () => guard.remove(), { once: true });
+            });
         }
         return guard;
+    }
+
+    function reviveMediaPreviews(root = document) {
+        root.querySelectorAll('.artsoul-card-media video').forEach((video) => {
+            video.pause();
+            const container = video.closest('.artsoul-card-media-video');
+            if (container) container.dataset.playing = 'false';
+            const toggle = container?.querySelector('.artsoul-media-toggle');
+            if (toggle) syncPlaybackButton(toggle, video, 'video preview');
+            prepareVideoPreview(video, {}, { force: true });
+        });
+
+        root.querySelectorAll('.artsoul-card-audio-element').forEach((audio) => {
+            audio.pause();
+            const wrap = audio.closest('.artsoul-card-audio');
+            const avatar = wrap?.querySelector('.artsoul-card-audio-avatar');
+            const toggle = wrap?.querySelector('.artsoul-media-toggle');
+            if (avatar) avatar.dataset.playing = 'false';
+            if (toggle) syncPlaybackButton(toggle, audio, 'audio preview');
+        });
+
+        if (window.matchMedia('(min-width: 769px) and (prefers-reduced-motion: no-preference)').matches) {
+            root.querySelectorAll('.artsoul-card-audio-avatar').forEach((avatar) => {
+                avatar.getAnimations?.().forEach((animation) => animation.play());
+            });
+        }
+
+        window.dispatchEvent(new CustomEvent('artsoul:media-previews-restored'));
     }
 
     function createMediaElement(artwork = {}, onUnavailable = null) {
@@ -347,7 +385,7 @@
             const video = document.createElement('video');
             video.src = url;
             video.className = 'artsoul-card-media-object';
-            video.preload = 'auto';
+            video.preload = 'metadata';
             video.poster = descriptor.poster;
             video.playsInline = true;
             video.muted = true;
@@ -507,6 +545,19 @@
             setPosterFailed(false);
             return () => ref.current?.pause();
         }, [url]);
+        React.useEffect(() => {
+            const restore = () => {
+                const video = ref.current;
+                if (!video) return;
+                video.pause();
+                setPlaying(false);
+                setStarted(false);
+                setLoaded(video.readyState >= 1);
+                prepareVideoPreview(video, artwork, { force: true });
+            };
+            window.addEventListener('artsoul:media-previews-restored', restore);
+            return () => window.removeEventListener('artsoul:media-previews-restored', restore);
+        }, [artwork, url]);
         const toggle = event => {
             stopCardActivation(event);
             const video = ref.current;
@@ -520,9 +571,9 @@
             setMuted(video.muted);
         };
         return h('div', { className: 'artsoul-card-media artsoul-card-media-video', 'data-playing': String(playing) },
-            h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'auto', playsInline: true,
+            h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'metadata', playsInline: true,
                 poster: posterFailed ? '' : poster, muted, style: { pointerEvents: 'none' },
-                onLoadedMetadata: event => prepareVideoPreview(event.currentTarget, artwork),
+                onLoadedMetadata: event => { prepareVideoPreview(event.currentTarget, artwork); setLoaded(true); },
                 onLoadedData: () => setLoaded(true),
                 onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); setStarted(true); },
                 onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
@@ -554,6 +605,14 @@
         const [playing, setPlaying] = React.useState(false);
         const [muted, setMuted] = React.useState(false);
         React.useEffect(() => () => ref.current?.pause(), [url]);
+        React.useEffect(() => {
+            const restore = () => {
+                ref.current?.pause();
+                setPlaying(false);
+            };
+            window.addEventListener('artsoul:media-previews-restored', restore);
+            return () => window.removeEventListener('artsoul:media-previews-restored', restore);
+        }, [url]);
         const toggle = event => {
             stopCardActivation(event);
             const audio = ref.current;
@@ -625,8 +684,19 @@
         );
     }
 
+    if (!window.__artsoulMediaRestoreBound) {
+        window.__artsoulMediaRestoreBound = true;
+        window.addEventListener('pageshow', (event) => {
+            const navigationType = performance.getEntriesByType?.('navigation')?.[0]?.type;
+            if (event.persisted || navigationType === 'back_forward') {
+                requestAnimationFrame(() => reviveMediaPreviews(document));
+            }
+        });
+    }
+
     window.ArtSoulArtworkCard = {
         createCardElement,
+        createMediaElement,
         ReactCard,
         ReactMedia,
         statusInfo,
@@ -641,6 +711,7 @@
         hasSafeMedia,
         detailHref,
         prepareVideoPreview,
+        reviveMediaPreviews,
         signalsText,
         toTimestamp
     };

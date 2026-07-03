@@ -120,7 +120,7 @@ let mobileConnectInitialAccountKey = '';
 let deferMobileAuthenticationThisTurn = false;
 const walletResumeWaiters = new Set();
 const boundRuntimeProviders = new WeakSet();
-const WALLET_HYDRATION_TIMEOUT = 2500;
+const WALLET_HYDRATION_TIMEOUT = 8000;
 const POST_CONNECT_DISCONNECT_GUARD = 1200;
 const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
 const WALLET_CONNECT_TIMEOUT_MOBILE = 240000;
@@ -493,9 +493,35 @@ function getAppKitAccountKey(account) {
     return address ? `${address}:${getStateChainId(account) || 'none'}` : '';
 }
 
+function appKitAccountSnapshotScore(account) {
+    if (!account || typeof account !== 'object') return -1;
+    const address = normalizeWalletAddress(account.address || account.allAccounts?.[0]?.address);
+    const explicitlyDisconnected = account.status === 'disconnected' || account.isConnected === false;
+    let score = address ? 100 : 0;
+    if (address && !explicitlyDisconnected) score += 100;
+    if (getStateChainId(account)) score += 20;
+    if (account.caipAddress || account.selectedNetworkId) score += 5;
+    return score;
+}
+
 function readAppKitAccountSnapshot() {
     try {
-        return modal?.getAccount?.() || window.web3Modal?.getAccount?.() || latestAppKitAccountSnapshot;
+        const candidates = [
+            modal?.getAccount?.(),
+            window.web3Modal?.getAccount?.(),
+            latestAppKitAccountSnapshot
+        ].filter(Boolean);
+        if (!candidates.length) return null;
+
+        // getAccount() can remain a truthy but empty pre-approval object after
+        // an external-browser deep-link round trip. Prefer the most complete
+        // connected snapshot instead of allowing that stale object to mask the
+        // fresh subscribeAccount event.
+        return candidates.reduce((best, candidate) => (
+            appKitAccountSnapshotScore(candidate) >= appKitAccountSnapshotScore(best)
+                ? candidate
+                : best
+        ), null);
     } catch (error) {
         console.warn('Unable to read AppKit account session:', error);
         return latestAppKitAccountSnapshot;
