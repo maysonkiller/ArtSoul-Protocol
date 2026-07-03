@@ -480,7 +480,7 @@
 
         renderNetworkOptions() {
             return `
-                <div class="avatar-network-options avatar-network-future-options">
+                <div id="avatarNetworkOptions" class="avatar-network-options avatar-network-future-options" hidden>
                     <button
                         type="button"
                         class="dropdown-item avatar-network-option is-disabled"
@@ -497,13 +497,20 @@
 
         renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false }) {
             const networkSection = networkInfo ? `
-                <div class="dropdown-item network-switcher-btn network-current-row" role="status">
+                <button
+                    type="button"
+                    class="dropdown-item network-switcher-btn network-current-row"
+                    onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
+                    aria-expanded="false"
+                    aria-controls="avatarNetworkOptions"
+                >
                     <img src="${networkInfo.icon}" alt="${networkInfo.name}" onerror="this.style.display='none'" />
                     <div class="network-switcher-copy">
                         <div><span data-network-name>${networkInfo.name}</span></div>
                         <div data-network-balance>${networkInfo.balance} ${networkInfo.currency}</div>
                     </div>
-                </div>
+                    <span class="network-options-arrow" aria-hidden="true">⌄</span>
+                </button>
                 ${this.renderNetworkOptions()}
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
@@ -515,7 +522,7 @@
                 </div>
             ` : networkInfo ? `
                 <div class="avatar-dropdown-divider"></div>
-                <button onclick="window.resetWalletConnection()" class="dropdown-item">
+                <button onclick="window.resetWalletConnection()" class="dropdown-item avatar-disconnect-item">
                     <span>Disconnect</span>
                 </button>
             ` : `
@@ -818,7 +825,6 @@
             let container = this.getNavContainer();
 
             if (!container) return false;
-            this.clearCachedHeaderIdentity();
             if (options.renderKey) {
                 container.dataset.avatarRenderKey = options.renderKey;
                 this.pendingRenderKey = options.renderKey;
