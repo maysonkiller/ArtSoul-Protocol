@@ -19,6 +19,109 @@
             return document.getElementById('navButtons') || document.getElementById('avatarButton');
         }
 
+        getStableStructure() {
+            const navButtons = this.getNavContainer();
+            if (!navButtons) return null;
+
+            let dropdown = navButtons.querySelector('.avatar-dropdown-container');
+            if (!dropdown) {
+                dropdown = document.createElement('div');
+                dropdown.className = 'avatar-dropdown-container';
+                navButtons.appendChild(dropdown);
+            }
+
+            let button = dropdown.querySelector('.avatar-button');
+            if (!button) {
+                button = document.createElement('button');
+                button.className = 'avatar-button';
+                dropdown.prepend(button);
+            }
+
+            button.type = 'button';
+            button.dataset.allowRapid = '';
+            button.setAttribute('aria-label', 'ArtSoul account menu');
+            button.setAttribute('aria-controls', 'avatarDropdownMenu');
+            button.setAttribute('aria-expanded', String(this.isOpen));
+            button.setAttribute('onclick', 'window.AvatarDropdown.toggle()');
+
+            if (!button.querySelector('[data-avatar-image]')) {
+                button.innerHTML = `
+                    <img data-avatar-image src="/default-avatar.png" alt="ArtSoul" />
+                    <div class="avatar-info">
+                        <div data-avatar-name>ArtSoul Guest</div>
+                        <div data-avatar-address aria-hidden="true">&nbsp;</div>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow" aria-hidden="true">
+                        <path d="M4 6l4 4 4-4"></path>
+                    </svg>
+                `;
+            }
+
+            let menu = dropdown.querySelector('#avatarDropdownMenu');
+            if (!menu) {
+                menu = document.createElement('div');
+                menu.id = 'avatarDropdownMenu';
+                menu.className = 'avatar-dropdown-menu';
+                menu.style.display = this.isOpen ? 'block' : 'none';
+                dropdown.appendChild(menu);
+            }
+
+            return { navButtons, dropdown, button, menu };
+        }
+
+        updateStableButton({ avatarUrl, avatarAlt, name, address = '', stateKey }) {
+            const structure = this.getStableStructure();
+            if (!structure) return null;
+            const { button } = structure;
+            const contentKey = `${stateKey || ''}|${avatarUrl || ''}|${name || ''}|${address || ''}`;
+            if (button.dataset.avatarContentKey === contentKey) return structure;
+
+            const image = button.querySelector('[data-avatar-image]');
+            const nameNode = button.querySelector('[data-avatar-name]');
+            const addressNode = button.querySelector('[data-avatar-address]');
+            const fallback = this.getDefaultAvatar();
+
+            if (image) {
+                image.src = avatarUrl || '/default-avatar.png';
+                image.alt = avatarAlt || name || 'ArtSoul';
+                image.onerror = () => {
+                    image.onerror = null;
+                    image.src = fallback;
+                };
+            }
+            if (nameNode) nameNode.textContent = name || 'ArtSoul Guest';
+            if (addressNode) {
+                addressNode.textContent = address || '\u00a0';
+                addressNode.setAttribute('aria-hidden', address ? 'false' : 'true');
+            }
+
+            button.dataset.avatarContentKey = contentKey;
+            return structure;
+        }
+
+        updateStableMenu(html, menuKey) {
+            const structure = this.getStableStructure();
+            if (!structure) return null;
+            if (structure.menu.dataset.menuKey !== menuKey) {
+                structure.menu.innerHTML = html;
+                structure.menu.dataset.menuKey = menuKey;
+            }
+            structure.menu.style.display = this.isOpen ? 'block' : 'none';
+            return structure;
+        }
+
+        bindOutsideCloseOnce() {
+            if (this.closeHandler) return;
+            this.closeHandler = (event) => {
+                const dropdown = this.getNavContainer()?.querySelector('.avatar-dropdown-container');
+                if (dropdown && !dropdown.contains(event.target) && this.isOpen) {
+                    this.close();
+                }
+            };
+            document.addEventListener('click', this.closeHandler);
+            document.addEventListener('touchstart', this.closeHandler, { passive: true });
+        }
+
         getNavigationLabels() {
             return window.ArtSoulNavigationLabels || {
                 explore: 'Explore Art',
@@ -62,7 +165,7 @@
                 .map(item => `
                     <a
                         href="${item.href}"
-                        class="dropdown-item"
+                        class="dropdown-item${item.profile ? ' dropdown-profile-item' : ''}"
                         style="
                             display: flex;
                             align-items: center;
@@ -161,6 +264,7 @@
             }
 
             container.dataset.avatarRenderKey = renderKey;
+            this.pendingRenderKey = renderKey;
 
             if (confirmedAddress) {
                 this.init(confirmedAddress, { renderKey, walletAddress: confirmedAddress });
@@ -355,6 +459,53 @@
             `;
         }
 
+        renderMenuContent({ currentPath, isOwnProfile, networkInfo = null }) {
+            const networkSection = networkInfo ? `
+                <button
+                    onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
+                    class="dropdown-item network-switcher-btn"
+                    data-allow-rapid
+                    aria-expanded="false"
+                    aria-controls="avatarNetworkOptions"
+                >
+                    <img src="${networkInfo.icon}" alt="${networkInfo.name}" onerror="this.style.display='none'" />
+                    <div class="network-switcher-copy">
+                        <div><span data-network-name>${networkInfo.name}</span></div>
+                        <div data-network-balance>${networkInfo.balance} ${networkInfo.currency}</div>
+                    </div>
+                </button>
+                ${this.renderNetworkOptions()}
+                <div class="avatar-dropdown-divider"></div>
+            ` : '';
+
+            const accountAction = networkInfo ? `
+                <div class="avatar-dropdown-divider"></div>
+                <button onclick="window.resetWalletConnection()" class="dropdown-item">
+                    <span>Disconnect</span>
+                </button>
+            ` : `
+                <div class="avatar-dropdown-divider"></div>
+                <button onclick="safeConnectWallet()" id="connectBtn" class="dropdown-item btn-main">
+                    <span>Connect Wallet</span>
+                </button>
+            `;
+
+            return `
+                <div class="avatar-theme-section">
+                    <div class="avatar-theme-label">Theme Mode</div>
+                    <div class="theme-toggle avatar-theme-switch">
+                        <button onclick="window.setTheme('classic')" id="classicBtnDropdown" class="theme-btn">Classic</button>
+                        <button onclick="window.setTheme('future')" id="futureBtnDropdown" class="theme-btn">Future</button>
+                    </div>
+                </div>
+                ${networkSection}
+                <div class="avatar-dropdown-navigation">
+                    ${this.renderDropdownNavItems({ currentPath, isOwnProfile })}
+                    ${accountAction}
+                </div>
+            `;
+        }
+
         toggleNetworkOptions(event) {
             event?.preventDefault?.();
             event?.stopPropagation?.();
@@ -402,11 +553,6 @@
             if (options.renderKey) navButtons.dataset.avatarRenderKey = options.renderKey;
 
             const currentPath = window.location.pathname;
-            const isIndexPage = currentPath.endsWith('index.html') || currentPath === '/' || currentPath.endsWith('/');
-            const isGalleryPage = currentPath.includes('gallery.html');
-            const isUploadPage = currentPath.includes('upload.html');
-            const isDocsPage = currentPath.includes('docs.html');
-
             // Check if on profile page
             const isProfilePage = currentPath.includes('profile.html');
             // Check if viewing own profile (no address parameter or address matches current wallet)
@@ -422,185 +568,22 @@
 
             // Render immediately; balance hydration runs after the menu shell exists.
             const networkInfo = await this.getCurrentNetworkInfo({ includeBalance: false });
+            if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
-            // Create avatar dropdown HTML
-            this.isOpen = false;
-            navButtons.innerHTML = `
-                <div class="avatar-dropdown-container" style="position: relative;">
-                    <!-- Avatar Button -->
-                    <button
-                        class="avatar-button"
-                        onclick="window.AvatarDropdown.toggle()"
-                        data-allow-rapid
-                        aria-expanded="false"
-                        aria-controls="avatarDropdownMenu"
-                        style="
-                            display: flex;
-                            align-items: center;
-                            gap: 0.75rem;
-                            padding: 0.5rem;
-                            border-radius: 9999px;
-                            cursor: pointer;
-                            transition: all 0.3s;
-                            border: 2px solid transparent;
-                        "
-                    >
-                        <!-- Avatar -->
-                        <img
-                            src="${avatarUrl}"
-                            alt="${username}"
-                            style="
-                                width: 40px;
-                                height: 40px;
-                                border-radius: 9999px;
-                                object-fit: cover;
-                                flex-shrink: 0;
-                            "
-                            onerror="this.src='${this.getDefaultAvatar()}'"
-                        />
-
-                        <!-- Username & Address (hidden on mobile) -->
-                        <div class="avatar-info" style="text-align: left;">
-                            <div style="font-weight: 600; font-size: 0.875rem;">${username}</div>
-                            <div style="font-size: 0.75rem; opacity: 0.6; font-family: monospace;">${shortAddress}</div>
-                        </div>
-
-                        <!-- Dropdown Arrow -->
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 16 16"
-                            fill="currentColor"
-                            style="transition: transform 0.3s; flex-shrink: 0;"
-                            class="dropdown-arrow"
-                        >
-                            <path d="M4 6l4 4 4-4"/>
-                        </svg>
-                    </button>
-
-                    <div
-                        id="avatarDropdownMenu"
-                        class="avatar-dropdown-menu"
-                        style="
-                            display: none;
-                            position: absolute;
-                            top: calc(100% + 0.5rem);
-                            right: 0;
-                            min-width: 220px;
-                            border-radius: 0.75rem;
-                            padding: 0.5rem;
-                            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-                            z-index: 10002;
-                        "
-                    >
-                        <!-- Theme Switcher -->
-                        <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-                            <div class="avatar-theme-label">Theme Mode</div>
-                            <div class="theme-toggle avatar-theme-switch" style="width: 100%;">
-                                <button onclick="window.setTheme('classic')" id="classicBtnDropdown" class="theme-btn" style="flex: 1;">Classic</button>
-                                <button onclick="window.setTheme('future')" id="futureBtnDropdown" class="theme-btn" style="flex: 1;">Future</button>
-                            </div>
-                        </div>
-
-                        <!-- Network Switcher -->
-                        <button
-                            onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
-                            class="dropdown-item network-switcher-btn"
-                            data-allow-rapid
-                            aria-expanded="false"
-                            aria-controls="avatarNetworkOptions"
-                            style="
-                                display: flex;
-                                align-items: center;
-                                gap: 0.75rem;
-                                padding: 0.75rem;
-                                border-radius: 0.5rem;
-                                cursor: pointer;
-                                transition: all 0.2s;
-                                width: 100%;
-                                border: none;
-                                background: transparent;
-                                color: inherit;
-                                text-align: left;
-                            "
-                        >
-                            <img src="${networkInfo.icon}" alt="${networkInfo.name}" style="width: 20px; height: 20px; border-radius: 50%;" onerror="this.style.display='none'" />
-                            <div style="flex: 1;">
-                                <div><span data-network-name>${networkInfo.name}</span></div>
-                                <div data-network-balance style="font-size: 0.75rem; opacity: 0.7; font-family: monospace;">${networkInfo.balance} ${networkInfo.currency}</div>
-                            </div>
-                        </button>
-                        ${this.renderNetworkOptions()}
-
-                        <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.25rem 0;"></div>
-
-                        <!-- Menu Items -->
-                        <div style="padding: 0.25rem 0;">
-                            ${this.renderDropdownNavItems({ currentPath, isOwnProfile })}
-
-                            <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.25rem 0;"></div>
-
-                            <button
-                                onclick="window.resetWalletConnection()"
-                                class="dropdown-item"
-                                style="
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 0.75rem;
-                                    padding: 0.75rem;
-                                    border-radius: 0.5rem;
-                                    cursor: pointer;
-                                    transition: all 0.2s;
-                                    width: 100%;
-                                    border: none;
-                                    background: transparent;
-                                    color: inherit;
-                                    text-align: left;
-                                "
-                            >
-                                <span>Disconnect</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Apply theme-specific styles
+            this.updateStableButton({
+                avatarUrl,
+                avatarAlt: username,
+                name: username,
+                address: shortAddress,
+                stateKey: options.renderKey || `profile:${walletAddress.toLowerCase()}`
+            });
+            this.updateStableMenu(
+                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo }),
+                `connected:${currentPath}:${isOwnProfile}:${networkInfo.name}`
+            );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
-
-            // Clean up old event listeners before adding new ones
-            if (this.closeHandler) {
-                document.removeEventListener('click', this.closeHandler);
-                document.removeEventListener('touchstart', this.closeHandler);
-            }
-
-            // Close dropdown when clicking outside
-            this.closeHandler = (e) => {
-                const container = document.querySelector('.avatar-dropdown-container');
-                const menu = document.getElementById('avatarDropdownMenu');
-
-                // Don't close if clicking inside the menu
-                if (menu && menu.contains(e.target)) {
-                    // Allow navigation links to work
-                    if (e.target.tagName === 'A' || e.target.closest('a')) {
-                        return; // Let link navigate
-                    }
-                    // Only close if clicking disconnect button
-                    if (e.target.closest('button')?.textContent?.includes('Disconnect')) {
-                        return; // Let disconnect handler close it
-                    }
-                    return; // Don't close for other menu items
-                }
-
-                // Close if clicking outside container
-                if (container && !container.contains(e.target) && this.isOpen) {
-                    this.close();
-                }
-            };
-
-            document.addEventListener('click', this.closeHandler);
-            document.addEventListener('touchstart', this.closeHandler, { passive: true });
+            this.bindOutsideCloseOnce();
         }
 
         /**
@@ -770,104 +753,26 @@
             let container = this.getNavContainer();
 
             if (!container) return false;
-            if (options.renderKey) container.dataset.avatarRenderKey = options.renderKey;
-
-            const currentPath = window.location.pathname;
-            const isIndexPage = currentPath.endsWith('index.html') || currentPath === '/' || currentPath.endsWith('/');
-            const isGalleryPage = currentPath.includes('gallery.html');
-            const isUploadPage = currentPath.includes('upload.html');
-            const isDocsPage = currentPath.includes('docs.html');
-            const isProfilePage = currentPath.includes('profile.html');
-            const guestAvatarFallback = this.getDefaultAvatar();
-
-            this.isOpen = false;
-            container.innerHTML = `
-                <div class="avatar-dropdown-container" style="position: relative;">
-                    <button
-                        class="avatar-button"
-                        onclick="window.AvatarDropdown.toggle()"
-                        data-allow-rapid
-                        aria-expanded="false"
-                        aria-controls="avatarDropdownMenu"
-                        style="
-                            display: flex;
-                            align-items: center;
-                            gap: 0.75rem;
-                            padding: 0.5rem 0.75rem;
-                            border-radius: 9999px;
-                            cursor: pointer;
-                            transition: all 0.3s;
-                            border: 2px solid transparent;
-                            background: transparent;
-                            color: inherit;
-                        "
-                    >
-                        <img
-                            src="/default-avatar.png"
-                            alt="ArtSoul"
-                            onerror="this.onerror=null;this.src='${guestAvatarFallback}'"
-                            style="width: 40px; height: 40px; border-radius: 9999px; object-fit: cover; flex-shrink: 0;"
-                        />
-                        <div class="avatar-info" style="text-align: left;">
-                            <div style="font-weight: 600; font-size: 0.875rem;">ArtSoul Guest</div>
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="transition: transform 0.3s; flex-shrink: 0;" class="dropdown-arrow">
-                            <path d="M4 6l4 4 4-4"/>
-                        </svg>
-                    </button>
-
-                    <div
-                        id="avatarDropdownMenu"
-                        class="avatar-dropdown-menu"
-                        style="
-                            display: none;
-                            position: absolute;
-                            top: calc(100% + 0.5rem);
-                            right: 0;
-                            min-width: 220px;
-                            border-radius: 0.75rem;
-                            padding: 0.5rem;
-                            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-                            z-index: 10002;
-                        "
-                    >
-                        <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-                            <div class="avatar-theme-label">Theme Mode</div>
-                            <div class="theme-toggle avatar-theme-switch" style="width: 100%;">
-                                <button onclick="window.setTheme('classic')" id="classicBtnDropdown" class="theme-btn" style="flex: 1;">Classic</button>
-                                <button onclick="window.setTheme('future')" id="futureBtnDropdown" class="theme-btn" style="flex: 1;">Future</button>
-                            </div>
-                        </div>
-
-                        <div style="padding: 0.25rem 0;">
-                            ${this.renderDropdownNavItems({ currentPath, isOwnProfile: isProfilePage })}
-
-                            <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.25rem 0;"></div>
-
-                            <button onclick="safeConnectWallet()" id="connectBtn" class="dropdown-item btn-main" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;padding:0.75rem;border-radius:0.5rem;cursor:pointer;width:100%;text-align:center;">
-                                <span>Connect Wallet</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            this.applyThemeStyles();
-
-            if (this.closeHandler) {
-                document.removeEventListener('click', this.closeHandler);
-                document.removeEventListener('touchstart', this.closeHandler);
+            if (options.renderKey) {
+                container.dataset.avatarRenderKey = options.renderKey;
+                this.pendingRenderKey = options.renderKey;
             }
 
-            this.closeHandler = (e) => {
-                const containerEl = document.querySelector('.avatar-dropdown-container');
-                if (containerEl && !containerEl.contains(e.target) && this.isOpen) {
-                    this.close();
-                }
-            };
-
-            document.addEventListener('click', this.closeHandler);
-            document.addEventListener('touchstart', this.closeHandler, { passive: true });
+            const currentPath = window.location.pathname;
+            const isProfilePage = currentPath.includes('profile.html');
+            this.updateStableButton({
+                avatarUrl: '/default-avatar.png',
+                avatarAlt: 'ArtSoul',
+                name: 'ArtSoul Guest',
+                address: '',
+                stateKey: options.renderKey || 'guest'
+            });
+            this.updateStableMenu(
+                this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
+                `guest:${currentPath}:${isProfilePage}`
+            );
+            this.applyThemeStyles();
+            this.bindOutsideCloseOnce();
             return true;
         }
 
@@ -880,11 +785,7 @@
             if (options.renderKey) navButtons.dataset.avatarRenderKey = options.renderKey;
 
             const currentPath = window.location.pathname;
-            const isIndexPage = currentPath.endsWith('index.html') || currentPath === '/' || currentPath.endsWith('/');
             const isProfilePage = currentPath.includes('profile.html');
-            const isGalleryPage = currentPath.includes('gallery.html');
-            const isUploadPage = currentPath.includes('upload.html');
-            const isDocsPage = currentPath.includes('docs.html');
             const urlParams = new URLSearchParams(window.location.search);
             const viewingAddress = urlParams.get('address');
             const currentWallet = walletAddress?.toLowerCase();
@@ -895,151 +796,22 @@
 
             // Render immediately; balance hydration runs after the menu shell exists.
             const networkInfo = await this.getCurrentNetworkInfo({ includeBalance: false });
+            if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
-            // Create avatar dropdown HTML (same as render() but without profile)
-            this.isOpen = false;
-            navButtons.innerHTML = `
-                <div class="avatar-dropdown-container" style="position: relative;">
-                    <!-- Avatar Button -->
-                    <button
-                        class="avatar-button"
-                        onclick="window.AvatarDropdown.toggle()"
-                        data-allow-rapid
-                        aria-expanded="false"
-                        aria-controls="avatarDropdownMenu"
-                        style="
-                            display: flex;
-                            align-items: center;
-                            gap: 0.75rem;
-                            padding: 0.5rem;
-                            border-radius: 9999px;
-                            cursor: pointer;
-                            transition: all 0.3s;
-                            border: 2px solid transparent;
-                        "
-                    >
-                        <!-- Avatar -->
-                        <img
-                            src="${avatarUrl}"
-                            alt="Wallet"
-                            style="
-                                width: 40px;
-                                height: 40px;
-                                border-radius: 9999px;
-                                object-fit: cover;
-                                flex-shrink: 0;
-                            "
-                        />
-
-                        <!-- Address (hidden on mobile) -->
-                        <div class="avatar-info" style="text-align: left;">
-                            <div style="font-weight: 600; font-size: 0.875rem;">Wallet Connected</div>
-                            <div style="font-size: 0.75rem; opacity: 0.6; font-family: monospace;">${shortAddress}</div>
-                        </div>
-
-                        <!-- Dropdown Arrow -->
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 16 16"
-                            fill="currentColor"
-                            style="transition: transform 0.3s; flex-shrink: 0;"
-                            class="dropdown-arrow"
-                        >
-                            <path d="M4 6l4 4 4-4"/>
-                        </svg>
-                    </button>
-
-                    <div
-                        id="avatarDropdownMenu"
-                        class="avatar-dropdown-menu"
-                        style="
-                            display: none;
-                            position: absolute;
-                            top: calc(100% + 0.5rem);
-                            right: 0;
-                            min-width: 220px;
-                            border-radius: 0.75rem;
-                            padding: 0.5rem;
-                            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-                            z-index: 10002;
-                        "
-                    >
-                        <!-- Theme Switcher -->
-                        <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-                            <div class="avatar-theme-label">Theme Mode</div>
-                            <div class="theme-toggle avatar-theme-switch" style="width: 100%;">
-                                <button onclick="window.setTheme('classic')" id="classicBtnDropdown" class="theme-btn" style="flex: 1;">Classic</button>
-                                <button onclick="window.setTheme('future')" id="futureBtnDropdown" class="theme-btn" style="flex: 1;">Future</button>
-                            </div>
-                        </div>
-
-                        <!-- Network Switcher -->
-                        <button
-                            onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
-                            class="dropdown-item network-switcher-btn"
-                            data-allow-rapid
-                            aria-expanded="false"
-                            aria-controls="avatarNetworkOptions"
-                            style="
-                                display: flex;
-                                align-items: center;
-                                gap: 0.75rem;
-                                padding: 0.75rem;
-                                border-radius: 0.5rem;
-                                cursor: pointer;
-                                transition: all 0.2s;
-                                width: 100%;
-                                border: none;
-                                background: transparent;
-                                color: inherit;
-                                text-align: left;
-                            "
-                        >
-                            <img src="${networkInfo.icon}" alt="${networkInfo.name}" style="width: 20px; height: 20px; border-radius: 50%;" onerror="this.style.display='none'" />
-                            <div style="flex: 1;">
-                                <div><span data-network-name>${networkInfo.name}</span></div>
-                                <div data-network-balance style="font-size: 0.75rem; opacity: 0.7; font-family: monospace;">${networkInfo.balance} ${networkInfo.currency}</div>
-                            </div>
-                        </button>
-                        ${this.renderNetworkOptions()}
-
-                        <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.25rem 0;"></div>
-
-                        <!-- Menu Items -->
-                        <div style="padding: 0.25rem 0;">
-                            ${this.renderDropdownNavItems({ currentPath, isOwnProfile })}
-
-                            <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 0.25rem 0;"></div>
-
-                            <button
-                                onclick="window.resetWalletConnection()"
-                                class="dropdown-item"
-                                style="
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 0.75rem;
-                                    padding: 0.75rem;
-                                    border-radius: 0.5rem;
-                                    cursor: pointer;
-                                    transition: all 0.2s;
-                                    width: 100%;
-                                    border: none;
-                                    background: transparent;
-                                    color: inherit;
-                                    text-align: left;
-                                "
-                            >
-                                <span>Disconnect</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Apply theme-specific styles
+            this.updateStableButton({
+                avatarUrl,
+                avatarAlt: 'Wallet',
+                name: 'Wallet Connected',
+                address: shortAddress,
+                stateKey: options.renderKey || `wallet:${currentWallet}`
+            });
+            this.updateStableMenu(
+                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo }),
+                `connected:${currentPath}:${isOwnProfile}:${networkInfo.name}`
+            );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
+            this.bindOutsideCloseOnce();
         }
     }
 
