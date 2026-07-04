@@ -309,28 +309,38 @@ class ArtSoulContracts {
         throw new Error('NFT is not minted yet. Complete settlement first.');
     }
 
-    async registerArtwork(metadataURI) {
+    async registerArtwork(metadataURI, options = {}) {
         this.ensureCore();
         const tx = await this.coreContract.registerArtwork(metadataURI);
         console.log('Registering artwork...', tx.hash);
+        try {
+            await options.onSubmitted?.(tx.hash);
+        } catch (error) {
+            console.warn('Register submission persistence failed:', error);
+        }
         const receipt = await tx.wait();
         const event = await this.waitForEvent(receipt, 'ArtworkRegistered');
         const artworkId = event?.args?.artworkId?.toString() || null;
         return { artworkId, txHash: tx.hash };
     }
 
-    async uploadArtwork(ipfsHash, metadataURI) {
+    async uploadArtwork(ipfsHash, metadataURI, _fileHash = '', _price = '', options = {}) {
         // Compatibility wrapper: V4.1 stores canonical metadata URI on-chain.
         const canonicalMetadataURI = metadataURI || ipfsHash;
-        return await this.registerArtwork(canonicalMetadataURI);
+        return await this.registerArtwork(canonicalMetadataURI, options);
     }
 
-    async createAuction(artworkId, startingPriceEth, duration) {
+    async createAuction(artworkId, startingPriceEth, duration, options = {}) {
         this.ensureCore();
         const startPrice = this.parseEth(startingPriceEth);
         const durationSeconds = this.normalizeDuration(duration);
         const tx = await this.coreContract.createAuction(artworkId, startPrice, durationSeconds);
         console.log('Creating V4.1 auction...', tx.hash);
+        try {
+            await options.onSubmitted?.(tx.hash);
+        } catch (error) {
+            console.warn('Auction submission persistence failed:', error);
+        }
         await tx.wait();
         return tx.hash;
     }

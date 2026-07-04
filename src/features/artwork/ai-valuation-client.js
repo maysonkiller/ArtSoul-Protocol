@@ -8,19 +8,19 @@
         if (isAuthenticated) return;
 
         if (!promptAuthentication) {
-            throw new Error('Estimate unavailable. Wallet authentication is not active.');
+            throw new Error('AI value guidance is unavailable because wallet authorization is not active.');
         }
 
         const authenticated = await global.ensureAuthenticated?.();
         if (!authenticated) {
-            throw new Error('Sign in with your wallet to request an estimate. You can still continue without one.');
+            throw new Error('Authorize your wallet before requesting AI value guidance.');
         }
     }
 
     async function request(payload, options = {}) {
         const walletAddress = payload?.creator || global.getCurrentWalletAddress?.();
         if (!walletAddress) {
-            throw new Error('Connect your wallet to request an estimate. You can still continue without one.');
+            throw new Error('Connect your wallet before requesting AI value guidance.');
         }
 
         await ensureWalletAuthentication(options.promptAuthentication !== false);
@@ -38,7 +38,7 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.valuation) {
-            throw new Error(data?.message || 'Estimate unavailable. You can still continue normally.');
+            throw new Error(data?.message || 'AI value guidance is temporarily unavailable. Please try again.');
         }
 
         return {
