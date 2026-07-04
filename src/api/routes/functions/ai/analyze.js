@@ -336,7 +336,7 @@ export default async function handler(req, res) {
       res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds));
       return res.status(429).json({
         error: 'AI_ANALYSIS_RATE_LIMITED',
-        message: 'AI estimate limit reached. Wait a moment and try again. You can still publish normally.',
+        message: 'AI value guidance request limit reached. Wait a moment and try again.',
         retry_after_seconds: rateLimit.retryAfterSeconds
       });
     }
@@ -345,7 +345,7 @@ export default async function handler(req, res) {
     if (!apiKey) {
       return res.status(503).json({
         error: 'AI_ANALYSIS_UNAVAILABLE',
-        message: 'AI analysis is temporarily unavailable.'
+        message: 'AI value guidance is temporarily unavailable. Please try again.'
       });
     }
 
