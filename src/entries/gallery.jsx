@@ -408,12 +408,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="px-4 py-2 rounded-lg"
-                                    style={{
-                                        background: isClassic ? 'rgba(232, 227, 213, 0.05)' : 'rgba(var(--c-accent-rgb), 0.05)',
-                                        border: isClassic ? '1px solid var(--c-accent)' : '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                                        color: isClassic ? 'var(--c-accent)' : 'var(--c-accent)'
-                                    }}
+                                    aria-label="Filter artworks by status"
+                                    data-artsoul-value={statusFilter}
+                                    className="gallery-filter-select"
                                 >
                                     <option value="all">All Status</option>
                                     <option value="draft">Draft</option>
@@ -426,13 +423,10 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     value={isGlobalSearch ? 'discovery' : sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
                                     disabled={searchQuery.trim() !== ''}
+                                    aria-label="Sort artworks"
+                                    data-artsoul-value={isGlobalSearch ? 'discovery' : sortBy}
                                     title={searchQuery.trim() !== '' ? 'Search results use Discovery Rank' : 'Sort artworks'}
-                                    className="px-4 py-2 rounded-lg"
-                                    style={{
-                                        background: isClassic ? 'rgba(232, 227, 213, 0.05)' : 'rgba(var(--c-accent-rgb), 0.05)',
-                                        border: isClassic ? '1px solid var(--c-accent)' : '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                                        color: isClassic ? 'var(--c-accent)' : 'var(--c-accent)'
-                                    }}
+                                    className="gallery-filter-select"
                                 >
                                     <option value="discovery">Discovery Rank</option>
                                     <option value="newest">Newest First</option>
