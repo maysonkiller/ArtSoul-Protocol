@@ -35,7 +35,7 @@ class IPFSClient {
     async uploadFile(file) {
         console.log('Uploading artwork media to Supabase Storage...');
 
-        const fileName = `${Date.now()}_${file.name}`;
+        const fileName = file.name;
         const url = await window.ArtSoulDB.uploadFile(file, fileName);
         const mockHash = 'Qm' + btoa(url).substring(0, 44);
 

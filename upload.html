@@ -19,18 +19,18 @@
     <meta name="description" content="Publish artwork to ArtSoul, prepare an auction, and keep minting tied to successful collector settlement.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="ArtSoul">
-    <meta property="og:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:title" content="ArtSoul: Discovery-First Art Auctions">
     <meta property="og:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
     <meta property="og:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <meta property="og:image:alt" content="ArtSoul: Discovery-First Art Auctions">
     <meta property="og:url" content="https://artsoul.vercel.app/upload.html">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="ArtSoul — Discovery-First Art Auctions">
+    <meta name="twitter:title" content="ArtSoul: Discovery-First Art Auctions">
     <meta name="twitter:description" content="Discover digital art through auctions, collector conviction, and delayed minting.">
     <meta name="twitter:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
-    <meta name="twitter:image:alt" content="ArtSoul — Discovery-First Art Auctions">
+    <meta name="twitter:image:alt" content="ArtSoul: Discovery-First Art Auctions">
     <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
     <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
@@ -60,12 +60,12 @@
         });
     </script>
     <script src="modal-system.js"></script>
-    <script src="src/features/artwork/ai-valuation-client.js?v=1"></script>
+    <script src="src/features/artwork/ai-valuation-client.js?v=2"></script>
     <script src="avatar-dropdown.js?v=20"></script>
     <script type="module" src="appkit-init.js?v=19"></script>
-    <script type="module" src="ipfs-client.js"></script>
+    <script type="module" src="ipfs-client.js?v=2"></script>
     <script src="contracts-config.js?v=1"></script>
-    <script type="module" src="contracts-integration.js?v=3"></script>
+    <script type="module" src="contracts-integration.js?v=4"></script>
 
     <!-- AI Integration -->
 
@@ -304,6 +304,42 @@ header {
             flex: 0 0 auto;
         }
 
+        .upload-page-heading {
+            margin-bottom: 2rem;
+        }
+
+        .upload-page-heading p,
+        .publish-readiness-hint {
+            color: var(--c-text-muted);
+        }
+
+        .upload-page-heading p {
+            margin-top: 0.4rem;
+            font-size: 0.95rem;
+        }
+
+        .publish-readiness-hint {
+            margin-top: -1.35rem;
+            font-size: 0.78rem;
+            line-height: 1.4;
+            text-align: center;
+        }
+
+        #publishBtn:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+            filter: none;
+            box-shadow: none;
+        }
+
+        .ai-guidance-actions {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
         .icon-svg {
             stroke-width: 2;
             stroke-linecap: round;
@@ -363,6 +399,144 @@ header {
             .balance-amount {
                 display: none;
             }
+
+            .upload-page-main {
+                width: 100%;
+                max-width: 100%;
+                padding-top: 1rem !important;
+                padding-bottom: 2rem !important;
+            }
+
+            .upload-page-heading {
+                margin-bottom: 1rem;
+            }
+
+            .upload-page-heading h1 {
+                font-size: 1.7rem !important;
+                line-height: 1.15;
+            }
+
+            .upload-page-heading p {
+                margin-top: 0.25rem;
+                font-size: 0.78rem;
+                line-height: 1.35;
+            }
+
+            .upload-form-stack > :not([hidden]) ~ :not([hidden]) {
+                margin-top: 0.75rem !important;
+            }
+
+            .upload-zone {
+                padding: 1rem !important;
+                border-radius: 0.65rem !important;
+            }
+
+            #uploadPrompt svg {
+                width: 2.5rem !important;
+                height: 2.5rem !important;
+                margin-bottom: 0.5rem !important;
+            }
+
+            #uploadPrompt .text-xl {
+                margin-bottom: 0.25rem !important;
+                font-size: 0.9rem !important;
+                line-height: 1.35;
+            }
+
+            #uploadPrompt .text-sm,
+            #fileName {
+                font-size: 0.7rem !important;
+                line-height: 1.35;
+            }
+
+            #fileName {
+                margin-bottom: 0.5rem !important;
+            }
+
+            #previewImage {
+                max-height: 13rem !important;
+            }
+
+            .upload-page-main .grid {
+                gap: 0.75rem !important;
+            }
+
+            .upload-page-main label,
+            .upload-page-main .font-medium,
+            .upload-page-main .font-semibold {
+                font-size: 0.82rem;
+                line-height: 1.3;
+            }
+
+            .upload-page-main label.block {
+                margin-bottom: 0.35rem !important;
+            }
+
+            .upload-page-main .form-input {
+                min-height: 44px;
+                padding: 0.6rem 0.7rem;
+                font-size: 1rem;
+            }
+
+            .upload-page-main textarea.form-input {
+                height: 5.5rem !important;
+                min-height: 5.5rem;
+            }
+
+            .publish-panel {
+                padding: 0.75rem;
+                border-radius: 0.65rem;
+            }
+
+            #aiValuationPanel > .flex {
+                align-items: center;
+                gap: 0.6rem;
+            }
+
+            #aiValuationStatus,
+            #aiValuationSuggestion,
+            #aiValuationRationale,
+            .publish-panel li,
+            .original-work-confirmation span,
+            .validation-message {
+                font-size: 0.72rem !important;
+                line-height: 1.35;
+            }
+
+            #aiValuationRetry,
+            #prePublishAction {
+                min-height: 40px;
+                padding: 0.45rem 0.65rem;
+                font-size: 0.72rem;
+            }
+
+            .ai-guidance-actions {
+                max-width: 48%;
+            }
+
+            .duration-options {
+                gap: 0.4rem;
+            }
+
+            .duration-option {
+                min-height: 44px;
+                padding: 0.35rem;
+                font-size: 0.72rem;
+            }
+
+            .publish-panel ul {
+                margin-bottom: 0.65rem !important;
+            }
+
+            .original-work-confirmation {
+                gap: 0.55rem;
+                padding: 0.6rem;
+            }
+
+            .publish-readiness-hint {
+                margin-top: -0.45rem !important;
+                font-size: 0.7rem;
+            }
         }
 
         /* Username gradient in Future mode */
@@ -393,10 +567,7 @@ header {
                     </a>
                 </div>
 
-                <div class="page-context">
-                    <div class="page-context-title">Publish Artwork</div>
-                    <div class="page-context-subtitle">Prepare artwork for auction discovery</div>
-                </div>
+                <div class="page-context" aria-hidden="true"></div>
 
                 <!-- Right: Buttons -->
                 <div class="flex items-center gap-4">
@@ -415,10 +586,13 @@ header {
         </div>
     </header>
 
-    <main class="container mx-auto px-4 py-12 max-w-3xl">
-        <h1 class="text-4xl font-light mb-8">Publish Artwork</h1>
+    <main class="upload-page-main container mx-auto px-4 py-12 max-w-3xl">
+        <div class="upload-page-heading text-center">
+            <h1 class="text-4xl font-light">Publish Artwork</h1>
+            <p>Prepare artwork for auction discovery</p>
+        </div>
 
-        <div class="space-y-8">
+        <div class="upload-form-stack space-y-8">
             <div class="upload-zone rounded-xl p-12 text-center" onclick="document.getElementById('fileInput').click()">
                 <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.gif" style="display: none;" onchange="handleFileSelect(event)">
 
@@ -428,7 +602,7 @@ header {
                         <path d="M12 3L12 21M12 3L6 9M12 3L18 9M3 15L3 21L21 21L21 15" stroke="currentColor" class="icon-svg"/>
                     </svg>
                     <p class="text-xl opacity-70 mb-2">Select the artwork you want collectors to discover</p>
-                    <p class="text-sm opacity-40">Supports JPG, PNG, MP4, GIF, MP3 (Max 100MB)</p>
+                    <p class="text-sm opacity-40">Supports JPG, PNG, WebP, MP4, WebM, GIF, MP3, WAV, OGG, AAC, and M4A. Maximum 100 MB.</p>
                 </div>
 
                 <!-- File info and preview (shown when file selected) -->
@@ -438,17 +612,21 @@ header {
                         <img id="previewImage" alt="Preview" class="w-full h-auto max-h-96 object-contain bg-black">
                     </div>
                 </div>
+                <p id="fileValidationError" class="validation-message" style="display: none;"></p>
             </div>
 
             <section id="aiValuationPanel" class="publish-panel" aria-live="polite">
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <h2 class="font-semibold">AI Value Guidance</h2>
-                        <p id="aiValuationStatus" class="text-sm opacity-70 mt-1">Select an artwork file to request an estimate.</p>
+                        <p id="aiValuationStatus" class="text-sm opacity-70 mt-1">Complete the form and confirm that this is your original work to request AI value guidance.</p>
                     </div>
-                    <button id="aiValuationRetry" type="button" class="btn-secondary" onclick="retryAIValuation()" style="display: none;">Retry</button>
+                    <div class="ai-guidance-actions">
+                        <button id="prePublishAction" type="button" class="btn-secondary" onclick="beginPrePublishFlow()" style="display: none;">Authorize and analyze</button>
+                        <button id="aiValuationRetry" type="button" class="btn-secondary" onclick="retryAIValuation()" style="display: none;">Retry</button>
+                    </div>
                 </div>
-                <p id="aiValuationRetryNote" class="text-xs opacity-60 mt-2" style="display: none;">Estimate limit reached for this upload session.</p>
+                <p id="aiValuationRetryNote" class="text-xs opacity-60 mt-2" style="display: none;">AI value guidance limit reached for this upload session.</p>
                 <div id="aiValuationContent" class="mt-3" style="display: none;">
                     <div id="aiValuationRange" class="ai-guidance-value"></div>
                     <div id="aiValuationSuggestion" class="text-sm mt-1"></div>
@@ -498,7 +676,8 @@ header {
                 <p id="originalWorkError" class="validation-message" style="display: none;">Confirm that this is your original work before publishing.</p>
             </section>
 
-            <button id="publishBtn" onclick="handleUpload()" class="btn-main w-full">Publish Artwork</button>
+            <button id="publishBtn" onclick="handleUpload()" class="btn-main w-full" disabled>Publish Artwork</button>
+            <p id="publishReadinessHint" class="publish-readiness-hint" aria-live="polite">Complete every required step before publishing.</p>
         </div>
     </main>
 
