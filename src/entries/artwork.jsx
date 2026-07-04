@@ -295,6 +295,11 @@ const { useState, useEffect, useRef } = React;
             const [isNewAuctionModalOpen, setIsNewAuctionModalOpen] = useState(false);
             const [reauctionEstimateState, setReauctionEstimateState] = useState('idle');
             const [reauctionEstimate, setReauctionEstimate] = useState(null);
+            const [withdrawalState, setWithdrawalState] = useState({
+                status: 'idle',
+                amount: '0',
+                message: ''
+            });
             const bidPollInFlightRef = useRef(false);
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
@@ -305,6 +310,7 @@ const { useState, useEffect, useRef } = React;
             const artworkId = new URLSearchParams(window.location.search).get('id');
             const v41CompositeId = parseV41CompositeArtworkId(artworkId);
             const isV41CompositeId = Boolean(v41CompositeId);
+            const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
 
             function beginTransactionAction(action) {
                 if (transactionActionsRef.current.has(action)) return false;
@@ -333,6 +339,91 @@ const { useState, useEffect, useRef } = React;
                     error?.reason ||
                     error?.message ||
                     fallback;
+            }
+
+            function requiredDepositForBidWei(value) {
+                const bidWei = parseEthToWei(value);
+                if (!bidWei || bidWei <= 0n) return 0n;
+                const percentageDeposit = (bidWei * 1000n + 9999n) / 10000n;
+                const minimumDeposit = 10000000000000000n;
+                return percentageDeposit > minimumDeposit ? percentageDeposit : minimumDeposit;
+            }
+
+            function releasedDepositCreditWei(walletAddress = connectedWalletAddress) {
+                const normalizedWallet = String(walletAddress || '').toLowerCase();
+                if (!normalizedWallet) return 0n;
+
+                const userBids = bidActivity.filter(bid =>
+                    String(bid.bidder || '').toLowerCase() === normalizedWallet
+                );
+                let releasedTotal = userBids.reduce(
+                    (total, bid) => total + requiredDepositForBidWei(bid.bid_amount),
+                    0n
+                );
+
+                if (isSameAddress(getAuctionHighestBidder(auction), walletAddress) && userBids.length > 0) {
+                    releasedTotal -= requiredDepositForBidWei(userBids[0].bid_amount);
+                }
+
+                return releasedTotal > 0n ? releasedTotal : 0n;
+            }
+
+            async function loadPendingWithdrawal() {
+                if (!walletRenderState.settled || !connectedWalletAddress || releasedDepositCreditWei() === 0n) {
+                    setWithdrawalState(current => current.status === 'success'
+                        ? current
+                        : { status: 'idle', amount: '0', message: '' });
+                    return;
+                }
+
+                try {
+                    const provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider || !window.ArtSoulContracts) return;
+                    await window.ArtSoulContracts.init(provider);
+                    const amount = await window.ArtSoulContracts.getPendingWithdrawal(connectedWalletAddress);
+                    setWithdrawalState({ status: 'ready', amount: String(amount || '0'), message: '' });
+                } catch (error) {
+                    console.warn('Could not load withdrawable deposit balance:', error);
+                }
+            }
+
+            async function handleWithdrawDeposit() {
+                if (!beginTransactionAction('withdraw-deposit')) return;
+
+                try {
+                    const provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider) throw new Error('Connect your wallet before withdrawing.');
+                    await window.ArtSoulContracts.init(provider);
+
+                    const available = await window.ArtSoulContracts.getPendingWithdrawal(connectedWalletAddress);
+                    if (!parseEthToWei(available)) {
+                        setWithdrawalState({
+                            status: 'success',
+                            amount: '0',
+                            message: 'No deposit balance remains to withdraw.'
+                        });
+                        return;
+                    }
+
+                    await window.ArtSoulContracts.withdraw();
+                    setWithdrawalState({
+                        status: 'success',
+                        amount: '0',
+                        message: 'Deposit balance withdrawn successfully.'
+                    });
+                } catch (error) {
+                    const message = getTransactionErrorMessage(
+                        error,
+                        'The deposit balance could not be withdrawn. Please try again.'
+                    );
+                    setWithdrawalState(current => ({
+                        ...current,
+                        status: 'error',
+                        message: `Withdrawal failed: ${message}`
+                    }));
+                } finally {
+                    finishTransactionAction('withdraw-deposit');
+                }
             }
 
             async function confirmAuctionAction(message, title = 'Confirm Auction Action') {
@@ -390,6 +481,16 @@ const { useState, useEffect, useRef } = React;
             }, [isNewAuctionModalOpen]);
 
             useEffect(() => () => reauctionValuationControllerRef.current?.abort(), []);
+
+            useEffect(() => {
+                void loadPendingWithdrawal();
+            }, [
+                walletRenderState.settled,
+                walletRenderState.address,
+                auction?.auctionId,
+                auction?.highestBidder,
+                bidActivity.length
+            ]);
 
             function getAuctionHelper(name) {
                 const helper = window.AuctionService?.[name];
@@ -1981,8 +2082,12 @@ const { useState, useEffect, useRef } = React;
                 poster: ''
             };
             const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(resolvedMedia.url) ? resolvedMedia.url : '';
-            const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
             const canCreateNewAuction = walletRenderState.settled && canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
+            const enteredBidDepositWei = requiredDepositForBidWei(bidAmount);
+            const pendingWithdrawalWei = parseEthToWei(withdrawalState.amount) || 0n;
+            const showWithdrawableDeposit = walletRenderState.settled &&
+                releasedDepositCreditWei() > 0n &&
+                pendingWithdrawalWei > 0n;
             const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(auction ? {
                 ...artwork,
                 auction_state: auction.state,
@@ -2519,6 +2624,11 @@ const { useState, useEffect, useRef } = React;
                                                 <div className="text-sm opacity-70 text-center">
                                                     Minimum bid: {minimumBidDetails.eth} ETH
                                                 </div>
+                                                <div className="artwork-bid-deposit-note" aria-live="polite">
+                                                    {enteredBidDepositWei > 0n
+                                                        ? `Your deposit: ${formatWeiToEth(enteredBidDepositWei, 8)} ETH. Fully refundable if you are outbid.`
+                                                        : 'Your deposit is 10% of the bid or 0.01 ETH minimum. It is fully refundable if you are outbid.'}
+                                                </div>
                                                 <button
                                                     onClick={handlePlaceBid}
                                                     className="btn-main w-full artwork-page-primary-action"
@@ -2530,6 +2640,38 @@ const { useState, useEffect, useRef } = React;
                                                         : 'Place Bid (10% deposit required)'}
                                                 </button>
                                             </div>
+                                        )}
+
+                                        {(showWithdrawableDeposit || withdrawalState.message) && (
+                                            <section className="artwork-withdrawal-panel" aria-live="polite">
+                                                {showWithdrawableDeposit && (
+                                                    <>
+                                                        <div className="artwork-withdrawal-summary">
+                                                            <span>Withdrawable balance</span>
+                                                            <strong>{withdrawalState.amount} ETH</strong>
+                                                        </div>
+                                                        <p>
+                                                            You placed a non-leading bid on this auction and the contract reports an available balance. This transaction withdraws the full balance, including any other refunds or proceeds.
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            className="btn-secondary artwork-page-primary-action"
+                                                            onClick={handleWithdrawDeposit}
+                                                            disabled={isTransactionActionPending('withdraw-deposit')}
+                                                            aria-busy={isTransactionActionPending('withdraw-deposit')}
+                                                        >
+                                                            {isTransactionActionPending('withdraw-deposit')
+                                                                ? <TransactionProcessingLabel />
+                                                                : `Withdraw deposit balance: ${withdrawalState.amount} ETH`}
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {withdrawalState.message && (
+                                                    <p className={withdrawalState.status === 'error' ? 'transaction-message-error' : 'transaction-message-success'}>
+                                                        {withdrawalState.message}
+                                                    </p>
+                                                )}
+                                            </section>
                                         )}
 
                                         {/* End Auction Button (for anyone after time expires) */}
