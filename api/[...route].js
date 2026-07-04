@@ -8,6 +8,11 @@ import functionsAiAnalyzeHandler from '../src/api/routes/functions/ai/analyze.js
 import functionsArtworksHandler from '../src/api/routes/functions/artworks.js';
 import functionsAuctionsHandler from '../src/api/routes/functions/auctions.js';
 import artworkVisibilityHandler from '../src/api/routes/moderation/artwork-visibility.js';
+import {
+  createOAuthCallbackHandler,
+  oauthStartHandler,
+  oauthUnlinkHandler
+} from '../src/api/routes/oauth.js';
 import profileHandler from '../src/api/routes/profile.js';
 import publicArtworksHandler from '../src/api/routes/public/artworks.js';
 import publicConfigHandler from '../src/api/routes/public/config.js';
@@ -30,6 +35,10 @@ const ROUTES = new Map([
   ['functions/artworks', functionsArtworksHandler],
   ['functions/auctions', functionsAuctionsHandler],
   ['moderation/artwork-visibility', artworkVisibilityHandler],
+  ['oauth/start', oauthStartHandler],
+  ['oauth/callback/discord', createOAuthCallbackHandler('discord')],
+  ['oauth/callback/twitter', createOAuthCallbackHandler('twitter')],
+  ['oauth/unlink', oauthUnlinkHandler],
   ['ai/analyze', functionsAiAnalyzeHandler],
   ['artworks', functionsArtworksHandler],
   ['auctions', functionsAuctionsHandler]

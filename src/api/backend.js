@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
 
 export const SESSION_COOKIE = 'artsoul_session';
+export const OAUTH_STATE_COOKIE = 'artsoul_oauth_state';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 const ENV_ERROR_CODES = {
   SESSION_SECRET: 'MISSING_SESSION_SECRET',
   SUPABASE_URL: 'MISSING_SUPABASE_URL',
@@ -106,6 +108,51 @@ export function clearWalletSession(res) {
   res.setHeader('Set-Cookie', serializeCookie(SESSION_COOKIE, '', {
     maxAge: 0,
     path: '/',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax'
+  }));
+}
+
+export function setOAuthState(res, state) {
+  const payload = base64url(JSON.stringify({
+    ...state,
+    exp: Math.floor(Date.now() / 1000) + OAUTH_STATE_TTL_SECONDS
+  }));
+  const signature = signPayload(payload);
+  res.setHeader('Set-Cookie', serializeCookie(OAUTH_STATE_COOKIE, `${payload}.${signature}`, {
+    maxAge: OAUTH_STATE_TTL_SECONDS,
+    path: '/api/oauth',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax'
+  }));
+}
+
+export function readOAuthState(req) {
+  const cookies = parseCookies(req.headers.cookie || '');
+  const token = cookies[OAUTH_STATE_COOKIE];
+  if (!token) return null;
+
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return null;
+  const expected = signPayload(payload);
+  if (Buffer.byteLength(signature) !== Buffer.byteLength(expected)) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+
+  try {
+    const state = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!state.exp || state.exp < Math.floor(Date.now() / 1000)) return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+export function clearOAuthState(res) {
+  res.setHeader('Set-Cookie', serializeCookie(OAUTH_STATE_COOKIE, '', {
+    maxAge: 0,
+    path: '/api/oauth',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'Lax'
