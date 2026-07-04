@@ -35,6 +35,7 @@ const { useState, useEffect, useRef } = React;
             ));
             const [pendingPayments, setPendingPayments] = useState([]);
             const [discoveryProfile, setDiscoveryProfile] = useState(null);
+            const [oauthNotice, setOAuthNotice] = useState(null);
             const fileInputRef = useRef(null);
             const profileSignalRef = useRef({ address: null, chainId: null, initialized: false });
             const profileRequestRef = useRef(0);
@@ -614,11 +615,62 @@ const { useState, useEffect, useRef } = React;
 
                 const result = await oauthIntegration.handleCallback();
                 if (result) {
-                    const walletAddress = result.walletAddress || getActiveWalletAddress();
+                    if (!result.success) {
+                        setOAuthNotice({ type: 'error', message: result.message });
+                        return;
+                    }
+                    const walletAddress = getActiveWalletAddress();
+                    setOAuthNotice({
+                        type: 'success',
+                        message: `${result.provider === 'discord' ? 'Discord' : 'X'} account linked successfully.`
+                    });
                     // Reload profile to show connected account
                     setTimeout(() => {
                         loadProfile(walletAddress, { force: true });
-                    }, 1000);
+                    }, 250);
+                }
+            }
+
+            async function handleSocialConnect(provider) {
+                setOAuthNotice(null);
+                try {
+                    const oauthIntegration = await waitForOAuthIntegration();
+                    if (!oauthIntegration) throw new Error('Social linking is still loading. Please try again.');
+                    const walletAddress = getActiveWalletAddress();
+                    if (provider === 'discord') {
+                        await oauthIntegration.connectDiscord(walletAddress);
+                    } else {
+                        await oauthIntegration.connectTwitter(walletAddress);
+                    }
+                } catch (error) {
+                    setOAuthNotice({
+                        type: 'error',
+                        message: error?.message || 'Social account linking could not start.'
+                    });
+                }
+            }
+
+            async function handleSocialDisconnect(provider) {
+                setOAuthNotice(null);
+                try {
+                    const oauthIntegration = await waitForOAuthIntegration();
+                    if (!oauthIntegration) throw new Error('Social linking is still loading. Please try again.');
+                    const result = await oauthIntegration.disconnect(provider, getActiveWalletAddress());
+                    setProfile(result.profile || {
+                        ...profile,
+                        ...(provider === 'discord'
+                            ? { discord_id: null, discord_username: null }
+                            : { twitter_id: null, twitter_username: null, twitter_handle: null })
+                    });
+                    setOAuthNotice({
+                        type: 'success',
+                        message: `${provider === 'discord' ? 'Discord' : 'X'} account removed.`
+                    });
+                } catch (error) {
+                    setOAuthNotice({
+                        type: 'error',
+                        message: error?.message || 'The linked account could not be removed.'
+                    });
                 }
             }
 
@@ -1251,10 +1303,9 @@ const { useState, useEffect, useRef } = React;
                                                                 <span className="truncate min-w-0">@{profile.twitter_username}</span>
                                                             </span>
                                                             <button
-                                                                onClick={() => {
-                                                                    window.OAuthIntegration.disconnect('twitter', window.getCurrentWalletAddress?.());
-                                                                    setProfile({...profile, twitter_username: null, twitter_id: null});
-                                                                }}
+                                                                onClick={() => handleSocialDisconnect('twitter')}
+                                                                type="button"
+                                                                aria-label="Remove linked X account"
                                                                 className="text-red-400 hover:text-red-300 text-sm flex-shrink-0 ml-2 w-6"
                                                             >
                                                                 ✕
@@ -1262,7 +1313,9 @@ const { useState, useEffect, useRef } = React;
                                                         </div>
                                                     ) : (
                                                         <button
-                                                            onClick={() => window.OAuthIntegration.connectTwitter(window.getCurrentWalletAddress?.())}
+                                                            onClick={() => handleSocialConnect('twitter')}
+                                                            type="button"
+                                                            aria-label="Link X account"
                                                             className={`w-full px-4 py-3 rounded-lg flex items-center justify-center ${
                                                                 isClassic
                                                                     ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
@@ -1288,10 +1341,9 @@ const { useState, useEffect, useRef } = React;
                                                                 <span className="truncate min-w-0">{profile.discord_username.replace('#0', '')}</span>
                                                             </span>
                                                             <button
-                                                                onClick={() => {
-                                                                    window.OAuthIntegration.disconnect('discord', window.getCurrentWalletAddress?.());
-                                                                    setProfile({...profile, discord_username: null, discord_id: null});
-                                                                }}
+                                                                onClick={() => handleSocialDisconnect('discord')}
+                                                                type="button"
+                                                                aria-label="Remove linked Discord account"
                                                                 className="text-red-400 hover:text-red-300 text-sm flex-shrink-0 ml-2 w-6"
                                                             >
                                                                 ✕
@@ -1299,7 +1351,9 @@ const { useState, useEffect, useRef } = React;
                                                         </div>
                                                     ) : (
                                                         <button
-                                                            onClick={() => window.OAuthIntegration.connectDiscord(window.getCurrentWalletAddress?.())}
+                                                            onClick={() => handleSocialConnect('discord')}
+                                                            type="button"
+                                                            aria-label="Link Discord account"
                                                             className={`w-full px-4 py-3 rounded-lg flex items-center justify-center ${
                                                                 isClassic
                                                                     ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
@@ -1393,6 +1447,15 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                             )}
                                         </div>
+                                    )}
+
+                                    {oauthNotice && (
+                                        <p
+                                            className={`profile-oauth-notice mt-4 ${oauthNotice.type === 'error' ? 'is-error' : 'is-success'}`}
+                                            role={oauthNotice.type === 'error' ? 'alert' : 'status'}
+                                        >
+                                            {oauthNotice.message}
+                                        </p>
                                     )}
 
                                     <div className="mt-6 flex gap-4 flex-wrap">

@@ -989,6 +989,23 @@ body.future .artwork-detail-frame {
     opacity: 0.5;
 }
 
+.profile-oauth-notice {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--c-border);
+    border-radius: 9px;
+    background: var(--c-surface-muted);
+    color: var(--c-accent);
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.profile-oauth-notice.is-error {
+    border-color: var(--c-accent-3);
+    color: var(--c-accent-3);
+}
+
 @media (hover: hover) and (pointer: fine) {
     .artsoul-themed-select {
         display: block;
