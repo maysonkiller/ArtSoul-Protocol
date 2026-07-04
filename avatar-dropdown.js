@@ -126,13 +126,13 @@
 
         getNavigationLabels() {
             return window.ArtSoulNavigationLabels || {
-                home: 'Home',
+                home: 'ArtSoul Home',
                 explore: 'Explore Art',
                 publish: 'Publish Artwork',
                 auctions: 'Auctions',
                 marketplace: 'Marketplace',
                 collections: 'Collections',
-                docs: 'Docs',
+                docs: 'Protocol Docs',
                 profile: 'Profile'
             };
         }
@@ -144,11 +144,10 @@
             // destinations — one clear path to the gallery.
             return [
                 { href: 'profile.html', label: labels.profile, path: 'profile.html', profile: true },
-                { href: 'index.html', label: labels.home || 'Home', path: 'index.html', home: true },
+                { href: 'index.html', label: labels.home || 'ArtSoul Home', path: 'index.html', home: true },
                 { href: 'gallery.html', label: labels.explore, path: 'gallery.html' },
                 { href: 'upload.html', label: labels.publish, path: 'upload.html' },
-                { href: 'auction-system.html', label: 'Protocol', path: 'auction-system.html' },
-                { href: 'docs.html', label: labels.docs, path: 'docs.html' }
+                { href: 'docs-protocol.html', label: labels.docs || 'Protocol Docs', path: 'docs-protocol.html' }
             ];
         }
 
@@ -164,13 +163,12 @@
             const currentPath = options.currentPath || window.location.pathname;
             const currentHash = window.location.hash || '';
             return this.getNavigationItems()
+                .filter(item => !this.isCurrentNavigationItem(item, currentPath, currentHash))
                 .map(item => {
-                    const isCurrent = this.isCurrentNavigationItem(item, currentPath, currentHash);
                     return `
                     <a
                         href="${item.href}"
                         class="dropdown-item${item.profile ? ' dropdown-profile-item' : ''}"
-                        ${isCurrent ? 'aria-current="page"' : ''}
                         style="
                             display: flex;
                             align-items: center;

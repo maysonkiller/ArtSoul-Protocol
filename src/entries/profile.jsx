@@ -30,9 +30,7 @@ const { useState, useEffect, useRef } = React;
             const [loading, setLoading] = useState(true);
             const [artworksLoading, setArtworksLoading] = useState(true);
             const [isOwnProfile, setIsOwnProfile] = useState(true);
-            const [walletStateSettled, setWalletStateSettled] = useState(() => (
-                Boolean(getViewAddress()) || window.artsoulWalletStateSettled === true
-            ));
+            const [walletStateSettled] = useState(true);
             const [pendingPayments, setPendingPayments] = useState([]);
             const [discoveryProfile, setDiscoveryProfile] = useState(null);
             const [oauthNotice, setOAuthNotice] = useState(null);
@@ -64,28 +62,22 @@ const { useState, useEffect, useRef } = React;
 
             // Load profile and keep it aligned with late wallet/network state.
             useEffect(() => {
-                handleOAuthCallback();
+                if (new URLSearchParams(window.location.search).has('oauth_status')) {
+                    handleOAuthCallback();
+                }
 
                 let disposed = false;
-                let walletBootstrapResolved = Boolean(getViewAddress()) || window.artsoulWalletStateSettled === true;
-
-                const resolveWalletBootstrap = () => {
-                    walletBootstrapResolved = true;
-                    setWalletStateSettled(true);
-                };
-
                 const refreshProfileState = (event = null, options = {}) => {
                     if (disposed) return;
 
                     const signal = getProfileSignal(event?.detail);
                     const previous = profileSignalRef.current;
-
-                    if (!walletBootstrapResolved) {
-                        if (getViewAddress() || window.artsoulWalletStateSettled === true) {
-                            resolveWalletBootstrap();
-                        } else {
-                            return;
-                        }
+                    const confirmedAddress = event?.detail?.isConnected
+                        ? event.detail.address
+                        : getActiveWalletAddress();
+                    const viewedAddress = getViewAddress() || signal.address;
+                    if (viewedAddress && confirmedAddress) {
+                        setIsOwnProfile(viewedAddress.toLowerCase() === confirmedAddress.toLowerCase());
                     }
 
                     const addressChanged = signal.address !== previous.address;
@@ -115,9 +107,8 @@ const { useState, useEffect, useRef } = React;
             useEffect(() => {
                 if (profile) {
                     loadMyArtworks();
-                    loadPendingPayments();
                 }
-            }, [profile, selectedGallery]);
+            }, [selectedGallery]);
 
             function sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
@@ -126,6 +117,10 @@ const { useState, useEffect, useRef } = React;
             function getViewAddress() {
                 const urlParams = new URLSearchParams(window.location.search);
                 return urlParams.get('address') || '';
+            }
+
+            function getStoredWalletHint() {
+                return window.getStoredWalletHint?.() || localStorage.getItem('artsoul_wallet') || '';
             }
 
             function getActiveWalletAddress() {
@@ -148,7 +143,7 @@ const { useState, useEffect, useRef } = React;
                 const viewAddress = getViewAddress();
                 const walletAddress = walletState?.isConnected === false
                     ? ''
-                    : walletState?.address || getActiveWalletAddress();
+                    : walletState?.address || getActiveWalletAddress() || getStoredWalletHint();
                 const chainId = walletState?.chainId || getActiveChainId();
 
                 return {
@@ -717,7 +712,12 @@ const { useState, useEffect, useRef } = React;
                         throw new Error('ArtSoulDB is not ready');
                     }
 
-                    // Try to load profile without authentication first
+                    // These public reads are independent. Start the artwork and
+                    // payment projections while the profile row is loading.
+                    const relatedDataPromise = Promise.allSettled([
+                        loadMyArtworks({ wallet_address: walletAddress }),
+                        loadPendingPayments({ wallet_address: walletAddress })
+                    ]);
                     let profileData = await db.getProfile(walletAddress);
                     if (!profileData) {
                         profileData = {
@@ -737,6 +737,7 @@ const { useState, useEffect, useRef } = React;
                     if (requestId !== profileRequestRef.current) return;
                     setProfile(profileData);
                     loadedProfileAddressRef.current = normalizedAddress;
+                    void relatedDataPromise;
                     refreshDiscoveryProfile(profileData).catch(error => {
                         console.warn('Discovery profile refresh skipped:', error);
                     });
@@ -756,11 +757,12 @@ const { useState, useEffect, useRef } = React;
                 setLoading(false);
             }
 
-            async function loadMyArtworks() {
+            async function loadMyArtworks(profileOverride = null) {
                 const requestId = ++artworksRequestRef.current;
                 setArtworksLoading(true);
 
-                if (!profile?.wallet_address) {
+                const activeProfile = profileOverride || profile;
+                if (!activeProfile?.wallet_address) {
                     if (requestId === artworksRequestRef.current) {
                         setMyArtworks([]);
                         setArtworksLoading(false);
@@ -769,7 +771,7 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 try {
-                    const walletAddress = profile.wallet_address;
+                    const walletAddress = activeProfile.wallet_address;
 
                     let filtered = [];
                     const suppressedArtworkIds = new Set();
@@ -830,11 +832,12 @@ const { useState, useEffect, useRef } = React;
                 }
             }
 
-            async function loadPendingPayments() {
-                if (!profile?.wallet_address) return;
+            async function loadPendingPayments(profileOverride = null) {
+                const activeProfile = profileOverride || profile;
+                if (!activeProfile?.wallet_address) return;
 
                 try {
-                    const walletAddress = profile.wallet_address;
+                    const walletAddress = activeProfile.wallet_address;
 
                     // Get all auctions where user is winner and state is WAITING_PAYMENT
                     const auctions = await window.ArtSoulDB.getAuctions();
@@ -1222,16 +1225,16 @@ const { useState, useEffect, useRef } = React;
                     {/* Main Content */}
                     <main className="container mx-auto px-4 py-8">
                         {/* Profile Header */}
-                        <div className={`rounded-xl p-8 mb-8 animate-fadeIn ${
+                        <div className={`profile-hero rounded-xl p-5 mb-5 ${
                             isClassic
                                 ? 'bg-gray-800/50 border border-gray-700'
                                 : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30 neon-border'
                         }`}>
-                            <div className="flex items-start gap-8 flex-wrap">
+                            <div className="flex items-start gap-5 flex-wrap">
                                 {/* Avatar */}
                                 <div className="flex-shrink-0">
                                     <div
-                                        className={`w-32 h-32 rounded-full overflow-hidden ${editMode ? 'cursor-pointer' : ''} ${
+                                        className={`w-24 h-24 rounded-full overflow-hidden ${editMode ? 'cursor-pointer' : ''} ${
                                             isClassic
                                                 ? 'bg-gray-700 border-4 border-gray-600'
                                                 : 'bg-gradient-to-br from-purple-900 to-cyan-900 border-4 border-cyan-400 neon-border'
@@ -1370,28 +1373,28 @@ const { useState, useEffect, useRef } = React;
                                         </div>
                                     ) : (
                                         <div>
-                                            <h1 className={`text-2xl md:text-4xl font-bold mb-2 break-words ${
+                                            <h1 className={`text-xl md:text-3xl font-bold mb-1 break-words ${
                                                 isClassic ? 'text-gray-100' : ''
                                             }`}>
                                                 {resolvedProfileName}
                                             </h1>
                                             {profile?.wallet_address && (
-                                                <p className={`text-sm mb-4 opacity-60 font-mono break-all`}>
+                                                <p className={`text-xs mb-3 opacity-60 font-mono break-all`}>
                                                     {profile.wallet_address.slice(0, 6)}...{profile.wallet_address.slice(-4)}
                                                 </p>
                                             )}
-                                            <p className={`text-base md:text-lg mb-4 break-words ${
+                                            <p className={`text-sm md:text-base mb-3 break-words ${
                                                 isClassic ? 'text-gray-400' : 'text-purple-300'
                                             }`}>
                                                 {profile?.bio || 'No bio yet'}
                                             </p>
-                                            <div className="flex gap-4 flex-wrap">
+                                            <div className="flex gap-3 flex-wrap">
                                                 {profile?.twitter_handle && (
                                                     <a
                                                         href={`https://twitter.com/${profile.twitter_handle.replace('@', '')}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity max-w-full ${
+                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity max-w-full ${
                                                         isClassic
                                                             ? 'bg-gray-700 text-gray-200 border border-gray-600'
                                                             : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/30 shadow-[0_0_15px_rgba(var(--c-accent-rgb),0.3)]'
@@ -1403,7 +1406,7 @@ const { useState, useEffect, useRef } = React;
                                                     </a>
                                                 )}
                                                 {profile?.discord_username && (
-                                                    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg max-w-full ${
+                                                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg max-w-full ${
                                                         isClassic
                                                             ? 'bg-gray-700 text-gray-200 border border-gray-600'
                                                             : 'bg-purple-900/50 text-purple-300 border border-purple-500/30 shadow-[0_0_15px_rgba(var(--c-accent-2-rgb),0.3)]'
@@ -1416,17 +1419,17 @@ const { useState, useEffect, useRef } = React;
                                                 )}
                                             </div>
                                             {discoveryProfile && (
-                                                <div className={`mt-6 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm ${
+                                                <div className={`mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm ${
                                                     isClassic ? 'text-gray-200' : 'text-cyan-100'
                                                 }`}>
-                                                    <div className={`p-4 rounded-lg ${
+                                                    <div className={`p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
                                                         <div className="opacity-70 mb-1">Trust Weight</div>
-                                                        <div className="text-2xl font-bold">{discoveryProfile.trust.score}</div>
+                                                        <div className="text-xl font-bold">{discoveryProfile.trust.score}</div>
                                                         <div className="text-xs opacity-70">{discoveryProfile.trust.tier}</div>
                                                     </div>
-                                                    <div className={`p-4 rounded-lg ${
+                                                    <div className={`p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-purple-900/20 border border-purple-500/30'
                                                     }`}>
                                                         <div className="opacity-70 mb-1">Genesis Status</div>
@@ -1437,11 +1440,11 @@ const { useState, useEffect, useRef } = React;
                                                             {discoveryProfile.genesisProgress.completed}/{discoveryProfile.genesisProgress.total} requirements
                                                         </div>
                                                     </div>
-                                                    <div className={`p-4 rounded-lg ${
+                                                    <div className={`p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
                                                         <div className="opacity-70 mb-1">Discovery Influence</div>
-                                                        <div className="text-2xl font-bold">{discoveryProfile.trust.influenceWeight}x</div>
+                                                        <div className="text-xl font-bold">{discoveryProfile.trust.influenceWeight}x</div>
                                                         <div className="text-xs opacity-70">Affects ranking only, not protocol economics.</div>
                                                     </div>
                                                 </div>
@@ -1458,7 +1461,7 @@ const { useState, useEffect, useRef } = React;
                                         </p>
                                     )}
 
-                                    <div className="mt-6 flex gap-4 flex-wrap">
+                                    <div className="mt-4 flex gap-3 flex-wrap">
                                         {editMode ? (
                                             <>
                                                 <button onClick={saveProfile} className="btn-main">

@@ -10,12 +10,13 @@
  */
 
 const ARTSOUL_NAVIGATION_LABELS = {
+    home: 'ArtSoul Home',
     explore: 'Explore Art',
     publish: 'Publish Artwork',
     auctions: 'Auctions',
     marketplace: 'Marketplace',
     collections: 'Collections',
-    docs: 'Docs',
+    docs: 'Protocol Docs',
     profile: 'Profile'
 };
 
@@ -32,8 +33,7 @@ class NavigationManager {
             'index.html': { name: ARTSOUL_NAVIGATION_LABELS.explore, icon: '' },
             'gallery.html': { name: ARTSOUL_NAVIGATION_LABELS.marketplace, icon: '' },
             'upload.html': { name: ARTSOUL_NAVIGATION_LABELS.publish, icon: '' },
-            'auction-system.html': { name: 'Protocol', icon: '' },
-            'docs.html': { name: ARTSOUL_NAVIGATION_LABELS.docs, icon: '' },
+            'docs-protocol.html': { name: ARTSOUL_NAVIGATION_LABELS.docs, icon: '' },
             'profile.html': { name: ARTSOUL_NAVIGATION_LABELS.profile, icon: '' },
             'artwork.html': { name: ARTSOUL_NAVIGATION_LABELS.explore, icon: '' }
         };
