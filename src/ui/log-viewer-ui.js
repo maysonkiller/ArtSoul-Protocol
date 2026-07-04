@@ -93,7 +93,7 @@ class LogViewerUI {
         controls.style.cssText = 'display: flex; gap: 10px; align-items: center;';
 
         // Level filter
-        const levelFilter = this.createSelect('levelFilter', [
+        const levelFilter = this.createSelect('levelFilter', 'Filter logs by level', [
             { value: '', label: 'All Levels' },
             { value: 'INFO', label: 'INFO' },
             { value: 'WARN', label: 'WARN' },
@@ -101,7 +101,7 @@ class LogViewerUI {
         ]);
 
         // Component filter
-        const componentFilter = this.createSelect('componentFilter', [
+        const componentFilter = this.createSelect('componentFilter', 'Filter logs by component', [
             { value: '', label: 'All Components' },
             { value: 'Queue', label: 'Queue' },
             { value: 'WAL', label: 'WAL' },
@@ -194,16 +194,11 @@ class LogViewerUI {
     /**
      * Create select element
      */
-    createSelect(id, options) {
+    createSelect(id, label, options) {
         const select = document.createElement('select');
         select.id = id;
-        select.style.cssText = `
-            padding: 5px 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid var(--c-accent);
-            border-radius: 4px;
-            color: var(--c-accent);
-        `;
+        select.setAttribute('aria-label', label);
+        select.className = 'log-viewer-select';
 
         options.forEach(opt => {
             const option = document.createElement('option');
