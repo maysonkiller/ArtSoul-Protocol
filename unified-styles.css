@@ -868,6 +868,157 @@ body.future .artwork-detail-frame {
     background: var(--c-surface);
 }
 
+/* Site-wide themed select controls. Desktop uses the accessible custom face;
+   touch devices retain the native picker for reliable platform interaction. */
+.artsoul-themed-select__native,
+.log-viewer-select {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 38px 9px 14px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 10px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+    color-scheme: dark;
+}
+
+.artsoul-themed-select__native:focus-visible,
+.log-viewer-select:focus-visible {
+    border-color: var(--c-border);
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 14px var(--c-glow);
+}
+
+.artsoul-themed-select {
+    position: relative;
+    display: none;
+    width: 100%;
+    min-width: 0;
+    font: inherit;
+}
+
+.artsoul-themed-select__button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 42px;
+    gap: 12px;
+    padding: 9px 14px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 10px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.artsoul-themed-select__button:hover,
+.artsoul-themed-select__button:focus-visible,
+.artsoul-themed-select.is-open .artsoul-themed-select__button {
+    border-color: var(--c-border);
+    outline: none;
+    box-shadow: 0 0 14px var(--c-glow);
+}
+
+.artsoul-themed-select__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.artsoul-themed-select__arrow {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+    border-right: 2px solid var(--c-accent);
+    border-bottom: 2px solid var(--c-accent);
+    transform: translateY(-2px) rotate(45deg);
+}
+
+.artsoul-themed-select.is-open .artsoul-themed-select__arrow {
+    transform: translateY(2px) rotate(225deg);
+}
+
+.artsoul-themed-select__listbox {
+    position: absolute;
+    z-index: 120;
+    top: calc(100% + 7px);
+    left: 0;
+    width: max-content;
+    min-width: 100%;
+    max-width: min(420px, calc(100vw - 32px));
+    max-height: min(320px, 55vh);
+    padding: 6px;
+    overflow-y: auto;
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    box-shadow: 0 16px 42px color-mix(in srgb, var(--c-bg) 72%, transparent), 0 0 18px var(--c-glow);
+}
+
+.artsoul-themed-select__option {
+    padding: 9px 11px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.artsoul-themed-select__option:hover,
+.artsoul-themed-select__option.is-active {
+    border-color: var(--c-border-soft);
+    background: var(--c-surface-muted);
+    color: var(--c-accent);
+    box-shadow: inset 0 0 10px var(--c-glow);
+}
+
+.artsoul-themed-select__option.is-selected {
+    border-color: var(--c-border);
+    color: var(--c-accent);
+}
+
+.artsoul-themed-select__option[aria-disabled="true"],
+.artsoul-themed-select.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .artsoul-themed-select {
+        display: block;
+    }
+
+    .artsoul-themed-select__native {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        min-height: 0 !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        clip: rect(0 0 0 0) !important;
+        clip-path: inset(50%) !important;
+        border: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        white-space: nowrap !important;
+    }
+}
+
+@media (max-width: 768px), (hover: none), (pointer: coarse) {
+    .artsoul-themed-select__native,
+    .log-viewer-select {
+        min-height: 44px;
+        font-size: 16px;
+    }
+}
+
 .artwork-detail-image-shell {
     position: relative;
     display: flex;
