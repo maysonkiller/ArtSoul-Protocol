@@ -13,8 +13,7 @@ const pageInputs = {
     artwork: 'artwork.html',
     profile: 'profile.html',
     upload: 'upload.html',
-    docs: 'docs.html',
-    'auction-system': 'auction-system.html',
+    'docs-protocol': 'docs-protocol.html',
     'visual-lab': 'visual-lab.html',
     'generate-favicon': 'generate-favicon.html'
 };
@@ -33,7 +32,6 @@ const legacyRootAssets = [
     'contracts-integration.js',
     'default-avatar.png',
     'design-system.css',
-    'docs_sections.json',
     'favicon.jpg',
     'ipfs-client.js',
     'mobile-no-motion.css',

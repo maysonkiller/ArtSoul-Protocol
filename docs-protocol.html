@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('artsoul_theme') || 'classic';
+                document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+            } catch (error) {
+                document.documentElement.classList.add('classic');
+            }
+        })();
+    </script>
+    <title>Protocol Docs | ArtSoul</title>
+    <meta name="description" content="User documentation for ArtSoul discovery-first auctions, deposit-backed bidding, settlement, lazy minting, fees, trust, and provenance.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ArtSoul">
+    <meta property="og:title" content="ArtSoul Protocol Docs">
+    <meta property="og:description" content="Learn how ArtSoul discovery-first auctions work from publishing through settlement and resale.">
+    <meta property="og:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <meta property="og:url" content="https://artsoul.vercel.app/docs-protocol.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ArtSoul Protocol Docs">
+    <meta name="twitter:description" content="Learn how ArtSoul discovery-first auctions work from publishing through settlement and resale.">
+    <meta name="twitter:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
+    <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="design-system.css?v=1">
+    <link rel="stylesheet" href="unified-styles.css?v=27">
+    <link rel="stylesheet" href="button-effects.css?v=5">
+    <link rel="stylesheet" href="mobile-no-motion.css?v=2">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="src/ui/theme-manager.js"></script>
+    <script src="modal-system.js"></script>
+    <script type="module" src="supabase-client.js"></script>
+    <script type="module" src="supabase-auth.js"></script>
+    <script src="avatar-dropdown.js?v=21"></script>
+    <script type="module" src="appkit-init.js?v=19"></script>
+</head>
+<body>
+    <header>
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <a href="index.html" class="logo-link" aria-label="ArtSoul home">
+                        <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                    </a>
+                </div>
+                <div class="page-context" aria-hidden="true"></div>
+                <div class="flex items-center gap-3">
+                    <div id="networkBadge"></div>
+                    <div class="flex items-center gap-3" id="navButtons" data-avatar-render-key="initializing">
+                        <div class="avatar-dropdown-container">
+                            <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
+                                <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">
+                                <div class="avatar-info"><div data-avatar-name>ArtSoul Guest</div><div data-avatar-address hidden aria-hidden="true"></div></div>
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="app"></div>
+    <script type="module" async src="/src/entries/docs-protocol.jsx"></script>
+</body>
+</html>

@@ -538,7 +538,9 @@ body.future .artwork-page-compact-action {
     --c-bg: var(--bg-classic);
     --c-surface: #010101;
     --c-surface-muted: rgba(169, 221, 211, 0.05);
+    --c-surface-strong: rgba(169, 221, 211, 0.1);
     --c-text: var(--text-classic);
+    --c-text-muted: rgba(169, 221, 211, 0.76);
     --c-accent: var(--accent-classic);
     --c-accent-2: var(--accent-classic);
     --c-accent-3: var(--accent-classic);
@@ -556,7 +558,9 @@ body.future .artwork-page-compact-action {
     --c-bg: #000000;
     --c-surface: #020611;
     --c-surface-muted: rgba(0, 245, 255, 0.05);
+    --c-surface-strong: rgba(0, 245, 255, 0.1);
     --c-text: var(--accent-future);
+    --c-text-muted: rgba(0, 245, 255, 0.76);
     --c-accent: var(--accent-future);
     --c-accent-2: var(--neon-purple);
     --c-accent-3: var(--accent-future-2);
@@ -3111,19 +3115,19 @@ header > .container > .flex > :last-child {
     position: absolute !important;
     top: calc(100% + 0.5rem) !important;
     right: 0 !important;
-    width: min(260px, calc(100vw - 24px)) !important;
+    width: min(208px, calc(100vw - 24px)) !important;
     max-width: calc(100vw - 40px) !important;
     max-height: none !important;
     overflow: visible !important;
     overflow-y: visible !important;
-    padding: 0.5rem !important;
+    padding: 0.4rem !important;
     border-radius: 0.75rem !important;
     box-sizing: border-box;
     z-index: 10002 !important;
 }
 
 .avatar-theme-section {
-    padding: 0.5rem;
+    padding: 0.4rem;
     border-bottom: 1px solid var(--c-border-soft);
 }
 
@@ -3136,7 +3140,7 @@ header > .container > .flex > :last-child {
 }
 
 .avatar-dropdown-navigation {
-    padding: 0.25rem 0;
+    padding: 0.15rem 0;
 }
 
 .avatar-dropdown-divider {
@@ -3154,8 +3158,8 @@ header > .container > .flex > :last-child {
 }
 
 .avatar-dropdown-menu .network-switcher-btn {
-    min-height: 44px !important;
-    padding: 0.5rem 0.65rem !important;
+    min-height: 40px !important;
+    padding: 0.4rem 0.55rem !important;
 }
 
 .avatar-dropdown-menu .network-current-row {
@@ -3179,8 +3183,15 @@ header > .container > .flex > :last-child {
 
 .avatar-dropdown-navigation .avatar-disconnect-item {
     width: 100%;
-    padding: 0.75rem !important;
+    padding: 0.55rem 0.65rem !important;
     text-align: left;
+}
+
+@media (min-width: 769px) {
+    .avatar-dropdown-menu .dropdown-item {
+        min-height: 40px !important;
+        padding: 0.55rem 0.65rem !important;
+    }
 }
 
 .avatar-dropdown-menu .network-switcher-btn > img {
