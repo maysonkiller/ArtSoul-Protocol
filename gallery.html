@@ -35,7 +35,7 @@
     <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=28">
+    <link rel="stylesheet" href="unified-styles.css?v=30">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -102,18 +102,18 @@
     <link rel="stylesheet" href="mobile-no-motion.css?v=2">
 </head>
 <body>
-    <header style="position: sticky; top: 0; z-index: 50; backdrop-filter: blur(12px);">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <div class="flex items-center gap-4">
-                    <a href="index.html" class="logo-link">
+    <header class="site-header">
+        <div class="site-header-shell">
+            <div class="site-header-row">
+                <div class="site-header-logo-zone">
+                    <a href="index.html" class="logo-link" aria-label="ArtSoul home">
                         <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
                     </a>
                 </div>
-                <div class="page-context" aria-hidden="true"></div>
-                <div class="flex items-center gap-3">
+                <div class="site-header-center page-context" aria-hidden="true"></div>
+                <div class="site-header-actions">
                     <div id="networkBadge"></div>
-                    <div id="navButtons" class="flex items-center gap-3" data-avatar-render-key="initializing">
+                    <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
                                 <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">

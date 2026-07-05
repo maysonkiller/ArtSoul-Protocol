@@ -35,7 +35,7 @@
     <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=29">
+    <link rel="stylesheet" href="unified-styles.css?v=30">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -162,11 +162,6 @@
             color: var(--text-classic);
         }
 
-        .classic header {
-            background: rgba(1, 1, 1, 0.95);
-            border-bottom: 1px solid var(--accent-classic);
-        }
-
         /* Button styles moved to unified-styles.css */
 
         .classic .gallery-item:hover {
@@ -178,12 +173,6 @@
         body.future {
             background: var(--c-bg);
             color: var(--accent-future);
-        }
-
-        .future header {
-            background: rgba(0, 0, 0, 0.8);
-            border-bottom: 1px solid var(--accent-future);
-            box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
         }
 
         /* Button hover effects moved to button-effects.css */
@@ -204,18 +193,6 @@
 
         /* Theme toggle styles moved to unified-styles.css */
 
-        header {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            backdrop-filter: blur(12px);
-        }
-
-        header .container {
-            padding-top: 0.75rem;
-            padding-bottom: 0.75rem;
-        }
-
 /* Username gradient in Future mode */
         @keyframes gradientFlow {
             0% { background-position: 0% 50%; }
@@ -234,18 +211,18 @@
     <link rel="stylesheet" href="mobile-no-motion.css?v=2">
 </head>
 <body>
-    <header>
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <div class="flex items-center gap-4">
-                    <a href="index.html" class="logo-link">
+    <header class="site-header">
+        <div class="site-header-shell">
+            <div class="site-header-row">
+                <div class="site-header-logo-zone">
+                    <a href="index.html" class="logo-link" aria-label="ArtSoul home">
                         <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
                     </a>
                 </div>
-                <div class="page-context" aria-hidden="true"></div>
-                <div class="flex items-center gap-3">
+                <div class="site-header-center page-context" aria-hidden="true"></div>
+                <div class="site-header-actions">
                     <div id="networkBadge"></div>
-                    <div id="navButtons" class="flex items-center gap-3" data-avatar-render-key="initializing">
+                    <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
                                 <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">
