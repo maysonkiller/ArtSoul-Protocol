@@ -1205,7 +1205,7 @@ const { useState, useEffect, useRef } = React;
             if (!viewAddress && !connectedWalletAddress) {
                 return (
                     <div className={`min-h-screen ${bgClass}`}>
-                        <main className="container mx-auto px-4 py-12">
+                        <main className="site-page-container py-12">
                             <section className="profile-connect-state max-w-xl mx-auto p-8 text-center">
                                 <h1 className="text-2xl font-semibold mb-3">Connect your wallet to view your profile</h1>
                                 <p className="text-sm opacity-70 mb-6">Your creator, auction, sales, and collected artwork sections will appear after connection.</p>
@@ -1223,7 +1223,7 @@ const { useState, useEffect, useRef } = React;
             return (
                 <div className={`min-h-screen ${bgClass} transition-all duration-500`}>
                     {/* Main Content */}
-                    <main className="container mx-auto px-4 py-8">
+                    <main className="site-page-container py-8">
                         {/* Profile Header */}
                         <div className={`profile-hero rounded-xl p-5 mb-5 ${
                             isClassic

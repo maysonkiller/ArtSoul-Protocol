@@ -205,7 +205,7 @@ function ProtocolDocsApp() {
     };
 
     return (
-        <main className="protocol-docs-shell">
+        <main className="protocol-docs-shell site-page-container">
             <div className="protocol-docs-intro">
                 <p className="protocol-eyebrow">ArtSoul</p>
                 <h1>Protocol Docs</h1>
