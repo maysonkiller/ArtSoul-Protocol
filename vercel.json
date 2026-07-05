@@ -12,13 +12,25 @@
       ]
     },
     {
-      "source": "/docs.html",
+      "source": "/docs-protocol.html",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
         }
       ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/docs.html",
+      "destination": "/docs-protocol.html",
+      "permanent": true
+    },
+    {
+      "source": "/auction-system.html",
+      "destination": "/docs-protocol.html",
+      "permanent": true
     }
   ],
   "rewrites": [
