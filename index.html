@@ -36,7 +36,7 @@
     <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="design-system.css?v=1">
-    <link rel="stylesheet" href="unified-styles.css?v=28">
+    <link rel="stylesheet" href="unified-styles.css?v=30">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="ai-ui-styles.css?v=1">
     <link rel="stylesheet" href="simplified-ui.css?v=1">
@@ -86,14 +86,14 @@
             background: var(--bg-classic);
             color: var(--text-classic);
             position: relative;
-            overflow-x: hidden;
+            overflow-x: clip;
         }
 
         body.future {
             background: var(--c-bg);
             color: var(--accent-future);
             position: relative;
-            overflow-x: hidden;
+            overflow-x: clip;
         }
 
         body.future::before {
@@ -119,24 +119,6 @@
         @keyframes starsMove {
             from { background-position: 0% 0%; }
             to { background-position: 100% 100%; }
-        }
-
-        header {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            backdrop-filter: blur(12px);
-        }
-
-        .classic header {
-            background: rgba(1, 1, 1, 0.95);
-            border-bottom: 1px solid var(--accent-classic);
-        }
-
-        .future header {
-            background: rgba(0, 0, 0, 0.8);
-            border-bottom: 1px solid var(--accent-future);
-            box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
         }
 
         .classic .card {
@@ -188,20 +170,6 @@
             }
         }
 
-        .site-logo {
-            height: 72px;
-            width: auto;
-            display: block;
-            transition: transform 0.3s ease, filter 0.3s ease;
-        }
-
-        .classic .site-logo {
-            filter: drop-shadow(0 0 8px rgba(var(--c-accent-rgb), 0.4));
-        }
-
-        .future .site-logo {
-            filter: drop-shadow(0 0 12px rgba(var(--c-accent-rgb), 0.6)) drop-shadow(0 0 20px rgba(var(--c-accent-2-rgb), 0.4));
-        }
 .devnet-banner {
             display: inline-flex;
             align-items: center;
@@ -244,10 +212,6 @@
         }
 
         @media (max-width: 768px) {
-            .site-logo {
-                height: 56px;
-            }
-
             .devnet-banner {
                 font-size: 0.75rem;
                 padding: 0.5rem 1rem;
@@ -262,23 +226,18 @@
     <link rel="stylesheet" href="mobile-no-motion.css?v=2">
 </head>
 <body>
-    <header>
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <!-- Left: Logo -->
-                <div class="flex items-center gap-4">
-                    <a href="index.html" class="logo-link">
+    <header class="site-header">
+        <div class="site-header-shell">
+            <div class="site-header-row">
+                <div class="site-header-logo-zone">
+                    <a href="index.html" class="logo-link" aria-label="ArtSoul home">
                         <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
                     </a>
                 </div>
-
-                <!-- Center: header spacer / status-banner zone -->
-                <div class="flex-1 flex items-center justify-center"></div>
-
-                <!-- Right: Buttons -->
-                <div class="flex items-center gap-4">
+                <div class="site-header-center page-context" aria-hidden="true"></div>
+                <div class="site-header-actions">
                     <div id="networkBadge"></div>
-                    <div class="flex items-center gap-3" id="navButtons" data-avatar-render-key="initializing">
+                    <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
                                 <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">
@@ -296,10 +255,10 @@
     <div id="morphBackdrop" class="morph-backdrop"></div>
 
     <!-- Home Section -->
-    <main id="homeSection" class="section active container mx-auto px-4 relative z-10" style="padding-top: 1.25rem; padding-bottom: 3rem;">
+    <main id="homeSection" class="section active site-page-container relative z-10" style="padding-top: 1.25rem; padding-bottom: 3rem;">
 
         <!-- Hero Section -->
-        <div class="text-center mb-8">
+        <div class="home-hero text-center mb-8">
             <h1 class="text-3xl md:text-5xl font-bold mb-3">
                 Discovery-First Auctions<br/>for Digital Art
             </h1>
@@ -317,7 +276,7 @@
         </div>
 
         <!-- Discovery Spotlight -->
-        <div class="mb-12">
+        <div class="home-spotlight mb-12">
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center">Discovery Spotlight</h2>
             <div class="gallery" id="artworkGallery" aria-busy="true" aria-label="Loading featured artworks">
                 <div class="artsoul-skeleton-card"><div class="artsoul-skeleton artsoul-skeleton-media"></div><div class="artsoul-skeleton-card-copy"><div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title"></div><div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short"></div></div></div>
