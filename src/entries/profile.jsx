@@ -22,16 +22,21 @@ const { useState, useEffect, useRef } = React;
         }
 
         function ProfilePage() {
+            const initialViewAddress = getViewAddress();
+            const initialWalletHint = getStoredWalletHint();
+            const hasInitialWalletHint = /^0x[a-f0-9]{40}$/i.test(initialWalletHint);
+            const initiallySettled = Boolean(initialViewAddress) ||
+                window.artsoulWalletStateSettled === true ||
+                !hasInitialWalletHint;
             const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
             const [profile, setProfile] = useState(null);
             const [editMode, setEditMode] = useState(false);
             const [selectedGallery, setSelectedGallery] = useState('created');
             const [myArtworks, setMyArtworks] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [artworksLoading, setArtworksLoading] = useState(true);
+            const [loading, setLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
+            const [artworksLoading, setArtworksLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
             const [isOwnProfile, setIsOwnProfile] = useState(true);
-            const [walletStateSettled] = useState(true);
-            const [pendingPayments, setPendingPayments] = useState([]);
+            const [walletStateSettled, setWalletStateSettled] = useState(initiallySettled);
             const [discoveryProfile, setDiscoveryProfile] = useState(null);
             const [oauthNotice, setOAuthNotice] = useState(null);
             const fileInputRef = useRef(null);
@@ -40,7 +45,6 @@ const { useState, useEffect, useRef } = React;
             const loadedProfileAddressRef = useRef(null);
             const loadingProfileAddressRef = useRef(null);
             const artworksRequestRef = useRef(0);
-            const discoveryRequestRef = useRef(0);
             const transactionActionsRef = useRef(new Set());
             const [transactionActions, setTransactionActions] = useState({});
 
@@ -70,6 +74,11 @@ const { useState, useEffect, useRef } = React;
                 const refreshProfileState = (event = null, options = {}) => {
                     if (disposed) return;
 
+                    const viewAddress = getViewAddress();
+                    const stateIsSettled = Boolean(viewAddress) || window.artsoulWalletStateSettled === true;
+                    if (!stateIsSettled) return;
+                    setWalletStateSettled(true);
+
                     const signal = getProfileSignal(event?.detail);
                     const previous = profileSignalRef.current;
                     const confirmedAddress = event?.detail?.isConnected
@@ -81,26 +90,23 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     const addressChanged = signal.address !== previous.address;
-                    const meaningfulChainChange = Boolean(previous.chainId && signal.chainId && signal.chainId !== previous.chainId);
-                    if (!previous.initialized || options.force || addressChanged || meaningfulChainChange) {
+                    if (!previous.initialized || options.force || addressChanged) {
                         profileSignalRef.current = { ...signal, initialized: true };
                         loadProfile(signal.address);
                     }
                 };
 
-                refreshProfileState();
+                if (getViewAddress() || window.artsoulWalletStateSettled === true) {
+                    refreshProfileState({ detail: window.artsoulSettledWalletState });
+                }
 
-                window.addEventListener('storage', refreshProfileState);
+                window.addEventListener('artsoul:wallet-state-settled', refreshProfileState);
                 window.addEventListener('artsoul:wallet-state-changed', refreshProfileState);
-                window.addEventListener('focus', refreshProfileState);
-                document.addEventListener('visibilitychange', refreshProfileState);
 
                 return () => {
                     disposed = true;
-                    window.removeEventListener('storage', refreshProfileState);
+                    window.removeEventListener('artsoul:wallet-state-settled', refreshProfileState);
                     window.removeEventListener('artsoul:wallet-state-changed', refreshProfileState);
-                    window.removeEventListener('focus', refreshProfileState);
-                    document.removeEventListener('visibilitychange', refreshProfileState);
                 };
             }, []);
 
@@ -143,7 +149,7 @@ const { useState, useEffect, useRef } = React;
                 const viewAddress = getViewAddress();
                 const walletAddress = walletState?.isConnected === false
                     ? ''
-                    : walletState?.address || getActiveWalletAddress() || getStoredWalletHint();
+                    : walletState?.address || getActiveWalletAddress();
                 const chainId = walletState?.chainId || getActiveChainId();
 
                 return {
@@ -559,34 +565,8 @@ const { useState, useEffect, useRef } = React;
                 }
             }
 
-            async function refreshDiscoveryProfile(profileData) {
-                const requestId = ++discoveryRequestRef.current;
-                if (!profileData?.wallet_address || !window.ArtSoulDiscovery) {
-                    setDiscoveryProfile(null);
-                    return;
-                }
-
-                const projectionPromise = waitForArtSoulDB().then(db => db?.getPublicProjectionArtworks?.({
-                    creator: profileData.wallet_address,
-                    limit: 200
-                }) || []);
-                const genesisPromise = getGenesisState(profileData.wallet_address);
-                const [projectionResult, genesisResult] = await Promise.allSettled([
-                    projectionPromise,
-                    genesisPromise
-                ]);
-                const projected = projectionResult.status === 'fulfilled' ? projectionResult.value : [];
-                const creatorArtworks = filterCanonicalProfileArtworks(
-                    projected,
-                    profileData.wallet_address,
-                    'created'
-                );
-                const pendingArtworks = loadPendingIndexerArtworks(profileData.wallet_address, 'created');
-                const fullArtworkCorpus = mergePendingIndexerArtworks(creatorArtworks, pendingArtworks);
-                const genesisState = genesisResult.status === 'fulfilled'
-                    ? genesisResult.value
-                    : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
-                if (requestId !== discoveryRequestRef.current) return;
+            function buildDiscoveryProfile(profileData, fullArtworkCorpus, genesisState) {
+                if (!profileData?.wallet_address || !window.ArtSoulDiscovery) return null;
                 const trust = window.ArtSoulDiscovery.computeTrustProfile(profileData, fullArtworkCorpus, {
                     genesisOwned: genesisState.owned
                 });
@@ -596,12 +576,7 @@ const { useState, useEffect, useRef } = React;
                     successfulSettlements: trust.signals.successfulSettlements,
                     interactionCount: trust.signals.interactionCount
                 });
-
-                setDiscoveryProfile({
-                    trust,
-                    genesisState,
-                    genesisProgress
-                });
+                return { trust, genesisState, genesisProgress };
             }
 
             async function handleOAuthCallback() {
@@ -691,7 +666,6 @@ const { useState, useEffect, useRef } = React;
                     setProfile(null);
                     setMyArtworks([]);
                     setArtworksLoading(false);
-                    setPendingPayments([]);
                     setDiscoveryProfile(null);
                     setIsOwnProfile(false);
                     setEditMode(false);
@@ -704,7 +678,6 @@ const { useState, useEffect, useRef } = React;
                 // Determine if this is the current user's profile
                 const currentAddress = getActiveWalletAddress();
                 const isOwn = currentAddress && currentAddress.toLowerCase() === walletAddress.toLowerCase();
-                setIsOwnProfile(isOwn);
 
                 try {
                     const db = await waitForArtSoulDB();
@@ -712,13 +685,12 @@ const { useState, useEffect, useRef } = React;
                         throw new Error('ArtSoulDB is not ready');
                     }
 
-                    // These public reads are independent. Start the artwork and
-                    // payment projections while the profile row is loading.
-                    const relatedDataPromise = Promise.allSettled([
-                        loadMyArtworks({ wallet_address: walletAddress }),
-                        loadPendingPayments({ wallet_address: walletAddress })
+                    const [profileResult, artworksResult, genesisResult] = await Promise.allSettled([
+                        db.getProfile(walletAddress),
+                        fetchProfileArtworks({ wallet_address: walletAddress }, selectedGallery, db),
+                        getGenesisState(walletAddress)
                     ]);
-                    let profileData = await db.getProfile(walletAddress);
+                    let profileData = profileResult.status === 'fulfilled' ? profileResult.value : null;
                     if (!profileData) {
                         profileData = {
                             wallet_address: walletAddress,
@@ -728,24 +700,24 @@ const { useState, useEffect, useRef } = React;
                             twitter_handle: '',
                             discord_username: ''
                         };
-                        // Only allow edit mode for own profile
-                        if (isOwn) {
-                            setEditMode(true);
-                        }
                     }
 
                     if (requestId !== profileRequestRef.current) return;
-                    setProfile(profileData);
-                    loadedProfileAddressRef.current = normalizedAddress;
-                    void relatedDataPromise;
-                    refreshDiscoveryProfile(profileData).catch(error => {
-                        console.warn('Discovery profile refresh skipped:', error);
-                    });
+                    const artworkData = artworksResult.status === 'fulfilled'
+                        ? artworksResult.value
+                        : { items: [], corpus: [] };
+                    const genesisState = genesisResult.status === 'fulfilled'
+                        ? genesisResult.value
+                        : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
+                    const nextDiscoveryProfile = buildDiscoveryProfile(profileData, artworkData.corpus, genesisState);
 
-                    // Disable edit mode if viewing someone else's profile
-                    if (!isOwn) {
-                        setEditMode(false);
-                    }
+                    setProfile(profileData);
+                    setMyArtworks(artworkData.items);
+                    setDiscoveryProfile(nextDiscoveryProfile);
+                    setArtworksLoading(false);
+                    setIsOwnProfile(Boolean(isOwn));
+                    setEditMode(Boolean(isOwn && profileResult.status === 'fulfilled' && !profileResult.value));
+                    loadedProfileAddressRef.current = normalizedAddress;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
                     console.error('Error loading profile:', error);
@@ -757,106 +729,49 @@ const { useState, useEffect, useRef } = React;
                 setLoading(false);
             }
 
+            async function fetchProfileArtworks(activeProfile, galleryType = selectedGallery, dbOverride = null) {
+                if (!activeProfile?.wallet_address) return { items: [], corpus: [] };
+
+                const walletAddress = activeProfile.wallet_address;
+                const db = dbOverride || await waitForArtSoulDB();
+                const suppressedArtworkIds = new Set();
+                const rememberSuppressedArtworks = (rows = []) => {
+                    (rows.suppressed_artwork_ids || []).forEach(value => {
+                        suppressedArtworkIds.add(String(value).toLowerCase());
+                    });
+                    return rows;
+                };
+
+                const options = galleryType === 'collected'
+                    ? { owner: walletAddress, limit: 200 }
+                    : { creator: walletAddress, limit: 200, ...(galleryType === 'auction' ? { view: 'auctions' } : {}) };
+                const projected = rememberSuppressedArtworks(
+                    await db?.getPublicProjectionArtworks?.(options) || []
+                );
+                const filtered = filterCanonicalProfileArtworks(projected, walletAddress, galleryType);
+                const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, galleryType)
+                    .filter(artwork => ![...artworkIdentityKeys(artwork)]
+                        .some(key => suppressedArtworkIds.has(key)));
+                const corpus = sortNewestFirst(mergePendingIndexerArtworks(filtered || [], pendingIndexerArtworks));
+                return {
+                    corpus,
+                    items: corpus.filter(artwork => window.ArtSoulArtworkCard?.hasSafeMedia?.(artwork) === true)
+                };
+            }
+
             async function loadMyArtworks(profileOverride = null) {
                 const requestId = ++artworksRequestRef.current;
                 setArtworksLoading(true);
-
                 const activeProfile = profileOverride || profile;
-                if (!activeProfile?.wallet_address) {
-                    if (requestId === artworksRequestRef.current) {
-                        setMyArtworks([]);
-                        setArtworksLoading(false);
-                    }
-                    return;
-                }
 
                 try {
-                    const walletAddress = activeProfile.wallet_address;
-
-                    let filtered = [];
-                    const suppressedArtworkIds = new Set();
-                    const rememberSuppressedArtworks = (rows = []) => {
-                        (rows.suppressed_artwork_ids || []).forEach(value => {
-                            suppressedArtworkIds.add(String(value).toLowerCase());
-                        });
-                        return rows;
-                    };
-
-                    if (selectedGallery === 'created') {
-                        const db = await waitForArtSoulDB();
-                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
-                            creator: walletAddress,
-                            limit: 200
-                        }) || []);
-                        filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'created');
-                    } else if (selectedGallery === 'auction') {
-                        const db = await waitForArtSoulDB();
-                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
-                            creator: walletAddress,
-                            view: 'auctions',
-                            limit: 200
-                        }) || []);
-                        filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'auction');
-                    } else if (selectedGallery === 'sold') {
-                        const db = await waitForArtSoulDB();
-                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
-                            creator: walletAddress,
-                            limit: 200
-                        }) || []);
-                        filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'sold');
-                    } else if (selectedGallery === 'collected') {
-                        const db = await waitForArtSoulDB();
-                        const projected = rememberSuppressedArtworks(await db?.getPublicProjectionArtworks?.({
-                            owner: walletAddress,
-                            limit: 200
-                        }) || []);
-                        filtered = filterCanonicalProfileArtworks(projected, walletAddress, 'collected');
-                    }
-
-                    const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, selectedGallery)
-                        .filter(artwork => ![...artworkIdentityKeys(artwork)]
-                            .some(key => suppressedArtworkIds.has(key)));
-                    const nextArtworks = sortNewestFirst(mergePendingIndexerArtworks(filtered || [], pendingIndexerArtworks))
-                        .filter(artwork => window.ArtSoulArtworkCard?.hasSafeMedia?.(artwork) === true);
-                    if (requestId !== artworksRequestRef.current) return;
-                    setMyArtworks(nextArtworks);
+                    const result = await fetchProfileArtworks(activeProfile, selectedGallery);
+                    if (requestId === artworksRequestRef.current) setMyArtworks(result.items);
                 } catch (error) {
                     console.error('Error loading artworks:', error);
-                    if (requestId === artworksRequestRef.current) {
-                        setMyArtworks([]);
-                    }
+                    if (requestId === artworksRequestRef.current) setMyArtworks([]);
                 } finally {
-                    if (requestId === artworksRequestRef.current) {
-                        setArtworksLoading(false);
-                    }
-                }
-            }
-
-            async function loadPendingPayments(profileOverride = null) {
-                const activeProfile = profileOverride || profile;
-                if (!activeProfile?.wallet_address) return;
-
-                try {
-                    const walletAddress = activeProfile.wallet_address;
-
-                    // Get all auctions where user is winner and state is WAITING_PAYMENT
-                    const auctions = await window.ArtSoulDB.getAuctions();
-                    const pending = auctions.filter(auction =>
-                        auction.state === 'WAITING_PAYMENT' &&
-                        auction.highestBidder?.toLowerCase() === walletAddress.toLowerCase()
-                    );
-
-                    // Get artwork details for each pending auction
-                    const pendingWithArtworks = await Promise.all(
-                        pending.map(async (auction) => {
-                            const artwork = auction.artwork || await window.ArtSoulDB.getArtwork(auction.artwork_id);
-                            return { auction, artwork };
-                        })
-                    );
-
-                    setPendingPayments(pendingWithArtworks);
-                } catch (error) {
-                    console.error('Error loading pending payments:', error);
+                    if (requestId === artworksRequestRef.current) setArtworksLoading(false);
                 }
             }
 
