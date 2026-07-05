@@ -725,10 +725,10 @@ const { useState, useEffect, useRef } = React;
                 } : {};
 
                 return (
-                    <div className="flex items-center gap-3">
+                    <div className="artwork-ownership-row flex w-full items-center gap-3">
                         <a
                             href={`profile.html?address=${encodeURIComponent(address)}`}
-                            className={`flex items-center gap-3 flex-1 min-w-0 p-3 rounded-lg transition-all ${
+                            className={`artwork-ownership-profile flex w-full items-center gap-3 flex-1 min-w-0 p-3 rounded-lg transition-all ${
                                 isClassic ? 'hover:bg-gray-700/50' : 'hover:bg-cyan-900/30'
                             }`}
                             style={roleCardStyle}
