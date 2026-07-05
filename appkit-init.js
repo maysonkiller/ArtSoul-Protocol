@@ -144,6 +144,8 @@ let connectAttemptSequence = 0;
 let walletDebugSequence = 0;
 const walletDebugEntries = [];
 const walletDebugStartedAt = Date.now();
+let walletDebugDiagnosticsBound = false;
+let lastWalletDebugModalStateKey = '';
 window.artsoulWalletHydrating = true;
 window.artsoulWalletStateSettled = false;
 window.artsoulSettledWalletState = null;
@@ -171,7 +173,7 @@ function walletDebugEnabled() {
 
 function sanitizeWalletDebugValue(value, key = '') {
     if (value === null || value === undefined) return value;
-    if (/signature|private|secret|token|projectid/i.test(key)) return '[redacted]';
+    if (/signature|private|secret|token/i.test(key) || /^projectid$/i.test(key)) return '[redacted]';
     if (typeof value === 'string') {
         return value.replace(/0x[a-fA-F0-9]{40}/g, (address) => maskWalletAddress(address));
     }
@@ -184,6 +186,15 @@ function sanitizeWalletDebugValue(value, key = '') {
         );
     }
     return value;
+}
+
+function describeWalletDebugError(error) {
+    return {
+        name: error?.name || 'Error',
+        code: error?.code ?? null,
+        message: error?.message || String(error),
+        stack: String(error?.stack || '').split('\n').slice(0, 5).join(' | ') || null
+    };
 }
 
 function walletDebugLog(step, detail = null) {
@@ -226,6 +237,10 @@ function walletDebugLog(step, detail = null) {
             'box-shadow:0 0 18px var(--c-glow, transparent)',
             'white-space:pre-wrap'
         ].join(';');
+        const heading = document.createElement('div');
+        heading.textContent = 'ARTSOUL WALLET DEBUG • screenshot this panel after the failure';
+        heading.style.cssText = 'position:sticky;top:0;padding:4px 0 8px;font-weight:700;color:var(--c-accent);background:var(--c-surface);z-index:1';
+        panel.appendChild(heading);
         document.documentElement.appendChild(panel);
     }
 
@@ -233,6 +248,35 @@ function walletDebugLog(step, detail = null) {
     line.textContent = `${payload.time} ${step}${payload.detail ? ` ${JSON.stringify(payload.detail)}` : ''}`;
     panel.appendChild(line);
     panel.scrollTop = panel.scrollHeight;
+}
+
+function bindWalletDebugDiagnostics() {
+    if (!walletDebugEnabled() || walletDebugDiagnosticsBound) return;
+    walletDebugDiagnosticsBound = true;
+    const snapshot = (eventName, detail = null) => walletDebugLog(eventName, {
+        ...(detail || {}),
+        account: getWalletDebugSnapshot()
+    });
+    window.addEventListener('error', (event) => {
+        walletDebugLog('window error', describeWalletDebugError(event.error || event.message));
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        walletDebugLog('unhandled rejection', describeWalletDebugError(event.reason));
+    });
+    window.addEventListener('pageshow', (event) => snapshot('pageshow', { persisted: event.persisted }));
+    window.addEventListener('pagehide', (event) => snapshot('pagehide', { persisted: event.persisted }));
+    window.addEventListener('online', () => snapshot('browser online'));
+    window.addEventListener('offline', () => snapshot('browser offline'));
+    walletDebugLog('debug environment', {
+        origin: window.location.origin,
+        path: window.location.pathname,
+        appKitVersion: '1.7.11',
+        expectedChainId: BASE_SEPOLIA_CHAIN_ID,
+        metadataUrl: appOrigin,
+        projectIdPresent: Boolean(projectId),
+        effectiveType: navigator.connection?.effectiveType || null,
+        userAgent: navigator.userAgent
+    });
 }
 
 window.ArtSoulWalletDebug = {
@@ -249,6 +293,8 @@ window.ArtSoulWalletDebug = {
         return walletDebugEntries.map((entry) => ({ ...entry }));
     }
 };
+
+bindWalletDebugDiagnostics();
 
 function parseChainId(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -1726,7 +1772,7 @@ window.safeConnectWallet = async () => {
             return null;
         }
         console.error('Connection error:', err);
-        walletDebugLog('wallet connect failed', { message: err?.message || String(err) });
+        walletDebugLog('wallet connect failed', describeWalletDebugError(err));
 
         // Handle "previous request still pending" error
         if (err.message?.includes('previous') || err.message?.includes('declined')) {
@@ -2019,6 +2065,14 @@ async function initializeAppKit() {
             injected: Boolean(window.ethereum?.request),
             injectedWalletBrowser: isInjectedWalletBrowser(),
             origin: window.location.origin
+        });
+        walletDebugLog('appkit configuration', {
+            appKitVersion: '1.7.11',
+            metadataUrl: metadata.url,
+            redirectUniversal: metadata.redirect?.universal || null,
+            defaultNetwork: BASE_SEPOLIA_CHAIN_ID,
+            configuredNetworks: networks.map((network) => network.id),
+            projectIdPresent: Boolean(projectId)
         });
 
         const explicitDisconnectRequested = sessionStorage.getItem('artsoul_disconnecting');
@@ -2368,6 +2422,16 @@ async function initializeAppKit() {
             const selectedChainId = parseChainId(state?.selectedNetworkId);
             const modalOpen = Boolean(state?.open || modal.getState?.()?.open);
             const modalView = String(state?.view || state?.openModalView || state?.selectedView || '').toLowerCase();
+            const debugStateKey = `${modalOpen}:${modalView}:${selectedChainId || 'none'}`;
+            if (debugStateKey !== lastWalletDebugModalStateKey) {
+                lastWalletDebugModalStateKey = debugStateKey;
+                walletDebugLog('appkit modal state', {
+                    open: modalOpen,
+                    view: modalView || null,
+                    selectedNetworkId: selectedChainId,
+                    snapshot: getWalletDebugSnapshot()
+                });
+            }
             const looksLikeNetworkModal = Boolean(selectedChainId || modalView.includes('network'));
             const hasUserIntent = hasNetworkModalIntent();
 
