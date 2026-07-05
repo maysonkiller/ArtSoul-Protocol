@@ -4063,6 +4063,12 @@ html.future .site-header .logo-link > .site-logo {
     transition: none !important;
 }
 
+/* Keep the fixed account-button shell visible while AppKit restores a saved
+   session, but never paint a guest or address-only identity underneath it. */
+html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
+    visibility: hidden !important;
+}
+
 .site-header #navButtons .avatar-button > img {
     width: 32px !important;
     min-width: 32px !important;

@@ -9,6 +9,7 @@
                 var theme = localStorage.getItem('artsoul_theme') || 'classic';
                 document.documentElement.classList.remove('classic', 'future');
                 document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+                if (/^0x[a-f0-9]{40}$/i.test(localStorage.getItem('artsoul_wallet') || '')) document.documentElement.classList.add('wallet-state-resolving');
             } catch (error) {
                 document.documentElement.classList.remove('classic', 'future');
                 document.documentElement.classList.add('classic');
@@ -35,7 +36,7 @@
     <link rel="shortcut icon" type="image/jpeg" href="favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=30">
+    <link rel="stylesheet" href="unified-styles.css?v=31">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -44,11 +45,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="src/ui/theme-manager.js"></script>
     <script defer src="src/ui/themed-selects.js?v=1"></script>
-    <script src="src/ui/theme-validator.js"></script>
-    <script src="src/ui/status-banner-system.js"></script>
+    <script defer src="src/ui/theme-validator.js"></script>
+    <script defer src="src/ui/status-banner-system.js"></script>
     <script src="src/ui/navigation-manager.js?v=4"></script>
-    <script src="src/ui/system-logger.js"></script>
-    <script src="src/ui/log-viewer-ui.js"></script>
+    <script defer src="src/ui/system-logger.js"></script>
+    <script defer src="src/ui/log-viewer-ui.js"></script>
     <script>
         window.addEventListener('load', () => {
             if (window.SystemLogger && window.LogViewerUI) {
@@ -114,7 +115,7 @@
             }
         }
     </style>
-    <script src="avatar-dropdown.js?v=21"></script>
+    <script src="avatar-dropdown.js?v=22"></script>
     <script type="module" src="appkit-init.js?v=19"></script>
     <script src="contracts-config.js?v=1"></script>
     <script type="module" src="contracts-integration.js?v=3"></script>
