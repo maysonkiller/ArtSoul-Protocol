@@ -628,6 +628,52 @@ let morphActive = false;
             container.appendChild(detail);
         }
 
+        function artworkRecency(artwork = {}) {
+            const value = artwork.created_at || artwork.updated_at || artwork.auction?.created_at || '';
+            const timestamp = Date.parse(value);
+            return Number.isFinite(timestamp) ? timestamp : 0;
+        }
+
+        function renderHomepageFeaturedRow(artworks = []) {
+            const section = document.getElementById('homepageFeaturedSection');
+            const row = document.getElementById('homepageFeaturedRow');
+            const summary = document.getElementById('homepageFeaturedSummary');
+            if (!section || !row) return;
+
+            const renderable = artworks
+                .filter(hasRenderableArtworkMedia)
+                .filter(artwork => !window.ArtSoulArtworkCard?.isHidden?.(artwork));
+            const live = renderable
+                .filter(artwork => window.ArtSoulArtworkCard?.statusInfo?.(artwork)?.key === 'live')
+                .sort((left, right) => artworkRecency(right) - artworkRecency(left));
+            const liveIds = new Set(live.map(artwork => String(artwork.id)));
+            const recent = renderable
+                .filter(artwork => !liveIds.has(String(artwork.id)))
+                .sort((left, right) => artworkRecency(right) - artworkRecency(left));
+            const featured = [...live, ...recent].slice(0, 4);
+
+            row.replaceChildren();
+            for (const artwork of featured) {
+                const card = window.ArtSoulArtworkCard?.createCardElement?.(artwork, {
+                    minimal: true,
+                    surface: 'homepage'
+                });
+                if (card) row.appendChild(card);
+            }
+
+            if (!row.children.length) {
+                section.hidden = true;
+                return;
+            }
+
+            section.hidden = false;
+            if (summary) {
+                summary.textContent = live.length
+                    ? 'Live auctions appear first, followed by recent Discovery works.'
+                    : 'Recent works from the public Discovery feed.';
+            }
+        }
+
         // Load artworks on page load
         async function loadHomeArtworks() {
             const gallery = document.getElementById('artworkGallery');
@@ -667,6 +713,8 @@ let morphActive = false;
                     reason: window.ArtSoulDiscovery?.classifyLifecycle?.(artwork)?.label || 'Community signal',
                     artwork
                 }));
+
+                renderHomepageFeaturedRow(artworks);
 
                 gallery.innerHTML = '';
                 gallery.setAttribute('aria-busy', 'false');
