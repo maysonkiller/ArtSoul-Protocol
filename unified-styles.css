@@ -1801,8 +1801,8 @@ body.future .gallery-filter-panel {
 
 @media (min-width: 901px) {
     .artwork-page-root {
-        height: calc(100vh - 105px);
-        height: calc(100dvh - 105px);
+        height: calc(100vh - var(--site-header-height, 77px));
+        height: calc(100dvh - var(--site-header-height, 77px));
         overflow: hidden;
     }
 
@@ -3128,27 +3128,27 @@ body.classic::before,
 }
 
 /* Shared header/menu contract: keep logo, context, and wallet zones stable across pages. */
-header {
+.site-header {
     overflow: visible !important;
 }
 
-body.classic header {
+body.classic .site-header {
     background: rgba(1, 1, 1, 0.95);
     border-bottom: 1px solid var(--text-classic);
 }
 
-body.future header {
+body.future .site-header {
     background: rgba(0, 0, 0, 0.8);
     border-bottom: 1px solid rgba(var(--c-accent-rgb), 0.3);
     box-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.3);
 }
 
-header .container {
+.site-header .container {
     display: block !important;
     overflow: visible !important;
 }
 
-header > .container > .flex {
+.site-header > .container > .flex {
     display: grid !important;
     grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) minmax(190px, 240px);
     align-items: center !important;
@@ -3156,28 +3156,28 @@ header > .container > .flex {
     flex-wrap: nowrap !important;
 }
 
-header > .container > .flex > :first-child {
+.site-header > .container > .flex > :first-child {
     justify-self: start;
     min-width: 190px;
 }
 
-header > .container > .flex > :nth-child(2) {
+.site-header > .container > .flex > :nth-child(2) {
     justify-self: center;
     width: 100%;
     min-width: 0;
     text-align: center;
 }
 
-header > .container > .flex > :nth-child(2):not(.page-context) {
+.site-header > .container > .flex > :nth-child(2):not(.page-context) {
     display: flex;
     justify-content: center;
 }
 
-header > .container > .flex > .page-context {
+.site-header > .container > .flex > .page-context {
     display: block;
 }
 
-header > .container > .flex > :last-child {
+.site-header > .container > .flex > :last-child {
     justify-self: end;
     min-width: 190px;
     display: flex;
@@ -3644,41 +3644,41 @@ header > .container > .flex > :last-child {
 }
 
 @media (min-width: 769px) {
-    header {
+    .site-header {
         min-height: 105px !important;
     }
 
-    header .container {
+    .site-header .container {
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
     }
 
-    header > .container > .flex {
+    .site-header > .container > .flex {
         grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) minmax(240px, 320px) !important;
         min-height: 72px !important;
     }
 
-    header > .container > .flex > :first-child,
-    header > .container > .flex > :last-child {
+    .site-header > .container > .flex > :first-child,
+    .site-header > .container > .flex > :last-child {
         width: 100% !important;
         min-width: 240px !important;
         max-width: 320px !important;
     }
 
-    header > .container > .flex > :nth-child(2) {
+    .site-header > .container > .flex > :nth-child(2) {
         min-height: 52px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
     }
 
-    header > .container > .flex > .page-context {
+    .site-header > .container > .flex > .page-context {
         flex-direction: column !important;
         justify-content: center !important;
         min-height: 52px !important;
     }
 
-    header .devnet-banner {
+    .site-header .devnet-banner {
         min-height: 52px !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -3754,14 +3754,14 @@ header > .container > .flex > :last-child {
         box-shadow: inset 0 0 12px rgba(var(--c-accent-rgb), 0.1) !important;
     }
 
-    header .container {
+    .site-header .container {
         padding-top: 0.5rem !important;
         padding-bottom: 0.5rem !important;
         width: 100% !important;
         max-width: 100% !important;
     }
 
-    header > .container > .flex {
+    .site-header > .container > .flex {
         display: grid !important;
         grid-template-columns: auto minmax(0, 1fr) auto;
         grid-template-areas:
@@ -3776,12 +3776,12 @@ header > .container > .flex > :last-child {
         min-width: 0 !important;
     }
 
-    header > .container > .flex > :first-child {
+    .site-header > .container > .flex > :first-child {
         grid-area: logo;
         min-width: 0;
     }
 
-    header > .container > .flex > :nth-child(2) {
+    .site-header > .container > .flex > :nth-child(2) {
         grid-area: context;
         width: 100%;
         justify-self: center;
@@ -3789,7 +3789,7 @@ header > .container > .flex > :last-child {
         text-align: center;
     }
 
-    header > .container > .flex > :last-child {
+    .site-header > .container > .flex > :last-child {
         grid-area: actions;
         min-width: 0;
         justify-self: end;
@@ -3799,13 +3799,13 @@ header > .container > .flex > :last-child {
         flex-shrink: 0;
     }
 
-    header .site-logo {
+    .site-header .site-logo {
         width: auto !important;
         height: 48px !important;
         max-width: 92px !important;
     }
 
-    header > .container > .flex > :nth-child(2):empty {
+    .site-header > .container > .flex > :nth-child(2):empty {
         display: none !important;
     }
 
@@ -3902,5 +3902,380 @@ header > .container > .flex > :last-child {
         margin: 0.5rem auto;
         display: block;
         text-align: center;
+    }
+}
+
+/* Unified site boundary and primary header contract. All public MPA pages use
+   these classes so page-local legacy header rules cannot change geometry. */
+:root {
+    --site-content-max: 1200px;
+    --site-gutter: clamp(12px, 2vw, 20px);
+    --site-header-height: 77px;
+}
+
+html,
+body {
+    width: 100%;
+    max-width: 100%;
+}
+
+body {
+    overflow-x: clip;
+}
+
+.site-page-container,
+.site-header-shell {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: calc(var(--site-content-max) + (2 * var(--site-gutter))) !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    padding-right: var(--site-gutter) !important;
+    padding-left: var(--site-gutter) !important;
+}
+
+.site-page-container,
+.site-page-container > * {
+    min-width: 0;
+}
+
+.site-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10000 !important;
+    min-height: 77px !important;
+    overflow: visible !important;
+    border-bottom: 1px solid var(--c-border-soft) !important;
+    background: color-mix(in srgb, var(--c-bg) 94%, transparent) !important;
+    backdrop-filter: blur(12px);
+}
+
+html.classic .site-header,
+body.classic .site-header {
+    box-shadow: none !important;
+}
+
+html.future .site-header,
+body.future .site-header {
+    box-shadow: 0 0 20px var(--c-glow) !important;
+}
+
+.site-header-shell {
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+    overflow: visible !important;
+}
+
+.site-header-row {
+    display: grid !important;
+    grid-template-columns: 172px minmax(0, 1fr) 172px;
+    min-width: 0;
+    min-height: 56px;
+    align-items: center;
+    gap: 1rem;
+}
+
+.site-header-logo-zone,
+.site-header-actions,
+.site-header-center {
+    min-width: 0;
+}
+
+.site-header-logo-zone {
+    display: flex;
+    align-items: center;
+    justify-self: start;
+}
+
+.site-header-center {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    text-align: center;
+}
+
+.site-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    justify-self: end;
+}
+
+.site-header .logo-link {
+    display: inline-flex;
+    min-height: 0;
+    flex: 0 0 auto;
+}
+
+.site-header .site-logo,
+body.classic .site-header .logo-link > .site-logo,
+body.future .site-header .logo-link > .site-logo,
+html.classic .site-header .logo-link > .site-logo,
+html.future .site-header .logo-link > .site-logo {
+    width: auto !important;
+    height: auto !important;
+    max-width: 58px !important;
+    max-height: 56px !important;
+}
+
+.site-header #networkBadge:empty {
+    display: none;
+}
+
+.site-header #navButtons,
+.site-header #navButtons .avatar-dropdown-container {
+    width: 172px !important;
+    min-width: 172px !important;
+    max-width: 172px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+}
+
+.site-header #navButtons {
+    display: flex !important;
+    margin: 0 !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    overflow: visible !important;
+}
+
+.site-header #navButtons .avatar-dropdown-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.site-header #navButtons .avatar-button {
+    width: 172px !important;
+    min-width: 172px !important;
+    max-width: 172px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    gap: 6px !important;
+    justify-content: flex-start !important;
+    padding: 5px 8px !important;
+    overflow: hidden;
+    transition: none !important;
+}
+
+.site-header #navButtons .avatar-button > img {
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    flex: 0 0 32px !important;
+}
+
+.site-header #navButtons .avatar-info {
+    display: flex !important;
+    width: 96px !important;
+    min-width: 96px !important;
+    max-width: 96px !important;
+    height: 32px !important;
+    flex: 0 0 96px !important;
+    justify-content: center;
+}
+
+.site-header #navButtons .avatar-info > div {
+    width: 96px !important;
+    max-width: 96px !important;
+}
+
+.site-header #navButtons [data-avatar-name] {
+    font-size: 0.8rem;
+    line-height: 1.15;
+}
+
+.site-header #navButtons [data-avatar-address] {
+    min-height: 0.78rem;
+    font-size: 0.68rem;
+    line-height: 1.15;
+}
+
+.site-header #navButtons .dropdown-arrow {
+    width: 10px !important;
+    min-width: 10px !important;
+    max-width: 10px !important;
+    height: 10px !important;
+    min-height: 10px !important;
+    max-height: 10px !important;
+    flex: 0 0 10px !important;
+}
+
+.site-header .avatar-dropdown-menu {
+    width: min(208px, calc(100vw - 24px)) !important;
+}
+
+.upload-page-main.site-page-container {
+    max-width: calc(48rem + (2 * var(--site-gutter))) !important;
+}
+
+.artwork-page-shell.site-page-container,
+.protocol-docs-shell.site-page-container {
+    max-width: calc(var(--site-content-max) + (2 * var(--site-gutter))) !important;
+}
+
+#homeSection,
+#homeSection .home-hero,
+#homeSection .home-spotlight,
+#homeSection .gallery,
+#homeSection .home-protocol-section,
+#homeSection .home-protocol-cta,
+#homeSection .home-featured-row {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+#homeSection .home-hero {
+    position: relative;
+    display: flex;
+    height: auto;
+    flex-direction: column;
+    align-items: center;
+    isolation: isolate;
+}
+
+#homeSection .home-hero h1,
+#homeSection .home-hero p {
+    max-width: 100%;
+    overflow-wrap: break-word;
+}
+
+#homeSection .home-spotlight,
+#homeSection .home-protocol-section,
+#homeSection .home-protocol-cta {
+    position: relative;
+    clear: both;
+}
+
+#homeSection .gallery > *,
+#homeSection .home-featured-row > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 768px) {
+    :root {
+        --site-gutter: 12px;
+        --site-header-height: 57px;
+    }
+
+    .site-header {
+        min-height: 57px !important;
+    }
+
+    .site-header-shell {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+    }
+
+    .site-header-row {
+        grid-template-columns: 42px minmax(0, 1fr) 56px;
+        min-height: 44px;
+        gap: 0.5rem;
+    }
+
+    .site-header-center:empty {
+        display: block !important;
+    }
+
+    .site-header .site-logo,
+    body.classic .site-header .logo-link > .site-logo,
+    body.future .site-header .logo-link > .site-logo,
+    html.classic .site-header .logo-link > .site-logo,
+    html.future .site-header .logo-link > .site-logo {
+        max-width: 44px !important;
+        max-height: 42px !important;
+    }
+
+    .site-header #navButtons,
+    .site-header #navButtons .avatar-dropdown-container,
+    .site-header #navButtons .avatar-button {
+        width: 56px !important;
+        min-width: 56px !important;
+        max-width: 56px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+        max-height: 44px !important;
+    }
+
+    .site-header #navButtons .avatar-button {
+        gap: 4px !important;
+        justify-content: center !important;
+        padding: 5px 6px !important;
+    }
+
+    .site-header #navButtons .avatar-info {
+        display: none !important;
+    }
+
+    .site-header #navButtons .avatar-button > img {
+        width: 30px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+        height: 30px !important;
+        min-height: 30px !important;
+        max-height: 30px !important;
+        flex-basis: 30px !important;
+    }
+
+    .site-header #navButtons .dropdown-arrow {
+        width: 8px !important;
+        min-width: 8px !important;
+        max-width: 8px !important;
+        height: 8px !important;
+        min-height: 8px !important;
+        max-height: 8px !important;
+        flex-basis: 8px !important;
+    }
+
+    #homeSection {
+        overflow-x: clip;
+    }
+
+    #homeSection .home-hero {
+        margin-bottom: 1.25rem !important;
+    }
+
+    #homeSection .home-hero h1 {
+        font-size: clamp(1.75rem, 8vw, 2.15rem) !important;
+        line-height: 1.12;
+        text-wrap: balance;
+    }
+
+    #homeSection .home-hero p {
+        font-size: 0.95rem !important;
+        line-height: 1.45;
+        text-wrap: balance;
+    }
+
+    #homeSection .home-hero > .flex {
+        width: 100%;
+        gap: 0.65rem !important;
+    }
+
+    #homeSection .home-hero .btn-main,
+    #homeSection .home-hero .btn-secondary {
+        min-width: 0;
+        flex: 1 1 140px;
+        padding-right: 0.75rem !important;
+        padding-left: 0.75rem !important;
+        white-space: normal;
+    }
+
+    .site-header *,
+    .site-header *::before,
+    .site-header *::after {
+        animation: none !important;
+        transition: none !important;
     }
 }

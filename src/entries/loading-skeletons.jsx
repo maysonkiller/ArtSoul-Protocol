@@ -22,7 +22,7 @@ export function CardGridSkeleton({ count = 12, className = 'grid grid-cols-2 sm:
 
 export function ArtworkPageSkeleton() {
     return (
-        <main className="artwork-page-shell" role="status" aria-label="Loading artwork" aria-busy="true">
+        <main className="artwork-page-shell site-page-container" role="status" aria-label="Loading artwork" aria-busy="true">
             <div className="artwork-page-layout">
                 <div className="artwork-page-left">
                     <section className="artwork-detail-stage artwork-mobile-media">
@@ -68,7 +68,7 @@ export function ArtworkPageSkeleton() {
 
 export function ProfilePageSkeleton({ className = '' }) {
     return (
-        <main className={`container mx-auto px-4 py-8 ${className}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
+        <main className={`site-page-container py-8 ${className}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
             <section className="profile-skeleton-header rounded-xl p-6 mb-6">
                 <div className="profile-skeleton-identity">
                     <SkeletonBlock className="profile-skeleton-avatar" />

@@ -2235,7 +2235,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
                     )}
                     {/* Content */}
-                    <main className="artwork-page-shell">
+                    <main className="artwork-page-shell site-page-container">
                         <div className="artwork-page-layout">
                             {/* Artwork Media Viewer */}
                             <div className="artwork-page-left">

@@ -52,8 +52,8 @@
 
 .protocol-side-nav {
     position: sticky;
-    top: 7.5rem;
-    max-height: calc(100vh - 9rem);
+    top: calc(var(--site-header-height, 77px) + 1rem);
+    max-height: calc(100vh - var(--site-header-height, 77px) - 2rem);
     overflow-y: auto;
     padding: 0.75rem;
     border-radius: 1rem;
@@ -104,7 +104,7 @@
 }
 
 .protocol-section {
-    scroll-margin-top: 7.5rem;
+    scroll-margin-top: calc(var(--site-header-height, 77px) + 1rem);
     overflow: hidden;
     border-radius: 1rem;
 }
@@ -270,7 +270,7 @@
     }
 
     .protocol-section {
-        scroll-margin-top: 5.5rem;
+        scroll-margin-top: calc(var(--site-header-height, 57px) + 0.75rem);
     }
 
     .protocol-section-trigger {

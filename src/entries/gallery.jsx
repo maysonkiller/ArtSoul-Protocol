@@ -364,7 +364,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             return (
                 <div className="min-h-screen">
                     {/* Main Content */}
-                    <main className="container mx-auto px-4 py-6">
+                    <main className="site-page-container py-6">
                         {/* Page title + subtitle live in the compact sticky header
                             (.page-context) — no large in-page hero heading here. */}
 
