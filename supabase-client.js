@@ -226,28 +226,44 @@ async function getPublicProjectionArtwork(idOrOptions) {
 }
 
 // Profile Functions
+const profileReadCache = new Map();
+const profileReadRequests = new Map();
+const PROFILE_READ_CACHE_MS = 15000;
+
 async function createProfile(walletAddress, profileData) {
     return updateProfile(walletAddress, profileData);
 }
 
 async function getProfile(walletAddress) {
-    const supabase = await initSupabase();
-
     // CRITICAL: Normalize wallet address to lowercase for consistent identity
     const normalizedAddress = walletAddress.toLowerCase();
-
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('wallet_address', normalizedAddress)
-        .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-        console.error('Error fetching profile:', error);
-        throw error;
+    const cached = profileReadCache.get(normalizedAddress);
+    if (cached && Date.now() - cached.timestamp < PROFILE_READ_CACHE_MS) {
+        return cached.data;
+    }
+    if (profileReadRequests.has(normalizedAddress)) {
+        return profileReadRequests.get(normalizedAddress);
     }
 
-    return data;
+    const request = (async () => {
+        const supabase = await initSupabase();
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('wallet_address', normalizedAddress)
+            .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+            console.error('Error fetching profile:', error);
+            throw error;
+        }
+
+        profileReadCache.set(normalizedAddress, { data: data || null, timestamp: Date.now() });
+        return data;
+    })().finally(() => profileReadRequests.delete(normalizedAddress));
+
+    profileReadRequests.set(normalizedAddress, request);
+    return request;
 }
 
 async function updateProfile(walletAddress, updates) {
@@ -256,6 +272,10 @@ async function updateProfile(walletAddress, updates) {
     }
 
     const result = await backendWrite('/api/profile', updates, 'PUT');
+    profileReadCache.set(walletAddress.toLowerCase(), {
+        data: result.profile || null,
+        timestamp: Date.now()
+    });
     return result.profile;
 }
 
