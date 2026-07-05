@@ -261,8 +261,13 @@
 
         getRenderKey(walletAddress, state = {}) {
             const normalizedAddress = walletAddress ? walletAddress.toLowerCase() : '';
-            const chainId = this.getNormalizedChainId(state) || 'none';
-            return normalizedAddress ? `wallet:${normalizedAddress}:chain:${chainId}` : 'guest';
+            return normalizedAddress ? `wallet:${normalizedAddress}` : 'guest';
+        }
+
+        commitVisibleState(state) {
+            document.documentElement.classList.remove('wallet-state-resolving');
+            document.documentElement.dataset.walletUiState = state;
+            this.getNavContainer()?.setAttribute('aria-busy', 'false');
         }
 
         isWalletConnectionConfirmed(walletAddress, options = {}) {
@@ -606,8 +611,6 @@
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
 
-            // Render immediately; balance hydration runs after the menu shell exists.
-            const networkInfo = await this.getCurrentNetworkInfo({ includeBalance: false });
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
             this.updateStableButton({
@@ -615,11 +618,12 @@
                 avatarAlt: username,
                 name: username,
                 address: shortAddress,
-                stateKey: options.renderKey || `profile:${walletAddress.toLowerCase()}`
+                stateKey: `identity:${walletAddress.toLowerCase()}`
             });
+            this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo }),
-                `connected:${currentPath}:${isOwnProfile}:${networkInfo.name}`
+                this.renderMenuContent({ currentPath, isOwnProfile, restoring: true }),
+                `connected:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
@@ -763,7 +767,7 @@
 
         getProfileDisplayName(profile, walletAddress) {
             const resolver = window.ArtSoulProfileDisplay?.displayName || window.ArtSoulDB?.displayName;
-            const fallback = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Wallet Connected';
+            const fallback = walletAddress ? 'ArtSoul User' : 'ArtSoul Guest';
             return resolver?.(profile, walletAddress) || fallback;
         }
 
@@ -787,7 +791,11 @@
             const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
             if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
             const cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
-            if (!cachedIdentity) return true;
+            if (!cachedIdentity) {
+                document.documentElement.classList.add('wallet-state-resolving');
+                container.setAttribute('aria-busy', 'true');
+                return true;
+            }
             if (container.dataset.avatarRenderKey === 'cached-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
 
             const currentPath = window.location.pathname;
@@ -801,8 +809,9 @@
                 avatarAlt: cachedIdentity.name,
                 name: cachedIdentity.name,
                 address: shortAddress,
-                stateKey: 'cached-wallet'
+                stateKey: `identity:${storedWallet}`
             });
+            this.commitVisibleState('connected');
             this.updateStableMenu(
                 this.renderMenuContent({
                     currentPath,
@@ -837,6 +846,7 @@
                 address: '',
                 stateKey: options.renderKey || 'guest'
             });
+            this.commitVisibleState('disconnected');
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
                 `guest:${currentPath}:${isProfilePage}`
@@ -849,7 +859,7 @@
         /**
          * Render wallet info when connected but no profile
          */
-        async renderWalletInfo(walletAddress, options = {}) {
+        renderWalletInfo(walletAddress, options = {}) {
             const navButtons = this.getNavContainer();
             if (!navButtons) return;
             if (options.renderKey) navButtons.dataset.avatarRenderKey = options.renderKey;
@@ -864,20 +874,19 @@
             const avatarUrl = this.getDefaultAvatar();
             const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 
-            // Render immediately; balance hydration runs after the menu shell exists.
-            const networkInfo = await this.getCurrentNetworkInfo({ includeBalance: false });
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
             this.updateStableButton({
                 avatarUrl,
-                avatarAlt: 'Wallet',
-                name: 'Wallet Connected',
+                avatarAlt: 'ArtSoul User',
+                name: 'ArtSoul User',
                 address: shortAddress,
                 stateKey: options.renderKey || `wallet:${currentWallet}`
             });
+            this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo }),
-                `connected:${currentPath}:${isOwnProfile}:${networkInfo.name}`
+                this.renderMenuContent({ currentPath, isOwnProfile, restoring: true }),
+                `connected:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
