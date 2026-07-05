@@ -1083,6 +1083,14 @@ body.future .artwork-detail-frame {
     object-position: center;
 }
 
+.artwork-image-lightbox .artwork-image-lightbox-media {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+}
+
 .artwork-image-lightbox-close {
     position: fixed;
     top: max(14px, env(safe-area-inset-top));
@@ -1108,6 +1116,18 @@ body.future .artwork-detail-frame {
     padding: clamp(8px, 1vw, 16px);
     background: linear-gradient(135deg, rgba(var(--c-accent-rgb), 0.06), rgba(var(--c-accent-2-rgb), 0.06));
     color-scheme: dark;
+}
+
+.artwork-detail-video:fullscreen,
+.artwork-detail-video:-webkit-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    padding: 0 !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    background: var(--c-bg) !important;
 }
 
 .artwork-detail-audio {
@@ -1350,7 +1370,22 @@ body.future .artwork-detail-frame {
 
 .artwork-page-people-list {
     display: grid;
+    width: 100%;
     gap: 7px;
+}
+
+.artwork-ownership-row,
+.artwork-ownership-profile {
+    width: 100%;
+    min-width: 0;
+}
+
+.artwork-ownership-row {
+    align-self: stretch;
+}
+
+.artwork-ownership-profile {
+    flex: 1 1 100%;
 }
 
 .artwork-page-root .artwork-page-people .space-y-4 > :not([hidden]) ~ :not([hidden]) {
@@ -1725,11 +1760,11 @@ body.future .artwork-detail-frame {
         max-width: 100%;
         max-height: 100%;
         padding: 0;
-        object-fit: fill;
+        object-fit: cover;
     }
 
     .artwork-page-left .artwork-detail-image {
-        object-fit: contain;
+        object-fit: cover;
     }
 
     .artwork-page-left .artwork-detail-video-shell {
@@ -1825,24 +1860,29 @@ body.future .artwork-detail-frame {
         height: min(38svh, 320px);
     }
 
+    .artwork-page-left .artwork-detail-frame:not(.artwork-detail-frame-audio):not(.artwork-detail-frame-unknown) {
+        height: min(30svh, 320px);
+        overflow: hidden;
+    }
+
     .artwork-page-left .artwork-detail-media-object,
     .artwork-page-left .artwork-detail-video-shell,
     .artwork-page-left .artwork-detail-video {
         width: 100%;
-        height: auto;
+        height: 100%;
         max-width: 100%;
-        max-height: 30svh;
+        max-height: none;
         padding: 0;
-        object-fit: fill;
+        object-fit: cover;
     }
 
     .artwork-page-left .artwork-detail-image-shell {
-        height: auto;
-        max-height: 30svh;
+        height: 100%;
+        max-height: none;
     }
 
     .artwork-page-left .artwork-detail-image {
-        object-fit: contain;
+        object-fit: cover;
     }
 
     .artwork-page-header {
