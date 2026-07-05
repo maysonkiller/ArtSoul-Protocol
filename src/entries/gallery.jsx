@@ -369,17 +369,13 @@ const { useState, useEffect, useMemo, useRef } = React;
                             (.page-context) — no large in-page hero heading here. */}
 
                         {/* Filters */}
-                        <div className="rounded-xl p-6 mb-8" style={{
-                            background: isClassic ? 'rgba(232, 227, 213, 0.03)' : 'rgba(var(--c-accent-rgb), 0.05)',
-                            border: isClassic ? '1px solid var(--c-accent)' : '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                            boxShadow: isClassic ? 'none' : '0 0 20px rgba(var(--c-accent-rgb), 0.1)'
-                        }}>
-                            <div className="flex flex-wrap gap-2 mb-4">
+                        <div className="gallery-filter-panel rounded-xl">
+                            <div className="gallery-tab-row">
                                 {GALLERY_TABS.map(tab => (
                                     <button
                                         key={tab.id}
                                         onClick={() => selectGalleryTab(tab.id)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                        className={`gallery-tab rounded-lg text-sm font-medium ${
                                             activeTab === tab.id
                                                 ? 'btn-main'
                                                 : 'btn-secondary'
@@ -389,19 +385,17 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     </button>
                                 ))}
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                            <div className="gallery-control-grid">
                                 {/* Search */}
                                 <input
                                     type="text"
                                     placeholder="Search title, creator, collection..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="px-4 py-2 rounded-lg"
-                                    style={{
-                                        background: isClassic ? 'rgba(232, 227, 213, 0.05)' : 'rgba(var(--c-accent-rgb), 0.05)',
-                                        border: isClassic ? '1px solid var(--c-accent)' : '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                                        color: isClassic ? 'var(--c-accent)' : 'var(--c-accent)'
-                                    }}
+                                    autoFocus={false}
+                                    autoComplete="off"
+                                    aria-label="Search artworks"
+                                    className="gallery-search-input rounded-lg"
                                 />
 
                                 {/* Status Filter */}
@@ -443,7 +437,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </select>
 
                                 {/* Clear Filters */}
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="gallery-filter-actions">
                                     <button
                                         onClick={() => setFiltersOpen(open => !open)}
                                         className="btn-secondary"
@@ -461,19 +455,14 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                             {/* Price Range */}
                             {filtersOpen && (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="gallery-price-grid">
                                     <input
                                         type="number"
                                         step="0.01"
                                         placeholder="Min Price (ETH)"
                                         value={minPrice}
                                         onChange={(e) => setMinPrice(e.target.value)}
-                                        className="px-4 py-2 rounded-lg"
-                                        style={{
-                                            background: isClassic ? 'rgba(232, 227, 213, 0.05)' : 'rgba(var(--c-accent-rgb), 0.05)',
-                                            border: isClassic ? '1px solid var(--c-accent)' : '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                                            color: isClassic ? 'var(--c-accent)' : 'var(--c-accent)'
-                                        }}
+                                        className="gallery-price-input rounded-lg"
                                     />
                                     <input
                                         type="number"
@@ -481,12 +470,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         placeholder="Max Price (ETH)"
                                         value={maxPrice}
                                         onChange={(e) => setMaxPrice(e.target.value)}
-                                        className="px-4 py-2 rounded-lg"
-                                        style={{
-                                            background: isClassic ? 'rgba(232, 227, 213, 0.05)' : 'rgba(var(--c-accent-rgb), 0.05)',
-                                            border: isClassic ? '1px solid var(--c-accent)' : '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                                            color: isClassic ? 'var(--c-accent)' : 'var(--c-accent)'
-                                        }}
+                                        className="gallery-price-input rounded-lg"
                                     />
                                 </div>
                             )}
@@ -505,7 +489,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                         {/* Gallery Grid */}
                         {loading ? (
-                            <CardGridSkeleton />
+                            <CardGridSkeleton className="gallery-results-grid" />
                         ) : filteredArtworks.length === 0 ? (
                             <div className="text-center py-20 rounded-xl" style={{
                                 background: isClassic ? 'rgba(232, 227, 213, 0.03)' : 'rgba(var(--c-accent-rgb), 0.04)',
@@ -534,7 +518,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 })()}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            <div className="gallery-results-grid">
                                 {filteredArtworks
                                     .filter(artwork => !window.ArtSoulArtworkCard?.isHidden?.(artwork))
                                     .map(artwork => {
