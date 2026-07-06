@@ -11,7 +11,8 @@ import { mainnet, base, sepolia, baseSepolia } from 'https://esm.sh/@reown/appki
 // CONFIGURATION
 // ============================================
 
-const projectId = 'f3a4411a5d6201d00fd86817d41b64e8';
+// Public Reown project identifier for the verified ArtSoul web project.
+const projectId = '9fdc97f91c02d46a28ca9d185a9e58f2';
 
 // Custom Rialo network
 const rialoPlayground = {
@@ -274,6 +275,7 @@ function bindWalletDebugDiagnostics() {
         expectedChainId: BASE_SEPOLIA_CHAIN_ID,
         metadataUrl: appOrigin,
         projectIdPresent: Boolean(projectId),
+        projectIdFingerprint: `${projectId.slice(0, 4)}...${projectId.slice(-4)}`,
         effectiveType: navigator.connection?.effectiveType || null,
         userAgent: navigator.userAgent
     });
@@ -2072,7 +2074,8 @@ async function initializeAppKit() {
             redirectUniversal: metadata.redirect?.universal || null,
             defaultNetwork: BASE_SEPOLIA_CHAIN_ID,
             configuredNetworks: networks.map((network) => network.id),
-            projectIdPresent: Boolean(projectId)
+            projectIdPresent: Boolean(projectId),
+            projectIdFingerprint: `${projectId.slice(0, 4)}...${projectId.slice(-4)}`
         });
 
         const explicitDisconnectRequested = sessionStorage.getItem('artsoul_disconnecting');

@@ -2,7 +2,8 @@ import { createAppKit } from 'https://esm.sh/@reown/appkit@1.7.11?bundle';
 import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.7.11?bundle';
 import { baseSepolia } from 'https://esm.sh/@reown/appkit/networks?bundle';
 
-const PROJECT_ID = 'f3a4411a5d6201d00fd86817d41b64e8';
+// Public Reown project identifier for the verified ArtSoul web project.
+const PROJECT_ID = '9fdc97f91c02d46a28ca9d185a9e58f2';
 const EXPECTED_CHAIN_ID = 84532;
 const startedAt = Date.now();
 const params = new URLSearchParams(window.location.search);
@@ -117,7 +118,8 @@ async function initializeBareLayer() {
         appKitVersion: '1.7.11',
         expectedChainId: EXPECTED_CHAIN_ID,
         metadataUrl: window.location.origin,
-        projectIdPresent: Boolean(PROJECT_ID)
+        projectIdPresent: Boolean(PROJECT_ID),
+        projectIdFingerprint: `${PROJECT_ID.slice(0, 4)}...${PROJECT_ID.slice(-4)}`
     });
     const networks = [baseSepolia];
     const adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID });
