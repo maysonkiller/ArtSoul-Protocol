@@ -15,6 +15,7 @@ const pageInputs = {
     upload: 'upload.html',
     docs: 'docs.html',
     'auction-system': 'auction-system.html',
+    'wallet-test': 'wallet-test.html',
     'visual-lab': 'visual-lab.html',
     'generate-favicon': 'generate-favicon.html'
 };
@@ -47,7 +48,8 @@ const legacyRootAssets = [
     'supabase-client.js',
     'theme-sync.js',
     'ui-core.css',
-    'unified-styles.css'
+    'unified-styles.css',
+    'wallet-test.js'
 ];
 
 const legacyClientTrees = [

@@ -12,6 +12,7 @@ const pages = [
     'upload.html',
     'docs.html',
     'auction-system.html',
+    'wallet-test.html',
     'visual-lab.html',
     'generate-favicon.html'
 ];
