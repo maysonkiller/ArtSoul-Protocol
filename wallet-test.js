@@ -1,10 +1,13 @@
 const PROJECT_ID = '9fdc97f91c02d46a28ca9d185a9e58f2';
 const EXPECTED_CHAIN_ID = 84532;
+const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
+const STRICT_METHODS = ['eth_sendTransaction', 'personal_sign'];
+const STRICT_EVENTS = ['chainChanged', 'accountsChanged'];
 const startedAt = Date.now();
 const params = new URLSearchParams(window.location.search);
 const layer = params.get('layer') || 'bare';
 const requestedVariant = params.get('variant') || 'legacy-redirect';
-const variant = ['legacy-redirect', 'aligned', 'no-redirect', 'latest', 'core-manual'].includes(requestedVariant)
+const variant = ['legacy-redirect', 'aligned', 'no-redirect', 'latest', 'core-manual', 'core-strict'].includes(requestedVariant)
     ? requestedVariant
     : 'legacy-redirect';
 const logElement = document.getElementById('walletTestLog');
@@ -15,28 +18,30 @@ const manualStatus = document.getElementById('walletManualStatus');
 const manualQr = document.getElementById('walletManualQr');
 const copyUriButton = document.getElementById('walletCopyUri');
 const openMetaMaskLink = document.getElementById('walletOpenMetaMask');
+const strictPrecondition = document.getElementById('walletStrictPrecondition');
+const strictReady = document.getElementById('walletStrictReady');
 let sequence = 0;
 let modal = null;
 let manualProvider = null;
 let manualPairingUri = null;
 let manualAccount = null;
-let manualChainId = EXPECTED_CHAIN_ID;
+let manualChainId = null;
 let configuredNetwork = null;
 let latestNetworkSyncAttempts = 0;
 let latestNetworkSyncInFlight = false;
-let latestStorageReset = false;
+let diagnosticStorageReset = false;
 let connectAttempt = 0;
 let socketSequence = 0;
 let activeAppKitVersion = layer === 'bare'
     ? variant === 'latest'
         ? '1.8.21'
-        : variant === 'core-manual'
+        : isManualVariant()
             ? 'none (EthereumProvider 2.23.10)'
             : '1.7.11'
     : 'ArtSoul wrapper';
 let activeNetworksVersion = variant === 'legacy-redirect'
     ? 'unversioned'
-    : variant === 'core-manual'
+    : isManualVariant()
         ? 'Base Sepolia 84532'
         : activeAppKitVersion;
 let activeRedirectIncluded = layer === 'bare'
@@ -50,6 +55,10 @@ const nativeConsoleError = console.error.bind(console);
 function maskAddress(value) {
     const address = String(value || '');
     return /^0x[a-f0-9]{40}$/i.test(address) ? `${address.slice(0, 6)}...${address.slice(-4)}` : address || null;
+}
+
+function isManualVariant() {
+    return variant === 'core-manual' || variant === 'core-strict';
 }
 
 function parseChainId(value) {
@@ -95,6 +104,47 @@ function describeNetworkUrl(value) {
     } catch {
         return String(value || '').split('?')[0];
     }
+}
+
+function summarizeCaipAccount(value) {
+    const parts = String(value || '').split(':');
+    if (parts.length < 3) return maskAddress(value);
+    return `${parts[0]}:${parts[1]}:${maskAddress(parts.slice(2).join(':'))}`;
+}
+
+function summarizeNamespaces(namespaces) {
+    if (!namespaces || typeof namespaces !== 'object') return null;
+    return Object.fromEntries(Object.entries(namespaces).map(([namespace, value]) => [namespace, {
+        chains: Array.isArray(value?.chains) ? [...value.chains] : [],
+        accounts: Array.isArray(value?.accounts) ? value.accounts.map(summarizeCaipAccount) : [],
+        methods: Array.isArray(value?.methods) ? [...value.methods] : [],
+        events: Array.isArray(value?.events) ? [...value.events] : []
+    }]));
+}
+
+function summarizeManualRpcConfig() {
+    const rpc = manualProvider?.rpc || {};
+    return {
+        chains: Array.isArray(rpc.chains) ? [...rpc.chains] : [],
+        optionalChains: Array.isArray(rpc.optionalChains) ? [...rpc.optionalChains] : [],
+        methods: Array.isArray(rpc.methods) ? [...rpc.methods] : [],
+        optionalMethods: Array.isArray(rpc.optionalMethods) ? [...rpc.optionalMethods] : [],
+        events: Array.isArray(rpc.events) ? [...rpc.events] : [],
+        optionalEvents: Array.isArray(rpc.optionalEvents) ? [...rpc.optionalEvents] : [],
+        rpcMap: Object.fromEntries(Object.entries(rpc.rpcMap || {}).map(([chainId, url]) => [chainId, describeNetworkUrl(url)]))
+    };
+}
+
+function logManualSettledNamespaces(label) {
+    const directSession = manualProvider?.session;
+    const signerSessions = manualProvider?.signer?.session?.getAll?.() || [];
+    const sessions = directSession?.namespaces
+        ? [directSession]
+        : signerSessions.filter((session) => session?.namespaces);
+    log(label, {
+        sessionCount: sessions.length,
+        namespaces: sessions.map((session) => summarizeNamespaces(session.namespaces))
+    });
 }
 
 function isDiagnosticNetwork(value) {
@@ -201,8 +251,8 @@ function scheduleSessionChecks(attemptId) {
     });
 }
 
-function resetLatestDiagnosticStorage() {
-    if (variant !== 'latest') return;
+function resetDiagnosticStorage() {
+    if (variant !== 'latest' && variant !== 'core-strict') return;
     const matchesDiagnosticWalletState = (key) => /wagmi|wallet|wc@|walletconnect|w3m|appkit|reown/i.test(key);
     const removed = [];
     for (const storage of [localStorage, sessionStorage]) {
@@ -211,22 +261,23 @@ function resetLatestDiagnosticStorage() {
             removed.push(key.split(':').slice(0, 3).join(':'));
         });
     }
-    latestStorageReset = true;
-    log('latest diagnostic storage reset', {
+    diagnosticStorageReset = true;
+    log('diagnostic wallet storage reset', {
+        variant,
         removedCount: removed.length,
         removedPrefixes: [...new Set(removed)].slice(0, 12)
     });
 }
 
 function snapshot(account = modal?.getAccount?.()) {
-    if (variant === 'core-manual') {
+    if (isManualVariant()) {
         return {
             address: maskAddress(manualAccount),
             status: manualAccount ? 'connected' : 'disconnected',
             isConnected: Boolean(manualAccount),
-            chainId: manualAccount ? manualChainId : null,
-            caipAddress: manualAccount ? `eip155:${manualChainId}:${maskAddress(manualAccount)}` : null,
-            selectedNetworkId: `eip155:${manualChainId}`,
+            chainId: manualChainId,
+            caipAddress: manualAccount && manualChainId ? `eip155:${manualChainId}:${maskAddress(manualAccount)}` : null,
+            selectedNetworkId: manualChainId ? `eip155:${manualChainId}` : null,
             resolvedChainId: manualChainId,
             modalOpen: false,
             modalView: 'manual-uri'
@@ -256,7 +307,7 @@ function updateStatus(account) {
         `Networks: ${activeNetworksVersion}`,
         `Configured network: eip155:${EXPECTED_CHAIN_ID}`,
         `redirectIncluded: ${activeRedirectIncluded}`,
-        ...(variant === 'latest' ? [`freshWalletState: ${latestStorageReset}`] : []),
+        ...(variant === 'latest' || variant === 'core-strict' ? [`freshWalletState: ${diagnosticStorageReset}`] : []),
         `Origin: ${window.location.origin}`,
         'Project: 9fdc...58f2',
         `Account: ${maskAddress(current.address) || 'none'}`,
@@ -437,43 +488,80 @@ function bindManualControls() {
 }
 
 async function initializeCoreManual() {
+    const strict = variant === 'core-strict';
     activeAppKitVersion = 'none (EthereumProvider 2.23.10)';
     activeNetworksVersion = 'Base Sepolia 84532';
     activeRedirectIncluded = false;
+    resetDiagnosticStorage();
     manualPanel.hidden = false;
-    connectButton.textContent = 'Create manual pairing URI';
+    strictPrecondition.hidden = !strict;
+    connectButton.textContent = strict ? 'Confirm Base Sepolia selection first' : 'Create manual pairing URI';
+    connectButton.disabled = strict;
+    if (strict) {
+        manualStatus.textContent = 'Strict mode requests Base Sepolia only. Confirm the MetaMask Mobile network state before pairing.';
+        strictReady.addEventListener('change', () => {
+            connectButton.disabled = !strictReady.checked;
+            connectButton.textContent = strictReady.checked
+                ? 'Create strict Base Sepolia pairing URI'
+                : 'Confirm Base Sepolia selection first';
+            log('strict precondition changed', { confirmed: strictReady.checked });
+        });
+    }
     updateStatus();
-    log('loading WalletConnect EthereumProvider', {
-        providerVersion: '2.23.10',
-        expectedChainId: EXPECTED_CHAIN_ID,
-        metadataUrl: window.location.origin,
-        projectIdFingerprint: '9fdc...58f2'
-    });
-    const providerModule = await import('https://esm.sh/@walletconnect/ethereum-provider@2.23.10?bundle');
-    const EthereumProvider = providerModule.EthereumProvider || providerModule.default?.EthereumProvider || providerModule.default;
-    manualProvider = await EthereumProvider.init({
+    const rpcMap = { [EXPECTED_CHAIN_ID]: BASE_SEPOLIA_RPC_URL };
+    const initOptions = {
         projectId: PROJECT_ID,
         chains: [EXPECTED_CHAIN_ID],
         showQrModal: false,
         metadata: {
             name: 'ArtSoul Wallet Test',
-            description: 'Isolated WalletConnect manual pairing diagnostic',
+            description: strict
+                ? 'Strict Base Sepolia WalletConnect namespace diagnostic'
+                : 'Isolated WalletConnect manual pairing diagnostic',
             url: window.location.origin,
             icons: [`${window.location.origin}/ARTSOULlogo-clean.png`]
         }
+    };
+    if (strict) Object.assign(initOptions, {
+        optionalChains: [],
+        methods: STRICT_METHODS,
+        optionalMethods: [],
+        events: STRICT_EVENTS,
+        optionalEvents: [],
+        rpcMap
     });
+    log('loading WalletConnect EthereumProvider', {
+        providerVersion: '2.23.10',
+        variant,
+        expectedChainId: EXPECTED_CHAIN_ID,
+        requestedChains: initOptions.chains,
+        requestedOptionalChains: initOptions.optionalChains ?? 'provider default',
+        requestedMethods: initOptions.methods ?? 'provider default',
+        requestedOptionalMethods: initOptions.optionalMethods ?? 'provider default',
+        requestedEvents: initOptions.events ?? 'provider default',
+        requestedOptionalEvents: initOptions.optionalEvents ?? 'provider default',
+        rpcMap: initOptions.rpcMap || 'provider default',
+        metadataUrl: window.location.origin,
+        projectIdFingerprint: '9fdc...58f2'
+    });
+    const providerModule = await import('https://esm.sh/@walletconnect/ethereum-provider@2.23.10?bundle');
+    const EthereumProvider = providerModule.EthereumProvider || providerModule.default?.EthereumProvider || providerModule.default;
+    manualProvider = await EthereumProvider.init(initOptions);
+    log('WalletConnect provider RPC config', summarizeManualRpcConfig());
     log('WalletConnect EthereumProvider created', snapshot());
     manualProvider.on('display_uri', (uri) => void presentManualPairingUri(uri));
     manualProvider.on('connect', (event) => log('manual provider connect event', {
         chainId: event?.chainId || manualProvider.chainId || null
     }));
+    manualProvider.on('connect', () => logManualSettledNamespaces('manual namespaces on provider connect'));
     manualProvider.on('accountsChanged', (accounts) => {
         manualAccount = accounts?.[0] || null;
         log('manual accountsChanged', { address: manualAccount });
+        logManualSettledNamespaces('manual namespaces after accountsChanged');
         updateStatus();
     });
     manualProvider.on('chainChanged', (chainId) => {
-        manualChainId = parseChainId(chainId) || EXPECTED_CHAIN_ID;
+        manualChainId = parseChainId(chainId);
         log('manual chainChanged', { chainId: manualChainId });
         updateStatus();
     });
@@ -492,17 +580,42 @@ async function initializeCoreManual() {
             return;
         }
         const attemptId = ++connectAttempt;
-        log('manual connect entered', { attemptId, account: snapshot() });
+        const connectOptions = strict ? {
+            chains: [EXPECTED_CHAIN_ID],
+            optionalChains: [],
+            rpcMap
+        } : undefined;
+        log('manual connect entered', {
+            attemptId,
+            account: snapshot(),
+            requestedNamespaces: strict ? {
+                required: {
+                    eip155: {
+                        chains: [`eip155:${EXPECTED_CHAIN_ID}`],
+                        methods: STRICT_METHODS,
+                        events: STRICT_EVENTS
+                    }
+                },
+                optional: {}
+            } : 'provider defaults',
+            connectOptions: strict ? {
+                chains: connectOptions.chains,
+                optionalChains: connectOptions.optionalChains,
+                rpcMap: connectOptions.rpcMap
+            } : 'provider defaults',
+            providerRpcConfig: summarizeManualRpcConfig()
+        });
         void logSessionMarkers('manual session markers before connect');
         scheduleSessionChecks(attemptId);
         connectButton.disabled = true;
         connectButton.textContent = 'Waiting for WalletConnect session';
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Manual WalletConnect session timed out after 120 seconds')), 120000));
         try {
-            await Promise.race([manualProvider.connect(), timeout]);
+            await Promise.race([manualProvider.connect(connectOptions), timeout]);
             manualAccount = manualProvider.accounts?.[0] || null;
-            manualChainId = parseChainId(manualProvider.chainId) || EXPECTED_CHAIN_ID;
+            manualChainId = parseChainId(manualProvider.chainId);
             log('manual connect resolved', snapshot());
+            logManualSettledNamespaces('manual namespaces after connect resolved');
             updateStatus();
         } catch (error) {
             log('manual connect rejected or timed out', describeError(error));
@@ -515,7 +628,7 @@ async function initializeCoreManual() {
 
 async function initializeBare() {
     const { createAppKit, WagmiAdapter, baseSepolia } = await loadBareModules();
-    resetLatestDiagnosticStorage();
+    resetDiagnosticStorage();
     const networks = [baseSepolia];
     configuredNetwork = baseSepolia;
     const includeRedirect = variant === 'legacy-redirect' || variant === 'aligned';
@@ -616,7 +729,7 @@ log('test page boot', { layer, variant, origin: window.location.origin, online: 
 try {
     if (layer === 'wrapper') await initializeWrapper(false);
     else if (layer === 'auth') await initializeWrapper(true);
-    else if (variant === 'core-manual') await initializeCoreManual();
+    else if (isManualVariant()) await initializeCoreManual();
     else await initializeBare();
 } catch (error) {
     log('initialization failed', describeError(error));

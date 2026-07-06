@@ -29,6 +29,11 @@
         .wallet-test-manual-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
         .wallet-test-manual-action { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px; border: 1px solid var(--c-accent); border-radius: 10px; color: var(--c-text); background: var(--c-bg); text-decoration: none; font: inherit; font-weight: 700; cursor: pointer; }
         .wallet-test-manual-action:disabled, .wallet-test-manual-action[aria-disabled="true"] { opacity: 0.55; pointer-events: none; }
+        .wallet-test-precondition { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--c-border); border-radius: 10px; background: var(--c-bg); text-align: left; }
+        .wallet-test-precondition[hidden] { display: none; }
+        .wallet-test-network-values { margin: 0; padding-left: 18px; color: var(--c-text-muted); font-size: 0.78rem; line-height: 1.5; }
+        .wallet-test-confirm { display: flex; align-items: flex-start; gap: 8px; color: var(--c-text); font-size: 0.82rem; font-weight: 700; }
+        .wallet-test-confirm input { width: 18px; height: 18px; margin: 0; accent-color: var(--c-accent); }
         #walletTestLog { min-height: 52vh; max-height: 62vh; overflow: auto; margin: 0; padding: 10px; border: 1px solid var(--c-border); border-radius: 10px; color: var(--c-text); background: var(--c-bg); white-space: pre-wrap; overflow-wrap: anywhere; font: 0.72rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     </style>
 </head>
@@ -44,13 +49,28 @@
                 <a class="wallet-test-variant" data-wallet-variant="aligned" href="?walletdebug=1&amp;variant=aligned">Aligned 1.7.11</a>
                 <a class="wallet-test-variant" data-wallet-variant="no-redirect" href="?walletdebug=1&amp;variant=no-redirect">No redirect</a>
                 <a class="wallet-test-variant" data-wallet-variant="latest" href="?walletdebug=1&amp;variant=latest">AppKit 1.8.21</a>
-                <a class="wallet-test-variant wallet-test-variant-wide" data-wallet-variant="core-manual" href="?walletdebug=1&amp;variant=core-manual">WalletConnect manual URI</a>
+                <a class="wallet-test-variant" data-wallet-variant="core-manual" href="?walletdebug=1&amp;variant=core-manual">WalletConnect manual URI</a>
+                <a class="wallet-test-variant" data-wallet-variant="core-strict" href="?walletdebug=1&amp;variant=core-strict">Strict Base Sepolia</a>
             </nav>
         </section>
         <button id="walletTestConnect" type="button">Connect with bare AppKit</button>
         <section id="walletManualPanel" class="wallet-test-card wallet-test-manual" hidden>
             <h2 class="wallet-test-manual-title">Manual WalletConnect pairing</h2>
             <p id="walletManualStatus" class="wallet-test-note">Tap Connect to create a private pairing URI.</p>
+            <div id="walletStrictPrecondition" class="wallet-test-precondition" hidden>
+                <p class="wallet-test-note">Before pairing, add and select Base Sepolia in MetaMask Mobile:</p>
+                <ul class="wallet-test-network-values">
+                    <li>Network: Base Sepolia</li>
+                    <li>RPC: https://sepolia.base.org</li>
+                    <li>Chain ID: 84532</li>
+                    <li>Currency: ETH</li>
+                    <li>Explorer: https://sepolia-explorer.base.org</li>
+                </ul>
+                <label class="wallet-test-confirm" for="walletStrictReady">
+                    <input id="walletStrictReady" type="checkbox">
+                    <span>I added and selected Base Sepolia (84532) in MetaMask Mobile.</span>
+                </label>
+            </div>
             <canvas id="walletManualQr" class="wallet-test-qr" aria-label="WalletConnect pairing QR code"></canvas>
             <div class="wallet-test-manual-actions">
                 <button id="walletCopyUri" class="wallet-test-manual-action" type="button" disabled>Copy private URI</button>
@@ -60,6 +80,6 @@
         </section>
         <pre id="walletTestLog" aria-live="polite"></pre>
     </main>
-    <script type="module" src="wallet-test.js?v=4"></script>
+    <script type="module" src="wallet-test.js?v=5"></script>
 </body>
 </html>
