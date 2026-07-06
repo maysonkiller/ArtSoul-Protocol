@@ -21,6 +21,10 @@ let manualProvider = null;
 let manualPairingUri = null;
 let manualAccount = null;
 let manualChainId = EXPECTED_CHAIN_ID;
+let configuredNetwork = null;
+let latestNetworkSyncAttempts = 0;
+let latestNetworkSyncInFlight = false;
+let latestStorageReset = false;
 let connectAttempt = 0;
 let socketSequence = 0;
 let activeAppKitVersion = layer === 'bare'
@@ -197,6 +201,23 @@ function scheduleSessionChecks(attemptId) {
     });
 }
 
+function resetLatestDiagnosticStorage() {
+    if (variant !== 'latest') return;
+    const matchesDiagnosticWalletState = (key) => /wagmi|wallet|wc@|walletconnect|w3m|appkit|reown/i.test(key);
+    const removed = [];
+    for (const storage of [localStorage, sessionStorage]) {
+        Object.keys(storage).filter(matchesDiagnosticWalletState).forEach((key) => {
+            storage.removeItem(key);
+            removed.push(key.split(':').slice(0, 3).join(':'));
+        });
+    }
+    latestStorageReset = true;
+    log('latest diagnostic storage reset', {
+        removedCount: removed.length,
+        removedPrefixes: [...new Set(removed)].slice(0, 12)
+    });
+}
+
 function snapshot(account = modal?.getAccount?.()) {
     if (variant === 'core-manual') {
         return {
@@ -233,7 +254,9 @@ function updateStatus(account) {
         `Variant: ${variant}`,
         `AppKit: ${activeAppKitVersion}`,
         `Networks: ${activeNetworksVersion}`,
+        `Configured network: eip155:${EXPECTED_CHAIN_ID}`,
         `redirectIncluded: ${activeRedirectIncluded}`,
+        ...(variant === 'latest' ? [`freshWalletState: ${latestStorageReset}`] : []),
         `Origin: ${window.location.origin}`,
         'Project: 9fdc...58f2',
         `Account: ${maskAddress(current.address) || 'none'}`,
@@ -261,7 +284,11 @@ function bindLifecycle() {
 }
 
 function subscribeToModal() {
-    modal?.subscribeAccount?.((account) => { log('subscribeAccount', snapshot(account)); updateStatus(account); });
+    modal?.subscribeAccount?.((account) => {
+        log('subscribeAccount', snapshot(account));
+        updateStatus(account);
+        if (variant === 'latest' && account?.isConnected) void syncLatestNetwork('connected account update', account);
+    });
     modal?.subscribeState?.((state) => log('subscribeState', {
         open: state?.open ?? null,
         view: state?.view || state?.openModalView || null,
@@ -278,6 +305,58 @@ function subscribeToModal() {
         }));
     } else {
         log('AppKit event subscription unavailable');
+    }
+}
+
+async function syncLatestNetwork(reason, account = modal?.getAccount?.()) {
+    if (variant !== 'latest' || !configuredNetwork || typeof modal?.switchNetwork !== 'function') return;
+    const stateBefore = modal.getState?.() || {};
+    const actualChainId = parseChainId(account?.chainId || account?.caipAddress);
+    const selectedChainId = parseChainId(account?.selectedNetworkId || stateBefore.selectedNetworkId);
+    if (selectedChainId === EXPECTED_CHAIN_ID && (!actualChainId || actualChainId === EXPECTED_CHAIN_ID)) {
+        log('latest network already synchronized', { reason, actualChainId, selectedChainId });
+        return;
+    }
+    if (latestNetworkSyncInFlight) {
+        log('latest network sync skipped while in flight', { reason, actualChainId, selectedChainId });
+        return;
+    }
+    if (latestNetworkSyncAttempts >= 2) {
+        log('latest network sync hard cap reached', { reason, actualChainId, selectedChainId });
+        return;
+    }
+    latestNetworkSyncAttempts += 1;
+    latestNetworkSyncInFlight = true;
+    log('latest network sync started', {
+        reason,
+        attempt: latestNetworkSyncAttempts,
+        actualChainId,
+        selectedChainId,
+        targetChainId: configuredNetwork.id,
+        targetCaipNetworkId: configuredNetwork.caipNetworkId || `eip155:${configuredNetwork.id}`
+    });
+    try {
+        await modal.switchNetwork(configuredNetwork);
+        const accountAfter = modal.getAccount?.() || {};
+        const stateAfter = modal.getState?.() || {};
+        const afterActualChainId = parseChainId(accountAfter.chainId || accountAfter.caipAddress);
+        const afterSelectedChainId = parseChainId(accountAfter.selectedNetworkId || stateAfter.selectedNetworkId);
+        log('latest network sync completed', {
+            reason,
+            afterActualChainId,
+            afterSelectedChainId,
+            modalOpen: stateAfter.open ?? null,
+            modalView: stateAfter.view || stateAfter.openModalView || null
+        });
+        updateStatus(accountAfter);
+        if (afterActualChainId === EXPECTED_CHAIN_ID && afterSelectedChainId === EXPECTED_CHAIN_ID && stateAfter.open) {
+            await modal.close?.();
+            log('latest synchronized Switch Network modal closed', snapshot());
+        }
+    } catch (error) {
+        log('latest network sync failed', describeError(error));
+    } finally {
+        latestNetworkSyncInFlight = false;
     }
 }
 
@@ -436,7 +515,9 @@ async function initializeCoreManual() {
 
 async function initializeBare() {
     const { createAppKit, WagmiAdapter, baseSepolia } = await loadBareModules();
+    resetLatestDiagnosticStorage();
     const networks = [baseSepolia];
+    configuredNetwork = baseSepolia;
     const includeRedirect = variant === 'legacy-redirect' || variant === 'aligned';
     activeRedirectIncluded = includeRedirect;
     const metadata = {
@@ -452,17 +533,29 @@ async function initializeBare() {
         expectedChainId: EXPECTED_CHAIN_ID,
         metadataUrl: metadata.url,
         redirectIncluded: includeRedirect,
+        configuredNetwork: {
+            id: baseSepolia.id,
+            name: baseSepolia.name,
+            testnet: baseSepolia.testnet ?? null,
+            chainNamespace: baseSepolia.chainNamespace || null,
+            caipNetworkId: baseSepolia.caipNetworkId || null
+        },
         projectIdFingerprint: '9fdc...58f2'
     });
     const adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID });
+    log('Wagmi adapter chains', {
+        chains: (adapter.wagmiConfig?.chains || []).map((chain) => ({ id: chain.id, name: chain.name, testnet: chain.testnet ?? null }))
+    });
     modal = createAppKit({
         adapters: [adapter], networks, defaultNetwork: baseSepolia, projectId: PROJECT_ID,
         metadata,
-        themeMode: 'dark', enableWalletConnect: true, enableInjected: true, enableAuthMode: false, debug: true,
+        themeMode: 'dark', enableWalletConnect: true, enableInjected: true, enableAuthMode: false,
+        enableNetworkSwitch: true, allowUnsupportedChain: false, debug: true,
         features: { email: false, socials: [] }
     });
     log('bare AppKit created', snapshot());
     subscribeToModal();
+    if (variant === 'latest') await syncLatestNetwork('post initialization');
     connectButton.addEventListener('click', async () => {
         const attemptId = ++connectAttempt;
         log('Connect click entered', { attemptId, account: snapshot() });
