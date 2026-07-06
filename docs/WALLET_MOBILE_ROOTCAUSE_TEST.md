@@ -72,8 +72,10 @@ Open Reown Dashboard, select the project whose public Project ID matches the val
 3. Domain entries contain only scheme plus hostname. Do not include `/index.html`, `/wallet-test.html`, query strings, or a trailing page path.
 4. The page log reports `metadataUrl` equal to the browser origin.
 5. The page log reports `projectIdPresent: true` without displaying the Project ID.
+   It must also report the verified project fingerprint `9fdc...58f2`.
 6. The configured AppKit and Wagmi networks are Base Sepolia only, chain ID `84532`, with Base Sepolia as `defaultNetwork`.
 7. Test once on Wi-Fi and once on cellular data with VPN, DNS filtering, and iCloud Private Relay disabled. Relay lookup or WebSocket errors point to network reachability rather than ArtSoul code.
+8. For the controlled connect-only test, set Dashboard -> AppKit Features -> `Social & Email` to OFF and `Reown Authentication` to OFF. ArtSoul uses its own deferred Supabase authentication and does not instantiate Reown SIWX. This also prevents a dashboard authentication feature from being confused with the wallet connection test.
 
 Reown documents an origin mismatch as `APKT002 Invalid App Configuration`, an invalid ID as `APKT007`, an unavailable/blocked relay as a connection or request timeout, and requires `metadata.url` to match the current domain and subdomain.
 
