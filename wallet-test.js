@@ -1,16 +1,24 @@
-import { createAppKit } from 'https://esm.sh/@reown/appkit@1.7.11?bundle';
-import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.7.11?bundle';
-import { baseSepolia } from 'https://esm.sh/@reown/appkit/networks?bundle';
-
 const PROJECT_ID = '9fdc97f91c02d46a28ca9d185a9e58f2';
 const EXPECTED_CHAIN_ID = 84532;
 const startedAt = Date.now();
-const layer = new URLSearchParams(window.location.search).get('layer') || 'bare';
+const params = new URLSearchParams(window.location.search);
+const layer = params.get('layer') || 'bare';
+const requestedVariant = params.get('variant') || 'legacy-redirect';
+const variant = ['legacy-redirect', 'aligned', 'no-redirect', 'latest'].includes(requestedVariant)
+    ? requestedVariant
+    : 'legacy-redirect';
 const logElement = document.getElementById('walletTestLog');
 const statusElement = document.getElementById('walletTestStatus');
 const connectButton = document.getElementById('walletTestConnect');
 let sequence = 0;
 let modal = null;
+let connectAttempt = 0;
+let activeAppKitVersion = layer === 'bare' ? (variant === 'latest' ? '1.8.21' : '1.7.11') : 'ArtSoul wrapper';
+let activeNetworksVersion = variant === 'legacy-redirect' ? 'unversioned' : activeAppKitVersion;
+const NativeWebSocket = window.WebSocket;
+const nativeFetch = window.fetch.bind(window);
+const nativeConsoleWarn = console.warn.bind(console);
+const nativeConsoleError = console.error.bind(console);
 
 function maskAddress(value) {
     const address = String(value || '');
@@ -53,15 +61,111 @@ function log(step, detail = null) {
     console.log('[WalletIsolationTest]', step, sanitize(detail));
 }
 
+function describeNetworkUrl(value) {
+    try {
+        const url = new URL(String(value));
+        return `${url.protocol}//${url.host}${url.pathname}`;
+    } catch {
+        return String(value || '').split('?')[0];
+    }
+}
+
+function isDiagnosticNetwork(value) {
+    return /walletconnect|reown|web3modal|w3m|esm\.sh/i.test(String(value || ''));
+}
+
+function instrumentTransport() {
+    const formatConsoleValue = (value) => {
+        const text = value instanceof Error
+            ? `${value.name}: ${value.message}`
+            : typeof value === 'string'
+                ? value
+                : (() => { try { return JSON.stringify(value); } catch { return String(value); } })();
+        return text
+            .replace(/wc:[^\s"']+/gi, 'wc:[redacted]')
+            .replace(/([?&](?:projectId|symKey|relay-protocol)=[^&\s"']+)/gi, '?[redacted]');
+    };
+    console.warn = (...values) => {
+        nativeConsoleWarn(...values);
+        log('SDK console.warn', { message: values.map(formatConsoleValue).join(' ').slice(0, 1200) });
+    };
+    console.error = (...values) => {
+        nativeConsoleError(...values);
+        log('SDK console.error', { message: values.map(formatConsoleValue).join(' ').slice(0, 1200) });
+    };
+
+    window.fetch = async (input, init) => {
+        const rawUrl = typeof input === 'string' ? input : input?.url;
+        const shouldLog = isDiagnosticNetwork(rawUrl);
+        if (shouldLog) log('HTTP request', { url: describeNetworkUrl(rawUrl), method: init?.method || 'GET' });
+        try {
+            const response = await nativeFetch(input, init);
+            if (shouldLog) log('HTTP response', { url: describeNetworkUrl(rawUrl), status: response.status, ok: response.ok });
+            return response;
+        } catch (error) {
+            if (shouldLog) log('HTTP error', { url: describeNetworkUrl(rawUrl), error: describeError(error) });
+            throw error;
+        }
+    };
+
+    class DiagnosticWebSocket extends NativeWebSocket {
+        constructor(url, protocols) {
+            if (protocols === undefined) super(url);
+            else super(url, protocols);
+            const safeUrl = describeNetworkUrl(url);
+            log('WebSocket created', { url: safeUrl });
+            this.addEventListener('open', () => log('WebSocket open', { url: safeUrl }));
+            this.addEventListener('error', () => log('WebSocket error', { url: safeUrl, readyState: this.readyState }));
+            this.addEventListener('close', (event) => log('WebSocket close', {
+                url: safeUrl,
+                code: event.code,
+                reason: event.reason || null,
+                wasClean: event.wasClean
+            }));
+        }
+    }
+    window.WebSocket = DiagnosticWebSocket;
+}
+
+async function logSessionMarkers(label) {
+    const summarizeKeys = (storage) => {
+        const matching = Object.keys(storage).filter((key) => /wallet|wc@|walletconnect|w3m|appkit/i.test(key));
+        return {
+            count: matching.length,
+            prefixes: [...new Set(matching.map((key) => key.split(':').slice(0, 3).join(':')).slice(0, 8))]
+        };
+    };
+    const localMarkers = summarizeKeys(localStorage);
+    const sessionMarkers = summarizeKeys(sessionStorage);
+    let databases = [];
+    try {
+        databases = typeof indexedDB.databases === 'function'
+            ? (await indexedDB.databases()).map((database) => database.name).filter((name) => /wallet|wc|w3m|appkit/i.test(name || ''))
+            : [];
+    } catch (error) {
+        log('storage marker read failed', describeError(error));
+    }
+    log(label, { localMarkers, sessionMarkers, indexedDbNames: databases, account: snapshot() });
+}
+
+function scheduleSessionChecks(attemptId) {
+    [10000, 30000, 60000].forEach((delay) => {
+        setTimeout(() => {
+            if (attemptId !== connectAttempt) return;
+            void logSessionMarkers(`session check +${delay / 1000}s`);
+        }, delay);
+    });
+}
+
 function snapshot(account = modal?.getAccount?.()) {
     const state = modal?.getState?.() || {};
     const address = account?.address || account?.allAccounts?.[0]?.address || null;
     return {
-        address,
+        address: maskAddress(address),
         status: account?.status || null,
         isConnected: account?.isConnected ?? null,
         chainId: account?.chainId ?? null,
-        caipAddress: account?.caipAddress || null,
+        caipAddress: String(account?.caipAddress || '').replace(/0x[a-f0-9]{40}/gi, (value) => maskAddress(value)) || null,
         selectedNetworkId: account?.selectedNetworkId ?? state.selectedNetworkId ?? null,
         resolvedChainId: parseChainId(account?.chainId || account?.caipAddress || account?.selectedNetworkId || state.selectedNetworkId),
         modalOpen: state.open ?? null,
@@ -73,6 +177,9 @@ function updateStatus(account) {
     const current = snapshot(account);
     statusElement.textContent = [
         `Layer: ${layer}`,
+        `Variant: ${variant}`,
+        `AppKit: ${activeAppKitVersion}`,
+        `Networks: ${activeNetworksVersion}`,
         `Origin: ${window.location.origin}`,
         'Project: 9fdc...58f2',
         `Account: ${maskAddress(current.address) || 'none'}`,
@@ -103,26 +210,70 @@ function subscribeToModal() {
         providerAvailable: Boolean(providerState?.walletProvider?.request || providerState?.provider?.request || providerState?.request),
         chainId: providerState?.chainId || providerState?.provider?.chainId || providerState?.walletProvider?.chainId || null
     }));
+    if (typeof modal?.subscribeEvents === 'function') {
+        modal.subscribeEvents((event) => log('AppKit event', {
+            type: event?.type || event?.event || event?.name || 'unknown',
+            category: event?.data?.event || event?.data?.type || null
+        }));
+    } else {
+        log('AppKit event subscription unavailable');
+    }
+}
+
+async function loadBareModules() {
+    const version = variant === 'latest' ? '1.8.21' : '1.7.11';
+    const networksVersion = variant === 'legacy-redirect' ? 'unversioned' : version;
+    const networksUrl = networksVersion === 'unversioned'
+        ? 'https://esm.sh/@reown/appkit/networks?bundle'
+        : `https://esm.sh/@reown/appkit@${networksVersion}/networks?bundle`;
+    activeAppKitVersion = version;
+    activeNetworksVersion = networksVersion;
+    log('loading bare AppKit modules', { version, networksVersion, variant });
+    const [appKitModule, adapterModule, networkModule] = await Promise.all([
+        import(`https://esm.sh/@reown/appkit@${version}?bundle`),
+        import(`https://esm.sh/@reown/appkit-adapter-wagmi@${version}?bundle`),
+        import(networksUrl)
+    ]);
+    return {
+        createAppKit: appKitModule.createAppKit,
+        WagmiAdapter: adapterModule.WagmiAdapter,
+        baseSepolia: networkModule.baseSepolia
+    };
 }
 
 async function initializeBare() {
+    const { createAppKit, WagmiAdapter, baseSepolia } = await loadBareModules();
     const networks = [baseSepolia];
-    log('bare init', { appKitVersion: '1.7.11', expectedChainId: EXPECTED_CHAIN_ID, metadataUrl: window.location.origin, projectIdFingerprint: '9fdc...58f2' });
+    const includeRedirect = variant === 'legacy-redirect' || variant === 'aligned';
+    const metadata = {
+        name: 'ArtSoul Wallet Test',
+        description: 'Isolated WalletConnect diagnostic',
+        url: window.location.origin,
+        icons: [`${window.location.origin}/ARTSOULlogo-clean.png`]
+    };
+    if (includeRedirect) metadata.redirect = { universal: window.location.href.split('#')[0] };
+    log('bare init', {
+        appKitVersion: activeAppKitVersion,
+        variant,
+        expectedChainId: EXPECTED_CHAIN_ID,
+        metadataUrl: metadata.url,
+        redirectIncluded: includeRedirect,
+        projectIdFingerprint: '9fdc...58f2'
+    });
     const adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID });
     modal = createAppKit({
         adapters: [adapter], networks, defaultNetwork: baseSepolia, projectId: PROJECT_ID,
-        metadata: {
-            name: 'ArtSoul Wallet Test', description: 'Isolated WalletConnect diagnostic',
-            url: window.location.origin, icons: [`${window.location.origin}/ARTSOULlogo-clean.png`],
-            redirect: { universal: window.location.href.split('#')[0] }
-        },
-        themeMode: 'dark', enableWalletConnect: true, enableInjected: true, enableAuthMode: false,
+        metadata,
+        themeMode: 'dark', enableWalletConnect: true, enableInjected: true, enableAuthMode: false, debug: true,
         features: { email: false, socials: [] }
     });
     log('bare AppKit created', snapshot());
     subscribeToModal();
     connectButton.addEventListener('click', async () => {
-        log('Connect click entered', snapshot());
+        const attemptId = ++connectAttempt;
+        log('Connect click entered', { attemptId, account: snapshot() });
+        void logSessionMarkers('session markers before connect');
+        scheduleSessionChecks(attemptId);
         connectButton.disabled = true;
         const retryGuard = setTimeout(() => {
             connectButton.disabled = false;
@@ -144,6 +295,8 @@ async function initializeBare() {
 }
 
 async function initializeWrapper(withAuth) {
+    activeAppKitVersion = 'ArtSoul wrapper 1.7.11';
+    activeNetworksVersion = 'unversioned';
     if (withAuth) {
         log('loading supabase-client module');
         await import('/supabase-client.js?wallettest=1');
@@ -169,7 +322,8 @@ async function initializeWrapper(withAuth) {
 }
 
 bindLifecycle();
-log('test page boot', { layer, origin: window.location.origin, online: navigator.onLine, effectiveType: navigator.connection?.effectiveType || null, userAgent: navigator.userAgent });
+instrumentTransport();
+log('test page boot', { layer, variant, origin: window.location.origin, online: navigator.onLine, effectiveType: navigator.connection?.effectiveType || null, userAgent: navigator.userAgent });
 try {
     if (layer === 'wrapper') await initializeWrapper(false);
     else if (layer === 'auth') await initializeWrapper(true);
