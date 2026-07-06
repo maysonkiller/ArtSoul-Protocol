@@ -13,7 +13,11 @@
         .wallet-test-card { padding: 14px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-surface); }
         .wallet-test-title { margin: 0 0 6px; font-size: 1.15rem; }
         .wallet-test-note { margin: 0; color: var(--c-text-muted); font-size: 0.84rem; }
-        #walletTestStatus { margin-top: 10px; white-space: pre-wrap; font: 0.78rem/1.45 ui-monospace, monospace; }
+        .wallet-test-config-title { margin: 14px 0 5px; color: var(--c-text); font-size: 0.84rem; font-weight: 700; }
+        #walletTestStatus { margin: 0; white-space: pre-wrap; font: 0.78rem/1.45 ui-monospace, monospace; }
+        .wallet-test-variants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+        .wallet-test-variant { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 10px; border: 1px solid var(--c-border); border-radius: 10px; color: var(--c-text); background: var(--c-bg); text-align: center; text-decoration: none; font-size: 0.8rem; font-weight: 700; }
+        .wallet-test-variant:hover, .wallet-test-variant:focus-visible, .wallet-test-variant[aria-current="page"] { border-color: var(--c-accent); outline: none; box-shadow: 0 0 0 1px var(--c-accent); }
         #walletTestConnect { width: 100%; min-height: 48px; border: 1px solid var(--c-accent); border-radius: 10px; color: var(--c-text); background: var(--c-surface); font: inherit; font-weight: 700; cursor: pointer; }
         #walletTestConnect:disabled { opacity: 0.65; cursor: wait; }
         #walletTestLog { min-height: 52vh; max-height: 62vh; overflow: auto; margin: 0; padding: 10px; border: 1px solid var(--c-border); border-radius: 10px; color: var(--c-text); background: var(--c-bg); white-space: pre-wrap; overflow-wrap: anywhere; font: 0.72rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -24,11 +28,18 @@
         <section class="wallet-test-card">
             <h1 class="wallet-test-title">Wallet connection isolation test</h1>
             <p class="wallet-test-note">This page is excluded from navigation. The default layer runs bare AppKit without ArtSoul services.</p>
+            <div class="wallet-test-config-title">Active configuration</div>
             <div id="walletTestStatus">Starting...</div>
+            <nav class="wallet-test-variants" aria-label="Diagnostic variants">
+                <a class="wallet-test-variant" data-wallet-variant="legacy-redirect" href="?walletdebug=1&amp;variant=legacy-redirect">Legacy redirect</a>
+                <a class="wallet-test-variant" data-wallet-variant="aligned" href="?walletdebug=1&amp;variant=aligned">Aligned 1.7.11</a>
+                <a class="wallet-test-variant" data-wallet-variant="no-redirect" href="?walletdebug=1&amp;variant=no-redirect">No redirect</a>
+                <a class="wallet-test-variant" data-wallet-variant="latest" href="?walletdebug=1&amp;variant=latest">AppKit 1.8.21</a>
+            </nav>
         </section>
         <button id="walletTestConnect" type="button">Connect with bare AppKit</button>
         <pre id="walletTestLog" aria-live="polite"></pre>
     </main>
-    <script type="module" src="wallet-test.js?v=1"></script>
+    <script type="module" src="wallet-test.js?v=2"></script>
 </body>
 </html>

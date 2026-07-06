@@ -15,6 +15,9 @@ let modal = null;
 let connectAttempt = 0;
 let activeAppKitVersion = layer === 'bare' ? (variant === 'latest' ? '1.8.21' : '1.7.11') : 'ArtSoul wrapper';
 let activeNetworksVersion = variant === 'legacy-redirect' ? 'unversioned' : activeAppKitVersion;
+let activeRedirectIncluded = layer === 'bare'
+    ? variant === 'legacy-redirect' || variant === 'aligned'
+    : true;
 const NativeWebSocket = window.WebSocket;
 const nativeFetch = window.fetch.bind(window);
 const nativeConsoleWarn = console.warn.bind(console);
@@ -180,11 +183,19 @@ function updateStatus(account) {
         `Variant: ${variant}`,
         `AppKit: ${activeAppKitVersion}`,
         `Networks: ${activeNetworksVersion}`,
+        `redirectIncluded: ${activeRedirectIncluded}`,
         `Origin: ${window.location.origin}`,
         'Project: 9fdc...58f2',
         `Account: ${maskAddress(current.address) || 'none'}`,
         `Chain: ${current.resolvedChainId || 'unknown'}${current.resolvedChainId === EXPECTED_CHAIN_ID ? ' (Base Sepolia)' : ''}`
     ].join('\n');
+}
+
+function markActiveVariant() {
+    document.querySelectorAll('[data-wallet-variant]').forEach((link) => {
+        if (link.dataset.walletVariant === variant && layer === 'bare') link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+    });
 }
 
 function bindLifecycle() {
@@ -245,6 +256,7 @@ async function initializeBare() {
     const { createAppKit, WagmiAdapter, baseSepolia } = await loadBareModules();
     const networks = [baseSepolia];
     const includeRedirect = variant === 'legacy-redirect' || variant === 'aligned';
+    activeRedirectIncluded = includeRedirect;
     const metadata = {
         name: 'ArtSoul Wallet Test',
         description: 'Isolated WalletConnect diagnostic',
@@ -323,6 +335,8 @@ async function initializeWrapper(withAuth) {
 
 bindLifecycle();
 instrumentTransport();
+markActiveVariant();
+updateStatus();
 log('test page boot', { layer, variant, origin: window.location.origin, online: navigator.onLine, effectiveType: navigator.connection?.effectiveType || null, userAgent: navigator.userAgent });
 try {
     if (layer === 'wrapper') await initializeWrapper(false);
