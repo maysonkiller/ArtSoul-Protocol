@@ -4,17 +4,37 @@ const startedAt = Date.now();
 const params = new URLSearchParams(window.location.search);
 const layer = params.get('layer') || 'bare';
 const requestedVariant = params.get('variant') || 'legacy-redirect';
-const variant = ['legacy-redirect', 'aligned', 'no-redirect', 'latest'].includes(requestedVariant)
+const variant = ['legacy-redirect', 'aligned', 'no-redirect', 'latest', 'core-manual'].includes(requestedVariant)
     ? requestedVariant
     : 'legacy-redirect';
 const logElement = document.getElementById('walletTestLog');
 const statusElement = document.getElementById('walletTestStatus');
 const connectButton = document.getElementById('walletTestConnect');
+const manualPanel = document.getElementById('walletManualPanel');
+const manualStatus = document.getElementById('walletManualStatus');
+const manualQr = document.getElementById('walletManualQr');
+const copyUriButton = document.getElementById('walletCopyUri');
+const openMetaMaskLink = document.getElementById('walletOpenMetaMask');
 let sequence = 0;
 let modal = null;
+let manualProvider = null;
+let manualPairingUri = null;
+let manualAccount = null;
+let manualChainId = EXPECTED_CHAIN_ID;
 let connectAttempt = 0;
-let activeAppKitVersion = layer === 'bare' ? (variant === 'latest' ? '1.8.21' : '1.7.11') : 'ArtSoul wrapper';
-let activeNetworksVersion = variant === 'legacy-redirect' ? 'unversioned' : activeAppKitVersion;
+let socketSequence = 0;
+let activeAppKitVersion = layer === 'bare'
+    ? variant === 'latest'
+        ? '1.8.21'
+        : variant === 'core-manual'
+            ? 'none (EthereumProvider 2.23.10)'
+            : '1.7.11'
+    : 'ArtSoul wrapper';
+let activeNetworksVersion = variant === 'legacy-redirect'
+    ? 'unversioned'
+    : variant === 'core-manual'
+        ? 'Base Sepolia 84532'
+        : activeAppKitVersion;
 let activeRedirectIncluded = layer === 'bare'
     ? variant === 'legacy-redirect' || variant === 'aligned'
     : true;
@@ -115,15 +135,32 @@ function instrumentTransport() {
         constructor(url, protocols) {
             if (protocols === undefined) super(url);
             else super(url, protocols);
+            const socketId = ++socketSequence;
             const safeUrl = describeNetworkUrl(url);
-            log('WebSocket created', { url: safeUrl });
-            this.addEventListener('open', () => log('WebSocket open', { url: safeUrl }));
-            this.addEventListener('error', () => log('WebSocket error', { url: safeUrl, readyState: this.readyState }));
+            let sentFrames = 0;
+            let receivedFrames = 0;
+            const frameSize = (value) => value?.byteLength ?? value?.size ?? String(value ?? '').length;
+            const nativeSend = this.send.bind(this);
+            this.send = (data) => {
+                sentFrames += 1;
+                log('WebSocket send', { socketId, frame: sentFrames, bytes: frameSize(data), readyState: this.readyState });
+                return nativeSend(data);
+            };
+            log('WebSocket created', { socketId, url: safeUrl });
+            this.addEventListener('open', () => log('WebSocket open', { socketId, url: safeUrl }));
+            this.addEventListener('message', (event) => {
+                receivedFrames += 1;
+                log('WebSocket message', { socketId, frame: receivedFrames, bytes: frameSize(event.data) });
+            });
+            this.addEventListener('error', () => log('WebSocket error', { socketId, url: safeUrl, readyState: this.readyState }));
             this.addEventListener('close', (event) => log('WebSocket close', {
+                socketId,
                 url: safeUrl,
                 code: event.code,
                 reason: event.reason || null,
-                wasClean: event.wasClean
+                wasClean: event.wasClean,
+                sentFrames,
+                receivedFrames
             }));
         }
     }
@@ -161,6 +198,19 @@ function scheduleSessionChecks(attemptId) {
 }
 
 function snapshot(account = modal?.getAccount?.()) {
+    if (variant === 'core-manual') {
+        return {
+            address: maskAddress(manualAccount),
+            status: manualAccount ? 'connected' : 'disconnected',
+            isConnected: Boolean(manualAccount),
+            chainId: manualAccount ? manualChainId : null,
+            caipAddress: manualAccount ? `eip155:${manualChainId}:${maskAddress(manualAccount)}` : null,
+            selectedNetworkId: `eip155:${manualChainId}`,
+            resolvedChainId: manualChainId,
+            modalOpen: false,
+            modalView: 'manual-uri'
+        };
+    }
     const state = modal?.getState?.() || {};
     const address = account?.address || account?.allAccounts?.[0]?.address || null;
     return {
@@ -252,6 +302,138 @@ async function loadBareModules() {
     };
 }
 
+async function presentManualPairingUri(uri) {
+    manualPairingUri = uri;
+    const topic = String(uri).match(/^wc:([^@]+)/i)?.[1] || '';
+    manualStatus.textContent = `Private pairing URI ready (${topic.slice(0, 8)}...). Use one method below.`;
+    copyUriButton.disabled = false;
+    openMetaMaskLink.href = `https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`;
+    openMetaMaskLink.setAttribute('aria-disabled', 'false');
+    log('manual display_uri ready', { topicFingerprint: topic.slice(0, 8), uriLength: String(uri).length });
+    try {
+        const qrModule = await import('https://esm.sh/qrcode@1.5.4?bundle');
+        const qrCode = qrModule.default || qrModule;
+        const pageStyle = getComputedStyle(document.body);
+        const toHex = (color) => {
+            if (color.startsWith('#')) return color;
+            const channels = color.match(/[\d.]+/g)?.slice(0, 4).map(Number);
+            if (!channels || channels.length < 3) return null;
+            const rgb = channels.slice(0, 3).map((channel) => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, '0')).join('');
+            const alpha = channels.length === 4 ? Math.round(channels[3] * 255).toString(16).padStart(2, '0') : '';
+            return `#${rgb}${alpha}`;
+        };
+        const dark = toHex(pageStyle.color);
+        const light = toHex(pageStyle.backgroundColor);
+        const qrOptions = {
+            width: Math.min(280, Math.max(220, window.innerWidth - 80)),
+            margin: 2,
+            errorCorrectionLevel: 'M'
+        };
+        if (dark && light) qrOptions.color = { dark, light };
+        await qrCode.toCanvas(manualQr, uri, qrOptions);
+        manualQr.classList.add('is-ready');
+        log('manual QR rendered locally', { width: manualQr.width, height: manualQr.height });
+    } catch (error) {
+        log('manual QR render failed', describeError(error));
+        manualStatus.textContent += ' QR rendering failed; Copy URI and Open MetaMask remain available.';
+    }
+}
+
+function bindManualControls() {
+    copyUriButton.addEventListener('click', async () => {
+        if (!manualPairingUri) return;
+        try {
+            await navigator.clipboard.writeText(manualPairingUri);
+            copyUriButton.textContent = 'Private URI copied';
+            log('manual pairing URI copied', { uriLength: manualPairingUri.length });
+        } catch (error) {
+            log('manual pairing URI copy failed', describeError(error));
+            copyUriButton.textContent = 'Copy failed';
+        }
+    });
+    openMetaMaskLink.addEventListener('click', () => {
+        if (!manualPairingUri) return;
+        log('manual MetaMask universal link opened', { uriLength: manualPairingUri.length });
+    });
+}
+
+async function initializeCoreManual() {
+    activeAppKitVersion = 'none (EthereumProvider 2.23.10)';
+    activeNetworksVersion = 'Base Sepolia 84532';
+    activeRedirectIncluded = false;
+    manualPanel.hidden = false;
+    connectButton.textContent = 'Create manual pairing URI';
+    updateStatus();
+    log('loading WalletConnect EthereumProvider', {
+        providerVersion: '2.23.10',
+        expectedChainId: EXPECTED_CHAIN_ID,
+        metadataUrl: window.location.origin,
+        projectIdFingerprint: '9fdc...58f2'
+    });
+    const providerModule = await import('https://esm.sh/@walletconnect/ethereum-provider@2.23.10?bundle');
+    const EthereumProvider = providerModule.EthereumProvider || providerModule.default?.EthereumProvider || providerModule.default;
+    manualProvider = await EthereumProvider.init({
+        projectId: PROJECT_ID,
+        chains: [EXPECTED_CHAIN_ID],
+        showQrModal: false,
+        metadata: {
+            name: 'ArtSoul Wallet Test',
+            description: 'Isolated WalletConnect manual pairing diagnostic',
+            url: window.location.origin,
+            icons: [`${window.location.origin}/ARTSOULlogo-clean.png`]
+        }
+    });
+    log('WalletConnect EthereumProvider created', snapshot());
+    manualProvider.on('display_uri', (uri) => void presentManualPairingUri(uri));
+    manualProvider.on('connect', (event) => log('manual provider connect event', {
+        chainId: event?.chainId || manualProvider.chainId || null
+    }));
+    manualProvider.on('accountsChanged', (accounts) => {
+        manualAccount = accounts?.[0] || null;
+        log('manual accountsChanged', { address: manualAccount });
+        updateStatus();
+    });
+    manualProvider.on('chainChanged', (chainId) => {
+        manualChainId = parseChainId(chainId) || EXPECTED_CHAIN_ID;
+        log('manual chainChanged', { chainId: manualChainId });
+        updateStatus();
+    });
+    manualProvider.on('session_event', (event) => log('manual session_event', {
+        name: event?.params?.event?.name || event?.name || 'unknown'
+    }));
+    manualProvider.on('disconnect', (error) => {
+        manualAccount = null;
+        log('manual provider disconnect', error ? describeError(error) : null);
+        updateStatus();
+    });
+    bindManualControls();
+    connectButton.addEventListener('click', async () => {
+        if (connectAttempt > 0 && !manualAccount) {
+            window.location.reload();
+            return;
+        }
+        const attemptId = ++connectAttempt;
+        log('manual connect entered', { attemptId, account: snapshot() });
+        void logSessionMarkers('manual session markers before connect');
+        scheduleSessionChecks(attemptId);
+        connectButton.disabled = true;
+        connectButton.textContent = 'Waiting for WalletConnect session';
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Manual WalletConnect session timed out after 120 seconds')), 120000));
+        try {
+            await Promise.race([manualProvider.connect(), timeout]);
+            manualAccount = manualProvider.accounts?.[0] || null;
+            manualChainId = parseChainId(manualProvider.chainId) || EXPECTED_CHAIN_ID;
+            log('manual connect resolved', snapshot());
+            updateStatus();
+        } catch (error) {
+            log('manual connect rejected or timed out', describeError(error));
+        } finally {
+            connectButton.disabled = Boolean(manualAccount);
+            connectButton.textContent = manualAccount ? 'WalletConnect session established' : 'Reload page to retry';
+        }
+    });
+}
+
 async function initializeBare() {
     const { createAppKit, WagmiAdapter, baseSepolia } = await loadBareModules();
     const networks = [baseSepolia];
@@ -341,6 +523,7 @@ log('test page boot', { layer, variant, origin: window.location.origin, online: 
 try {
     if (layer === 'wrapper') await initializeWrapper(false);
     else if (layer === 'auth') await initializeWrapper(true);
+    else if (variant === 'core-manual') await initializeCoreManual();
     else await initializeBare();
 } catch (error) {
     log('initialization failed', describeError(error));

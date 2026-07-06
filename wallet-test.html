@@ -18,8 +18,17 @@
         .wallet-test-variants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
         .wallet-test-variant { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 10px; border: 1px solid var(--c-border); border-radius: 10px; color: var(--c-text); background: var(--c-bg); text-align: center; text-decoration: none; font-size: 0.8rem; font-weight: 700; }
         .wallet-test-variant:hover, .wallet-test-variant:focus-visible, .wallet-test-variant[aria-current="page"] { border-color: var(--c-accent); outline: none; box-shadow: 0 0 0 1px var(--c-accent); }
+        .wallet-test-variant-wide { grid-column: 1 / -1; }
         #walletTestConnect { width: 100%; min-height: 48px; border: 1px solid var(--c-accent); border-radius: 10px; color: var(--c-text); background: var(--c-surface); font: inherit; font-weight: 700; cursor: pointer; }
         #walletTestConnect:disabled { opacity: 0.65; cursor: wait; }
+        .wallet-test-manual { display: grid; gap: 10px; text-align: center; }
+        .wallet-test-manual[hidden] { display: none; }
+        .wallet-test-manual-title { margin: 0; font-size: 1rem; }
+        .wallet-test-qr { display: none; width: min(280px, 100%); height: auto; margin: 0 auto; border: 8px solid var(--c-surface); border-radius: 10px; background: var(--c-surface); }
+        .wallet-test-qr.is-ready { display: block; }
+        .wallet-test-manual-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .wallet-test-manual-action { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px; border: 1px solid var(--c-accent); border-radius: 10px; color: var(--c-text); background: var(--c-bg); text-decoration: none; font: inherit; font-weight: 700; cursor: pointer; }
+        .wallet-test-manual-action:disabled, .wallet-test-manual-action[aria-disabled="true"] { opacity: 0.55; pointer-events: none; }
         #walletTestLog { min-height: 52vh; max-height: 62vh; overflow: auto; margin: 0; padding: 10px; border: 1px solid var(--c-border); border-radius: 10px; color: var(--c-text); background: var(--c-bg); white-space: pre-wrap; overflow-wrap: anywhere; font: 0.72rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     </style>
 </head>
@@ -35,11 +44,22 @@
                 <a class="wallet-test-variant" data-wallet-variant="aligned" href="?walletdebug=1&amp;variant=aligned">Aligned 1.7.11</a>
                 <a class="wallet-test-variant" data-wallet-variant="no-redirect" href="?walletdebug=1&amp;variant=no-redirect">No redirect</a>
                 <a class="wallet-test-variant" data-wallet-variant="latest" href="?walletdebug=1&amp;variant=latest">AppKit 1.8.21</a>
+                <a class="wallet-test-variant wallet-test-variant-wide" data-wallet-variant="core-manual" href="?walletdebug=1&amp;variant=core-manual">WalletConnect manual URI</a>
             </nav>
         </section>
         <button id="walletTestConnect" type="button">Connect with bare AppKit</button>
+        <section id="walletManualPanel" class="wallet-test-card wallet-test-manual" hidden>
+            <h2 class="wallet-test-manual-title">Manual WalletConnect pairing</h2>
+            <p id="walletManualStatus" class="wallet-test-note">Tap Connect to create a private pairing URI.</p>
+            <canvas id="walletManualQr" class="wallet-test-qr" aria-label="WalletConnect pairing QR code"></canvas>
+            <div class="wallet-test-manual-actions">
+                <button id="walletCopyUri" class="wallet-test-manual-action" type="button" disabled>Copy private URI</button>
+                <a id="walletOpenMetaMask" class="wallet-test-manual-action" href="#" aria-disabled="true">Open MetaMask</a>
+            </div>
+            <p class="wallet-test-note">The pairing URI contains a temporary secret. Do not share the QR or copied URI publicly.</p>
+        </section>
         <pre id="walletTestLog" aria-live="polite"></pre>
     </main>
-    <script type="module" src="wallet-test.js?v=2"></script>
+    <script type="module" src="wallet-test.js?v=3"></script>
 </body>
 </html>
