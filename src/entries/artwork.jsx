@@ -341,6 +341,26 @@ const { useState, useEffect, useRef } = React;
                     fallback;
             }
 
+            function getArtworkWriteChainId() {
+                const explicitChainId = Number(
+                    artwork?.chain_id || artwork?.chainId || v41CompositeId?.chainId || 0
+                );
+                if (Number.isSafeInteger(explicitChainId) && explicitChainId > 0) return explicitChainId;
+                if (artwork?.network === 'baseSepolia') return 84532;
+                if (artwork?.network === 'sepolia') return 11155111;
+                return null;
+            }
+
+            function ensureArtworkWriteEnabled() {
+                const artworkChainId = getArtworkWriteChainId();
+                const legacyNetwork = artwork?.network === 'sepolia' || artworkChainId === 11155111;
+                if (legacyNetwork || (!artworkChainId && artwork?.network !== 'baseSepolia')) {
+                    alert('This artwork is on a legacy network. On-chain actions are disabled for now.');
+                    return false;
+                }
+                return true;
+            }
+
             function requiredDepositForBidWei(value) {
                 const bidWei = parseEthToWei(value);
                 if (!bidWei || bidWei <= 0n) return 0n;
@@ -388,6 +408,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function handleWithdrawDeposit() {
+                if (!ensureArtworkWriteEnabled()) return;
                 if (!beginTransactionAction('withdraw-deposit')) return;
 
                 try {
@@ -1470,6 +1491,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function placeBidOnce() {
+                if (!ensureArtworkWriteEnabled()) return;
                 const minimumBidDetails = calculateMinimumBidDetails(auction);
                 const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
                 const creatorAddress = artwork?.creator_id || artwork?.creator;
@@ -1524,54 +1546,7 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     await window.ArtSoulContracts.init(provider);
-
-                    // Check if user is on the correct network
-                    const currentNetwork = window.ArtSoulContracts.currentNetwork;
-                    const artworkNetwork = artwork.network || 'sepolia'; // Default to sepolia for old artworks
-
-                    if (currentNetwork !== artworkNetwork) {
-                        const networkNames = {
-                            'sepolia': 'Ethereum Sepolia',
-                            'baseSepolia': 'Base Sepolia'
-                        };
-
-                        // Ask user to switch network
-                        if (await confirmAuctionAction(
-                            `This artwork is on ${networkNames[artworkNetwork] || artworkNetwork}.\n\nSwitch to ${networkNames[artworkNetwork] || artworkNetwork} network?`,
-                            'Switch Network'
-                        )) {
-                            try {
-                                const networkChainIds = {
-                                    'sepolia': 11155111,
-                                    'baseSepolia': 84532
-                                };
-                                const targetChainId = networkChainIds[artworkNetwork];
-                                if (!targetChainId || !window.switchArtSoulNetwork) {
-                                    throw new Error('Network switch helper is not available');
-                                }
-
-                                const switched = await window.switchArtSoulNetwork(targetChainId);
-                                if (!switched) return;
-
-                                const refreshedProvider = await window.web3Modal?.getWalletProvider() || provider;
-                                await window.ArtSoulContracts.init(refreshedProvider);
-                                if (window.ArtSoulContracts.currentNetwork !== artworkNetwork) {
-                                    throw new Error('Wallet did not confirm the requested network');
-                                }
-
-                                // Retry bid
-                                await window.ArtSoulContracts.placeBid(auctionActionId, bidAmount);
-                            } catch (switchError) {
-                                console.error('Network switch before bid failed:', switchError);
-                                alert('Could not switch networks. Please switch to the correct network in your wallet and try again.');
-                                return;
-                            }
-                        } else {
-                            return;
-                        }
-                    } else {
-                        await window.ArtSoulContracts.placeBid(auctionActionId, bidAmount);
-                    }
+                    await window.ArtSoulContracts.placeBid(auctionActionId, bidAmount);
 
                     alert('Bid placed successfully!');
                     await refreshLiveBidActivity();
@@ -1637,6 +1612,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function handleConfirmNewAuction() {
+                if (!ensureArtworkWriteEnabled()) return;
                 if (!beginTransactionAction('create-auction')) return;
 
                 try {
@@ -1711,6 +1687,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function endAuctionOnce() {
+                if (!ensureArtworkWriteEnabled()) return;
                 const confirmed = await confirmAuctionAction(
                     'Finalize this expired auction? If it has bids, the winner settlement window will open. If it has no bids, the creator can create a new auction.',
                     'End Expired Auction'
@@ -1879,6 +1856,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function settleAuctionOnce() {
+                if (!ensureArtworkWriteEnabled()) return;
                 const auctionActionId = getAuctionActionId();
                 if (!auctionActionId) {
                     alert('Auction ID is unavailable');
@@ -1943,6 +1921,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function purchaseResaleOnce() {
+                if (!ensureArtworkWriteEnabled()) return;
                 if (!artwork.blockchain_id) {
                     alert('Blockchain ID not found');
                     return;
