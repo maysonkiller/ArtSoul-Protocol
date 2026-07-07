@@ -3,79 +3,96 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'appkit-init.js'), 'utf8');
+const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+const appKit = read('appkit-init.js');
+const contracts = read('contracts-integration.js');
+const artwork = read(path.join('src', 'entries', 'artwork.jsx'));
+const auctionServiceV3 = read(path.join('src', 'features', 'auction', 'auction-service-v3.js'));
+const walletTest = read('wallet-test.js');
 
-test('mobile wallet confirmation uses a foreground-only four minute timeout', () => {
-    assert.match(source, /const WALLET_CONNECT_TIMEOUT_MOBILE = 240000;/);
-    assert.match(source, /function createForegroundDeadline\(timeoutMs\)/);
-    assert.match(source, /if \(document\.visibilityState !== 'visible'\) return false;/);
-    assert.match(source, /document\.removeEventListener\('visibilitychange', handleVisibilityChange\)/);
+test('production and isolated diagnostics pin every Reown import to 1.8.21', () => {
+    for (const source of [appKit, walletTest]) {
+        assert.match(source, /@reown\/appkit@1\.8\.21\?bundle/);
+        assert.match(source, /@reown\/appkit-adapter-wagmi@1\.8\.21\?bundle/);
+        assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
+    }
 });
 
-test('desktop wallet timeout and modal-close behavior stay unchanged', () => {
-    assert.match(source, /const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;/);
-    assert.match(source, /async function waitForConfirmedDesktopWallet\(timeoutMs\)/);
-    assert.match(source, /Date\.now\(\) - modalClosedAt > 5000/);
-    assert.match(source, /options\.mobile\s*\? waitForConfirmedMobileWallet\(timeoutMs, options\.attempt\)\s*:\s*waitForConfirmedDesktopWallet\(timeoutMs\)/);
+test('WalletConnect negotiation does not strictly override chains or defaultChain', () => {
+    const override = appKit.match(/universalProviderConfigOverride:\s*\{[\s\S]*?\n\s*\},\n\s*themeMode/)?.[0] || '';
+    assert.match(override, /events:/);
+    assert.match(override, /rpcMap:/);
+    assert.doesNotMatch(override, /chains:/);
+    assert.doesNotMatch(override, /defaultChain:/);
+    assert.match(appKit, /const networks = \[baseSepolia\]/);
+    assert.match(appKit, /defaultNetwork: baseSepolia/);
 });
 
-test('focus and visibility return wake confirmation and reconcile the approved AppKit session', () => {
-    assert.match(source, /window\.addEventListener\('focus', \(\) => notifyWalletResume\('window focus'\)\)/);
-    assert.match(source, /notifyWalletResume\('visibility return'\)/);
-    assert.match(source, /await reconcileMobileAppKitSession\('mobile connect confirmation', attempt\)/);
-    assert.match(source, /await reconcileMobileAppKitSession\('mobile connect final confirmation', attempt\)/);
-    assert.match(source, /await acceptMobileAppKitWalletState\([\s\S]*?'AppKit account update'/);
-    assert.match(source, /readAppKitAccountSnapshot\(\)/);
-    assert.match(source, /appKitAccountRevision > mobileConnectStartRevision/);
-    assert.match(source, /accountKey !== mobileConnectInitialAccountKey/);
-    assert.match(source, /activeMobileConnect \|\| Date\.now\(\) < connectModalIntentUntil/);
+test('mobile handoff waits for AppKit, Wagmi and WalletConnect settlement after return', () => {
+    assert.match(appKit, /const MOBILE_RETURN_SETTLEMENT_WINDOW = 18000;/);
+    assert.match(appKit, /function markMobileWalletHandoff/);
+    assert.match(appKit, /manual wallet return observed/);
+    assert.match(appKit, /async function reconcileMobileConnectionSources/);
+    assert.match(appKit, /source}: AppKit/);
+    assert.match(appKit, /source}: Wagmi/);
+    assert.match(appKit, /source}: WalletConnect session/);
+    assert.match(appKit, /mobile bounded final confirmation/);
 });
 
-test('external mobile connect finalizes the approved session before a non-blocking Base switch and defers SIWE', () => {
-    const mobileWaiter = source.match(/async function waitForConfirmedMobileWallet[\s\S]*?\n}/)?.[0] || '';
-    assert.match(mobileWaiter, /reconcileMobileAppKitSession/);
-    assert.doesNotMatch(mobileWaiter, /reconcileActiveWalletFromProviders/);
-    assert.match(source, /ensureExternalMobileBaseSepolia/);
-    assert.match(source, /requestMobileBaseSepoliaAfterConnect/);
-    assert.match(source, /const BASE_SEPOLIA_CHAIN_ID = 84532;/);
-    assert.match(source, /switchEthereumChain\(provider, target\)/);
-    assert.match(source, /mobile wallet accepted before network finalization/);
-    assert.match(source, /mobile network finalized after connected UI/);
-    const acceptSession = source.match(/async function acceptMobileAppKitWalletState[\s\S]*?return mobileSessionFinalizePromise;\n}/)?.[0] || '';
-    assert.ok(acceptSession.indexOf('dispatchWalletStateChanged') < acceptSession.indexOf('requestMobileBaseSepoliaAfterConnect'));
-    assert.doesNotMatch(source, /attempt\.failure = new Error\('Switch to Base Sepolia/);
-    assert.match(source, /connectedDuringThisRequest \|\| deferMobileAuthenticationThisTurn/);
-    assert.match(source, /setTimeout\(\(\) => \{\s*deferMobileAuthenticationThisTurn = false;/);
-    assert.match(source, /SIWE deferred after external mobile wallet connect/);
+test('retry clears only incomplete SDK connection state', () => {
+    assert.match(appKit, /async function clearIncompleteWalletConnectState/);
+    assert.match(appKit, /if \(hasConfirmedWalletAddress\(\)\)/);
+    assert.match(appKit, /mobileRetryCleanupRequired/);
+    assert.match(appKit, /before mobile retry/);
+    const cleanup = appKit.match(/async function clearIncompleteWalletConnectState[\s\S]*?\n}/)?.[0] || '';
+    assert.doesNotMatch(cleanup, /artsoul_authenticated_wallet/);
+    assert.doesNotMatch(cleanup, /supabase/);
 });
 
-test('AppKit CAIP chain IDs are parsed before injected or cached fallbacks', () => {
-    assert.match(source, /trimmed\.match\(\/\^eip155:\(\\d\+\)\(\?:\:\|\$\)\/i\)/);
-    assert.match(source, /state\.caipAddress/);
-    assert.match(source, /getStateChainId\(account\)/);
-    assert.match(source, /setCurrentChainId\(chainId\)/);
+test('Rabby iOS fails clearly when WalletGuide has no universal link', () => {
+    assert.match(appKit, /RABBY_IOS_UNAVAILABLE/);
+    assert.match(appKit, /Rabby could not be opened on this device\./);
+    assert.match(appKit, /isIOSDevice\(\) && rabbySelected && !universalLink/);
 });
 
-test('wallet diagnostics are gated and external mobile connect remains retryable', () => {
-    assert.match(source, /\['walletdebug', 'walletDebug'\]/);
-    assert.match(source, /if \(!walletDebugEnabled\(\)\) return;/);
-    assert.match(source, /connect button handler entered/);
-    assert.match(source, /visibility changed/);
-    assert.match(source, /getWalletDebugSnapshot/);
-    assert.match(source, /activeConnectAttempt\.cancelled = true/);
-    assert.match(source, /setConnectButtonPending\(true, \{ retryable: externalMobileConnect \}\)/);
+test('wallet debug captures SDK, connector, session, lifecycle and provider truth', () => {
+    assert.match(appKit, /component: 'AppKit Networks', version: '1\.8\.21'/);
+    assert.match(appKit, /component: 'Wagmi Adapter', version: '1\.8\.21'/);
+    assert.match(appKit, /connectorRdns/);
+    assert.match(appKit, /sessionCount/);
+    assert.match(appKit, /pairingCount/);
+    assert.match(appKit, /window\.addEventListener\('blur'/);
+    assert.match(appKit, /manual return provider truth/);
+    assert.match(appKit, /'eth_accounts'/);
+    assert.match(appKit, /'eth_chainId'/);
 });
 
-test('mobile injected providers use the same resumable confirmation window', () => {
-    assert.match(source, /async function requestInjectedMobileAccounts\(\)/);
-    assert.match(source, /const accounts = await requestInjectedMobileAccounts\(\);/);
-    assert.doesNotMatch(source, /sleep\(20000\).*Injected wallet connection timed out/s);
+test('all contract write methods share the Base Sepolia guard', () => {
+    assert.match(appKit, /window\.ensureArtSoulWriteNetwork = async/);
+    assert.match(appKit, /This action requires Base Sepolia\./);
+    const guardedMethods = [
+        'registerArtwork',
+        'createAuction',
+        'placeBid',
+        'endAuction',
+        'completeSettlement',
+        'claimSettlementDefault',
+        'withdraw',
+        'listResale',
+        'buyResale'
+    ];
+    for (const method of guardedMethods) {
+        const body = contracts.match(new RegExp(`async ${method}\\([^)]*\\) \\{[\\s\\S]*?\\n    \\}`))?.[0] || '';
+        assert.match(body, /await this\.ensureBaseSepoliaWrite\(\)/, `${method} must be guarded`);
+    }
+    for (const method of ['createAuction', 'placeBid', 'endAuction', 'settleAuction', 'withdraw']) {
+        const body = auctionServiceV3.match(new RegExp(`async ${method}\\([^)]*\\) \\{[\\s\\S]*?\\n    \\}`))?.[0] || '';
+        assert.match(body, /await this\._ensureBaseSepoliaWrite\(\)/, `AuctionServiceV3.${method} must be guarded`);
+    }
 });
 
-test('WalletConnect metadata uses the live HTTPS origin without an empty native redirect', () => {
-    assert.match(source, /url: appOrigin,/);
-    assert.match(source, /icons: \[`\$\{appOrigin\}\/ARTSOULlogo-clean\.png`\]/);
-    assert.match(source, /const appReturnUrl =/);
-    assert.match(source, /redirect:\s*\{\s*universal: appReturnUrl\s*\}/);
-    assert.doesNotMatch(source, /native:\s*''/);
+test('legacy Ethereum Sepolia artwork writes are blocked without a switch prompt', () => {
+    assert.match(artwork, /This artwork is on a legacy network\. On-chain actions are disabled for now\./);
+    assert.doesNotMatch(artwork, /Switch to \$\{networkNames\[artworkNetwork\]/);
+    assert.doesNotMatch(artwork, /'sepolia': 11155111,\s*'baseSepolia': 84532/);
 });

@@ -189,6 +189,33 @@ class ArtSoulContracts {
         }
     }
 
+    async ensureBaseSepoliaWrite() {
+        if (typeof window.ensureArtSoulWriteNetwork !== 'function') {
+            throw new Error('This action requires Base Sepolia.');
+        }
+
+        await window.ensureArtSoulWriteNetwork();
+        const rawProvider = await window.web3Modal?.getWalletProvider?.() || window.ethereum;
+        if (!rawProvider?.request) {
+            throw new Error('This action requires Base Sepolia.');
+        }
+
+        const networkProbe = new ethers.BrowserProvider(rawProvider);
+        const network = await networkProbe.getNetwork();
+        if (Number(network.chainId) !== CONTRACTS.baseSepolia.chainId) {
+            throw new Error('This action requires Base Sepolia.');
+        }
+
+        // Reads from legacy Ethereum Sepolia remain supported. Before any write,
+        // rebuild the signer/contracts against Base Sepolia after a successful switch.
+        if (this.currentNetwork !== 'baseSepolia') {
+            await this.init(rawProvider);
+        }
+        if (this.currentNetwork !== 'baseSepolia') {
+            throw new Error('This action requires Base Sepolia.');
+        }
+    }
+
     isZeroAddress(address) {
         return !address || address.toLowerCase() === ZERO_ADDRESS;
     }
@@ -310,6 +337,7 @@ class ArtSoulContracts {
     }
 
     async registerArtwork(metadataURI, options = {}) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const tx = await this.coreContract.registerArtwork(metadataURI);
         console.log('Registering artwork...', tx.hash);
@@ -331,6 +359,7 @@ class ArtSoulContracts {
     }
 
     async createAuction(artworkId, startingPriceEth, duration, options = {}) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const startPrice = this.parseEth(startingPriceEth);
         const durationSeconds = this.normalizeDuration(duration);
@@ -346,6 +375,7 @@ class ArtSoulContracts {
     }
 
     async placeBid(auctionOrArtworkId, bidAmountEth) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
         const bidAmount = this.parseEth(bidAmountEth);
@@ -357,6 +387,7 @@ class ArtSoulContracts {
     }
 
     async endAuction(auctionOrArtworkId) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
         const tx = await this.coreContract.endAuction(auctionId);
@@ -366,6 +397,7 @@ class ArtSoulContracts {
     }
 
     async completeSettlement(auctionOrArtworkId) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
         const auction = await this.getAuctionStruct(auctionId);
@@ -379,6 +411,7 @@ class ArtSoulContracts {
     }
 
     async claimSettlementDefault(auctionOrArtworkId) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
         const tx = await this.coreContract.claimSettlementDefault(auctionId);
@@ -388,6 +421,7 @@ class ArtSoulContracts {
     }
 
     async withdraw() {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const tx = await this.coreContract.withdraw();
         console.log('Withdrawing pending funds...', tx.hash);
@@ -487,6 +521,7 @@ class ArtSoulContracts {
     }
 
     async listResale(tokenOrArtworkId, priceEth) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const tokenId = await this.resolveTokenId(tokenOrArtworkId);
         const price = this.parseEth(priceEth);
@@ -510,6 +545,7 @@ class ArtSoulContracts {
     }
 
     async buyResale(tokenOrArtworkId, priceEth) {
+        await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const tokenId = await this.resolveTokenId(tokenOrArtworkId);
         const price = this.parseEth(priceEth);
