@@ -1138,18 +1138,18 @@ const { useState, useEffect, useRef } = React;
             return (
                 <div className={`min-h-screen ${bgClass} transition-all duration-500`}>
                     {/* Main Content */}
-                    <main className="site-page-container py-8">
+                    <main className="site-page-container profile-page-main py-8">
                         {/* Profile Header */}
-                        <div className={`profile-hero rounded-xl p-5 mb-5 ${
+                        <div className={`profile-hero ${editMode ? 'is-editing' : ''} rounded-xl p-5 mb-5 ${
                             isClassic
                                 ? 'bg-gray-800/50 border border-gray-700'
                                 : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30 neon-border'
                         }`}>
-                            <div className="flex items-start gap-5 flex-wrap">
+                            <div className="profile-identity-layout flex items-start gap-5 flex-wrap">
                                 {/* Avatar */}
-                                <div className="flex-shrink-0">
+                                <div className="profile-avatar-column flex-shrink-0">
                                     <div
-                                        className={`w-24 h-24 rounded-full overflow-hidden ${editMode ? 'cursor-pointer' : ''} ${
+                                        className={`profile-avatar-shell w-24 h-24 rounded-full overflow-hidden ${editMode ? 'cursor-pointer' : ''} ${
                                             isClassic
                                                 ? 'bg-gray-700 border-4 border-gray-600'
                                                 : 'bg-gradient-to-br from-purple-900 to-cyan-900 border-4 border-cyan-400 neon-border'
@@ -1182,7 +1182,7 @@ const { useState, useEffect, useRef } = React;
                                 </div>
 
                                 {/* Profile Info */}
-                                <div className="flex-1 min-w-0">
+                                <div className="profile-identity-copy flex-1 min-w-0">
                                     {editMode ? (
                                         <div className="space-y-4">
                                             <input
@@ -1303,7 +1303,7 @@ const { useState, useEffect, useRef } = React;
                                             }`}>
                                                 {profile?.bio || 'No bio yet'}
                                             </p>
-                                            <div className="flex gap-3 flex-wrap">
+                                            <div className="profile-social-links flex gap-3 flex-wrap">
                                                 {profile?.twitter_handle && (
                                                     <a
                                                         href={`https://twitter.com/${profile.twitter_handle.replace('@', '')}`}
@@ -1334,17 +1334,17 @@ const { useState, useEffect, useRef } = React;
                                                 )}
                                             </div>
                                             {discoveryProfile && (
-                                                <div className={`mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm ${
+                                                <div className={`profile-stat-grid mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm ${
                                                     isClassic ? 'text-gray-200' : 'text-cyan-100'
                                                 }`}>
-                                                    <div className={`p-3 rounded-lg ${
+                                                    <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
                                                         <div className="opacity-70 mb-1">Trust Weight</div>
                                                         <div className="text-xl font-bold">{discoveryProfile.trust.score}</div>
                                                         <div className="text-xs opacity-70">{discoveryProfile.trust.tier}</div>
                                                     </div>
-                                                    <div className={`p-3 rounded-lg ${
+                                                    <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-purple-900/20 border border-purple-500/30'
                                                     }`}>
                                                         <div className="opacity-70 mb-1">Genesis Status</div>
@@ -1355,7 +1355,7 @@ const { useState, useEffect, useRef } = React;
                                                             {discoveryProfile.genesisProgress.completed}/{discoveryProfile.genesisProgress.total} requirements
                                                         </div>
                                                     </div>
-                                                    <div className={`p-3 rounded-lg ${
+                                                    <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
                                                         <div className="opacity-70 mb-1">Discovery Influence</div>
@@ -1376,7 +1376,7 @@ const { useState, useEffect, useRef } = React;
                                         </p>
                                     )}
 
-                                    <div className="mt-4 flex gap-3 flex-wrap">
+                                    <div className="profile-actions mt-4 flex gap-3 flex-wrap">
                                         {editMode ? (
                                             <>
                                                 <button onClick={saveProfile} className="btn-main">
@@ -1404,7 +1404,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
 
                         {/* Gallery Tabs */}
-                        <div className={`rounded-xl p-6 mb-6 ${
+                        <div className={`profile-sections-nav rounded-xl p-6 mb-6 ${
                             isClassic
                                 ? 'bg-gray-800/50 border border-gray-700'
                                 : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30'
@@ -1414,7 +1414,7 @@ const { useState, useEffect, useRef } = React;
                             }`}>
                                 Profile Sections
                             </h2>
-                            <div className="flex flex-wrap gap-3">
+                            <div className="profile-section-tabs flex flex-wrap gap-3">
                                 {GALLERY_TYPES.map(gallery => (
                                     <button
                                         key={gallery.id}
@@ -1441,7 +1441,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
 
                         {/* Gallery Content */}
-                        <div className={`rounded-xl p-6 ${
+                        <div className={`profile-gallery-panel rounded-xl p-6 ${
                             isClassic
                                 ? 'bg-gray-800/50 border border-gray-700'
                                 : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30'

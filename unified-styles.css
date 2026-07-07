@@ -3909,7 +3909,7 @@ body.future .site-header {
    these classes so page-local legacy header rules cannot change geometry. */
 :root {
     --site-content-max: 1200px;
-    --site-gutter: clamp(12px, 2vw, 20px);
+    --site-gutter: clamp(16px, 2.5vw, 24px);
     --site-header-height: 77px;
 }
 
@@ -3927,7 +3927,7 @@ body {
 .site-header-shell {
     box-sizing: border-box;
     width: 100% !important;
-    max-width: calc(var(--site-content-max) + (2 * var(--site-gutter))) !important;
+    max-width: var(--site-content-max) !important;
     margin-right: auto !important;
     margin-left: auto !important;
     padding-right: var(--site-gutter) !important;
@@ -4005,6 +4005,10 @@ body.future .site-header {
 
 .site-header .logo-link {
     display: inline-flex;
+    width: 56px;
+    height: 56px;
+    align-items: center;
+    justify-content: center;
     min-height: 0;
     flex: 0 0 auto;
 }
@@ -4014,10 +4018,11 @@ body.classic .site-header .logo-link > .site-logo,
 body.future .site-header .logo-link > .site-logo,
 html.classic .site-header .logo-link > .site-logo,
 html.future .site-header .logo-link > .site-logo {
-    width: auto !important;
-    height: auto !important;
-    max-width: 58px !important;
+    width: 56px !important;
+    height: 56px !important;
+    max-width: 56px !important;
     max-height: 56px !important;
+    object-fit: contain !important;
 }
 
 .site-header #networkBadge:empty {
@@ -4120,12 +4125,12 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .upload-page-main.site-page-container {
-    max-width: calc(48rem + (2 * var(--site-gutter))) !important;
+    max-width: 48rem !important;
 }
 
 .artwork-page-shell.site-page-container,
 .protocol-docs-shell.site-page-container {
-    max-width: calc(var(--site-content-max) + (2 * var(--site-gutter))) !important;
+    max-width: var(--site-content-max) !important;
 }
 
 #homeSection,
@@ -4147,13 +4152,32 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     height: auto;
     flex-direction: column;
     align-items: center;
+    gap: 0;
     isolation: isolate;
 }
 
 #homeSection .home-hero h1,
 #homeSection .home-hero p {
+    position: relative;
+    margin-right: auto;
+    margin-left: auto;
     max-width: 100%;
     overflow-wrap: break-word;
+}
+
+#homeSection .home-hero-actions {
+    position: relative;
+    z-index: 1;
+}
+
+/* Profile composition hooks keep the React markup semantically stable while
+   allowing the same card to adapt without changing profile data or behavior. */
+.profile-identity-layout,
+.profile-identity-copy,
+.profile-stat-grid,
+.profile-sections-nav,
+.profile-gallery-panel {
+    min-width: 0;
 }
 
 #homeSection .home-spotlight,
@@ -4171,21 +4195,21 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
 @media (max-width: 768px) {
     :root {
-        --site-gutter: 12px;
-        --site-header-height: 57px;
+        --site-gutter: 14px;
+        --site-header-height: 55px;
     }
 
     .site-header {
-        min-height: 57px !important;
+        min-height: 55px !important;
     }
 
     .site-header-shell {
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
+        padding-top: 5px !important;
+        padding-bottom: 5px !important;
     }
 
     .site-header-row {
-        grid-template-columns: 42px minmax(0, 1fr) 56px;
+        grid-template-columns: 40px minmax(0, 1fr) 44px;
         min-height: 44px;
         gap: 0.5rem;
     }
@@ -4194,30 +4218,42 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         display: block !important;
     }
 
+    .site-header .logo-link {
+        width: 40px;
+        height: 40px;
+    }
+
     .site-header .site-logo,
     body.classic .site-header .logo-link > .site-logo,
     body.future .site-header .logo-link > .site-logo,
     html.classic .site-header .logo-link > .site-logo,
     html.future .site-header .logo-link > .site-logo {
-        max-width: 44px !important;
-        max-height: 42px !important;
+        width: 40px !important;
+        height: 40px !important;
+        max-width: 40px !important;
+        max-height: 40px !important;
     }
 
     .site-header #navButtons,
-    .site-header #navButtons .avatar-dropdown-container,
-    .site-header #navButtons .avatar-button {
-        width: 56px !important;
-        min-width: 56px !important;
-        max-width: 56px !important;
+    .site-header #navButtons .avatar-dropdown-container {
+        width: 44px !important;
+        min-width: 44px !important;
+        max-width: 44px !important;
         height: 44px !important;
         min-height: 44px !important;
         max-height: 44px !important;
     }
 
     .site-header #navButtons .avatar-button {
-        gap: 4px !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        max-width: 44px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
+        gap: 3px !important;
         justify-content: center !important;
-        padding: 5px 6px !important;
+        padding: 4px !important;
     }
 
     .site-header #navButtons .avatar-info {
@@ -4225,23 +4261,23 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header #navButtons .avatar-button > img {
-        width: 30px !important;
-        min-width: 30px !important;
-        max-width: 30px !important;
-        height: 30px !important;
-        min-height: 30px !important;
-        max-height: 30px !important;
-        flex-basis: 30px !important;
+        width: 27px !important;
+        min-width: 27px !important;
+        max-width: 27px !important;
+        height: 27px !important;
+        min-height: 27px !important;
+        max-height: 27px !important;
+        flex-basis: 27px !important;
     }
 
     .site-header #navButtons .dropdown-arrow {
-        width: 8px !important;
-        min-width: 8px !important;
-        max-width: 8px !important;
-        height: 8px !important;
-        min-height: 8px !important;
-        max-height: 8px !important;
-        flex-basis: 8px !important;
+        width: 7px !important;
+        min-width: 7px !important;
+        max-width: 7px !important;
+        height: 7px !important;
+        min-height: 7px !important;
+        max-height: 7px !important;
+        flex-basis: 7px !important;
     }
 
     #homeSection {
@@ -4249,33 +4285,182 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     #homeSection .home-hero {
-        margin-bottom: 1.25rem !important;
+        margin-bottom: 1.5rem !important;
+        padding-top: 0.15rem;
     }
 
     #homeSection .home-hero h1 {
-        font-size: clamp(1.75rem, 8vw, 2.15rem) !important;
-        line-height: 1.12;
+        margin-bottom: 0.65rem !important;
+        font-size: clamp(1.65rem, 7.4vw, 2rem) !important;
+        line-height: 1.1;
         text-wrap: balance;
     }
 
     #homeSection .home-hero p {
-        font-size: 0.95rem !important;
-        line-height: 1.45;
+        width: min(32rem, 92%);
+        margin-bottom: 0.9rem !important;
+        font-size: 0.85rem !important;
+        line-height: 1.4;
         text-wrap: balance;
     }
 
-    #homeSection .home-hero > .flex {
+    #homeSection .home-hero-actions {
         width: 100%;
-        gap: 0.65rem !important;
+        flex-wrap: nowrap !important;
+        gap: 0.6rem !important;
     }
 
     #homeSection .home-hero .btn-main,
     #homeSection .home-hero .btn-secondary {
         min-width: 0;
-        flex: 1 1 140px;
+        min-height: 42px;
+        flex: 1 1 0;
+        font-size: 0.86rem !important;
+        line-height: 1.15;
         padding-right: 0.75rem !important;
         padding-left: 0.75rem !important;
         white-space: normal;
+    }
+
+    #homeSection .home-spotlight {
+        margin-top: 0 !important;
+    }
+
+    #homeSection .home-spotlight > h2 {
+        margin-bottom: 1rem !important;
+        font-size: 1.35rem !important;
+        line-height: 1.2;
+    }
+
+    .profile-page-main {
+        padding-top: 0.9rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+
+    .profile-hero {
+        margin-bottom: 0.9rem !important;
+        padding: 0.85rem !important;
+    }
+
+    .profile-identity-layout {
+        display: grid !important;
+        grid-template-columns: 72px minmax(0, 1fr);
+        align-items: start !important;
+        gap: 0.8rem !important;
+    }
+
+    .profile-avatar-column,
+    .profile-avatar-shell {
+        width: 72px !important;
+        min-width: 72px !important;
+        max-width: 72px !important;
+    }
+
+    .profile-avatar-shell {
+        height: 72px !important;
+        min-height: 72px !important;
+        max-height: 72px !important;
+        border-width: 3px !important;
+    }
+
+    .profile-identity-copy h1 {
+        font-size: 1.18rem !important;
+        line-height: 1.15;
+    }
+
+    .profile-social-links {
+        gap: 0.45rem !important;
+    }
+
+    .profile-social-links > * {
+        min-width: 0;
+        padding: 0.35rem 0.55rem !important;
+        font-size: 0.75rem;
+    }
+
+    .profile-stat-grid {
+        grid-column: 1 / -1;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.55rem !important;
+        margin-top: 0.75rem !important;
+    }
+
+    .profile-stat-card {
+        min-width: 0;
+        padding: 0.65rem !important;
+    }
+
+    .profile-stat-card:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+
+    .profile-stat-card > div:first-child {
+        margin-bottom: 0.2rem !important;
+        font-size: 0.72rem;
+    }
+
+    .profile-stat-card > .text-xl,
+    .profile-stat-card > .text-lg {
+        font-size: 1rem !important;
+        line-height: 1.2;
+    }
+
+    .profile-actions {
+        grid-column: 1 / -1;
+        margin-top: 0.75rem !important;
+    }
+
+    .profile-actions .btn-main,
+    .profile-actions button {
+        min-height: 40px;
+        padding: 0.45rem 0.85rem !important;
+        font-size: 0.82rem;
+    }
+
+    .profile-sections-nav,
+    .profile-gallery-panel {
+        padding: 0.85rem !important;
+    }
+
+    .profile-sections-nav {
+        margin-bottom: 0.9rem !important;
+    }
+
+    .profile-sections-nav h2 {
+        margin-bottom: 0.7rem !important;
+        font-size: 1.15rem !important;
+    }
+
+    .profile-section-tabs {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem !important;
+    }
+
+    .profile-section-tabs > button {
+        min-width: 0;
+        min-height: 40px;
+        padding: 0.45rem 0.55rem !important;
+        font-size: 0.78rem;
+        line-height: 1.15;
+        transform: none !important;
+    }
+
+    .profile-gallery-panel > .flex:first-child {
+        margin-bottom: 0.85rem !important;
+    }
+
+    .profile-gallery-panel h3 {
+        font-size: 1rem !important;
+    }
+
+    .profile-hero.is-editing .profile-identity-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-hero.is-editing .profile-avatar-column {
+        justify-self: center;
     }
 
     .site-header *,
@@ -4283,5 +4468,11 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     .site-header *::after {
         animation: none !important;
         transition: none !important;
+    }
+}
+
+@media (max-width: 420px) {
+    #homeSection .home-hero-break {
+        display: none;
     }
 }
