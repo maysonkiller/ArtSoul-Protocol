@@ -3913,6 +3913,15 @@ body.future .site-header {
     --site-header-height: 77px;
 }
 
+/* Desktop uses the full available canvas while keeping the header and every
+   page on one responsive grid. Mobile retains its existing compact contract. */
+@media (min-width: 769px) {
+    :root {
+        --site-content-max: 1840px;
+        --site-gutter: clamp(20px, 1.5vw, 28px);
+    }
+}
+
 html,
 body {
     width: 100%;
