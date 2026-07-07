@@ -1,10 +1,15 @@
-import { createAppKit } from 'https://esm.sh/@reown/appkit@1.7.11?bundle';
-import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.7.11?bundle';
-import { baseSepolia } from 'https://esm.sh/@reown/appkit/networks?bundle';
+import { createAppKit } from 'https://esm.sh/@reown/appkit@1.8.21?bundle';
+import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.8.21?bundle';
+import { baseSepolia } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle';
 
 // Public Reown project identifier for the verified ArtSoul web project.
 const PROJECT_ID = '9fdc97f91c02d46a28ca9d185a9e58f2';
 const EXPECTED_CHAIN_ID = 84532;
+const BASE_SEPOLIA_CAIP_ID = 'eip155:84532';
+const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
+const customRpcUrls = {
+    [BASE_SEPOLIA_CAIP_ID]: [{ url: BASE_SEPOLIA_RPC_URL }]
+};
 const startedAt = Date.now();
 const params = new URLSearchParams(window.location.search);
 const layer = params.get('layer') || 'bare';
@@ -115,14 +120,16 @@ function bindLifecycleLogs() {
 
 async function initializeBareLayer() {
     log('bare imports ready', {
-        appKitVersion: '1.7.11',
+        appKitVersion: '1.8.21',
+        networksVersion: '1.8.21',
+        wagmiAdapterVersion: '1.8.21',
         expectedChainId: EXPECTED_CHAIN_ID,
         metadataUrl: window.location.origin,
         projectIdPresent: Boolean(PROJECT_ID),
         projectIdFingerprint: `${PROJECT_ID.slice(0, 4)}...${PROJECT_ID.slice(-4)}`
     });
     const networks = [baseSepolia];
-    const adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID });
+    const adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID, customRpcUrls });
     log('WagmiAdapter created', { networks: networks.map((network) => network.id) });
 
     modal = createAppKit({
@@ -130,6 +137,13 @@ async function initializeBareLayer() {
         networks,
         defaultNetwork: baseSepolia,
         projectId: PROJECT_ID,
+        customRpcUrls,
+        allowUnsupportedChain: false,
+        enableNetworkSwitch: false,
+        universalProviderConfigOverride: {
+            events: { eip155: ['chainChanged', 'accountsChanged'] },
+            rpcMap: { [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URL }
+        },
         metadata: {
             name: 'ArtSoul Wallet Test',
             description: 'Isolated WalletConnect diagnostic',
@@ -140,6 +154,7 @@ async function initializeBareLayer() {
         themeMode: 'dark',
         enableWalletConnect: true,
         enableInjected: true,
+        allWallets: 'SHOW',
         enableAuthMode: false,
         features: { email: false, socials: [] }
     });
@@ -193,7 +208,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=20');
+    await import('/appkit-init.js?v=21');
     log('ArtSoul appkit wrapper imported', {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function'
