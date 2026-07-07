@@ -3908,9 +3908,18 @@ body.future .site-header {
 /* Unified site boundary and primary header contract. All public MPA pages use
    these classes so page-local legacy header rules cannot change geometry. */
 :root {
-    --site-content-max: 1200px;
-    --site-gutter: clamp(16px, 2.5vw, 24px);
+    --site-content-max: 1360px;
+    --site-gutter: clamp(18px, 2.5vw, 32px);
     --site-header-height: 77px;
+}
+
+/* Desktop uses the full available canvas while keeping the header and every
+   page on one responsive grid. Mobile retains its existing compact contract. */
+@media (min-width: 769px) {
+    :root {
+        --site-content-max: 1840px;
+        --site-gutter: clamp(20px, 1.5vw, 28px);
+    }
 }
 
 html,
@@ -4125,7 +4134,15 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .upload-page-main.site-page-container {
-    max-width: 48rem !important;
+    max-width: var(--site-content-max) !important;
+}
+
+.upload-page-main > .upload-page-heading,
+.upload-page-main > .upload-form-stack {
+    width: 100%;
+    max-width: 48rem;
+    margin-right: auto;
+    margin-left: auto;
 }
 
 .artwork-page-shell.site-page-container,
@@ -4209,7 +4226,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header-row {
-        grid-template-columns: 40px minmax(0, 1fr) 44px;
+        grid-template-columns: 40px minmax(0, 1fr) 48px;
         min-height: 44px;
         gap: 0.5rem;
     }
@@ -4236,21 +4253,21 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .site-header #navButtons,
     .site-header #navButtons .avatar-dropdown-container {
-        width: 44px !important;
-        min-width: 44px !important;
-        max-width: 44px !important;
+        width: 48px !important;
+        min-width: 48px !important;
+        max-width: 48px !important;
         height: 44px !important;
         min-height: 44px !important;
         max-height: 44px !important;
     }
 
     .site-header #navButtons .avatar-button {
-        width: 44px !important;
-        min-width: 44px !important;
-        max-width: 44px !important;
-        height: 40px !important;
-        min-height: 40px !important;
-        max-height: 40px !important;
+        width: 48px !important;
+        min-width: 48px !important;
+        max-width: 48px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        max-height: 42px !important;
         gap: 3px !important;
         justify-content: center !important;
         padding: 4px !important;
@@ -4261,13 +4278,13 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header #navButtons .avatar-button > img {
-        width: 27px !important;
-        min-width: 27px !important;
-        max-width: 27px !important;
-        height: 27px !important;
-        min-height: 27px !important;
-        max-height: 27px !important;
-        flex-basis: 27px !important;
+        width: 29px !important;
+        min-width: 29px !important;
+        max-width: 29px !important;
+        height: 29px !important;
+        min-height: 29px !important;
+        max-height: 29px !important;
+        flex-basis: 29px !important;
     }
 
     .site-header #navButtons .dropdown-arrow {
@@ -4278,6 +4295,95 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         min-height: 7px !important;
         max-height: 7px !important;
         flex-basis: 7px !important;
+    }
+
+    /* Compact mobile account menu. Higher specificity intentionally wins over
+       the component's late-injected desktop defaults without changing JS. */
+    .site-header .avatar-dropdown-menu {
+        top: calc(100% + 0.35rem) !important;
+        width: min(184px, calc(100vw - 28px)) !important;
+        max-width: calc(100vw - 28px) !important;
+        max-height: calc(100dvh - var(--site-header-height) - 14px) !important;
+        padding: 0.3rem !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        border-radius: 0.65rem !important;
+        overscroll-behavior: contain;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-theme-section {
+        padding: 0.3rem !important;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-theme-label {
+        margin-bottom: 0.35rem !important;
+        font-size: 0.68rem !important;
+        line-height: 1.15 !important;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-theme-switch {
+        padding: 0.18rem !important;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-theme-switch .theme-btn {
+        min-height: 30px !important;
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.72rem !important;
+        line-height: 1.1 !important;
+    }
+
+    .site-header .avatar-dropdown-navigation {
+        padding: 0.1rem 0 !important;
+    }
+
+    .site-header .avatar-dropdown-menu .dropdown-item,
+    .site-header .avatar-dropdown-menu .network-switcher-btn,
+    .site-header .avatar-dropdown-menu button[onclick*="resetWalletConnection"] {
+        min-height: 36px !important;
+        gap: 0.45rem !important;
+        padding: 0.4rem 0.5rem !important;
+        border-radius: 0.42rem !important;
+        font-size: 0.78rem !important;
+        line-height: 1.15 !important;
+    }
+
+    .site-header .avatar-dropdown-menu .network-switcher-btn > img {
+        width: 20px !important;
+        min-width: 20px !important;
+        max-width: 20px !important;
+        height: 20px !important;
+        min-height: 20px !important;
+        max-height: 20px !important;
+        flex-basis: 20px !important;
+    }
+
+    .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name] {
+        font-size: 0.74rem !important;
+    }
+
+    .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-balance] {
+        font-size: 0.64rem !important;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-network-options {
+        gap: 0.15rem;
+        padding: 0.15rem 0 0.3rem 0.5rem;
+    }
+
+    .site-header .avatar-dropdown-menu .network-soon-badge {
+        padding: 0.12rem 0.3rem;
+        font-size: 0.56rem;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-dropdown-divider {
+        margin: 0.15rem 0 !important;
+    }
+
+    .site-header .avatar-dropdown-menu #connectBtn,
+    .site-header .avatar-dropdown-menu .btn-main#connectBtn {
+        min-height: 38px !important;
+        padding: 0.45rem 0.5rem !important;
+        font-size: 0.78rem !important;
     }
 
     #homeSection {
