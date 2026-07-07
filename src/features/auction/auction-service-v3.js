@@ -117,6 +117,7 @@ class AuctionServiceV3 {
     }
 
     async createAuction(signer, artworkId, startingPrice, duration) {
+        await this._ensureBaseSepoliaWrite();
         const contractWithSigner = this.contract.connect(signer);
         const tx = await contractWithSigner.createAuction(artworkId, startingPrice, duration);
         await tx.wait();
@@ -125,6 +126,7 @@ class AuctionServiceV3 {
     }
 
     async placeBid(signer, artworkId, bidAmount) {
+        await this._ensureBaseSepoliaWrite();
         const contractWithSigner = this.contract.connect(signer);
         const auction = await this._getAuctionByArtwork(artworkId);
         const deposit = await contractWithSigner.requiredDepositForBid(bidAmount);
@@ -135,6 +137,7 @@ class AuctionServiceV3 {
     }
 
     async endAuction(signer, artworkId) {
+        await this._ensureBaseSepoliaWrite();
         const contractWithSigner = this.contract.connect(signer);
         const auction = await this._getAuctionByArtwork(artworkId);
         const tx = await contractWithSigner.endAuction(auction.auctionId);
@@ -144,6 +147,7 @@ class AuctionServiceV3 {
     }
 
     async settleAuction(signer, artworkId) {
+        await this._ensureBaseSepoliaWrite();
         const contractWithSigner = this.contract.connect(signer);
         const auction = await this._getAuctionByArtwork(artworkId);
         const remaining = auction.raw.highestBid > auction.raw.depositLocked
@@ -156,6 +160,7 @@ class AuctionServiceV3 {
     }
 
     async withdraw(signer) {
+        await this._ensureBaseSepoliaWrite();
         const contractWithSigner = this.contract.connect(signer);
         const tx = await contractWithSigner.withdraw();
         await tx.wait();
@@ -164,6 +169,13 @@ class AuctionServiceV3 {
 
     async getPendingWithdrawal(address) {
         return await this.contract.pendingWithdrawals(address);
+    }
+
+    async _ensureBaseSepoliaWrite() {
+        if (typeof window.ensureArtSoulWriteNetwork !== 'function') {
+            throw new Error('This action requires Base Sepolia.');
+        }
+        await window.ensureArtSoulWriteNetwork();
     }
 
     async _getAuctionByArtwork(artworkId) {
