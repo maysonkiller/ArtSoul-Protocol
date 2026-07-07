@@ -1,5 +1,6 @@
 import { React, createRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
+import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 
@@ -274,7 +275,8 @@ const { useState, useEffect, useRef } = React;
             const [moderationMessage, setModerationMessage] = useState('');
             const [walletRenderState, setWalletRenderState] = useState(() => ({
                 settled: window.artsoulWalletStateSettled === true,
-                address: window.artsoulSettledWalletState?.address || window.currentWalletAddress || null
+                address: window.artsoulSettledWalletState?.address || window.currentWalletAddress || null,
+                chainId: Number(window.getCurrentChainId?.(window.artsoulSettledWalletState) || 0)
             }));
             const [timeLeft, setTimeLeft] = useState('');
             const [userVote, setUserVote] = useState(null);
@@ -300,6 +302,7 @@ const { useState, useEffect, useRef } = React;
                 amount: '0',
                 message: ''
             });
+            const [confirmedResaleListing, setConfirmedResaleListing] = useState(false);
             const bidPollInFlightRef = useRef(false);
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
@@ -473,7 +476,8 @@ const { useState, useEffect, useRef } = React;
                     const detail = event?.detail || window.artsoulSettledWalletState || {};
                     setWalletRenderState({
                         settled: window.artsoulWalletStateSettled === true,
-                        address: detail.isConnected === false ? null : (detail.address || window.currentWalletAddress || null)
+                        address: detail.isConnected === false ? null : (detail.address || window.currentWalletAddress || null),
+                        chainId: Number(window.getCurrentChainId?.(detail, window.artsoulSettledWalletState) || 0)
                     });
                 };
 
@@ -1920,6 +1924,92 @@ const { useState, useEffect, useRef } = React;
                 }
             }
 
+            async function handleListForResale() {
+                if (!beginTransactionAction('resale-list')) return;
+
+                try {
+                    await listForResaleOnce();
+                } finally {
+                    finishTransactionAction('resale-list');
+                }
+            }
+
+            async function listForResaleOnce() {
+                if (!ensureArtworkWriteEnabled()) return;
+
+                const walletAddress = connectedWalletAddress || window.currentWalletAddress || window.getCurrentWalletAddress?.();
+                if (!walletRenderState.settled || !walletAddress) {
+                    alert('Please connect your wallet');
+                    return;
+                }
+
+                const tokenId = artwork.token_id || artwork.tokenId;
+                if (!isArtworkMinted(artwork) || !hasProtocolId(tokenId)) {
+                    alert('Complete settlement and mint this NFT before listing it for resale.');
+                    return;
+                }
+
+                if (!isSameAddress(walletAddress, artwork.current_owner_address)) {
+                    alert('Only the current NFT owner can create a resale listing.');
+                    return;
+                }
+
+                const defaultPrice = firstDefined(
+                    artwork.floor_price,
+                    artwork.canonical_floor,
+                    artwork.final_price
+                );
+                const floorPrice = Number(defaultPrice || 0);
+                if (!Number.isFinite(floorPrice) || floorPrice <= 0) {
+                    alert('The canonical floor price is unavailable. Wait for the settlement projection to finish updating.');
+                    return;
+                }
+
+                const enteredPrice = prompt(
+                    `Resale price in ETH. Minimum canonical floor: ${defaultPrice} ETH`,
+                    String(defaultPrice)
+                );
+                if (enteredPrice === null) return;
+
+                const normalizedListingPrice = String(enteredPrice).trim();
+                const listingPrice = Number(normalizedListingPrice);
+                if (!Number.isFinite(listingPrice) || listingPrice < floorPrice) {
+                    alert(`Listing price must be at least the canonical floor of ${defaultPrice} ETH.`);
+                    return;
+                }
+
+                try {
+                    const provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider) {
+                        alert('Please connect your wallet');
+                        return;
+                    }
+
+                    await window.ArtSoulContracts.init(provider);
+                    const protocolArtworkId = artwork.blockchain_id || artwork.artwork_id;
+                    if (!hasProtocolId(protocolArtworkId)) {
+                        alert('Artwork ID is unavailable for resale listing.');
+                        return;
+                    }
+
+                    await window.ArtSoulContracts.listResale(
+                        protocolArtworkId,
+                        normalizedListingPrice
+                    );
+
+                    setConfirmedResaleListing(true);
+                    alert('NFT listed for resale. Public state will update shortly.');
+                    await loadArtwork();
+                } catch (error) {
+                    console.error('Resale listing failed:', error);
+                    const message = getTransactionErrorMessage(
+                        error,
+                        'The resale listing could not be created. Please try again.'
+                    );
+                    alert(`Resale listing failed: ${message}`);
+                }
+            }
+
             async function purchaseResaleOnce() {
                 if (!ensureArtworkWriteEnabled()) return;
                 if (!artwork.blockchain_id) {
@@ -2084,7 +2174,15 @@ const { useState, useEffect, useRef } = React;
             const mintedArtwork = isArtworkMinted(artwork) || auction?.state === 'SOLD';
             const awaitingPayment = auction?.state === 'WAITING_PAYMENT';
             const liveAuction = Boolean(auction && !auctionEnded && !awaitingPayment && !mintedArtwork);
-            const listedForResale = mintedArtwork && Number(artwork.sale_price || 0) > 0 && artwork.status === 'for_sale';
+            const resaleStatus = String(artwork.status || artwork.listing_status || artwork.resale_status || '').toLowerCase();
+            const listedForResale = mintedArtwork &&
+                Number(artwork.sale_price || artwork.listing_price || artwork.resale_price || 0) > 0 &&
+                ['for_sale', 'listed', 'resale_listed'].includes(resaleStatus);
+            const resaleFloorPrice = firstDefined(
+                artwork.floor_price,
+                artwork.canonical_floor,
+                artwork.final_price
+            );
             const startingPrice = firstDefined(auction?.startingPrice, artwork.start_price, artwork.creator_value, '0');
             const finalPrice = hasAuctionBids
                 ? currentHighestBid
@@ -2092,6 +2190,19 @@ const { useState, useEffect, useRef } = React;
             const winnerAddress = currentHighestBidder || artwork.auction_winner_address;
             const creatorAddress = artwork.creator_id || artwork.creator;
             const ownerAddress = artwork.current_owner_address;
+            const connectedWalletOwnsArtwork = walletRenderState.settled &&
+                isSameAddress(connectedWalletAddress, ownerAddress);
+            const resaleEligibility = getOwnerResaleEligibility({
+                walletSettled: walletRenderState.settled,
+                walletAddress: connectedWalletAddress,
+                walletChainId: walletRenderState.chainId,
+                currentOwnerAddress: ownerAddress,
+                minted: mintedArtwork,
+                tokenId: artwork.token_id || artwork.tokenId,
+                floorPrice: resaleFloorPrice,
+                activeListing: listedForResale || confirmedResaleListing,
+                activeAuction: liveAuction
+            });
             const tokenExplorerUrl = mintedArtwork ? getTokenExplorerUrl(artwork) : '';
             const statusForState = mintedArtwork
                 ? { key: 'sold', label: 'Sold' }
@@ -2716,8 +2827,37 @@ const { useState, useEffect, useRef } = React;
                                             </div>
                                         )}
 
-                                        {/* Resale purchase button (only after successful settlement/mint) */}
-                                        {listedForResale && (
+                                        {/* Resale actions (only after successful settlement/mint) */}
+                                        {resaleEligibility.showOwnerAction && (
+                                            <div className="artwork-auction-next-step mt-4">
+                                                <p>
+                                                    List this minted NFT at or above its canonical floor of {resaleFloorPrice || 'pending'} ETH.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleListForResale}
+                                                    className="btn-main w-full artwork-page-primary-action"
+                                                    disabled={!resaleEligibility.canList || isTransactionActionPending('resale-list')}
+                                                    aria-busy={isTransactionActionPending('resale-list')}
+                                                >
+                                                    {isTransactionActionPending('resale-list')
+                                                        ? <TransactionProcessingLabel />
+                                                        : resaleEligibility.reason === 'wrong_chain'
+                                                            ? 'Base Sepolia Required'
+                                                            : resaleEligibility.reason === 'floor_unavailable'
+                                                                ? 'Floor Price Loading'
+                                                                : 'List NFT'}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {listedForResale && connectedWalletOwnsArtwork && (
+                                            <div className="artwork-auction-next-step mt-4">
+                                                <p>Your NFT is already listed for {artwork.sale_price} ETH.</p>
+                                            </div>
+                                        )}
+
+                                        {listedForResale && !connectedWalletOwnsArtwork && (
                                             <div className="mt-6">
                                                 <button
                                                     onClick={handleDirectPurchase}
