@@ -6,6 +6,19 @@
 import { createAppKit } from 'https://esm.sh/@reown/appkit@1.8.21?bundle'
 import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.8.21?bundle'
 import { baseSepolia, base, mainnet } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle'
+// Mobile external browsers connect through the proven bare
+// @walletconnect/ethereum-provider path instead of the AppKit modal.
+import {
+    configureCoreWallet,
+    connectCoreWallet,
+    disconnectCoreWallet,
+    getConnectedCoreProvider,
+    isCoreConnectInFlight,
+    isCoreSessionActive,
+    restoreCoreSession,
+    showCoreWalletSheet,
+    waitForWalletChainSettle
+} from './wallet-core-connect.js?v=1'
 
 // ============================================
 // CONFIGURATION
@@ -69,6 +82,14 @@ const metadata = {
 const networkMap = {
     84532: { name: 'Base Sepolia', currency: 'ETH' }
 };
+
+// The core path shares the exact production metadata (including
+// redirect.universal) so wallets can return the user to this browser tab.
+configureCoreWallet({
+    projectId,
+    metadata,
+    log: (step, detail) => walletDebugLog(step, detail)
+});
 
 // ============================================
 // STATE
@@ -981,7 +1002,10 @@ function bindWalletConnectDiagnostics(provider, source = 'WalletConnect provider
 }
 
 async function restartWalletConnectTransport(source = 'browser return') {
-    if (!activeMobileConnect || isInjectedWalletBrowser()) return false;
+    // Restart during active mobile connects (v23 behavior) AND whenever a
+    // core session exists — its relay socket dies in the background on iOS
+    // and must be reopened before state is re-read.
+    if ((!activeMobileConnect && !isCoreSessionActive()) || isInjectedWalletBrowser()) return false;
     if (walletTransportRestartPromise) return walletTransportRestartPromise;
 
     walletTransportRestartPromise = (async () => {
@@ -2461,6 +2485,117 @@ async function openAppKitConnectModal(attempt) {
     }
 }
 
+// New production path for mobile external browsers: bare
+// @walletconnect/ethereum-provider + the ArtSoul wallet sheet. Desktop and
+// injected wallet browsers keep their existing flows.
+async function connectExternalMobileCoreWallet(attempt) {
+    walletDebugLog('core mobile connect started', { attemptId: attempt.id });
+    let sheet = null;
+    try {
+        const connectPromise = connectCoreWallet({
+            onDisplayUri: (uri) => {
+                lastWalletConnectUri = uri;
+                if (sheet) {
+                    sheet.update(uri);
+                    return;
+                }
+                sheet = showCoreWalletSheet({
+                    uri,
+                    isIOS: isIOSDevice(),
+                    log: (step, detail) => walletDebugLog(step, detail),
+                    onWalletOpened: (walletName) => {
+                        lastSelectedWallet = {
+                            id: null,
+                            name: walletName,
+                            rdns: null,
+                            nativeLink: null,
+                            universalLink: null,
+                            deepLinkAvailable: true
+                        };
+                        markMobileWalletHandoff(`core sheet ${walletName}`);
+                    },
+                    onCancel: () => {
+                        attempt.cancelled = true;
+                        notifyWalletResume('core sheet cancelled');
+                    }
+                });
+            }
+        });
+
+        const connected = await Promise.race([
+            connectPromise,
+            (async () => {
+                const deadline = Date.now() + WALLET_CONNECT_TIMEOUT_MOBILE;
+                while (Date.now() < deadline && !attempt.cancelled && !attempt.failure) {
+                    await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
+                }
+                return null;
+            })()
+        ]);
+        if (attempt.cancelled) return null;
+        if (attempt.failure) throw attempt.failure;
+        if (!connected?.address) {
+            throw createWalletConnectError(
+                'WALLET_CONNECT_TIMEOUT',
+                'Wallet connection was not confirmed. Please retry or open ArtSoul in your wallet browser.'
+            );
+        }
+
+        const coreProvider = connected.provider;
+        activeWalletProvider = coreProvider;
+        bindRuntimeProviderEvents(coreProvider, 'core walletconnect provider');
+        bindWalletConnectDiagnostics(coreProvider, 'core walletconnect provider');
+        bindCoreProviderDisconnect(coreProvider);
+        walletDebugLog('core session connected', {
+            address: maskWalletAddress(connected.address),
+            chainId: connected.chainId,
+            restored: connected.restored
+        });
+        sheet?.setStatus('Wallet connected. Confirming the network...');
+
+        // The wallet may follow up with chainChanged for its own active
+        // network right after settle (observed 84532 -> 8453). Wait for that
+        // signal before deciding whether the add/switch cycle is needed.
+        const settleSource = await waitForWalletChainSettle(coreProvider, 2500);
+        walletDebugLog('core chain settle window closed', { source: settleSource });
+        if (attempt.cancelled) return null;
+
+        const validated = await ensureExternalMobileBaseSepolia({
+            address: connected.address,
+            chainId: connected.chainId,
+            account: { address: connected.address, chainId: connected.chainId }
+        }, 'core walletconnect', attempt, coreProvider);
+        if (attempt.cancelled) return null;
+        if (!validated?.address) {
+            throw attempt.failure || createWalletConnectError(
+                'BASE_SEPOLIA_REQUIRED',
+                'Select Base Sepolia in your wallet and retry.'
+            );
+        }
+
+        await handleProviderChainConfirmed(validated.chainId, 'core walletconnect');
+        await handleProviderAccountsChanged([validated.address], 'core walletconnect', coreProvider);
+        walletDebugLog('core mobile connect complete', {
+            address: maskWalletAddress(validated.address),
+            chainId: validated.chainId
+        });
+        return validated.address;
+    } finally {
+        sheet?.close();
+    }
+}
+
+const boundCoreDisconnectProviders = new WeakSet();
+
+function bindCoreProviderDisconnect(provider) {
+    if (!provider?.on || boundCoreDisconnectProviders.has(provider)) return;
+    boundCoreDisconnectProviders.add(provider);
+    provider.on('disconnect', () => {
+        walletDebugLog('core session disconnect event', {});
+        void handleProviderAccountsChanged([], 'core walletconnect disconnect', provider);
+    });
+}
+
 function findWalletConnectUri(value, depth = 0, seen = new WeakSet()) {
     if (depth > 5 || value === null || value === undefined) return null;
     if (typeof value === 'string') return value.startsWith('wc:') ? value : null;
@@ -2539,6 +2674,17 @@ window.safeConnectWallet = async () => {
     const mobileConnect = isMobileDevice();
     const injectedMobileConnect = mobileConnect && isInjectedWalletBrowser();
     const externalMobileConnect = mobileConnect && !injectedMobileConnect;
+
+    // A core pairing is already waiting for the wallet: keep it. Regenerating
+    // or deleting an active pairing mid-attempt is exactly the SDK race that
+    // killed AppKit settlement — the sheet with the current URI stays up.
+    if (externalMobileConnect && activeConnectAttempt && !activeConnectAttempt.cancelled && isCoreConnectInFlight()) {
+        walletDebugLog('core connect already pending; keeping active pairing', {
+            attemptId: activeConnectAttempt.id
+        });
+        return null;
+    }
+
     removeMobileWalletRecovery();
     lastSelectedWallet = null;
     lastWalletConnectUri = null;
@@ -2549,12 +2695,14 @@ window.safeConnectWallet = async () => {
             snapshot: getWalletDebugSnapshot()
         });
         activeConnectAttempt.cancelled = true;
-        mobileRetryCleanupRequired = true;
+        if (!externalMobileConnect) mobileRetryCleanupRequired = true;
         notifyWalletResume('connect retry');
         void safeCloseModal('mobile connect retry', { silent: true });
     }
 
-    if (mobileConnect && mobileRetryCleanupRequired) {
+    // The SDK-state wipe belongs to the AppKit mobile path only. The core
+    // path keeps its provider storage; stale proposals expire on their own.
+    if (mobileConnect && mobileRetryCleanupRequired && !externalMobileConnect) {
         await clearIncompleteWalletConnectState('before mobile retry');
     }
 
@@ -2618,6 +2766,25 @@ window.safeConnectWallet = async () => {
                 chainId: validated.chainId
             });
             return validated.address;
+        }
+
+        if (externalMobileConnect) {
+            const coreAddress = await connectExternalMobileCoreWallet(attempt);
+            if (attempt.cancelled) return null;
+            if (!coreAddress) {
+                throw attempt.failure || createWalletConnectError(
+                    'WALLET_CONNECT_TIMEOUT',
+                    'Wallet connection was not confirmed. Please retry or open ArtSoul in your wallet browser.'
+                );
+            }
+            clearModalIntent();
+            // Same connect-only gesture rule as the AppKit mobile path: SIWE
+            // waits for the next protected action.
+            deferMobileAuthenticationThisTurn = true;
+            setTimeout(() => {
+                deferMobileAuthenticationThisTurn = false;
+            }, 0);
+            return coreAddress;
         }
 
         if (window.web3Modal) {
@@ -2706,7 +2873,8 @@ window.safeConnectWallet = async () => {
         await safeCloseModal('wallet connect failed', { silent: true });
         if (mobileConnect) showMobileWalletRecovery(err);
         else alert(err?.message || 'Wallet connection was not completed. Please try again.');
-        if (mobileConnect && !hasConfirmedWalletAddress()) mobileRetryCleanupRequired = true;
+        // Core-path retries must not wipe the provider's persisted state.
+        if (mobileConnect && !externalMobileConnect && !hasConfirmedWalletAddress()) mobileRetryCleanupRequired = true;
         return null;
     } finally {
         walletDebugLog('connect button handler exited', {
@@ -2889,6 +3057,15 @@ window.resetWalletConnection = async () => {
         // Set disconnecting flag to prevent auto-reconnect
         sessionStorage.setItem('artsoul_disconnecting', 'true');
         clearModalIntent();
+
+        try {
+            await Promise.race([
+                disconnectCoreWallet(),
+                new Promise((resolve) => setTimeout(resolve, 2500))
+            ]);
+        } catch (coreDisconnectError) {
+            console.warn('Core WalletConnect disconnect skipped:', coreDisconnectError);
+        }
 
         if (window.web3Modal) {
             await safeCloseModal('disconnect start');
@@ -3196,6 +3373,18 @@ async function initializeAppKit() {
         console.log(' Using WagmiAdapter for browser extensions');
 
         modal = createAppKit(config);
+        // Every page and contracts-integration reads the signing provider via
+        // web3Modal.getWalletProvider(). When the core WalletConnect session
+        // is active (mobile external browser), that call must return the core
+        // provider so the whole site sees the connection exactly as today.
+        const appKitGetWalletProvider = typeof modal.getWalletProvider === 'function'
+            ? modal.getWalletProvider.bind(modal)
+            : null;
+        modal.getWalletProvider = async (...args) => {
+            const coreProvider = getConnectedCoreProvider();
+            if (coreProvider) return coreProvider;
+            return appKitGetWalletProvider ? appKitGetWalletProvider(...args) : null;
+        };
         window.web3Modal = modal;
         walletDebugLog('appkit modal created', { origin: appOrigin });
         void bindConfiguredWalletConnectDiagnostics();
@@ -3203,6 +3392,29 @@ async function initializeAppKit() {
             modal.subscribeEvents(handleAppKitEvent);
         } else {
             walletDebugLog('AppKit event subscription unavailable');
+        }
+
+        // Core WalletConnect sessions persist in IndexedDB. Restore them on
+        // load without a new pairing so a live mobile session survives page
+        // reloads exactly like an injected provider does.
+        if (isMobile && !isInjectedWalletBrowser()) {
+            void restoreCoreSession().then((restored) => {
+                if (!restored?.address || window.currentWalletAddress) return;
+                activeWalletProvider = restored.provider;
+                bindRuntimeProviderEvents(restored.provider, 'core walletconnect restore');
+                bindWalletConnectDiagnostics(restored.provider, 'core walletconnect restore');
+                bindCoreProviderDisconnect(restored.provider);
+                applyConfirmedWalletState({
+                    address: restored.address,
+                    chainId: restored.chainId
+                });
+                walletDebugLog('core session restored on boot', {
+                    address: maskWalletAddress(restored.address),
+                    chainId: restored.chainId
+                });
+            }).catch((error) => {
+                walletDebugLog('core session boot restore failed', describeWalletDebugError(error));
+            });
         }
 
         // Accept only synchronous provider truth here. AppKit's cached account can

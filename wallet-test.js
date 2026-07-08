@@ -359,6 +359,104 @@ async function initializeBareLayer() {
     updateStatus();
 }
 
+// Mirrors the production mobile external-browser path one-to-one: the exact
+// module, provider version, chain configuration, and wallet sheet that
+// appkit-init.js uses. Only the logging wrapper differs.
+async function initializeCoreLayer() {
+    const core = await import('/wallet-core-connect.js?v=1');
+    core.configureCoreWallet({
+        projectId: PROJECT_ID,
+        metadata: {
+            name: 'ArtSoul Marketplace',
+            description: 'Decentralized Art Marketplace',
+            url: window.location.origin,
+            icons: [`${window.location.origin}/ARTSOULlogo-clean.png`],
+            redirect: { universal: window.location.href.split('#')[0] }
+        },
+        log: (step, detail) => log(step, detail)
+    });
+
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const updateCoreStatus = (address, chainId) => {
+        statusElement.textContent = [
+            'Layer: core (production mobile path)',
+            'Provider: @walletconnect/ethereum-provider 2.23.10',
+            `Chains: eip155:${EXPECTED_CHAIN_ID} required; 8453, 1 optional`,
+            `Origin: ${window.location.origin}`,
+            `Account: ${maskAddress(address) || 'none'}`,
+            `Chain: ${chainId || 'unknown'}${chainId === EXPECTED_CHAIN_ID ? ' (Base Sepolia)' : ''}`
+        ].join('\n');
+    };
+    updateCoreStatus(null, null);
+
+    const restored = await core.restoreCoreSession();
+    if (restored?.address) {
+        log('core session restored on load', {
+            address: maskAddress(restored.address),
+            chainId: restored.chainId
+        });
+        updateCoreStatus(restored.address, restored.chainId);
+        restored.provider.on?.('chainChanged', (chainId) => {
+            updateCoreStatus(restored.address, core.parseCoreChainId(chainId));
+        });
+    }
+
+    connectButton.textContent = 'Connect with core path';
+    connectButton.addEventListener('click', async () => {
+        log('core connect click entered');
+        connectButton.disabled = true;
+        let sheet = null;
+        try {
+            const connected = await core.connectCoreWallet({
+                onDisplayUri: (uri) => {
+                    if (sheet) {
+                        sheet.update(uri);
+                        return;
+                    }
+                    sheet = core.showCoreWalletSheet({
+                        uri,
+                        isIOS,
+                        log: (step, detail) => log(step, detail),
+                        onWalletOpened: (walletName) => log('core sheet wallet opened', { walletName }),
+                        onCancel: () => log('core connect cancelled by sheet')
+                    });
+                }
+            });
+            log('core connect resolved', {
+                address: maskAddress(connected.address),
+                chainId: connected.chainId,
+                restored: connected.restored
+            });
+            const settleSource = await core.waitForWalletChainSettle(connected.provider, 2500);
+            const settledChainId = core.parseCoreChainId(connected.provider.chainId);
+            log('core chain settle window closed', { source: settleSource, chainId: settledChainId });
+            updateCoreStatus(connected.address, settledChainId);
+            connected.provider.on?.('chainChanged', (chainId) => {
+                updateCoreStatus(connected.address, core.parseCoreChainId(chainId));
+            });
+        } catch (error) {
+            log('core connect rejected', describeError(error));
+        } finally {
+            sheet?.close();
+            connectButton.disabled = false;
+            connectButton.textContent = 'Connect with core path';
+        }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        const provider = core.getConnectedCoreProvider();
+        const relayer = provider?.signer?.client?.core?.relayer || null;
+        if (!relayer) return;
+        void Promise.resolve(
+            typeof relayer.restartTransport === 'function'
+                ? relayer.restartTransport()
+                : Promise.resolve()
+        ).then(() => log('core relay restarted on visibility return'))
+            .catch((error) => log('core relay restart failed', describeError(error)));
+    });
+}
+
 async function initializeArtSoulLayer(withAuth) {
     if (withAuth) {
         log('layer module requested', { src: '/supabase-client.js' });
@@ -369,7 +467,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=23');
+    await import('/appkit-init.js?v=24');
     log('ArtSoul appkit wrapper imported', {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function'
@@ -402,7 +500,8 @@ log('test page boot', {
 });
 
 try {
-    if (layer === 'wrapper') await initializeArtSoulLayer(false);
+    if (layer === 'core') await initializeCoreLayer();
+    else if (layer === 'wrapper') await initializeArtSoulLayer(false);
     else if (layer === 'auth') await initializeArtSoulLayer(true);
     else await initializeBareLayer();
 } catch (error) {
