@@ -5,7 +5,7 @@
 
 import { createAppKit } from 'https://esm.sh/@reown/appkit@1.8.21?bundle'
 import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.8.21?bundle'
-import { baseSepolia } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle'
+import { baseSepolia, base, mainnet } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle'
 
 // ============================================
 // CONFIGURATION
@@ -17,7 +17,9 @@ const projectId = '9fdc97f91c02d46a28ca9d185a9e58f2';
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_CAIP_ID = 'eip155:84532';
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
-const networks = [baseSepolia];
+// Mainnet entries are negotiation-only compatibility routes for mobile
+// WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
+const networks = [baseSepolia, base, mainnet];
 const customRpcUrls = {
     [BASE_SEPOLIA_CAIP_ID]: [{ url: BASE_SEPOLIA_RPC_URL }]
 };
@@ -100,7 +102,7 @@ const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
 const WALLET_CONNECT_TIMEOUT_MOBILE = 90000;
 const APPKIT_MODAL_OPEN_TIMEOUT = 10000;
 const MOBILE_MODAL_CLOSED_GRACE = 8000;
-const MOBILE_RETURN_SETTLEMENT_WINDOW = 18000;
+const MOBILE_RETURN_SETTLEMENT_WINDOW = 30000;
 const WALLET_CONFIRMATION_INTERVAL = 400;
 const MOBILE_PROVIDER_REQUEST_TIMEOUT = 5000;
 const MOBILE_NETWORK_SWITCH_TIMEOUT = 15000;
@@ -109,7 +111,7 @@ const NETWORK_CONFIRMATION_INTERVAL = 300;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
 const MODAL_CLOSE_RETRY_DELAY = 400;
 const WALLET_STORAGE_VERSION_KEY = 'artsoul_wallet_storage_version';
-const WALLET_STORAGE_VERSION = 'appkit-1.8.21-base-sepolia-v1';
+const WALLET_STORAGE_VERSION = 'appkit-1.8.21-compatible-session-v2';
 const FEATURED_WALLETS = {
     base: 'fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa',
     metamask: 'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96',
@@ -125,7 +127,12 @@ let mobileSessionFinalizeKey = '';
 let activeConnectAttempt = null;
 let connectAttemptSequence = 0;
 let lastSelectedWallet = null;
+let lastWalletConnectUri = null;
 let mobileRetryCleanupRequired = false;
+let walletTransportRestartPromise = null;
+const walletConnectDiagnosticClients = new WeakSet();
+const walletConnectDiagnosticRelayers = new WeakSet();
+const walletConnectUriProviders = new WeakSet();
 let walletDebugSequence = 0;
 const walletDebugEntries = [];
 const walletDebugStartedAt = Date.now();
@@ -432,6 +439,7 @@ async function getAppKitWalletProvider() {
     try {
         const provider = await (modal?.getWalletProvider?.() || window.web3Modal?.getWalletProvider?.());
         bindRuntimeProviderEvents(provider, 'appkit wallet provider');
+        bindWalletConnectDiagnostics(provider, 'appkit wallet provider');
         return provider;
     } catch (error) {
         console.warn('Unable to get AppKit wallet provider:', error);
@@ -776,7 +784,7 @@ async function ensureExternalMobileBaseSepolia(walletState, source, attempt, pre
     });
 
     const switchOutcome = Promise.resolve()
-        .then(() => switchEthereumChain(provider, target))
+        .then(() => addThenSwitchEthereumChain(provider, target))
         .then(() => ({ complete: true }))
         .catch((error) => ({ error }));
 
@@ -857,6 +865,188 @@ function getWalletConnectClient(provider) {
     return provider?.signer?.client || provider?.client || provider?.provider?.signer?.client || null;
 }
 
+function getWalletConnectRelayer(provider) {
+    const client = getWalletConnectClient(provider);
+    return client?.core?.relayer || provider?.signer?.client?.core?.relayer || null;
+}
+
+function summarizeWalletConnectNamespaces(value = {}) {
+    if (!value || typeof value !== 'object') return null;
+    return Object.fromEntries(Object.entries(value).map(([namespace, config]) => [namespace, {
+        chains: Array.isArray(config?.chains) ? config.chains : [],
+        methods: Array.isArray(config?.methods) ? config.methods : [],
+        events: Array.isArray(config?.events) ? config.events : []
+    }]));
+}
+
+function readWalletConnectMessageMethod(message) {
+    if (!message) return null;
+    if (typeof message === 'object') {
+        return message.method || message.params?.request?.method || message.payload?.method || null;
+    }
+    try {
+        const parsed = JSON.parse(message);
+        return readWalletConnectMessageMethod(parsed);
+    } catch {
+        return null;
+    }
+}
+
+function bindWalletConnectUriCapture(provider) {
+    if (!provider || typeof provider !== 'object' || walletConnectUriProviders.has(provider)) return;
+    walletConnectUriProviders.add(provider);
+    const capture = (uri) => {
+        const value = typeof uri === 'string' ? uri : findWalletConnectUri(uri);
+        if (!value) return;
+        lastWalletConnectUri = value;
+        walletDebugLog('WalletConnect display URI captured', { uriAvailable: true });
+    };
+    provider.on?.('display_uri', capture);
+    provider.signer?.on?.('display_uri', capture);
+}
+
+function bindWalletConnectDiagnostics(provider, source = 'WalletConnect provider') {
+    bindWalletConnectUriCapture(provider);
+    if (!walletDebugEnabled() || !provider) return;
+    const client = getWalletConnectClient(provider);
+    const relayer = getWalletConnectRelayer(provider);
+
+    if (client && !walletConnectDiagnosticClients.has(client)) {
+        walletConnectDiagnosticClients.add(client);
+        walletDebugLog('WalletConnect provider negotiation config', {
+            source,
+            requiredNamespaces: summarizeWalletConnectNamespaces(provider?.namespaces || provider?.requiredNamespaces),
+            optionalNamespaces: summarizeWalletConnectNamespaces(provider?.optionalNamespaces),
+            chains: networks.map((network) => network.caipNetworkId || `eip155:${network.id}`)
+        });
+        const originalConnect = typeof client.connect === 'function' ? client.connect.bind(client) : null;
+        if (originalConnect) {
+            try {
+                client.connect = (proposal = {}) => {
+                    walletDebugLog('WalletConnect proposal before publish', {
+                        source,
+                        requiredNamespaces: summarizeWalletConnectNamespaces(proposal.requiredNamespaces),
+                        optionalNamespaces: summarizeWalletConnectNamespaces(proposal.optionalNamespaces),
+                        chains: networks.map((network) => network.caipNetworkId || `eip155:${network.id}`),
+                        methods: proposal.methods || null,
+                        events: proposal.events || null
+                    });
+                    return originalConnect(proposal);
+                };
+            } catch (error) {
+                walletDebugLog('WalletConnect proposal hook unavailable', describeWalletDebugError(error));
+            }
+        }
+
+        const lifecycleEvents = [
+            'proposal_expire',
+            'session_proposal',
+            'session_connect',
+            'session_settle',
+            'session_delete',
+            'session_expire',
+            'session_event'
+        ];
+        lifecycleEvents.forEach((eventName) => {
+            client.on?.(eventName, (event) => {
+                walletDebugLog(`WalletConnect ${eventName}`, {
+                    source,
+                    topic: event?.topic || event?.params?.topic || null,
+                    method: event?.method || event?.params?.request?.method || null,
+                    error: event?.error ? describeWalletDebugError(event.error) : null,
+                    reason: event?.reason || event?.params?.reason || null
+                });
+            });
+        });
+    }
+
+    if (relayer && !walletConnectDiagnosticRelayers.has(relayer)) {
+        walletConnectDiagnosticRelayers.add(relayer);
+        const events = relayer.events || relayer;
+        events.on?.('message', (event) => {
+            walletDebugLog('WalletConnect relay message', {
+                source,
+                topic: event?.topic || event?.params?.topic || null,
+                method: readWalletConnectMessageMethod(event?.message || event?.payload || event),
+                encrypted: !readWalletConnectMessageMethod(event?.message || event?.payload || event)
+            });
+        });
+        events.on?.('error', (error) => {
+            walletDebugLog('WalletConnect relay error', {
+                source,
+                error: describeWalletDebugError(error)
+            });
+        });
+    }
+}
+
+async function restartWalletConnectTransport(source = 'browser return') {
+    if (!activeMobileConnect || isInjectedWalletBrowser()) return false;
+    if (walletTransportRestartPromise) return walletTransportRestartPromise;
+
+    walletTransportRestartPromise = (async () => {
+        const wagmi = readWagmiConnectorSnapshot();
+        const providers = [...new Set([
+            await getWagmiConnectorProvider(wagmi),
+            activeWalletProvider,
+            await getAppKitWalletProviderWithin(1500)
+        ].filter(Boolean))];
+        const relayers = [...new Set(providers.map(getWalletConnectRelayer).filter(Boolean))];
+        if (!relayers.length) {
+            walletDebugLog('WalletConnect transport restart unavailable', {
+                source,
+                reason: 'provider or relayer absent',
+                wagmiStatus: wagmi.status,
+                connectorId: wagmi.connectorId
+            });
+            return false;
+        }
+
+        let restarted = false;
+        for (const provider of providers) bindWalletConnectDiagnostics(provider, source);
+        for (const relayer of relayers) {
+            try {
+                if (typeof relayer.restartTransport === 'function') {
+                    await Promise.race([Promise.resolve(relayer.restartTransport()), sleep(4000)]);
+                    restarted = true;
+                } else if (typeof relayer.transportClose === 'function' && typeof relayer.transportOpen === 'function') {
+                    await Promise.race([Promise.resolve(relayer.transportClose()), sleep(1500)]);
+                    await Promise.race([Promise.resolve(relayer.transportOpen()), sleep(4000)]);
+                    restarted = true;
+                }
+            } catch (error) {
+                walletDebugLog('WalletConnect transport restart failed', {
+                    source,
+                    error: describeWalletDebugError(error)
+                });
+            }
+        }
+        walletDebugLog('WalletConnect transport restart completed', { source, restarted });
+        return restarted;
+    })().finally(() => {
+        walletTransportRestartPromise = null;
+    });
+
+    return walletTransportRestartPromise;
+}
+
+async function bindConfiguredWalletConnectDiagnostics() {
+    const connectors = wagmiAdapter?.wagmiConfig?.connectors || [];
+    for (const connector of connectors) {
+        const identity = `${connector?.id || ''} ${connector?.name || ''} ${connector?.type || ''}`.toLowerCase();
+        if (!identity.includes('walletconnect')) continue;
+        try {
+            const provider = await connector.getProvider?.();
+            bindWalletConnectDiagnostics(provider, 'configured WalletConnect connector');
+        } catch (error) {
+            walletDebugLog('configured WalletConnect diagnostic binding failed', {
+                connectorId: connector?.id || null,
+                error: describeWalletDebugError(error)
+            });
+        }
+    }
+}
+
 function getWalletConnectSessions(provider = activeWalletProvider) {
     const client = getWalletConnectClient(provider);
     try {
@@ -920,7 +1110,9 @@ function getWalletConnectSessionWalletState(provider = activeWalletProvider) {
 
 async function getWagmiConnectorProvider(snapshot = readWagmiConnectorSnapshot()) {
     try {
-        return await snapshot?.connector?.getProvider?.();
+        const provider = await snapshot?.connector?.getProvider?.();
+        bindWalletConnectDiagnostics(provider, 'wagmi connector provider');
+        return provider;
     } catch (error) {
         walletDebugLog('wagmi connector provider unavailable', {
             connectorId: snapshot?.connectorId || null,
@@ -1081,15 +1273,15 @@ function scheduleWalletReconciliation(source, delay = 150, options = {}) {
     }, delay);
 }
 
-function notifyWalletResume(source) {
+async function processWalletResume(source) {
     if (activeConnectAttempt?.handoffObserved && document.visibilityState === 'visible') {
         activeConnectAttempt.returnedAt ||= Date.now();
         walletDebugLog('manual wallet return observed', {
             source,
-            returnedAt: activeConnectAttempt.returnedAt,
-            snapshot: getWalletDebugSnapshot()
+            returnedAt: activeConnectAttempt.returnedAt
         });
-        void logProviderTruthAfterMobileReturn(source);
+        await restartWalletConnectTransport(source);
+        await logProviderTruthAfterMobileReturn(source);
     }
     walletDebugLog('browser resume signal', {
         source,
@@ -1099,6 +1291,10 @@ function notifyWalletResume(source) {
     walletResumeWaiters.clear();
     waiters.forEach((resolve) => resolve(source));
     scheduleWalletReconciliation(source, 0);
+}
+
+function notifyWalletResume(source) {
+    void processWalletResume(source);
 }
 
 function markMobileWalletHandoff(source) {
@@ -1184,13 +1380,14 @@ function bindWalletResumeListeners() {
     window.addEventListener('focus', () => notifyWalletResume('window focus'));
     window.addEventListener('blur', () => markMobileWalletHandoff('window blur'));
     document.addEventListener('visibilitychange', () => {
-        walletDebugLog('visibility changed', {
-            state: document.visibilityState,
-            snapshot: getWalletDebugSnapshot()
-        });
         if (document.visibilityState === 'hidden') {
+            walletDebugLog('visibility changed', {
+                state: document.visibilityState,
+                snapshot: getWalletDebugSnapshot()
+            });
             markMobileWalletHandoff('visibility hidden');
         } else if (document.visibilityState === 'visible') {
+            walletDebugLog('visibility changed', { state: document.visibilityState });
             notifyWalletResume('visibility return');
         }
     });
@@ -1662,6 +1859,27 @@ async function switchEthereumChain(provider, target) {
             params: [{ chainId: target.hexChainId }]
         });
     }
+}
+
+async function addThenSwitchEthereumChain(provider, target) {
+    if (!provider?.request) throw new Error('Wallet provider is not available');
+
+    try {
+        walletDebugLog('Base Sepolia add request started', { chainId: target.chainId });
+        await addEthereumChain(provider, target);
+        walletDebugLog('Base Sepolia add request resolved', { chainId: target.chainId });
+    } catch (error) {
+        if (isUserRejectedError(error)) throw error;
+        // Wallets differ when a chain already exists: some resolve and others
+        // return an "already added" error. In either case, switching is the
+        // authoritative next step.
+        walletDebugLog('Base Sepolia add request non-fatal result', describeWalletDebugError(error));
+    }
+
+    await provider.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: target.hexChainId }]
+    });
 }
 
 function applyConfirmedNetwork(chainId) {
@@ -2161,7 +2379,10 @@ function showMobileWalletRecovery(error) {
     status.textContent = error?.message || 'The wallet connection was not completed.';
     const instruction = document.createElement('p');
     instruction.style.cssText = 'margin:0;color:var(--c-text);font-size:0.85rem;line-height:1.4';
-    instruction.textContent = 'Select Base Sepolia (84532) in your wallet, then retry.';
+    const rabbyIOSUnavailable = error?.code === 'RABBY_IOS_UNAVAILABLE';
+    instruction.textContent = rabbyIOSUnavailable
+        ? 'Open Rabby, choose WalletConnect, paste the copied URI, or open ArtSoul in the Rabby browser.'
+        : 'ArtSoul will add and select Base Sepolia after the wallet session connects.';
     const actions = document.createElement('div');
     actions.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px';
     const makeButton = (label) => {
@@ -2187,7 +2408,26 @@ function showMobileWalletRecovery(error) {
     });
     const walletBrowserButton = makeButton('Open in wallet browser');
     walletBrowserButton.addEventListener('click', () => void openWalletBrowserFallback(status));
-    actions.append(retryButton, walletBrowserButton);
+    actions.append(retryButton);
+    if (rabbyIOSUnavailable) {
+        const copyLinkButton = makeButton('Copy link');
+        copyLinkButton.addEventListener('click', async () => {
+            if (!lastWalletConnectUri) {
+                status.textContent = 'The WalletConnect URI is unavailable. Open ArtSoul inside the Rabby browser instead.';
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(lastWalletConnectUri);
+                status.textContent = 'WalletConnect URI copied. Open Rabby, choose WalletConnect, and paste it.';
+                walletDebugLog('Rabby WalletConnect URI copied', { uriAvailable: true });
+            } catch (copyError) {
+                status.textContent = 'Copy failed. Open ArtSoul inside the Rabby browser instead.';
+                walletDebugLog('Rabby WalletConnect URI copy failed', describeWalletDebugError(copyError));
+            }
+        });
+        actions.append(copyLinkButton);
+    }
+    actions.append(walletBrowserButton);
     panel.append(title, status, instruction, actions);
     document.documentElement.appendChild(panel);
 }
@@ -2221,6 +2461,19 @@ async function openAppKitConnectModal(attempt) {
     }
 }
 
+function findWalletConnectUri(value, depth = 0, seen = new WeakSet()) {
+    if (depth > 5 || value === null || value === undefined) return null;
+    if (typeof value === 'string') return value.startsWith('wc:') ? value : null;
+    if (typeof value !== 'object') return null;
+    if (seen.has(value)) return null;
+    seen.add(value);
+    for (const nested of Object.values(value)) {
+        const uri = findWalletConnectUri(nested, depth + 1, seen);
+        if (uri) return uri;
+    }
+    return null;
+}
+
 function handleAppKitEvent(event) {
     const data = event?.data || {};
     const properties = data?.properties || event?.properties || {};
@@ -2236,6 +2489,8 @@ function handleAppKitEvent(event) {
         data?.mobile_universal || data?.mobileUniversal || data?.universal_link || data?.universalLink || null;
     const deepLinkAvailable = Boolean(nativeLink || universalLink);
     const eventType = event?.type || event?.event || data?.event || data?.type || 'unknown';
+    const walletConnectUri = findWalletConnectUri(event);
+    if (walletConnectUri) lastWalletConnectUri = walletConnectUri;
     if (walletId || walletName) {
         lastSelectedWallet = {
             id: walletId || lastSelectedWallet?.id || null,
@@ -2253,7 +2508,9 @@ function handleAppKitEvent(event) {
         walletRdns,
         nativeLink,
         universalLink,
-        deepLinkAvailable
+        deepLinkAvailable,
+        walletConnectUriAvailable: Boolean(walletConnectUri),
+        error: event?.error?.message || data?.error?.message || properties?.error_message || null
     });
 
     const rabbySelected = walletId === FEATURED_WALLETS.rabby || String(walletName || '').toLowerCase().includes('rabby');
@@ -2284,6 +2541,7 @@ window.safeConnectWallet = async () => {
     const externalMobileConnect = mobileConnect && !injectedMobileConnect;
     removeMobileWalletRecovery();
     lastSelectedWallet = null;
+    lastWalletConnectUri = null;
 
     if (mobileConnect && activeConnectAttempt && !activeConnectAttempt.cancelled) {
         walletDebugLog('connect button retry requested', {
@@ -2381,11 +2639,31 @@ window.safeConnectWallet = async () => {
                 );
             }
 
+            let finalized = confirmed;
+            if (!mobileConnect && confirmed.chainId !== BASE_SEPOLIA_CHAIN_ID) {
+                finalized = await ensureExternalMobileBaseSepolia(
+                    {
+                        address: confirmed.address,
+                        chainId: confirmed.chainId,
+                        account: { address: confirmed.address, chainId: confirmed.chainId }
+                    },
+                    'desktop post-connect network validation',
+                    attempt,
+                    confirmed.provider || await getAppKitWalletProviderWithin(MOBILE_PROVIDER_REQUEST_TIMEOUT)
+                );
+                if (!finalized?.address) {
+                    throw attempt.failure || createWalletConnectError(
+                        'BASE_SEPOLIA_REQUIRED',
+                        'This connection requires Base Sepolia.'
+                    );
+                }
+            }
+
             clearModalIntent();
             await safeCloseModal('wallet connected');
             walletDebugLog('wallet connection confirmed', {
-                address: maskWalletAddress(confirmed.address),
-                chainId: confirmed.chainId
+                address: maskWalletAddress(finalized.address),
+                chainId: finalized.chainId
             });
             if (mobileConnect) {
                 // Let callers finish this user gesture as connect-only. The flag
@@ -2396,7 +2674,7 @@ window.safeConnectWallet = async () => {
                     deferMobileAuthenticationThisTurn = false;
                 }, 0);
             }
-            return confirmed.address;
+            return finalized.address;
         } else {
             throw createWalletConnectError(
                 'APPKIT_NOT_READY',
@@ -2781,7 +3059,13 @@ async function initializeAppKit() {
             metadataUrl: metadata.url,
             redirectUniversal: metadata.redirect?.universal || null,
             defaultNetwork: BASE_SEPOLIA_CAIP_ID,
-            configuredNetworks: networks.map((network) => network.caipNetworkId || `eip155:${network.id}`),
+            configuredNetworks: networks.map((network) => ({
+                id: network.id,
+                caipNetworkId: network.caipNetworkId || `eip155:${network.id}`,
+                chainNamespace: network.chainNamespace || 'eip155'
+            })),
+            operationalWriteChain: BASE_SEPOLIA_CAIP_ID,
+            allowUnsupportedChain: true,
             projectIdPresent: Boolean(projectId),
             projectIdFingerprint: `${projectId.slice(0, 4)}...${projectId.slice(-4)}`
         });
@@ -2874,7 +3158,7 @@ async function initializeAppKit() {
             metadata,
             projectId,
             customRpcUrls,
-            allowUnsupportedChain: false,
+            allowUnsupportedChain: true,
             enableNetworkSwitch: false,
             universalProviderConfigOverride: {
                 events: { eip155: ['chainChanged', 'accountsChanged'] },
@@ -2914,6 +3198,7 @@ async function initializeAppKit() {
         modal = createAppKit(config);
         window.web3Modal = modal;
         walletDebugLog('appkit modal created', { origin: appOrigin });
+        void bindConfiguredWalletConnectDiagnostics();
         if (typeof modal.subscribeEvents === 'function') {
             modal.subscribeEvents(handleAppKitEvent);
         } else {
@@ -3206,6 +3491,7 @@ async function initializeAppKit() {
                         snapshot: getWalletDebugSnapshot()
                     });
                     bindRuntimeProviderEvents(provider, 'appkit provider subscription');
+                    bindWalletConnectDiagnostics(provider, 'appkit provider subscription');
                 if (provider?.request) {
                     activeWalletProvider = provider;
                     scheduleWalletReconciliation('appkit provider available');
