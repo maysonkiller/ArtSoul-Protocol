@@ -304,6 +304,7 @@ const { useState, useEffect, useRef } = React;
             });
             const [confirmedResaleListing, setConfirmedResaleListing] = useState(false);
             const bidPollInFlightRef = useRef(false);
+            const bidCursorRef = useRef(null);
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
             const reauctionValuationControllerRef = useRef(null);
@@ -933,6 +934,21 @@ const { useState, useEffect, useRef } = React;
                 });
             }
 
+            function bidIdentity(bid) {
+                return `${bid?.transaction_hash || ''}:${Number(bid?.block_number || 0)}:${Number(bid?.log_index || 0)}`;
+            }
+
+            function advanceBidCursor(bids) {
+                for (const bid of bids || []) {
+                    const block = Number(bid?.block_number || 0);
+                    const log = Number(bid?.log_index || 0);
+                    const cursor = bidCursorRef.current;
+                    if (!cursor || block > cursor.block || (block === cursor.block && log > cursor.log)) {
+                        bidCursorRef.current = { block, log };
+                    }
+                }
+            }
+
             async function applyLiveAuctionProjection(projection) {
                 const nextBids = Array.isArray(projection?.bids)
                     ? [...projection.bids].sort((left, right) => {
@@ -943,19 +959,42 @@ const { useState, useEffect, useRef } = React;
                         return normalizeTimestampMs(right.indexed_at) - normalizeTimestampMs(left.indexed_at);
                     })
                     : [];
+                advanceBidCursor(nextBids);
                 setBidActivity(nextBids);
                 setAuction(current => mergeProjectedAuction(current, projection));
                 await hydrateBidderProfiles(nextBids);
             }
 
+            // Live polling hits the light cursor endpoint (new bids only), not the
+            // full projection — the projection is only fetched on page load.
             async function refreshLiveBidActivity() {
                 if (!isV41CompositeId || bidPollInFlightRef.current) return;
 
+                const auctionActionId = getAuctionActionId();
+                if (!auctionActionId) return;
+
                 bidPollInFlightRef.current = true;
                 try {
-                    const projection = await window.ArtSoulDB.getPublicProjectionArtwork(artworkId);
-                    if (projection) {
-                        await applyLiveAuctionProjection(projection);
+                    const cursor = bidCursorRef.current;
+                    const live = await window.ArtSoulDB.getLiveAuctionActivity({
+                        chain_id: artwork?.chain_id,
+                        auction_id: auctionActionId,
+                        after_block: cursor ? cursor.block : undefined,
+                        after_log: cursor ? cursor.log : undefined
+                    });
+                    if (!live) return;
+
+                    const newBids = Array.isArray(live.bids) ? live.bids : [];
+                    if (newBids.length > 0) {
+                        advanceBidCursor(newBids);
+                        setBidActivity(current => {
+                            const seen = new Set(current.map(bidIdentity));
+                            return [...newBids.filter(bid => !seen.has(bidIdentity(bid))), ...current];
+                        });
+                        await hydrateBidderProfiles(newBids);
+                    }
+                    if (live.auction) {
+                        setAuction(current => mergeProjectedAuction(current, live.auction));
                     }
                 } catch (error) {
                     console.warn('Could not refresh live bid activity:', error);
@@ -1304,8 +1343,10 @@ const { useState, useEffect, useRef } = React;
                 if (!isV41CompositeId || !auction || isAuctionClosedForBidding(auction)) return;
 
                 let cancelled = false;
-                const interval = setInterval(async () => {
+                const poll = async () => {
                     if (cancelled) return;
+                    // Fully stop network activity while the tab is in the background.
+                    if (document.visibilityState !== 'visible') return;
 
                     const endTimeMs = normalizeAuctionTimestamp(auction.endTime);
                     if (endTimeMs > 0 && Date.now() >= endTimeMs) {
@@ -1315,11 +1356,17 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     await refreshLiveBidActivity();
-                }, 4000);
+                };
+                const interval = setInterval(poll, 12000);
+                const onVisibilityChange = () => {
+                    if (document.visibilityState === 'visible') poll();
+                };
+                document.addEventListener('visibilitychange', onVisibilityChange);
 
                 return () => {
                     cancelled = true;
                     clearInterval(interval);
+                    document.removeEventListener('visibilitychange', onVisibilityChange);
                 };
             }, [artworkId, isV41CompositeId, auction?.status, auction?.state, auction?.endTime]);
 
