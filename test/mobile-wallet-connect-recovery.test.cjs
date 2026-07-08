@@ -9,6 +9,7 @@ const contracts = read('contracts-integration.js');
 const artwork = read(path.join('src', 'entries', 'artwork.jsx'));
 const auctionServiceV3 = read(path.join('src', 'features', 'auction', 'auction-service-v3.js'));
 const walletTest = read('wallet-test.js');
+const coreWallet = read('wallet-core-connect.js');
 
 test('production and isolated diagnostics pin every Reown import to 1.8.21', () => {
     for (const source of [appKit, walletTest]) {
@@ -17,8 +18,27 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=23/, `${page} must load the new wallet state machine`);
+        assert.match(read(page), /appkit-init\.js\?v=24/, `${page} must load the new wallet state machine`);
     }
+});
+
+test('mobile external browsers connect through the pinned bare WalletConnect provider', () => {
+    assert.match(coreWallet, /WC_ETHEREUM_PROVIDER_VERSION = '2\.23\.10'/);
+    assert.match(coreWallet, /esm\.sh\/@walletconnect\/ethereum-provider@\$\{WC_ETHEREUM_PROVIDER_VERSION\}/);
+    assert.match(coreWallet, /chains: \[BASE_SEPOLIA_CHAIN_ID\]/);
+    assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1\]/);
+    assert.match(coreWallet, /showQrModal: false/);
+    assert.match(coreWallet, /no matching key/i);
+    assert.match(coreWallet, /restoreCoreSession/);
+    assert.match(coreWallet, /metamask\.app\.link\/wc\?uri=/);
+    assert.match(appKit, /async function connectExternalMobileCoreWallet/);
+    assert.match(appKit, /const coreAddress = await connectExternalMobileCoreWallet\(attempt\);/);
+    assert.match(appKit, /waitForWalletChainSettle\(coreProvider, 2500\)/);
+    assert.match(appKit, /'core walletconnect', attempt, coreProvider\)/);
+    assert.match(appKit, /if \(coreProvider\) return coreProvider;/);
+    assert.match(appKit, /keeping active pairing/);
+    assert.match(walletTest, /initializeCoreLayer/);
+    assert.match(read('wallet-test.html'), /layer=core/);
 });
 
 test('WalletConnect negotiation accepts common EVM session chains without changing the operational default', () => {
