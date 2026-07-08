@@ -45,6 +45,24 @@
             cursor: pointer;
         }
         #walletTestConnect:disabled { opacity: 0.65; cursor: wait; }
+        .wallet-test-variants {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .wallet-test-variant {
+            min-height: 44px;
+            display: grid;
+            place-items: center;
+            padding: 8px;
+            border: 1px solid var(--c-border);
+            border-radius: 10px;
+            color: var(--c-text);
+            background: var(--c-bg);
+            text-align: center;
+            text-decoration: none;
+            font-weight: 700;
+        }
         #walletTestLog {
             min-height: 52vh;
             max-height: 62vh;
@@ -68,9 +86,13 @@
             <p class="wallet-test-note">Not linked from ArtSoul. No artwork, profile, Supabase, or contract code runs in the default bare layer.</p>
             <div id="walletTestStatus" class="wallet-test-status">Starting...</div>
         </section>
+        <nav class="wallet-test-variants" aria-label="WalletConnect proposal variants">
+            <a class="wallet-test-variant" href="?walletdebug=1&amp;variant=single">A: Base Sepolia only</a>
+            <a class="wallet-test-variant" href="?walletdebug=1&amp;variant=multi">B: Sepolia + Base + Mainnet</a>
+        </nav>
         <button id="walletTestConnect" type="button">Connect with bare AppKit</button>
         <pre id="walletTestLog" aria-live="polite"></pre>
     </main>
-    <script type="module" src="wallet-test.js?v=2"></script>
+    <script type="module" src="wallet-test.js?v=3"></script>
 </body>
 </html>

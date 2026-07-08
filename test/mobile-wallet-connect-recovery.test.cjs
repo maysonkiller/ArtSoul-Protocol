@@ -16,20 +16,25 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit-adapter-wagmi@1\.8\.21\?bundle/);
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
+    for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
+        assert.match(read(page), /appkit-init\.js\?v=23/, `${page} must load the new wallet state machine`);
+    }
 });
 
-test('WalletConnect negotiation does not strictly override chains or defaultChain', () => {
-    const override = appKit.match(/universalProviderConfigOverride:\s*\{[\s\S]*?\n\s*\},\n\s*themeMode/)?.[0] || '';
+test('WalletConnect negotiation accepts common EVM session chains without changing the operational default', () => {
+    const override = appKit.match(/universalProviderConfigOverride:\s*\{[\s\S]*?themeMode/)?.[0] || '';
     assert.match(override, /events:/);
     assert.match(override, /rpcMap:/);
     assert.doesNotMatch(override, /chains:/);
     assert.doesNotMatch(override, /defaultChain:/);
-    assert.match(appKit, /const networks = \[baseSepolia\]/);
+    assert.match(appKit, /const networks = \[baseSepolia, base, mainnet\]/);
     assert.match(appKit, /defaultNetwork: baseSepolia/);
+    assert.match(appKit, /allowUnsupportedChain: true/);
+    assert.match(appKit, /enableNetworkSwitch: false/);
 });
 
 test('mobile handoff waits for AppKit, Wagmi and WalletConnect settlement after return', () => {
-    assert.match(appKit, /const MOBILE_RETURN_SETTLEMENT_WINDOW = 18000;/);
+    assert.match(appKit, /const MOBILE_RETURN_SETTLEMENT_WINDOW = 30000;/);
     assert.match(appKit, /function markMobileWalletHandoff/);
     assert.match(appKit, /manual wallet return observed/);
     assert.match(appKit, /async function reconcileMobileConnectionSources/);
@@ -37,6 +42,23 @@ test('mobile handoff waits for AppKit, Wagmi and WalletConnect settlement after 
     assert.match(appKit, /source}: Wagmi/);
     assert.match(appKit, /source}: WalletConnect session/);
     assert.match(appKit, /mobile bounded final confirmation/);
+    assert.match(appKit, /async function restartWalletConnectTransport/);
+    assert.match(appKit, /restartTransport/);
+    assert.match(appKit, /transportClose/);
+    assert.match(appKit, /transportOpen/);
+});
+
+test('mobile post-settlement validation adds then switches to Base Sepolia once per attempt', () => {
+    assert.match(appKit, /async function addThenSwitchEthereumChain/);
+    assert.match(appKit, /\.then\(\(\) => addThenSwitchEthereumChain\(provider, target\)\)/);
+    assert.match(appKit, /if \(attempt\?\.networkSwitchRequested\)/);
+    assert.match(appKit, /attempt\.networkSwitchRequested = true/);
+    const addThenSwitch = appKit.match(/async function addThenSwitchEthereumChain[\s\S]*?\n}/)?.[0] || '';
+    assert.ok(
+        addThenSwitch.indexOf("method: 'wallet_addEthereumChain'") < addThenSwitch.indexOf("method: 'wallet_switchEthereumChain'") ||
+        addThenSwitch.indexOf('await addEthereumChain(provider, target)') < addThenSwitch.indexOf("method: 'wallet_switchEthereumChain'"),
+        'Base Sepolia must be added before the switch request'
+    );
 });
 
 test('retry clears only incomplete SDK connection state', () => {
@@ -53,6 +75,8 @@ test('Rabby iOS fails clearly when WalletGuide has no universal link', () => {
     assert.match(appKit, /RABBY_IOS_UNAVAILABLE/);
     assert.match(appKit, /Rabby could not be opened on this device\./);
     assert.match(appKit, /isIOSDevice\(\) && rabbySelected && !universalLink/);
+    assert.match(appKit, /Copy link/);
+    assert.match(appKit, /lastWalletConnectUri/);
 });
 
 test('wallet debug captures SDK, connector, session, lifecycle and provider truth', () => {
@@ -65,6 +89,20 @@ test('wallet debug captures SDK, connector, session, lifecycle and provider trut
     assert.match(appKit, /manual return provider truth/);
     assert.match(appKit, /'eth_accounts'/);
     assert.match(appKit, /'eth_chainId'/);
+    assert.match(appKit, /WalletConnect proposal before publish/);
+    assert.match(appKit, /WalletConnect relay message/);
+    assert.match(appKit, /session_settle/);
+    assert.match(appKit, /proposal_expire/);
+});
+
+test('isolation page exposes single and compatibility proposal variants', () => {
+    assert.match(walletTest, /variant === 'multi' \? \[baseSepolia, base, mainnet\] : \[baseSepolia\]/);
+    assert.match(walletTest, /allowUnsupportedChain: true/);
+    assert.match(walletTest, /proposal before publish/);
+    assert.match(walletTest, /relay inbound/);
+    const html = read('wallet-test.html');
+    assert.match(html, /variant=single/);
+    assert.match(html, /variant=multi/);
 });
 
 test('all contract write methods share the Base Sepolia guard', () => {
