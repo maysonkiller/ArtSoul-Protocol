@@ -155,7 +155,13 @@ const { useState, useEffect, useRef } = React;
                             poster={poster || undefined}
                             className="artwork-detail-media-object artwork-detail-video"
                             style={{ visibility: videoLoaded ? 'visible' : 'hidden' }}
-                            onLoadedMetadata={renderFirstVideoFrame}
+                            onLoadedMetadata={(event) => {
+                                renderFirstVideoFrame(event);
+                                // iOS/mobile browsers with preload="metadata" never fire
+                                // loadeddata before playback starts, so metadata must
+                                // already reveal the (tappable) player.
+                                setVideoLoaded(true);
+                            }}
                             onLoadedData={() => setVideoLoaded(true)}
                             onError={() => setMediaError(true)}
                         >
