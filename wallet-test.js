@@ -1,6 +1,6 @@
 import { createAppKit } from 'https://esm.sh/@reown/appkit@1.8.21?bundle';
 import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.8.21?bundle';
-import { baseSepolia } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle';
+import { baseSepolia, base, mainnet } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle';
 
 // Public Reown project identifier for the verified ArtSoul web project.
 const PROJECT_ID = '9fdc97f91c02d46a28ca9d185a9e58f2';
@@ -13,11 +13,17 @@ const customRpcUrls = {
 const startedAt = Date.now();
 const params = new URLSearchParams(window.location.search);
 const layer = params.get('layer') || 'bare';
+const variant = params.get('variant') === 'multi' ? 'multi' : 'single';
+const networks = variant === 'multi' ? [baseSepolia, base, mainnet] : [baseSepolia];
 const logElement = document.getElementById('walletTestLog');
 const statusElement = document.getElementById('walletTestStatus');
 const connectButton = document.getElementById('walletTestConnect');
 let sequence = 0;
 let modal = null;
+let adapter = null;
+let transportRestartPromise = null;
+const diagnosticClients = new WeakSet();
+const diagnosticRelayers = new WeakSet();
 
 function maskAddress(value) {
     const address = String(value || '');
@@ -42,6 +48,134 @@ function describeError(error) {
         message: error?.message || String(error),
         stack: String(error?.stack || '').split('\n').slice(0, 4).join(' | ') || null
     };
+}
+
+function getWalletConnectClient(provider) {
+    return provider?.signer?.client || provider?.client || provider?.provider?.signer?.client || null;
+}
+
+function getWalletConnectRelayer(provider) {
+    return getWalletConnectClient(provider)?.core?.relayer || null;
+}
+
+function summarizeNamespaces(value = {}) {
+    if (!value || typeof value !== 'object') return null;
+    return Object.fromEntries(Object.entries(value).map(([namespace, config]) => [namespace, {
+        chains: Array.isArray(config?.chains) ? config.chains : [],
+        methods: Array.isArray(config?.methods) ? config.methods : [],
+        events: Array.isArray(config?.events) ? config.events : []
+    }]));
+}
+
+function relayMethod(message) {
+    if (!message) return null;
+    if (typeof message === 'object') return message.method || message.params?.request?.method || null;
+    try {
+        return relayMethod(JSON.parse(message));
+    } catch {
+        return null;
+    }
+}
+
+function bindWalletConnectDiagnostics(provider, source = 'isolation provider') {
+    if (!provider) return;
+    const client = getWalletConnectClient(provider);
+    const relayer = getWalletConnectRelayer(provider);
+    if (client && !diagnosticClients.has(client)) {
+        diagnosticClients.add(client);
+        log('WalletConnect provider config', {
+            source,
+            requiredNamespaces: summarizeNamespaces(provider.namespaces || provider.requiredNamespaces),
+            optionalNamespaces: summarizeNamespaces(provider.optionalNamespaces),
+            chains: networks.map((network) => network.caipNetworkId || `eip155:${network.id}`)
+        });
+        const originalConnect = typeof client.connect === 'function' ? client.connect.bind(client) : null;
+        if (originalConnect) {
+            try {
+                client.connect = (proposal = {}) => {
+                    log('proposal before publish', {
+                        requiredNamespaces: summarizeNamespaces(proposal.requiredNamespaces),
+                        optionalNamespaces: summarizeNamespaces(proposal.optionalNamespaces),
+                        chains: networks.map((network) => network.caipNetworkId || `eip155:${network.id}`),
+                        methods: proposal.methods || null,
+                        events: proposal.events || null
+                    });
+                    return originalConnect(proposal);
+                };
+            } catch (error) {
+                log('proposal hook unavailable', describeError(error));
+            }
+        }
+        [
+            'proposal_expire',
+            'session_proposal',
+            'session_connect',
+            'session_settle',
+            'session_delete',
+            'session_expire',
+            'session_event'
+        ].forEach((eventName) => client.on?.(eventName, (event) => log(eventName, {
+            topic: event?.topic || event?.params?.topic || null,
+            method: event?.method || event?.params?.request?.method || null,
+            reason: event?.reason || event?.params?.reason || null,
+            error: event?.error ? describeError(event.error) : null
+        })));
+    }
+    if (relayer && !diagnosticRelayers.has(relayer)) {
+        diagnosticRelayers.add(relayer);
+        const events = relayer.events || relayer;
+        events.on?.('message', (event) => log('relay inbound', {
+            topic: event?.topic || event?.params?.topic || null,
+            method: relayMethod(event?.message || event?.payload || event),
+            encrypted: !relayMethod(event?.message || event?.payload || event)
+        }));
+        events.on?.('error', (error) => log('relay error', describeError(error)));
+    }
+}
+
+async function getWalletConnectProvider() {
+    const connectors = adapter?.wagmiConfig?.connectors || [];
+    const connector = connectors.find((candidate) => (
+        `${candidate?.id || ''} ${candidate?.name || ''}`.toLowerCase().includes('walletconnect')
+    ));
+    try {
+        return await connector?.getProvider?.() || await modal?.getWalletProvider?.() || null;
+    } catch (error) {
+        log('provider lookup failed', describeError(error));
+        return null;
+    }
+}
+
+async function restartRelayTransport(source) {
+    if (transportRestartPromise) return transportRestartPromise;
+    transportRestartPromise = (async () => {
+        const provider = await getWalletConnectProvider();
+        bindWalletConnectDiagnostics(provider, source);
+        const relayer = getWalletConnectRelayer(provider);
+        if (!relayer) {
+            log('relay restart unavailable', { source, reason: 'provider or relayer absent' });
+            return false;
+        }
+        try {
+            if (typeof relayer.restartTransport === 'function') {
+                await relayer.restartTransport();
+            } else if (typeof relayer.transportClose === 'function' && typeof relayer.transportOpen === 'function') {
+                await relayer.transportClose();
+                await relayer.transportOpen();
+            } else {
+                log('relay restart unavailable', { source, reason: 'restart methods absent' });
+                return false;
+            }
+            log('relay restart complete', { source });
+            return true;
+        } catch (error) {
+            log('relay restart failed', { source, error: describeError(error) });
+            return false;
+        }
+    })().finally(() => {
+        transportRestartPromise = null;
+    });
+    return transportRestartPromise;
 }
 
 function safeDetail(detail) {
@@ -94,6 +228,9 @@ function updateStatus(account = modal?.getAccount?.()) {
     const chainOkay = snapshot.resolvedChainId === EXPECTED_CHAIN_ID;
     statusElement.textContent = [
         `Layer: ${layer}`,
+        `Variant: ${variant === 'multi' ? 'B multi-network proposal' : 'A Base Sepolia only'}`,
+        `Networks: ${networks.map((network) => network.caipNetworkId || `eip155:${network.id}`).join(', ')}`,
+        'allowUnsupportedChain: true',
         `Origin: ${window.location.origin}`,
         `Account: ${maskAddress(snapshot.address) || 'none'}`,
         `Chain: ${snapshot.resolvedChainId || 'unknown'}${chainOkay ? ' (Base Sepolia)' : ''}`
@@ -102,12 +239,23 @@ function updateStatus(account = modal?.getAccount?.()) {
 
 function bindLifecycleLogs() {
     document.addEventListener('visibilitychange', () => {
-        log('visibilitychange', accountSnapshot());
-        updateStatus();
+        if (document.visibilityState === 'visible') {
+            log('visibilitychange visible');
+            void restartRelayTransport('visibility return').then(() => {
+                log('post-restart account state', accountSnapshot());
+                updateStatus();
+            });
+        } else {
+            log('visibilitychange hidden', accountSnapshot());
+            updateStatus();
+        }
     });
     window.addEventListener('focus', () => {
-        log('window focus', accountSnapshot());
-        updateStatus();
+        log('window focus');
+        void restartRelayTransport('window focus').then(() => {
+            log('post-restart account state', accountSnapshot());
+            updateStatus();
+        });
     });
     window.addEventListener('blur', () => log('window blur', accountSnapshot()));
     window.addEventListener('pageshow', (event) => log('pageshow', { persisted: event.persisted }));
@@ -126,10 +274,15 @@ async function initializeBareLayer() {
         expectedChainId: EXPECTED_CHAIN_ID,
         metadataUrl: window.location.origin,
         projectIdPresent: Boolean(PROJECT_ID),
-        projectIdFingerprint: `${PROJECT_ID.slice(0, 4)}...${PROJECT_ID.slice(-4)}`
+        projectIdFingerprint: `${PROJECT_ID.slice(0, 4)}...${PROJECT_ID.slice(-4)}`,
+        variant,
+        configuredNetworks: networks.map((network) => ({
+            id: network.id,
+            caipNetworkId: network.caipNetworkId || `eip155:${network.id}`,
+            chainNamespace: network.chainNamespace || 'eip155'
+        }))
     });
-    const networks = [baseSepolia];
-    const adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID, customRpcUrls });
+    adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID, customRpcUrls });
     log('WagmiAdapter created', { networks: networks.map((network) => network.id) });
 
     modal = createAppKit({
@@ -138,7 +291,7 @@ async function initializeBareLayer() {
         defaultNetwork: baseSepolia,
         projectId: PROJECT_ID,
         customRpcUrls,
-        allowUnsupportedChain: false,
+        allowUnsupportedChain: true,
         enableNetworkSwitch: false,
         universalProviderConfigOverride: {
             events: { eip155: ['chainChanged', 'accountsChanged'] },
@@ -160,6 +313,10 @@ async function initializeBareLayer() {
     });
     log('bare AppKit created', accountSnapshot());
 
+    void getWalletConnectProvider().then((provider) => {
+        bindWalletConnectDiagnostics(provider, 'configured isolation connector');
+    });
+
     modal.subscribeAccount((account) => {
         log('subscribeAccount', accountSnapshot(account));
         updateStatus(account);
@@ -173,6 +330,10 @@ async function initializeBareLayer() {
         providerAvailable: Boolean(providerState?.walletProvider?.request || providerState?.provider?.request || providerState?.request),
         chainId: providerState?.chainId || providerState?.provider?.chainId || providerState?.walletProvider?.chainId || null
     }));
+    modal.subscribeProvider?.((providerState) => {
+        const provider = providerState?.walletProvider || providerState?.provider || providerState;
+        bindWalletConnectDiagnostics(provider, 'isolation provider subscription');
+    });
 
     connectButton.addEventListener('click', async () => {
         log('Connect click entered', accountSnapshot());
@@ -208,7 +369,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=21');
+    await import('/appkit-init.js?v=23');
     log('ArtSoul appkit wrapper imported', {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function'
