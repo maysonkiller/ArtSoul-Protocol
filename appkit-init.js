@@ -15,10 +15,10 @@ import {
     getConnectedCoreProvider,
     isCoreConnectInFlight,
     isCoreSessionActive,
-    restoreCoreSession,
+    restoreCoreSessionOutcome,
     showCoreWalletSheet,
     waitForWalletChainSettle
-} from './wallet-core-connect.js?v=1'
+} from './wallet-core-connect.js?v=2'
 
 // ============================================
 // CONFIGURATION
@@ -157,6 +157,22 @@ let lastSelectedWallet = null;
 let lastWalletConnectUri = null;
 let mobileRetryCleanupRequired = false;
 let walletTransportRestartPromise = null;
+// Mobile core-path session restore (external browsers). The persisted
+// WalletConnect session is the source of truth for "connected"; these track
+// the in-flight restore so no timer or protected action decides
+// "disconnected" while it is still running. Both stay null on desktop and in
+// injected wallet browsers.
+let coreSessionRestoreTask = null;
+let coreSessionRestoreCompletion = null;
+let coreSessionRestoreSettled = false;
+// Per-attempt cap and retries for the restore: the esm.sh import +
+// EthereumProvider.init() can fail transiently on mobile networks; a failed
+// restore must not be mistaken for "no session".
+const CORE_RESTORE_ATTEMPT_TIMEOUT = 12000;
+const CORE_RESTORE_MAX_ATTEMPTS = 3;
+// A core 'disconnect' delivered while the browser is backgrounded (iOS kills
+// the relay socket) is re-checked on return instead of wiping state blind.
+let pendingCoreDisconnectProvider = null;
 const walletConnectDiagnosticClients = new WeakSet();
 const walletConnectDiagnosticRelayers = new WeakSet();
 const walletConnectUriProviders = new WeakSet();
@@ -1312,6 +1328,15 @@ async function processWalletResume(source) {
         });
         await restartWalletConnectTransport(source);
         await logProviderTruthAfterMobileReturn(source);
+    } else if (document.visibilityState === 'visible' && isCoreSessionActive()) {
+        // A restored core session loses its relay socket whenever the mobile
+        // browser goes to the background. Reopen it on every return so the
+        // session keeps working without any user-visible disconnect.
+        // (restartWalletConnectTransport is a no-op outside the core path.)
+        await restartWalletConnectTransport(source);
+    }
+    if (document.visibilityState === 'visible') {
+        await recheckDeferredCoreDisconnect(source);
     }
     walletDebugLog('browser resume signal', {
         source,
@@ -2624,7 +2649,30 @@ async function handleCoreProviderDisconnect(provider, payload) {
         await restartWalletConnectTransport('core transient disconnect');
         return;
     }
+    // Backgrounded browsers (iOS especially) deliver relay drops as disconnects
+    // while the session record may be momentarily unreadable. Never wipe state
+    // from the background — re-check after the transport restarts on return.
+    if (document.visibilityState === 'hidden') {
+        pendingCoreDisconnectProvider = provider;
+        walletDebugLog('core disconnect deferred while backgrounded', { code });
+        return;
+    }
     walletDebugLog('core session ended (genuine disconnect)', { code });
+    await handleProviderAccountsChanged([], 'core walletconnect disconnect', provider);
+}
+
+// Resolve a disconnect that arrived while backgrounded: restart the relay,
+// then trust the persisted session record — wipe only when it is really gone.
+async function recheckDeferredCoreDisconnect(source) {
+    const provider = pendingCoreDisconnectProvider;
+    if (!provider) return;
+    pendingCoreDisconnectProvider = null;
+    await restartWalletConnectTransport(`${source}: deferred core disconnect`);
+    if (coreSessionStillLive(provider)) {
+        walletDebugLog('deferred core disconnect resolved as transient', { source });
+        return;
+    }
+    walletDebugLog('core session ended (genuine disconnect)', { source, deferred: true });
     await handleProviderAccountsChanged([], 'core walletconnect disconnect', provider);
 }
 
@@ -2640,6 +2688,29 @@ function bindCoreProviderDisconnect(provider) {
         walletDebugLog('core session_delete event', {});
         void handleProviderAccountsChanged([], 'core walletconnect session_delete', provider);
     });
+}
+
+// Restore the persisted core session with retries. Every MPA navigation is a
+// full page load that must re-import the WalletConnect SDK and reopen the
+// relay, so a single flaky attempt is common on mobile networks. Only a clean
+// "no session in storage" counts as disconnected; errors keep the last-known
+// wallet hint so the next attempt or page load can still restore.
+async function runCoreSessionRestore() {
+    let outcome = { status: 'error', session: null };
+    for (let attempt = 1; attempt <= CORE_RESTORE_MAX_ATTEMPTS; attempt++) {
+        outcome = await Promise.race([
+            restoreCoreSessionOutcome(),
+            sleep(CORE_RESTORE_ATTEMPT_TIMEOUT).then(() => ({ status: 'error', session: null, timedOut: true }))
+        ]);
+        if (outcome.status !== 'error') return outcome;
+        walletDebugLog('core session restore attempt failed', {
+            attempt,
+            timedOut: Boolean(outcome.timedOut),
+            error: outcome.error ? describeWalletDebugError(outcome.error) : null
+        });
+        if (attempt < CORE_RESTORE_MAX_ATTEMPTS) await sleep(500 * attempt);
+    }
+    return outcome;
 }
 
 function findWalletConnectUri(value, depth = 0, seen = new WeakSet()) {
@@ -3275,6 +3346,16 @@ function waitForWalletHydration(timeoutMs = WALLET_HYDRATION_TIMEOUT + 500) {
 // resolves with the connected address once approved. The caller stays on the
 // same page and can continue its work — no redirect, no toast.
 window.ensureWalletConnected = async () => {
+    // Mobile core path: the persisted-session restore is the authority on
+    // "connected". Protected actions wait for it to finish (it is bounded by
+    // its own attempt caps) instead of deciding from the momentary UI state.
+    if (coreSessionRestoreCompletion && !coreSessionRestoreSettled) {
+        try {
+            await coreSessionRestoreCompletion;
+        } catch {
+            // The completion handler logs its own failures.
+        }
+    }
     await waitForWalletHydration();
     const existing = window.getCurrentWalletAddress?.();
     if (existing) return existing;
@@ -3339,6 +3420,17 @@ async function initializeAppKit() {
             sessionStorage.removeItem('artsoul_disconnecting');
         }
 
+        // Mobile external browsers: kick off the core WalletConnect session
+        // restore immediately. It re-imports the SDK and reopens the relay on
+        // every page load (MPA), so it must run in parallel with the rest of
+        // the boot; the fail-open/hydration timers below wait for it instead
+        // of declaring "disconnected" while it is still in flight. After an
+        // explicit disconnect the WalletConnect storage was just cleared, so
+        // the restore settles as "none" almost instantly.
+        if (isMobile && !isInjectedWalletBrowser()) {
+            coreSessionRestoreTask = runCoreSessionRestore();
+        }
+
         const storedWalletAtBoot = localStorage.getItem('artsoul_wallet');
         let walletHydrationPending = true;
         let walletHydrationTimer = null;
@@ -3392,6 +3484,16 @@ async function initializeAppKit() {
 
         walletHydrationTimer = setTimeout(() => {
             if (!walletHydrationPending) return;
+            // Mobile core path: the persisted-session restore is the source of
+            // truth. While it is still running (slow network, retry), do not
+            // wipe the stored wallet — its completion handler settles the
+            // state either way, and it is bounded by its own attempt caps.
+            if (coreSessionRestoreCompletion && !coreSessionRestoreSettled) {
+                void coreSessionRestoreCompletion.then(() => {
+                    if (walletHydrationPending) clearStaleWalletState();
+                });
+                return;
+            }
             clearStaleWalletState();
         }, WALLET_HYDRATION_TIMEOUT);
 
@@ -3404,6 +3506,16 @@ async function initializeAppKit() {
             if (window.artsoulWalletStateSettled === true) return;
             // A connect is actively running (its own flow will settle the UI).
             if (activeMobileConnect || Date.now() < connectModalIntentUntil) return;
+            // Mobile core path: the persisted-session restore is still in
+            // flight — it settles the UI itself (connected or guest) and is
+            // bounded by its own attempt caps, so failing open to guest here
+            // would flash "Connect Wallet" over a live session on every page
+            // load. Desktop never sets coreSessionRestoreTask and keeps the
+            // exact fail-open behavior below.
+            if (coreSessionRestoreTask && !coreSessionRestoreSettled) {
+                walletDebugLog('fail-open deferred to core session restore', {});
+                return;
+            }
             try {
                 // Injected (extension) truth first, then a live AppKit account
                 // snapshot, so a genuinely-connected desktop user is never shown
@@ -3524,40 +3636,57 @@ async function initializeAppKit() {
             walletDebugLog('AppKit event subscription unavailable');
         }
 
-        // Core WalletConnect sessions persist in IndexedDB. Restore them on
-        // load without a new pairing so a live mobile session survives page
-        // reloads exactly like an injected provider does.
-        if (isMobile && !isInjectedWalletBrowser()) {
-            void restoreCoreSession().then((restored) => {
-                if (!restored?.address || window.currentWalletAddress) {
-                    // On the external-mobile path the core session is the only
-                    // wallet source. If none was restored, hydration is settled —
-                    // release it now instead of blocking protected actions for
-                    // the full hydration timeout.
-                    if (!restored?.address && walletHydrationPending && !window.currentWalletAddress) {
-                        dispatchWalletStateChanged({
-                            address: null,
-                            chainId: null,
-                            isConnected: false
-                        }, { settled: true });
-                        finishWalletHydration();
-                    }
+        // Core WalletConnect sessions persist in WalletConnect storage.
+        // Restore them on load without a new pairing so a live mobile session
+        // survives page reloads and navigation exactly like an injected
+        // provider does. The completion promise is what the fail-open timer,
+        // the hydration timer and protected actions wait on.
+        if (coreSessionRestoreTask) {
+            coreSessionRestoreCompletion = coreSessionRestoreTask.then((outcome) => {
+                const restored = outcome.session;
+                if (restored?.address) {
+                    // Bind the session provider even if a fresh connect already
+                    // confirmed an address, so transient relay drops on this
+                    // provider stay classified instead of wiping state.
+                    bindRuntimeProviderEvents(restored.provider, 'core walletconnect restore');
+                    bindWalletConnectDiagnostics(restored.provider, 'core walletconnect restore');
+                    bindCoreProviderDisconnect(restored.provider);
+                    if (window.currentWalletAddress) return;
+                    activeWalletProvider = restored.provider;
+                    applyConfirmedWalletState({
+                        address: restored.address,
+                        chainId: restored.chainId
+                    });
+                    walletDebugLog('core session restored on boot', {
+                        address: maskWalletAddress(restored.address),
+                        chainId: restored.chainId
+                    });
                     return;
                 }
-                activeWalletProvider = restored.provider;
-                bindRuntimeProviderEvents(restored.provider, 'core walletconnect restore');
-                bindWalletConnectDiagnostics(restored.provider, 'core walletconnect restore');
-                bindCoreProviderDisconnect(restored.provider);
-                applyConfirmedWalletState({
-                    address: restored.address,
-                    chainId: restored.chainId
-                });
-                walletDebugLog('core session restored on boot', {
-                    address: maskWalletAddress(restored.address),
-                    chainId: restored.chainId
-                });
+
+                if (window.currentWalletAddress) return;
+                // Only a clean "no session in storage" proves the wallet is
+                // disconnected; a restore error keeps the stored wallet hint so
+                // the next page load renders optimistically and retries.
+                if (outcome.status === 'none') {
+                    localStorage.removeItem('artsoul_wallet');
+                }
+                if (walletHydrationPending) {
+                    // The settled guest dispatch re-renders the header via the
+                    // wallet-state-changed listener. A null nav-buttons update
+                    // is deliberately NOT issued here: it would also erase the
+                    // stored wallet hint, which must survive a restore *error*.
+                    dispatchWalletStateChanged({
+                        address: null,
+                        chainId: null,
+                        isConnected: false
+                    }, { settled: true });
+                    finishWalletHydration();
+                }
             }).catch((error) => {
                 walletDebugLog('core session boot restore failed', describeWalletDebugError(error));
+            }).finally(() => {
+                coreSessionRestoreSettled = true;
             });
         }
 

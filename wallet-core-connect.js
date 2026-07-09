@@ -180,14 +180,18 @@ export async function getCoreEthereumProvider() {
     return providerInitPromise;
 }
 
-// EthereumProvider persists its session in IndexedDB. On page load an
-// existing session is restored without a new pairing.
-export async function restoreCoreSession() {
+// EthereumProvider persists its session in WalletConnect storage. On page
+// load an existing session is restored without a new pairing. The outcome
+// distinguishes "no session exists" from "restore errored" — an error (flaky
+// network, failed SDK import, relay hiccup) does NOT mean the user is
+// disconnected: the persisted session is still in storage and a later retry
+// or page load can restore it.
+export async function restoreCoreSessionOutcome() {
     try {
         const instance = await getCoreEthereumProvider();
-        if (!instance.session) return null;
+        if (!instance.session) return { status: 'none', session: null };
         const address = (instance.accounts || []).filter(Boolean)[0] || null;
-        if (!address) return null;
+        if (!address) return { status: 'none', session: null };
         const restored = {
             provider: instance,
             address,
@@ -198,11 +202,16 @@ export async function restoreCoreSession() {
             chainId: restored.chainId,
             namespaceChains: instance.session?.namespaces?.eip155?.chains || null
         });
-        return restored;
+        return { status: 'restored', session: restored };
     } catch (error) {
         coreLog('core session restore failed', describeCoreError(error));
-        return null;
+        return { status: 'error', session: null, error };
     }
+}
+
+export async function restoreCoreSession() {
+    const outcome = await restoreCoreSessionOutcome();
+    return outcome.session;
 }
 
 // One pairing URI per attempt. The URI is emitted once by connect() and is
