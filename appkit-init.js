@@ -159,14 +159,6 @@ const walletDebugEntries = [];
 const walletDebugStartedAt = Date.now();
 let walletDebugDiagnosticsBound = false;
 let lastWalletDebugModalStateKey = '';
-// Substituted with the real commit at build time (see vite.config.js). Stays
-// as the literal token in local dev, which the panel renders as "local/dev".
-const ARTSOUL_BUILD_COMMIT = '__ARTSOUL_BUILD_COMMIT__';
-const CORE_WALLET_SHEET_ID = 'artsoul-core-wallet-sheet';
-let lastWalletDebugError = null;
-let lastWalletTap = null;
-let walletTapDiagnosticsBound = false;
-let walletDebugStatusTimer = null;
 window.artsoulWalletHydrating = true;
 window.artsoulWalletStateSettled = false;
 window.artsoulSettledWalletState = null;
@@ -271,187 +263,6 @@ function walletDebugLog(step, detail = null) {
     panel.scrollTop = panel.scrollHeight;
 }
 
-// ============================================
-// WALLET TAP DIAGNOSTICS (?walletdebug=1 only)
-// Temporary instrumentation to answer: do wallet buttons receive taps, do
-// their handlers fire, and is anything (overlay / disabled state) swallowing
-// the tap? Everything here is gated behind walletDebugEnabled().
-// ============================================
-
-function describeElementForDebug(el) {
-    if (!el || el === document || el === window) return String(el === document ? 'document' : el === window ? 'window' : el);
-    if (el.nodeType !== 1) return String(el?.nodeName || el);
-    const id = el.id ? `#${el.id}` : '';
-    const className = typeof el.className === 'string' ? el.className.trim() : '';
-    const cls = className ? `.${className.split(/\s+/).slice(0, 3).join('.')}` : '';
-    const text = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 22);
-    return `${el.tagName.toLowerCase()}${id}${cls}${text ? ` "${text}"` : ''}`;
-}
-
-// Any element that belongs to a wallet-connect surface.
-function isWalletRelatedTarget(el) {
-    return Boolean(el?.closest?.(
-        '#connectBtn, .avatar-button, #avatarDropdownMenu, ' +
-        `#${CORE_WALLET_SHEET_ID}, #${CORE_WALLET_SHEET_ID}-backdrop, ` +
-        '[data-artsoul-wallet-tap], .avatar-disconnect-item'
-    ));
-}
-
-function walletConnectPathLabel() {
-    try {
-        if (isInjectedWalletBrowser()) return 'injected';
-        if (isMobileDevice()) return 'manual-core (external mobile WalletConnect)';
-        return 'appkit (desktop)';
-    } catch {
-        return 'unknown';
-    }
-}
-
-function bindWalletTapDiagnostics() {
-    if (!walletDebugEnabled() || walletTapDiagnosticsBound) return;
-    walletTapDiagnosticsBound = true;
-
-    const record = (event) => {
-        const point = event.touches?.[0] || event.changedTouches?.[0] || event;
-        const x = point?.clientX;
-        const y = point?.clientY;
-        const target = event.target;
-        const walletRelated = isWalletRelatedTarget(target);
-        // The single most useful overlay check: what is actually on top at the
-        // tap coordinates? If it is not the button (nor an ancestor/descendant),
-        // an invisible layer is intercepting the tap.
-        const topmost = (Number.isFinite(x) && Number.isFinite(y))
-            ? document.elementFromPoint(x, y)
-            : null;
-        const covered = Boolean(
-            topmost && target &&
-            topmost !== target &&
-            !target.contains?.(topmost) &&
-            !topmost.contains?.(target)
-        );
-        const button = target?.closest?.('button, [role="button"]') || null;
-        const info = {
-            type: event.type,
-            target: describeElementForDebug(target),
-            topmostAtPoint: describeElementForDebug(topmost),
-            coveredByOverlay: covered,
-            buttonDisabled: Boolean(button?.disabled),
-            buttonAllowRapid: button ? button.hasAttribute('data-allow-rapid') : null,
-            defaultPrevented: event.defaultPrevented,
-            walletRelated,
-            path: walletConnectPathLabel(),
-            at: new Date().toISOString()
-        };
-        if (walletRelated || covered) {
-            lastWalletTap = info;
-            walletDebugLog(`tap ${event.type}`, info);
-            renderWalletDebugStatus();
-        }
-    };
-
-    ['pointerdown', 'touchstart', 'click'].forEach((type) => {
-        document.addEventListener(type, record, { capture: true, passive: true });
-    });
-
-    // Bubble-phase click: ran AFTER inline onclick + the global preventDoubleClick
-    // guard, so it reveals whether the tap survived to actually do something.
-    document.addEventListener('click', (event) => {
-        if (!isWalletRelatedTarget(event.target)) return;
-        const button = event.target?.closest?.('button, [role="button"]') || null;
-        walletDebugLog('tap click resolved', {
-            target: describeElementForDebug(event.target),
-            defaultPrevented: event.defaultPrevented,
-            buttonDisabledAfter: Boolean(button?.disabled),
-            sheetMounted: Boolean(document.getElementById(CORE_WALLET_SHEET_ID))
-        });
-        renderWalletDebugStatus();
-    });
-}
-
-function renderWalletDebugStatus() {
-    if (!walletDebugEnabled()) return;
-    let panel = document.getElementById('artsoul-wallet-debug');
-    if (!panel) {
-        // walletDebugLog builds the panel; trigger it once.
-        walletDebugLog('wallet debug panel init', {});
-        panel = document.getElementById('artsoul-wallet-debug');
-        if (!panel) return;
-    }
-
-    let status = document.getElementById('artsoul-wallet-debug-status');
-    if (!status) {
-        status = document.createElement('div');
-        status.id = 'artsoul-wallet-debug-status';
-        status.style.cssText = [
-            'position:sticky',
-            'top:24px',
-            'z-index:1',
-            'padding:6px 0',
-            'margin-bottom:6px',
-            'border-bottom:1px dashed var(--c-border)',
-            'color:var(--c-text)',
-            'background:var(--c-surface)',
-            'white-space:pre-wrap',
-            'font-weight:600'
-        ].join(';');
-        panel.insertBefore(status, panel.children[1] || null);
-
-        const debugButton = document.createElement('button');
-        debugButton.type = 'button';
-        debugButton.textContent = 'Debug Open Wallet Sheet';
-        debugButton.setAttribute('data-artsoul-wallet-tap', '');
-        // Exempt from the global double-click guard so the diagnostic itself is
-        // never the thing that swallows the tap.
-        debugButton.setAttribute('data-allow-rapid', '');
-        debugButton.style.cssText = [
-            'display:block',
-            'width:100%',
-            'min-height:44px',
-            'margin:4px 0 8px',
-            'border:1px solid var(--c-accent)',
-            'border-radius:8px',
-            'background:var(--c-bg)',
-            'color:var(--c-text)',
-            'font:inherit',
-            'font-weight:700'
-        ].join(';');
-        debugButton.addEventListener('click', () => {
-            walletDebugLog('debug open wallet sheet tapped', { path: walletConnectPathLabel() });
-            try {
-                void window.safeConnectWallet?.();
-            } catch (error) {
-                lastWalletDebugError = describeWalletDebugError(error).message;
-                walletDebugLog('debug open wallet sheet threw', describeWalletDebugError(error));
-            }
-            renderWalletDebugStatus();
-        });
-        status.insertAdjacentElement('afterend', debugButton);
-    }
-
-    const commit = ARTSOUL_BUILD_COMMIT.startsWith('__ARTSOUL')
-        ? 'local/dev'
-        : ARTSOUL_BUILD_COMMIT.slice(0, 8);
-    const tap = lastWalletTap
-        ? `${lastWalletTap.type} → ${lastWalletTap.target}` +
-          (lastWalletTap.coveredByOverlay ? `\n   ⚠ COVERED BY: ${lastWalletTap.topmostAtPoint}` : '') +
-          (lastWalletTap.buttonDisabled ? '\n   ⚠ button was DISABLED' : '') +
-          (lastWalletTap.buttonAllowRapid === false ? '\n   ⚠ no data-allow-rapid (double-click guard applies)' : '')
-        : 'none yet';
-    status.textContent = [
-        'ARTSOUL WALLET TAP DEBUG',
-        `commit: ${commit}`,
-        `path: ${walletConnectPathLabel()}`,
-        `window.ethereum: ${Boolean(window.ethereum)}`,
-        `mobileExternalBrowser: ${(() => { try { return isMobileDevice() && !isInjectedWalletBrowser(); } catch { return 'n/a'; } })()}`,
-        `connect handler attached: ${typeof window.safeConnectWallet === 'function'}`,
-        `wallet sheet mounted: ${Boolean(document.getElementById(CORE_WALLET_SHEET_ID))}`,
-        `hydrating: ${Boolean(window.artsoulWalletHydrating)}  settled: ${Boolean(window.artsoulWalletStateSettled)}`,
-        `last tap: ${tap}`,
-        `last tap at: ${lastWalletTap?.at || 'none'}`,
-        `last error: ${lastWalletDebugError || 'none'}`
-    ].join('\n');
-}
-
 function bindWalletDebugDiagnostics() {
     if (!walletDebugEnabled() || walletDebugDiagnosticsBound) return;
     walletDebugDiagnosticsBound = true;
@@ -460,23 +271,11 @@ function bindWalletDebugDiagnostics() {
         account: getWalletDebugSnapshot()
     });
     window.addEventListener('error', (event) => {
-        const described = describeWalletDebugError(event.error || event.message);
-        lastWalletDebugError = `${described.name}: ${described.message}`;
-        walletDebugLog('window error', described);
-        renderWalletDebugStatus();
+        walletDebugLog('window error', describeWalletDebugError(event.error || event.message));
     });
     window.addEventListener('unhandledrejection', (event) => {
-        const described = describeWalletDebugError(event.reason);
-        lastWalletDebugError = `${described.name}: ${described.message}`;
-        walletDebugLog('unhandled rejection', described);
-        renderWalletDebugStatus();
+        walletDebugLog('unhandled rejection', describeWalletDebugError(event.reason));
     });
-    bindWalletTapDiagnostics();
-    renderWalletDebugStatus();
-    // Keep live fields (sheet mounted / hydration) fresh without a tap.
-    if (!walletDebugStatusTimer) {
-        walletDebugStatusTimer = setInterval(renderWalletDebugStatus, 1000);
-    }
     window.addEventListener('pageshow', (event) => snapshot('pageshow', { persisted: event.persisted }));
     window.addEventListener('pagehide', (event) => snapshot('pagehide', { persisted: event.persisted }));
     window.addEventListener('blur', () => snapshot('window blur'));

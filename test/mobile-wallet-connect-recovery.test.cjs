@@ -223,19 +223,6 @@ test('wallet buttons are exempt from the global double-click guard that swallowe
     assert.match(perf, /dataset\.allowRapid/);
 });
 
-test('walletdebug exposes tap diagnostics, overlay audit and a Debug Open Wallet Sheet button', () => {
-    assert.match(appKit, /function bindWalletTapDiagnostics/);
-    assert.match(appKit, /document\.elementFromPoint/);
-    assert.match(appKit, /coveredByOverlay/);
-    assert.match(appKit, /Debug Open Wallet Sheet/);
-    assert.match(appKit, /function renderWalletDebugStatus/);
-    assert.match(appKit, /connect handler attached:/);
-    assert.match(appKit, /wallet sheet mounted:/);
-    // Commit is stamped at build time via a token substitution.
-    assert.match(appKit, /ARTSOUL_BUILD_COMMIT = '__ARTSOUL_BUILD_COMMIT__'/);
-    assert.match(read('vite.config.js'), /BUILD_COMMIT_TOKEN/);
-});
-
 test('wallet return deep link preserves the current page, not the homepage', () => {
     assert.match(appKit, /redirect:\s*\{\s*\n\s*universal: appReturnUrl/);
     assert.match(appKit, /returnUrl\.hash = ''/);
