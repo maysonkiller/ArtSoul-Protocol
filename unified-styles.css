@@ -129,9 +129,9 @@ body.future .artsoul-skeleton-card {
     }
 
     .profile-skeleton-avatar {
-        width: 80px;
-        height: 80px;
-        flex-basis: 80px;
+        width: 72px;
+        height: 72px;
+        flex-basis: 72px;
     }
 
     .profile-skeleton-tab-row {
@@ -4611,10 +4611,16 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .profile-page-main {
         padding-top: 0.9rem !important;
-        padding-bottom: 1.5rem !important;
+        padding-bottom: max(1.5rem, calc(1rem + env(safe-area-inset-bottom))) !important;
     }
 
-    .profile-hero {
+    .profile-hero,
+    .profile-skeleton-header {
+        margin-bottom: 0.9rem !important;
+        padding: 0.85rem !important;
+    }
+
+    .profile-skeleton-tabs {
         margin-bottom: 0.9rem !important;
         padding: 0.85rem !important;
     }
@@ -4655,8 +4661,18 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         font-size: 0.75rem;
     }
 
+    /* .profile-stat-grid / .profile-oauth-notice / .profile-actions render nested
+       inside .profile-identity-copy, so `grid-column: 1 / -1` never reaches the
+       actual grid container -- pull them back over the avatar column instead so
+       they use the full card width rather than being squeezed into the name column. */
+    .profile-stat-grid,
+    .profile-oauth-notice,
+    .profile-actions {
+        margin-left: calc(-72px - 0.8rem);
+        width: calc(100% + 72px + 0.8rem);
+    }
+
     .profile-stat-grid {
-        grid-column: 1 / -1;
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 0.55rem !important;
@@ -4738,6 +4754,13 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .profile-hero.is-editing .profile-avatar-column {
         justify-self: center;
+    }
+
+    .profile-hero.is-editing .profile-stat-grid,
+    .profile-hero.is-editing .profile-oauth-notice,
+    .profile-hero.is-editing .profile-actions {
+        margin-left: 0;
+        width: 100%;
     }
 
     .site-header *,

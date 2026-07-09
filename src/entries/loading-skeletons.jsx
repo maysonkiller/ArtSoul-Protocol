@@ -68,7 +68,7 @@ export function ArtworkPageSkeleton() {
 
 export function ProfilePageSkeleton({ className = '' }) {
     return (
-        <main className={`site-page-container py-8 ${className}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
+        <main className={`site-page-container profile-page-main py-8 ${className}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
             <section className="profile-skeleton-header rounded-xl p-6 mb-6">
                 <div className="profile-skeleton-identity">
                     <SkeletonBlock className="profile-skeleton-avatar" />
