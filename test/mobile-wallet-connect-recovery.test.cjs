@@ -10,6 +10,8 @@ const artwork = read(path.join('src', 'entries', 'artwork.jsx'));
 const auctionServiceV3 = read(path.join('src', 'features', 'auction', 'auction-service-v3.js'));
 const walletTest = read('wallet-test.js');
 const coreWallet = read('wallet-core-connect.js');
+const profile = read(path.join('src', 'entries', 'profile.jsx'));
+const upload = read(path.join('src', 'entries', 'upload.js'));
 
 test('production and isolated diagnostics pin every Reown import to 1.8.21', () => {
     for (const source of [appKit, walletTest]) {
@@ -153,4 +155,75 @@ test('legacy Ethereum Sepolia artwork writes are blocked without a switch prompt
     assert.match(artwork, /This artwork is on a legacy network\. On-chain actions are disabled for now\./);
     assert.doesNotMatch(artwork, /Switch to \$\{networkNames\[artworkNetwork\]/);
     assert.doesNotMatch(artwork, /'sepolia': 11155111,\s*'baseSepolia': 84532/);
+});
+
+test('branded wallet modal lists every supported wallet with a local icon and "Other" QR path', () => {
+    assert.match(coreWallet, /const CORE_WALLETS = \[/);
+    for (const name of ['MetaMask', 'Trust Wallet', 'Coinbase Wallet', 'Rainbow', 'Zerion', 'Rabby', 'OKX Wallet']) {
+        assert.ok(coreWallet.includes(name), `${name} must appear in the wallet list`);
+    }
+    assert.match(coreWallet, /Connect Wallet/);
+    assert.match(coreWallet, /Other wallets \(QR \/ link\)/);
+    // Icons are local (inline monogram tiles), never hot-linked remote images.
+    assert.doesNotMatch(coreWallet, /<img[^>]+src=["']https?:/);
+    assert.match(coreWallet, /QRCode\.toCanvas/);
+    // Slide-up animation is Future-theme only (Classic = no animation).
+    assert.match(coreWallet, /artsoul_theme.*future|future.*artsoul_theme/s);
+});
+
+test('each wallet carries a real iOS/Android deep link or an honest copy-paste fallback', () => {
+    assert.match(coreWallet, /https:\/\/metamask\.app\.link\/wc\?uri=/);
+    assert.match(coreWallet, /https:\/\/link\.trustwallet\.com\/wc\?uri=/);
+    assert.match(coreWallet, /https:\/\/go\.cb-w\.com\/wc\?uri=/);
+    assert.match(coreWallet, /https:\/\/rnbwapp\.com\/wc\?uri=/);
+    assert.match(coreWallet, /https:\/\/wallet\.zerion\.io\/wc\?uri=/);
+    assert.match(coreWallet, /rabby:\/\/wc\?uri=/);
+    assert.match(coreWallet, /okx:\/\/wallet\/wc\?uri=/);
+    assert.match(coreWallet, /encodeURIComponent\(uri\)/);
+    // Rabby has no reliable iOS link → copy-and-paste, never a dead link.
+    assert.match(coreWallet, /ios: null/);
+    assert.match(coreWallet, /Open \$\{wallet\.name\} and paste it/);
+    // One pairing URI per attempt: the sheet only re-renders the URI it is given.
+    assert.match(coreWallet, /itself never asks the provider for a new pairing/);
+});
+
+test('core session survives transient relay drops and only wipes on a genuine end', () => {
+    assert.match(appKit, /function coreSessionStillLive/);
+    assert.match(appKit, /async function handleCoreProviderDisconnect/);
+    assert.match(appKit, /transient relay drop/);
+    assert.match(appKit, /restartWalletConnectTransport\('core transient disconnect'\)/);
+    assert.match(appKit, /provider\.on\?\.\('session_delete'/);
+    // A genuine end still wipes state so the user is not stuck "connected".
+    assert.match(appKit, /core session ended \(genuine disconnect\)/);
+});
+
+test('protected actions open the wallet modal via a single hydration-aware entry point', () => {
+    assert.match(appKit, /window\.ensureWalletConnected = async/);
+    assert.match(appKit, /function waitForWalletHydration/);
+    // No page decides "not connected" before boot restore settles.
+    assert.match(appKit, /await waitForWalletHydration\(\)/);
+    for (const [label, source] of [['artwork', artwork], ['profile', profile], ['upload', upload]]) {
+        assert.match(source, /window\.ensureWalletConnected\?\.\(\)/, `${label} must route protected actions through ensureWalletConnected`);
+    }
+    // The old "connect your wallet" alert toasts are gone from the tap paths.
+    assert.doesNotMatch(artwork, /alert\('Please connect your wallet'\)/);
+    assert.doesNotMatch(profile, /alert\('Please connect your wallet'\)/);
+});
+
+test('wallet buttons are exempt from the global double-click guard that swallowed mobile taps', () => {
+    const avatar = read('avatar-dropdown.js');
+    // The Connect Wallet + Disconnect items must opt out of preventDoubleClick.
+    assert.match(avatar, /id="connectBtn" data-allow-rapid/);
+    assert.match(avatar, /resetWalletConnection\(\)" data-allow-rapid/);
+    // Every branded-sheet control opts out too.
+    const rapidCount = (coreWallet.match(/data-allow-rapid/g) || []).length;
+    assert.ok(rapidCount >= 4, `sheet controls must set data-allow-rapid (found ${rapidCount})`);
+    // The guard itself still exists and still honours the opt-out attribute.
+    const perf = read(path.join('src', 'core', 'utils', 'performance-utils.js'));
+    assert.match(perf, /dataset\.allowRapid/);
+});
+
+test('wallet return deep link preserves the current page, not the homepage', () => {
+    assert.match(appKit, /redirect:\s*\{\s*\n\s*universal: appReturnUrl/);
+    assert.match(appKit, /returnUrl\.hash = ''/);
 });

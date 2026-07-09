@@ -33,13 +33,10 @@ class ProfileButton {
     /**
      * Navigate to profile
      */
-    goToProfile() {
-        const walletAddress = window.getCurrentWalletAddress?.();
-
-        if (!walletAddress) {
-            alert('Please connect your wallet first');
-            return;
-        }
+    async goToProfile() {
+        // Open the wallet modal on tap when not connected, then continue.
+        const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+        if (!walletAddress) return;
 
         window.location.href = 'profile.html';
     }

@@ -525,12 +525,12 @@
                 </div>
             ` : networkInfo ? `
                 <div class="avatar-dropdown-divider"></div>
-                <button onclick="window.resetWalletConnection()" class="dropdown-item avatar-disconnect-item">
+                <button onclick="window.resetWalletConnection()" data-allow-rapid class="dropdown-item avatar-disconnect-item">
                     <span>Disconnect</span>
                 </button>
             ` : `
                 <div class="avatar-dropdown-divider"></div>
-                <button onclick="safeConnectWallet()" id="connectBtn" class="dropdown-item btn-main">
+                <button onclick="safeConnectWallet()" id="connectBtn" data-allow-rapid class="dropdown-item btn-main">
                     <span>Connect Wallet</span>
                 </button>
             `;

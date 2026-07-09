@@ -814,11 +814,8 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function saveProfile() {
-                const walletAddress = window.getCurrentWalletAddress?.();
-                if (!walletAddress) {
-                    alert('Please connect your wallet first');
-                    return;
-                }
+                const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                if (!walletAddress) return;
 
                 try {
                     // Authenticate before saving (only once)
@@ -912,17 +909,15 @@ const { useState, useEffect, useRef } = React;
 
                 try {
                     // Check wallet connection
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
-                    const walletAddress = window.getCurrentWalletAddress?.();
-                    if (!walletAddress) {
-                        alert('Please connect your wallet');
-                        return;
-                    }
+                    const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                    if (!walletAddress) return;
 
                     if (!canCreateNewAuction(artwork, walletAddress)) {
                         alert('A new primary auction is only available to the creator while the artwork is unminted and has no active auction.');
@@ -1010,18 +1005,16 @@ const { useState, useEffect, useRef } = React;
 
                 try {
                     // Check wallet connection
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
                     // Verify ownership
-                    const walletAddress = window.getCurrentWalletAddress?.();
-                    if (!walletAddress) {
-                        alert('Please connect your wallet');
-                        return;
-                    }
+                    const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                    if (!walletAddress) return;
 
                     if (artwork.creator_id?.toLowerCase() !== walletAddress.toLowerCase()) {
                         alert('You can only delete your own artworks');
@@ -1053,18 +1046,16 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     // Check wallet connection
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
                     // Verify ownership
-                    const walletAddress = window.getCurrentWalletAddress?.();
-                    if (!walletAddress) {
-                        alert('Please connect your wallet');
-                        return;
-                    }
+                    const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                    if (!walletAddress) return;
 
                     if (!canListForResale(artwork, walletAddress)) {
                         alert('Only the current owner can list this minted NFT for resale.');
