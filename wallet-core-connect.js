@@ -493,6 +493,9 @@ export function showCoreWalletSheet({ uri, isIOS, onWalletOpened, onCancel, log 
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
     closeButton.className = 'as-close';
+    // Exempt every sheet control from the global preventDoubleClick guard, which
+    // otherwise disables the button for 500ms on tap and swallows mobile taps.
+    closeButton.setAttribute('data-allow-rapid', '');
     closeButton.setAttribute('aria-label', 'Close');
     closeButton.textContent = '✕';
     head.append(title, closeButton);
@@ -557,6 +560,7 @@ export function showCoreWalletSheet({ uri, isIOS, onWalletOpened, onCancel, log 
         const row = document.createElement('button');
         row.type = 'button';
         row.className = 'as-row';
+        row.setAttribute('data-allow-rapid', '');
         const icon = document.createElement('span');
         icon.className = 'as-ic';
         icon.style.backgroundImage = wallet.tint;
@@ -588,6 +592,7 @@ export function showCoreWalletSheet({ uri, isIOS, onWalletOpened, onCancel, log 
     const otherRow = document.createElement('button');
     otherRow.type = 'button';
     otherRow.className = 'as-row as-other';
+    otherRow.setAttribute('data-allow-rapid', '');
     const otherIcon = document.createElement('span');
     otherIcon.className = 'as-ic';
     otherIcon.style.backgroundImage = 'linear-gradient(135deg,var(--c-accent),var(--c-accent-2,var(--c-accent)))';
@@ -611,6 +616,7 @@ export function showCoreWalletSheet({ uri, isIOS, onWalletOpened, onCancel, log 
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
     copyButton.className = 'as-copy';
+    copyButton.setAttribute('data-allow-rapid', '');
     copyButton.textContent = 'Copy connection link';
     copyButton.addEventListener('click', () => {
         void copyUri('Link copied. Open your wallet, choose WalletConnect, and paste it.');

@@ -184,7 +184,7 @@ test('each wallet carries a real iOS/Android deep link or an honest copy-paste f
     assert.match(coreWallet, /ios: null/);
     assert.match(coreWallet, /Open \$\{wallet\.name\} and paste it/);
     // One pairing URI per attempt: the sheet only re-renders the URI it is given.
-    assert.match(coreWallet, /the sheet\n\s*\/\/ itself never asks the provider for a new pairing/);
+    assert.match(coreWallet, /itself never asks the provider for a new pairing/);
 });
 
 test('core session survives transient relay drops and only wipes on a genuine end', () => {
@@ -208,6 +208,32 @@ test('protected actions open the wallet modal via a single hydration-aware entry
     // The old "connect your wallet" alert toasts are gone from the tap paths.
     assert.doesNotMatch(artwork, /alert\('Please connect your wallet'\)/);
     assert.doesNotMatch(profile, /alert\('Please connect your wallet'\)/);
+});
+
+test('wallet buttons are exempt from the global double-click guard that swallowed mobile taps', () => {
+    const avatar = read('avatar-dropdown.js');
+    // The Connect Wallet + Disconnect items must opt out of preventDoubleClick.
+    assert.match(avatar, /id="connectBtn" data-allow-rapid/);
+    assert.match(avatar, /resetWalletConnection\(\)" data-allow-rapid/);
+    // Every branded-sheet control opts out too.
+    const rapidCount = (coreWallet.match(/data-allow-rapid/g) || []).length;
+    assert.ok(rapidCount >= 4, `sheet controls must set data-allow-rapid (found ${rapidCount})`);
+    // The guard itself still exists and still honours the opt-out attribute.
+    const perf = read(path.join('src', 'core', 'utils', 'performance-utils.js'));
+    assert.match(perf, /dataset\.allowRapid/);
+});
+
+test('walletdebug exposes tap diagnostics, overlay audit and a Debug Open Wallet Sheet button', () => {
+    assert.match(appKit, /function bindWalletTapDiagnostics/);
+    assert.match(appKit, /document\.elementFromPoint/);
+    assert.match(appKit, /coveredByOverlay/);
+    assert.match(appKit, /Debug Open Wallet Sheet/);
+    assert.match(appKit, /function renderWalletDebugStatus/);
+    assert.match(appKit, /connect handler attached:/);
+    assert.match(appKit, /wallet sheet mounted:/);
+    // Commit is stamped at build time via a token substitution.
+    assert.match(appKit, /ARTSOUL_BUILD_COMMIT = '__ARTSOUL_BUILD_COMMIT__'/);
+    assert.match(read('vite.config.js'), /BUILD_COMMIT_TOKEN/);
 });
 
 test('wallet return deep link preserves the current page, not the homepage', () => {
