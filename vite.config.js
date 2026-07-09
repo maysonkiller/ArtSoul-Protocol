@@ -64,10 +64,26 @@ const legacyClientFiles = [
     'src/services-index.js'
 ];
 
+// Best-effort deployment commit for the ?walletdebug=1 status panel. Vercel
+// exposes VERCEL_GIT_COMMIT_SHA at build time; fall back to a local marker.
+const BUILD_COMMIT = process.env.VERCEL_GIT_COMMIT_SHA
+    || process.env.GITHUB_SHA
+    || 'local-dev';
+const BUILD_COMMIT_TOKEN = '__ARTSOUL_BUILD_COMMIT__';
+
 async function copyRelative(relativePath) {
     const source = path.join(root, relativePath);
     const destination = path.join(outDir, relativePath);
     await mkdir(path.dirname(destination), { recursive: true });
+    // Legacy JS assets are copied verbatim (not bundled), so a build-time
+    // token substitution is how the deployment commit reaches the debug panel.
+    if (relativePath.endsWith('.js')) {
+        const content = await readFile(source, 'utf8');
+        if (content.includes(BUILD_COMMIT_TOKEN)) {
+            await writeFile(destination, content.replaceAll(BUILD_COMMIT_TOKEN, BUILD_COMMIT));
+            return;
+        }
+    }
     await copyFile(source, destination);
 }
 
