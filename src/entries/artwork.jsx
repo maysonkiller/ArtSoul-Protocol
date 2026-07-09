@@ -426,7 +426,11 @@ const { useState, useEffect, useRef } = React;
                 if (!beginTransactionAction('withdraw-deposit')) return;
 
                 try {
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider) {
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
+                    }
                     if (!provider) throw new Error('Connect your wallet before withdrawing.');
                     await window.ArtSoulContracts.init(provider);
 
@@ -1570,7 +1574,10 @@ const { useState, useEffect, useRef } = React;
             async function placeBidOnce() {
                 if (!ensureArtworkWriteEnabled()) return;
                 const minimumBidDetails = calculateMinimumBidDetails(auction);
-                const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
+                // Open the wallet modal on tap when not connected, then continue
+                // the bid on this same page instead of showing a "connect" toast.
+                const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                if (!walletAddress) return;
                 const creatorAddress = artwork?.creator_id || artwork?.creator;
                 const highestBidder = getAuctionHighestBidder(auction);
                 const bidContext = {
@@ -1616,11 +1623,12 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 try {
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
                     await window.ArtSoulContracts.init(provider);
                     await window.ArtSoulContracts.placeBid(auctionActionId, bidAmount);
@@ -1693,11 +1701,8 @@ const { useState, useEffect, useRef } = React;
                 if (!beginTransactionAction('create-auction')) return;
 
                 try {
-                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
-                    if (!walletAddress) {
-                        alert('Please connect your wallet');
-                        return;
-                    }
+                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                    if (!walletAddress) return;
 
                     if (!canCreateNewAuctionForWallet(artwork, walletAddress)) {
                         alert('Re-auction is available only to the creator for an ended-no-bids or defaulted artwork that is unminted and has no active auction.');
@@ -1715,11 +1720,12 @@ const { useState, useEffect, useRef } = React;
                         return;
                     }
 
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
                     await window.ArtSoulContracts.init(provider);
 
@@ -1777,11 +1783,12 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 try {
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
                     await window.ArtSoulContracts.init(provider);
 
@@ -1829,12 +1836,9 @@ const { useState, useEffect, useRef } = React;
                     return;
                 }
 
-                // Check wallet connection
-                const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
-                if (!walletAddress) {
-                    alert('Please connect your wallet to vote');
-                    return;
-                }
+                // Check wallet connection — open the wallet modal instead of a toast.
+                const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                if (!walletAddress) return;
 
                 try {
                     if (isV41CompositeId) {
@@ -1877,11 +1881,8 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function handleDiscoverySignal(type) {
-                const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
-                if (!walletAddress) {
-                    alert('Please connect your wallet to save discovery signals');
-                    return;
-                }
+                const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                if (!walletAddress) return;
 
                 try {
                     if (isV41CompositeId) {
@@ -1941,7 +1942,7 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 try {
-                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.();
+                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
                     const auctionWinner = getAuctionHighestBidder(auction);
                     if (!walletAddress || !isSameAddress(walletAddress, auctionWinner)) {
                         alert('Only the auction winner can complete settlement');
@@ -1954,11 +1955,12 @@ const { useState, useEffect, useRef } = React;
                     );
                     if (!confirmed) return;
 
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
                     await window.ArtSoulContracts.init(provider);
 
@@ -2020,14 +2022,11 @@ const { useState, useEffect, useRef } = React;
                 return { valid: true, normalized, numeric, error: '' };
             }
 
-            function openResaleListingModal() {
+            async function openResaleListingModal() {
                 if (!ensureArtworkWriteEnabled()) return;
 
-                const walletAddress = connectedWalletAddress || window.currentWalletAddress || window.getCurrentWalletAddress?.();
-                if (!walletRenderState.settled || !walletAddress) {
-                    alert('Please connect your wallet');
-                    return;
-                }
+                const walletAddress = connectedWalletAddress || window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                if (!walletAddress) return;
 
                 const tokenId = artwork.token_id || artwork.tokenId;
                 if (!isArtworkMinted(artwork) || !hasProtocolId(tokenId)) {
@@ -2084,9 +2083,13 @@ const { useState, useEffect, useRef } = React;
                 setResaleModalStepLabel('');
 
                 try {
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        setResaleModalError('Please connect your wallet.');
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
+                    }
+                    if (!provider) {
+                        setResaleModalError('Connect your wallet to list this NFT.');
                         return;
                     }
 
@@ -2139,19 +2142,17 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 try {
-                    const provider = await window.web3Modal?.getWalletProvider();
+                    let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
-                        return;
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
                     }
+                    if (!provider) return;
 
                     await window.ArtSoulContracts.init(provider);
 
-                    const walletAddress = window.currentWalletAddress;
-                    if (!walletAddress) {
-                        alert('Please connect your wallet');
-                        return;
-                    }
+                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                    if (!walletAddress) return;
 
                     // Buy an already minted resale listing.
                     const txHash = await window.ArtSoulContracts.buyResale(
