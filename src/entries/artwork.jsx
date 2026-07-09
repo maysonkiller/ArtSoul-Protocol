@@ -303,6 +303,10 @@ const { useState, useEffect, useRef } = React;
             const [isNewAuctionModalOpen, setIsNewAuctionModalOpen] = useState(false);
             const [reauctionEstimateState, setReauctionEstimateState] = useState('idle');
             const [reauctionEstimate, setReauctionEstimate] = useState(null);
+            const [isResaleModalOpen, setIsResaleModalOpen] = useState(false);
+            const [resaleModalPrice, setResaleModalPrice] = useState('');
+            const [resaleModalError, setResaleModalError] = useState('');
+            const [resaleModalStepLabel, setResaleModalStepLabel] = useState('');
             const [withdrawalState, setWithdrawalState] = useState({
                 status: 'idle',
                 amount: '0',
@@ -512,6 +516,22 @@ const { useState, useEffect, useRef } = React;
             }, [isNewAuctionModalOpen]);
 
             useEffect(() => () => reauctionValuationControllerRef.current?.abort(), []);
+
+            useEffect(() => {
+                if (!isResaleModalOpen) return undefined;
+                const previousOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                const closeOnEscape = event => {
+                    if (event.key === 'Escape' && !transactionActionsRef.current.has('resale-list')) {
+                        setIsResaleModalOpen(false);
+                    }
+                };
+                window.addEventListener('keydown', closeOnEscape);
+                return () => {
+                    window.removeEventListener('keydown', closeOnEscape);
+                    document.body.style.overflow = previousOverflow;
+                };
+            }, [isResaleModalOpen]);
 
             useEffect(() => {
                 void loadPendingWithdrawal();
@@ -1930,17 +1950,30 @@ const { useState, useEffect, useRef } = React;
                 }
             }
 
-            async function handleListForResale() {
-                if (!beginTransactionAction('resale-list')) return;
-
-                try {
-                    await listForResaleOnce();
-                } finally {
-                    finishTransactionAction('resale-list');
-                }
+            function normalizeResalePriceInput(rawValue) {
+                return String(rawValue || '').trim().replace(',', '.');
             }
 
-            async function listForResaleOnce() {
+            function validateResaleModalPrice(rawValue, floorPrice) {
+                const normalized = normalizeResalePriceInput(rawValue);
+                if (!normalized) {
+                    return { valid: false, normalized, error: 'Enter a resale price.' };
+                }
+                const numeric = Number(normalized);
+                if (!Number.isFinite(numeric) || numeric <= 0) {
+                    return { valid: false, normalized, error: 'Enter a valid ETH amount.' };
+                }
+                if (numeric < floorPrice) {
+                    return {
+                        valid: false,
+                        normalized,
+                        error: `Listing price must be at least the canonical floor of ${floorPrice} ETH.`
+                    };
+                }
+                return { valid: true, normalized, numeric, error: '' };
+            }
+
+            function openResaleListingModal() {
                 if (!ensureArtworkWriteEnabled()) return;
 
                 const walletAddress = connectedWalletAddress || window.currentWalletAddress || window.getCurrentWalletAddress?.();
@@ -1971,39 +2004,66 @@ const { useState, useEffect, useRef } = React;
                     return;
                 }
 
-                const enteredPrice = prompt(
-                    `Resale price in ETH. Minimum canonical floor: ${defaultPrice} ETH`,
-                    String(defaultPrice)
-                );
-                if (enteredPrice === null) return;
+                setResaleModalPrice(String(defaultPrice));
+                setResaleModalError('');
+                setResaleModalStepLabel('');
+                setIsResaleModalOpen(true);
+            }
 
-                const normalizedListingPrice = String(enteredPrice).trim();
-                const listingPrice = Number(normalizedListingPrice);
-                if (!Number.isFinite(listingPrice) || listingPrice < floorPrice) {
-                    alert(`Listing price must be at least the canonical floor of ${defaultPrice} ETH.`);
+            function closeResaleListingModal() {
+                if (isTransactionActionPending('resale-list')) return;
+                setIsResaleModalOpen(false);
+                setResaleModalError('');
+            }
+
+            function handleResaleModalPriceChange(rawValue) {
+                setResaleModalPrice(rawValue);
+                if (!resaleModalError) return;
+                const floorPrice = Number(resaleFloorPrice || 0);
+                const validation = validateResaleModalPrice(rawValue, floorPrice);
+                setResaleModalError(validation.valid ? '' : validation.error);
+            }
+
+            async function confirmResaleListing() {
+                const floorPrice = Number(resaleFloorPrice || 0);
+                const validation = validateResaleModalPrice(resaleModalPrice, floorPrice);
+                if (!validation.valid) {
+                    setResaleModalError(validation.error);
                     return;
                 }
+
+                if (!beginTransactionAction('resale-list')) return;
+                setResaleModalError('');
+                setResaleModalStepLabel('');
 
                 try {
                     const provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
-                        alert('Please connect your wallet');
+                        setResaleModalError('Please connect your wallet.');
                         return;
                     }
 
                     await window.ArtSoulContracts.init(provider);
                     const protocolArtworkId = artwork.blockchain_id || artwork.artwork_id;
                     if (!hasProtocolId(protocolArtworkId)) {
-                        alert('Artwork ID is unavailable for resale listing.');
+                        setResaleModalError('Artwork ID is unavailable for resale listing.');
                         return;
                     }
 
                     await window.ArtSoulContracts.listResale(
                         protocolArtworkId,
-                        normalizedListingPrice
+                        validation.normalized,
+                        ({ step, totalSteps }) => {
+                            setResaleModalStepLabel(
+                                totalSteps > 1
+                                    ? `Step ${step} of ${totalSteps}: ${step === totalSteps ? 'confirm the listing' : 'allow the marketplace to access this NFT'}`
+                                    : 'Confirm the listing in your wallet'
+                            );
+                        }
                     );
 
                     setConfirmedResaleListing(true);
+                    setIsResaleModalOpen(false);
                     alert('NFT listed for resale. Public state will update shortly.');
                     await loadArtwork();
                 } catch (error) {
@@ -2012,7 +2072,10 @@ const { useState, useEffect, useRef } = React;
                         error,
                         'The resale listing could not be created. Please try again.'
                     );
-                    alert(`Resale listing failed: ${message}`);
+                    setResaleModalError(message);
+                } finally {
+                    setResaleModalStepLabel('');
+                    finishTransactionAction('resale-list');
                 }
             }
 
@@ -2330,6 +2393,118 @@ const { useState, useEffect, useRef } = React;
                             </section>
                         </div>
                     )}
+                    {isResaleModalOpen && (() => {
+                        const floorPrice = Number(resaleFloorPrice || 0);
+                        const resaleTokenId = artwork.token_id || artwork.tokenId;
+                        const resaleOwnerAddress = artwork.current_owner_address || connectedWalletAddress || '';
+                        const resaleOwnerShort = resaleOwnerAddress
+                            ? `${resaleOwnerAddress.slice(0, 6)}...${resaleOwnerAddress.slice(-4)}`
+                            : 'Unavailable';
+                        const resalePending = isTransactionActionPending('resale-list');
+                        return (
+                            <div
+                                className="resale-modal-backdrop"
+                                role="presentation"
+                                onMouseDown={event => {
+                                    if (event.target === event.currentTarget) closeResaleListingModal();
+                                }}
+                            >
+                                <section
+                                    className="resale-modal"
+                                    role="dialog"
+                                    aria-modal="true"
+                                    aria-labelledby="resaleModalTitle"
+                                >
+                                    <div className="resale-modal-header">
+                                        <div>
+                                            <p className="resale-modal-eyebrow">Resale listing</p>
+                                            <h2 id="resaleModalTitle">List NFT for resale</h2>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="resale-modal-close"
+                                            aria-label="Close resale listing"
+                                            onClick={closeResaleListingModal}
+                                            disabled={resalePending}
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+
+                                    <dl className="resale-modal-summary">
+                                        <div>
+                                            <dt>Artwork</dt>
+                                            <dd>{artwork.title || 'Untitled'}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Token ID</dt>
+                                            <dd>#{resaleTokenId ?? '—'}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Network</dt>
+                                            <dd>Base Sepolia</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Owner</dt>
+                                            <dd>{resaleOwnerShort}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Canonical floor</dt>
+                                            <dd>{floorPrice} ETH</dd>
+                                        </div>
+                                    </dl>
+
+                                    <label className="resale-field-label" htmlFor="resaleModalPrice">
+                                        Resale price (ETH) — minimum {floorPrice} ETH
+                                    </label>
+                                    <input
+                                        id="resaleModalPrice"
+                                        className={`resale-modal-input rounded-lg px-4 py-3${resaleModalError ? ' has-error' : ''}`}
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={resaleModalPrice}
+                                        onChange={event => handleResaleModalPriceChange(event.target.value)}
+                                        disabled={resalePending}
+                                        aria-invalid={Boolean(resaleModalError)}
+                                        aria-describedby={resaleModalError ? 'resaleModalError' : undefined}
+                                        autoFocus
+                                    />
+                                    {resaleModalError && (
+                                        <p id="resaleModalError" className="resale-modal-error" role="alert">
+                                            {resaleModalError}
+                                        </p>
+                                    )}
+                                    {resalePending && resaleModalStepLabel && (
+                                        <p className="resale-modal-step" aria-live="polite">
+                                            {resaleModalStepLabel}
+                                        </p>
+                                    )}
+
+                                    <div className="resale-modal-actions">
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={closeResaleListingModal}
+                                            disabled={resalePending}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-main"
+                                            onClick={confirmResaleListing}
+                                            disabled={resalePending}
+                                            aria-busy={resalePending}
+                                        >
+                                            {resalePending
+                                                ? <TransactionProcessingLabel />
+                                                : 'List NFT'}
+                                        </button>
+                                    </div>
+                                </section>
+                            </div>
+                        );
+                    })()}
                     {/* Content */}
                     <main className="artwork-page-shell site-page-container">
                         <div className="artwork-page-layout">
@@ -2841,7 +3016,7 @@ const { useState, useEffect, useRef } = React;
                                                 </p>
                                                 <button
                                                     type="button"
-                                                    onClick={handleListForResale}
+                                                    onClick={openResaleListingModal}
                                                     className="btn-main w-full artwork-page-primary-action"
                                                     disabled={!resaleEligibility.canList || isTransactionActionPending('resale-list')}
                                                     aria-busy={isTransactionActionPending('resale-list')}

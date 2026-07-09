@@ -2303,6 +2303,177 @@ body.future .gallery-filter-panel {
     }
 }
 
+.resale-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: color-mix(in srgb, var(--c-bg) 84%, transparent);
+    overflow-y: auto;
+}
+
+.resale-modal {
+    width: min(100%, 480px);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: clamp(20px, 4vw, 32px);
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    box-shadow: 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
+}
+
+body.future .resale-modal {
+    box-shadow: 0 0 28px var(--c-glow), 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
+}
+
+.resale-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.resale-modal-header h2 {
+    margin: 2px 0 0;
+    color: var(--c-text);
+    font-size: clamp(20px, 4.5vw, 26px);
+    line-height: 1.15;
+}
+
+.resale-modal-eyebrow {
+    color: var(--c-accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.resale-modal-close {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 50%;
+    background: var(--c-surface-muted);
+    color: var(--c-text);
+    font-size: 24px;
+    line-height: 1;
+}
+
+.resale-modal-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    margin: 0 0 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 12px;
+    background: var(--c-surface-muted);
+}
+
+.resale-modal-summary dt {
+    margin: 0;
+    color: var(--c-text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.resale-modal-summary dd {
+    margin: 2px 0 0;
+    color: var(--c-text);
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.resale-field-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--c-text);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.resale-modal-input {
+    width: 100%;
+    background: var(--c-surface-muted);
+    border: 1px solid var(--c-border-soft);
+    color: var(--c-text);
+    font-size: 16px;
+}
+
+.resale-modal-input:focus {
+    border-color: var(--c-border);
+    box-shadow: 0 0 0 2px var(--c-glow);
+    outline: none;
+}
+
+.resale-modal-input.has-error {
+    border-color: var(--c-accent-3);
+}
+
+.resale-modal-error,
+.resale-modal-step {
+    margin: 10px 0 0;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.resale-modal-error {
+    color: var(--c-accent-3);
+    font-weight: 600;
+}
+
+.resale-modal-step {
+    color: var(--c-accent);
+    opacity: 0.85;
+}
+
+.resale-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.resale-modal-actions .btn-main,
+.resale-modal-actions .btn-secondary {
+    min-width: 128px;
+}
+
+@media (max-width: 600px) {
+    .resale-modal-backdrop {
+        align-items: flex-end;
+        padding: 12px;
+    }
+
+    .resale-modal {
+        width: 100%;
+        max-height: calc(100vh - 24px);
+        border-radius: 14px;
+    }
+
+    .resale-modal-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .resale-modal-actions .btn-main,
+    .resale-modal-actions .btn-secondary {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
 .artsoul-artwork-card-minimal .artsoul-card-body {
     min-height: 86px;
 }
