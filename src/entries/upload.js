@@ -445,7 +445,9 @@ let selectedFile = null;
         async function ensureUploadAuthorization() {
             let walletAddress = window.getCurrentWalletAddress?.();
             if (!walletAddress) {
-                walletAddress = await window.safeConnectWallet?.();
+                // Waits for boot-time session restore, then opens the branded
+                // wallet modal and resolves with the connected address.
+                walletAddress = await window.ensureWalletConnected?.();
             }
             if (!walletAddress) {
                 throw createUploadError('WALLET_NOT_CONNECTED', 'Connect your wallet to continue.');
@@ -776,11 +778,8 @@ let selectedFile = null;
                 return;
             }
 
-            const walletAddress = window.getCurrentWalletAddress?.();
-            if (!walletAddress) {
-                alert('Connect your wallet before publishing this artwork.');
-                return;
-            }
+            const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+            if (!walletAddress) return;
             const chainId = Number(window.getCurrentChainId?.() || window.ArtSoulContracts?.currentNetwork?.chainId || 0);
             if (chainId && chainId !== BASE_SEPOLIA_CHAIN_ID) {
                 alert('This artwork must be published on Base Sepolia. Switch networks and try again.');
