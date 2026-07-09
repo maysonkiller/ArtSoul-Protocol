@@ -520,7 +520,7 @@ class ArtSoulContracts {
         return await this.createAuction(artworkId, newPriceEth, 24);
     }
 
-    async listResale(tokenOrArtworkId, priceEth) {
+    async listResale(tokenOrArtworkId, priceEth, onStep) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const tokenId = await this.resolveTokenId(tokenOrArtworkId);
@@ -532,12 +532,17 @@ class ArtSoulContracts {
             this.nftContract.isApprovedForAll(seller, coreAddress)
         ]);
 
-        if (approved.toLowerCase() !== coreAddress.toLowerCase() && !approvedForAll) {
+        const needsApproval = approved.toLowerCase() !== coreAddress.toLowerCase() && !approvedForAll;
+        const totalSteps = needsApproval ? 2 : 1;
+
+        if (needsApproval) {
+            onStep?.({ step: 1, totalSteps });
             const approveTx = await this.nftContract.approve(coreAddress, tokenId);
             console.log('Approving Core for resale...', approveTx.hash);
             await approveTx.wait();
         }
 
+        onStep?.({ step: totalSteps, totalSteps });
         const tx = await this.coreContract.listResale(tokenId, price);
         console.log('Listing resale...', tx.hash);
         await tx.wait();
