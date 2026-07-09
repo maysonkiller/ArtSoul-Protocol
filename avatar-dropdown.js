@@ -498,7 +498,7 @@
             `;
         }
 
-        renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false }) {
+        renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false, connected = false }) {
             const networkSection = networkInfo ? `
                 <button
                     type="button"
@@ -518,12 +518,13 @@
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
 
+            const isConnected = connected || !!networkInfo;
             const accountAction = restoring ? `
                 <div class="avatar-dropdown-divider"></div>
                 <div class="dropdown-item is-disabled wallet-restoring-state" role="status" aria-live="polite">
                     <span>Restoring wallet...</span>
                 </div>
-            ` : networkInfo ? `
+            ` : isConnected ? `
                 <div class="avatar-dropdown-divider"></div>
                 <button onclick="window.resetWalletConnection()" data-allow-rapid class="dropdown-item avatar-disconnect-item">
                     <span>Disconnect</span>
@@ -622,7 +623,7 @@
             });
             this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, restoring: true }),
+                this.renderMenuContent({ currentPath, isOwnProfile, connected: true }),
                 `connected:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();
@@ -885,7 +886,7 @@
             });
             this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, restoring: true }),
+                this.renderMenuContent({ currentPath, isOwnProfile, connected: true }),
                 `connected:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();
