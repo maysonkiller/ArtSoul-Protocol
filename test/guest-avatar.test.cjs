@@ -18,7 +18,7 @@ test('stored wallet hydration never renders a disconnected guest state', () => {
   assert.match(avatarDropdown, /getCachedHeaderIdentity\(storedWallet\)/);
   assert.match(avatarDropdown, /name: cachedIdentity\.name/);
   assert.match(avatarDropdown, /Restoring wallet\.\.\./);
-  assert.match(avatarDropdown, /stateKey: 'cached-wallet'/);
+  assert.match(avatarDropdown, /dataset\.avatarRenderKey = 'cached-wallet'/);
   assert.doesNotMatch(avatarDropdown, /name: 'Wallet'/);
 });
 
