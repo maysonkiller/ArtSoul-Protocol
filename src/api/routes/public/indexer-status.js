@@ -146,6 +146,7 @@ export default async function handler(req, res) {
     };
 
     const chains = buildChainStatus(stateRows, tableRows);
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=240');
     res.status(200).json({
       success: true,
       source: 'indexer_projection_status',
