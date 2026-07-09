@@ -118,6 +118,12 @@ let deferMobileAuthenticationThisTurn = false;
 const walletResumeWaiters = new Set();
 const boundRuntimeProviders = new WeakSet();
 const WALLET_HYDRATION_TIMEOUT = 8000;
+// Hard fail-open: the wallet UI must never sit on "Restoring wallet..." forever.
+// If nothing has settled the state within this short window (e.g. a provider
+// read stalls, or AppKit never emits an account on desktop), force the settled
+// state so the header shows Connect Wallet. A wallet that connects later still
+// flips to connected. Kept below WALLET_HYDRATION_TIMEOUT so it always wins.
+const WALLET_SETTLE_FAILOPEN_TIMEOUT = 4000;
 const POST_CONNECT_DISCONNECT_GUARD = 1200;
 const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
 const WALLET_CONNECT_TIMEOUT_MOBILE = 90000;
@@ -3388,6 +3394,52 @@ async function initializeAppKit() {
             if (!walletHydrationPending) return;
             clearStaleWalletState();
         }, WALLET_HYDRATION_TIMEOUT);
+
+        // Independent hard fail-open. This does NOT await any provider reconcile
+        // (which is what can stall the 8s path), and it does NOT clear hydration
+        // — it only guarantees the UI settles so "Restoring wallet..." can never
+        // persist. Desktop guests reach Connect Wallet quickly; an in-flight
+        // connect or a wallet that settles later still updates the UI normally.
+        setTimeout(() => {
+            if (window.artsoulWalletStateSettled === true) return;
+            // A connect is actively running (its own flow will settle the UI).
+            if (activeMobileConnect || Date.now() < connectModalIntentUntil) return;
+            try {
+                // Injected (extension) truth first, then a live AppKit account
+                // snapshot, so a genuinely-connected desktop user is never shown
+                // guest by the fail-open.
+                const providerState = getProviderWalletState();
+                if (providerState?.isConnected && providerState.address) {
+                    applyConfirmedWalletState(providerState);
+                    return;
+                }
+                const snapshot = readAppKitAccountSnapshot();
+                const snapshotAddress = normalizeWalletAddress(
+                    snapshot?.address || snapshot?.allAccounts?.[0]?.address
+                );
+                const snapshotConnected = Boolean(snapshotAddress) &&
+                    snapshot?.isConnected !== false &&
+                    snapshot?.status !== 'disconnected';
+                if (snapshotConnected) {
+                    applyConfirmedWalletState({
+                        address: snapshotAddress,
+                        chainId: getStateChainId(snapshot)
+                    });
+                    return;
+                }
+            } catch (error) {
+                walletDebugLog('fail-open provider check failed', describeWalletDebugError(error));
+            }
+            walletDebugLog('wallet state fail-open to guest', {
+                storedWalletAtBoot: Boolean(storedWalletAtBoot)
+            });
+            dispatchWalletStateChanged({
+                address: null,
+                chainId: null,
+                isConnected: false
+            }, { settled: true });
+            updateNavButtons(null);
+        }, WALLET_SETTLE_FAILOPEN_TIMEOUT);
 
         // Create Wagmi adapter for better browser extension support
         wagmiAdapter = new WagmiAdapter({
