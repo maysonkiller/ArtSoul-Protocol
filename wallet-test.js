@@ -363,7 +363,7 @@ async function initializeBareLayer() {
 // module, provider version, chain configuration, and wallet sheet that
 // appkit-init.js uses. Only the logging wrapper differs.
 async function initializeCoreLayer() {
-    const core = await import('/wallet-core-connect.js?v=1');
+    const core = await import('/wallet-core-connect.js?v=2');
     core.configureCoreWallet({
         projectId: PROJECT_ID,
         metadata: {
