@@ -161,11 +161,8 @@ let morphActive = false;
         }
 
         async function saveProfile() {
-            const walletAddress = window.getCurrentWalletAddress?.();
-            if (!walletAddress) {
-                alert('Please connect your wallet first');
-                return;
-            }
+            const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+            if (!walletAddress) return;
 
             // Ensure user is authenticated before saving
             const isAuthenticated = await window.ensureAuthenticated();

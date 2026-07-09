@@ -2587,12 +2587,52 @@ async function connectExternalMobileCoreWallet(attempt) {
 
 const boundCoreDisconnectProviders = new WeakSet();
 
+// The relay WebSocket dies while the tab is backgrounded on iOS and surfaces
+// as an EIP-1193 `disconnect` (commonly close code 1006). That is NOT the user
+// ending the session — the WalletConnect session record still lives in storage
+// and the socket reconnects. Only a genuine `session_delete` (user disconnected
+// in the wallet) actually removes the session. Wiping wallet state + signing
+// out on every transient socket blip is what made the wallet "randomly
+// disconnect"; distinguish the two here.
+function coreSessionStillLive(provider) {
+    try {
+        if (isCoreSessionActive()) return true;
+        if (provider?.session) return true;
+        if (getWalletConnectSessions(provider).length > 0) return true;
+    } catch {
+        // If we cannot prove the session is gone, err on keeping it.
+        return true;
+    }
+    return false;
+}
+
+async function handleCoreProviderDisconnect(provider, payload) {
+    const code = payload?.code ?? payload?.error?.code ?? payload?.reason?.code ?? null;
+    if (coreSessionStillLive(provider)) {
+        walletDebugLog('core disconnect treated as transient relay drop', {
+            code,
+            sessionAlive: true
+        });
+        // Reopen the relay socket so the live session keeps working; keep the
+        // connected UI untouched.
+        await restartWalletConnectTransport('core transient disconnect');
+        return;
+    }
+    walletDebugLog('core session ended (genuine disconnect)', { code });
+    await handleProviderAccountsChanged([], 'core walletconnect disconnect', provider);
+}
+
 function bindCoreProviderDisconnect(provider) {
     if (!provider?.on || boundCoreDisconnectProviders.has(provider)) return;
     boundCoreDisconnectProviders.add(provider);
-    provider.on('disconnect', () => {
-        walletDebugLog('core session disconnect event', {});
-        void handleProviderAccountsChanged([], 'core walletconnect disconnect', provider);
+    provider.on('disconnect', (payload) => {
+        void handleCoreProviderDisconnect(provider, payload);
+    });
+    // A genuine end-of-session from the wallet side. By the time this fires the
+    // session record is already removed from storage, so it is safe to wipe.
+    provider.on?.('session_delete', () => {
+        walletDebugLog('core session_delete event', {});
+        void handleProviderAccountsChanged([], 'core walletconnect session_delete', provider);
     });
 }
 
@@ -3203,6 +3243,44 @@ window.getStoredWalletHint = () => {
     return localStorage.getItem('artsoul_wallet') || '';
 };
 
+// Resolve once the boot-time wallet hydration (including the async core
+// WalletConnect session restore) has settled, so a page never decides
+// "not connected" while a live session is still being restored. Bounded so a
+// hung restore can never freeze a protected action.
+function waitForWalletHydration(timeoutMs = WALLET_HYDRATION_TIMEOUT + 500) {
+    if (!window.artsoulWalletHydrating) return Promise.resolve();
+    return new Promise((resolve) => {
+        const startedAt = Date.now();
+        const check = () => {
+            if (!window.artsoulWalletHydrating || Date.now() - startedAt >= timeoutMs) {
+                resolve();
+                return;
+            }
+            setTimeout(check, 60);
+        };
+        check();
+    });
+}
+
+// Single entry point for every protected action ("place bid", "like",
+// "upload", "buy", "withdraw", ...). Instead of telling the user to connect,
+// the action calls this: it waits for hydration, returns the address if a
+// session is already live, and otherwise opens the branded wallet modal and
+// resolves with the connected address once approved. The caller stays on the
+// same page and can continue its work — no redirect, no toast.
+window.ensureWalletConnected = async () => {
+    await waitForWalletHydration();
+    const existing = window.getCurrentWalletAddress?.();
+    if (existing) return existing;
+    try {
+        const connected = await window.safeConnectWallet?.();
+        return normalizeWalletAddress(connected) || window.getCurrentWalletAddress?.() || '';
+    } catch (error) {
+        walletDebugLog('ensureWalletConnected failed', describeWalletDebugError(error));
+        return window.getCurrentWalletAddress?.() || '';
+    }
+};
+
 // ============================================
 // DEVICE DETECTION
 // ============================================
@@ -3399,7 +3477,21 @@ async function initializeAppKit() {
         // reloads exactly like an injected provider does.
         if (isMobile && !isInjectedWalletBrowser()) {
             void restoreCoreSession().then((restored) => {
-                if (!restored?.address || window.currentWalletAddress) return;
+                if (!restored?.address || window.currentWalletAddress) {
+                    // On the external-mobile path the core session is the only
+                    // wallet source. If none was restored, hydration is settled —
+                    // release it now instead of blocking protected actions for
+                    // the full hydration timeout.
+                    if (!restored?.address && walletHydrationPending && !window.currentWalletAddress) {
+                        dispatchWalletStateChanged({
+                            address: null,
+                            chainId: null,
+                            isConnected: false
+                        }, { settled: true });
+                        finishWalletHydration();
+                    }
+                    return;
+                }
                 activeWalletProvider = restored.provider;
                 bindRuntimeProviderEvents(restored.provider, 'core walletconnect restore');
                 bindWalletConnectDiagnostics(restored.provider, 'core walletconnect restore');
