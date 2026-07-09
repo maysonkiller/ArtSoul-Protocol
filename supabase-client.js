@@ -217,6 +217,22 @@ async function getPublicProjectionArtworks(options = {}) {
     }
 }
 
+async function getLiveAuctionActivity({ chain_id, auction_id, after_block, after_log } = {}) {
+    if (!auction_id) return null;
+
+    try {
+        return await backendRead(`/api/public/auction-live${buildQuery({
+            chain_id: chain_id || currentChainId(),
+            auction_id,
+            after_block,
+            after_log
+        })}`);
+    } catch (error) {
+        console.warn('[ArtSoulDB] Live auction feed unavailable:', error.message);
+        return null;
+    }
+}
+
 async function getPublicProjectionArtwork(idOrOptions) {
     const options = typeof idOrOptions === 'string'
         ? { id: idOrOptions, limit: 1 }
@@ -955,6 +971,7 @@ window.ArtSoulDB = {
     createArtwork,
     getPublicProjectionArtworks,
     getPublicProjectionArtwork,
+    getLiveAuctionActivity,
     getArtworks,
     getAllArtworks,
     getArtwork,

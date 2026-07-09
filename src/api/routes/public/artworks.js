@@ -152,6 +152,25 @@ async function loadMetadata(metadataUri) {
   }
 }
 
+// Metadata files are immutable (uploads use unique timestamped names), so a
+// successful read stays valid for the lifetime of the instance.
+const metadataCache = new Map();
+const METADATA_CACHE_MAX = 500;
+
+async function loadMetadataCached(metadataUri) {
+  const key = normalizeText(metadataUri);
+  if (key && metadataCache.has(key)) return metadataCache.get(key);
+
+  const metadata = await loadMetadata(metadataUri);
+  if (key && metadata && Object.keys(metadata).length > 0) {
+    if (metadataCache.size >= METADATA_CACHE_MAX) {
+      metadataCache.delete(metadataCache.keys().next().value);
+    }
+    metadataCache.set(key, metadata);
+  }
+  return metadata;
+}
+
 function getMediaType(metadata = {}, mediaUrl = '') {
   const explicitTypes = [
     metadata.media_type,
@@ -253,10 +272,32 @@ function getAIValueGuidance(metadata = {}) {
   };
 }
 
+// When a projection table is missing (migration not applied yet), remember the
+// 404 instead of re-issuing the failing query on every projection rebuild.
+const MISSING_TABLE_RETRY_MS = 10 * 60 * 1000;
+const missingTables = new Map();
+
+function isMissingTableError(error) {
+  const text = `${error?.message || ''} ${JSON.stringify(error?.details || {})}`;
+  return /PGRST205|42P01|could not find the table|does not exist/i.test(text);
+}
+
 async function queryTable(table, query, warnings) {
+  const missingUntil = missingTables.get(table);
+  if (missingUntil) {
+    if (Date.now() < missingUntil) {
+      warnings.push({ table, code: 'TABLE_MISSING_SKIPPED' });
+      return [];
+    }
+    missingTables.delete(table);
+  }
+
   try {
     return await supabaseRest(`${table}?${query}`) || [];
   } catch (error) {
+    if (isMissingTableError(error)) {
+      missingTables.set(table, Date.now() + MISSING_TABLE_RETRY_MS);
+    }
     warnings.push({ table, code: error.code || 'QUERY_FAILED' });
     return [];
   }
@@ -432,7 +473,7 @@ async function toPublicCard(artwork, maps) {
     watching: 0
   };
   const moderation = maps.moderation.get(keyFor(chain, artworkId));
-  const metadata = await loadMetadata(artwork.metadata_uri);
+  const metadata = await loadMetadataCached(artwork.metadata_uri);
   const mediaType = getMediaType(metadata);
   const rawMediaUrl = getMediaUrl(metadata, mediaType);
   const mediaUrl = toHttpUri(rawMediaUrl) || rawMediaUrl;
@@ -545,112 +586,156 @@ function filterCards(cards, query) {
   return result.slice(0, limit);
 }
 
+async function buildProjectionSnapshot() {
+  const warnings = [];
+  const chainFilter = `in.(${PUBLIC_CHAIN_IDS.join(',')})`;
+  const [
+    v41Artworks,
+    v41Auctions,
+    v41Bids,
+    v41Settlements,
+    v41ResaleListings,
+    v41ResaleHistory,
+    v41FloorHistory,
+    v41TrustSignals,
+    artworkSocialSignals,
+    artworkModerationVisibility
+  ] = await Promise.all([
+    queryTable(
+      'v41_artworks',
+      'select=chain_id,artwork_id,creator,metadata_uri,minted,token_id,canonical_floor,active_auction_id,block_number,transaction_hash,indexed_at,last_updated_at' +
+        `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
+      warnings
+    ),
+    queryTable(
+      'v41_auctions',
+      'select=chain_id,auction_id,artwork_id,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id' +
+        `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
+      warnings
+    ),
+    queryTable(
+      'v41_bids',
+      `select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
+      warnings
+    ),
+    queryTable(
+      'v41_settlements',
+      `select=chain_id,artwork_id,settlement_status,winner,token_id,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=200`,
+      warnings
+    ),
+    queryTable(
+      'v41_resale_listings',
+      `select=chain_id,token_id,active,price,seller&chain_id=${chainFilter}&limit=200`,
+      warnings
+    ),
+    queryTable(
+      'v41_resale_history',
+      `select=chain_id,token_id,buyer,seller,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=1000`,
+      warnings
+    ),
+    queryTable(
+      'v41_floor_history',
+      `select=chain_id,artwork_id,floor_price,block_number&chain_id=${chainFilter}&limit=200`,
+      warnings
+    ),
+    queryTable('v41_trust_signals', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
+    queryTable(
+      'artwork_social_signals',
+      `select=chain_id,artwork_id,wallet_address,signal_type&chain_id=${chainFilter}&limit=5000`,
+      warnings
+    ),
+    queryTable(
+      'artwork_moderation_visibility',
+      `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&limit=1000`,
+      warnings
+    )
+  ]);
+  const tableData = {
+    v41_artworks: v41Artworks,
+    v41_auctions: v41Auctions,
+    v41_bids: v41Bids,
+    v41_settlements: v41Settlements,
+    v41_resale_listings: v41ResaleListings,
+    v41_resale_history: v41ResaleHistory,
+    v41_floor_history: v41FloorHistory,
+    v41_trust_signals: v41TrustSignals,
+    artwork_social_signals: artworkSocialSignals,
+    artwork_moderation_visibility: artworkModerationVisibility
+  };
+
+  const maps = {
+    auctions: latestAuctionByArtwork(tableData.v41_auctions),
+    settlements: latestCompletedSettlementByArtwork(tableData.v41_settlements),
+    resales: resaleByToken(tableData.v41_resale_listings),
+    resaleHistory: latestResaleByToken(tableData.v41_resale_history),
+    floors: floorByArtwork(tableData.v41_floor_history),
+    socialSignals: socialSignalsByArtwork(tableData.artwork_social_signals),
+    moderation: moderationVisibilityByArtwork(tableData.artwork_moderation_visibility),
+    bids: bidsByAuction(tableData.v41_bids)
+  };
+
+  const cards = await Promise.all(tableData.v41_artworks.map(artwork => toPublicCard(artwork, maps)));
+  const diagnostics = TABLES.reduce((acc, table) => {
+    acc[table] = {
+      rowsByChain: countByChain(tableData[table] || []),
+      sampledRows: (tableData[table] || []).length
+    };
+    return acc;
+  }, {});
+
+  return { cards, bids: maps.bids, diagnostics, warnings };
+}
+
+// One projection rebuild per instance per TTL window; every request inside the
+// window is served from memory without touching Supabase.
+const PROJECTION_CACHE_MS = Math.max(1000, Number(process.env.PUBLIC_PROJECTION_CACHE_MS) || 30000);
+let projectionSnapshotPromise = null;
+let projectionSnapshotAt = 0;
+
+function getProjectionSnapshot() {
+  const now = Date.now();
+  if (!projectionSnapshotPromise || now - projectionSnapshotAt >= PROJECTION_CACHE_MS) {
+    projectionSnapshotAt = now;
+    const promise = buildProjectionSnapshot();
+    projectionSnapshotPromise = promise;
+    promise.catch(() => {
+      if (projectionSnapshotPromise === promise) projectionSnapshotPromise = null;
+    });
+  }
+  return projectionSnapshotPromise;
+}
+
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
 
   try {
-    const warnings = [];
-    const chainFilter = `in.(${PUBLIC_CHAIN_IDS.join(',')})`;
-    const [
-      v41Artworks,
-      v41Auctions,
-      v41Bids,
-      v41Settlements,
-      v41ResaleListings,
-      v41ResaleHistory,
-      v41FloorHistory,
-      v41TrustSignals,
-      artworkSocialSignals,
-      artworkModerationVisibility
-    ] = await Promise.all([
-      queryTable(
-        'v41_artworks',
-        `select=*&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
-        warnings
-      ),
-      queryTable(
-        'v41_auctions',
-        `select=*&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
-        warnings
-      ),
-      queryTable(
-        'v41_bids',
-        `select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
-        warnings
-      ),
-      queryTable('v41_settlements', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
-      queryTable('v41_resale_listings', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
-      queryTable(
-        'v41_resale_history',
-        `select=chain_id,token_id,buyer,seller,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=1000`,
-        warnings
-      ),
-      queryTable('v41_floor_history', `select=*&chain_id=${chainFilter}&limit=200`, warnings),
-      queryTable('v41_trust_signals', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
-      queryTable(
-        'artwork_social_signals',
-        `select=chain_id,artwork_id,wallet_address,signal_type&chain_id=${chainFilter}&limit=5000`,
-        warnings
-      ),
-      queryTable(
-        'artwork_moderation_visibility',
-        `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&limit=1000`,
-        warnings
-      )
-    ]);
-    const tableData = {
-      v41_artworks: v41Artworks,
-      v41_auctions: v41Auctions,
-      v41_bids: v41Bids,
-      v41_settlements: v41Settlements,
-      v41_resale_listings: v41ResaleListings,
-      v41_resale_history: v41ResaleHistory,
-      v41_floor_history: v41FloorHistory,
-      v41_trust_signals: v41TrustSignals,
-      artwork_social_signals: artworkSocialSignals,
-      artwork_moderation_visibility: artworkModerationVisibility
-    };
-
-    const maps = {
-      auctions: latestAuctionByArtwork(tableData.v41_auctions),
-      settlements: latestCompletedSettlementByArtwork(tableData.v41_settlements),
-      resales: resaleByToken(tableData.v41_resale_listings),
-      resaleHistory: latestResaleByToken(tableData.v41_resale_history),
-      floors: floorByArtwork(tableData.v41_floor_history),
-      socialSignals: socialSignalsByArtwork(tableData.artwork_social_signals),
-      moderation: moderationVisibilityByArtwork(tableData.artwork_moderation_visibility),
-      bids: bidsByAuction(tableData.v41_bids)
-    };
-
-    const cards = await Promise.all(tableData.v41_artworks.map(artwork => toPublicCard(artwork, maps)));
+    const { cards, bids, diagnostics, warnings } = await getProjectionSnapshot();
     const requestQuery = req.query || {};
     const suppressedArtworkIds = cards
       .filter(card => card.moderation_hidden === true)
       .map(card => card.id);
     const isDirectArtworkLookup = Boolean(validateArtworkId(requestQuery.id)) ||
       Boolean(protocolId(requestQuery.artwork_id));
-    const moderationAccess = isDirectArtworkLookup
+    const moderationAccess = isDirectArtworkLookup && suppressedArtworkIds.length > 0
       ? await getModerationAccess(req)
       : { canModerate: false };
     const visibleCards = cards.filter(card =>
       card.moderation_hidden !== true || (isDirectArtworkLookup && moderationAccess.canModerate)
     );
     const filteredCards = filterCards(visibleCards, requestQuery);
-    const includeBidActivity = Boolean(validateArtworkId(requestQuery.id)) ||
-      Boolean(protocolId(requestQuery.artwork_id));
-    const data = includeBidActivity
+    const data = isDirectArtworkLookup
       ? filteredCards.map(card => ({
           ...card,
-          bids: maps.bids.get(keyFor(card.chain_id, card.auction_id)) || []
+          bids: bids.get(keyFor(card.chain_id, card.auction_id)) || []
         }))
       : filteredCards;
-    const diagnostics = TABLES.reduce((acc, table) => {
-      acc[table] = {
-        rowsByChain: countByChain(tableData[table] || []),
-        sampledRows: (tableData[table] || []).length
-      };
-      return acc;
-    }, {});
+
+    // Direct lookups can differ per viewer (staff see hidden works), so only
+    // list responses are CDN-cacheable.
+    const cacheSeconds = Math.max(1, Math.round(PROJECTION_CACHE_MS / 1000));
+    res.setHeader('Cache-Control', isDirectArtworkLookup
+      ? 'private, no-store'
+      : `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 4}`);
 
     res.status(200).json({
       success: true,
