@@ -47,6 +47,26 @@ export function getConnectedCoreProvider() {
     return providerInstance?.session ? providerInstance : null;
 }
 
+// The SDK's `instance.accounts` is filtered by the provider's CURRENT chainId
+// (setAccounts drops every namespace account whose chain differs), and that
+// chainId is persisted across page loads. A session whose wallet sits on a
+// foreign network (observed: MetaMask parked on 8453) therefore reports []
+// while the session record — with the address — is alive in storage. Read the
+// address chain-independently from the session namespaces: the address is what
+// "connected" means; the network is the write-guard's business.
+export function getCoreSessionAddress(instance = providerInstance) {
+    if (!instance?.session) return null;
+    const liveAccount = (instance.accounts || []).filter(Boolean)[0] || null;
+    if (liveAccount) return liveAccount;
+    const namespaceAccounts = Object.values(instance.session.namespaces || {})
+        .flatMap((namespace) => namespace?.accounts || []);
+    for (const account of namespaceAccounts) {
+        const match = String(account).match(/^eip155:\d+:(0x[a-fA-F0-9]{40})$/);
+        if (match) return match[1];
+    }
+    return null;
+}
+
 export function parseCoreChainId(value) {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -190,7 +210,9 @@ export async function restoreCoreSessionOutcome() {
     try {
         const instance = await getCoreEthereumProvider();
         if (!instance.session) return { status: 'none', session: null };
-        const address = (instance.accounts || []).filter(Boolean)[0] || null;
+        // Chain-independent: a session parked on a foreign chain (accounts
+        // getter filtered empty) is still a connected wallet, not "no session".
+        const address = getCoreSessionAddress(instance);
         if (!address) return { status: 'none', session: null };
         const restored = {
             provider: instance,
@@ -221,7 +243,7 @@ export async function connectCoreWallet({ onDisplayUri } = {}) {
     const instance = await getCoreEthereumProvider();
 
     if (instance.session) {
-        const address = (instance.accounts || []).filter(Boolean)[0] || null;
+        const address = getCoreSessionAddress(instance);
         if (address) {
             coreLog('core connect reused live session', { chainId: parseCoreChainId(instance.chainId) });
             return {
@@ -257,7 +279,7 @@ export async function connectCoreWallet({ onDisplayUri } = {}) {
     const promise = (async () => {
         try {
             await instance.connect();
-            const address = (instance.accounts || []).filter(Boolean)[0] || null;
+            const address = getCoreSessionAddress(instance);
             const result = {
                 provider: instance,
                 address,
