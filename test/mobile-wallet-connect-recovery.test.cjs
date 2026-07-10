@@ -20,7 +20,7 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=25/, `${page} must load the new wallet state machine`);
+        assert.match(read(page), /appkit-init\.js\?v=26/, `${page} must load the new wallet state machine`);
     }
 });
 

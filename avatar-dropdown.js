@@ -276,6 +276,19 @@
 
             if (options.confirmed === true) return true;
 
+            // Mobile core path (external browser, no injected provider): the
+            // WalletConnect session lives outside AppKit and window.ethereum,
+            // so neither can confirm it. The settled wallet state maintained
+            // by appkit-init is the authority there — whatever network the
+            // wallet is currently on.
+            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobileUA && !window.ethereum?.request) {
+                const settled = window.artsoulSettledWalletState;
+                if (settled?.isConnected && String(settled.address || '').toLowerCase() === normalizedAddress) {
+                    return true;
+                }
+            }
+
             try {
                 const account = window.web3Modal?.getAccount?.();
                 const accountAddress = account?.address || account?.allAccounts?.[0]?.address || '';
