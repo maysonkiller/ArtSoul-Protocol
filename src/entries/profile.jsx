@@ -606,7 +606,10 @@ const { useState, useEffect, useRef } = React;
                 try {
                     const oauthIntegration = await waitForOAuthIntegration();
                     if (!oauthIntegration) throw new Error('Social linking is still loading. Please try again.');
-                    const walletAddress = getActiveWalletAddress();
+                    // Open the wallet modal on tap when not connected, then
+                    // continue linking on this same page — no error toast.
+                    const walletAddress = getActiveWalletAddress() || await window.ensureWalletConnected?.() || '';
+                    if (!walletAddress) return;
                     if (provider === 'discord') {
                         await oauthIntegration.connectDiscord(walletAddress);
                     } else {
@@ -625,7 +628,9 @@ const { useState, useEffect, useRef } = React;
                 try {
                     const oauthIntegration = await waitForOAuthIntegration();
                     if (!oauthIntegration) throw new Error('Social linking is still loading. Please try again.');
-                    const result = await oauthIntegration.disconnect(provider, getActiveWalletAddress());
+                    const walletAddress = getActiveWalletAddress() || await window.ensureWalletConnected?.() || '';
+                    if (!walletAddress) return;
+                    const result = await oauthIntegration.disconnect(provider, walletAddress);
                     setProfile(result.profile || {
                         ...profile,
                         ...(provider === 'discord'
