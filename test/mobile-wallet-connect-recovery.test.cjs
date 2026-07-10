@@ -118,7 +118,9 @@ test('wallet debug captures SDK, connector, session, lifecycle and provider trut
 });
 
 test('isolation page exposes single and compatibility proposal variants', () => {
-    assert.match(walletTest, /variant === 'multi' \? \[baseSepolia, base, mainnet\] : \[baseSepolia\]/);
+    // Variant D (appkit-modal layer) always proposes Base Sepolia only; the
+    // bare layer keeps the single/multi proposal variants.
+    assert.match(walletTest, /layer === 'appkit-modal' \|\| variant !== 'multi'\s*\n\s*\? \[baseSepolia\]\s*\n\s*: \[baseSepolia, base, mainnet\]/);
     assert.match(walletTest, /allowUnsupportedChain: true/);
     assert.match(walletTest, /proposal before publish/);
     assert.match(walletTest, /relay inbound/);
