@@ -1811,6 +1811,16 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
     // All accounts revoked at the provider (wallet locked / disconnected).
     if (!nextAddress) {
         if (!lastProcessedAddress) return;
+        // Mobile core path: only the core provider itself may report "no
+        // accounts". AppKit/injected providers know nothing about the core
+        // session, so their empty events must not wipe it. A genuine core
+        // end (session_delete) removes the session record first, which makes
+        // getConnectedCoreProvider() null and lets the wipe proceed.
+        const coreProvider = getConnectedCoreProvider();
+        if (coreProvider && provider !== coreProvider) {
+            walletDebugLog('empty accountsChanged ignored; core session is authoritative', { source });
+            return;
+        }
         const explicitDisconnectInProgress = sessionStorage.getItem('artsoul_disconnecting');
         const recentlyConfirmed = Date.now() - lastConfirmedWalletAt < POST_CONNECT_DISCONNECT_GUARD;
         if (!explicitDisconnectInProgress && recentlyConfirmed) return;
@@ -3461,6 +3471,19 @@ async function initializeAppKit() {
                 return;
             }
 
+            // Mobile core path: a live restored session outranks a failed
+            // provider read (the relay may not be reopened yet). Confirm from
+            // the session record instead of wiping it.
+            const coreProvider = getConnectedCoreProvider();
+            const coreAddress = (coreProvider?.accounts || []).filter(Boolean)[0] || null;
+            if (coreAddress) {
+                applyConfirmedWalletState({
+                    address: coreAddress,
+                    chainId: parseChainId(coreProvider.chainId)
+                });
+                return;
+            }
+
             dispatchWalletStateChanged({
                 address: null,
                 chainId: null,
@@ -3733,6 +3756,18 @@ async function initializeAppKit() {
             }
 
             if (!observedAddress) {
+                // Mobile core path: AppKit has no connection to report — the
+                // persisted WalletConnect session is the authority. Its own
+                // classifier (handleCoreProviderDisconnect / session_delete)
+                // ends it; an AppKit empty-account event landing after the
+                // POST_CONNECT_DISCONNECT_GUARD window must never wipe a live
+                // core session.
+                if (isCoreSessionActive() || (coreSessionRestoreCompletion && !coreSessionRestoreSettled)) {
+                    walletDebugLog('appkit empty account ignored; core session is authoritative', {
+                        restoreSettled: coreSessionRestoreSettled
+                    });
+                    return;
+                }
                 const connectIntentActive = activeMobileConnect || Date.now() < connectModalIntentUntil;
                 if (connectIntentActive) {
                     console.log('Skipping transient disconnected state during wallet hydration');
@@ -3853,6 +3888,14 @@ async function initializeAppKit() {
                 });
 
             } else if (account?.status === 'disconnected' && lastProcessedAddress) {
+                // Same authority rule as the empty-account branch above: a live
+                // core session outranks AppKit's own "disconnected" status.
+                if (isCoreSessionActive() || (coreSessionRestoreCompletion && !coreSessionRestoreSettled)) {
+                    walletDebugLog('appkit disconnected status ignored; core session is authoritative', {
+                        restoreSettled: coreSessionRestoreSettled
+                    });
+                    return;
+                }
                 const explicitDisconnectInProgress = sessionStorage.getItem('artsoul_disconnecting');
                 const recentlyConfirmed = Date.now() - lastConfirmedWalletAt < POST_CONNECT_DISCONNECT_GUARD;
                 if (!explicitDisconnectInProgress && recentlyConfirmed) {
