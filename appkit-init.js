@@ -13,12 +13,13 @@ import {
     connectCoreWallet,
     disconnectCoreWallet,
     getConnectedCoreProvider,
+    getCoreSessionAddress,
     isCoreConnectInFlight,
     isCoreSessionActive,
     restoreCoreSessionOutcome,
     showCoreWalletSheet,
     waitForWalletChainSettle
-} from './wallet-core-connect.js?v=2'
+} from './wallet-core-connect.js?v=3'
 
 // ============================================
 // CONFIGURATION
@@ -1811,14 +1812,21 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
     // All accounts revoked at the provider (wallet locked / disconnected).
     if (!nextAddress) {
         if (!lastProcessedAddress) return;
-        // Mobile core path: only the core provider itself may report "no
-        // accounts". AppKit/injected providers know nothing about the core
-        // session, so their empty events must not wipe it. A genuine core
-        // end (session_delete) removes the session record first, which makes
-        // getConnectedCoreProvider() null and lets the wipe proceed.
+        // Mobile core path: while the core session record is alive, NO empty
+        // accountsChanged may wipe it. AppKit/injected providers know nothing
+        // about the core session; and the core provider ITSELF emits
+        // chain-filtered empty accounts (the SDK's setAccounts keeps only
+        // accounts matching the current chainId) whenever the wallet's
+        // chainChanged lands on a network without a namespace account entry.
+        // A genuine core end (session_delete / classified disconnect) removes
+        // the session record first, which makes getConnectedCoreProvider()
+        // null and lets the wipe proceed.
         const coreProvider = getConnectedCoreProvider();
-        if (coreProvider && provider !== coreProvider) {
-            walletDebugLog('empty accountsChanged ignored; core session is authoritative', { source });
+        if (coreProvider) {
+            walletDebugLog('empty accountsChanged ignored; core session is authoritative', {
+                source,
+                fromCoreProvider: provider === coreProvider
+            });
             return;
         }
         const explicitDisconnectInProgress = sessionStorage.getItem('artsoul_disconnecting');
@@ -3473,9 +3481,10 @@ async function initializeAppKit() {
 
             // Mobile core path: a live restored session outranks a failed
             // provider read (the relay may not be reopened yet). Confirm from
-            // the session record instead of wiping it.
+            // the session record instead of wiping it — chain-independently,
+            // since provider.accounts is filtered by the current chainId.
             const coreProvider = getConnectedCoreProvider();
-            const coreAddress = (coreProvider?.accounts || []).filter(Boolean)[0] || null;
+            const coreAddress = getCoreSessionAddress(coreProvider);
             if (coreAddress) {
                 applyConfirmedWalletState({
                     address: coreAddress,
