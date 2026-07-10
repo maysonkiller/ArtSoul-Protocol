@@ -791,7 +791,18 @@
             const storedWallet = (localStorage.getItem('artsoul_wallet') || '').toLowerCase();
             const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
             if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
-            const cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
+            let cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
+            // Mobile core path (WalletConnect session restore is async on every
+            // page load): a stored wallet renders the connected header
+            // immediately, even without a cached identity — the address is the
+            // optimistic identity. Desktop keeps its resolving state.
+            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (!cachedIdentity && isMobileUA) {
+                cachedIdentity = {
+                    name: `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`,
+                    avatarUrl: this.getDefaultAvatar()
+                };
+            }
             if (!cachedIdentity) {
                 document.documentElement.classList.add('wallet-state-resolving');
                 container.setAttribute('aria-busy', 'true');
