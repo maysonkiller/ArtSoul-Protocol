@@ -10,11 +10,28 @@ const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 const customRpcUrls = {
     [BASE_SEPOLIA_CAIP_ID]: [{ url: BASE_SEPOLIA_RPC_URL }]
 };
+const BASE_SEPOLIA_HEX_CHAIN_ID = '0x14a34';
+const BASE_SEPOLIA_ADD_CHAIN_PARAMS = {
+    chainId: BASE_SEPOLIA_HEX_CHAIN_ID,
+    chainName: 'Base Sepolia',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: [BASE_SEPOLIA_RPC_URL],
+    blockExplorerUrls: ['https://sepolia.basescan.org']
+};
+// WalletConnect explorer ids; same registry appkit-init.js uses for featuring.
+const FEATURED_WALLET_IDS = [
+    'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96', // MetaMask
+    '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0', // Trust
+    'fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa'  // Coinbase
+];
 const startedAt = Date.now();
 const params = new URLSearchParams(window.location.search);
 const layer = params.get('layer') || 'bare';
 const variant = params.get('variant') === 'multi' ? 'multi' : 'single';
-const networks = variant === 'multi' ? [baseSepolia, base, mainnet] : [baseSepolia];
+// Variant D always proposes Base Sepolia only, matching the intended prod config.
+const networks = layer === 'appkit-modal' || variant !== 'multi'
+    ? [baseSepolia]
+    : [baseSepolia, base, mainnet];
 const logElement = document.getElementById('walletTestLog');
 const statusElement = document.getElementById('walletTestStatus');
 const connectButton = document.getElementById('walletTestConnect');
@@ -226,9 +243,12 @@ function accountSnapshot(account = modal?.getAccount?.()) {
 function updateStatus(account = modal?.getAccount?.()) {
     const snapshot = accountSnapshot(account);
     const chainOkay = snapshot.resolvedChainId === EXPECTED_CHAIN_ID;
+    const variantLabel = layer === 'appkit-modal'
+        ? 'D official AppKit modal (createAppKit + open)'
+        : (variant === 'multi' ? 'B multi-network proposal' : 'A Base Sepolia only');
     statusElement.textContent = [
         `Layer: ${layer}`,
-        `Variant: ${variant === 'multi' ? 'B multi-network proposal' : 'A Base Sepolia only'}`,
+        `Variant: ${variantLabel}`,
         `Networks: ${networks.map((network) => network.caipNetworkId || `eip155:${network.id}`).join(', ')}`,
         'allowUnsupportedChain: true',
         `Origin: ${window.location.origin}`,
@@ -313,6 +333,14 @@ async function initializeBareLayer() {
     });
     log('bare AppKit created', accountSnapshot());
 
+    wireModalSubscriptionsAndConnect({
+        connectLabel: 'Connect with bare AppKit',
+        openingLabel: 'Opening AppKit...',
+        retryLabel: 'Retry bare AppKit'
+    });
+}
+
+function wireModalSubscriptionsAndConnect({ connectLabel, openingLabel, retryLabel, onAccount = null }) {
     void getWalletConnectProvider().then((provider) => {
         bindWalletConnectDiagnostics(provider, 'configured isolation connector');
     });
@@ -320,6 +348,7 @@ async function initializeBareLayer() {
     modal.subscribeAccount((account) => {
         log('subscribeAccount', accountSnapshot(account));
         updateStatus(account);
+        onAccount?.(account);
     });
     modal.subscribeState((state) => log('subscribeState', {
         open: state?.open ?? null,
@@ -335,13 +364,14 @@ async function initializeBareLayer() {
         bindWalletConnectDiagnostics(provider, 'isolation provider subscription');
     });
 
+    connectButton.textContent = connectLabel;
     connectButton.addEventListener('click', async () => {
         log('Connect click entered', accountSnapshot());
         connectButton.disabled = true;
-        connectButton.textContent = 'Opening AppKit...';
+        connectButton.textContent = openingLabel;
         const retryGuard = window.setTimeout(() => {
             connectButton.disabled = false;
-            connectButton.textContent = 'Retry bare AppKit';
+            connectButton.textContent = retryLabel;
             log('modal.open still pending; button made retryable', accountSnapshot());
         }, 10000);
         try {
@@ -352,11 +382,129 @@ async function initializeBareLayer() {
         } finally {
             window.clearTimeout(retryGuard);
             connectButton.disabled = false;
-            connectButton.textContent = 'Connect with bare AppKit';
+            connectButton.textContent = connectLabel;
             log('Connect click exited', accountSnapshot());
         }
     });
     updateStatus();
+}
+
+// Variant D: the FULL official Reown AppKit modal (createAppKit + open), the
+// way production would ship it. Isolated from appkit-init.js and the core
+// path. Networks propose Base Sepolia only, without the strict
+// chains/defaultChain universalProviderConfigOverride that used to break the
+// mobile modal flow; sessions settling on another chain get one
+// add/switch cycle to 84532 after settle.
+async function initializeAppKitModalLayer() {
+    let chainCycleKey = null;
+
+    const ensureBaseSepoliaAfterSettle = async (account) => {
+        const snapshot = accountSnapshot(account);
+        if (!snapshot.address || snapshot.isConnected === false) {
+            chainCycleKey = null;
+            return;
+        }
+        if (snapshot.resolvedChainId === null) return;
+        if (snapshot.resolvedChainId === EXPECTED_CHAIN_ID) {
+            log('settled chain confirmed', { chainId: snapshot.resolvedChainId, baseSepolia: true });
+            return;
+        }
+        const attemptKey = `${snapshot.address}:${snapshot.resolvedChainId}`;
+        if (chainCycleKey === attemptKey) return;
+        chainCycleKey = attemptKey;
+        const provider = await modal?.getWalletProvider?.().catch(() => null) || await getWalletConnectProvider();
+        if (!provider?.request) {
+            log('Base Sepolia cycle skipped', { reason: 'no wallet provider with request' });
+            return;
+        }
+        log('Base Sepolia add/switch cycle started', { fromChainId: snapshot.resolvedChainId });
+        try {
+            try {
+                await provider.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [BASE_SEPOLIA_ADD_CHAIN_PARAMS]
+                });
+                log('wallet_addEthereumChain resolved');
+            } catch (error) {
+                // Wallets differ when the chain already exists: some resolve,
+                // others reject. Switching is the authoritative next step.
+                log('wallet_addEthereumChain non-fatal result', describeError(error));
+            }
+            await provider.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: BASE_SEPOLIA_HEX_CHAIN_ID }]
+            });
+            log('wallet_switchEthereumChain resolved');
+        } catch (error) {
+            log('Base Sepolia add/switch cycle failed', describeError(error));
+        }
+        const finalChainId = parseChainId(provider.chainId) ?? accountSnapshot().resolvedChainId;
+        log('post-cycle chain state', { chainId: finalChainId, baseSepolia: finalChainId === EXPECTED_CHAIN_ID });
+        updateStatus();
+    };
+
+    log('appkit-modal imports ready', {
+        appKitVersion: '1.8.21',
+        wagmiAdapterVersion: '1.8.21',
+        expectedChainId: EXPECTED_CHAIN_ID,
+        metadataUrl: window.location.origin,
+        redirectUniversal: window.location.href.split('#')[0],
+        projectIdPresent: Boolean(PROJECT_ID),
+        projectIdFingerprint: `${PROJECT_ID.slice(0, 4)}...${PROJECT_ID.slice(-4)}`,
+        featuredWallets: ['MetaMask', 'Trust', 'Coinbase'],
+        strictProviderOverride: false,
+        allowUnsupportedChain: true,
+        relayRestartOnReturn: true,
+        configuredNetworks: networks.map((network) => ({
+            id: network.id,
+            caipNetworkId: network.caipNetworkId || `eip155:${network.id}`,
+            chainNamespace: network.chainNamespace || 'eip155'
+        }))
+    });
+    adapter = new WagmiAdapter({ networks, projectId: PROJECT_ID, customRpcUrls });
+    log('WagmiAdapter created', { networks: networks.map((network) => network.id) });
+
+    modal = createAppKit({
+        adapters: [adapter],
+        networks,
+        defaultNetwork: baseSepolia,
+        projectId: PROJECT_ID,
+        customRpcUrls,
+        allowUnsupportedChain: true,
+        enableNetworkSwitch: false,
+        // Deliberately NO strict chains/defaultChain override here — only the
+        // soft events/rpcMap hints. The strict override was one of the three
+        // root causes of the mobile modal settlement failures.
+        universalProviderConfigOverride: {
+            events: { eip155: ['chainChanged', 'accountsChanged'] },
+            rpcMap: { [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URL }
+        },
+        metadata: {
+            name: 'ArtSoul Wallet Test',
+            description: 'Isolated official AppKit modal diagnostic',
+            url: window.location.origin,
+            icons: [`${window.location.origin}/ARTSOULlogo-clean.png`],
+            redirect: { universal: window.location.href.split('#')[0] }
+        },
+        themeMode: 'dark',
+        enableWalletConnect: true,
+        enableInjected: true,
+        enableCoinbase: true,
+        coinbasePreference: 'all',
+        enableEIP6963: true,
+        enableAuthMode: false,
+        allWallets: 'SHOW',
+        features: { email: false, socials: [] },
+        featuredWalletIds: FEATURED_WALLET_IDS
+    });
+    log('official AppKit modal created', accountSnapshot());
+
+    wireModalSubscriptionsAndConnect({
+        connectLabel: 'Connect with official AppKit modal',
+        openingLabel: 'Opening official modal...',
+        retryLabel: 'Retry official modal',
+        onAccount: (account) => void ensureBaseSepoliaAfterSettle(account)
+    });
 }
 
 // Mirrors the production mobile external-browser path one-to-one: the exact
@@ -501,6 +649,7 @@ log('test page boot', {
 
 try {
     if (layer === 'core') await initializeCoreLayer();
+    else if (layer === 'appkit-modal') await initializeAppKitModalLayer();
     else if (layer === 'wrapper') await initializeArtSoulLayer(false);
     else if (layer === 'auth') await initializeArtSoulLayer(true);
     else await initializeBareLayer();
