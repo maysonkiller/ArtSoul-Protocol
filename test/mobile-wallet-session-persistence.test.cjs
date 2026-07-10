@@ -82,6 +82,36 @@ test('mobile header renders the stored wallet optimistically while the restore r
     assert.match(initializing, /wallet-state-resolving/);
 });
 
+test('a live core session outranks AppKit/injected empty-account events', () => {
+    // The prod navigation bug: on every MPA page load AppKit knows nothing
+    // about the core WalletConnect session, so its empty/disconnected account
+    // events landing after POST_CONNECT_DISCONNECT_GUARD wiped the restored
+    // wallet. Both subscribeAccount wipe paths must defer to the core session.
+    assert.match(appKit, /appkit empty account ignored; core session is authoritative/);
+    assert.match(appKit, /appkit disconnected status ignored; core session is authoritative/);
+    const guards = appKit.match(/isCoreSessionActive\(\) \|\| \(coreSessionRestoreCompletion && !coreSessionRestoreSettled\)/g) || [];
+    assert.ok(guards.length >= 2, 'both subscribeAccount wipe paths must cover the live session AND the in-flight restore');
+    // accountsChanged []: only the core provider itself may end its session.
+    assert.match(appKit, /empty accountsChanged ignored; core session is authoritative/);
+    const accountsGuard = appKit.match(/if \(!nextAddress\) \{[\s\S]*?getConnectedCoreProvider\(\);[\s\S]*?provider !== coreProvider/)?.[0] || '';
+    assert.ok(accountsGuard, 'handleProviderAccountsChanged must ignore empty accounts from non-core providers');
+});
+
+test('hydration-timeout wipe re-confirms from the live core session record', () => {
+    const staleClear = appKit.match(/const clearStaleWalletState = async \(\) => \{[\s\S]*?\n        \};/)?.[0] || '';
+    assert.ok(staleClear, 'clearStaleWalletState must exist');
+    assert.match(staleClear, /getConnectedCoreProvider\(\)/);
+    assert.match(staleClear, /applyConfirmedWalletState/);
+});
+
+test('X/Discord linking routes through ensureWalletConnected instead of an error toast', () => {
+    const profile = read('src/entries/profile.jsx');
+    const socialConnect = profile.match(/async function handleSocialConnect[\s\S]*?\n            \}/)?.[0] || '';
+    assert.match(socialConnect, /await window\.ensureWalletConnected\?\.\(\)/);
+    const socialDisconnect = profile.match(/async function handleSocialDisconnect[\s\S]*?\n            \}/)?.[0] || '';
+    assert.match(socialDisconnect, /await window\.ensureWalletConnected\?\.\(\)/);
+});
+
 test('explicit disconnect does not resurrect: cache clear runs before restore starts', () => {
     const initSection = appKit.match(/const explicitDisconnectRequested = sessionStorage\.getItem\('artsoul_disconnecting'\);[\s\S]*?coreSessionRestoreTask = runCoreSessionRestore\(\);/)?.[0] || '';
     assert.ok(initSection, 'explicit-disconnect cleanup must precede the restore kick-off');
