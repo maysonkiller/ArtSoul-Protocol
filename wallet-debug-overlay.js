@@ -125,6 +125,29 @@
         }
     }
 
+    // The WalletConnect SDK persists sessions in localStorage under
+    // "wc@2:client:<version>//session" (a JSON array of session records).
+    // This key is the authoritative storage truth for "can the session be
+    // restored on the next page load" — not IndexedDB.
+    function coreSessionRecordSummary() {
+        try {
+            const sessionKey = Object.keys(localStorage).find((key) => /^wc@2:client:.*\/\/session$/i.test(key)) || null;
+            if (!sessionKey) return { sessionKey: null, recordCount: 0 };
+            let recordCount = null;
+            try {
+                const parsed = JSON.parse(localStorage.getItem(sessionKey));
+                if (Array.isArray(parsed)) recordCount = parsed.length;
+                else if (parsed && typeof parsed === 'object') recordCount = Object.keys(parsed).length;
+                else recordCount = 0;
+            } catch {
+                recordCount = 'unparsed';
+            }
+            return { sessionKey, recordCount };
+        } catch {
+            return { unreadable: true };
+        }
+    }
+
     function logPageContext() {
         addContextLine('page loaded', {
             page: window.location.pathname,
@@ -133,6 +156,7 @@
         });
         addContextLine('localStorage artsoul_wallet', { value: readLocalWalletHint() });
         addContextLine('WalletConnect localStorage keys', walletConnectLocalStorageSummary());
+        addContextLine('core session record (SDK localStorage)', coreSessionRecordSummary());
         probeIndexedDbSessionRecord();
     }
 
@@ -217,15 +241,26 @@
         });
     }
 
+    // Best effort only: the SDK's browser storage is localStorage, and iOS
+    // can return an empty indexedDB.databases() list even when databases
+    // exist. An empty result here is NOT evidence that the session is gone —
+    // read "core session record (SDK localStorage)" above instead.
     async function probeIndexedDbSessionRecord() {
         if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') {
-            addContextLine('core session in IndexedDB', { supported: false });
+            addContextLine('core session in IndexedDB (best effort)', { supported: false });
             return;
         }
         try {
             const databases = (await indexedDB.databases()).filter((db) => (
                 db.name && STORAGE_FRAGMENTS.some((fragment) => db.name.toLowerCase().includes(fragment))
             ));
+            if (databases.length === 0) {
+                addContextLine('core session in IndexedDB (best effort)', {
+                    databases: [],
+                    note: 'iOS may hide IndexedDB; localStorage probe is authoritative'
+                });
+                return;
+            }
             let coreSessionRecordPresent = false;
             const probed = [];
             for (const info of databases) {
@@ -233,7 +268,7 @@
                 probed.push(`${info.name}=${hasSession ? 'session' : 'empty'}`);
                 if (hasSession) coreSessionRecordPresent = true;
             }
-            addContextLine('core session in IndexedDB', { coreSessionRecordPresent, databases: probed });
+            addContextLine('core session in IndexedDB (best effort)', { coreSessionRecordPresent, databases: probed });
         } catch (error) {
             addContextLine('core session IndexedDB probe failed', { message: error?.message || String(error) });
         }
