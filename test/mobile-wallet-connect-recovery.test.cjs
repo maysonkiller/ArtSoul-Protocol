@@ -20,7 +20,7 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=26/, `${page} must load the new wallet state machine`);
+        assert.match(read(page), /appkit-init\.js\?v=27/, `${page} must load the new wallet state machine`);
     }
 });
 
@@ -36,7 +36,7 @@ test('mobile external browsers connect through the pinned bare WalletConnect pro
     assert.match(appKit, /async function connectExternalMobileCoreWallet/);
     assert.match(appKit, /const coreAddress = await connectExternalMobileCoreWallet\(attempt\);/);
     assert.match(appKit, /waitForWalletChainSettle\(coreProvider, 2500\)/);
-    assert.match(appKit, /'core walletconnect', attempt, coreProvider\)/);
+    assert.match(appKit, /'core walletconnect', attempt, coreProvider, \{/);
     assert.match(appKit, /if \(coreProvider\) return coreProvider;/);
     assert.match(appKit, /keeping active pairing/);
     assert.match(walletTest, /initializeCoreLayer/);
@@ -81,6 +81,44 @@ test('mobile post-settlement validation adds then switches to Base Sepolia once 
         addThenSwitch.indexOf('await addEthereumChain(provider, target)') < addThenSwitch.indexOf("method: 'wallet_switchEthereumChain'"),
         'Base Sepolia must be added before the switch request'
     );
+});
+
+test('initial mobile connect resolving on a foreign chain yields connected state', () => {
+    // Address = connected; the chain is the write-guard's business. The one
+    // add/switch cycle still runs, but refusal/timeout/no-response accepts
+    // the session on its actual chain instead of failing the whole attempt.
+    const ensure = appKit.match(/async function ensureExternalMobileBaseSepolia[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(ensure, /acceptForeignChain/);
+    assert.match(ensure, /acceptOnActualChain/);
+    assert.match(ensure, /baseSepoliaConfirmed: false/);
+    // Refusal, timeout and switch errors all resolve instead of throwing.
+    assert.match(ensure, /if \(acceptForeignChain\) return acceptOnActualChain\('switch declined by user'\)/);
+    assert.match(ensure, /if \(acceptForeignChain\) return acceptOnActualChain\('switch not confirmed in time'\)/);
+    // Both initial mobile connect paths opt in with the short switch wait.
+    assert.match(appKit, /const MOBILE_CONNECT_SWITCH_TIMEOUT = 8000;/);
+    const optIns = appKit.match(/acceptForeignChain: true,\s*\n\s*switchTimeout: MOBILE_CONNECT_SWITCH_TIMEOUT/g) || [];
+    assert.ok(optIns.length >= 2, 'core and injected mobile connects must both accept foreign chains');
+    // The accepted connection is applied as confirmed state, then hinted.
+    assert.match(appKit, /notifyForeignChainAccepted\(validated\.chainId\)/);
+    assert.match(appKit, /Connected\. Base Sepolia will be requested when you place a bid\./);
+    // Desktop post-connect validation stays strict (no tolerance options).
+    assert.match(appKit, /'desktop post-connect network validation',\s*\n\s*attempt,\s*\n\s*confirmed\.provider \|\| await getAppKitWalletProviderWithin\(MOBILE_PROVIDER_REQUEST_TIMEOUT\)\s*\n\s*\);/);
+    // The write guard remains the sole Base Sepolia enforcement point.
+    assert.match(appKit, /window\.ensureArtSoulWriteNetwork = async/);
+});
+
+test('no failure or cleanup path clears WalletConnect storage with a confirmed address', () => {
+    // The declined/pending cache wipe in the connect failure handler must
+    // never tear down a live session.
+    assert.match(appKit, /&& !hasConfirmedWalletAddress\(\)\) \{\s*\n\s*await clearWalletConnectionCache\(\);/);
+    // Retry cleanup keeps its confirmed-address guard.
+    const cleanup = appKit.match(/async function clearIncompleteWalletConnectState[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(cleanup, /if \(hasConfirmedWalletAddress\(\)\)/);
+    // disconnectCoreWallet stays confined to the explicit user disconnect.
+    const disconnectCalls = appKit.match(/disconnectCoreWallet\(\)/g) || [];
+    assert.equal(disconnectCalls.length, 1, 'disconnectCoreWallet must only run inside resetWalletConnection');
+    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.match(reset, /disconnectCoreWallet\(\)/);
 });
 
 test('retry clears only incomplete SDK connection state', () => {

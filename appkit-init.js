@@ -134,6 +134,10 @@ const MOBILE_RETURN_SETTLEMENT_WINDOW = 30000;
 const WALLET_CONFIRMATION_INTERVAL = 400;
 const MOBILE_PROVIDER_REQUEST_TIMEOUT = 5000;
 const MOBILE_NETWORK_SWITCH_TIMEOUT = 15000;
+// Initial mobile connect only: the one add/switch cycle is a courtesy, not a
+// gate — WalletConnect network switching on iOS is unreliable, so the sheet
+// must not hang long before accepting the session on its actual chain.
+const MOBILE_CONNECT_SWITCH_TIMEOUT = 8000;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
@@ -716,8 +720,8 @@ async function readMobileProviderChainId(provider) {
     }
 }
 
-async function waitForMobileBaseSepolia(provider, switchOutcome, attempt, requireProviderChain = false) {
-    const deadline = createForegroundDeadline(MOBILE_NETWORK_SWITCH_TIMEOUT);
+async function waitForMobileBaseSepolia(provider, switchOutcome, attempt, requireProviderChain = false, timeoutMs = MOBILE_NETWORK_SWITCH_TIMEOUT) {
+    const deadline = createForegroundDeadline(timeoutMs);
     let lastReportedChainId = null;
 
     try {
@@ -758,7 +762,13 @@ async function waitForMobileBaseSepolia(provider, switchOutcome, attempt, requir
     }
 }
 
-async function ensureExternalMobileBaseSepolia(walletState, source, attempt, preferredProvider = null) {
+// acceptForeignChain (initial mobile connect): the address is what
+// "connected" means — the one add/switch cycle still runs, but refusal,
+// timeout or no response resolves to the session's actual chain instead of
+// failing the attempt. The write guard (ensureArtSoulWriteNetwork) remains
+// the sole Base Sepolia enforcement point, exactly like the restore path.
+async function ensureExternalMobileBaseSepolia(walletState, source, attempt, preferredProvider = null, options = {}) {
+    const { acceptForeignChain = false, switchTimeout = MOBILE_NETWORK_SWITCH_TIMEOUT } = options;
     while (document.visibilityState !== 'visible' && !attempt?.cancelled) {
         await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
     }
@@ -811,7 +821,16 @@ async function ensureExternalMobileBaseSepolia(walletState, source, attempt, pre
     if (currentChainId === BASE_SEPOLIA_CHAIN_ID) {
         return { ...walletState, address: providerAddress, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
     }
+    const acceptOnActualChain = (reason) => {
+        walletDebugLog('mobile connect accepted on foreign chain', {
+            source,
+            chainId: currentChainId,
+            reason
+        });
+        return { ...walletState, address: providerAddress, chainId: currentChainId, provider, baseSepoliaConfirmed: false };
+    };
     if (attempt?.networkSwitchRequested) {
+        if (acceptForeignChain) return acceptOnActualChain('switch already requested this attempt');
         throw createWalletConnectError(
             'BASE_SEPOLIA_REQUIRED',
             'Your wallet is still on another network. Select Base Sepolia and retry.'
@@ -838,14 +857,20 @@ async function ensureExternalMobileBaseSepolia(walletState, source, attempt, pre
             provider,
             switchOutcome,
             attempt,
-            true
+            true,
+            switchTimeout
         );
     } catch (error) {
         if (isUserRejectedError(error)) {
+            if (acceptForeignChain) return acceptOnActualChain('switch declined by user');
             throw createWalletConnectError(
                 'BASE_SEPOLIA_SWITCH_REJECTED',
                 'Network switch was declined. This action requires Base Sepolia.'
             );
+        }
+        if (acceptForeignChain) {
+            walletDebugLog('mobile Base Sepolia switch errored; accepting session', describeWalletDebugError(error));
+            return acceptOnActualChain('switch request errored');
         }
         throw error;
     }
@@ -854,6 +879,7 @@ async function ensureExternalMobileBaseSepolia(walletState, source, attempt, pre
             source,
             cancelled: Boolean(attempt?.cancelled)
         });
+        if (acceptForeignChain) return acceptOnActualChain('switch not confirmed in time');
         throw createWalletConnectError(
             'BASE_SEPOLIA_REQUIRED',
             'The wallet did not switch to Base Sepolia. Select Base Sepolia in the wallet and retry.'
@@ -2424,6 +2450,17 @@ async function openWalletBrowserFallback(statusElement) {
     }
 }
 
+// Small heads-up after a connection is accepted on a foreign chain: the
+// write guard will request Base Sepolia at action time.
+function notifyForeignChainAccepted(chainId) {
+    if (parseChainId(chainId) === BASE_SEPOLIA_CHAIN_ID) return;
+    try {
+        window.ErrorHandler?.showToast?.('Connected. Base Sepolia will be requested when you place a bid.', 'info');
+    } catch {
+        // The hint is best effort; the connection itself is already applied.
+    }
+}
+
 function showMobileWalletRecovery(error) {
     removeMobileWalletRecovery();
     const panel = document.createElement('section');
@@ -2613,17 +2650,21 @@ async function connectExternalMobileCoreWallet(attempt) {
             address: connected.address,
             chainId: connected.chainId,
             account: { address: connected.address, chainId: connected.chainId }
-        }, 'core walletconnect', attempt, coreProvider);
+        }, 'core walletconnect', attempt, coreProvider, {
+            acceptForeignChain: true,
+            switchTimeout: MOBILE_CONNECT_SWITCH_TIMEOUT
+        });
         if (attempt.cancelled) return null;
         if (!validated?.address) {
             throw attempt.failure || createWalletConnectError(
-                'BASE_SEPOLIA_REQUIRED',
-                'Select Base Sepolia in your wallet and retry.'
+                'MOBILE_ACCOUNT_UNCONFIRMED',
+                'The wallet session did not confirm the selected account. Please retry the connection.'
             );
         }
 
         await handleProviderChainConfirmed(validated.chainId, 'core walletconnect');
         await handleProviderAccountsChanged([validated.address], 'core walletconnect', coreProvider);
+        notifyForeignChainAccepted(validated.chainId);
         walletDebugLog('core mobile connect complete', {
             address: maskWalletAddress(validated.address),
             chainId: validated.chainId
@@ -2886,15 +2927,19 @@ window.safeConnectWallet = async () => {
                 address: connectedAddress,
                 chainId,
                 account: { address: connectedAddress, chainId }
-            }, 'mobile injected provider', attempt, window.ethereum);
+            }, 'mobile injected provider', attempt, window.ethereum, {
+                acceptForeignChain: true,
+                switchTimeout: MOBILE_CONNECT_SWITCH_TIMEOUT
+            });
             if (!validated) {
                 throw attempt.failure || createWalletConnectError(
-                    'BASE_SEPOLIA_REQUIRED',
-                    'Select Base Sepolia in your wallet and retry.'
+                    'MOBILE_ACCOUNT_UNCONFIRMED',
+                    'The wallet session did not confirm the selected account. Please retry the connection.'
                 );
             }
             await handleProviderChainConfirmed(validated.chainId, 'mobile injected provider');
             await handleProviderAccountsChanged([validated.address], 'mobile injected provider', window.ethereum);
+            notifyForeignChainAccepted(validated.chainId);
             clearModalIntent();
             walletDebugLog('mobile injected connect complete', {
                 address: maskWalletAddress(validated.address),
@@ -2999,8 +3044,9 @@ window.safeConnectWallet = async () => {
             deepLinkAvailable: Boolean(lastSelectedWallet?.deepLinkAvailable)
         });
 
-        // Handle "previous request still pending" error
-        if (err.message?.includes('previous') || err.message?.includes('declined')) {
+        // Handle "previous request still pending" error. A confirmed address
+        // means a live session — a failed retry must never tear it down.
+        if ((err.message?.includes('previous') || err.message?.includes('declined')) && !hasConfirmedWalletAddress()) {
             await clearWalletConnectionCache();
             updateNavButtons(null);
         }
