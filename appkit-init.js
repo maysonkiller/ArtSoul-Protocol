@@ -6,20 +6,18 @@
 import { createAppKit } from 'https://esm.sh/@reown/appkit@1.8.21?bundle'
 import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.8.21?bundle'
 import { baseSepolia, base, mainnet } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle'
-// Mobile external browsers connect through the proven bare
-// @walletconnect/ethereum-provider path instead of the AppKit modal.
+// Mobile external browsers connect through the standard WalletConnect flow:
+// the proven bare @walletconnect/ethereum-provider driving the official
+// WalletConnect modal. AppKit stays for desktop and injected browsers.
 import {
     configureCoreWallet,
     connectCoreWallet,
     disconnectCoreWallet,
     getConnectedCoreProvider,
     getCoreSessionAddress,
-    isCoreConnectInFlight,
     isCoreSessionActive,
-    restoreCoreSessionOutcome,
-    showCoreWalletSheet,
-    waitForWalletChainSettle
-} from './wallet-core-connect.js?v=3'
+    restoreCoreSessionOutcome
+} from './wallet-core-connect.js?v=4'
 
 // ============================================
 // CONFIGURATION
@@ -110,11 +108,8 @@ let connectModalIntentUntil = 0;
 let activeWalletProvider = null;
 let walletResumeTimer = null;
 let walletResumeListenersBound = false;
-let activeMobileConnect = false;
 let latestAppKitAccountSnapshot = null;
 let appKitAccountRevision = 0;
-let mobileConnectStartRevision = 0;
-let mobileConnectInitialAccountKey = '';
 let deferMobileAuthenticationThisTurn = false;
 const walletResumeWaiters = new Set();
 const boundRuntimeProviders = new WeakSet();
@@ -127,16 +122,15 @@ const WALLET_HYDRATION_TIMEOUT = 8000;
 const WALLET_SETTLE_FAILOPEN_TIMEOUT = 4000;
 const POST_CONNECT_DISCONNECT_GUARD = 1200;
 const WALLET_CONNECT_TIMEOUT_DESKTOP = 45000;
+// Injected wallet browsers (e.g. MetaMask in-app) only.
 const WALLET_CONNECT_TIMEOUT_MOBILE = 90000;
 const APPKIT_MODAL_OPEN_TIMEOUT = 10000;
-const MOBILE_MODAL_CLOSED_GRACE = 8000;
-const MOBILE_RETURN_SETTLEMENT_WINDOW = 30000;
 const WALLET_CONFIRMATION_INTERVAL = 400;
 const MOBILE_PROVIDER_REQUEST_TIMEOUT = 5000;
 const MOBILE_NETWORK_SWITCH_TIMEOUT = 15000;
-// Initial mobile connect only: the one add/switch cycle is a courtesy, not a
-// gate — WalletConnect network switching on iOS is unreliable, so the sheet
-// must not hang long before accepting the session on its actual chain.
+// Injected in-app browsers only: the one add/switch cycle at connect is a
+// courtesy, not a gate — refusal or timeout accepts the session on its
+// actual chain. The mobile EXTERNAL browser path never switches at connect.
 const MOBILE_CONNECT_SWITCH_TIMEOUT = 8000;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
@@ -150,18 +144,20 @@ const FEATURED_WALLETS = {
     rabby: '18388be9ac2d02726dbac9777c96efaac06d744b2f6d580fccdd4127a6d01fd1'
 };
 let lastDispatchedWalletStateKey = null;
-let lastAcceptedMobileAccountKey = null;
 let lastObservedAppKitAccountKey = null;
 let modalClosePromise = null;
 let modalCloseRetryTimer = null;
-let mobileSessionFinalizePromise = null;
-let mobileSessionFinalizeKey = '';
 let activeConnectAttempt = null;
 let connectAttemptSequence = 0;
 let lastSelectedWallet = null;
 let lastWalletConnectUri = null;
 let mobileRetryCleanupRequired = false;
 let walletTransportRestartPromise = null;
+// Boot-time wallet hydration. Module-scoped so the standard mobile connect
+// path can apply confirmed state through the same single function the boot
+// restore uses.
+let walletHydrationPending = true;
+let walletHydrationTimer = null;
 // Mobile core-path session restore (external browsers). The persisted
 // WalletConnect session is the source of truth for "connected"; these track
 // the in-flight restore so no timer or protected action decides
@@ -170,11 +166,6 @@ let walletTransportRestartPromise = null;
 let coreSessionRestoreTask = null;
 let coreSessionRestoreCompletion = null;
 let coreSessionRestoreSettled = false;
-// Per-attempt cap and retries for the restore: the esm.sh import +
-// EthereumProvider.init() can fail transiently on mobile networks; a failed
-// restore must not be mistaken for "no session".
-const CORE_RESTORE_ATTEMPT_TIMEOUT = 12000;
-const CORE_RESTORE_MAX_ATTEMPTS = 3;
 // A core 'disconnect' delivered while the browser is backgrounded (iOS kills
 // the relay socket) is re-checked on return instead of wiping state blind.
 let pendingCoreDisconnectProvider = null;
@@ -580,11 +571,6 @@ async function requestProviderValueWithin(provider, method, params = [], timeout
     return outcome?.timedOut ? null : outcome?.value;
 }
 
-function getAppKitAccountKey(account) {
-    const address = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
-    return address ? `${address}:${getStateChainId(account) || 'none'}` : '';
-}
-
 function appKitAccountSnapshotScore(account) {
     if (!account || typeof account !== 'object') return -1;
     const address = normalizeWalletAddress(account.address || account.allAccounts?.[0]?.address);
@@ -651,8 +637,7 @@ function getWalletDebugSnapshot(account = readAppKitAccountSnapshot()) {
             currentWallet: maskWalletAddress(window.currentWalletAddress),
             currentChainId: parseChainId(window.currentChainId),
             storedChainId: parseChainId(localStorage.getItem('artsoul_chain_id')),
-            accountRevision: appKitAccountRevision,
-            activeMobileConnect
+            accountRevision: appKitAccountRevision
         },
         wagmi: {
             status: wagmi.status,
@@ -673,32 +658,6 @@ function isUserRejectedError(error) {
     const code = getWalletErrorCode(error);
     const message = `${error?.message || ''} ${error?.data?.message || ''}`.toLowerCase();
     return code === 4001 || code === '4001' || message.includes('user rejected') || message.includes('user denied');
-}
-
-function getFreshMobileAppKitWalletState(account = readAppKitAccountSnapshot(), attempt = activeConnectAttempt) {
-    if (!activeMobileConnect) return null;
-
-    const accountKey = getAppKitAccountKey(account);
-    const hasFreshAccountEvent = appKitAccountRevision > mobileConnectStartRevision;
-    const sessionChangedSinceConnect = Boolean(accountKey && accountKey !== mobileConnectInitialAccountKey);
-    // A WalletConnect approval can land while the browser is suspended. AppKit
-    // may then expose the restored session without emitting another account
-    // event after focus. An explicit connect attempt may reuse that session, but
-    // it still has to pass provider/network confirmation before UI finalization.
-    if (!hasFreshAccountEvent && !sessionChangedSinceConnect && !attempt?.allowExistingSession) return null;
-
-    const address = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
-    const isConnected = Boolean(address) &&
-        account?.isConnected !== false &&
-        account?.status !== 'disconnected';
-    if (!isConnected) return null;
-
-    return {
-        address,
-        chainId: getStateChainId(account),
-        isConnected: true,
-        account
-    };
 }
 
 async function readMobileProviderChainId(provider) {
@@ -762,11 +721,14 @@ async function waitForMobileBaseSepolia(provider, switchOutcome, attempt, requir
     }
 }
 
-// acceptForeignChain (initial mobile connect): the address is what
+// Injected in-app browsers and desktop post-connect validation ONLY. The
+// mobile EXTERNAL browser path never calls this — it applies the session
+// chain as-is and leaves 84532 to the write guard.
+// acceptForeignChain (injected mobile connect): the address is what
 // "connected" means — the one add/switch cycle still runs, but refusal,
 // timeout or no response resolves to the session's actual chain instead of
 // failing the attempt. The write guard (ensureArtSoulWriteNetwork) remains
-// the sole Base Sepolia enforcement point, exactly like the restore path.
+// the sole Base Sepolia enforcement point.
 async function ensureExternalMobileBaseSepolia(walletState, source, attempt, preferredProvider = null, options = {}) {
     const { acceptForeignChain = false, switchTimeout = MOBILE_NETWORK_SWITCH_TIMEOUT } = options;
     while (document.visibilityState !== 'visible' && !attempt?.cancelled) {
@@ -888,10 +850,6 @@ async function ensureExternalMobileBaseSepolia(walletState, source, attempt, pre
 
     walletDebugLog('external mobile Base Sepolia confirmed', { source });
     return { ...walletState, address: providerAddress, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
-}
-
-function isIOSDevice() {
-    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 function readWagmiConnectorSnapshot() {
@@ -1051,26 +1009,22 @@ function bindWalletConnectDiagnostics(provider, source = 'WalletConnect provider
 }
 
 async function restartWalletConnectTransport(source = 'browser return') {
-    // Restart during active mobile connects (v23 behavior) AND whenever a
-    // core session exists — its relay socket dies in the background on iOS
-    // and must be reopened before state is re-read.
-    if ((!activeMobileConnect && !isCoreSessionActive()) || isInjectedWalletBrowser()) return false;
+    // One of the two proven survival mechanisms on the mobile external path:
+    // the relay socket dies in the background on iOS and must be reopened on
+    // return whenever a core session exists.
+    if (!isCoreSessionActive() || isInjectedWalletBrowser()) return false;
     if (walletTransportRestartPromise) return walletTransportRestartPromise;
 
     walletTransportRestartPromise = (async () => {
-        const wagmi = readWagmiConnectorSnapshot();
         const providers = [...new Set([
-            await getWagmiConnectorProvider(wagmi),
-            activeWalletProvider,
-            await getAppKitWalletProviderWithin(1500)
+            getConnectedCoreProvider(),
+            activeWalletProvider
         ].filter(Boolean))];
         const relayers = [...new Set(providers.map(getWalletConnectRelayer).filter(Boolean))];
         if (!relayers.length) {
             walletDebugLog('WalletConnect transport restart unavailable', {
                 source,
-                reason: 'provider or relayer absent',
-                wagmiStatus: wagmi.status,
-                connectorId: wagmi.connectorId
+                reason: 'provider or relayer absent'
             });
             return false;
         }
@@ -1156,31 +1110,6 @@ function readWalletConnectSnapshot(provider = activeWalletProvider) {
     };
 }
 
-function getWalletConnectSessionWalletState(provider = activeWalletProvider) {
-    for (const session of getWalletConnectSessions(provider)) {
-        const accounts = Object.values(session?.namespaces || {})
-            .flatMap((namespace) => namespace?.accounts || []);
-        for (const account of accounts) {
-            const match = String(account).match(/^eip155:(\d+):(0x[a-fA-F0-9]{40})$/);
-            if (!match) continue;
-            return {
-                address: normalizeWalletAddress(match[2]),
-                chainId: parseInt(match[1], 10),
-                isConnected: true,
-                account: {
-                    address: normalizeWalletAddress(match[2]),
-                    chainId: parseInt(match[1], 10),
-                    caipAddress: account,
-                    status: 'connected',
-                    isConnected: true
-                },
-                provider
-            };
-        }
-    }
-    return null;
-}
-
 async function getWagmiConnectorProvider(snapshot = readWagmiConnectorSnapshot()) {
     try {
         const provider = await snapshot?.connector?.getProvider?.();
@@ -1195,142 +1124,11 @@ async function getWagmiConnectorProvider(snapshot = readWagmiConnectorSnapshot()
     }
 }
 
-async function acceptMobileAppKitWalletState(
-    account,
-    source = 'mobile AppKit session',
-    attempt = activeConnectAttempt,
-    preferredProvider = null
-) {
-    const walletState = getFreshMobileAppKitWalletState(account, attempt);
-    if (!walletState || attempt?.cancelled) return null;
-
-    const initialKey = `${walletState.address}:${walletState.chainId || 'none'}:${appKitAccountRevision}`;
-    if (mobileSessionFinalizePromise && mobileSessionFinalizeKey === initialKey) {
-        return mobileSessionFinalizePromise;
-    }
-
-    mobileSessionFinalizeKey = initialKey;
-    mobileSessionFinalizePromise = (async () => {
-        let acceptedState = null;
-        try {
-            acceptedState = await ensureExternalMobileBaseSepolia(walletState, source, attempt, preferredProvider);
-        } catch (error) {
-            if (attempt && !attempt.cancelled) attempt.failure = error;
-            clearModalIntent();
-            void safeCloseModal('mobile wallet validation failed', { silent: true });
-            walletDebugLog('mobile wallet final failure', {
-                source,
-                code: error?.code || null,
-                message: error?.message || String(error),
-                walletId: lastSelectedWallet?.id || null,
-                walletName: lastSelectedWallet?.name || null
-            });
-            notifyWalletResume('mobile wallet validation failed');
-            return null;
-        }
-        if (!acceptedState || attempt?.cancelled) return null;
-
-        const { address, chainId, provider } = acceptedState;
-        const accountKey = `${address}:${chainId}`;
-        if (accountKey === lastAcceptedMobileAccountKey) return acceptedState;
-        lastAcceptedMobileAccountKey = accountKey;
-        lastProcessedAddress = address;
-        lastProcessedChainId = chainId;
-        lastConfirmedWalletAt = Date.now();
-        if (provider) activeWalletProvider = provider;
-        window.currentWalletAddress = address;
-        localStorage.setItem('artsoul_wallet', address);
-        setCurrentChainId(chainId);
-
-        // Do not expose a connected UI until both account and Base Sepolia have
-        // been confirmed from the active provider.
-        dispatchWalletStateChanged({ address, chainId, isConnected: true });
-        updateNavButtons({ address, chainId });
-        updateNetworkBadge({ address, chainId });
-        removeMobileWalletRecovery();
-        mobileRetryCleanupRequired = false;
-
-        Promise.resolve(signOutMismatchedSession(address)).catch((error) => {
-            console.warn('Stale session cleanup after mobile connect failed:', error);
-        });
-
-        clearModalIntent();
-        safeCloseModal('mobile wallet connected');
-        scheduleModalCloseRetries('mobile wallet connected');
-        walletDebugLog('mobile wallet connection finalized', {
-            source,
-            address: maskWalletAddress(address),
-            chainId
-        });
-        return acceptedState;
-    })().finally(() => {
-        if (mobileSessionFinalizeKey === initialKey) {
-            mobileSessionFinalizePromise = null;
-            mobileSessionFinalizeKey = '';
-        }
-    });
-
-    return mobileSessionFinalizePromise;
-}
-
-async function reconcileMobileAppKitSession(source = 'mobile session reconciliation', attempt = activeConnectAttempt) {
-    return acceptMobileAppKitWalletState(readAppKitAccountSnapshot(), source, attempt);
-}
-
-async function reconcileMobileConnectionSources(source = 'mobile connection reconciliation', attempt = activeConnectAttempt) {
-    const wagmi = readWagmiConnectorSnapshot();
-    const wagmiProvider = await getWagmiConnectorProvider(wagmi);
-    if (wagmiProvider?.request) {
-        activeWalletProvider = wagmiProvider;
-        bindRuntimeProviderEvents(wagmiProvider, 'wagmi mobile connector');
-    }
-
-    const appKitAccepted = await acceptMobileAppKitWalletState(
-        readAppKitAccountSnapshot(),
-        `${source}: AppKit`,
-        attempt,
-        wagmiProvider
-    );
-    if (appKitAccepted?.address || attempt?.cancelled || attempt?.failure) return appKitAccepted;
-
-    if (wagmi.rawAddress) {
-        const wagmiAccepted = await acceptMobileAppKitWalletState({
-            address: wagmi.rawAddress,
-            chainId: wagmi.chainId,
-            caipAddress: wagmi.chainId ? `eip155:${wagmi.chainId}:${wagmi.rawAddress}` : null,
-            status: wagmi.status === 'disconnected' ? 'disconnected' : 'connected',
-            isConnected: wagmi.status !== 'disconnected'
-        }, `${source}: Wagmi`, attempt, wagmiProvider);
-        if (wagmiAccepted?.address || attempt?.cancelled || attempt?.failure) return wagmiAccepted;
-    }
-
-    const walletConnectState = getWalletConnectSessionWalletState(wagmiProvider || activeWalletProvider);
-    if (walletConnectState?.address) {
-        return acceptMobileAppKitWalletState(
-            walletConnectState.account,
-            `${source}: WalletConnect session`,
-            attempt,
-            walletConnectState.provider
-        );
-    }
-
-    walletDebugLog('mobile connection sources not confirmed', {
-        source,
-        appKit: getWalletDebugSnapshot().account,
-        wagmi: {
-            status: wagmi.status,
-            chainId: wagmi.chainId,
-            address: wagmi.address,
-            connectorId: wagmi.connectorId,
-            connectorName: wagmi.connectorName,
-            connectorRdns: wagmi.connectorRdns
-        },
-        walletConnect: readWalletConnectSnapshot(wagmiProvider || activeWalletProvider)
-    });
-    return null;
-}
-
 function scheduleWalletReconciliation(source, delay = 150, options = {}) {
+    // Desktop and injected wallet browsers only. On the mobile external path
+    // the core provider's session is the single source of truth — no
+    // reconciliation from AppKit/Wagmi/injected reads may touch state there.
+    if (isMobileDevice() && !isInjectedWalletBrowser()) return;
     if (walletResumeTimer) clearTimeout(walletResumeTimer);
     walletResumeTimer = setTimeout(async () => {
         walletResumeTimer = null;
@@ -1338,31 +1136,17 @@ function scheduleWalletReconciliation(source, delay = 150, options = {}) {
             source,
             snapshot: getWalletDebugSnapshot()
         });
-        if (activeMobileConnect && !isInjectedWalletBrowser()) {
-            await reconcileMobileConnectionSources(source, activeConnectAttempt);
-            return;
-        }
         await reconcileActiveWalletFromProviders(source, options);
     }, delay);
 }
 
 async function processWalletResume(source) {
-    if (activeConnectAttempt?.handoffObserved && document.visibilityState === 'visible') {
-        activeConnectAttempt.returnedAt ||= Date.now();
-        walletDebugLog('manual wallet return observed', {
-            source,
-            returnedAt: activeConnectAttempt.returnedAt
-        });
-        await restartWalletConnectTransport(source);
-        await logProviderTruthAfterMobileReturn(source);
-    } else if (document.visibilityState === 'visible' && isCoreSessionActive()) {
-        // A restored core session loses its relay socket whenever the mobile
-        // browser goes to the background. Reopen it on every return so the
-        // session keeps working without any user-visible disconnect.
-        // (restartWalletConnectTransport is a no-op outside the core path.)
-        await restartWalletConnectTransport(source);
-    }
     if (document.visibilityState === 'visible') {
+        // A core session loses its relay socket whenever the mobile browser
+        // goes to the background. Reopen it on every return so the session
+        // keeps working without any user-visible disconnect.
+        // (restartWalletConnectTransport is a no-op outside the core path.)
+        if (isCoreSessionActive()) await restartWalletConnectTransport(source);
         await recheckDeferredCoreDisconnect(source);
     }
     walletDebugLog('browser resume signal', {
@@ -1377,64 +1161,6 @@ async function processWalletResume(source) {
 
 function notifyWalletResume(source) {
     void processWalletResume(source);
-}
-
-function markMobileWalletHandoff(source) {
-    if (!activeMobileConnect || !activeConnectAttempt) return;
-    activeConnectAttempt.handoffObserved = true;
-    activeConnectAttempt.handoffStartedAt ||= Date.now();
-    walletDebugLog('mobile wallet handoff observed', {
-        source,
-        walletId: lastSelectedWallet?.id || null,
-        walletName: lastSelectedWallet?.name || null,
-        walletRdns: lastSelectedWallet?.rdns || null,
-        nativeLink: lastSelectedWallet?.nativeLink || null,
-        universalLink: lastSelectedWallet?.universalLink || null
-    });
-}
-
-async function logProviderTruthAfterMobileReturn(source) {
-    if (!walletDebugEnabled()) return;
-    const wagmi = readWagmiConnectorSnapshot();
-    const wagmiProvider = await getWagmiConnectorProvider(wagmi);
-    const providers = [...new Set([
-        wagmiProvider,
-        activeWalletProvider,
-        await getAppKitWalletProviderWithin(MOBILE_PROVIDER_REQUEST_TIMEOUT)
-    ].filter(Boolean))];
-    if (!providers.length) {
-        walletDebugLog('manual return provider absent', {
-            source,
-            wagmiStatus: wagmi.status,
-            connectorId: wagmi.connectorId,
-            connectorName: wagmi.connectorName,
-            walletConnect: readWalletConnectSnapshot()
-        });
-        return;
-    }
-
-    for (const provider of providers) {
-        const accounts = await requestProviderValueWithin(
-            provider,
-            'eth_accounts',
-            [],
-            MOBILE_PROVIDER_REQUEST_TIMEOUT
-        ).catch((error) => ({ error }));
-        const chainId = await requestProviderValueWithin(
-            provider,
-            'eth_chainId',
-            [],
-            MOBILE_PROVIDER_REQUEST_TIMEOUT
-        ).catch((error) => ({ error }));
-        walletDebugLog('manual return provider truth', {
-            source,
-            accounts: Array.isArray(accounts) ? accounts.map(maskWalletAddress) : null,
-            accountsError: accounts?.error?.message || null,
-            chainId: chainId?.error ? null : parseChainId(chainId),
-            chainError: chainId?.error?.message || null,
-            walletConnect: readWalletConnectSnapshot(provider)
-        });
-    }
 }
 
 function waitForWalletResumeOrDelay(delay) {
@@ -1460,14 +1186,12 @@ function bindWalletResumeListeners() {
 
     window.addEventListener('pageshow', () => notifyWalletResume('pageshow'));
     window.addEventListener('focus', () => notifyWalletResume('window focus'));
-    window.addEventListener('blur', () => markMobileWalletHandoff('window blur'));
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             walletDebugLog('visibility changed', {
                 state: document.visibilityState,
                 snapshot: getWalletDebugSnapshot()
             });
-            markMobileWalletHandoff('visibility hidden');
         } else if (document.visibilityState === 'visible') {
             walletDebugLog('visibility changed', { state: document.visibilityState });
             notifyWalletResume('visibility return');
@@ -1537,101 +1261,6 @@ function createForegroundDeadline(timeoutMs) {
     };
 }
 
-async function waitForConfirmedMobileWallet(timeoutMs, attempt = activeConnectAttempt) {
-    const deadline = createForegroundDeadline(timeoutMs);
-    let lastSnapshotKey = '';
-    let modalWasOpen = Boolean(attempt?.modalOpened);
-    let modalClosedAt = null;
-
-    try {
-        while (!deadline.hasExpired() && !attempt?.cancelled && !attempt?.failure) {
-            if (document.visibilityState !== 'visible') {
-                await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
-                continue;
-            }
-
-            const snapshot = getWalletDebugSnapshot();
-            const modalOpen = Boolean(snapshot?.modal?.open);
-            let pendingFailure = null;
-            if (modalOpen) {
-                modalWasOpen = true;
-                modalClosedAt = null;
-            } else if (modalWasOpen) {
-                modalClosedAt ||= Date.now();
-                if (!attempt?.handoffObserved && Date.now() - modalClosedAt >= MOBILE_MODAL_CLOSED_GRACE) {
-                    pendingFailure = createWalletConnectError(
-                        'MOBILE_MODAL_CLOSED',
-                        'Wallet selection closed before a connection was confirmed. Please retry or use your wallet browser.'
-                    );
-                }
-            }
-            if (
-                attempt?.handoffObserved &&
-                attempt?.returnedAt &&
-                Date.now() - attempt.returnedAt >= MOBILE_RETURN_SETTLEMENT_WINDOW
-            ) {
-                pendingFailure = createWalletConnectError(
-                    'MOBILE_SESSION_UNCONFIRMED',
-                    'The wallet did not return a confirmed session. Please retry or open ArtSoul in your wallet browser.'
-                );
-            }
-            if (pendingFailure) {
-                const finalRestored = await reconcileMobileConnectionSources(
-                    'mobile bounded final confirmation',
-                    attempt
-                );
-                if (finalRestored?.address) return finalRestored;
-                if (!attempt.failure) attempt.failure = pendingFailure;
-                walletDebugLog('mobile connection bounded wait ended', {
-                        code: attempt.failure?.code || pendingFailure.code,
-                        graceMs: MOBILE_MODAL_CLOSED_GRACE,
-                        returnWindowMs: MOBILE_RETURN_SETTLEMENT_WINDOW,
-                        handoffObserved: Boolean(attempt?.handoffObserved),
-                        snapshot
-                    });
-                break;
-            }
-            const snapshotKey = JSON.stringify(snapshot);
-            if (snapshotKey !== lastSnapshotKey) {
-                lastSnapshotKey = snapshotKey;
-                walletDebugLog('mobile confirmation state', {
-                    remainingMs: deadline.remaining(),
-                    snapshot
-                });
-            }
-
-            const restored = await reconcileMobileConnectionSources('mobile connect confirmation', attempt);
-            if (restored?.address) return restored;
-
-            await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
-        }
-
-        // Approval and the browser visibility event can arrive in either order.
-        // Re-check provider/session truth once more before presenting a timeout.
-        const restored = attempt?.cancelled || attempt?.failure
-            ? null
-            : await reconcileMobileConnectionSources('mobile connect final confirmation', attempt);
-        if (restored?.address) return restored;
-
-        walletDebugLog('mobile wallet confirmation expired', {
-            foregroundTimeoutMs: timeoutMs,
-            remainingMs: deadline.remaining(),
-            cancelled: Boolean(attempt?.cancelled),
-            failureCode: attempt?.failure?.code || null,
-            snapshot: getWalletDebugSnapshot()
-        });
-        return null;
-    } finally {
-        deadline.dispose();
-    }
-}
-
-async function waitForConfirmedWallet(timeoutMs, options = {}) {
-    return options.mobile
-        ? waitForConfirmedMobileWallet(timeoutMs, options.attempt)
-        : waitForConfirmedDesktopWallet(timeoutMs);
-}
-
 async function requestInjectedMobileAccounts() {
     const deadline = createForegroundDeadline(WALLET_CONNECT_TIMEOUT_MOBILE);
     const requestOutcome = Promise.resolve(window.ethereum.request({ method: 'eth_requestAccounts' }))
@@ -1688,7 +1317,6 @@ function hasNetworkModalIntent() {
     const now = Date.now();
     return Boolean(
         activeNetworkSwitchChainId ||
-        activeMobileConnect ||
         now < networkModalIntentUntil ||
         now < connectModalIntentUntil
     );
@@ -2104,6 +1732,37 @@ function dispatchWalletStateChanged(state = {}, options = {}) {
     return true;
 }
 
+function finishWalletHydration() {
+    walletHydrationPending = false;
+    window.artsoulWalletHydrating = false;
+    if (walletHydrationTimer) {
+        clearTimeout(walletHydrationTimer);
+        walletHydrationTimer = null;
+    }
+}
+
+// The single place a confirmed wallet becomes app state. Both the boot-time
+// session restore and the standard mobile connect apply through here; the
+// chain id is stored AS-IS — Base Sepolia is only ever requested by the
+// write guard at action time.
+function applyConfirmedWalletState(walletState) {
+    const normalizedAddress = walletState.address.toLowerCase();
+    const normalizedChainId = setCurrentChainId(walletState);
+    finishWalletHydration();
+    lastProcessedAddress = normalizedAddress;
+    lastProcessedChainId = normalizedChainId;
+    lastConfirmedWalletAt = Date.now();
+    window.currentWalletAddress = normalizedAddress;
+    localStorage.setItem('artsoul_wallet', normalizedAddress);
+    updateNavButtons({ address: normalizedAddress, chainId: normalizedChainId });
+    updateNetworkBadge({ address: normalizedAddress, chainId: normalizedChainId });
+    dispatchWalletStateChanged({
+        address: normalizedAddress,
+        chainId: normalizedChainId,
+        isConnected: true
+    });
+}
+
 async function clearWalletConnectionCache() {
     const walletFragments = [
         'walletconnect',
@@ -2216,8 +1875,6 @@ async function clearIncompleteWalletConnectState(reason = 'mobile retry') {
     latestAppKitAccountSnapshot = null;
     activeWalletProvider = null;
     lastObservedAppKitAccountKey = null;
-    mobileSessionFinalizePromise = null;
-    mobileSessionFinalizeKey = '';
     mobileRetryCleanupRequired = false;
     walletDebugLog('incomplete WalletConnect cleanup completed', { reason });
     return true;
@@ -2409,47 +2066,6 @@ function createWalletConnectError(code, message) {
     return error;
 }
 
-function removeMobileWalletRecovery() {
-    document.getElementById('artsoul-mobile-wallet-recovery')?.remove();
-}
-
-function getKnownWalletLaunchUrl() {
-    const id = String(lastSelectedWallet?.id || '').toLowerCase();
-    const name = String(lastSelectedWallet?.name || '').toLowerCase();
-    if (id === FEATURED_WALLETS.metamask || name.includes('metamask')) {
-        const dappPath = `${window.location.host}${window.location.pathname}${window.location.search}`;
-        return `https://metamask.app.link/dapp/${dappPath}`;
-    }
-    if ((id === FEATURED_WALLETS.rabby || name.includes('rabby')) && !isIOSDevice()) return 'rabby://';
-    return null;
-}
-
-async function openWalletBrowserFallback(statusElement) {
-    const launchUrl = getKnownWalletLaunchUrl();
-    if (launchUrl) {
-        walletDebugLog('mobile wallet browser fallback opened', {
-            walletId: lastSelectedWallet?.id || null,
-            walletName: lastSelectedWallet?.name || null,
-            directLinkAvailable: true
-        });
-        window.location.href = launchUrl;
-        return;
-    }
-
-    try {
-        await navigator.clipboard.writeText(window.location.href);
-        statusElement.textContent = 'ArtSoul URL copied. Open your wallet browser, paste the URL, and select Base Sepolia.';
-        walletDebugLog('mobile wallet browser fallback copied URL', {
-            walletId: lastSelectedWallet?.id || null,
-            walletName: lastSelectedWallet?.name || null,
-            directLinkAvailable: false
-        });
-    } catch (error) {
-        statusElement.textContent = 'Open this page inside your wallet browser and select Base Sepolia before retrying.';
-        walletDebugLog('mobile wallet browser fallback copy failed', describeWalletDebugError(error));
-    }
-}
-
 // Small heads-up after a connection is accepted on a foreign chain: the
 // write guard will request Base Sepolia at action time.
 function notifyForeignChainAccepted(chainId) {
@@ -2459,87 +2075,6 @@ function notifyForeignChainAccepted(chainId) {
     } catch {
         // The hint is best effort; the connection itself is already applied.
     }
-}
-
-function showMobileWalletRecovery(error) {
-    removeMobileWalletRecovery();
-    const panel = document.createElement('section');
-    panel.id = 'artsoul-mobile-wallet-recovery';
-    panel.setAttribute('role', 'alert');
-    panel.style.cssText = [
-        'position:fixed',
-        'left:12px',
-        'right:12px',
-        'bottom:12px',
-        'z-index:2147483646',
-        'display:grid',
-        'gap:10px',
-        'padding:14px',
-        'border:1px solid var(--c-border)',
-        'border-radius:12px',
-        'color:var(--c-text)',
-        'background:var(--c-surface)',
-        'box-shadow:0 0 18px var(--c-glow, transparent)'
-    ].join(';');
-
-    const title = document.createElement('strong');
-    title.textContent = 'Wallet connection needs attention';
-    const status = document.createElement('p');
-    status.style.cssText = 'margin:0;color:var(--c-text-muted);font-size:0.9rem;line-height:1.45';
-    status.textContent = error?.message || 'The wallet connection was not completed.';
-    const instruction = document.createElement('p');
-    instruction.style.cssText = 'margin:0;color:var(--c-text);font-size:0.85rem;line-height:1.4';
-    const rabbyIOSUnavailable = error?.code === 'RABBY_IOS_UNAVAILABLE';
-    instruction.textContent = rabbyIOSUnavailable
-        ? 'Open Rabby, choose WalletConnect, paste the copied URI, or open ArtSoul in the Rabby browser.'
-        : 'ArtSoul will add and select Base Sepolia after the wallet session connects.';
-    const actions = document.createElement('div');
-    actions.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px';
-    const makeButton = (label) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = label;
-        button.style.cssText = [
-            'min-height:44px',
-            'padding:8px 10px',
-            'border:1px solid var(--c-accent)',
-            'border-radius:10px',
-            'color:var(--c-text)',
-            'background:var(--c-bg)',
-            'font:inherit',
-            'font-weight:700'
-        ].join(';');
-        return button;
-    };
-    const retryButton = makeButton('Retry');
-    retryButton.addEventListener('click', () => {
-        removeMobileWalletRecovery();
-        void window.safeConnectWallet?.();
-    });
-    const walletBrowserButton = makeButton('Open in wallet browser');
-    walletBrowserButton.addEventListener('click', () => void openWalletBrowserFallback(status));
-    actions.append(retryButton);
-    if (rabbyIOSUnavailable) {
-        const copyLinkButton = makeButton('Copy link');
-        copyLinkButton.addEventListener('click', async () => {
-            if (!lastWalletConnectUri) {
-                status.textContent = 'The WalletConnect URI is unavailable. Open ArtSoul inside the Rabby browser instead.';
-                return;
-            }
-            try {
-                await navigator.clipboard.writeText(lastWalletConnectUri);
-                status.textContent = 'WalletConnect URI copied. Open Rabby, choose WalletConnect, and paste it.';
-                walletDebugLog('Rabby WalletConnect URI copied', { uriAvailable: true });
-            } catch (copyError) {
-                status.textContent = 'Copy failed. Open ArtSoul inside the Rabby browser instead.';
-                walletDebugLog('Rabby WalletConnect URI copy failed', describeWalletDebugError(copyError));
-            }
-        });
-        actions.append(copyLinkButton);
-    }
-    actions.append(walletBrowserButton);
-    panel.append(title, status, instruction, actions);
-    document.documentElement.appendChild(panel);
 }
 
 async function openAppKitConnectModal(attempt) {
@@ -2571,60 +2106,20 @@ async function openAppKitConnectModal(attempt) {
     }
 }
 
-// New production path for mobile external browsers: bare
-// @walletconnect/ethereum-provider + the ArtSoul wallet sheet. Desktop and
-// injected wallet browsers keep their existing flows.
-async function connectExternalMobileCoreWallet(attempt) {
-    walletDebugLog('core mobile connect started', { attemptId: attempt.id });
-    let sheet = null;
+// STANDARD mobile external-browser connect: await provider.connect() through
+// the official WalletConnect modal, then apply the settled session as-is.
+// No chain switching, no settle windows, no custom timeouts, no storage
+// cleanup. A second tap while a connect is in flight reuses the same pairing
+// (connectCoreWallet dedupes), so a page never holds two pairings.
+async function connectExternalMobileStandard() {
+    sessionStorage.removeItem('artsoul_disconnecting');
+    setConnectButtonPending(true);
+    walletDebugLog('standard mobile connect entered', {});
     try {
-        const connectPromise = connectCoreWallet({
-            onDisplayUri: (uri) => {
-                lastWalletConnectUri = uri;
-                if (sheet) {
-                    sheet.update(uri);
-                    return;
-                }
-                sheet = showCoreWalletSheet({
-                    uri,
-                    isIOS: isIOSDevice(),
-                    log: (step, detail) => walletDebugLog(step, detail),
-                    onWalletOpened: (walletName) => {
-                        lastSelectedWallet = {
-                            id: null,
-                            name: walletName,
-                            rdns: null,
-                            nativeLink: null,
-                            universalLink: null,
-                            deepLinkAvailable: true
-                        };
-                        markMobileWalletHandoff(`core sheet ${walletName}`);
-                    },
-                    onCancel: () => {
-                        attempt.cancelled = true;
-                        notifyWalletResume('core sheet cancelled');
-                    }
-                });
-            }
-        });
-
-        const connected = await Promise.race([
-            connectPromise,
-            (async () => {
-                const deadline = Date.now() + WALLET_CONNECT_TIMEOUT_MOBILE;
-                while (Date.now() < deadline && !attempt.cancelled && !attempt.failure) {
-                    await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
-                }
-                return null;
-            })()
-        ]);
-        if (attempt.cancelled) return null;
-        if (attempt.failure) throw attempt.failure;
+        const connected = await connectCoreWallet();
         if (!connected?.address) {
-            throw createWalletConnectError(
-                'WALLET_CONNECT_TIMEOUT',
-                'Wallet connection was not confirmed. Please retry or open ArtSoul in your wallet browser.'
-            );
+            walletDebugLog('standard mobile connect returned no address', {});
+            return null;
         }
 
         const coreProvider = connected.provider;
@@ -2632,46 +2127,49 @@ async function connectExternalMobileCoreWallet(attempt) {
         bindRuntimeProviderEvents(coreProvider, 'core walletconnect provider');
         bindWalletConnectDiagnostics(coreProvider, 'core walletconnect provider');
         bindCoreProviderDisconnect(coreProvider);
-        walletDebugLog('core session connected', {
+
+        // Apply the session exactly as the wallet settled it — the write
+        // guard is the only place that ever requests Base Sepolia.
+        applyConfirmedWalletState({
+            address: connected.address,
+            chainId: connected.chainId
+        });
+        try {
+            window.ErrorHandler?.showToast?.('Connected.', 'info');
+        } catch {
+            // The toast is best effort; the connection is already applied.
+        }
+        walletDebugLog('standard mobile connect settled', {
             address: maskWalletAddress(connected.address),
             chainId: connected.chainId,
             restored: connected.restored
         });
-        sheet?.setStatus('Wallet connected. Confirming the network...');
 
-        // The wallet may follow up with chainChanged for its own active
-        // network right after settle (observed 84532 -> 8453). Wait for that
-        // signal before deciding whether the add/switch cycle is needed.
-        const settleSource = await waitForWalletChainSettle(coreProvider, 2500);
-        walletDebugLog('core chain settle window closed', { source: settleSource });
-        if (attempt.cancelled) return null;
-
-        const validated = await ensureExternalMobileBaseSepolia({
-            address: connected.address,
-            chainId: connected.chainId,
-            account: { address: connected.address, chainId: connected.chainId }
-        }, 'core walletconnect', attempt, coreProvider, {
-            acceptForeignChain: true,
-            switchTimeout: MOBILE_CONNECT_SWITCH_TIMEOUT
-        });
-        if (attempt.cancelled) return null;
-        if (!validated?.address) {
-            throw attempt.failure || createWalletConnectError(
-                'MOBILE_ACCOUNT_UNCONFIRMED',
-                'The wallet session did not confirm the selected account. Please retry the connection.'
-            );
+        // Connect-only gesture: SIWE waits for the next protected action so
+        // the wallet round trip is never doubled.
+        deferMobileAuthenticationThisTurn = true;
+        setTimeout(() => {
+            deferMobileAuthenticationThisTurn = false;
+        }, 0);
+        return connected.address;
+    } catch (error) {
+        // User closed the official modal or rejected in the wallet: settle
+        // back to the previous state. NO cleanup runs here — the provider's
+        // persisted storage stays untouched except on explicit Disconnect.
+        walletDebugLog('standard mobile connect failed', describeWalletDebugError(error));
+        if (!isUserRejectedError(error)) {
+            try {
+                window.ErrorHandler?.showToast?.(
+                    'Wallet connection was not completed. Please try again.',
+                    'error'
+                );
+            } catch {
+                // Best effort only.
+            }
         }
-
-        await handleProviderChainConfirmed(validated.chainId, 'core walletconnect');
-        await handleProviderAccountsChanged([validated.address], 'core walletconnect', coreProvider);
-        notifyForeignChainAccepted(validated.chainId);
-        walletDebugLog('core mobile connect complete', {
-            address: maskWalletAddress(validated.address),
-            chainId: validated.chainId
-        });
-        return validated.address;
+        return null;
     } finally {
-        sheet?.close();
+        setConnectButtonPending(false);
     }
 }
 
@@ -2749,29 +2247,6 @@ function bindCoreProviderDisconnect(provider) {
     });
 }
 
-// Restore the persisted core session with retries. Every MPA navigation is a
-// full page load that must re-import the WalletConnect SDK and reopen the
-// relay, so a single flaky attempt is common on mobile networks. Only a clean
-// "no session in storage" counts as disconnected; errors keep the last-known
-// wallet hint so the next attempt or page load can still restore.
-async function runCoreSessionRestore() {
-    let outcome = { status: 'error', session: null };
-    for (let attempt = 1; attempt <= CORE_RESTORE_MAX_ATTEMPTS; attempt++) {
-        outcome = await Promise.race([
-            restoreCoreSessionOutcome(),
-            sleep(CORE_RESTORE_ATTEMPT_TIMEOUT).then(() => ({ status: 'error', session: null, timedOut: true }))
-        ]);
-        if (outcome.status !== 'error') return outcome;
-        walletDebugLog('core session restore attempt failed', {
-            attempt,
-            timedOut: Boolean(outcome.timedOut),
-            error: outcome.error ? describeWalletDebugError(outcome.error) : null
-        });
-        if (attempt < CORE_RESTORE_MAX_ATTEMPTS) await sleep(500 * attempt);
-    }
-    return outcome;
-}
-
 function findWalletConnectUri(value, depth = 0, seen = new WeakSet()) {
     if (depth > 5 || value === null || value === undefined) return null;
     if (typeof value === 'string') return value.startsWith('wc:') ? value : null;
@@ -2823,23 +2298,6 @@ function handleAppKitEvent(event) {
         walletConnectUriAvailable: Boolean(walletConnectUri),
         error: event?.error?.message || data?.error?.message || properties?.error_message || null
     });
-
-    const rabbySelected = walletId === FEATURED_WALLETS.rabby || String(walletName || '').toLowerCase().includes('rabby');
-    if (activeMobileConnect && isIOSDevice() && rabbySelected && !universalLink && activeConnectAttempt && !activeConnectAttempt.failure) {
-        activeConnectAttempt.failure = createWalletConnectError(
-            'RABBY_IOS_UNAVAILABLE',
-            'Rabby could not be opened on this device.'
-        );
-        mobileRetryCleanupRequired = true;
-        walletDebugLog('Rabby iOS universal link unavailable', {
-            walletId,
-            walletName,
-            nativeLink,
-            universalLink
-        });
-        void safeCloseModal('Rabby iOS unavailable', { silent: true });
-        notifyWalletResume('Rabby iOS unavailable');
-    }
 }
 
 /**
@@ -2849,61 +2307,45 @@ function handleAppKitEvent(event) {
 window.safeConnectWallet = async () => {
     const mobileConnect = isMobileDevice();
     const injectedMobileConnect = mobileConnect && isInjectedWalletBrowser();
-    const externalMobileConnect = mobileConnect && !injectedMobileConnect;
 
-    // A core pairing is already waiting for the wallet: keep it. Regenerating
-    // or deleting an active pairing mid-attempt is exactly the SDK race that
-    // killed AppKit settlement — the sheet with the current URI stays up.
-    if (externalMobileConnect && activeConnectAttempt && !activeConnectAttempt.cancelled && isCoreConnectInFlight()) {
-        walletDebugLog('core connect already pending; keeping active pairing', {
-            attemptId: activeConnectAttempt.id
-        });
-        return null;
+    // Mobile external browser: the STANDARD WalletConnect flow. One provider,
+    // the official modal, await connect(), apply the session as-is. Nothing
+    // below this line runs for that path.
+    if (mobileConnect && !injectedMobileConnect) {
+        return connectExternalMobileStandard();
     }
 
-    removeMobileWalletRecovery();
     lastSelectedWallet = null;
     lastWalletConnectUri = null;
 
-    if (mobileConnect && activeConnectAttempt && !activeConnectAttempt.cancelled) {
+    if (injectedMobileConnect && activeConnectAttempt && !activeConnectAttempt.cancelled) {
         walletDebugLog('connect button retry requested', {
             cancelledAttemptId: activeConnectAttempt.id,
             snapshot: getWalletDebugSnapshot()
         });
         activeConnectAttempt.cancelled = true;
-        if (!externalMobileConnect) mobileRetryCleanupRequired = true;
+        mobileRetryCleanupRequired = true;
         notifyWalletResume('connect retry');
         void safeCloseModal('mobile connect retry', { silent: true });
     }
 
-    // The SDK-state wipe belongs to the AppKit mobile path only. The core
-    // path keeps its provider storage; stale proposals expire on their own.
-    if (mobileConnect && mobileRetryCleanupRequired && !externalMobileConnect) {
+    // The SDK-state wipe belongs to the AppKit/injected mobile path only.
+    if (injectedMobileConnect && mobileRetryCleanupRequired) {
         await clearIncompleteWalletConnectState('before mobile retry');
     }
 
     const attempt = {
         id: ++connectAttemptSequence,
         cancelled: false,
-        externalMobile: externalMobileConnect,
-        allowExistingSession: externalMobileConnect,
         startedAt: Date.now()
     };
     activeConnectAttempt = attempt;
-    setConnectButtonPending(true, { retryable: mobileConnect });
+    setConnectButtonPending(true, { retryable: injectedMobileConnect });
     walletDebugLog('connect button handler entered', {
         mobile: mobileConnect,
         injectedMobile: injectedMobileConnect,
-        externalMobile: externalMobileConnect,
         snapshot: getWalletDebugSnapshot()
     });
-
-        if (mobileConnect) {
-            activeMobileConnect = true;
-        lastAcceptedMobileAccountKey = null;
-        mobileConnectStartRevision = appKitAccountRevision;
-        mobileConnectInitialAccountKey = getAppKitAccountKey(readAppKitAccountSnapshot());
-    }
 
     try {
         sessionStorage.removeItem('artsoul_disconnecting');
@@ -2948,33 +2390,11 @@ window.safeConnectWallet = async () => {
             return validated.address;
         }
 
-        if (externalMobileConnect) {
-            const coreAddress = await connectExternalMobileCoreWallet(attempt);
-            if (attempt.cancelled) return null;
-            if (!coreAddress) {
-                throw attempt.failure || createWalletConnectError(
-                    'WALLET_CONNECT_TIMEOUT',
-                    'Wallet connection was not confirmed. Please retry or open ArtSoul in your wallet browser.'
-                );
-            }
-            clearModalIntent();
-            // Same connect-only gesture rule as the AppKit mobile path: SIWE
-            // waits for the next protected action.
-            deferMobileAuthenticationThisTurn = true;
-            setTimeout(() => {
-                deferMobileAuthenticationThisTurn = false;
-            }, 0);
-            return coreAddress;
-        }
-
         if (window.web3Modal) {
             await openAppKitConnectModal(attempt);
 
             walletDebugLog('waiting for wallet confirmation', { mobile: mobileConnect });
-            const confirmed = await waitForConfirmedWallet(
-                mobileConnect ? WALLET_CONNECT_TIMEOUT_MOBILE : WALLET_CONNECT_TIMEOUT_DESKTOP,
-                { mobile: mobileConnect, attempt }
-            );
+            const confirmed = await waitForConfirmedDesktopWallet(WALLET_CONNECT_TIMEOUT_DESKTOP);
             if (attempt.cancelled) return null;
             if (attempt.failure) throw attempt.failure;
             if (!confirmed?.address) {
@@ -2987,7 +2407,7 @@ window.safeConnectWallet = async () => {
             }
 
             let finalized = confirmed;
-            if (!mobileConnect && confirmed.chainId !== BASE_SEPOLIA_CHAIN_ID) {
+            if (confirmed.chainId !== BASE_SEPOLIA_CHAIN_ID) {
                 finalized = await ensureExternalMobileBaseSepolia(
                     {
                         address: confirmed.address,
@@ -3012,15 +2432,6 @@ window.safeConnectWallet = async () => {
                 address: maskWalletAddress(finalized.address),
                 chainId: finalized.chainId
             });
-            if (mobileConnect) {
-                // Let callers finish this user gesture as connect-only. The flag
-                // survives promise continuations in this turn, then clears before
-                // a later protected-action gesture can request normal SIWE.
-                deferMobileAuthenticationThisTurn = true;
-                setTimeout(() => {
-                    deferMobileAuthenticationThisTurn = false;
-                }, 0);
-            }
             return finalized.address;
         } else {
             throw createWalletConnectError(
@@ -3052,10 +2463,8 @@ window.safeConnectWallet = async () => {
         }
         clearModalIntent();
         await safeCloseModal('wallet connect failed', { silent: true });
-        if (mobileConnect) showMobileWalletRecovery(err);
-        else alert(err?.message || 'Wallet connection was not completed. Please try again.');
-        // Core-path retries must not wipe the provider's persisted state.
-        if (mobileConnect && !externalMobileConnect && !hasConfirmedWalletAddress()) mobileRetryCleanupRequired = true;
+        alert(err?.message || 'Wallet connection was not completed. Please try again.');
+        if (injectedMobileConnect && !hasConfirmedWalletAddress()) mobileRetryCleanupRequired = true;
         return null;
     } finally {
         walletDebugLog('connect button handler exited', {
@@ -3066,7 +2475,6 @@ window.safeConnectWallet = async () => {
         });
         if (activeConnectAttempt === attempt) {
             activeConnectAttempt = null;
-            activeMobileConnect = false;
             setConnectButtonPending(false);
         }
     }
@@ -3271,22 +2679,19 @@ window.resetWalletConnection = async () => {
             isConnected: false
         });
 
-        // Check if we're already on index.html
-        const isIndexPage = window.location.pathname.endsWith('index.html') ||
-                            window.location.pathname === '/' ||
-                            window.location.pathname.endsWith('/');
-
-        if (isIndexPage) {
-            // Already on index, just reload
-            window.location.reload();
-        } else {
-            // Redirect to home page
-            window.location.href = 'index.html';
-        }
+        // The site NEVER reloads or redirects itself around wallet flows.
+        // The UI settles to guest in place; nothing resurrects the session.
+        sessionStorage.removeItem('artsoul_disconnecting');
+        return true;
     } catch (error) {
         console.error('Reset failed:', error);
-        // Force reload anyway
-        window.location.reload();
+        updateNavButtons(null);
+        dispatchWalletStateChanged({
+            address: null,
+            chainId: null,
+            isConnected: false
+        }, { settled: true });
+        return false;
     }
 };
 
@@ -3410,9 +2815,9 @@ function waitForWalletHydration(timeoutMs = WALLET_HYDRATION_TIMEOUT + 500) {
 // resolves with the connected address once approved. The caller stays on the
 // same page and can continue its work — no redirect, no toast.
 window.ensureWalletConnected = async () => {
-    // Mobile core path: the persisted-session restore is the authority on
-    // "connected". Protected actions wait for it to finish (it is bounded by
-    // its own attempt caps) instead of deciding from the momentary UI state.
+    // Mobile core path: the boot-time provider init is the authority on
+    // "connected". Protected actions await it instead of deciding from the
+    // momentary UI state.
     if (coreSessionRestoreCompletion && !coreSessionRestoreSettled) {
         try {
             await coreSessionRestoreCompletion;
@@ -3484,39 +2889,20 @@ async function initializeAppKit() {
             sessionStorage.removeItem('artsoul_disconnecting');
         }
 
-        // Mobile external browsers: kick off the core WalletConnect session
-        // restore immediately. It re-imports the SDK and reopens the relay on
-        // every page load (MPA), so it must run in parallel with the rest of
-        // the boot; the fail-open/hydration timers below wait for it instead
-        // of declaring "disconnected" while it is still in flight. After an
-        // explicit disconnect the WalletConnect storage was just cleared, so
-        // the restore settles as "none" almost instantly.
+        // Mobile external browsers: await the provider init. The provider's
+        // persisted session is the single source of truth on this path —
+        // session exists -> connected immediately; else guest. The
+        // fail-open/hydration timers below wait for it instead of declaring
+        // "disconnected" while it is still in flight. After an explicit
+        // disconnect the WalletConnect storage was just cleared, so the
+        // restore settles as "none" almost instantly.
         if (isMobile && !isInjectedWalletBrowser()) {
-            coreSessionRestoreTask = runCoreSessionRestore();
+            coreSessionRestoreTask = restoreCoreSessionOutcome();
         }
 
         const storedWalletAtBoot = localStorage.getItem('artsoul_wallet');
-        let walletHydrationPending = true;
-        let walletHydrationTimer = null;
+        walletHydrationPending = true;
         window.artsoulWalletHydrating = true;
-
-        const applyConfirmedWalletState = (walletState) => {
-            const normalizedAddress = walletState.address.toLowerCase();
-            const normalizedChainId = setCurrentChainId(walletState);
-            finishWalletHydration();
-            lastProcessedAddress = normalizedAddress;
-            lastProcessedChainId = normalizedChainId;
-            lastConfirmedWalletAt = Date.now();
-            window.currentWalletAddress = normalizedAddress;
-            localStorage.setItem('artsoul_wallet', normalizedAddress);
-            updateNavButtons({ address: normalizedAddress, chainId: normalizedChainId });
-            updateNetworkBadge({ address: normalizedAddress, chainId: normalizedChainId });
-            dispatchWalletStateChanged({
-                address: normalizedAddress,
-                chainId: normalizedChainId,
-                isConnected: true
-            });
-        };
 
         const clearStaleWalletState = async () => {
             const restoredWalletState = await reconcileActiveWalletFromProviders('wallet hydration timeout');
@@ -3551,21 +2937,12 @@ async function initializeAppKit() {
             updateNetworkBadge(null);
         };
 
-        const finishWalletHydration = () => {
-            walletHydrationPending = false;
-            window.artsoulWalletHydrating = false;
-            if (walletHydrationTimer) {
-                clearTimeout(walletHydrationTimer);
-                walletHydrationTimer = null;
-            }
-        };
-
         walletHydrationTimer = setTimeout(() => {
             if (!walletHydrationPending) return;
             // Mobile core path: the persisted-session restore is the source of
-            // truth. While it is still running (slow network, retry), do not
-            // wipe the stored wallet — its completion handler settles the
-            // state either way, and it is bounded by its own attempt caps.
+            // truth. While the provider init is still running (slow network),
+            // do not wipe the stored wallet — its completion handler settles
+            // the state either way (connected, guest, or error->guest).
             if (coreSessionRestoreCompletion && !coreSessionRestoreSettled) {
                 void coreSessionRestoreCompletion.then(() => {
                     if (walletHydrationPending) clearStaleWalletState();
@@ -3583,13 +2960,12 @@ async function initializeAppKit() {
         setTimeout(() => {
             if (window.artsoulWalletStateSettled === true) return;
             // A connect is actively running (its own flow will settle the UI).
-            if (activeMobileConnect || Date.now() < connectModalIntentUntil) return;
-            // Mobile core path: the persisted-session restore is still in
-            // flight — it settles the UI itself (connected or guest) and is
-            // bounded by its own attempt caps, so failing open to guest here
-            // would flash "Connect Wallet" over a live session on every page
-            // load. Desktop never sets coreSessionRestoreTask and keeps the
-            // exact fail-open behavior below.
+            if (Date.now() < connectModalIntentUntil) return;
+            // Mobile core path: the provider init is still in flight — it
+            // settles the UI itself (connected or guest), so failing open to
+            // guest here would flash "Connect Wallet" over a live session on
+            // every page load. Desktop never sets coreSessionRestoreTask and
+            // keeps the exact fail-open behavior below.
             if (coreSessionRestoreTask && !coreSessionRestoreSettled) {
                 walletDebugLog('fail-open deferred to core session restore', {});
                 return;
@@ -3779,6 +3155,17 @@ async function initializeAppKit() {
 
         // Subscribe to account changes with detailed logging
         modal.subscribeAccount(async (account) => {
+            // Mobile external browsers: the core provider's session is the
+            // single source of truth. AppKit account events are fully inert
+            // on this path — they must never touch wallet state.
+            if (isMobileDevice() && !isInjectedWalletBrowser()) {
+                walletDebugLog('appkit account event ignored (standard mobile external path)', {
+                    address: maskWalletAddress(account?.address || account?.allAccounts?.[0]?.address),
+                    status: account?.status || null
+                });
+                return;
+            }
+
             latestAppKitAccountSnapshot = account || null;
             appKitAccountRevision++;
             const observedAddress = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
@@ -3788,8 +3175,7 @@ async function initializeAppKit() {
                 account?.status !== 'disconnected';
             const observedAccountKey = `${observedAddress || 'guest'}:${observedChainId || 'none'}:${observedConnected ? 'connected' : 'disconnected'}`;
 
-            const isFreshMobileConnectEvent = activeMobileConnect && appKitAccountRevision > mobileConnectStartRevision;
-            if (observedAccountKey === lastObservedAppKitAccountKey && !isFreshMobileConnectEvent) return;
+            if (observedAccountKey === lastObservedAppKitAccountKey) return;
             lastObservedAppKitAccountKey = observedAccountKey;
 
             walletDebugLog('appkit account update', {
@@ -3811,19 +3197,7 @@ async function initializeAppKit() {
             }
 
             if (!observedAddress) {
-                // Mobile core path: AppKit has no connection to report — the
-                // persisted WalletConnect session is the authority. Its own
-                // classifier (handleCoreProviderDisconnect / session_delete)
-                // ends it; an AppKit empty-account event landing after the
-                // POST_CONNECT_DISCONNECT_GUARD window must never wipe a live
-                // core session.
-                if (isCoreSessionActive() || (coreSessionRestoreCompletion && !coreSessionRestoreSettled)) {
-                    walletDebugLog('appkit empty account ignored; core session is authoritative', {
-                        restoreSettled: coreSessionRestoreSettled
-                    });
-                    return;
-                }
-                const connectIntentActive = activeMobileConnect || Date.now() < connectModalIntentUntil;
+                const connectIntentActive = Date.now() < connectModalIntentUntil;
                 if (connectIntentActive) {
                     console.log('Skipping transient disconnected state during wallet hydration');
                     return;
@@ -3863,23 +3237,6 @@ async function initializeAppKit() {
                 account?.status !== 'disconnected';
 
             if (accountIsConnected) {
-                // External mobile browsers can suspend provider requests during
-                // the wallet-app round trip. Finalize only after the provider
-                // confirms both the address and Base Sepolia.
-                if (activeMobileConnect && !isInjectedWalletBrowser()) {
-                    const restored = await acceptMobileAppKitWalletState(
-                        account,
-                        'AppKit account update',
-                        activeConnectAttempt
-                    );
-                    if (restored?.address) return;
-                    if (activeConnectAttempt?.failure) return;
-                    walletDebugLog('AppKit account waiting for approved mobile session', {
-                        snapshot: getWalletDebugSnapshot(account)
-                    });
-                    return;
-                }
-
                 const eventAddress = observedAddress;
                 const eventChainId = normalizeChainId(account);
                 if (
@@ -3943,14 +3300,6 @@ async function initializeAppKit() {
                 });
 
             } else if (account?.status === 'disconnected' && lastProcessedAddress) {
-                // Same authority rule as the empty-account branch above: a live
-                // core session outranks AppKit's own "disconnected" status.
-                if (isCoreSessionActive() || (coreSessionRestoreCompletion && !coreSessionRestoreSettled)) {
-                    walletDebugLog('appkit disconnected status ignored; core session is authoritative', {
-                        restoreSettled: coreSessionRestoreSettled
-                    });
-                    return;
-                }
                 const explicitDisconnectInProgress = sessionStorage.getItem('artsoul_disconnecting');
                 const recentlyConfirmed = Date.now() - lastConfirmedWalletAt < POST_CONNECT_DISCONNECT_GUARD;
                 if (!explicitDisconnectInProgress && recentlyConfirmed) {
@@ -4002,13 +3351,6 @@ async function initializeAppKit() {
 
                 if (window.location.pathname.includes('profile.html')) {
                     console.log('Profile wallet disconnected; staying in guest profile mode.');
-                    return;
-                }
-
-                // Redirect to home if on profile page
-                if (window.location.pathname.includes('profile.html')) {
-                    console.log('🏠 Redirecting to home page...');
-                    window.location.href = 'index.html';
                 }
             }
         });
@@ -4067,6 +3409,9 @@ async function initializeAppKit() {
 
             if (modal.subscribeProvider) {
                 modal.subscribeProvider((providerState) => {
+                    // Same rule as subscribeAccount: AppKit provider updates are
+                    // inert on the mobile external path — the core provider owns it.
+                    if (isMobileDevice() && !isInjectedWalletBrowser()) return;
                     const provider = providerState?.walletProvider || providerState?.provider || providerState;
                     walletDebugLog('appkit provider update', {
                         providerAvailable: Boolean(provider?.request),
@@ -4095,17 +3440,22 @@ async function initializeAppKit() {
         bindRuntimeProviderEvents(window.ethereum, 'injected provider');
         bindWalletResumeListeners();
 
-        const restoredProviderState = await reconcileActiveWalletFromProviders('appkit boot', {
-            allowInjectedFallback: !storedWalletAtBoot
-        });
-        if (restoredProviderState?.address) {
-            finishWalletHydration();
-        } else if (!walletHydrationPending) {
-            await clearStaleWalletState();
-        } else {
-            scheduleWalletReconciliation('delayed appkit hydration', 600, {
-                allowInjectedFallback: false
+        // Desktop and injected browsers reconcile from their providers at
+        // boot. The mobile external path skips this entirely: its core
+        // session restore settles the state on its own.
+        if (!isMobile || isInjectedWalletBrowser()) {
+            const restoredProviderState = await reconcileActiveWalletFromProviders('appkit boot', {
+                allowInjectedFallback: !storedWalletAtBoot
             });
+            if (restoredProviderState?.address) {
+                finishWalletHydration();
+            } else if (!walletHydrationPending) {
+                await clearStaleWalletState();
+            } else {
+                scheduleWalletReconciliation('delayed appkit hydration', 600, {
+                    allowInjectedFallback: false
+                });
+            }
         }
 
         console.log('AppKit initialized');
