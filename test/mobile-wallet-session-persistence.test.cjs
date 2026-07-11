@@ -15,14 +15,14 @@ test('core session restore distinguishes "no session" from a restore error', () 
     assert.match(coreWallet, /\{ status: 'error', session: null, error \}/);
     // The legacy API stays for the isolation page.
     assert.match(coreWallet, /export async function restoreCoreSession\(/);
-    assert.match(appKit, /restoreCoreSessionOutcome,/);
+    assert.match(appKit, /restoreCoreSessionOutcome/);
 });
 
 test('restore race: no page-load timer decides "disconnected" before the core restore settles', () => {
-    // The restore starts as early as possible and is retried with a bounded cap.
-    assert.match(appKit, /coreSessionRestoreTask = runCoreSessionRestore\(\)/);
-    assert.match(appKit, /const CORE_RESTORE_ATTEMPT_TIMEOUT = \d+/);
-    assert.match(appKit, /const CORE_RESTORE_MAX_ATTEMPTS = \d+/);
+    // Boot awaits the provider init directly: session exists -> connected
+    // immediately; else guest. No retry orchestration around it.
+    assert.match(appKit, /coreSessionRestoreTask = restoreCoreSessionOutcome\(\)/);
+    assert.doesNotMatch(appKit, /runCoreSessionRestore|CORE_RESTORE_ATTEMPT_TIMEOUT|CORE_RESTORE_MAX_ATTEMPTS/);
     // The 4s fail-open defers to the in-flight restore on the mobile core path.
     const failOpen = appKit.match(/setTimeout\(\(\) => \{\s*\n\s*if \(window\.artsoulWalletStateSettled === true\) return;[\s\S]*?WALLET_SETTLE_FAILOPEN_TIMEOUT\)/)?.[0] || '';
     assert.match(failOpen, /coreSessionRestoreTask && !coreSessionRestoreSettled/);
@@ -85,12 +85,9 @@ test('mobile header renders the stored wallet optimistically while the restore r
 test('a live core session outranks AppKit/injected empty-account events', () => {
     // The prod navigation bug: on every MPA page load AppKit knows nothing
     // about the core WalletConnect session, so its empty/disconnected account
-    // events landing after POST_CONNECT_DISCONNECT_GUARD wiped the restored
-    // wallet. Both subscribeAccount wipe paths must defer to the core session.
-    assert.match(appKit, /appkit empty account ignored; core session is authoritative/);
-    assert.match(appKit, /appkit disconnected status ignored; core session is authoritative/);
-    const guards = appKit.match(/isCoreSessionActive\(\) \|\| \(coreSessionRestoreCompletion && !coreSessionRestoreSettled\)/g) || [];
-    assert.ok(guards.length >= 2, 'both subscribeAccount wipe paths must cover the live session AND the in-flight restore');
+    // events wiped the restored wallet. On the standard path AppKit account
+    // events are fully inert for mobile external browsers.
+    assert.match(appKit, /appkit account event ignored \(standard mobile external path\)/);
     // accountsChanged []: while the core session record is alive, NO empty
     // event may wipe it — including the core provider's own chain-filtered
     // empty accounts (SDK setAccounts drops accounts of foreign chains).
@@ -163,9 +160,13 @@ test('X/Discord linking routes through ensureWalletConnected instead of an error
 });
 
 test('explicit disconnect does not resurrect: cache clear runs before restore starts', () => {
-    const initSection = appKit.match(/const explicitDisconnectRequested = sessionStorage\.getItem\('artsoul_disconnecting'\);[\s\S]*?coreSessionRestoreTask = runCoreSessionRestore\(\);/)?.[0] || '';
+    const initSection = appKit.match(/const explicitDisconnectRequested = sessionStorage\.getItem\('artsoul_disconnecting'\);[\s\S]*?coreSessionRestoreTask = restoreCoreSessionOutcome\(\);/)?.[0] || '';
     assert.ok(initSection, 'explicit-disconnect cleanup must precede the restore kick-off');
     assert.match(initSection, /await clearWalletConnectionCache\(\)/);
     // Restore only runs on the mobile external-browser path.
     assert.match(initSection, /isMobile && !isInjectedWalletBrowser\(\)/);
+    // Disconnect settles the UI in place — never via reload/redirect.
+    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.match(reset, /disconnectCoreWallet\(\)/);
+    assert.doesNotMatch(reset, /location\./);
 });
