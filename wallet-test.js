@@ -508,10 +508,11 @@ async function initializeAppKitModalLayer() {
 }
 
 // Mirrors the production mobile external-browser path one-to-one: the exact
-// module, provider version, chain configuration, and wallet sheet that
-// appkit-init.js uses. Only the logging wrapper differs.
+// module, provider version, chain configuration, and official WalletConnect
+// modal (showQrModal: true) that appkit-init.js uses. Only the logging
+// wrapper differs.
 async function initializeCoreLayer() {
-    const core = await import('/wallet-core-connect.js?v=2');
+    const core = await import('/wallet-core-connect.js?v=4');
     core.configureCoreWallet({
         projectId: PROJECT_ID,
         metadata: {
@@ -524,11 +525,10 @@ async function initializeCoreLayer() {
         log: (step, detail) => log(step, detail)
     });
 
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const updateCoreStatus = (address, chainId) => {
         statusElement.textContent = [
             'Layer: core (production mobile path)',
-            'Provider: @walletconnect/ethereum-provider 2.23.10',
+            'Provider: @walletconnect/ethereum-provider 2.23.10 + official WC modal',
             `Chains: eip155:${EXPECTED_CHAIN_ID} required; 8453, 1 optional`,
             `Origin: ${window.location.origin}`,
             `Account: ${maskAddress(address) || 'none'}`,
@@ -553,39 +553,22 @@ async function initializeCoreLayer() {
     connectButton.addEventListener('click', async () => {
         log('core connect click entered');
         connectButton.disabled = true;
-        let sheet = null;
         try {
-            const connected = await core.connectCoreWallet({
-                onDisplayUri: (uri) => {
-                    if (sheet) {
-                        sheet.update(uri);
-                        return;
-                    }
-                    sheet = core.showCoreWalletSheet({
-                        uri,
-                        isIOS,
-                        log: (step, detail) => log(step, detail),
-                        onWalletOpened: (walletName) => log('core sheet wallet opened', { walletName }),
-                        onCancel: () => log('core connect cancelled by sheet')
-                    });
-                }
-            });
+            // The official WalletConnect modal handles wallet choice, deep
+            // links and QR. No chain settle window, no custom timeout.
+            const connected = await core.connectCoreWallet();
             log('core connect resolved', {
                 address: maskAddress(connected.address),
                 chainId: connected.chainId,
                 restored: connected.restored
             });
-            const settleSource = await core.waitForWalletChainSettle(connected.provider, 2500);
-            const settledChainId = core.parseCoreChainId(connected.provider.chainId);
-            log('core chain settle window closed', { source: settleSource, chainId: settledChainId });
-            updateCoreStatus(connected.address, settledChainId);
+            updateCoreStatus(connected.address, connected.chainId);
             connected.provider.on?.('chainChanged', (chainId) => {
                 updateCoreStatus(connected.address, core.parseCoreChainId(chainId));
             });
         } catch (error) {
             log('core connect rejected', describeError(error));
         } finally {
-            sheet?.close();
             connectButton.disabled = false;
             connectButton.textContent = 'Connect with core path';
         }
@@ -615,7 +598,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=24');
+    await import('/appkit-init.js?v=28');
     log('ArtSoul appkit wrapper imported', {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function'
