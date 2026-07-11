@@ -77,14 +77,14 @@
                 if (flag === '0') return;
                 if (flag !== '1' && localStorage.getItem('artsoul_wallet_debug') !== '1') return;
                 var script = document.createElement('script');
-                script.src = 'wallet-debug-overlay.js?v=1';
+                script.src = 'wallet-debug-overlay.js?v=2';
                 document.head.appendChild(script);
             } catch (error) {
                 // Diagnostics only - never block the page.
             }
         })();
     </script>
-    <script type="module" src="appkit-init.js?v=26"></script>
+    <script type="module" src="appkit-init.js?v=27"></script>
     <script src="contracts-config.js?v=1"></script>
     <script type="module" src="contracts-integration.js?v=5"></script>
 
