@@ -64,6 +64,24 @@
     <script src="modal-system.js"></script>
     <script src="src/features/artwork/ai-valuation-client.js?v=2"></script>
     <script src="avatar-dropdown.js?v=24"></script>
+    <!-- On-screen wallet debug overlay for mobile diagnosis; fetched only when wallet debug is enabled -->
+    <script>
+        (function () {
+            try {
+                var params = new URLSearchParams(location.search);
+                var hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+                var flag = params.get('walletdebug') || params.get('walletDebug') ||
+                    hashParams.get('walletdebug') || hashParams.get('walletDebug');
+                if (flag === '0') return;
+                if (flag !== '1' && localStorage.getItem('artsoul_wallet_debug') !== '1') return;
+                var script = document.createElement('script');
+                script.src = 'wallet-debug-overlay.js?v=1';
+                document.head.appendChild(script);
+            } catch (error) {
+                // Diagnostics only - never block the page.
+            }
+        })();
+    </script>
     <script type="module" src="appkit-init.js?v=26"></script>
     <script type="module" src="ipfs-client.js?v=2"></script>
     <script src="contracts-config.js?v=1"></script>
