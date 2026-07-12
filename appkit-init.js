@@ -19,7 +19,7 @@ import {
     isCoreConnectInFlight,
     isCoreSessionActive,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=6'
+} from './wallet-core-connect.js?v=7'
 
 // ============================================
 // CONFIGURATION
@@ -1785,6 +1785,15 @@ function applyConfirmedWalletState(walletState) {
 }
 
 async function clearWalletConnectionCache() {
+    // SINGLE-TEARDOWN INVARIANT: with a LIVE core WalletConnect session, the
+    // only caller allowed to clear wallet storage is the user's explicit
+    // Disconnect (resetWalletConnection sets artsoul_disconnecting first).
+    // Every other caller — failure handlers, retries, boot — must leave the
+    // session record and our hints intact.
+    if (isCoreSessionActive() && !sessionStorage.getItem('artsoul_disconnecting')) {
+        walletDebugLog('wallet cache clear skipped; live core session without explicit disconnect', {});
+        return;
+    }
     const walletFragments = [
         'walletconnect',
         'wc@',
@@ -1837,10 +1846,14 @@ function hasConfirmedWalletAddress() {
 }
 
 async function clearIncompleteWalletConnectState(reason = 'mobile retry') {
-    if (hasConfirmedWalletAddress()) {
+    // A live core session (even before the address is confirmed, e.g. during
+    // hydration) is never "incomplete" — this AppKit/injected-path cleanup
+    // must not touch it. Explicit Disconnect is the only core teardown.
+    if (hasConfirmedWalletAddress() || isCoreSessionActive()) {
         walletDebugLog('incomplete WalletConnect cleanup skipped', {
             reason,
-            confirmedAddressPresent: true
+            confirmedAddressPresent: hasConfirmedWalletAddress(),
+            coreSessionActive: isCoreSessionActive()
         });
         return false;
     }
@@ -1853,7 +1866,12 @@ async function clearIncompleteWalletConnectState(reason = 'mobile retry') {
 
     const wagmi = readWagmiConnectorSnapshot();
     const wagmiProvider = await getWagmiConnectorProvider(wagmi);
-    const providers = [...new Set([wagmiProvider, activeWalletProvider].filter(Boolean))];
+    // The core provider is structurally excluded: even if it ever leaked into
+    // activeWalletProvider here, this path may not disconnect it or delete
+    // its sessions/pairings.
+    const coreProviderInstance = getCoreProviderInstance();
+    const providers = [...new Set([wagmiProvider, activeWalletProvider].filter(Boolean))]
+        .filter((provider) => provider !== coreProviderInstance);
     const cleanupTasks = [];
     for (const provider of providers) {
         const client = getWalletConnectClient(provider);

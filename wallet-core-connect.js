@@ -128,6 +128,26 @@ function describeCoreError(error) {
     };
 }
 
+// Diagnostic only: requests route to the provider's CURRENT chainId (84532 by
+// construction — chains: [84532]), and the write guard's switch covers every
+// action. But a wallet may approve namespaces WITHOUT eip155:84532 (observed
+// on prod: MetaMask approved [1,59144,8453,...] while provider chainId was
+// 84532). Surface that gap in one line so field logs show it immediately.
+function warnIfWriteChainMissing(instance) {
+    try {
+        const chains = [...new Set(Object.values(instance?.session?.namespaces || {})
+            .flatMap((namespace) => [
+                ...(namespace?.chains || []),
+                ...((namespace?.accounts || []).map((account) => String(account).split(':').slice(0, 2).join(':')))
+            ]))];
+        if (!chains.includes(`eip155:${BASE_SEPOLIA_CHAIN_ID}`)) {
+            coreLog('warning: approved namespaces are missing eip155:84532; the write guard switch will request it', { chains });
+        }
+    } catch {
+        // Diagnostics must never break the connection flow.
+    }
+}
+
 // The WalletConnect SDK has a pairing/session topic rotation race that
 // surfaces as an unhandled "No matching key" rejection. In the proven
 // bare-provider session it is non-fatal — swallow it so nothing upstream
@@ -312,29 +332,75 @@ export async function connectCoreWallet() {
         const modal = getCoreWalletModal();
         const startedAt = Date.now();
 
-        // Modal lifecycle for THIS attempt: display_uri opens the official
-        // modal with the pairing URI; the modal closes on every settle path
-        // (success, wallet rejection, manual close). A failure to open is a
-        // real rejection of the attempt — never a silent pending connect.
+        // Modal lifecycle for THIS attempt, idempotent and total: display_uri
+        // opens the official modal with the pairing URI; closeModal() fires on
+        // EVERY settle signal — the awaited connect() resolution, the provider
+        // 'connect' event, accountsChanged carrying an address — whichever
+        // lands first, plus a final close when the attempt ends. Every close
+        // (and every close failure) is logged, and later signals retry a
+        // failed close, so the Connecting view can never outlive a settled
+        // session. A failure to open is a real rejection of the attempt —
+        // never a silent pending connect.
         let rejectAttempt = () => {};
         const attemptAborted = new Promise((_, reject) => {
             rejectAttempt = reject;
         });
+        // A late rejection after the race already settled (e.g. an openModal
+        // failure landing post-settle) must not surface as unhandled.
+        attemptAborted.catch(() => {});
+        let attemptSettled = false;
+        const closeAttemptModal = (reason) => {
+            try {
+                modal.closeModal();
+                coreLog(`wc modal closed (${reason})`, {});
+            } catch (error) {
+                coreLog('wc modal close failed', { reason, ...describeCoreError(error) });
+            }
+        };
+        const markAttemptSettled = (reason) => {
+            attemptSettled = true;
+            closeAttemptModal(reason);
+        };
         const handleDisplayUri = (uri) => {
+            if (attemptSettled) return;
             Promise.resolve()
                 .then(() => modal.openModal({ uri }))
-                .then(() => coreLog('official modal opened', {}))
+                .then(() => {
+                    coreLog('official modal opened', {});
+                    // The wcm open resolves from a readiness poll and can land
+                    // AFTER a fast settle: close again so a late open never
+                    // resurrects the Connecting view.
+                    if (attemptSettled) closeAttemptModal('settle landed during modal open');
+                })
                 .catch((error) => {
                     coreLog('official modal open failed', describeCoreError(error));
                     rejectAttempt(error);
                 });
         };
+        const handleConnectSettleSignal = () => markAttemptSettled('provider connect event');
+        const handleAccountsSettleSignal = (accounts) => {
+            const hasAddress = (Array.isArray(accounts) ? accounts : []).filter(Boolean).length > 0;
+            if (hasAddress) markAttemptSettled('accountsChanged with address');
+        };
         instance.on('display_uri', handleDisplayUri);
-        // Manual close without a session = the user cancelled: abort the
-        // pairing attempt (exactly what the provider's built-in modal path
-        // does) and settle, so the Connect button is immediately reusable.
+        instance.on('connect', handleConnectSettleSignal);
+        instance.on('accountsChanged', handleAccountsSettleSignal);
+        // Modal close is NEVER destructive. Re-read the LIVE state at close
+        // time (never a captured snapshot): with a session settled — or any
+        // settle signal already landed — the close is just the modal going
+        // away, and nothing happens. Only a true mid-flight close cancels the
+        // attempt so the Connect button is immediately reusable: abort the
+        // pairing loop (abortPairingAttempt only sets a loop flag inside the
+        // signer — it cannot delete a settled session or touch storage) and
+        // settle as a user rejection. Never a disconnect, never a WalletConnect
+        // storage write, never a hint clear — the user's explicit Disconnect
+        // stays the only teardown on this path.
         const unsubscribeModal = modal.subscribeModal((state) => {
-            if (state?.open || instance.session) return;
+            if (state?.open) return;
+            if (instance.session || attemptSettled) {
+                coreLog('wc modal closed with a live session; no action', {});
+                return;
+            }
             coreLog('official modal closed without a session; attempt cancelled', {});
             try {
                 instance.signer?.abortPairingAttempt?.();
@@ -345,7 +411,12 @@ export async function connectCoreWallet() {
         });
 
         try {
-            await Promise.race([instance.connect(), attemptAborted]);
+            const connectTask = instance.connect();
+            // If the attempt is cancelled, the losing connect() may reject
+            // much later (aborted pairing loop) — keep it observed.
+            connectTask.catch(() => {});
+            await Promise.race([connectTask, attemptAborted]);
+            markAttemptSettled('connect() resolved');
             const result = {
                 provider: instance,
                 address: getCoreSessionAddress(instance),
@@ -357,10 +428,13 @@ export async function connectCoreWallet() {
                 chainId: result.chainId,
                 namespaceChains: instance.session?.namespaces?.eip155?.chains || null
             });
+            warnIfWriteChainMissing(instance);
             return result;
         } finally {
             try {
                 instance.removeListener?.('display_uri', handleDisplayUri);
+                instance.removeListener?.('connect', handleConnectSettleSignal);
+                instance.removeListener?.('accountsChanged', handleAccountsSettleSignal);
             } catch {
                 // Listener teardown must never mask the connect outcome.
             }
@@ -369,11 +443,7 @@ export async function connectCoreWallet() {
             } catch {
                 // Same: teardown is best effort.
             }
-            try {
-                modal.closeModal();
-            } catch {
-                // Closing an already-closed modal is a no-op failure.
-            }
+            closeAttemptModal('attempt finalized');
         }
     })().finally(() => {
         connectPromise = null;
