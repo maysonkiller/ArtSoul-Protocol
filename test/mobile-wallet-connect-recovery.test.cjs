@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=28/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=29/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=4/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=4/);
-    assert.match(walletTest, /appkit-init\.js\?v=28/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=5/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=5/);
+    assert.match(walletTest, /appkit-init\.js\?v=29/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
@@ -32,8 +32,18 @@ test('mobile external browsers use the standard flow: pinned provider + official
     assert.match(coreWallet, /esm\.sh\/@walletconnect\/ethereum-provider@\$\{WC_ETHEREUM_PROVIDER_VERSION\}/);
     assert.match(coreWallet, /chains: \[BASE_SEPOLIA_CHAIN_ID\]/);
     assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1\]/);
-    // The OFFICIAL WalletConnect modal drives wallet choice, deep links, QR.
-    assert.match(coreWallet, /showQrModal: true/);
+    // The OFFICIAL WalletConnect modal drives wallet choice, deep links, QR —
+    // statically imported and pinned by US (showQrModal: false). The
+    // provider's built-in runtime modal load silently failed on prod:
+    // connect() pended forever with no modal and no error.
+    assert.match(coreWallet, /showQrModal: false/);
+    assert.doesNotMatch(coreWallet, /showQrModal: true/);
+    assert.match(coreWallet, /import \{ WalletConnectModal \} from 'https:\/\/esm\.sh\/@walletconnect\/modal@2\.7\.0\?bundle'/);
+    assert.match(coreWallet, /WC_MODAL_VERSION = '2\.7\.0'/);
+    // The modal instance is a singleton with the z-index ceiling so no
+    // ArtSoul overlay can cover it.
+    assert.match(coreWallet, /'--wcm-z-index': '2147483647'/);
+    assert.match(coreWallet, /if \(modalInstance\) return modalInstance;/);
     assert.match(coreWallet, /no matching key/i);
     // The custom wallet sheet is gone: no wallet list, no hand-rolled deep
     // links, no QR module of our own.
@@ -44,6 +54,30 @@ test('mobile external browsers use the standard flow: pinned provider + official
     // appkit-init routes mobile external connects through the standard path.
     assert.match(appKit, /async function connectExternalMobileStandard/);
     assert.match(appKit, /return connectExternalMobileStandard\(\);/);
+});
+
+test('the official modal lifecycle is deterministic: open on display_uri, close on every settle', () => {
+    const connect = coreWallet.match(/export async function connectCoreWallet[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(connect, 'connectCoreWallet must exist');
+    // display_uri -> openModal({ uri }); an open failure rejects the attempt
+    // instead of pending silently.
+    assert.match(connect, /instance\.on\('display_uri', handleDisplayUri\)/);
+    assert.match(connect, /modal\.openModal\(\{ uri \}\)/);
+    assert.match(connect, /rejectAttempt\(error\)/);
+    // Manual close without a session aborts the pairing and settles the
+    // attempt as a user rejection (4001) — the button is reusable at once.
+    assert.match(connect, /modal\.subscribeModal/);
+    assert.match(connect, /abortPairingAttempt/);
+    assert.match(connect, /rejectAttempt\(createModalClosedError\(\)\)/);
+    assert.match(coreWallet, /error\.code = 4001;/);
+    // Every settle path tears down: display_uri listener off, modal
+    // subscription off, closeModal.
+    assert.match(connect, /removeListener\?\.\('display_uri', handleDisplayUri\)/);
+    assert.match(connect, /unsubscribeModal\?\.\(\)/);
+    assert.match(connect, /modal\.closeModal\(\)/);
+    // A connect failure is always surfaced in the production handler.
+    assert.match(appKit, /walletDebugLog\('standard connect rejected'/);
+    assert.match(appKit, /alert\(`Wallet connection failed: \$\{error\?\.message \|\| error\}`\)/);
 });
 
 test('the standard mobile connect never switches chains, cleans storage, or times out', () => {

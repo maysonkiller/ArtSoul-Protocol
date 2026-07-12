@@ -1,14 +1,24 @@
 // ============================================
 // ARTSOUL CORE WALLETCONNECT PATH
 // Mobile external browsers connect through the bare
-// @walletconnect/ethereum-provider with the OFFICIAL WalletConnect modal
-// (showQrModal: true) — the standard, unorchestrated flow. The provider's
-// persisted session is the single source of truth for "connected" on this
-// path. AppKit remains the desktop and injected-provider path.
+// @walletconnect/ethereum-provider driving the OFFICIAL WalletConnect modal
+// that WE import statically and pinned (showQrModal: false). The provider's
+// built-in modal loading builds a second @reown/appkit at runtime inside the
+// provider bundle and its open() failures are unobservable — on prod the
+// modal silently never rendered and connect() pended forever. Owning the
+// modal makes its whole lifecycle deterministic.
+// The provider's persisted session is the single source of truth for
+// "connected" on this path. AppKit remains the desktop and injected path.
 // ============================================
+
+// Pinned OFFICIAL modal (wcm-* custom elements — no collision with the
+// page's @reown/appkit w3m-* elements). The bundle is fully self-contained:
+// no runtime dynamic imports left to fail silently.
+import { WalletConnectModal } from 'https://esm.sh/@walletconnect/modal@2.7.0?bundle';
 
 const WC_ETHEREUM_PROVIDER_VERSION = '2.23.10';
 const WC_ETHEREUM_PROVIDER_URL = `https://esm.sh/@walletconnect/ethereum-provider@${WC_ETHEREUM_PROVIDER_VERSION}?bundle`;
+const WC_MODAL_VERSION = '2.7.0';
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
@@ -22,6 +32,31 @@ let providerInstance = null;
 let providerInitPromise = null;
 let connectPromise = null;
 let rejectionGuardBound = false;
+let modalInstance = null;
+
+// ONE modal instance per page, constructed on the first connect (the
+// projectId only arrives via configureCoreWallet, after module init). The
+// z-index ceiling keeps the modal above every ArtSoul overlay so nothing of
+// ours can ever cover it. A construction failure propagates to the caller —
+// never a silent pending connect.
+function getCoreWalletModal() {
+    if (modalInstance) return modalInstance;
+    modalInstance = new WalletConnectModal({
+        projectId: settings.projectId,
+        themeMode: 'dark',
+        themeVariables: { '--wcm-z-index': '2147483647' }
+    });
+    coreLog('official modal instantiated', { version: WC_MODAL_VERSION });
+    return modalInstance;
+}
+
+// Closing the modal without approving is a user rejection (EIP-1193 4001):
+// upstream settles quietly and the Connect button is immediately reusable.
+function createModalClosedError() {
+    const error = new Error('Connection request cancelled: the WalletConnect modal was closed.');
+    error.code = 4001;
+    return error;
+}
 
 function coreLog(step, detail = null) {
     try {
@@ -164,9 +199,10 @@ function summarizeEventPayload(eventName, payload) {
     return { value: payload ?? null };
 }
 
-// ONE provider instance per page. showQrModal: true means the official
-// WalletConnect modal (wallet list, deep links, QR) drives the whole connect
-// UX — no custom wallet sheet, no hand-rolled deep links.
+// ONE provider instance per page. showQrModal: false — the provider must
+// NOT build its own runtime modal; our statically imported official modal
+// (wallet list, deep links, QR) drives the whole connect UX instead. Still
+// no custom wallet sheet and no hand-rolled deep links.
 export async function getCoreEthereumProvider() {
     if (providerInstance) return providerInstance;
     if (!providerInitPromise) {
@@ -179,7 +215,7 @@ export async function getCoreEthereumProvider() {
                 projectId: settings.projectId,
                 chains: [BASE_SEPOLIA_CHAIN_ID],
                 optionalChains: OPTIONAL_CHAIN_IDS,
-                showQrModal: true,
+                showQrModal: false,
                 metadata: settings.metadata,
                 rpcMap: { [BASE_SEPOLIA_CHAIN_ID]: BASE_SEPOLIA_RPC_URL }
             });
@@ -237,11 +273,12 @@ export async function restoreCoreSession() {
     return outcome.session;
 }
 
-// The standard connect: await provider.connect() and nothing else. The
-// official modal handles wallet choice, deep linking and QR. No timeout marks
-// the attempt failed — the user approves at their own pace. A second tap
-// while a connect is in flight reuses the SAME promise (and therefore the
-// same pairing): a page never holds two pairings for one attempt.
+// The standard connect: await provider.connect() while OUR official modal
+// shows the pairing. The modal handles wallet choice, deep linking and QR.
+// No timeout marks the attempt failed — the user approves at their own pace.
+// A second tap while a connect is in flight reuses the SAME promise (and
+// therefore the same pairing): a page never holds two pairings for one
+// attempt, and the URI is never regenerated within an attempt.
 export async function connectCoreWallet() {
     if (connectPromise) {
         coreLog('core connect already in flight; reusing the active pairing', {});
@@ -264,20 +301,72 @@ export async function connectCoreWallet() {
             }
         }
 
+        const modal = getCoreWalletModal();
         const startedAt = Date.now();
-        await instance.connect();
-        const result = {
-            provider: instance,
-            address: getCoreSessionAddress(instance),
-            chainId: parseCoreChainId(instance.chainId),
-            restored: false
-        };
-        coreLog('core connect settled', {
-            elapsedMs: Date.now() - startedAt,
-            chainId: result.chainId,
-            namespaceChains: instance.session?.namespaces?.eip155?.chains || null
+
+        // Modal lifecycle for THIS attempt: display_uri opens the official
+        // modal with the pairing URI; the modal closes on every settle path
+        // (success, wallet rejection, manual close). A failure to open is a
+        // real rejection of the attempt — never a silent pending connect.
+        let rejectAttempt = () => {};
+        const attemptAborted = new Promise((_, reject) => {
+            rejectAttempt = reject;
         });
-        return result;
+        const handleDisplayUri = (uri) => {
+            Promise.resolve()
+                .then(() => modal.openModal({ uri }))
+                .then(() => coreLog('official modal opened', {}))
+                .catch((error) => {
+                    coreLog('official modal open failed', describeCoreError(error));
+                    rejectAttempt(error);
+                });
+        };
+        instance.on('display_uri', handleDisplayUri);
+        // Manual close without a session = the user cancelled: abort the
+        // pairing attempt (exactly what the provider's built-in modal path
+        // does) and settle, so the Connect button is immediately reusable.
+        const unsubscribeModal = modal.subscribeModal((state) => {
+            if (state?.open || instance.session) return;
+            coreLog('official modal closed without a session; attempt cancelled', {});
+            try {
+                instance.signer?.abortPairingAttempt?.();
+            } catch {
+                // Abort is best effort; the rejection below settles the attempt.
+            }
+            rejectAttempt(createModalClosedError());
+        });
+
+        try {
+            await Promise.race([instance.connect(), attemptAborted]);
+            const result = {
+                provider: instance,
+                address: getCoreSessionAddress(instance),
+                chainId: parseCoreChainId(instance.chainId),
+                restored: false
+            };
+            coreLog('core connect settled', {
+                elapsedMs: Date.now() - startedAt,
+                chainId: result.chainId,
+                namespaceChains: instance.session?.namespaces?.eip155?.chains || null
+            });
+            return result;
+        } finally {
+            try {
+                instance.removeListener?.('display_uri', handleDisplayUri);
+            } catch {
+                // Listener teardown must never mask the connect outcome.
+            }
+            try {
+                unsubscribeModal?.();
+            } catch {
+                // Same: teardown is best effort.
+            }
+            try {
+                modal.closeModal();
+            } catch {
+                // Closing an already-closed modal is a no-op failure.
+            }
+        }
     })().finally(() => {
         connectPromise = null;
     });
