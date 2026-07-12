@@ -82,6 +82,14 @@ export function getConnectedCoreProvider() {
     return providerInstance?.session ? providerInstance : null;
 }
 
+// The provider instance regardless of session state. An IN-FLIGHT connect()
+// has a provider (and a relay socket) but no session yet — the browser-return
+// transport restart needs to reach that relayer so the wallet's approval
+// message lands in this tab and the pending connect() settles here.
+export function getCoreProviderInstance() {
+    return providerInstance;
+}
+
 // The SDK's `instance.accounts` is filtered by the provider's CURRENT chainId
 // (setAccounts drops every namespace account whose chain differs), and that
 // chainId is persisted across page loads. A session whose wallet sits on a
