@@ -14,10 +14,12 @@ import {
     connectCoreWallet,
     disconnectCoreWallet,
     getConnectedCoreProvider,
+    getCoreProviderInstance,
     getCoreSessionAddress,
+    isCoreConnectInFlight,
     isCoreSessionActive,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=5'
+} from './wallet-core-connect.js?v=6'
 
 // ============================================
 // CONFIGURATION
@@ -70,11 +72,25 @@ const metadata = {
     description: 'Decentralized Art Marketplace',
     url: appOrigin,
     icons: [`${appOrigin}/ARTSOULlogo-clean.png`],
-    // Tell WalletConnect where to send the user back after approval. Preserve
-    // the current artwork/profile route instead of dropping the user at /.
+    // AppKit (desktop/injected) metadata only. The mobile external path below
+    // deliberately carries NO redirect.
     redirect: {
         universal: appReturnUrl
     }
+};
+
+// Mobile external (core) path metadata: NO redirect, universal or native.
+// On iOS a universal-link redirect cannot re-enter the existing tab — it can
+// only open a NEW tab (possibly in a different browser), whose separate
+// storage has no session, so the user lands on a guest page while the real
+// connected session lives in the original tab. Without a redirect the wallet
+// shows its own "Return to browser" hint; the user switches back via the app
+// switcher into the SAME tab, where the pending connect() resolves.
+const coreWalletMetadata = {
+    name: metadata.name,
+    description: metadata.description,
+    url: metadata.url,
+    icons: metadata.icons
 };
 
 // Network display names and currencies
@@ -82,11 +98,9 @@ const networkMap = {
     84532: { name: 'Base Sepolia', currency: 'ETH' }
 };
 
-// The core path shares the exact production metadata (including
-// redirect.universal) so wallets can return the user to this browser tab.
 configureCoreWallet({
     projectId,
-    metadata,
+    metadata: coreWalletMetadata,
     log: (step, detail) => walletDebugLog(step, detail)
 });
 
@@ -1011,13 +1025,17 @@ function bindWalletConnectDiagnostics(provider, source = 'WalletConnect provider
 async function restartWalletConnectTransport(source = 'browser return') {
     // One of the two proven survival mechanisms on the mobile external path:
     // the relay socket dies in the background on iOS and must be reopened on
-    // return whenever a core session exists.
-    if (!isCoreSessionActive() || isInjectedWalletBrowser()) return false;
+    // return whenever a core session exists — or a connect() is still in
+    // flight: the user approved in the wallet, and the settle message must
+    // land in THIS tab once they switch back so the pending connect resolves.
+    if ((!isCoreSessionActive() && !isCoreConnectInFlight()) || isInjectedWalletBrowser()) return false;
     if (walletTransportRestartPromise) return walletTransportRestartPromise;
 
     walletTransportRestartPromise = (async () => {
+        // getCoreProviderInstance, not getConnectedCoreProvider: an in-flight
+        // connect has a provider (and a relayer) but no session yet.
         const providers = [...new Set([
-            getConnectedCoreProvider(),
+            getCoreProviderInstance(),
             activeWalletProvider
         ].filter(Boolean))];
         const relayers = [...new Set(providers.map(getWalletConnectRelayer).filter(Boolean))];
@@ -1144,9 +1162,12 @@ async function processWalletResume(source) {
     if (document.visibilityState === 'visible') {
         // A core session loses its relay socket whenever the mobile browser
         // goes to the background. Reopen it on every return so the session
-        // keeps working without any user-visible disconnect.
+        // keeps working without any user-visible disconnect. The SAME applies
+        // to an in-flight connect(): the user approved in the wallet and
+        // switched back manually (no redirect on this path), so restart the
+        // relay to let the approval land and the pending connect settle here.
         // (restartWalletConnectTransport is a no-op outside the core path.)
-        if (isCoreSessionActive()) await restartWalletConnectTransport(source);
+        if (isCoreSessionActive() || isCoreConnectInFlight()) await restartWalletConnectTransport(source);
         await recheckDeferredCoreDisconnect(source);
     }
     walletDebugLog('browser resume signal', {
