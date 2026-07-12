@@ -17,7 +17,7 @@ import {
     getCoreSessionAddress,
     isCoreSessionActive,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=4'
+} from './wallet-core-connect.js?v=5'
 
 // ============================================
 // CONFIGURATION
@@ -2156,16 +2156,11 @@ async function connectExternalMobileStandard() {
         // User closed the official modal or rejected in the wallet: settle
         // back to the previous state. NO cleanup runs here — the provider's
         // persisted storage stays untouched except on explicit Disconnect.
-        walletDebugLog('standard mobile connect failed', describeWalletDebugError(error));
+        walletDebugLog('standard connect rejected', describeWalletDebugError(error));
         if (!isUserRejectedError(error)) {
-            try {
-                window.ErrorHandler?.showToast?.(
-                    'Wallet connection was not completed. Please try again.',
-                    'error'
-                );
-            } catch {
-                // Best effort only.
-            }
+            // Never a silent failure: surface the real error where a toast
+            // could be missed or suppressed.
+            alert(`Wallet connection failed: ${error?.message || error}`);
         }
         return null;
     } finally {

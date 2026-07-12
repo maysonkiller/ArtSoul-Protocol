@@ -508,11 +508,11 @@ async function initializeAppKitModalLayer() {
 }
 
 // Mirrors the production mobile external-browser path one-to-one: the exact
-// module, provider version, chain configuration, and official WalletConnect
-// modal (showQrModal: true) that appkit-init.js uses. Only the logging
-// wrapper differs.
+// module, provider version, chain configuration, and statically pinned
+// official WalletConnect modal (showQrModal: false) that appkit-init.js
+// uses. Only the logging wrapper differs.
 async function initializeCoreLayer() {
-    const core = await import('/wallet-core-connect.js?v=4');
+    const core = await import('/wallet-core-connect.js?v=5');
     core.configureCoreWallet({
         projectId: PROJECT_ID,
         metadata: {
@@ -528,7 +528,7 @@ async function initializeCoreLayer() {
     const updateCoreStatus = (address, chainId) => {
         statusElement.textContent = [
             'Layer: core (production mobile path)',
-            'Provider: @walletconnect/ethereum-provider 2.23.10 + official WC modal',
+            'Provider: @walletconnect/ethereum-provider 2.23.10 + pinned official WC modal 2.7.0',
             `Chains: eip155:${EXPECTED_CHAIN_ID} required; 8453, 1 optional`,
             `Origin: ${window.location.origin}`,
             `Account: ${maskAddress(address) || 'none'}`,
@@ -598,7 +598,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=28');
+    await import('/appkit-init.js?v=29');
     log('ArtSoul appkit wrapper imported', {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function'
