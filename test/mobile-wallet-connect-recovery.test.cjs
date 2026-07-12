@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=29/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=30/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=5/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=5/);
-    assert.match(walletTest, /appkit-init\.js\?v=29/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=6/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=6/);
+    assert.match(walletTest, /appkit-init\.js\?v=30/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
@@ -156,12 +156,24 @@ test('AppKit account and provider events are fully inert on the mobile external 
 });
 
 test('the two survival mechanisms remain: relay restart on return + provider bridge', () => {
-    // 1) relayer.restartTransport() on visibility return while a session exists.
+    // 1) relayer.restartTransport() on visibility return while a session
+    // exists OR a connect() is in flight (the user approves in the wallet and
+    // switches back manually — the approval must land in THIS tab).
     const resume = appKit.match(/async function processWalletResume[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(resume, /isCoreSessionActive\(\)/);
+    assert.match(resume, /isCoreSessionActive\(\) \|\| isCoreConnectInFlight\(\)/);
     assert.match(resume, /await restartWalletConnectTransport\(source\)/);
     assert.match(appKit, /notifyWalletResume\('visibility return'\)/);
     assert.match(appKit, /restartTransport/);
+    // The restart guard admits the in-flight case and reads the provider
+    // session-independently (no session exists yet mid-connect).
+    const restart = appKit.match(/async function restartWalletConnectTransport[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(restart, /!isCoreSessionActive\(\) && !isCoreConnectInFlight\(\)/);
+    assert.match(restart, /getCoreProviderInstance\(\)/);
+    assert.match(coreWallet, /export function isCoreConnectInFlight/);
+    assert.match(coreWallet, /export function getCoreProviderInstance/);
+    // No timeouts and no failure marking ride along the restart: the pending
+    // connect just settles when the approval arrives.
+    assert.doesNotMatch(resume, /abortPairingAttempt|rejectAttempt|createModalClosedError|WALLET_CONNECT_TIMEOUT/);
     // 2) the getWalletProvider bridge: contracts/auth read the core provider.
     assert.match(appKit, /if \(coreProvider\) return coreProvider;/);
     // Protected actions await the boot init through one entry point.
@@ -229,9 +241,27 @@ test('wallet buttons are exempt from the global double-click guard that swallowe
     assert.match(perf, /dataset\.allowRapid/);
 });
 
-test('wallet return deep link preserves the current page, not the homepage', () => {
+test('mobile external metadata carries NO redirect: the user returns to the SAME tab', () => {
+    // On iOS a universal-link redirect cannot re-enter the existing tab — it
+    // opens a NEW tab (possibly another browser) with separate storage and no
+    // session, stranding the user on a guest page while the real session
+    // lives in the original tab. The core path therefore sets no redirect:
+    // the wallet shows its own "Return to browser" hint and the pending
+    // connect() resolves in the tab the user manually switches back to.
+    const coreMetadata = appKit.match(/const coreWalletMetadata = \{[\s\S]*?\n\};/)?.[0] || '';
+    assert.ok(coreMetadata, 'coreWalletMetadata must exist');
+    assert.doesNotMatch(coreMetadata, /redirect/);
+    for (const field of ['name', 'description', 'url', 'icons']) {
+        assert.match(coreMetadata, new RegExp(`${field}: metadata\\.${field}`), `core metadata must keep ${field}`);
+    }
+    const coreConfig = appKit.match(/configureCoreWallet\(\{[\s\S]*?\}\);/)?.[0] || '';
+    assert.match(coreConfig, /metadata: coreWalletMetadata/);
+    // The wallet-core module itself never injects a redirect either.
+    assert.doesNotMatch(coreWallet, /redirect/i);
+    // The isolated diagnostic core layer mirrors production: no redirect.
+    const walletTestCore = walletTest.match(/async function initializeCoreLayer[\s\S]*?updateCoreStatus\(null, null\);/)?.[0] || '';
+    assert.ok(walletTestCore, 'wallet-test core layer must exist');
+    assert.doesNotMatch(walletTestCore, /redirect\s*:/);
+    // Desktop AppKit metadata is untouched (redirect is harmless off-mobile).
     assert.match(appKit, /redirect:\s*\{\s*\n\s*universal: appReturnUrl/);
-    assert.match(appKit, /returnUrl\.hash = ''/);
-    // The core module receives the exact production metadata (incl. redirect).
-    assert.match(coreWallet, /metadata: settings\.metadata/);
 });

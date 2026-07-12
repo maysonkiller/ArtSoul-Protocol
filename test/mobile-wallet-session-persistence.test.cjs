@@ -69,6 +69,9 @@ test('disconnect classification: transient and backgrounded drops never wipe; ge
 test('returning from background restarts the relay for a restored core session', () => {
     const resume = appKit.match(/async function processWalletResume[\s\S]*?\n\}/)?.[0] || '';
     assert.match(resume, /isCoreSessionActive\(\)/);
+    // An in-flight connect() also restarts the relay on return, so the
+    // wallet's approval lands in this tab and the pending connect settles.
+    assert.match(resume, /isCoreConnectInFlight\(\)/);
     assert.match(resume, /await restartWalletConnectTransport\(source\)/);
     assert.match(resume, /recheckDeferredCoreDisconnect\(source\)/);
 });
