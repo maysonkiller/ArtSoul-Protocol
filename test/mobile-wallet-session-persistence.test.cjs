@@ -8,8 +8,20 @@ const appKit = read('appkit-init.js');
 const coreWallet = read('wallet-core-connect.js');
 const avatar = read('avatar-dropdown.js');
 
+function loadCoreRestoreHarness() {
+    const executableSource = coreWallet
+        .replace(/import \{ WalletConnectModal \} from [^;]+;/, 'const WalletConnectModal = class {};')
+        .replace(/\bexport\s+/g, '');
+    return new Function(
+        'window',
+        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot };`
+    )({ addEventListener() {} });
+}
+
 test('core session restore distinguishes "no session" from a restore error', () => {
     assert.match(coreWallet, /export async function restoreCoreSessionOutcome/);
+    assert.match(coreWallet, /export async function waitForCoreSessionSnapshot/);
+    assert.match(coreWallet, /CORE_RESTORE_TIMEOUT_MS = 4500/);
     assert.match(coreWallet, /\{ status: 'none', session: null \}/);
     assert.match(coreWallet, /\{ status: 'restored', session: restored \}/);
     assert.match(coreWallet, /\{ status: 'error', session: null, error \}/);
@@ -19,10 +31,11 @@ test('core session restore distinguishes "no session" from a restore error', () 
 });
 
 test('restore race: no page-load timer decides "disconnected" before the core restore settles', () => {
-    // Boot awaits the provider init directly: session exists -> connected
-    // immediately; else guest. No retry orchestration around it.
+    // Boot starts one bounded core-provider restore lifecycle. AppKit is not
+    // allowed to publish guest while that lifecycle is restoring.
     assert.match(appKit, /coreSessionRestoreTask = restoreCoreSessionOutcome\(\)/);
-    assert.doesNotMatch(appKit, /runCoreSessionRestore|CORE_RESTORE_ATTEMPT_TIMEOUT|CORE_RESTORE_MAX_ATTEMPTS/);
+    assert.match(appKit, /setMobileCoreRestoreState\('restoring'/);
+    assert.match(appKit, /disconnected state ignored during core restore/);
     // The 4s fail-open defers to the in-flight restore on the mobile core path.
     const failOpen = appKit.match(/setTimeout\(\(\) => \{\s*\n\s*if \(window\.artsoulWalletStateSettled === true\) return;[\s\S]*?WALLET_SETTLE_FAILOPEN_TIMEOUT\)/)?.[0] || '';
     assert.match(failOpen, /coreSessionRestoreTask && !coreSessionRestoreSettled/);
@@ -34,6 +47,48 @@ test('restore race: no page-load timer decides "disconnected" before the core re
     const ensureConnected = appKit.match(/window\.ensureWalletConnected = async[\s\S]*?\n\};/)?.[0] || '';
     assert.match(ensureConnected, /await coreSessionRestoreCompletion/);
     assert.match(ensureConnected, /await waitForWalletHydration\(\)/);
+});
+
+test('delayed WalletConnect persistence hydration restores before the bounded deadline', async () => {
+    const { waitForCoreSessionSnapshot } = loadCoreRestoreHarness();
+    let clock = 0;
+    let polls = 0;
+    const provider = { session: null, accounts: [], chainId: 84532 };
+    const snapshot = await waitForCoreSessionSnapshot(provider, {
+        timeoutMs: 4500,
+        pollIntervalMs: 100,
+        now: () => clock,
+        wait: async (ms) => {
+            clock += ms;
+            polls += 1;
+            if (polls === 3) {
+                provider.session = {
+                    namespaces: {
+                        eip155: { accounts: ['eip155:84532:0x6ec800000000000000000000000000000000989b'] }
+                    }
+                };
+            }
+        }
+    });
+
+    assert.equal(snapshot.address, '0x6ec800000000000000000000000000000000989b');
+    assert.equal(snapshot.chainId, 84532);
+    assert.equal(clock, 300);
+});
+
+test('bounded restore performs a final read and settles disconnected when no session exists', async () => {
+    const { waitForCoreSessionSnapshot } = loadCoreRestoreHarness();
+    let clock = 0;
+    const provider = { session: null, accounts: [], chainId: null };
+    const snapshot = await waitForCoreSessionSnapshot(provider, {
+        timeoutMs: 400,
+        pollIntervalMs: 100,
+        now: () => clock,
+        wait: async (ms) => { clock += ms; }
+    });
+
+    assert.equal(snapshot, null);
+    assert.equal(clock, 400);
 });
 
 test('only a clean "no session" clears the stored wallet; a restore error keeps the hint', () => {
@@ -61,7 +116,8 @@ test('disconnect classification: transient and backgrounded drops never wipe; ge
     const recheck = appKit.match(/async function recheckDeferredCoreDisconnect[\s\S]*?\n\}/)?.[0] || '';
     assert.match(recheck, /restartWalletConnectTransport/);
     assert.match(recheck, /coreSessionStillLive\(provider\)/);
-    assert.match(recheck, /handleProviderAccountsChanged\(\[\], 'core walletconnect disconnect', provider\)/);
+    assert.match(recheck, /'core walletconnect disconnect'/);
+    assert.match(recheck, /genuineDisconnect: true/);
     // Genuine session_delete still wipes.
     assert.match(appKit, /provider\.on\?\.\('session_delete'/);
 });
@@ -95,8 +151,9 @@ test('a live core session outranks AppKit/injected empty-account events', () => 
     // event may wipe it — including the core provider's own chain-filtered
     // empty accounts (SDK setAccounts drops accounts of foreign chains).
     assert.match(appKit, /empty accountsChanged ignored; core session is authoritative/);
-    const accountsGuard = appKit.match(/if \(!nextAddress\) \{[\s\S]*?getConnectedCoreProvider\(\);\s*\n\s*if \(coreProvider\) \{/)?.[0] || '';
+    const accountsGuard = appKit.match(/if \(!nextAddress\) \{[\s\S]*?getConnectedCoreProvider\(\);\s*\n\s*if \(coreProvider && !genuineCoreSessionEnd\) \{/)?.[0] || '';
     assert.ok(accountsGuard, 'handleProviderAccountsChanged must ignore empty accounts while the core session record is alive');
+    assert.match(appKit, /empty accountsChanged reconciled to live core session/);
 });
 
 test('restore is chain-tolerant: a session parked on a foreign chain stays connected', () => {
@@ -108,10 +165,12 @@ test('restore is chain-tolerant: a session parked on a foreign chain stays conne
     const helper = coreWallet.match(/export function getCoreSessionAddress[\s\S]*?\n\}/)?.[0] || '';
     assert.match(helper, /namespaces/);
     assert.match(helper, /eip155:\\d\+/);
-    // restoreCoreSessionOutcome resolves the address through the helper —
-    // "no session" is only an actually missing session record.
+    // restoreCoreSessionOutcome resolves through the bounded snapshot helper,
+    // which reads the address chain-independently from session namespaces.
     const restoreOutcome = coreWallet.match(/export async function restoreCoreSessionOutcome[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(restoreOutcome, /getCoreSessionAddress\(instance\)/);
+    assert.match(restoreOutcome, /waitForCoreSessionSnapshot\(instance/);
+    const readSnapshot = coreWallet.match(/export function readCoreSessionSnapshot[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(readSnapshot, /getCoreSessionAddress\(instance\)/);
     assert.doesNotMatch(restoreOutcome, /instance\.accounts \|\| \[\]/);
     // The boot handler applies the restored state as connected without any
     // chain gate; the 84532 requirement lives only in the write guard.
@@ -145,6 +204,19 @@ test('external mobile header trusts the settled wallet state over AppKit/injecte
     const confirmed = avatar.match(/isWalletConnectionConfirmed\(walletAddress, options = \{\}\) \{[\s\S]*?\n        \}/)?.[0] || '';
     assert.match(confirmed, /artsoulSettledWalletState/);
     assert.match(confirmed, /isMobileUA && !window\.ethereum\?\.request/);
+});
+
+test('protected actions prefer the restored mobile core provider', () => {
+    const providerSelection = appKit.match(/async function getProviderForWallet[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(providerSelection, /getConnectedCoreProvider\(\)/);
+    assert.match(providerSelection, /getCoreSessionAddress\(coreProvider\)/);
+    assert.match(providerSelection, /source: 'mobile core'/);
+    assert.match(appKit, /modal\.getWalletProvider = async/);
+    assert.match(appKit, /if \(coreProvider\) return coreProvider/);
+});
+
+test('the raw SDK connected toast is not emitted', () => {
+    assert.doesNotMatch(appKit, /showToast\?\.\('Connected\.'/);
 });
 
 test('hydration-timeout wipe re-confirms from the live core session record', () => {

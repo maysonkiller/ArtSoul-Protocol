@@ -22,6 +22,8 @@ const WC_MODAL_VERSION = '2.7.0';
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
+const CORE_RESTORE_TIMEOUT_MS = 4500;
+const CORE_RESTORE_POLL_INTERVAL_MS = 120;
 // Optional chains let wallets sitting on another network settle the session.
 // Nothing on this path ever requests a chain switch — the write guard
 // (ensureArtSoulWriteNetwork) is the only place that ever asks for 84532.
@@ -118,6 +120,42 @@ export function parseCoreChainId(value) {
     if (caipMatch) return Number(caipMatch[1]);
     const parsed = text.startsWith('0x') ? parseInt(text, 16) : parseInt(text, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function waitForCoreDelay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function readCoreSessionSnapshot(instance = providerInstance) {
+    if (!instance?.session) return null;
+    const address = getCoreSessionAddress(instance);
+    if (!address) return null;
+    return {
+        provider: instance,
+        address,
+        chainId: parseCoreChainId(instance.chainId),
+        restored: true
+    };
+}
+
+// WalletConnect persistence hydration can finish shortly after
+// EthereumProvider.init() resolves on iOS. A single immediate session read is
+// therefore not proof that no saved session exists. Poll only for the bounded
+// boot restore window, then perform one final direct read.
+export async function waitForCoreSessionSnapshot(instance, options = {}) {
+    const timeoutMs = Math.max(0, Number(options.timeoutMs ?? CORE_RESTORE_TIMEOUT_MS));
+    const pollIntervalMs = Math.max(10, Number(options.pollIntervalMs ?? CORE_RESTORE_POLL_INTERVAL_MS));
+    const now = options.now || Date.now;
+    const wait = options.wait || waitForCoreDelay;
+    const deadline = now() + timeoutMs;
+
+    let snapshot = readCoreSessionSnapshot(instance);
+    while (!snapshot && now() < deadline) {
+        await wait(Math.min(pollIntervalMs, Math.max(0, deadline - now())));
+        snapshot = readCoreSessionSnapshot(instance);
+    }
+
+    return snapshot || readCoreSessionSnapshot(instance);
 }
 
 function describeCoreError(error) {
@@ -271,23 +309,44 @@ export async function getCoreEthereumProvider() {
 // network, failed SDK import, relay hiccup) does NOT mean the user is
 // disconnected: the persisted session is still in storage and a later retry
 // or page load can restore it.
-export async function restoreCoreSessionOutcome() {
+export async function restoreCoreSessionOutcome(options = {}) {
+    const timeoutMs = Math.max(0, Number(options.timeoutMs ?? CORE_RESTORE_TIMEOUT_MS));
+    const startedAt = Date.now();
     try {
-        const instance = await getCoreEthereumProvider();
-        if (!instance.session) return { status: 'none', session: null };
+        let initTimeoutId = null;
+        const initTimeout = new Promise((_, reject) => {
+            initTimeoutId = setTimeout(() => {
+                const error = new Error('WalletConnect provider restore timed out.');
+                error.code = 'CORE_RESTORE_TIMEOUT';
+                reject(error);
+            }, timeoutMs);
+        });
+        let instance;
+        try {
+            instance = await Promise.race([getCoreEthereumProvider(), initTimeout]);
+        } finally {
+            if (initTimeoutId) clearTimeout(initTimeoutId);
+        }
+
+        const remainingMs = Math.max(0, timeoutMs - (Date.now() - startedAt));
         // Chain-independent: a session parked on a foreign chain (accounts
         // getter filtered empty) is still a connected wallet, not "no session".
-        const address = getCoreSessionAddress(instance);
-        if (!address) return { status: 'none', session: null };
-        const restored = {
-            provider: instance,
-            address,
-            chainId: parseCoreChainId(instance.chainId),
-            restored: true
-        };
+        const restored = await waitForCoreSessionSnapshot(instance, {
+            timeoutMs: remainingMs,
+            pollIntervalMs: options.pollIntervalMs
+        });
+        if (!restored) {
+            coreLog('core session restore completed without a session', {
+                elapsedMs: Date.now() - startedAt,
+                providerSessionPresent: Boolean(instance?.session),
+                providerAccountsCount: Array.isArray(instance?.accounts) ? instance.accounts.length : 0
+            });
+            return { status: 'none', session: null };
+        }
         coreLog('core session restored from storage', {
             chainId: restored.chainId,
-            namespaceChains: instance.session?.namespaces?.eip155?.chains || null
+            namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
+            elapsedMs: Date.now() - startedAt
         });
         return { status: 'restored', session: restored };
     } catch (error) {
