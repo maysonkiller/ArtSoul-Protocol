@@ -4,6 +4,8 @@
 (function() {
     'use strict';
 
+    const ETHEREUM_NETWORK_ICON = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMiIgZmlsbD0iIzYyN0VFQSIvPjxwYXRoIGQ9Ik0xMiA0TDYgMTJMMTIgMTZMMTggMTJMMTIgNFoiIGZpbGw9IndoaXRlIi8+PHBhdGggZD0iTTEyIDE3TDYgMTNMMTIgMjBMMTggMTNMMTIgMTdaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==';
+
     class AvatarDropdown {
         constructor() {
             this.profile = null;
@@ -422,7 +424,7 @@
                 },
                 11155111: {
                     name: 'Ethereum Sepolia',
-                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMiIgZmlsbD0iIzYyN0VFQSIvPjxwYXRoIGQ9Ik0xMiA0TDYgMTJMMTIgMTZMMTggMTJMMTIgNFoiIGZpbGw9IndoaXRlIi8+PHBhdGggZD0iTTEyIDE3TDYgMTNMMTIgMjBMMTggMTNMMTIgMTdaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==',
+                    icon: ETHEREUM_NETWORK_ICON,
                     color: '#627EEA',
                     currency: 'ETH'
                 },
@@ -510,6 +512,7 @@
                         aria-disabled="true"
                         title="Coming soon"
                     >
+                        <img src="${ETHEREUM_NETWORK_ICON}" alt="" aria-hidden="true" />
                         <span class="network-option-name">ETH Sepolia</span>
                         <span class="network-soon-badge">SOON</span>
                     </button>
@@ -540,12 +543,7 @@
             ` : '';
 
             const isConnected = connected || !!networkInfo;
-            const accountAction = restoring ? `
-                <div class="avatar-dropdown-divider"></div>
-                <div class="dropdown-item is-disabled wallet-restoring-state" role="status" aria-live="polite">
-                    <span>Restoring wallet...</span>
-                </div>
-            ` : isConnected ? `
+            const accountAction = restoring ? '' : isConnected ? `
                 <div class="avatar-dropdown-divider"></div>
                 <button onclick="window.resetWalletConnection()" data-allow-rapid class="dropdown-item avatar-disconnect-item">
                     <span>Disconnect</span>
@@ -982,71 +980,8 @@
 
     startNavObserver();
 
-    // Add mobile-responsive CSS
-    const style = document.createElement('style');
-    style.textContent = `
-        /* Hide username/address text on mobile, show only avatar and arrow */
-        @media (max-width: 640px) {
-            .avatar-info {
-                display: none !important;
-            }
-            .avatar-button {
-                gap: 0.5rem !important;
-            }
-        }
-        .avatar-dropdown-menu {
-            overflow: visible !important;
-            max-height: none !important;
-        }
-        .avatar-theme-switch {
-            position: relative;
-            display: flex;
-            gap: 0 !important;
-            padding: 0.25rem !important;
-            border-radius: 9999px !important;
-            overflow: hidden;
-            border: 1px solid currentColor;
-        }
-        .avatar-theme-label {
-            display: block;
-            width: 100%;
-            text-align: center;
-            margin-bottom: 0.55rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            letter-spacing: 0;
-            opacity: 0.78;
-        }
-        .avatar-theme-switch .theme-btn {
-            position: relative;
-            z-index: 1;
-            flex: 1;
-            border-radius: 9999px !important;
-            padding: 0.45rem 0.85rem !important;
-            border: 0 !important;
-        }
-        .classic .avatar-theme-switch {
-            color: var(--c-text);
-            background: var(--c-surface);
-            border-color: var(--c-border);
-            box-shadow: none;
-        }
-        .classic .avatar-theme-label {
-            color: var(--c-text);
-            text-shadow: none;
-        }
-        .future .avatar-theme-switch {
-            color: var(--c-accent);
-            background: linear-gradient(90deg, rgba(var(--c-accent-rgb), 0.09), rgba(var(--c-accent-2-rgb), 0.13));
-            border-color: var(--c-border-soft);
-            box-shadow: inset 0 0 18px rgba(var(--c-accent-rgb), 0.12), 0 0 18px rgba(var(--c-accent-2-rgb), 0.16);
-        }
-        .future .avatar-theme-label {
-            color: var(--c-accent);
-            text-shadow: 0 0 8px rgba(var(--c-accent-rgb), 0.45);
-        }
-    `;
-    document.head.appendChild(style);
+    // unified-styles.css owns the component from first paint so hydration
+    // cannot introduce a second set of visual rules.
 
     console.log('📦 Avatar Dropdown module loaded');
 })();
