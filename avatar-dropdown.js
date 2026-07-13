@@ -52,7 +52,7 @@
                         <div data-avatar-name>ArtSoul Guest</div>
                         <div data-avatar-address hidden aria-hidden="true"></div>
                     </div>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true">
                         <path d="M4 6l4 4 4-4"></path>
                     </svg>
                 `;
@@ -510,7 +510,7 @@
                         aria-disabled="true"
                         title="Coming soon"
                     >
-                        <span>Ethereum Sepolia</span>
+                        <span class="network-option-name">ETH Sepolia</span>
                         <span class="network-soon-badge">SOON</span>
                     </button>
                 </div>
@@ -531,7 +531,9 @@
                         <div><span data-network-name>${networkInfo.name}</span></div>
                         <div data-network-balance>${networkInfo.balance} ${networkInfo.currency}</div>
                     </div>
-                    <span class="network-options-arrow" aria-hidden="true">⌄</span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" class="network-options-arrow menu-chevron" aria-hidden="true">
+                        <path d="M4 6l4 4 4-4"></path>
+                    </svg>
                 </button>
                 ${this.renderNetworkOptions()}
                 <div class="avatar-dropdown-divider"></div>

@@ -23,9 +23,9 @@ test('stored wallet hydration never renders a disconnected guest state', () => {
   assert.doesNotMatch(avatarDropdown, /name: 'Wallet'/);
 });
 
-test('Base appears once as current network and Ethereum Sepolia is visibly future-only', () => {
+test('Base appears once as current network and ETH Sepolia is visibly future-only', () => {
   assert.match(avatarDropdown, /network-switcher-btn network-current-row/);
-  assert.match(avatarDropdown, /Ethereum Sepolia/);
+  assert.match(avatarDropdown, /<span class="network-option-name">ETH Sepolia<\/span>/);
   assert.match(avatarDropdown, /network-soon-badge">SOON/);
   const ethereumStart = avatarDropdown.indexOf('class="dropdown-item avatar-network-option is-disabled"');
   const ethereumOption = ethereumStart >= 0
@@ -42,9 +42,15 @@ test('connected account menus render the current network and balance row', () =>
 });
 
 test('account menu uses the compact desktop and mobile width contracts', () => {
-  assert.match(unifiedStyles, /width: min\(168px, calc\(100vw - 24px\)\) !important;/);
-  assert.match(unifiedStyles, /width: min\(160px, calc\(100vw - 28px\)\) !important;/);
+  assert.match(unifiedStyles, /width: min\(152px, calc\(100vw - 24px\)\) !important;/);
+  assert.match(unifiedStyles, /width: min\(148px, calc\(100vw - 28px\)\) !important;/);
   assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?flex-wrap: nowrap !important;/);
+});
+
+test('account and network controls share one SVG chevron contract', () => {
+  assert.equal((avatarDropdown.match(/class="[^"]*menu-chevron[^"]*"/g) || []).length, 2);
+  assert.match(unifiedStyles, /\.menu-chevron \{[\s\S]*?stroke: currentColor;/);
+  assert.match(unifiedStyles, /network-current-row\[aria-expanded="true"\][\s\S]*?rotate\(180deg\)/);
 });
 
 test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
