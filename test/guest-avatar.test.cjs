@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const avatarDropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
+const unifiedStyles = fs.readFileSync('unified-styles.css', 'utf8');
 
 test('guest avatar uses the local ArtSoul image with the generated fallback', () => {
   assert.equal(fs.existsSync('default-avatar.png'), true);
@@ -32,6 +33,18 @@ test('Base appears once as current network and Ethereum Sepolia is visibly futur
     : '';
   assert.doesNotMatch(ethereumOption, /network-option-indicator/);
   assert.doesNotMatch(avatarDropdown, /avatar-network-option is-active/);
+});
+
+test('connected account menus render the current network and balance row', () => {
+  assert.match(avatarDropdown, /const networkInfo = await this\.getCurrentNetworkInfo\(\);/);
+  assert.match(avatarDropdown, /renderMenuContent\(\{ currentPath, isOwnProfile, networkInfo, connected: true \}\)/);
+  assert.match(avatarDropdown, /data-network-balance/);
+});
+
+test('account menu uses the compact desktop and mobile width contracts', () => {
+  assert.match(unifiedStyles, /width: min\(168px, calc\(100vw - 24px\)\) !important;/);
+  assert.match(unifiedStyles, /width: min\(160px, calc\(100vw - 28px\)\) !important;/);
+  assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?flex-wrap: nowrap !important;/);
 });
 
 test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
