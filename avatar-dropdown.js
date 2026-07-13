@@ -358,18 +358,18 @@
 
                 if (!this.profile) {
                     if (this.pendingRenderKey !== renderKey) return;
-                    this.renderWalletInfo(walletAddress, { renderKey });
+                    await this.renderWalletInfo(walletAddress, { renderKey });
                     return;
                 }
 
                 if (this.pendingRenderKey !== renderKey) return;
-                this.render({ renderKey, walletAddress });
+                await this.render({ renderKey, walletAddress });
             } catch (error) {
                 console.error(' Failed to load profile:', error);
                 console.log('👤 Falling back to wallet info due to error');
                 // Show wallet info on error instead of connect button
                 if (this.pendingRenderKey !== renderKey) return;
-                this.renderWalletInfo(walletAddress, { renderKey });
+                await this.renderWalletInfo(walletAddress, { renderKey });
             }
         }
 
@@ -433,6 +433,12 @@
                     currency: 'RIA'
                 }
             };
+
+            // Mainnet networks can be returned by a connected wallet session.
+            // They are display-only here; Base Sepolia remains the operational
+            // write network enforced by the shared transaction guard.
+            networks[8453] = { ...networks[84532], name: 'Base Mainnet' };
+            networks[1] = { ...networks[11155111], name: 'Ethereum Mainnet' };
 
             // Get balance
             let balance = '0.0000';
@@ -624,6 +630,7 @@
             const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
+            const networkInfo = await this.getCurrentNetworkInfo();
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
@@ -636,7 +643,7 @@
             });
             this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, connected: true }),
+                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
                 `connected:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();
@@ -884,7 +891,7 @@
         /**
          * Render wallet info when connected but no profile
          */
-        renderWalletInfo(walletAddress, options = {}) {
+        async renderWalletInfo(walletAddress, options = {}) {
             const navButtons = this.getNavContainer();
             if (!navButtons) return;
             if (options.renderKey) navButtons.dataset.avatarRenderKey = options.renderKey;
@@ -898,6 +905,7 @@
 
             const avatarUrl = this.getDefaultAvatar();
             const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+            const networkInfo = await this.getCurrentNetworkInfo();
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
@@ -910,7 +918,7 @@
             });
             this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, connected: true }),
+                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
                 `connected:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();

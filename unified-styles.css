@@ -3781,8 +3781,8 @@ body.future .site-header {
 
 @media (min-width: 769px) {
     .avatar-dropdown-menu .dropdown-item {
-        min-height: 40px !important;
-        padding: 0.55rem 0.65rem !important;
+        min-height: 36px !important;
+        padding: 0.42rem 0.52rem !important;
     }
 }
 
@@ -4211,12 +4211,12 @@ html.future .site-header .logo-link > .site-logo {
 
 .site-header #navButtons,
 .site-header #navButtons .avatar-dropdown-container {
-    width: 172px !important;
-    min-width: 172px !important;
-    max-width: 172px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
+    width: 168px !important;
+    min-width: 168px !important;
+    max-width: 168px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
 }
 
 .site-header #navButtons {
@@ -4235,15 +4235,15 @@ html.future .site-header .logo-link > .site-logo {
 }
 
 .site-header #navButtons .avatar-button {
-    width: 172px !important;
-    min-width: 172px !important;
-    max-width: 172px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    gap: 6px !important;
+    width: 168px !important;
+    min-width: 168px !important;
+    max-width: 168px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    gap: 5px !important;
     justify-content: flex-start !important;
-    padding: 5px 8px !important;
+    padding: 5px 7px !important;
     overflow: hidden;
     transition: none !important;
 }
@@ -4255,28 +4255,28 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .site-header #navButtons .avatar-button > img {
-    width: 32px !important;
-    min-width: 32px !important;
-    max-width: 32px !important;
-    height: 32px !important;
-    min-height: 32px !important;
-    max-height: 32px !important;
-    flex: 0 0 32px !important;
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    flex: 0 0 30px !important;
 }
 
 .site-header #navButtons .avatar-info {
     display: flex !important;
-    width: 96px !important;
-    min-width: 96px !important;
-    max-width: 96px !important;
-    height: 32px !important;
-    flex: 0 0 96px !important;
+    width: 94px !important;
+    min-width: 94px !important;
+    max-width: 94px !important;
+    height: 30px !important;
+    flex: 0 0 94px !important;
     justify-content: center;
 }
 
 .site-header #navButtons .avatar-info > div {
-    width: 96px !important;
-    max-width: 96px !important;
+    width: 94px !important;
+    max-width: 94px !important;
 }
 
 .site-header #navButtons [data-avatar-name] {
@@ -4291,17 +4291,56 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .site-header #navButtons .dropdown-arrow {
-    width: 10px !important;
-    min-width: 10px !important;
-    max-width: 10px !important;
-    height: 10px !important;
-    min-height: 10px !important;
-    max-height: 10px !important;
-    flex: 0 0 10px !important;
+    width: 9px !important;
+    min-width: 9px !important;
+    max-width: 9px !important;
+    height: 9px !important;
+    min-height: 9px !important;
+    max-height: 9px !important;
+    flex: 0 0 9px !important;
 }
 
 .site-header .avatar-dropdown-menu {
-    width: min(208px, calc(100vw - 24px)) !important;
+    width: min(168px, calc(100vw - 24px)) !important;
+    padding: 0.35rem !important;
+}
+
+.site-header .avatar-dropdown-menu .avatar-theme-section {
+    padding: 0.3rem !important;
+}
+
+.site-header .avatar-dropdown-menu .avatar-theme-label {
+    margin-bottom: 0.35rem !important;
+    font-size: 0.7rem !important;
+    line-height: 1.15 !important;
+}
+
+.site-header .avatar-dropdown-menu .avatar-theme-switch {
+    padding: 0.18rem !important;
+}
+
+.site-header .avatar-dropdown-menu .avatar-theme-switch .theme-btn {
+    min-height: 30px !important;
+    padding: 0.3rem 0.42rem !important;
+    font-size: 0.72rem !important;
+    line-height: 1.1 !important;
+}
+
+.site-header .avatar-dropdown-menu .dropdown-item,
+.site-header .avatar-dropdown-menu .network-switcher-btn,
+.site-header .avatar-dropdown-menu button[onclick*="resetWalletConnection"] {
+    gap: 0.45rem !important;
+    font-size: 0.82rem !important;
+}
+
+.site-header .avatar-dropdown-menu .network-switcher-btn > img {
+    width: 22px !important;
+    min-width: 22px !important;
+    max-width: 22px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    flex-basis: 22px !important;
 }
 
 .upload-page-main.site-page-container {
@@ -4472,7 +4511,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
        the component's late-injected desktop defaults without changing JS. */
     .site-header .avatar-dropdown-menu {
         top: calc(100% + 0.35rem) !important;
-        width: min(184px, calc(100vw - 28px)) !important;
+        width: min(160px, calc(100vw - 28px)) !important;
         max-width: calc(100vw - 28px) !important;
         max-height: calc(100dvh - var(--site-header-height) - 14px) !important;
         padding: 0.3rem !important;
@@ -4487,8 +4526,8 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header .avatar-dropdown-menu .avatar-theme-label {
-        margin-bottom: 0.35rem !important;
-        font-size: 0.68rem !important;
+        margin-bottom: 0.3rem !important;
+        font-size: 0.64rem !important;
         line-height: 1.15 !important;
     }
 
@@ -4497,9 +4536,9 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header .avatar-dropdown-menu .avatar-theme-switch .theme-btn {
-        min-height: 30px !important;
-        padding: 0.3rem 0.5rem !important;
-        font-size: 0.72rem !important;
+        min-height: 28px !important;
+        padding: 0.25rem 0.4rem !important;
+        font-size: 0.68rem !important;
         line-height: 1.1 !important;
     }
 
@@ -4510,11 +4549,11 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     .site-header .avatar-dropdown-menu .dropdown-item,
     .site-header .avatar-dropdown-menu .network-switcher-btn,
     .site-header .avatar-dropdown-menu button[onclick*="resetWalletConnection"] {
-        min-height: 36px !important;
+        min-height: 34px !important;
         gap: 0.45rem !important;
-        padding: 0.4rem 0.5rem !important;
+        padding: 0.35rem 0.45rem !important;
         border-radius: 0.42rem !important;
-        font-size: 0.78rem !important;
+        font-size: 0.76rem !important;
         line-height: 1.15 !important;
     }
 
@@ -4552,9 +4591,9 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .site-header .avatar-dropdown-menu #connectBtn,
     .site-header .avatar-dropdown-menu .btn-main#connectBtn {
-        min-height: 38px !important;
-        padding: 0.45rem 0.5rem !important;
-        font-size: 0.78rem !important;
+        min-height: 36px !important;
+        padding: 0.4rem 0.45rem !important;
+        font-size: 0.76rem !important;
     }
 
     #homeSection {
@@ -4653,6 +4692,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .profile-social-links {
         gap: 0.45rem !important;
+        flex-wrap: nowrap !important;
     }
 
     .profile-social-links > * {
