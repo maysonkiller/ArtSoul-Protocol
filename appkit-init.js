@@ -19,7 +19,7 @@ import {
     isCoreConnectInFlight,
     isCoreSessionActive,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=7'
+} from './wallet-core-connect.js?v=8'
 
 // ============================================
 // CONFIGURATION
@@ -180,6 +180,7 @@ let walletHydrationTimer = null;
 let coreSessionRestoreTask = null;
 let coreSessionRestoreCompletion = null;
 let coreSessionRestoreSettled = false;
+let mobileCoreRestoreState = 'idle';
 // A core 'disconnect' delivered while the browser is backgrounded (iOS kills
 // the relay socket) is re-checked on return instead of wiping state blind.
 let pendingCoreDisconnectProvider = null;
@@ -194,6 +195,7 @@ let lastWalletDebugModalStateKey = '';
 window.artsoulWalletHydrating = true;
 window.artsoulWalletStateSettled = false;
 window.artsoulSettledWalletState = null;
+window.artsoulMobileWalletRestoreState = mobileCoreRestoreState;
 
 function walletDebugEnabled() {
     try {
@@ -293,6 +295,18 @@ function walletDebugLog(step, detail = null) {
     line.textContent = `${payload.time} ${step}${payload.detail ? ` ${JSON.stringify(payload.detail)}` : ''}`;
     panel.appendChild(line);
     panel.scrollTop = panel.scrollHeight;
+}
+
+function setMobileCoreRestoreState(nextState, detail = null) {
+    if (mobileCoreRestoreState === nextState) return;
+    const previousState = mobileCoreRestoreState;
+    mobileCoreRestoreState = nextState;
+    window.artsoulMobileWalletRestoreState = nextState;
+    walletDebugLog('mobile core restore lifecycle', {
+        from: previousState,
+        to: nextState,
+        ...(detail || {})
+    });
 }
 
 function bindWalletDebugDiagnostics() {
@@ -530,17 +544,45 @@ async function getProviderForWallet(walletAddress) {
     const normalizedWallet = normalizeWalletAddress(walletAddress);
     if (!normalizedWallet) return null;
 
+    // The core provider can expose an empty eth_accounts list while its live
+    // WalletConnect session is parked on a chain without a matching namespace
+    // account. The session address, not Wagmi/AppKit, owns external-mobile
+    // identity and therefore also owns protected-action provider selection.
+    const coreProvider = getConnectedCoreProvider();
+    if (
+        coreProvider &&
+        normalizeWalletAddress(getCoreSessionAddress(coreProvider)) === normalizedWallet
+    ) {
+        activeWalletProvider = coreProvider;
+        walletDebugLog('transaction provider selected', {
+            source: 'mobile core',
+            address: maskWalletAddress(normalizedWallet)
+        });
+        return coreProvider;
+    }
+
     const providers = await getWalletProviderCandidates();
     for (const provider of providers) {
         const accounts = await requestProviderAccounts(provider);
         if (accounts[0] === normalizedWallet) {
             activeWalletProvider = provider;
+            walletDebugLog('transaction provider selected', {
+                source: provider === window.ethereum ? 'injected' : 'AppKit',
+                address: maskWalletAddress(normalizedWallet)
+            });
             return provider;
         }
     }
 
     return null;
 }
+
+window.getArtSoulWalletProviderSource = (provider) => {
+    if (provider && provider === getCoreProviderInstance()) return 'mobile core';
+    if (provider && provider === window.ethereum) return 'injected';
+    if (provider?.request) return 'AppKit';
+    return 'missing';
+};
 
 async function reconcileActiveWalletFromProviders(source = 'provider reconciliation', options = {}) {
     const providers = await getWalletProviderCandidates(options);
@@ -1478,7 +1520,7 @@ async function handleProviderChainConfirmed(chainId, source = 'provider') {
     return normalizedChainId;
 }
 
-async function handleProviderAccountsChanged(accounts, source = 'provider', provider = null) {
+async function handleProviderAccountsChanged(accounts, source = 'provider', provider = null, options = {}) {
     const list = Array.isArray(accounts) ? accounts : (accounts ? [accounts] : []);
     const nextAddress = normalizeWalletAddress(list[0]) || null;
     console.log(`Provider accountsChanged from ${source}:`, maskWalletAddress(nextAddress) || 'none');
@@ -1487,6 +1529,19 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
     // All accounts revoked at the provider (wallet locked / disconnected).
     if (!nextAddress) {
         if (!lastProcessedAddress) return;
+        const explicitDisconnectInProgress = sessionStorage.getItem('artsoul_disconnecting');
+        const genuineCoreSessionEnd = options.genuineDisconnect === true ||
+            source.includes('session_delete') ||
+            Boolean(explicitDisconnectInProgress);
+        if (
+            isMobileDevice() &&
+            !isInjectedWalletBrowser() &&
+            mobileCoreRestoreState === 'restoring' &&
+            !genuineCoreSessionEnd
+        ) {
+            walletDebugLog('empty accountsChanged ignored during core restore', { source });
+            return;
+        }
         // Mobile core path: while the core session record is alive, NO empty
         // accountsChanged may wipe it. AppKit/injected providers know nothing
         // about the core session; and the core provider ITSELF emits
@@ -1497,14 +1552,40 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
         // the session record first, which makes getConnectedCoreProvider()
         // null and lets the wipe proceed.
         const coreProvider = getConnectedCoreProvider();
-        if (coreProvider) {
+        if (coreProvider && !genuineCoreSessionEnd) {
             walletDebugLog('empty accountsChanged ignored; core session is authoritative', {
                 source,
                 fromCoreProvider: provider === coreProvider
             });
             return;
         }
-        const explicitDisconnectInProgress = sessionStorage.getItem('artsoul_disconnecting');
+        // A transient empty-account event can land between the relay transport
+        // dropping and the provider reattaching its persisted session. Re-read
+        // once before accepting a disconnect. session_delete and explicit
+        // Disconnect bypass this reconciliation and remain immediately final.
+        if (
+            provider &&
+            provider === getCoreProviderInstance() &&
+            !genuineCoreSessionEnd
+        ) {
+            await sleep(300);
+            const reconciledAddress = getCoreSessionAddress(provider);
+            if (reconciledAddress || provider.session) {
+                walletDebugLog('empty accountsChanged reconciled to live core session', {
+                    source,
+                    address: maskWalletAddress(reconciledAddress)
+                });
+                if (reconciledAddress) {
+                    activeWalletProvider = provider;
+                    setMobileCoreRestoreState('connected', { reason: 'empty account reconciliation' });
+                    applyConfirmedWalletState({
+                        address: reconciledAddress,
+                        chainId: parseChainId(provider.chainId)
+                    });
+                }
+                return;
+            }
+        }
         const recentlyConfirmed = Date.now() - lastConfirmedWalletAt < POST_CONNECT_DISCONNECT_GUARD;
         if (!explicitDisconnectInProgress && recentlyConfirmed) return;
 
@@ -1520,7 +1601,10 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
         }
         updateNavButtons(null);
         updateNetworkBadge(null);
-        dispatchWalletStateChanged({ address: null, chainId: null, isConnected: false });
+        dispatchWalletStateChanged(
+            { address: null, chainId: null, isConnected: false },
+            { acceptCoreDisconnect: genuineCoreSessionEnd }
+        );
         walletDebugLog('wallet disconnected by provider', { source });
         return;
     }
@@ -1725,6 +1809,30 @@ function dispatchWalletStateChanged(state = {}, options = {}) {
     const detail = { address, chainId, isConnected };
     let didSettleInitialState = false;
 
+    if (
+        !isConnected &&
+        isMobileDevice() &&
+        !isInjectedWalletBrowser() &&
+        mobileCoreRestoreState === 'restoring'
+    ) {
+        walletDebugLog('disconnected state ignored during core restore', {
+            settledRequested: options.settled === true
+        });
+        return false;
+    }
+
+    if (
+        !isConnected &&
+        isMobileDevice() &&
+        !isInjectedWalletBrowser() &&
+        isCoreSessionActive() &&
+        !sessionStorage.getItem('artsoul_disconnecting') &&
+        options.acceptCoreDisconnect !== true
+    ) {
+        walletDebugLog('disconnected state ignored; live core session is authoritative', {});
+        return false;
+    }
+
     // AppKit emits several empty account snapshots while restoring providers.
     // Do not expose those snapshots to the UI. The first connected state, or an
     // explicitly finalized guest state after reconciliation, opens the gate.
@@ -1773,6 +1881,12 @@ function applyConfirmedWalletState(walletState) {
     lastProcessedAddress = normalizedAddress;
     lastProcessedChainId = normalizedChainId;
     lastConfirmedWalletAt = Date.now();
+    if (isMobileDevice() && !isInjectedWalletBrowser()) {
+        setMobileCoreRestoreState('connected', {
+            address: maskWalletAddress(normalizedAddress),
+            chainId: normalizedChainId
+        });
+    }
     window.currentWalletAddress = normalizedAddress;
     localStorage.setItem('artsoul_wallet', normalizedAddress);
     updateNavButtons({ address: normalizedAddress, chainId: normalizedChainId });
@@ -2173,11 +2287,6 @@ async function connectExternalMobileStandard() {
             address: connected.address,
             chainId: connected.chainId
         });
-        try {
-            window.ErrorHandler?.showToast?.('Connected.', 'info');
-        } catch {
-            // The toast is best effort; the connection is already applied.
-        }
         walletDebugLog('standard mobile connect settled', {
             address: maskWalletAddress(connected.address),
             chainId: connected.chainId,
@@ -2249,7 +2358,12 @@ async function handleCoreProviderDisconnect(provider, payload) {
         return;
     }
     walletDebugLog('core session ended (genuine disconnect)', { code });
-    await handleProviderAccountsChanged([], 'core walletconnect disconnect', provider);
+    await handleProviderAccountsChanged(
+        [],
+        'core walletconnect disconnect',
+        provider,
+        { genuineDisconnect: true }
+    );
 }
 
 // Resolve a disconnect that arrived while backgrounded: restart the relay,
@@ -2264,7 +2378,12 @@ async function recheckDeferredCoreDisconnect(source) {
         return;
     }
     walletDebugLog('core session ended (genuine disconnect)', { source, deferred: true });
-    await handleProviderAccountsChanged([], 'core walletconnect disconnect', provider);
+    await handleProviderAccountsChanged(
+        [],
+        'core walletconnect disconnect',
+        provider,
+        { genuineDisconnect: true }
+    );
 }
 
 function bindCoreProviderDisconnect(provider) {
@@ -2277,7 +2396,13 @@ function bindCoreProviderDisconnect(provider) {
     // session record is already removed from storage, so it is safe to wipe.
     provider.on?.('session_delete', () => {
         walletDebugLog('core session_delete event', {});
-        void handleProviderAccountsChanged([], 'core walletconnect session_delete', provider);
+        setMobileCoreRestoreState('disconnected', { reason: 'session_delete' });
+        void handleProviderAccountsChanged(
+            [],
+            'core walletconnect session_delete',
+            provider,
+            { genuineDisconnect: true }
+        );
     });
 }
 
@@ -2705,6 +2830,7 @@ window.resetWalletConnection = async () => {
         }
 
         await clearWalletConnectionCache();
+        setMobileCoreRestoreState('disconnected', { reason: 'explicit disconnect' });
         updateNavButtons(null);
         updateNetworkBadge(null);
         dispatchWalletStateChanged({
@@ -2931,6 +3057,7 @@ async function initializeAppKit() {
         // disconnect the WalletConnect storage was just cleared, so the
         // restore settles as "none" almost instantly.
         if (isMobile && !isInjectedWalletBrowser()) {
+            setMobileCoreRestoreState('restoring', { reason: 'page boot' });
             coreSessionRestoreTask = restoreCoreSessionOutcome();
         }
 
@@ -2939,6 +3066,10 @@ async function initializeAppKit() {
         window.artsoulWalletHydrating = true;
 
         const clearStaleWalletState = async () => {
+            if (mobileCoreRestoreState === 'restoring') {
+                walletDebugLog('stale wallet clear deferred during core restore', {});
+                return;
+            }
             const restoredWalletState = await reconcileActiveWalletFromProviders('wallet hydration timeout');
             if (restoredWalletState?.isConnected && restoredWalletState.address) {
                 finishWalletHydration();
@@ -3141,6 +3272,11 @@ async function initializeAppKit() {
                     bindCoreProviderDisconnect(restored.provider);
                     if (window.currentWalletAddress) return;
                     activeWalletProvider = restored.provider;
+                    setMobileCoreRestoreState('connected', {
+                        reason: 'boot restore',
+                        address: maskWalletAddress(restored.address),
+                        chainId: restored.chainId
+                    });
                     applyConfirmedWalletState({
                         address: restored.address,
                         chainId: restored.chainId
@@ -3157,7 +3293,10 @@ async function initializeAppKit() {
                 // disconnected; a restore error keeps the stored wallet hint so
                 // the next page load renders optimistically and retries.
                 if (outcome.status === 'none') {
+                    setMobileCoreRestoreState('disconnected', { reason: 'bounded restore found no session' });
                     localStorage.removeItem('artsoul_wallet');
+                } else {
+                    setMobileCoreRestoreState('failed', { reason: 'provider restore error' });
                 }
                 if (walletHydrationPending) {
                     // The settled guest dispatch re-renders the header via the
@@ -3172,7 +3311,16 @@ async function initializeAppKit() {
                     finishWalletHydration();
                 }
             }).catch((error) => {
+                setMobileCoreRestoreState('failed', { reason: 'restore completion rejected' });
                 walletDebugLog('core session boot restore failed', describeWalletDebugError(error));
+                if (walletHydrationPending) {
+                    dispatchWalletStateChanged({
+                        address: null,
+                        chainId: null,
+                        isConnected: false
+                    }, { settled: true });
+                    finishWalletHydration();
+                }
             }).finally(() => {
                 coreSessionRestoreSettled = true;
             });

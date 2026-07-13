@@ -1,6 +1,7 @@
 import { React, createRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
 import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
+import { classifyBidFailure } from '../features/auction/bid-error.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 
@@ -1230,73 +1231,18 @@ const { useState, useEffect, useRef } = React;
                 return { valid: true };
             }
 
-            function collectErrorText(error) {
-                const parts = [
-                    error?.code,
-                    error?.reason,
-                    error?.shortMessage,
-                    error?.message,
-                    error?.errorName,
-                    error?.revert?.name,
-                    error?.info?.error?.message,
-                    error?.error?.message,
-                    error?.data?.message
-                ];
-
-                for (const value of [error?.data, error?.info, error?.error]) {
-                    if (!value) continue;
-                    try {
-                        parts.push(JSON.stringify(value));
-                    } catch {
-                        // Ignore circular provider error payloads.
-                    }
-                }
-
-                return parts.filter(Boolean).join(' ').toLowerCase();
-            }
-
-            function genericBidFailureMessage(includeCreatorCause) {
-                const causes = includeCreatorCause
-                    ? "you're the artwork's creator, your bid is below the minimum, the auction has ended, you're already the highest bidder, or you don't have enough testnet ETH."
-                    : "you're already the highest bidder, your bid is below the minimum, the auction has ended, or you don't have enough testnet ETH.";
-                return `Your bid couldn't be placed. Common reasons: ${causes}`;
-            }
-
             function formatBidFailureMessage(error, context = {}) {
-                const text = collectErrorText(error);
                 const minimumBidDetails = context.minimumBidDetails || calculateMinimumBidDetails(auction);
                 const isCreator = isSameAddress(context.walletAddress, context.creatorAddress);
                 const isHighestBidder = isSameAddress(context.walletAddress, context.highestBidder);
-                const includeCreatorCause = !context.walletAddress || !context.creatorAddress || isCreator;
-
-                if (/please connect|connect.*wallet|wallet.*connect/.test(text)) {
-                    return 'Please connect your wallet to place a bid.';
-                }
-                if (/user rejected|user denied|rejected request|action_rejected/.test(text)) {
-                    return 'Transaction was rejected in your wallet.';
-                }
-                if (/insufficient funds|exceeds balance|not enough.*eth|insufficient.*balance/.test(text)) {
-                    return 'Not enough testnet ETH to cover the bid + gas.';
-                }
-                if (/biddercannotselfoutbid|highest bidder|self.?outbid|already.*highest/.test(text) || isHighestBidder) {
-                    return "You're already the highest bidder.";
-                }
-                if (/creatorcannotbid|creator cannot bid|author cannot bid|own artwork/.test(text)) {
-                    return isCreator
-                        ? "You can't bid on your own artwork."
-                        : genericBidFailureMessage(false);
-                }
-                if (/bidtoolow|bid too low|minimum|increment|too low|below/.test(text)) {
-                    return friendlyMinimumBidMessage(minimumBidDetails);
-                }
-                if (/auctionnotactive|auction not active|auction ended|not active|ended|expired|closed/.test(text)) {
-                    return 'This auction has ended.';
-                }
-                if (/call_exception|missing revert data|execution reverted/.test(text)) {
-                    return genericBidFailureMessage(includeCreatorCause);
-                }
-
-                return genericBidFailureMessage(includeCreatorCause);
+                return classifyBidFailure(error, {
+                    providerSource: context.providerSource,
+                    minimumBidEth: minimumBidDetails?.eth || '0',
+                    isCreator,
+                    isHighestBidder,
+                    auctionEnded: context.auctionEnded,
+                    bidBelowMinimum: context.bidBelowMinimum
+                }).message;
             }
 
             async function canPlaceBidSafe(artworkIdValue, walletAddress, creatorAddress) {
@@ -1584,7 +1530,13 @@ const { useState, useEffect, useRef } = React;
                     walletAddress,
                     creatorAddress,
                     highestBidder,
-                    minimumBidDetails
+                    minimumBidDetails,
+                    auctionEnded: isAuctionClosedForBidding(auction),
+                    bidBelowMinimum: Boolean(
+                        parseEthToWei(bidAmount) &&
+                        minimumBidDetails?.wei &&
+                        parseEthToWei(bidAmount) < minimumBidDetails.wei
+                    )
                 };
 
                 if (!parseEthToWei(bidAmount) || parseEthToWei(bidAmount) <= 0n) {
@@ -1622,8 +1574,9 @@ const { useState, useEffect, useRef } = React;
                     return;
                 }
 
+                let provider = null;
                 try {
-                    let provider = await window.web3Modal?.getWalletProvider();
+                    provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
                         await window.ensureWalletConnected?.();
                         provider = await window.web3Modal?.getWalletProvider();
@@ -1637,7 +1590,44 @@ const { useState, useEffect, useRef } = React;
                     await refreshLiveBidActivity();
                 } catch (error) {
                     console.error('Bid failed:', error);
-                    const message = formatBidFailureMessage(error, bidContext);
+                    const providerSource = window.getArtSoulWalletProviderSource?.(provider) || (provider ? 'unknown' : 'missing');
+                    let providerChainId = null;
+                    try {
+                        providerChainId = await provider?.request?.({ method: 'eth_chainId' });
+                    } catch {
+                        // The original transaction error remains authoritative.
+                    }
+                    const failureContext = {
+                        ...bidContext,
+                        providerSource
+                    };
+                    const classification = classifyBidFailure(error, {
+                        providerSource,
+                        minimumBidEth: minimumBidDetails?.eth || '0',
+                        isCreator: isSameAddress(walletAddress, creatorAddress),
+                        isHighestBidder: isSameAddress(walletAddress, highestBidder),
+                        auctionEnded: bidContext.auctionEnded,
+                        bidBelowMinimum: bidContext.bidBelowMinimum
+                    });
+                    window.ArtSoulWalletDebug?.log?.('bid failure classified', {
+                        classification: classification.category,
+                        connectedAddress: walletAddress,
+                        providerSource,
+                        chainId: providerChainId,
+                        artworkCreator: creatorAddress || null,
+                        currentHighestBidder: highestBidder || null,
+                        auctionStatus: auction?.status || null,
+                        auctionEndTime: auction?.endTime || auction?.end_time || null,
+                        bidAmount,
+                        requiredMinimum: minimumBidDetails?.eth || null,
+                        walletBalance: document.querySelector('[data-network-balance]')?.textContent || null,
+                        rpcErrorCode: classification.rpcCode ?? error?.code ?? error?.info?.error?.code ?? null,
+                        revertReason: error?.reason || error?.revert?.name || null,
+                        shortMessage: error?.shortMessage || null,
+                        details: error?.details || error?.info?.error?.message || error?.error?.message || null,
+                        cause: error?.cause?.message || null
+                    });
+                    const message = formatBidFailureMessage(error, failureContext);
                     console.log('Bid error shown to user:', message);
                     alert(message);
                 }
