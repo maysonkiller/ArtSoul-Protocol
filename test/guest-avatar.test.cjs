@@ -4,6 +4,14 @@ const fs = require('node:fs');
 
 const avatarDropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
 const unifiedStyles = fs.readFileSync('unified-styles.css', 'utf8');
+const sharedHeaderPages = [
+  'index.html',
+  'gallery.html',
+  'artwork.html',
+  'profile.html',
+  'upload.html',
+  'docs-protocol.html'
+];
 
 test('guest avatar uses the local ArtSoul image with the generated fallback', () => {
   assert.equal(fs.existsSync('default-avatar.png'), true);
@@ -18,7 +26,7 @@ test('stored wallet hydration never renders a disconnected guest state', () => {
   assert.match(avatarDropdown, /artsoul_header_identity/);
   assert.match(avatarDropdown, /getCachedHeaderIdentity\(storedWallet\)/);
   assert.match(avatarDropdown, /name: cachedIdentity\.name/);
-  assert.match(avatarDropdown, /Restoring wallet\.\.\./);
+  assert.doesNotMatch(avatarDropdown, /Restoring wallet\.\.\./);
   assert.match(avatarDropdown, /dataset\.avatarRenderKey = 'cached-wallet'/);
   assert.doesNotMatch(avatarDropdown, /name: 'Wallet'/);
 });
@@ -26,6 +34,7 @@ test('stored wallet hydration never renders a disconnected guest state', () => {
 test('Base appears once as current network and ETH Sepolia is visibly future-only', () => {
   assert.match(avatarDropdown, /network-switcher-btn network-current-row/);
   assert.match(avatarDropdown, /<span class="network-option-name">ETH Sepolia<\/span>/);
+  assert.match(avatarDropdown, /<img src="\$\{ETHEREUM_NETWORK_ICON\}" alt="" aria-hidden="true" \/>/);
   assert.match(avatarDropdown, /network-soon-badge">SOON/);
   const ethereumStart = avatarDropdown.indexOf('class="dropdown-item avatar-network-option is-disabled"');
   const ethereumOption = ethereumStart >= 0
@@ -42,9 +51,23 @@ test('connected account menus render the current network and balance row', () =>
 });
 
 test('account menu uses the compact desktop and mobile width contracts', () => {
-  assert.match(unifiedStyles, /width: min\(152px, calc\(100vw - 24px\)\) !important;/);
+  assert.match(unifiedStyles, /width: min\(164px, calc\(100vw - 24px\)\) !important;/);
   assert.match(unifiedStyles, /width: min\(148px, calc\(100vw - 28px\)\) !important;/);
   assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?flex-wrap: nowrap !important;/);
+});
+
+test('account menu has one stylesheet source and equal network row geometry', () => {
+  assert.doesNotMatch(avatarDropdown, /document\.head\.appendChild\(style\)/);
+  assert.match(unifiedStyles, /network-current-row,[\s\S]*?avatar-network-option \{[\s\S]*?border-color: var\(--c-border-soft\)/);
+  assert.match(unifiedStyles, /network-current-row,[\s\S]*?avatar-network-option \{[\s\S]*?height: 40px !important;/);
+});
+
+test('every product page loads the same account menu and stylesheet versions', () => {
+  for (const page of sharedHeaderPages) {
+    const html = fs.readFileSync(page, 'utf8');
+    assert.match(html, /unified-styles\.css\?v=34/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=27/, `${page} must use the shared menu cache version`);
+  }
 });
 
 test('account and network controls share one SVG chevron contract', () => {

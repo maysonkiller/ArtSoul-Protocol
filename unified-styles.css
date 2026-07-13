@@ -3219,7 +3219,7 @@ body.classic::before,
 
 .avatar-network-option.is-disabled {
     cursor: not-allowed !important;
-    opacity: 0.46;
+    opacity: 0.62;
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
@@ -3240,7 +3240,9 @@ body.classic::before,
 }
 
 .avatar-network-option .network-option-name {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -3813,7 +3815,8 @@ body.future .site-header {
     }
 }
 
-.avatar-dropdown-menu .network-switcher-btn > img {
+.avatar-dropdown-menu .network-switcher-btn > img,
+.avatar-dropdown-menu .avatar-network-option > img {
     width: 24px !important;
     min-width: 24px !important;
     max-width: 24px !important;
@@ -4238,9 +4241,9 @@ html.future .site-header .logo-link > .site-logo {
 
 .site-header #navButtons,
 .site-header #navButtons .avatar-dropdown-container {
-    width: 152px !important;
-    min-width: 152px !important;
-    max-width: 152px !important;
+    width: 164px !important;
+    min-width: 164px !important;
+    max-width: 164px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
@@ -4262,9 +4265,9 @@ html.future .site-header .logo-link > .site-logo {
 }
 
 .site-header #navButtons .avatar-button {
-    width: 152px !important;
-    min-width: 152px !important;
-    max-width: 152px !important;
+    width: 164px !important;
+    min-width: 164px !important;
+    max-width: 164px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
@@ -4293,17 +4296,17 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
 .site-header #navButtons .avatar-info {
     display: flex !important;
-    width: 85px !important;
-    min-width: 85px !important;
-    max-width: 85px !important;
+    width: 97px !important;
+    min-width: 97px !important;
+    max-width: 97px !important;
     height: 30px !important;
-    flex: 0 0 85px !important;
+    flex: 0 0 97px !important;
     justify-content: center;
 }
 
 .site-header #navButtons .avatar-info > div {
-    width: 85px !important;
-    max-width: 85px !important;
+    width: 97px !important;
+    max-width: 97px !important;
 }
 
 .site-header #navButtons [data-avatar-name] {
@@ -4328,7 +4331,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .site-header .avatar-dropdown-menu {
-    width: min(152px, calc(100vw - 24px)) !important;
+    width: min(164px, calc(100vw - 24px)) !important;
     padding: 0.35rem !important;
 }
 
@@ -4360,14 +4363,44 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     font-size: 0.82rem !important;
 }
 
-.site-header .avatar-dropdown-menu .network-switcher-btn > img {
-    width: 22px !important;
-    min-width: 22px !important;
-    max-width: 22px !important;
-    height: 22px !important;
-    min-height: 22px !important;
-    max-height: 22px !important;
-    flex-basis: 22px !important;
+.site-header .avatar-dropdown-menu .network-switcher-btn > img,
+.site-header .avatar-dropdown-menu .avatar-network-option > img {
+    width: 18px !important;
+    min-width: 18px !important;
+    max-width: 18px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    flex-basis: 18px !important;
+}
+
+.site-header .avatar-dropdown-menu .network-current-row,
+.site-header .avatar-dropdown-menu .avatar-network-option {
+    width: 100% !important;
+    border-color: var(--c-border-soft) !important;
+    background: var(--c-surface-muted) !important;
+}
+
+.site-header .avatar-dropdown-menu .avatar-network-option {
+    gap: 0.3rem !important;
+}
+
+.site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name],
+.site-header .avatar-dropdown-menu .avatar-network-option .network-option-name {
+    font-size: 0.7rem !important;
+    font-weight: 650;
+    line-height: 1.1 !important;
+    white-space: nowrap;
+}
+
+.site-header .avatar-dropdown-menu .network-switcher-copy [data-network-balance] {
+    font-size: 0.6rem !important;
+}
+
+.site-header .avatar-dropdown-menu .network-soon-badge {
+    padding: 0.08rem 0.22rem;
+    font-size: 0.5rem;
+    letter-spacing: 0.015em;
 }
 
 .upload-page-main.site-page-container {
@@ -4584,14 +4617,15 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         line-height: 1.15 !important;
     }
 
-    .site-header .avatar-dropdown-menu .network-switcher-btn > img {
-        width: 20px !important;
-        min-width: 20px !important;
-        max-width: 20px !important;
-        height: 20px !important;
-        min-height: 20px !important;
-        max-height: 20px !important;
-        flex-basis: 20px !important;
+    .site-header .avatar-dropdown-menu .network-switcher-btn > img,
+    .site-header .avatar-dropdown-menu .avatar-network-option > img {
+        width: 18px !important;
+        min-width: 18px !important;
+        max-width: 18px !important;
+        height: 18px !important;
+        min-height: 18px !important;
+        max-height: 18px !important;
+        flex-basis: 18px !important;
     }
 
     .site-header .avatar-dropdown-menu .network-current-row,
@@ -4603,11 +4637,11 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name] {
-        font-size: 0.74rem !important;
+        font-size: 0.68rem !important;
     }
 
     .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-balance] {
-        font-size: 0.64rem !important;
+        font-size: 0.58rem !important;
     }
 
     .site-header .avatar-dropdown-menu .avatar-network-options {
@@ -4616,8 +4650,8 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header .avatar-dropdown-menu .network-soon-badge {
-        padding: 0.12rem 0.3rem;
-        font-size: 0.56rem;
+        padding: 0.08rem 0.2rem;
+        font-size: 0.48rem;
     }
 
     .site-header .avatar-dropdown-menu .avatar-dropdown-divider {
