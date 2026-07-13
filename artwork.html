@@ -40,7 +40,7 @@
     <meta name="twitter:image:alt" content="ArtSoul: Discovery-First Art Auctions">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="unified-styles.css?v=32">
+    <link rel="stylesheet" href="unified-styles.css?v=33">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-responsive.css?v=5">
     <link rel="stylesheet" href="performance-optimizations.css?v=2">
@@ -65,7 +65,7 @@
     <script src="src/features/artwork/ai-valuation-client.js?v=1"></script>
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
     <script src="src/ui/components/artwork-card.js?v=8"></script>
-    <script src="avatar-dropdown.js?v=25"></script>
+    <script src="avatar-dropdown.js?v=26"></script>
     <!-- On-screen wallet debug overlay for mobile diagnosis; fetched only when wallet debug is enabled -->
     <script>
         (function () {
@@ -279,7 +279,7 @@ body.classic,
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
                                 <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">
                                 <div class="avatar-info"><div data-avatar-name>ArtSoul Guest</div><div data-avatar-address hidden aria-hidden="true"></div></div>
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
+                                <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
                             </button>
                         </div>
                     </div>

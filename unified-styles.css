@@ -3227,15 +3227,21 @@ body.classic::before,
 
 .network-soon-badge {
     margin-left: auto;
-    padding: 0.15rem 0.4rem;
+    flex: 0 0 auto;
+    padding: 0.12rem 0.3rem;
     border: 1px solid var(--c-border);
     border-radius: 999px;
     color: var(--c-text) !important;
     font-size: 0.625rem;
     font-weight: 700;
     line-height: 1;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.03em;
     -webkit-text-fill-color: currentColor !important;
+}
+
+.avatar-network-option .network-option-name {
+    flex: 0 1 auto;
+    white-space: nowrap;
 }
 
 .avatar-dropdown-menu .dropdown-item span,
@@ -3759,10 +3765,15 @@ body.future .site-header {
 }
 
 .avatar-dropdown-menu .network-current-row .network-options-arrow {
-    flex: 0 0 auto;
+    flex: 0 0 12px;
+    width: 12px;
+    height: 12px;
     color: var(--c-text-muted);
-    font-size: 0.9rem;
-    line-height: 1;
+    transition: none !important;
+}
+
+.avatar-dropdown-menu .network-current-row[aria-expanded="true"] .network-options-arrow {
+    transform: rotate(180deg);
 }
 
 .avatar-network-options[hidden] {
@@ -3771,6 +3782,14 @@ body.future .site-header {
 
 .avatar-network-options:not([hidden]) {
     display: block;
+}
+
+.menu-chevron {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .avatar-dropdown-navigation .avatar-disconnect-item {
@@ -3783,6 +3802,14 @@ body.future .site-header {
     .avatar-dropdown-menu .dropdown-item {
         min-height: 36px !important;
         padding: 0.42rem 0.52rem !important;
+    }
+
+    .site-header .avatar-dropdown-menu .network-current-row,
+    .site-header .avatar-dropdown-menu .avatar-network-option {
+        height: 40px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
+        padding: 0.35rem 0.42rem !important;
     }
 }
 
@@ -4211,9 +4238,9 @@ html.future .site-header .logo-link > .site-logo {
 
 .site-header #navButtons,
 .site-header #navButtons .avatar-dropdown-container {
-    width: 168px !important;
-    min-width: 168px !important;
-    max-width: 168px !important;
+    width: 152px !important;
+    min-width: 152px !important;
+    max-width: 152px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
@@ -4235,15 +4262,15 @@ html.future .site-header .logo-link > .site-logo {
 }
 
 .site-header #navButtons .avatar-button {
-    width: 168px !important;
-    min-width: 168px !important;
-    max-width: 168px !important;
+    width: 152px !important;
+    min-width: 152px !important;
+    max-width: 152px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
-    gap: 5px !important;
+    gap: 4px !important;
     justify-content: flex-start !important;
-    padding: 5px 7px !important;
+    padding: 5px 6px !important;
     overflow: hidden;
     transition: none !important;
 }
@@ -4266,17 +4293,17 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
 .site-header #navButtons .avatar-info {
     display: flex !important;
-    width: 94px !important;
-    min-width: 94px !important;
-    max-width: 94px !important;
+    width: 85px !important;
+    min-width: 85px !important;
+    max-width: 85px !important;
     height: 30px !important;
-    flex: 0 0 94px !important;
+    flex: 0 0 85px !important;
     justify-content: center;
 }
 
 .site-header #navButtons .avatar-info > div {
-    width: 94px !important;
-    max-width: 94px !important;
+    width: 85px !important;
+    max-width: 85px !important;
 }
 
 .site-header #navButtons [data-avatar-name] {
@@ -4291,17 +4318,17 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .site-header #navButtons .dropdown-arrow {
-    width: 9px !important;
-    min-width: 9px !important;
-    max-width: 9px !important;
-    height: 9px !important;
-    min-height: 9px !important;
-    max-height: 9px !important;
-    flex: 0 0 9px !important;
+    width: 12px !important;
+    min-width: 12px !important;
+    max-width: 12px !important;
+    height: 12px !important;
+    min-height: 12px !important;
+    max-height: 12px !important;
+    flex: 0 0 12px !important;
 }
 
 .site-header .avatar-dropdown-menu {
-    width: min(168px, calc(100vw - 24px)) !important;
+    width: min(152px, calc(100vw - 24px)) !important;
     padding: 0.35rem !important;
 }
 
@@ -4329,7 +4356,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 .site-header .avatar-dropdown-menu .dropdown-item,
 .site-header .avatar-dropdown-menu .network-switcher-btn,
 .site-header .avatar-dropdown-menu button[onclick*="resetWalletConnection"] {
-    gap: 0.45rem !important;
+    gap: 0.35rem !important;
     font-size: 0.82rem !important;
 }
 
@@ -4511,7 +4538,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
        the component's late-injected desktop defaults without changing JS. */
     .site-header .avatar-dropdown-menu {
         top: calc(100% + 0.35rem) !important;
-        width: min(160px, calc(100vw - 28px)) !important;
+        width: min(148px, calc(100vw - 28px)) !important;
         max-width: calc(100vw - 28px) !important;
         max-height: calc(100dvh - var(--site-header-height) - 14px) !important;
         padding: 0.3rem !important;
@@ -4567,6 +4594,14 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         flex-basis: 20px !important;
     }
 
+    .site-header .avatar-dropdown-menu .network-current-row,
+    .site-header .avatar-dropdown-menu .avatar-network-option {
+        height: 38px !important;
+        min-height: 38px !important;
+        max-height: 38px !important;
+        padding: 0.32rem 0.38rem !important;
+    }
+
     .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name] {
         font-size: 0.74rem !important;
     }
@@ -4577,7 +4612,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .site-header .avatar-dropdown-menu .avatar-network-options {
         gap: 0.15rem;
-        padding: 0.15rem 0 0.3rem 0.5rem;
+        padding: 0.15rem 0 0.3rem;
     }
 
     .site-header .avatar-dropdown-menu .network-soon-badge {
