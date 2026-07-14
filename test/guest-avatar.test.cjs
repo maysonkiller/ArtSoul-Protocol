@@ -27,6 +27,9 @@ test('stored wallet hydration never renders a disconnected guest state', () => {
   assert.match(avatarDropdown, /getCachedHeaderIdentity\(storedWallet\)/);
   assert.match(avatarDropdown, /getCachedHeaderNetwork\(storedWallet\)/);
   assert.match(avatarDropdown, /artsoul_header_network/);
+  assert.match(avatarDropdown, /artsoul_header_ui_state/);
+  assert.match(avatarDropdown, /cachedUiState === 'connected'/);
+  assert.match(avatarDropdown, /cachedIdentityWithoutHint\?\.wallet/);
   assert.match(avatarDropdown, /name: cachedIdentity\.name/);
   assert.doesNotMatch(avatarDropdown, /Restoring wallet\.\.\./);
   assert.match(avatarDropdown, /dataset\.avatarRenderKey = 'cached-wallet'/);
@@ -60,17 +63,19 @@ test('account menu uses the compact desktop and mobile width contracts', () => {
 
 test('account menu has one stylesheet source and a full-width compact future network row', () => {
   assert.doesNotMatch(avatarDropdown, /document\.head\.appendChild\(style\)/);
+  assert.doesNotMatch(avatarDropdown, /class="dropdown-item[^\"]*"\s+style=/);
   assert.match(unifiedStyles, /network-current-row,[\s\S]*?avatar-network-option \{[\s\S]*?border-color: var\(--c-border-soft\)/);
-  assert.match(unifiedStyles, /avatar-network-options \{[\s\S]*?width: 100%;[\s\S]*?padding: 0\.15rem 0 0\.3rem !important;/);
-  assert.match(unifiedStyles, /avatar-network-option \{[\s\S]*?height: 32px !important;/);
+  assert.match(unifiedStyles, /avatar-network-options \{[\s\S]*?width: 100%;[\s\S]*?padding: 0\.08rem 0 0\.12rem !important;/);
+  assert.match(unifiedStyles, /network-current-row \{[\s\S]*?height: 36px !important;/);
   assert.match(unifiedStyles, /avatar-network-option \{[\s\S]*?height: 30px !important;/);
+  assert.match(unifiedStyles, /network-option-name \{[\s\S]*?font-size: 0\.78rem !important;/);
 });
 
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=35/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=28/, `${page} must use the shared menu cache version`);
+    assert.match(html, /unified-styles\.css\?v=36/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=29/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
@@ -78,6 +83,16 @@ test('every product page loads the same account menu and stylesheet versions', (
 test('stable button hydration does not reassign identical avatar content', () => {
   assert.match(avatarDropdown, /const contentAlreadyMatches =/);
   assert.match(avatarDropdown, /if \(contentAlreadyMatches\) \{[\s\S]*?button\.dataset\.avatarContentKey = contentKey;[\s\S]*?return structure;/);
+  assert.match(avatarDropdown, /image\.classList\.add\('avatar-image-loading'\)/);
+  assert.match(unifiedStyles, /avatar-button > img\.avatar-image-loading \{[\s\S]*?visibility: hidden !important;/);
+});
+
+test('header typography and menu interaction geometry are shared across pages', () => {
+  assert.match(unifiedStyles, /\.site-header \{[\s\S]*?font-family: Inter, Arial, sans-serif !important;/);
+  assert.match(unifiedStyles, /\[data-avatar-name\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 650 !important;/);
+  assert.match(unifiedStyles, /avatar-theme-switch \.theme-btn \{[\s\S]*?min-height: 27px !important;[\s\S]*?font-size: 0\.75rem !important;/);
+  assert.match(unifiedStyles, /avatar-disconnect-item \{[\s\S]*?min-height: 34px !important;/);
+  assert.match(unifiedStyles, /\.future \.site-header \.avatar-dropdown-menu \.dropdown-item:not\(\.is-disabled\):hover[\s\S]*?var\(--c-glow-strong\)/);
 });
 
 test('account and network controls share one SVG chevron contract', () => {

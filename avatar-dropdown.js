@@ -17,6 +17,7 @@
             this.profileRequests = new Map();
             this.headerIdentityStorageKey = 'artsoul_header_identity';
             this.headerNetworkStorageKey = 'artsoul_header_network';
+            this.headerStateStorageKey = 'artsoul_header_ui_state';
         }
 
         getNavContainer() {
@@ -97,12 +98,19 @@
             }
 
             if (image) {
+                const revealAvatar = () => image.classList.remove('avatar-image-loading');
+                if (image.getAttribute('src') !== nextAvatarUrl) {
+                    image.classList.add('avatar-image-loading');
+                    image.addEventListener('load', revealAvatar, { once: true });
+                }
                 image.src = nextAvatarUrl;
                 image.alt = avatarAlt || nextName || 'ArtSoul';
                 image.onerror = () => {
                     image.onerror = null;
                     image.src = fallback;
+                    if (image.complete) revealAvatar();
                 };
+                if (image.complete) revealAvatar();
             }
             if (nameNode) nameNode.textContent = nextName;
             if (addressNode) {
@@ -180,21 +188,7 @@
                 .filter(item => !this.isCurrentNavigationItem(item, currentPath, currentHash))
                 .map(item => {
                     return `
-                    <a
-                        href="${item.href}"
-                        class="dropdown-item${item.profile ? ' dropdown-profile-item' : ''}"
-                        style="
-                            display: flex;
-                            align-items: center;
-                            gap: 0.75rem;
-                            padding: 0.75rem;
-                            border-radius: 0.5rem;
-                            cursor: pointer;
-                            transition: all 0.2s;
-                            text-decoration: none;
-                            color: inherit;
-                        "
-                    >
+                    <a href="${item.href}" class="dropdown-item${item.profile ? ' dropdown-profile-item' : ''}">
                         <span>${item.label}</span>
                     </a>
                 `;
@@ -202,12 +196,14 @@
                 .join('');
         }
 
-        getCachedHeaderIdentity(walletAddress) {
+        getCachedHeaderIdentity(walletAddress = '') {
             const normalizedWallet = String(walletAddress || '').toLowerCase();
-            if (!normalizedWallet) return null;
             try {
                 const cached = JSON.parse(localStorage.getItem(this.headerIdentityStorageKey) || 'null');
-                if (!cached || String(cached.wallet || '').toLowerCase() !== normalizedWallet) return null;
+                if (!cached) return null;
+                const cachedWallet = String(cached.wallet || '').toLowerCase();
+                if (!/^0x[a-f0-9]{40}$/.test(cachedWallet)) return null;
+                if (normalizedWallet && cachedWallet !== normalizedWallet) return null;
                 if (!cached.name || !cached.avatarUrl) return null;
                 return cached;
             } catch {
@@ -313,6 +309,11 @@
             document.documentElement.classList.remove('wallet-state-resolving');
             document.documentElement.dataset.walletUiState = state;
             this.getNavContainer()?.setAttribute('aria-busy', 'false');
+            try {
+                localStorage.setItem(this.headerStateStorageKey, state);
+            } catch {
+                // The visible state remains stable without storage.
+            }
         }
 
         isWalletConnectionConfirmed(walletAddress, options = {}) {
@@ -862,7 +863,14 @@
             const container = this.getNavContainer();
             if (!container) return false;
 
-            const storedWallet = (localStorage.getItem('artsoul_wallet') || '').toLowerCase();
+            const storedWalletHint = (localStorage.getItem('artsoul_wallet') || '').toLowerCase();
+            const cachedUiState = localStorage.getItem(this.headerStateStorageKey);
+            const cachedIdentityWithoutHint = cachedUiState === 'connected'
+                ? this.getCachedHeaderIdentity()
+                : null;
+            const storedWallet = /^0x[a-f0-9]{40}$/.test(storedWalletHint)
+                ? storedWalletHint
+                : (cachedIdentityWithoutHint?.wallet || '');
             const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
             if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
             let cachedIdentity = this.getCachedHeaderIdentity(storedWallet);

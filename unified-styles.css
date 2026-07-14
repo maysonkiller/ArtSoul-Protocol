@@ -3807,17 +3807,17 @@ body.future .site-header {
     }
 
     .site-header .avatar-dropdown-menu .network-current-row {
-        height: 40px !important;
-        min-height: 40px !important;
-        max-height: 40px !important;
-        padding: 0.35rem 0.42rem !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        padding: 0.28rem 0.42rem !important;
     }
 
     .site-header .avatar-dropdown-menu .avatar-network-option {
-        height: 32px !important;
-        min-height: 32px !important;
-        max-height: 32px !important;
-        padding: 0.26rem 0.42rem !important;
+        height: 30px !important;
+        min-height: 30px !important;
+        max-height: 30px !important;
+        padding: 0.2rem 0.42rem !important;
     }
 }
 
@@ -4164,6 +4164,7 @@ body {
     border-bottom: 1px solid var(--c-border-soft) !important;
     background: color-mix(in srgb, var(--c-bg) 94%, transparent) !important;
     backdrop-filter: blur(12px);
+    font-family: Inter, Arial, sans-serif !important;
 }
 
 html.classic .site-header,
@@ -4278,7 +4279,7 @@ html.future .site-header .logo-link > .site-logo {
     min-height: 42px !important;
     max-height: 42px !important;
     gap: 4px !important;
-    justify-content: flex-start !important;
+    justify-content: center !important;
     padding: 5px 6px !important;
     overflow: hidden;
     transition: none !important;
@@ -4300,54 +4301,61 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     flex: 0 0 30px !important;
 }
 
+.site-header #navButtons .avatar-button > img.avatar-image-loading {
+    visibility: hidden !important;
+}
+
 .site-header #navButtons .avatar-info {
     display: flex !important;
-    width: 97px !important;
-    min-width: 97px !important;
-    max-width: 97px !important;
+    width: 88px !important;
+    min-width: 88px !important;
+    max-width: 88px !important;
     height: 30px !important;
-    flex: 0 0 97px !important;
+    flex: 0 0 88px !important;
     justify-content: center;
 }
 
 .site-header #navButtons .avatar-info > div {
-    width: 97px !important;
-    max-width: 97px !important;
+    width: 88px !important;
+    max-width: 88px !important;
 }
 
 .site-header #navButtons [data-avatar-name] {
-    font-size: 0.8rem;
+    font-family: Inter, Arial, sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 650 !important;
     line-height: 1.15;
 }
 
 .site-header #navButtons [data-avatar-address] {
     min-height: 0.78rem;
-    font-size: 0.68rem;
+    font-size: 0.66rem !important;
     line-height: 1.15;
 }
 
 .site-header #navButtons .dropdown-arrow {
-    width: 12px !important;
-    min-width: 12px !important;
-    max-width: 12px !important;
-    height: 12px !important;
-    min-height: 12px !important;
-    max-height: 12px !important;
-    flex: 0 0 12px !important;
+    width: 10px !important;
+    min-width: 10px !important;
+    max-width: 10px !important;
+    height: 10px !important;
+    min-height: 10px !important;
+    max-height: 10px !important;
+    flex: 0 0 10px !important;
 }
 
 .site-header .avatar-dropdown-menu {
     width: min(164px, calc(100vw - 24px)) !important;
-    padding: 0.35rem !important;
+    padding: 0.32rem !important;
+    font-family: Inter, Arial, sans-serif !important;
 }
 
 .site-header .avatar-dropdown-menu .avatar-theme-section {
-    padding: 0.3rem !important;
+    padding: 0.24rem !important;
 }
 
 .site-header .avatar-dropdown-menu .avatar-theme-label {
-    margin-bottom: 0.35rem !important;
-    font-size: 0.7rem !important;
+    margin-bottom: 0.24rem !important;
+    font-size: 0.72rem !important;
     line-height: 1.15 !important;
 }
 
@@ -4356,28 +4364,33 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .site-header .avatar-dropdown-menu .avatar-theme-switch .theme-btn {
-    min-height: 30px !important;
-    padding: 0.3rem 0.42rem !important;
-    font-size: 0.72rem !important;
+    min-height: 27px !important;
+    padding: 0.22rem 0.36rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
     line-height: 1.1 !important;
 }
 
 .site-header .avatar-dropdown-menu .dropdown-item,
 .site-header .avatar-dropdown-menu .network-switcher-btn,
 .site-header .avatar-dropdown-menu button[onclick*="resetWalletConnection"] {
-    gap: 0.35rem !important;
-    font-size: 0.82rem !important;
+    gap: 0.32rem !important;
+    min-height: 34px !important;
+    padding: 0.34rem 0.48rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    line-height: 1.15 !important;
 }
 
 .site-header .avatar-dropdown-menu .network-switcher-btn > img,
 .site-header .avatar-dropdown-menu .avatar-network-option > img {
-    width: 18px !important;
-    min-width: 18px !important;
-    max-width: 18px !important;
-    height: 18px !important;
-    min-height: 18px !important;
-    max-height: 18px !important;
-    flex-basis: 18px !important;
+    width: 16px !important;
+    min-width: 16px !important;
+    max-width: 16px !important;
+    height: 16px !important;
+    min-height: 16px !important;
+    max-height: 16px !important;
+    flex-basis: 16px !important;
 }
 
 .site-header .avatar-dropdown-menu .network-current-row,
@@ -4389,11 +4402,14 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
 .site-header .avatar-dropdown-menu .avatar-network-options {
     width: 100%;
-    padding: 0.15rem 0 0.3rem !important;
+    padding: 0.08rem 0 0.12rem !important;
 }
 
 .site-header .avatar-dropdown-menu .avatar-network-option {
     gap: 0.3rem !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
 }
 
 .site-header .avatar-dropdown-menu .avatar-network-option > img {
@@ -4408,20 +4424,35 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
 .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name],
 .site-header .avatar-dropdown-menu .avatar-network-option .network-option-name {
-    font-size: 0.66rem !important;
+    font-size: 0.78rem !important;
     font-weight: 650;
     line-height: 1.1 !important;
     white-space: nowrap;
 }
 
 .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-balance] {
-    font-size: 0.6rem !important;
+    font-size: 0.65rem !important;
 }
 
 .site-header .avatar-dropdown-menu .network-soon-badge {
-    padding: 0.06rem 0.18rem;
-    font-size: 0.46rem;
+    padding: 0.05rem 0.16rem;
+    font-size: 0.49rem;
     letter-spacing: 0.015em;
+}
+
+.site-header .avatar-dropdown-menu .avatar-dropdown-divider {
+    margin: 0.18rem 0 !important;
+}
+
+.site-header .avatar-dropdown-navigation .avatar-disconnect-item {
+    min-height: 34px !important;
+    padding: 0.34rem 0.48rem !important;
+}
+
+.future .site-header .avatar-dropdown-menu .dropdown-item:not(.is-disabled):hover,
+.future .site-header .avatar-dropdown-menu .dropdown-item:not(.is-disabled):focus-visible {
+    border-color: var(--c-accent) !important;
+    box-shadow: 0 0 12px var(--c-glow-strong), inset 0 0 10px var(--c-glow) !important;
 }
 
 .upload-page-main.site-page-container {
@@ -4634,26 +4665,26 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         gap: 0.45rem !important;
         padding: 0.35rem 0.45rem !important;
         border-radius: 0.42rem !important;
-        font-size: 0.76rem !important;
+        font-size: 0.78rem !important;
         line-height: 1.15 !important;
     }
 
     .site-header .avatar-dropdown-menu .network-switcher-btn > img,
     .site-header .avatar-dropdown-menu .avatar-network-option > img {
-        width: 18px !important;
-        min-width: 18px !important;
-        max-width: 18px !important;
-        height: 18px !important;
-        min-height: 18px !important;
-        max-height: 18px !important;
-        flex-basis: 18px !important;
+        width: 16px !important;
+        min-width: 16px !important;
+        max-width: 16px !important;
+        height: 16px !important;
+        min-height: 16px !important;
+        max-height: 16px !important;
+        flex-basis: 16px !important;
     }
 
     .site-header .avatar-dropdown-menu .network-current-row {
-        height: 38px !important;
-        min-height: 38px !important;
-        max-height: 38px !important;
-        padding: 0.32rem 0.38rem !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        padding: 0.28rem 0.38rem !important;
     }
 
     .site-header .avatar-dropdown-menu .avatar-network-option {
@@ -4664,7 +4695,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name] {
-        font-size: 0.68rem !important;
+        font-size: 0.7rem !important;
     }
 
     .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-balance] {
@@ -4673,7 +4704,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .site-header .avatar-dropdown-menu .avatar-network-options {
         gap: 0.15rem;
-        padding: 0.12rem 0 0.25rem !important;
+        padding: 0.08rem 0 0.12rem !important;
     }
 
     .site-header .avatar-dropdown-menu .network-soon-badge {
