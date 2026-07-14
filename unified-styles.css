@@ -3241,8 +3241,8 @@ body.classic::before,
 
 .avatar-network-option .network-option-name {
     flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: clip;
     white-space: nowrap;
 }
 
@@ -3806,12 +3806,18 @@ body.future .site-header {
         padding: 0.42rem 0.52rem !important;
     }
 
-    .site-header .avatar-dropdown-menu .network-current-row,
-    .site-header .avatar-dropdown-menu .avatar-network-option {
+    .site-header .avatar-dropdown-menu .network-current-row {
         height: 40px !important;
         min-height: 40px !important;
         max-height: 40px !important;
         padding: 0.35rem 0.42rem !important;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-network-option {
+        height: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        padding: 0.26rem 0.42rem !important;
     }
 }
 
@@ -4381,13 +4387,28 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     background: var(--c-surface-muted) !important;
 }
 
+.site-header .avatar-dropdown-menu .avatar-network-options {
+    width: 100%;
+    padding: 0.15rem 0 0.3rem !important;
+}
+
 .site-header .avatar-dropdown-menu .avatar-network-option {
     gap: 0.3rem !important;
 }
 
+.site-header .avatar-dropdown-menu .avatar-network-option > img {
+    width: 16px !important;
+    min-width: 16px !important;
+    max-width: 16px !important;
+    height: 16px !important;
+    min-height: 16px !important;
+    max-height: 16px !important;
+    flex-basis: 16px !important;
+}
+
 .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name],
 .site-header .avatar-dropdown-menu .avatar-network-option .network-option-name {
-    font-size: 0.7rem !important;
+    font-size: 0.66rem !important;
     font-weight: 650;
     line-height: 1.1 !important;
     white-space: nowrap;
@@ -4398,8 +4419,8 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .site-header .avatar-dropdown-menu .network-soon-badge {
-    padding: 0.08rem 0.22rem;
-    font-size: 0.5rem;
+    padding: 0.06rem 0.18rem;
+    font-size: 0.46rem;
     letter-spacing: 0.015em;
 }
 
@@ -4628,12 +4649,18 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         flex-basis: 18px !important;
     }
 
-    .site-header .avatar-dropdown-menu .network-current-row,
-    .site-header .avatar-dropdown-menu .avatar-network-option {
+    .site-header .avatar-dropdown-menu .network-current-row {
         height: 38px !important;
         min-height: 38px !important;
         max-height: 38px !important;
         padding: 0.32rem 0.38rem !important;
+    }
+
+    .site-header .avatar-dropdown-menu .avatar-network-option {
+        height: 30px !important;
+        min-height: 30px !important;
+        max-height: 30px !important;
+        padding: 0.22rem 0.36rem !important;
     }
 
     .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name] {
@@ -4646,12 +4673,12 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
     .site-header .avatar-dropdown-menu .avatar-network-options {
         gap: 0.15rem;
-        padding: 0.15rem 0 0.3rem;
+        padding: 0.12rem 0 0.25rem !important;
     }
 
     .site-header .avatar-dropdown-menu .network-soon-badge {
-        padding: 0.08rem 0.2rem;
-        font-size: 0.48rem;
+        padding: 0.05rem 0.16rem;
+        font-size: 0.44rem;
     }
 
     .site-header .avatar-dropdown-menu .avatar-dropdown-divider {
