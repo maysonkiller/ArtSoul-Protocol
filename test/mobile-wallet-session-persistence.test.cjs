@@ -30,6 +30,26 @@ test('core session restore distinguishes "no session" from a restore error', () 
     assert.match(appKit, /restoreCoreSessionOutcome/);
 });
 
+test('external mobile runs one WalletConnect client and exposes only a compatibility facade', () => {
+    const runtimeSelection = appKit.match(
+        /const externalMobileCorePath = isMobile && !isInjectedWalletBrowser\(\);[\s\S]*?if \(externalMobileCorePath\) \{[\s\S]*?\n\s*\} else \{[\s\S]*?modal = createAppKit\(config\);/
+    )?.[0] || '';
+    assert.ok(runtimeSelection, 'mobile and AppKit runtimes must be selected explicitly');
+    const coreBranch = runtimeSelection.split('} else {')[0];
+    assert.match(coreBranch, /modal = createExternalMobileCoreFacade\(\)/);
+    assert.match(coreBranch, /appKitRuntimeActive: false/);
+    assert.match(coreBranch, /wagmiRuntimeActive: false/);
+    assert.doesNotMatch(coreBranch, /new WagmiAdapter|createAppKit/);
+    assert.match(runtimeSelection, /wagmiAdapter = new WagmiAdapter/);
+    assert.match(runtimeSelection, /modal = createAppKit\(config\)/);
+
+    const facade = appKit.match(/function createExternalMobileCoreFacade\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(facade, /getConnectedCoreProvider\(\) \|\| getCoreProviderInstance\(\)/);
+    assert.match(facade, /getAccount: readAccount/);
+    assert.match(facade, /open: async \(\) => window\.safeConnectWallet/);
+    assert.match(facade, /disconnect: async \(\) => false/);
+});
+
 test('restore race: no page-load timer decides "disconnected" before the core restore settles', () => {
     // Boot starts one bounded core-provider restore lifecycle. AppKit is not
     // allowed to publish guest while that lifecycle is restoring.

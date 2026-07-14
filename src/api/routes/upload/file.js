@@ -38,7 +38,7 @@ const SAFE_ERROR_MESSAGES = {
   STORAGE_SIGNED_UPLOAD_FAILED: 'Upload storage authorization failed.',
   INVALID_UPLOAD_PAYLOAD: 'Upload request is invalid.',
   SIGNED_UPLOAD_URL_MISSING: 'Upload storage did not return an upload URL.',
-  UNAUTHENTICATED: 'Please sign in with Ethereum.'
+  UNAUTHENTICATED: 'Please authenticate with your connected wallet.'
 };
 
 function sanitizeFilename(value, fallbackExtension) {
