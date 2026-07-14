@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=32/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=33/, `${page} must load the standard wallet flow`);
     }
     assert.match(appKit, /wallet-core-connect\.js\?v=8/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=8/);
-    assert.match(walletTest, /appkit-init\.js\?v=32/);
+    assert.match(walletTest, /appkit-init\.js\?v=33/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
