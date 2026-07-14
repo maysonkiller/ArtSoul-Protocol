@@ -1829,6 +1829,10 @@ const { useState, useEffect, useRef } = React;
                 // Check wallet connection — open the wallet modal instead of a toast.
                 const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
                 if (!walletAddress) return;
+                if (typeof window.ensureAuthenticated === 'function') {
+                    const authenticated = await window.ensureAuthenticated();
+                    if (!authenticated) return;
+                }
 
                 try {
                     if (isV41CompositeId) {
@@ -1873,6 +1877,10 @@ const { useState, useEffect, useRef } = React;
             async function handleDiscoverySignal(type) {
                 const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
                 if (!walletAddress) return;
+                if (typeof window.ensureAuthenticated === 'function') {
+                    const authenticated = await window.ensureAuthenticated();
+                    if (!authenticated) return;
+                }
 
                 try {
                     if (isV41CompositeId) {

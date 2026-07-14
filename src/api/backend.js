@@ -182,7 +182,7 @@ export function readWalletSession(req) {
 export function requireWallet(req) {
   const wallet = readWalletSession(req);
   if (!wallet) {
-    const err = new Error('Please sign in with Ethereum');
+    const err = new Error('Please authenticate with your connected wallet.');
     err.statusCode = 401;
     err.code = 'UNAUTHENTICATED';
     throw err;

@@ -2219,6 +2219,61 @@ function createWalletConnectError(code, message) {
     return error;
 }
 
+// External mobile browsers have their own single WalletConnect authority in
+// wallet-core-connect.js. Instantiating AppKit's Wagmi WalletConnect connector
+// beside it creates a second SignClient against the same browser storage and
+// relay topics. This small compatibility facade preserves the web3Modal API
+// consumed by the rest of the site without starting that competing client.
+function createExternalMobileCoreFacade() {
+    const readAccount = () => {
+        const provider = getConnectedCoreProvider();
+        const address = normalizeWalletAddress(
+            window.currentWalletAddress || getCoreSessionAddress(provider)
+        );
+        const chainId = parseChainId(provider?.chainId || window.currentChainId);
+        return {
+            address,
+            allAccounts: address ? [{ address }] : [],
+            status: address ? 'connected' : 'disconnected',
+            isConnected: Boolean(address),
+            chainId,
+            caipAddress: address && chainId ? `eip155:${chainId}:${address}` : null,
+            selectedNetworkId: chainId ? `eip155:${chainId}` : null
+        };
+    };
+
+    const subscribeWalletState = (listener) => {
+        if (typeof listener !== 'function') return () => {};
+        const handler = (event) => listener(event?.detail || readAccount());
+        window.addEventListener('wallet-state-changed', handler);
+        return () => window.removeEventListener('wallet-state-changed', handler);
+    };
+
+    return {
+        __artsoulCoreFacade: true,
+        getAccount: readAccount,
+        getState: () => {
+            const account = readAccount();
+            return {
+                open: false,
+                chainId: account.chainId,
+                selectedNetworkId: account.selectedNetworkId
+            };
+        },
+        getChainId: () => readAccount().chainId,
+        getWalletProvider: async () => getConnectedCoreProvider() || getCoreProviderInstance(),
+        open: async () => window.safeConnectWallet?.(),
+        // resetWalletConnection owns the sole core teardown. This method is a
+        // compatibility no-op because that reset calls disconnectCoreWallet
+        // directly before touching the facade.
+        disconnect: async () => false,
+        subscribeAccount: subscribeWalletState,
+        subscribeState: () => () => {},
+        subscribeProvider: () => () => {},
+        subscribeEvents: () => () => {}
+    };
+}
+
 // Small heads-up after a connection is accepted on a foreign chain: the
 // write guard will request Base Sepolia at action time.
 function notifyForeignChainAccepted(chainId) {
@@ -3172,87 +3227,94 @@ async function initializeAppKit() {
             updateNavButtons(null);
         }, WALLET_SETTLE_FAILOPEN_TIMEOUT);
 
-        // Create Wagmi adapter for better browser extension support
-        wagmiAdapter = new WagmiAdapter({
-            networks,
-            projectId,
-            customRpcUrls
-        });
-
-        const getThemeValue = (variableName, fallback) => {
-            try {
-                return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim() || fallback;
-            } catch {
-                return fallback;
-            }
-        };
-        const activeTheme = localStorage.getItem('artsoul_theme') === 'future' ? 'future' : 'classic';
-        const fallbackAccent = getThemeValue(activeTheme === 'future' ? '--accent-future' : '--accent-classic', 'currentColor');
-        const fallbackAccentMix = getThemeValue(activeTheme === 'future' ? '--neon-purple' : '--accent-classic', fallbackAccent);
-        const config = {
-            adapters: [wagmiAdapter],
-            networks,
-            defaultNetwork: baseSepolia,
-            metadata,
-            projectId,
-            customRpcUrls,
-            allowUnsupportedChain: true,
-            enableNetworkSwitch: false,
-            universalProviderConfigOverride: {
-                events: { eip155: ['chainChanged', 'accountsChanged'] },
-                rpcMap: { [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URL }
-            },
-            themeMode: 'dark',
-            themeVariables: {
-                '--w3m-accent': getThemeValue('--c-accent', fallbackAccent),
-                '--w3m-color-mix': getThemeValue('--c-accent-2', fallbackAccentMix)
-            },
-            // Mobile wallet configuration
-            enableWalletConnect: true,
-            enableInjected: true,
-            enableCoinbase: true,
-            // Support both Base Account and legacy Coinbase EOA users. Do not
-            // force the legacy-only connector path.
-            coinbasePreference: 'all',
-            enableEIP6963: true,
-            enableAuthMode: false,
-            allWallets: 'SHOW',
-            debug: walletDebugEnabled(),
-            features: {
-                email: false,
-                socials: []
-            },
-            // Prioritize these wallets without creating an allowlist. Every
-            // other WalletGuide wallet remains available under All Wallets.
-            featuredWalletIds: [
-                FEATURED_WALLETS.base,
-                FEATURED_WALLETS.metamask,
-                FEATURED_WALLETS.rabby
-            ]
-        };
-
-        console.log(' Using WagmiAdapter for browser extensions');
-
-        modal = createAppKit(config);
-        // Every page and contracts-integration reads the signing provider via
-        // web3Modal.getWalletProvider(). When the core WalletConnect session
-        // is active (mobile external browser), that call must return the core
-        // provider so the whole site sees the connection exactly as today.
-        const appKitGetWalletProvider = typeof modal.getWalletProvider === 'function'
-            ? modal.getWalletProvider.bind(modal)
-            : null;
-        modal.getWalletProvider = async (...args) => {
-            const coreProvider = getConnectedCoreProvider();
-            if (coreProvider) return coreProvider;
-            return appKitGetWalletProvider ? appKitGetWalletProvider(...args) : null;
-        };
-        window.web3Modal = modal;
-        walletDebugLog('appkit modal created', { origin: appOrigin });
-        void bindConfiguredWalletConnectDiagnostics();
-        if (typeof modal.subscribeEvents === 'function') {
-            modal.subscribeEvents(handleAppKitEvent);
+        const externalMobileCorePath = isMobile && !isInjectedWalletBrowser();
+        if (externalMobileCorePath) {
+            // The bare core provider is the ONLY WalletConnect client on this
+            // path. A facade keeps legacy consumers working without creating
+            // AppKit/Wagmi's second connector and competing session store.
+            wagmiAdapter = null;
+            modal = createExternalMobileCoreFacade();
+            window.web3Modal = modal;
+            walletDebugLog('external mobile core facade created', {
+                appKitRuntimeActive: false,
+                wagmiRuntimeActive: false,
+                sourceOfTruth: 'wallet-core-connect'
+            });
         } else {
-            walletDebugLog('AppKit event subscription unavailable');
+            // Create Wagmi adapter for desktop extensions and injected wallet
+            // browsers only.
+            wagmiAdapter = new WagmiAdapter({
+                networks,
+                projectId,
+                customRpcUrls
+            });
+
+            const getThemeValue = (variableName, fallback) => {
+                try {
+                    return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim() || fallback;
+                } catch {
+                    return fallback;
+                }
+            };
+            const activeTheme = localStorage.getItem('artsoul_theme') === 'future' ? 'future' : 'classic';
+            const fallbackAccent = getThemeValue(activeTheme === 'future' ? '--accent-future' : '--accent-classic', 'currentColor');
+            const fallbackAccentMix = getThemeValue(activeTheme === 'future' ? '--neon-purple' : '--accent-classic', fallbackAccent);
+            const config = {
+                adapters: [wagmiAdapter],
+                networks,
+                defaultNetwork: baseSepolia,
+                metadata,
+                projectId,
+                customRpcUrls,
+                allowUnsupportedChain: true,
+                enableNetworkSwitch: false,
+                universalProviderConfigOverride: {
+                    events: { eip155: ['chainChanged', 'accountsChanged'] },
+                    rpcMap: { [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URL }
+                },
+                themeMode: 'dark',
+                themeVariables: {
+                    '--w3m-accent': getThemeValue('--c-accent', fallbackAccent),
+                    '--w3m-color-mix': getThemeValue('--c-accent-2', fallbackAccentMix)
+                },
+                enableWalletConnect: true,
+                enableInjected: true,
+                enableCoinbase: true,
+                coinbasePreference: 'all',
+                enableEIP6963: true,
+                enableAuthMode: false,
+                allWallets: 'SHOW',
+                debug: walletDebugEnabled(),
+                features: {
+                    email: false,
+                    socials: []
+                },
+                featuredWalletIds: [
+                    FEATURED_WALLETS.base,
+                    FEATURED_WALLETS.metamask,
+                    FEATURED_WALLETS.rabby
+                ]
+            };
+
+            console.log(' Using WagmiAdapter for browser extensions');
+
+            modal = createAppKit(config);
+            const appKitGetWalletProvider = typeof modal.getWalletProvider === 'function'
+                ? modal.getWalletProvider.bind(modal)
+                : null;
+            modal.getWalletProvider = async (...args) => {
+                const coreProvider = getConnectedCoreProvider();
+                if (coreProvider) return coreProvider;
+                return appKitGetWalletProvider ? appKitGetWalletProvider(...args) : null;
+            };
+            window.web3Modal = modal;
+            walletDebugLog('appkit modal created', { origin: appOrigin });
+            void bindConfiguredWalletConnectDiagnostics();
+            if (typeof modal.subscribeEvents === 'function') {
+                modal.subscribeEvents(handleAppKitEvent);
+            } else {
+                walletDebugLog('AppKit event subscription unavailable');
+            }
         }
 
         // Core WalletConnect sessions persist in WalletConnect storage.
