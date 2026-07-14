@@ -16,6 +16,7 @@
             this.profileCache = new Map();
             this.profileRequests = new Map();
             this.headerIdentityStorageKey = 'artsoul_header_identity';
+            this.headerNetworkStorageKey = 'artsoul_header_network';
         }
 
         getNavContainer() {
@@ -83,16 +84,27 @@
             const nameNode = button.querySelector('[data-avatar-name]');
             const addressNode = button.querySelector('[data-avatar-address]');
             const fallback = this.getDefaultAvatar();
+            const nextAvatarUrl = avatarUrl || '/default-avatar.png';
+            const nextName = name || 'ArtSoul Guest';
+            const currentAddress = addressNode?.hidden ? '' : (addressNode?.textContent || '');
+            const contentAlreadyMatches = image?.getAttribute('src') === nextAvatarUrl
+                && nameNode?.textContent === nextName
+                && currentAddress === (address || '');
+
+            if (contentAlreadyMatches) {
+                button.dataset.avatarContentKey = contentKey;
+                return structure;
+            }
 
             if (image) {
-                image.src = avatarUrl || '/default-avatar.png';
-                image.alt = avatarAlt || name || 'ArtSoul';
+                image.src = nextAvatarUrl;
+                image.alt = avatarAlt || nextName || 'ArtSoul';
                 image.onerror = () => {
                     image.onerror = null;
                     image.src = fallback;
                 };
             }
-            if (nameNode) nameNode.textContent = name || 'ArtSoul Guest';
+            if (nameNode) nameNode.textContent = nextName;
             if (addressNode) {
                 addressNode.hidden = !address;
                 addressNode.textContent = address || '';
@@ -215,6 +227,37 @@
                 localStorage.setItem(this.headerIdentityStorageKey, JSON.stringify(identity));
             } catch {
                 // The normal async profile render remains available without storage.
+            }
+        }
+
+        getCachedHeaderNetwork(walletAddress) {
+            const normalizedWallet = String(walletAddress || '').toLowerCase();
+            if (!normalizedWallet) return null;
+            try {
+                const cached = JSON.parse(localStorage.getItem(this.headerNetworkStorageKey) || 'null');
+                if (!cached || String(cached.wallet || '').toLowerCase() !== normalizedWallet) return null;
+                if (!cached.name || !cached.icon || !cached.chainId) return null;
+                return cached;
+            } catch {
+                return null;
+            }
+        }
+
+        cacheHeaderNetwork(networkInfo, walletAddress, chainId) {
+            const wallet = String(walletAddress || '').toLowerCase();
+            const normalizedChainId = this.parseChainId(chainId);
+            if (!wallet || !normalizedChainId || !networkInfo?.name || !networkInfo?.icon) return;
+            try {
+                localStorage.setItem(this.headerNetworkStorageKey, JSON.stringify({
+                    wallet,
+                    chainId: normalizedChainId,
+                    name: networkInfo.name,
+                    icon: networkInfo.icon,
+                    currency: networkInfo.currency || 'ETH',
+                    balance: networkInfo.balance || '0.0000'
+                }));
+            } catch {
+                // The live network read remains available without storage.
             }
         }
 
@@ -413,6 +456,13 @@
          */
         async getCurrentNetworkInfo(options = {}) {
             const chainId = this.getNormalizedChainId();
+            const walletAddress = String(
+                options.walletAddress
+                || window.currentWalletAddress
+                || localStorage.getItem('artsoul_wallet')
+                || ''
+            ).toLowerCase();
+            const cachedNetwork = this.getCachedHeaderNetwork(walletAddress);
 
             // Network mapping with proper icons (matching AppKit)
             const networks = {
@@ -443,7 +493,9 @@
             networks[1] = { ...networks[11155111], name: 'Ethereum Mainnet' };
 
             // Get balance
-            let balance = '0.0000';
+            let balance = cachedNetwork?.chainId === chainId
+                ? cachedNetwork.balance
+                : '0.0000';
             if (options.includeBalance !== false && chainId && window.currentWalletAddress) {
                 try {
                     const provider = await window.web3Modal?.getWalletProvider();
@@ -479,7 +531,9 @@
                 return { name: 'Unsupported', icon: '', color: '#ff6b6b', currency: 'ETH', balance: options.includeBalance === false ? '…' : '0.0000' };
             }
 
-            return { ...network, balance };
+            const networkInfo = { ...network, balance };
+            this.cacheHeaderNetwork(networkInfo, walletAddress, chainId);
+            return networkInfo;
         }
 
         /**
@@ -543,7 +597,7 @@
             ` : '';
 
             const isConnected = connected || !!networkInfo;
-            const accountAction = restoring ? '' : isConnected ? `
+            const accountAction = (restoring || isConnected) ? `
                 <div class="avatar-dropdown-divider"></div>
                 <button onclick="window.resetWalletConnection()" data-allow-rapid class="dropdown-item avatar-disconnect-item">
                     <span>Disconnect</span>
@@ -630,7 +684,7 @@
             const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
-            const networkInfo = await this.getCurrentNetworkInfo();
+            const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
@@ -832,7 +886,11 @@
 
             const currentPath = window.location.pathname;
             const isProfilePage = currentPath.includes('profile.html');
+            const viewingAddress = new URLSearchParams(window.location.search).get('address');
+            const isOwnProfile = isProfilePage
+                && (!viewingAddress || viewingAddress.toLowerCase() === storedWallet);
             const shortAddress = `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`;
+            const networkInfo = this.getCachedHeaderNetwork(storedWallet);
             container.dataset.avatarRenderKey = 'cached-wallet';
             container.dataset.avatarCacheHydrated = 'true';
             this.pendingRenderKey = 'cached-wallet';
@@ -847,10 +905,13 @@
             this.updateStableMenu(
                 this.renderMenuContent({
                     currentPath,
-                    isOwnProfile: isProfilePage,
+                    isOwnProfile,
+                    networkInfo,
                     restoring: true
                 }),
-                `cached-restoring:${currentPath}:${isProfilePage}`
+                networkInfo
+                    ? `connected:${currentPath}:${isOwnProfile}`
+                    : `cached-restoring:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();
             this.bindOutsideCloseOnce();
@@ -905,7 +966,7 @@
 
             const avatarUrl = this.getDefaultAvatar();
             const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
-            const networkInfo = await this.getCurrentNetworkInfo();
+            const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
 
