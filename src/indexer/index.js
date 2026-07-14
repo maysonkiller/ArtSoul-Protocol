@@ -10,6 +10,7 @@ class ArtSoulIndexer {
 
         this.eventListener = new EventListener({
             rpcUrl: config.rpcUrl,
+            readRpcUrls: config.readRpcUrls,
             contractAddress: config.contractAddress,
             chainId: this.chainId
         });

@@ -5,6 +5,7 @@ export const SUPPORTED_INDEXER_CHAINS = {
         chainId: 84532,
         chainIdEnv: 'BASE_SEPOLIA_CHAIN_ID',
         rpcEnv: ['BASE_SEPOLIA_RPC_URLS', 'BASE_SEPOLIA_RPC_URL', 'RPC_URL'],
+        defaultRpcUrls: ['https://sepolia.base.org'],
         coreAddressEnv: ['ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA', 'ARTSOUL_CORE_ADDRESS'],
         nftAddressEnv: ['ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA', 'ARTSOUL_NFT_ADDRESS'],
         projectNFTAddressEnv: ['ARTSOUL_PROJECT_NFT_ADDRESS_BASE_SEPOLIA', 'ARTSOUL_PROJECT_NFT_ADDRESS'],
@@ -18,6 +19,7 @@ export const SUPPORTED_INDEXER_CHAINS = {
         chainId: 11155111,
         chainIdEnv: 'ETH_SEPOLIA_CHAIN_ID',
         rpcEnv: ['ETH_SEPOLIA_RPC_URLS', 'ETH_SEPOLIA_RPC_URL', 'RPC_URL'],
+        defaultRpcUrls: [],
         coreAddressEnv: ['ARTSOUL_CORE_ADDRESS_ETH_SEPOLIA', 'ARTSOUL_CORE_ADDRESS'],
         nftAddressEnv: ['ARTSOUL_NFT_ADDRESS_ETH_SEPOLIA', 'ARTSOUL_NFT_ADDRESS'],
         projectNFTAddressEnv: ['ARTSOUL_PROJECT_NFT_ADDRESS_ETH_SEPOLIA', 'ARTSOUL_PROJECT_NFT_ADDRESS'],
@@ -64,6 +66,27 @@ function parseChainList(value) {
         .filter(Boolean);
 }
 
+function parseRpcList(value) {
+    if (!value || !value.trim()) return [];
+    return value
+        .split(',')
+        .map(url => url.trim())
+        .filter(Boolean);
+}
+
+function uniqueRpcUrls(urls) {
+    return [...new Set(urls.filter(Boolean))];
+}
+
+function resolveRpcUrls(chain) {
+    const configured = parseRpcList(requireEnv(chain.rpcEnv, `${chain.label} RPC URL`));
+    return uniqueRpcUrls([...(chain.defaultRpcUrls || []), ...configured]);
+}
+
+function resolveReadRpcUrls(chain, rpcUrls) {
+    return uniqueRpcUrls(rpcUrls);
+}
+
 export function resolveChainSlug(value) {
     if (!value || !value.trim()) return '';
 
@@ -81,7 +104,7 @@ export function resolveIndexerChainSlugs() {
         process.env.ARTSOUL_INDEXER_CHAIN_ID ||
         process.env.CHAIN_ID;
 
-    return [resolveChainSlug(singleChain || 'eth-sepolia')];
+    return [resolveChainSlug(singleChain || 'base-sepolia')];
 }
 
 function resolveStartBlock(chain) {
@@ -125,11 +148,14 @@ export function resolveIndexerChainConfig(slug) {
         throw new Error(`${chain.label} is disabled. ${chain.reason}`);
     }
 
+    const rpcUrls = resolveRpcUrls(chain);
+
     return {
         slug: chain.slug,
         label: chain.label,
         chainId: resolveChainId(chain),
-        rpcUrl: requireEnv(chain.rpcEnv, `${chain.label} RPC URL`),
+        rpcUrl: rpcUrls,
+        readRpcUrls: resolveReadRpcUrls(chain, rpcUrls),
         coreAddress: requireEnv(chain.coreAddressEnv, `${chain.label} ArtSoulCore address`),
         nftAddress: readEnv(chain.nftAddressEnv),
         projectNFTAddress: readEnv(chain.projectNFTAddressEnv),
