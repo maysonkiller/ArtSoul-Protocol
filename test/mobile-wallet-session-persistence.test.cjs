@@ -14,7 +14,7 @@ function loadCoreRestoreHarness() {
         .replace(/\bexport\s+/g, '');
     return new Function(
         'window',
-        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot };`
+        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, resolveCoreSessionChainId };`
     )({ addEventListener() {} });
 }
 
@@ -94,6 +94,33 @@ test('delayed WalletConnect persistence hydration restores before the bounded de
     assert.equal(snapshot.address, '0x6ec800000000000000000000000000000000989b');
     assert.equal(snapshot.chainId, 84532);
     assert.equal(clock, 300);
+});
+
+test('restored core session never reports a configured chain missing from its namespaces', () => {
+    const { resolveCoreSessionChainId } = loadCoreRestoreHarness();
+    const provider = {
+        chainId: 84532,
+        session: {
+            namespaces: {
+                eip155: {
+                    chains: ['eip155:1', 'eip155:8453'],
+                    accounts: ['eip155:8453:0x6ec800000000000000000000000000000000989b']
+                }
+            }
+        }
+    };
+
+    assert.equal(resolveCoreSessionChainId(provider, 8453), 8453);
+    assert.equal(resolveCoreSessionChainId(provider, 84532), null);
+    provider.chainId = 8453;
+    assert.equal(resolveCoreSessionChainId(provider, 84532), 8453);
+
+    // Production display and write validation both stop at the namespace-aware
+    // result. They must never fall through to EthereumProvider's configured
+    // `chainId` when the core session is live.
+    assert.match(appKit, /if \(provider === coreProvider && provider\?\.session\) \{\s*\n\s*return resolveCoreSessionChainId\(provider, getLastConfirmedCoreChainId\(\)\);/);
+    assert.match(appKit, /if \(appKitProvider === coreProvider && coreProvider\?\.session\) \{\s*\n\s*return resolveCoreSessionChainId\(coreProvider, getLastConfirmedCoreChainId\(\)\);/);
+    assert.match(avatar, /if \(provider\) chainId = this\.parseChainId\(providerChainId\);/);
 });
 
 test('bounded restore performs a final read and settles disconnected when no session exists', async () => {
@@ -195,7 +222,8 @@ test('restore is chain-tolerant: a session parked on a foreign chain stays conne
     // The boot handler applies the restored state as connected without any
     // chain gate; the 84532 requirement lives only in the write guard.
     const completion = appKit.match(/coreSessionRestoreCompletion = coreSessionRestoreTask\.then[\s\S]*?coreSessionRestoreSettled = true;\s*\n\s*\}\);/)?.[0] || '';
-    assert.match(completion, /applyConfirmedWalletState\(\{\s*\n\s*address: restored\.address,\s*\n\s*chainId: restored\.chainId/);
+    assert.match(completion, /restoredChainId = resolveCoreSessionChainId\(/);
+    assert.match(completion, /applyConfirmedWalletState\(\{\s*\n\s*address: restored\.address,\s*\n\s*chainId: restoredChainId/);
     assert.doesNotMatch(completion, /BASE_SEPOLIA_CHAIN_ID/);
     // No automatic network switch on restore/navigation: the add/switch cycle
     // stays confined to explicit connects and the write guard.

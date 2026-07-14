@@ -18,8 +18,9 @@ import {
     getCoreSessionAddress,
     isCoreConnectInFlight,
     isCoreSessionActive,
+    resolveCoreSessionChainId,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=8'
+} from './wallet-core-connect.js?v=9'
 
 // ============================================
 // CONFIGURATION
@@ -716,8 +717,16 @@ function isUserRejectedError(error) {
     return code === 4001 || code === '4001' || message.includes('user rejected') || message.includes('user denied');
 }
 
+function getLastConfirmedCoreChainId() {
+    return parseChainId(window.currentChainId || localStorage.getItem('artsoul_chain_id'));
+}
+
 async function readMobileProviderChainId(provider) {
     if (!provider?.request) return null;
+    const coreProvider = getConnectedCoreProvider() || getCoreProviderInstance();
+    if (provider === coreProvider && provider?.session) {
+        return resolveCoreSessionChainId(provider, getLastConfirmedCoreChainId());
+    }
     try {
         const chainId = await requestProviderValueWithin(
             provider,
@@ -1403,6 +1412,10 @@ async function requestProviderChainId(provider) {
 
 async function getProviderTruthChainId(preferredProvider = null) {
     const appKitProvider = preferredProvider || await getAppKitWalletProvider();
+    const coreProvider = getConnectedCoreProvider() || getCoreProviderInstance();
+    if (appKitProvider === coreProvider && coreProvider?.session) {
+        return resolveCoreSessionChainId(coreProvider, getLastConfirmedCoreChainId());
+    }
     const appKitProviderChainId = await requestProviderChainId(appKitProvider);
     if (appKitProviderChainId) return appKitProviderChainId;
 
@@ -1418,6 +1431,8 @@ async function getProviderTruthChainId(preferredProvider = null) {
 
     return null;
 }
+
+window.getArtSoulProviderChainId = (preferredProvider = null) => getProviderTruthChainId(preferredProvider);
 
 async function waitForProviderChainId(expectedChainId, timeout = NETWORK_CONFIRMATION_TIMEOUT, preferredProvider = null) {
     const startedAt = Date.now();
@@ -1580,7 +1595,7 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
                     setMobileCoreRestoreState('connected', { reason: 'empty account reconciliation' });
                     applyConfirmedWalletState({
                         address: reconciledAddress,
-                        chainId: parseChainId(provider.chainId)
+                        chainId: resolveCoreSessionChainId(provider, getLastConfirmedCoreChainId())
                     });
                 }
                 return;
@@ -2230,7 +2245,7 @@ function createExternalMobileCoreFacade() {
         const address = normalizeWalletAddress(
             window.currentWalletAddress || getCoreSessionAddress(provider)
         );
-        const chainId = parseChainId(provider?.chainId || window.currentChainId);
+        const chainId = resolveCoreSessionChainId(provider, getLastConfirmedCoreChainId());
         return {
             address,
             allAccounts: address ? [{ address }] : [],
@@ -3140,7 +3155,7 @@ async function initializeAppKit() {
             if (coreAddress) {
                 applyConfirmedWalletState({
                     address: coreAddress,
-                    chainId: parseChainId(coreProvider.chainId)
+                    chainId: resolveCoreSessionChainId(coreProvider, getLastConfirmedCoreChainId())
                 });
                 return;
             }
@@ -3326,6 +3341,10 @@ async function initializeAppKit() {
             coreSessionRestoreCompletion = coreSessionRestoreTask.then((outcome) => {
                 const restored = outcome.session;
                 if (restored?.address) {
+                    const restoredChainId = resolveCoreSessionChainId(
+                        restored.provider,
+                        getLastConfirmedCoreChainId()
+                    );
                     // Bind the session provider even if a fresh connect already
                     // confirmed an address, so transient relay drops on this
                     // provider stay classified instead of wiping state.
@@ -3337,15 +3356,15 @@ async function initializeAppKit() {
                     setMobileCoreRestoreState('connected', {
                         reason: 'boot restore',
                         address: maskWalletAddress(restored.address),
-                        chainId: restored.chainId
+                        chainId: restoredChainId
                     });
                     applyConfirmedWalletState({
                         address: restored.address,
-                        chainId: restored.chainId
+                        chainId: restoredChainId
                     });
                     walletDebugLog('core session restored on boot', {
                         address: maskWalletAddress(restored.address),
-                        chainId: restored.chainId
+                        chainId: restoredChainId
                     });
                     return;
                 }
