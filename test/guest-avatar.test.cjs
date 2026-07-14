@@ -3,6 +3,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const avatarDropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
+const unifiedStyles = fs.readFileSync('unified-styles.css', 'utf8');
+const sharedHeaderPages = [
+  'index.html',
+  'gallery.html',
+  'artwork.html',
+  'profile.html',
+  'upload.html',
+  'docs-protocol.html'
+];
 
 test('guest avatar uses the local ArtSoul image with the generated fallback', () => {
   assert.equal(fs.existsSync('default-avatar.png'), true);
@@ -16,15 +25,21 @@ test('stored wallet hydration never renders a disconnected guest state', () => {
   assert.match(avatarDropdown, /localStorage\.getItem\('artsoul_wallet'\)/);
   assert.match(avatarDropdown, /artsoul_header_identity/);
   assert.match(avatarDropdown, /getCachedHeaderIdentity\(storedWallet\)/);
+  assert.match(avatarDropdown, /getCachedHeaderNetwork\(storedWallet\)/);
+  assert.match(avatarDropdown, /artsoul_header_network/);
+  assert.match(avatarDropdown, /artsoul_header_ui_state/);
+  assert.match(avatarDropdown, /cachedUiState === 'connected'/);
+  assert.match(avatarDropdown, /cachedIdentityWithoutHint\?\.wallet/);
   assert.match(avatarDropdown, /name: cachedIdentity\.name/);
-  assert.match(avatarDropdown, /Restoring wallet\.\.\./);
+  assert.doesNotMatch(avatarDropdown, /Restoring wallet\.\.\./);
   assert.match(avatarDropdown, /dataset\.avatarRenderKey = 'cached-wallet'/);
   assert.doesNotMatch(avatarDropdown, /name: 'Wallet'/);
 });
 
-test('Base appears once as current network and Ethereum Sepolia is visibly future-only', () => {
+test('Base appears once as current network and ETH Sepolia is visibly future-only', () => {
   assert.match(avatarDropdown, /network-switcher-btn network-current-row/);
-  assert.match(avatarDropdown, /Ethereum Sepolia/);
+  assert.match(avatarDropdown, /<span class="network-option-name">ETH Sepolia<\/span>/);
+  assert.match(avatarDropdown, /<img src="\$\{ETHEREUM_NETWORK_ICON\}" alt="" aria-hidden="true" \/>/);
   assert.match(avatarDropdown, /network-soon-badge">SOON/);
   const ethereumStart = avatarDropdown.indexOf('class="dropdown-item avatar-network-option is-disabled"');
   const ethereumOption = ethereumStart >= 0
@@ -32,6 +47,58 @@ test('Base appears once as current network and Ethereum Sepolia is visibly futur
     : '';
   assert.doesNotMatch(ethereumOption, /network-option-indicator/);
   assert.doesNotMatch(avatarDropdown, /avatar-network-option is-active/);
+});
+
+test('connected account menus render the current network and balance row', () => {
+  assert.match(avatarDropdown, /const networkInfo = await this\.getCurrentNetworkInfo\(\{ walletAddress \}\);/);
+  assert.match(avatarDropdown, /renderMenuContent\(\{ currentPath, isOwnProfile, networkInfo, connected: true \}\)/);
+  assert.match(avatarDropdown, /data-network-balance/);
+});
+
+test('account menu uses the compact desktop and mobile width contracts', () => {
+  assert.match(unifiedStyles, /width: min\(164px, calc\(100vw - 24px\)\) !important;/);
+  assert.match(unifiedStyles, /width: min\(148px, calc\(100vw - 28px\)\) !important;/);
+  assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?flex-wrap: nowrap !important;/);
+});
+
+test('account menu has one stylesheet source and a full-width compact future network row', () => {
+  assert.doesNotMatch(avatarDropdown, /document\.head\.appendChild\(style\)/);
+  assert.doesNotMatch(avatarDropdown, /class="dropdown-item[^\"]*"\s+style=/);
+  assert.match(unifiedStyles, /network-current-row,[\s\S]*?avatar-network-option \{[\s\S]*?border-color: var\(--c-border-soft\)/);
+  assert.match(unifiedStyles, /avatar-network-options \{[\s\S]*?width: 100%;[\s\S]*?padding: 0\.08rem 0 0\.12rem !important;/);
+  assert.match(unifiedStyles, /network-current-row \{[\s\S]*?height: 36px !important;/);
+  assert.match(unifiedStyles, /avatar-network-option \{[\s\S]*?height: 30px !important;/);
+  assert.match(unifiedStyles, /network-option-name \{[\s\S]*?font-size: 0\.78rem !important;/);
+});
+
+test('every product page loads the same account menu and stylesheet versions', () => {
+  for (const page of sharedHeaderPages) {
+    const html = fs.readFileSync(page, 'utf8');
+    assert.match(html, /unified-styles\.css\?v=36/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=29/, `${page} must use the shared menu cache version`);
+    assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
+  }
+});
+
+test('stable button hydration does not reassign identical avatar content', () => {
+  assert.match(avatarDropdown, /const contentAlreadyMatches =/);
+  assert.match(avatarDropdown, /if \(contentAlreadyMatches\) \{[\s\S]*?button\.dataset\.avatarContentKey = contentKey;[\s\S]*?return structure;/);
+  assert.match(avatarDropdown, /image\.classList\.add\('avatar-image-loading'\)/);
+  assert.match(unifiedStyles, /avatar-button > img\.avatar-image-loading \{[\s\S]*?visibility: hidden !important;/);
+});
+
+test('header typography and menu interaction geometry are shared across pages', () => {
+  assert.match(unifiedStyles, /\.site-header \{[\s\S]*?font-family: Inter, Arial, sans-serif !important;/);
+  assert.match(unifiedStyles, /\[data-avatar-name\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 650 !important;/);
+  assert.match(unifiedStyles, /avatar-theme-switch \.theme-btn \{[\s\S]*?min-height: 27px !important;[\s\S]*?font-size: 0\.75rem !important;/);
+  assert.match(unifiedStyles, /avatar-disconnect-item \{[\s\S]*?min-height: 34px !important;/);
+  assert.match(unifiedStyles, /\.future \.site-header \.avatar-dropdown-menu \.dropdown-item:not\(\.is-disabled\):hover[\s\S]*?var\(--c-glow-strong\)/);
+});
+
+test('account and network controls share one SVG chevron contract', () => {
+  assert.equal((avatarDropdown.match(/class="[^"]*menu-chevron[^"]*"/g) || []).length, 2);
+  assert.match(unifiedStyles, /\.menu-chevron \{[\s\S]*?stroke: currentColor;/);
+  assert.match(unifiedStyles, /network-current-row\[aria-expanded="true"\][\s\S]*?rotate\(180deg\)/);
 });
 
 test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
