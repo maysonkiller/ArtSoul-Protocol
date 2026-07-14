@@ -197,7 +197,7 @@ app.get('/auth/session', (req, res) => {
 
 const authenticateWallet = (req, res, next) => {
     if (!req.session.wallet) {
-        return res.status(401).json({ error: 'UNAUTHENTICATED', message: 'Please sign in with Ethereum' });
+        return res.status(401).json({ error: 'UNAUTHENTICATED', message: 'Please authenticate with your connected wallet.' });
     }
     next();
 };
