@@ -122,6 +122,37 @@ export function parseCoreChainId(value) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+export function getCoreSessionChainIds(instance = providerInstance) {
+    if (!instance?.session) return [];
+    const chainIds = Object.values(instance.session.namespaces || {})
+        .flatMap((namespace) => [
+            ...(namespace?.chains || []),
+            ...((namespace?.accounts || []).map((account) => String(account).split(':').slice(0, 2).join(':')))
+        ])
+        .map(parseCoreChainId)
+        .filter(Boolean);
+    return [...new Set(chainIds)];
+}
+
+// EthereumProvider initializes `chainId` from the dapp's required chain even
+// when a restored wallet session did not approve that chain. Never present
+// that configured value as live wallet truth. Prefer a provider chain that is
+// actually in the session, then the last confirmed chainChanged value when it
+// is still authorized by the same session.
+export function resolveCoreSessionChainId(instance = providerInstance, confirmedChainId = null) {
+    const sessionChainIds = getCoreSessionChainIds(instance);
+    const providerChainId = parseCoreChainId(instance?.chainId);
+    const normalizedConfirmedChainId = parseCoreChainId(confirmedChainId);
+
+    if (!sessionChainIds.length) return normalizedConfirmedChainId || providerChainId;
+    if (providerChainId && sessionChainIds.includes(providerChainId)) return providerChainId;
+    if (normalizedConfirmedChainId && sessionChainIds.includes(normalizedConfirmedChainId)) {
+        return normalizedConfirmedChainId;
+    }
+    if (sessionChainIds.length === 1) return sessionChainIds[0];
+    return null;
+}
+
 function waitForCoreDelay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -133,7 +164,7 @@ export function readCoreSessionSnapshot(instance = providerInstance) {
     return {
         provider: instance,
         address,
-        chainId: parseCoreChainId(instance.chainId),
+        chainId: resolveCoreSessionChainId(instance),
         restored: true
     };
 }
@@ -378,11 +409,12 @@ export async function connectCoreWallet() {
         if (instance.session) {
             const address = getCoreSessionAddress(instance);
             if (address) {
-                coreLog('core connect reused live session', { chainId: parseCoreChainId(instance.chainId) });
+                const chainId = resolveCoreSessionChainId(instance);
+                coreLog('core connect reused live session', { chainId });
                 return {
                     provider: instance,
                     address,
-                    chainId: parseCoreChainId(instance.chainId),
+                    chainId,
                     restored: true
                 };
             }
@@ -479,7 +511,7 @@ export async function connectCoreWallet() {
             const result = {
                 provider: instance,
                 address: getCoreSessionAddress(instance),
-                chainId: parseCoreChainId(instance.chainId),
+                chainId: resolveCoreSessionChainId(instance),
                 restored: false
             };
             coreLog('core connect settled', {
