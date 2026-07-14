@@ -208,7 +208,7 @@ class IndexerSyncEngine {
         );
 
         // 3. Reprocess missing blocks in batch
-        const currentBlock = await this.eventListener.provider.getBlockNumber();
+        const currentBlock = await this.eventListener.getCurrentBlock();
         if (currentBlock > safeBlock) {
             console.log(`[IndexerSyncEngine] Reprocessing blocks ${safeBlock + 1} to ${currentBlock}`);
             await this.syncHistoricalEvents(safeBlock + 1, currentBlock);
@@ -234,7 +234,7 @@ class IndexerSyncEngine {
         console.log('[IndexerSyncEngine] Stopped');
     }
 
-    async syncHistoricalEvents(fromBlock, toBlock) {
+    async syncHistoricalEvents(fromBlock, toBlock, options = {}) {
         console.log(`[IndexerSyncEngine] Syncing historical events from ${fromBlock} to ${toBlock}`);
 
         const events = await this.eventListener.queryAllHistoricalEvents(fromBlock, toBlock);
@@ -326,7 +326,9 @@ class IndexerSyncEngine {
         );
 
         // Update confirmation state if depth is reached
-        const currentBlock = await this.eventListener.provider.getBlockNumber();
+        const currentBlock = Number.isFinite(Number(options.currentBlock))
+            ? Number(options.currentBlock)
+            : await this.eventListener.getCurrentBlock();
         const state = await this.getIndexerState();
         const safeBlock = currentBlock - state.confirmation_depth;
 
@@ -390,7 +392,7 @@ class IndexerSyncEngine {
             try {
                 // Fetch blocks in parallel
                 const blockPromises = batch.map(blockNumber =>
-                    this.eventListener.provider.getBlock(Number(blockNumber))
+                    this.eventListener.getBlock(Number(blockNumber))
                         .catch(error => {
                             console.error(`[IndexerSyncEngine] Failed to fetch block ${blockNumber}:`, error.message);
                             return null;
@@ -443,9 +445,14 @@ class IndexerSyncEngine {
         }
     }
 
-    async detectReorg() {
+    async detectReorg(options = {}) {
         const state = await this.getIndexerState();
         if (!state) return false;
+
+        const configuredSampleSize = Number(options.sampleSize || process.env.INDEXER_REORG_SAMPLE_SIZE || 12);
+        const sampleSize = Number.isSafeInteger(configuredSampleSize) && configuredSampleSize > 0
+            ? configuredSampleSize
+            : 12;
 
         // 1. Fast Path: State Hash Verification
         // Verify that the current chain's state hash at last_confirmed_block matches our record
@@ -461,15 +468,20 @@ class IndexerSyncEngine {
             }
         }
 
-        // 2. Slow Path: Detailed block hash check (last 256 blocks)
-        const checkFromBlock = Math.max(0, state.last_indexed_block - 256);
-
-
+        // 2. Slow Path: sample the most recent stored hashes. A bounded sample
+        // preserves reorg detection without re-reading hundreds of old blocks on
+        // every poll.
         const storedBlocks = await this.db.query(
-            `SELECT block_number, block_hash, parent_hash FROM block_hashes
-             WHERE chain_id = $1 AND block_number >= $2 AND block_number <= $3
+            `SELECT block_number, block_hash, parent_hash
+             FROM (
+                 SELECT block_number, block_hash, parent_hash
+                 FROM block_hashes
+                 WHERE chain_id = $1 AND block_number <= $2
+                 ORDER BY block_number DESC
+                 LIMIT $3
+             ) recent_blocks
              ORDER BY block_number ASC`,
-            [this._chainIdString(), checkFromBlock, state.last_indexed_block]
+            [this._chainIdString(), state.last_indexed_block, sampleSize]
         );
 
         if (storedBlocks.length === 0) {
@@ -479,7 +491,7 @@ class IndexerSyncEngine {
         // Check block hash mismatches
         for (const stored of storedBlocks) {
             try {
-                const currentBlock = await this.eventListener.provider.getBlock(Number(stored.block_number));
+                const currentBlock = await this.eventListener.getBlock(Number(stored.block_number));
 
                 if (currentBlock && currentBlock.hash !== stored.block_hash) {
                     console.error(`[IndexerSyncEngine]  REORG DETECTED at block ${stored.block_number}`);
