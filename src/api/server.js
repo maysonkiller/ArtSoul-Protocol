@@ -45,6 +45,7 @@ function resolveApiIndexerConfig() {
 
     return {
         rpcUrl: chain.rpcUrl,
+        readRpcUrls: chain.readRpcUrls,
         contractAddress: chain.coreAddress,
         chainId: chain.chainId,
         startBlock: chain.startBlock
@@ -103,6 +104,7 @@ const apiIndexerConfig = resolveApiIndexerConfig();
 const indexer = new ArtSoulIndexer({
     database: database,
     rpcUrl: apiIndexerConfig.rpcUrl,
+    readRpcUrls: apiIndexerConfig.readRpcUrls,
     contractAddress: apiIndexerConfig.contractAddress,
     chainId: apiIndexerConfig.chainId,
     startBlock: apiIndexerConfig.startBlock

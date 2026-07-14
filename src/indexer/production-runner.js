@@ -24,6 +24,7 @@ function resolveProductionIndexerConfig() {
     return {
         databaseUrl: requireEnv(['DATABASE_URL'], 'DATABASE_URL'),
         rpcUrl: chain.rpcUrl,
+        readRpcUrls: chain.readRpcUrls,
         contractAddress: chain.coreAddress,
         nftAddress: chain.nftAddress,
         projectNFTAddress: chain.projectNFTAddress,
@@ -33,6 +34,8 @@ function resolveProductionIndexerConfig() {
         lockName: chain.lockName,
         confirmationDepth: chain.confirmationDepth,
         pollInterval: parseInt(process.env.INDEXER_POLL_INTERVAL || '15000', 10),
+        reorgCheckInterval: parseInt(process.env.INDEXER_REORG_CHECK_INTERVAL || '60000', 10),
+        reorgSampleSize: parseInt(process.env.INDEXER_REORG_SAMPLE_SIZE || '12', 10),
         healthPort: parseInt(process.env.INDEXER_HEALTH_PORT || '3001', 10),
         alertWebhook: process.env.ALERT_WEBHOOK
     };
@@ -45,16 +48,14 @@ class ProductionIndexer {
             connectionString: config.databaseUrl
         });
 
-        // Support multiple RPC endpoints
-        const rpcUrls = config.rpcUrl.includes(',')
-            ? config.rpcUrl.split(',').map(url => url.trim())
-            : [config.rpcUrl];
+        const rpcUrls = Array.isArray(config.rpcUrl) ? config.rpcUrl : [config.rpcUrl];
 
         // Prometheus metrics
         this.metrics = new IndexerMetrics();
 
         this.eventListener = new EventListener({
             rpcUrl: rpcUrls,
+            readRpcUrls: config.readRpcUrls,
             contractAddress: config.contractAddress,
             chainId: config.chainId
         }, this.metrics);
@@ -74,6 +75,10 @@ class ProductionIndexer {
 
         this.confirmationDepth = config.confirmationDepth || 12;
         this.pollInterval = config.pollInterval || 15000;
+        this.reorgCheckInterval = config.reorgCheckInterval || 60000;
+        this.reorgSampleSize = config.reorgSampleSize || 12;
+        this.lastReorgCheckAt = 0;
+        this.lastObservedBlock = null;
         this.isLeader = false;
         this.isRunning = false;
         this.leaderElectionInProgress = false;
@@ -123,6 +128,8 @@ class ProductionIndexer {
         console.log('  Chain:', config.chainSlug || config.chainId);
         console.log('  Confirmation Depth:', this.confirmationDepth);
         console.log('  Poll Interval:', this.pollInterval, 'ms');
+        console.log('  Reorg Check Interval:', this.reorgCheckInterval, 'ms');
+        console.log('  Reorg Sample Size:', this.reorgSampleSize, 'blocks');
         console.log('  Health Port:', config.healthPort);
         console.log('  Alert Webhook:', this.alertWebhook ? 'Configured' : 'Not configured');
         console.log('  Prometheus Metrics:', 'Enabled');
@@ -366,9 +373,8 @@ class ProductionIndexer {
 
                 // Update block lag
                 const state = await this.syncEngine.getIndexerState();
-                if (state) {
-                    const currentBlock = await this.eventListener.getCurrentBlock();
-                    const lag = currentBlock - state.last_indexed_block;
+                if (state && Number.isFinite(this.lastObservedBlock)) {
+                    const lag = this.lastObservedBlock - state.last_indexed_block;
                     this.metrics.updateBlockLag(lag);
                 }
 
@@ -682,16 +688,20 @@ class ProductionIndexer {
 
         this.confirmationTimer = setInterval(async () => {
             try {
-                // Check for reorgs first
-                const reorgDetected = await this.syncEngine.detectReorg();
-                if (reorgDetected) {
-                    console.warn('[ProductionIndexer] Reorg detected, resyncing...');
-                    // Reorg handling will reset state, continue normal operation
-                    return;
+                const now = Date.now();
+                if (now - this.lastReorgCheckAt >= this.reorgCheckInterval) {
+                    this.lastReorgCheckAt = now;
+                    const reorgDetected = await this.syncEngine.detectReorg({
+                        sampleSize: this.reorgSampleSize
+                    });
+                    if (reorgDetected) {
+                        console.warn('[ProductionIndexer] Reorg detected, resyncing...');
+                        return;
+                    }
                 }
 
-                await this._catchUpToSafeBlock('poll');
-                await this._processConfirmations();
+                const checkpoint = await this._catchUpToSafeBlock('poll');
+                await this._processConfirmations(checkpoint?.currentBlock);
             } catch (error) {
                 console.error('[ProductionIndexer] Confirmation polling error:', error);
             }
@@ -723,12 +733,13 @@ class ProductionIndexer {
         this.catchUpInProgress = true;
         try {
             const currentBlock = await this.eventListener.getCurrentBlock();
+            this.lastObservedBlock = currentBlock;
             const safeBlock = Math.max(0, currentBlock - this.confirmationDepth);
             const state = await this.syncEngine.getIndexerState();
             const lastIndexedBlock = Number(state.last_indexed_block || 0);
 
             if (safeBlock <= lastIndexedBlock) {
-                return;
+                return { currentBlock, safeBlock, lastIndexedBlock };
             }
 
             console.log(JSON.stringify({
@@ -742,7 +753,8 @@ class ProductionIndexer {
                 confirmationDepth: this.confirmationDepth
             }));
 
-            await this.syncEngine.syncHistoricalEvents(lastIndexedBlock + 1, safeBlock);
+            await this.syncEngine.syncHistoricalEvents(lastIndexedBlock + 1, safeBlock, { currentBlock });
+            return { currentBlock, safeBlock, lastIndexedBlock: safeBlock };
         } catch (error) {
             console.error(JSON.stringify({
                 phase: 'catch_up',
@@ -756,16 +768,11 @@ class ProductionIndexer {
         }
     }
 
-    async _processConfirmations() {
-        const currentBlock = await this.eventListener.getCurrentBlock();
+    async _processConfirmations(observedBlock = null) {
+        const currentBlock = Number.isFinite(Number(observedBlock))
+            ? Number(observedBlock)
+            : await this.eventListener.getCurrentBlock();
         const state = await this.syncEngine.getIndexerState();
-
-        // Check for reorgs before confirming new blocks
-        const reorgDetected = await this.detectReorg();
-        if (reorgDetected) {
-            console.log('[ProductionIndexer] Reorg detected and handled, skipping confirmation this round');
-            return;
-        }
 
         const confirmedBlock = currentBlock - this.confirmationDepth;
 
@@ -796,81 +803,6 @@ class ProductionIndexer {
 
             console.log(`[ProductionIndexer] Confirmed ${confirmedCount} events up to block ${confirmedBlock}`);
         }
-    }
-
-    async detectReorg() {
-        const state = await this.syncEngine.getIndexerState();
-
-        // Only check blocks that should be confirmed
-        const checkFromBlock = Math.max(
-            state.last_confirmed_block - 100,
-            state.last_indexed_block - this.confirmationDepth - 100
-        );
-
-        // Get recent confirmed blocks
-        const recentBlocks = await this.db.query(
-            `SELECT block_number, block_hash
-             FROM block_hashes
-             WHERE chain_id = $1 AND block_number > $2
-             ORDER BY block_number DESC
-             LIMIT 100`,
-            [this.config.chainId.toString(), checkFromBlock]
-        );
-
-        // Check if block hashes match
-        for (const record of recentBlocks) {
-            const block = await this.eventListener.provider.getBlock(record.block_number);
-
-            if (block.hash !== record.block_hash) {
-                console.warn(`[ProductionIndexer]  REORG DETECTED at block ${record.block_number}`);
-                console.warn(`  Expected hash: ${record.block_hash}`);
-                console.warn(`  Actual hash: ${block.hash}`);
-                console.warn(`  Depth: ${state.last_indexed_block - record.block_number} blocks`);
-
-                await this._handleReorg(record.block_number);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    async _handleReorg(fromBlock) {
-        console.log(`[ProductionIndexer] Handling reorg from block ${fromBlock}`);
-
-        // Log reorg event
-        try {
-            await this.db.query(
-                `INSERT INTO reorg_events (from_block, to_block, detected_at)
-                 VALUES ($1, $2, NOW())`,
-                [fromBlock, fromBlock + 100]
-            );
-        } catch (error) {
-            console.warn('[ProductionIndexer] Reorg audit table unavailable; continuing rollback:', error.message);
-        }
-
-        // Rollback unconfirmed events
-        const result = await this.db.query(
-            'SELECT * FROM rollback_events_from_block($1, $2)',
-            [fromBlock, this.config.chainId.toString()]
-        );
-
-        console.log(`[ProductionIndexer] Rolled back:`);
-        console.log(`  Auctions: ${result[0].auctions_deleted}`);
-        console.log(`  Bids: ${result[0].bids_deleted}`);
-        console.log(`  Events: ${result[0].events_deleted}`);
-
-        // Update indexer state to resync from reorg point
-        await this.db.query(
-            `UPDATE indexer_state
-             SET last_indexed_block = $1,
-                 last_confirmed_block = $1,
-                 last_indexed_at = NOW()
-             WHERE chain_id = $2`,
-            [fromBlock - 1, this.config.chainId.toString()]
-        );
-
-        console.log(`[ProductionIndexer] Reorg handled, will resync from block ${fromBlock}`);
     }
 
     async getHealth() {

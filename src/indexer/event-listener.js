@@ -10,14 +10,24 @@ function redactRpcUrl(value) {
     }
 }
 
+function normalizeRpcList(value) {
+    const values = Array.isArray(value) ? value : [value];
+    return [...new Set(values.map(url => String(url || '').trim()).filter(Boolean))];
+}
+
 class EventListener {
     constructor(config, metrics = null) {
         // Support multiple RPC endpoints
-        this.rpcs = Array.isArray(config.rpcUrl) ? config.rpcUrl : [config.rpcUrl];
+        this.rpcs = normalizeRpcList(config.rpcUrl);
+        this.readRpcs = normalizeRpcList(config.readRpcUrls?.length ? config.readRpcUrls : this.rpcs);
         this.currentRpcIndex = 0;
+        this.primaryRpcRetryInterval = 300000;
+        this.lastPrimaryRpcRetryAt = 0;
         this.metrics = metrics;
 
         this.provider = new ethers.JsonRpcProvider(this.rpcs[this.currentRpcIndex]);
+        this.readProviders = this.readRpcs.map(url => new ethers.JsonRpcProvider(url));
+        this.readRpcUnavailableUntil = this.readRpcs.map(() => 0);
         this.contractAddress = config.contractAddress;
         this.contract = new ethers.Contract(this.contractAddress, V41_CORE_ABI, this.provider);
         this.chainId = config.chainId;
@@ -73,7 +83,45 @@ class EventListener {
         this.rpcs.forEach((rpc, i) => {
             console.log(`    [${i}] ${redactRpcUrl(rpc)}`);
         });
+        console.log('  Read RPC endpoints:', this.readRpcs.length);
+        this.readRpcs.forEach((rpc, i) => {
+            console.log(`    [${i}] ${redactRpcUrl(rpc)}`);
+        });
         console.log('  Rate limit:', this.maxRequestsPerSecond, 'req/sec');
+    }
+
+    async _readRpcCall(operation, context) {
+        let lastError = null;
+        const now = Date.now();
+        const candidates = this.readProviders
+            .map((provider, index) => ({ provider, index }))
+            .filter(({ index }) => now >= this.readRpcUnavailableUntil[index]);
+        const attempts = candidates.length > 0
+            ? candidates
+            : this.readProviders.map((provider, index) => ({ provider, index }));
+
+        for (const { provider, index } of attempts) {
+            let timeoutId;
+            try {
+                const timeout = new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error(`${context} timed out`)), this.baseTimeout);
+                });
+                const result = await Promise.race([operation(provider), timeout]);
+                clearTimeout(timeoutId);
+                this.readRpcUnavailableUntil[index] = 0;
+                return result;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                lastError = error;
+                this.readRpcUnavailableUntil[index] = Date.now() + 60000;
+                console.warn(
+                    `[EventListener] ${context} failed on read RPC[${index}] ` +
+                    `(${redactRpcUrl(this.readRpcs[index])}); trying fallback: ${error.message}`
+                );
+            }
+        }
+
+        throw lastError || new Error(`${context} failed: no read RPC endpoint is available`);
     }
 
     /**
@@ -249,10 +297,25 @@ class EventListener {
         if (bestRpc.index !== this.currentRpcIndex) {
             console.log(`[EventListener] Switching RPC: [${currentRpc.index}] (health: ${currentRpc.healthScore.toFixed(1)}) → [${bestRpc.index}] (health: ${bestRpc.healthScore.toFixed(1)})`);
 
-            this.currentRpcIndex = bestRpc.index;
-            this.provider = new ethers.JsonRpcProvider(this.rpcs[this.currentRpcIndex]);
-            this.contract = new ethers.Contract(this.contractAddress, V41_CORE_ABI, this.provider);
+            this._useRpc(bestRpc.index);
         }
+    }
+
+    _useRpc(index) {
+        this.currentRpcIndex = index;
+        this.provider = new ethers.JsonRpcProvider(this.rpcs[index]);
+        this.contract = new ethers.Contract(this.contractAddress, V41_CORE_ABI, this.provider);
+    }
+
+    _maybeRetryPrimaryRpc() {
+        if (this.currentRpcIndex === 0 || this.rpcs.length < 2) return;
+
+        const now = Date.now();
+        if (now - this.lastPrimaryRpcRetryAt < this.primaryRpcRetryInterval) return;
+
+        this.lastPrimaryRpcRetryAt = now;
+        console.log('[EventListener] Re-probing primary RPC after fallback cooldown');
+        this._useRpc(0);
     }
 
     /**
@@ -322,6 +385,7 @@ class EventListener {
      */
     async _retryRpcCall(fn, context = 'RPC call') {
         let lastError;
+        this._maybeRetryPrimaryRpc();
 
         for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
             try {
@@ -605,9 +669,16 @@ class EventListener {
     }
 
     async getCurrentBlock() {
-        return await this._retryRpcCall(
-            async () => await this.provider.getBlockNumber(),
+        return await this._readRpcCall(
+            provider => provider.getBlockNumber(),
             'getCurrentBlock'
+        );
+    }
+
+    async getBlock(blockNumber) {
+        return await this._readRpcCall(
+            provider => provider.getBlock(Number(blockNumber)),
+            `getBlock(${blockNumber})`
         );
     }
 }
