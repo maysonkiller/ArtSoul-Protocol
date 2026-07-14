@@ -456,7 +456,7 @@
          * Get current network info with balance
          */
         async getCurrentNetworkInfo(options = {}) {
-            const chainId = this.getNormalizedChainId();
+            let chainId = this.getNormalizedChainId();
             const walletAddress = String(
                 options.walletAddress
                 || window.currentWalletAddress
@@ -464,6 +464,14 @@
                 || ''
             ).toLowerCase();
             const cachedNetwork = this.getCachedHeaderNetwork(walletAddress);
+            let provider = null;
+            try {
+                provider = await window.web3Modal?.getWalletProvider?.();
+                const providerChainId = await window.getArtSoulProviderChainId?.(provider);
+                if (provider) chainId = this.parseChainId(providerChainId);
+            } catch (error) {
+                console.warn('Unable to confirm the live wallet network:', error);
+            }
 
             // Network mapping with proper icons (matching AppKit)
             const networks = {
@@ -492,6 +500,7 @@
             // write network enforced by the shared transaction guard.
             networks[8453] = { ...networks[84532], name: 'Base Mainnet' };
             networks[1] = { ...networks[11155111], name: 'Ethereum Mainnet' };
+            this.baseNetworkIcon = networks[84532].icon;
 
             // Get balance
             let balance = cachedNetwork?.chainId === chainId
@@ -499,7 +508,6 @@
                 : '0.0000';
             if (options.includeBalance !== false && chainId && window.currentWalletAddress) {
                 try {
-                    const provider = await window.web3Modal?.getWalletProvider();
                     if (provider && provider.request) {
                         const balanceHex = await provider.request({
                             method: 'eth_getBalance',
@@ -532,7 +540,7 @@
                 return { name: 'Unsupported', icon: '', color: '#ff6b6b', currency: 'ETH', balance: options.includeBalance === false ? '…' : '0.0000' };
             }
 
-            const networkInfo = { ...network, balance };
+            const networkInfo = { ...network, balance, chainId };
             this.cacheHeaderNetwork(networkInfo, walletAddress, chainId);
             return networkInfo;
         }
@@ -557,9 +565,20 @@
             }
         }
 
-        renderNetworkOptions() {
+        renderNetworkOptions(currentChainId) {
+            const baseSepoliaOption = Number(currentChainId) === 84532 ? '' : `
+                    <button
+                        type="button"
+                        class="dropdown-item avatar-network-option"
+                        onclick="window.AvatarDropdown.selectNetwork(84532, event)"
+                    >
+                        <img src="${this.baseNetworkIcon || ''}" alt="" aria-hidden="true" />
+                        <span class="network-option-name">Base Sepolia</span>
+                    </button>
+            `;
             return `
                 <div id="avatarNetworkOptions" class="avatar-network-options avatar-network-future-options" hidden>
+                    ${baseSepoliaOption}
                     <button
                         type="button"
                         class="dropdown-item avatar-network-option is-disabled"
@@ -593,7 +612,7 @@
                         <path d="M4 6l4 4 4-4"></path>
                     </svg>
                 </button>
-                ${this.renderNetworkOptions()}
+                ${this.renderNetworkOptions(networkInfo.chainId)}
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
 

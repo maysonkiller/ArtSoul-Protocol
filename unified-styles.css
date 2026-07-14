@@ -3814,10 +3814,10 @@ body.future .site-header {
     }
 
     .site-header .avatar-dropdown-menu .avatar-network-option {
-        height: 30px !important;
-        min-height: 30px !important;
-        max-height: 30px !important;
-        padding: 0.2rem 0.42rem !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        padding: 0.28rem 0.42rem !important;
     }
 }
 
@@ -4407,9 +4407,9 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
 .site-header .avatar-dropdown-menu .avatar-network-option {
     gap: 0.3rem !important;
-    height: 30px !important;
-    min-height: 30px !important;
-    max-height: 30px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
 }
 
 .site-header .avatar-dropdown-menu .avatar-network-option > img {
@@ -4688,10 +4688,10 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     }
 
     .site-header .avatar-dropdown-menu .avatar-network-option {
-        height: 30px !important;
-        min-height: 30px !important;
-        max-height: 30px !important;
-        padding: 0.22rem 0.36rem !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        padding: 0.28rem 0.38rem !important;
     }
 
     .site-header .avatar-dropdown-menu .network-switcher-copy [data-network-name] {
@@ -4817,15 +4817,43 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         line-height: 1.15;
     }
 
+    .profile-social-action-row {
+        margin-left: calc(-72px - 0.8rem);
+        width: calc(100% + 72px + 0.8rem);
+    }
+
     .profile-social-links {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.45rem !important;
-        flex-wrap: nowrap !important;
+        width: 100%;
     }
 
     .profile-social-links > * {
+        width: 100%;
         min-width: 0;
-        padding: 0.35rem 0.55rem !important;
-        font-size: 0.75rem;
+        max-width: none !important;
+        overflow: visible;
+        padding: 0.35rem 0.45rem !important;
+        font-size: clamp(0.62rem, 2.8vw, 0.72rem);
+        white-space: nowrap;
+    }
+
+    .profile-social-links .truncate {
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .profile-inline-edit-action {
+        display: flex;
+        justify-content: flex-start;
+        margin-top: 0.5rem;
+    }
+
+    .profile-inline-edit-action .btn-main {
+        min-height: 38px;
+        padding: 0.4rem 0.75rem !important;
+        font-size: 0.78rem;
     }
 
     /* .profile-stat-grid / .profile-oauth-notice / .profile-actions render nested
