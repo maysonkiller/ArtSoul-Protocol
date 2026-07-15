@@ -64,6 +64,19 @@ test('current network stays unique while foreign sessions expose an explicit Bas
   assert.match(avatarDropdown, /connected:\$\{currentPath\}:\$\{isOwnProfile\}:\$\{this\.networkMenuKeySegment\(networkInfo\)\}/);
 });
 
+test('the render key encodes the network so a post-connect Base Sepolia confirmation refreshes the header', () => {
+  // sync() early-returns when the render key is unchanged. A wallet connects on
+  // mainnet, then a second wallet-state-changed only flips the chain to 84532;
+  // without the chain in the key the header keeps showing Ethereum Mainnet until
+  // the next full page render. The key must include the chain and the confirmed
+  // state so the confirmation triggers a re-render.
+  const renderKeyFn = avatarDropdown.match(/getRenderKey\(walletAddress, state = \{\}\) \{[\s\S]*?\n        \}/)?.[0] || '';
+  assert.ok(renderKeyFn, 'getRenderKey must exist');
+  assert.match(renderKeyFn, /this\.getNormalizedChainId\(state\)/);
+  assert.match(renderKeyFn, /isArtSoulBaseSepoliaConfirmed/);
+  assert.match(renderKeyFn, /wallet:\$\{normalizedAddress\}:\$\{chainId \|\| 'none'\}:\$\{baseSepoliaConfirmed \? 'confirmed' : 'pending'\}/);
+});
+
 test('connected account menus render the current network and balance row', () => {
   assert.match(avatarDropdown, /const networkInfo = await this\.getCurrentNetworkInfo\(\{ walletAddress \}\);/);
   assert.match(avatarDropdown, /renderMenuContent\(\{ currentPath, isOwnProfile, networkInfo, connected: true \}\)/);
@@ -97,7 +110,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=37/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=35/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=36/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });

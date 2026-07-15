@@ -318,7 +318,17 @@
 
         getRenderKey(walletAddress, state = {}) {
             const normalizedAddress = walletAddress ? walletAddress.toLowerCase() : '';
-            return normalizedAddress ? `wallet:${normalizedAddress}` : 'guest';
+            if (!normalizedAddress) return 'guest';
+            // The key must encode the network, not just the wallet. sync() skips
+            // the re-render when the key is unchanged, so without the chain the
+            // post-connect Base Sepolia confirmation (a second wallet-state-changed
+            // that only flips the chain from mainnet to 84532) never refreshes the
+            // header network row until the next full page render.
+            const chainId = this.getNormalizedChainId(state);
+            const baseSepoliaConfirmed = typeof window.isArtSoulBaseSepoliaConfirmed === 'function'
+                ? window.isArtSoulBaseSepoliaConfirmed()
+                : chainId === 84532;
+            return `wallet:${normalizedAddress}:${chainId || 'none'}:${baseSepoliaConfirmed ? 'confirmed' : 'pending'}`;
         }
 
         commitVisibleState(state) {
