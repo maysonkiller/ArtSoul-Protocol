@@ -292,6 +292,21 @@ test('all contract write methods share the Base Sepolia guard', () => {
     }
 });
 
+test('contract transactions foreground the wallet on the mobile core path', () => {
+    // ethers dispatches eth_sendTransaction on the raw provider, which bypasses
+    // the deep-link handoff. Without a switch to carry the user into the wallet
+    // (already on Base Sepolia), auction actions used to hang: the wallet never
+    // opened and the button stayed disabled. init() wraps the provider so only
+    // approval/signature methods route through requestArtSoulWalletProvider.
+    assert.match(contracts, /const WALLET_APPROVAL_METHODS = new Set\(\[[\s\S]*?'eth_sendtransaction'[\s\S]*?\]\);/);
+    assert.match(contracts, /function wrapProviderForWalletApprovals\(rawProvider\)/);
+    assert.match(contracts, /window\.requestArtSoulWalletProvider\(target, args\)/);
+    // Reads stay on the raw provider (no gas/nonce/chain routing change).
+    assert.match(contracts, /return target\.request\(args\);/);
+    // The signer is built from the wrapped provider.
+    assert.match(contracts, /new ethers\.BrowserProvider\(wrapProviderForWalletApprovals\(provider\)\)/);
+});
+
 test('legacy Ethereum Sepolia artwork writes are blocked without a switch prompt', () => {
     assert.match(artwork, /This artwork is on a legacy network\. On-chain actions are disabled for now\./);
     assert.doesNotMatch(artwork, /Switch to \$\{networkNames\[artworkNetwork\]/);
