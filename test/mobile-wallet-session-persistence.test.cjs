@@ -14,7 +14,7 @@ function loadCoreRestoreHarness() {
         .replace(/\bexport\s+/g, '');
     return new Function(
         'window',
-        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, resolveCoreSessionChainId };`
+        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, resolveCoreSessionChainId, resolveCoreRequestChainId, requestCoreWalletMethod };`
     )({ addEventListener() {} });
 }
 
@@ -118,8 +118,8 @@ test('restored core session never reports a configured chain missing from its na
     // Production display and write validation both stop at the namespace-aware
     // result. They must never fall through to EthereumProvider's configured
     // `chainId` when the core session is live.
-    assert.match(appKit, /if \(provider === coreProvider && provider\?\.session\) \{\s*\n\s*return resolveCoreSessionChainId\(provider, getLastConfirmedCoreChainId\(\)\);/);
-    assert.match(appKit, /if \(appKitProvider === coreProvider && coreProvider\?\.session\) \{\s*\n\s*return resolveCoreSessionChainId\(coreProvider, getLastConfirmedCoreChainId\(\)\);/);
+    assert.match(appKit, /if \(provider === coreProvider && provider\?\.session\) \{\s*\n\s*const confirmedCoreChainId = getLastConfirmedCoreChainId\(\);\s*\n\s*return confirmedCoreChainId \|\| resolveCoreSessionChainId\(provider\);/);
+    assert.match(appKit, /if \(appKitProvider === coreProvider && coreProvider\?\.session\) \{\s*\n\s*const confirmedCoreChainId = getLastConfirmedCoreChainId\(\);\s*\n\s*return confirmedCoreChainId \|\| resolveCoreSessionChainId\(coreProvider\);/);
     assert.match(avatar, /if \(provider\) chainId = this\.parseChainId\(providerChainId\);/);
 });
 
@@ -245,6 +245,41 @@ test('chainChanged to any network updates the display and never erases the sessi
     assert.doesNotMatch(chainConfirmed, /updateNavButtons\(null\)/);
 });
 
+test('core wallet methods bypass a fictitious SDK chain and use an approved session route', async () => {
+    const { resolveCoreRequestChainId, requestCoreWalletMethod } = loadCoreRestoreHarness();
+    const requests = [];
+    const provider = {
+        chainId: 84532,
+        session: {
+            namespaces: {
+                eip155: {
+                    chains: ['eip155:1', 'eip155:8453'],
+                    accounts: ['eip155:8453:0x6ec800000000000000000000000000000000989b']
+                }
+            }
+        },
+        signer: {
+            request: async (request, route) => {
+                requests.push({ request, route });
+                return null;
+            }
+        }
+    };
+
+    assert.equal(resolveCoreRequestChainId(provider), 8453);
+    await requestCoreWalletMethod(provider, {
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x14a34' }]
+    });
+    assert.deepEqual(requests, [{
+        request: {
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a34' }]
+        },
+        route: 'eip155:8453'
+    }]);
+});
+
 test('core chain inference cannot bypass explicit Base Sepolia confirmation', () => {
     assert.match(appKit, /CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation'/);
     assert.match(appKit, /stored\?\.topic !== topic/);
@@ -256,9 +291,12 @@ test('core chain inference cannot bypass explicit Base Sepolia confirmation', ()
     assert.match(selector, /currentChainId === target\.chainId && !requiresCoreConfirmation/);
     assert.match(selector, /confirmCoreBaseSepolia\(provider, 'account menu'\)/);
     const confirmNetwork = appKit.match(/async function confirmCoreBaseSepolia[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(confirmNetwork, /addThenSwitchEthereumChain\(provider, target\)/);
-    assert.match(confirmNetwork, /method: 'eth_chainId'/);
-    assert.match(confirmNetwork, /writeCoreNetworkConfirmation\(provider, BASE_SEPOLIA_CHAIN_ID\)/);
+    assert.match(confirmNetwork, /addThenSwitchCoreEthereumChain\(provider, target\)/);
+    assert.match(confirmNetwork, /waitForCoreBaseSepoliaConfirmation\(provider\)/);
+    assert.doesNotMatch(confirmNetwork, /method: 'eth_chainId'/);
+    assert.match(appKit, /CORE_NETWORK_CONFIRMATION_TIMEOUT = 30000/);
+    assert.match(appKit, /requestCoreWalletMethod\(provider, \{\s*\n\s*method: 'wallet_addEthereumChain'/);
+    assert.match(appKit, /requestCoreWalletMethod\(provider, \{\s*\n\s*method: 'wallet_switchEthereumChain'/);
     const scheduledPrompt = appKit.match(/function scheduleMobileOperationalNetworkPrompt[\s\S]*?\n\}/)?.[0] || '';
     assert.match(scheduledPrompt, /const accepted = await window\.confirm\(/);
 });
