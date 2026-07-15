@@ -620,8 +620,14 @@
             }
         }
 
-        renderNetworkOptions(currentChainId) {
-            const baseSepoliaOption = Number(currentChainId) === 84532 ? '' : `
+        renderNetworkOptions(currentChainId, requiresConfirmation = false) {
+            // Hide the Base Sepolia switch option when it would duplicate the
+            // current row: the wallet is already on Base Sepolia, or the row is
+            // itself the "Tap to switch" control (requiresConfirmation, where
+            // chainId is intentionally null while a mobile session still awaits
+            // a Base Sepolia confirmation).
+            const alreadyOnBaseSepolia = Number(currentChainId) === 84532 || requiresConfirmation === true;
+            const baseSepoliaOption = alreadyOnBaseSepolia ? '' : `
                     <button
                         type="button"
                         class="dropdown-item avatar-network-option"
@@ -649,6 +655,16 @@
             `;
         }
 
+        // The stable menu is only re-rendered when its key changes, so the key
+        // must encode the network state. Otherwise the options list built while
+        // a mobile session is unconfirmed (requiresConfirmation) survives after
+        // the switch to Base Sepolia, leaving a duplicate "Base Sepolia" row.
+        networkMenuKeySegment(networkInfo) {
+            if (!networkInfo) return 'none';
+            if (networkInfo.requiresConfirmation) return 'pending';
+            return networkInfo.chainId ? `chain${networkInfo.chainId}` : 'unknown';
+        }
+
         renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false, connected = false }) {
             const networkSection = networkInfo ? `
                 <button
@@ -667,7 +683,7 @@
                         <path d="M4 6l4 4 4-4"></path>
                     </svg>
                 </button>
-                ${this.renderNetworkOptions(networkInfo.chainId)}
+                ${this.renderNetworkOptions(networkInfo.chainId, networkInfo.requiresConfirmation)}
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
 
@@ -780,7 +796,7 @@
             this.commitVisibleState('connected');
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
-                `connected:${currentPath}:${isOwnProfile}`
+                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
@@ -1002,7 +1018,7 @@
                     restoring: true
                 }),
                 networkInfo
-                    ? `connected:${currentPath}:${isOwnProfile}`
+                    ? `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
                     : `cached-restoring:${currentPath}:${isOwnProfile}`
             );
             this.applyThemeStyles();
@@ -1072,7 +1088,7 @@
             this.commitVisibleState('connected');
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
-                `connected:${currentPath}:${isOwnProfile}`
+                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();

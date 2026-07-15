@@ -51,6 +51,17 @@ test('current network stays unique while foreign sessions expose an explicit Bas
     : '';
   assert.doesNotMatch(ethereumOption, /network-option-indicator/);
   assert.doesNotMatch(avatarDropdown, /avatar-network-option is-active/);
+  // The Base Sepolia switch option must not duplicate the current row while a
+  // mobile session is still on the "Tap to switch" (requiresConfirmation) state,
+  // where chainId is intentionally null. The row itself is the switch control.
+  assert.match(avatarDropdown, /renderNetworkOptions\(currentChainId, requiresConfirmation = false\)/);
+  assert.match(avatarDropdown, /Number\(currentChainId\) === 84532 \|\| requiresConfirmation === true/);
+  assert.match(avatarDropdown, /renderNetworkOptions\(networkInfo\.chainId, networkInfo\.requiresConfirmation\)/);
+  // The stable menu key encodes the network state so the options list rebuilds
+  // when the wallet confirms Base Sepolia — otherwise the stale option survives.
+  assert.match(avatarDropdown, /networkMenuKeySegment\(networkInfo\)/);
+  assert.match(avatarDropdown, /if \(networkInfo\.requiresConfirmation\) return 'pending';/);
+  assert.match(avatarDropdown, /connected:\$\{currentPath\}:\$\{isOwnProfile\}:\$\{this\.networkMenuKeySegment\(networkInfo\)\}/);
 });
 
 test('connected account menus render the current network and balance row', () => {
@@ -86,7 +97,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=37/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=34/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=35/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
