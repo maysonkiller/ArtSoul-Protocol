@@ -20,7 +20,7 @@ import {
     isCoreSessionActive,
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=9'
+} from './wallet-core-connect.js?v=10'
 
 // ============================================
 // CONFIGURATION
@@ -32,6 +32,8 @@ const projectId = '9fdc97f91c02d46a28ca9d185a9e58f2';
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_CAIP_ID = 'eip155:84532';
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
+const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation';
+const CORE_NETWORK_PROMPT_KEY = 'artsoul_core_network_prompt';
 // Mainnet entries are negotiation-only compatibility routes for mobile
 // WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
 const networks = [baseSepolia, base, mainnet];
@@ -126,6 +128,8 @@ let walletResumeListenersBound = false;
 let latestAppKitAccountSnapshot = null;
 let appKitAccountRevision = 0;
 let deferMobileAuthenticationThisTurn = false;
+let coreNetworkConfirmationPromise = null;
+let coreNetworkPromptScheduled = false;
 const walletResumeWaiters = new Set();
 const boundRuntimeProviders = new WeakSet();
 const WALLET_HYDRATION_TIMEOUT = 8000;
@@ -718,8 +722,55 @@ function isUserRejectedError(error) {
 }
 
 function getLastConfirmedCoreChainId() {
-    return parseChainId(window.currentChainId || localStorage.getItem('artsoul_chain_id'));
+    return readCoreNetworkConfirmation(getConnectedCoreProvider());
 }
+
+function getCoreSessionTopic(provider = getConnectedCoreProvider()) {
+    return provider?.session?.topic || null;
+}
+
+function readCoreNetworkConfirmation(provider = getConnectedCoreProvider()) {
+    const topic = getCoreSessionTopic(provider);
+    if (!topic) return null;
+    try {
+        const stored = JSON.parse(sessionStorage.getItem(CORE_NETWORK_CONFIRMATION_KEY) || 'null');
+        if (stored?.topic !== topic) return null;
+        return parseChainId(stored.chainId);
+    } catch {
+        return null;
+    }
+}
+
+function writeCoreNetworkConfirmation(provider, chainId) {
+    const topic = getCoreSessionTopic(provider);
+    const normalizedChainId = parseChainId(chainId);
+    if (!topic || normalizedChainId !== BASE_SEPOLIA_CHAIN_ID) {
+        sessionStorage.removeItem(CORE_NETWORK_CONFIRMATION_KEY);
+        return null;
+    }
+    sessionStorage.setItem(CORE_NETWORK_CONFIRMATION_KEY, JSON.stringify({
+        topic,
+        chainId: normalizedChainId
+    }));
+    return normalizedChainId;
+}
+
+function coreSessionNeedsBaseSepoliaConfirmation(provider = getConnectedCoreProvider()) {
+    return Boolean(
+        provider?.session &&
+        readCoreNetworkConfirmation(provider) !== BASE_SEPOLIA_CHAIN_ID
+    );
+}
+
+window.isArtSoulBaseSepoliaConfirmed = () => {
+    const coreProvider = getConnectedCoreProvider();
+    if (coreProvider?.session) {
+        return !coreSessionNeedsBaseSepoliaConfirmation(coreProvider);
+    }
+    return parseChainId(
+        window.currentChainId || localStorage.getItem('artsoul_chain_id')
+    ) === BASE_SEPOLIA_CHAIN_ID;
+};
 
 async function readMobileProviderChainId(provider) {
     if (!provider?.request) return null;
@@ -1513,6 +1564,11 @@ async function handleProviderChainConfirmed(chainId, source = 'provider') {
     const normalizedChainId = setCurrentChainId(chainId);
     if (!normalizedChainId) return null;
 
+    const coreProvider = getConnectedCoreProvider();
+    if (coreProvider?.session && source.includes('core')) {
+        writeCoreNetworkConfirmation(coreProvider, normalizedChainId);
+    }
+
     console.log(`Provider chain confirmed from ${source}:`, normalizedChainId);
 
     if (window.currentWalletAddress) {
@@ -1729,6 +1785,90 @@ async function addThenSwitchEthereumChain(provider, target) {
     });
 }
 
+async function confirmCoreBaseSepolia(provider, source = 'mobile core session') {
+    if (!provider?.session || !provider?.request) {
+        throw createWalletConnectError(
+            'BASE_SEPOLIA_REQUIRED',
+            'This connection must be confirmed on Base Sepolia.'
+        );
+    }
+    if (!coreSessionNeedsBaseSepoliaConfirmation(provider)) return true;
+    if (coreNetworkConfirmationPromise) return coreNetworkConfirmationPromise;
+
+    coreNetworkConfirmationPromise = (async () => {
+        const target = getSupportedNetworkTarget(BASE_SEPOLIA_CHAIN_ID);
+        walletDebugLog('core Base Sepolia confirmation requested', {
+            source,
+            topic: getCoreSessionTopic(provider)?.slice(0, 8) || null
+        });
+        await addThenSwitchEthereumChain(provider, target);
+        const confirmedChainId = parseChainId(await provider.request({ method: 'eth_chainId' }));
+        if (confirmedChainId !== BASE_SEPOLIA_CHAIN_ID) {
+            throw createWalletConnectError(
+                'BASE_SEPOLIA_REQUIRED',
+                'The wallet did not confirm Base Sepolia.'
+            );
+        }
+        writeCoreNetworkConfirmation(provider, BASE_SEPOLIA_CHAIN_ID);
+        applyConfirmedNetwork(BASE_SEPOLIA_CHAIN_ID);
+        walletDebugLog('core Base Sepolia confirmation resolved', {
+            source,
+            chainId: BASE_SEPOLIA_CHAIN_ID
+        });
+        return true;
+    })().finally(() => {
+        coreNetworkConfirmationPromise = null;
+    });
+
+    return coreNetworkConfirmationPromise;
+}
+
+function scheduleMobileOperationalNetworkPrompt(provider, source) {
+    if (
+        coreNetworkPromptScheduled ||
+        !isMobileDevice() ||
+        isInjectedWalletBrowser() ||
+        !coreSessionNeedsBaseSepoliaConfirmation(provider)
+    ) return;
+
+    const topic = getCoreSessionTopic(provider);
+    if (!topic) return;
+    try {
+        if (sessionStorage.getItem(CORE_NETWORK_PROMPT_KEY) === topic) return;
+        sessionStorage.setItem(CORE_NETWORK_PROMPT_KEY, topic);
+    } catch {
+        // The prompt can still run when sessionStorage is unavailable.
+    }
+
+    coreNetworkPromptScheduled = true;
+    setTimeout(async () => {
+        try {
+            while (document.visibilityState !== 'visible') {
+                await waitForWalletResumeOrDelay(250);
+            }
+            const accepted = await window.confirm(
+                'ArtSoul uses Base Sepolia for bids, publishing, settlement, and minting. Switch your wallet to Base Sepolia now?'
+            );
+            if (!accepted) {
+                window.ErrorHandler?.showToast?.(
+                    'Connected. Base Sepolia will be requested before your next on-chain action.',
+                    'info'
+                );
+                return;
+            }
+            await confirmCoreBaseSepolia(provider, source);
+        } catch (error) {
+            walletDebugLog('core Base Sepolia confirmation failed', describeWalletDebugError(error));
+            const message = isUserRejectedError(error)
+                ? 'Network switch was declined. Base Sepolia is required for ArtSoul actions.'
+                : `Base Sepolia could not be confirmed: ${error?.message || 'Unknown wallet error'}`;
+            alert(message);
+        } finally {
+            coreNetworkPromptScheduled = false;
+        }
+    }, 0);
+}
+
 function applyConfirmedNetwork(chainId) {
     const normalizedChainId = setCurrentChainId(chainId);
     if (!window.currentWalletAddress) return normalizedChainId;
@@ -1886,9 +2026,9 @@ function finishWalletHydration() {
 }
 
 // The single place a confirmed wallet becomes app state. Both the boot-time
-// session restore and the standard mobile connect apply through here; the
-// chain id is stored AS-IS — Base Sepolia is only ever requested by the
-// write guard at action time.
+// session restore and the standard mobile connect apply through here. Network
+// confirmation remains separate so a compatible session can settle before
+// Base Sepolia is requested.
 function applyConfirmedWalletState(walletState) {
     const normalizedAddress = walletState.address.toLowerCase();
     const normalizedChainId = setCurrentChainId(walletState);
@@ -2330,10 +2470,10 @@ async function openAppKitConnectModal(attempt) {
 }
 
 // STANDARD mobile external-browser connect: await provider.connect() through
-// the official WalletConnect modal, then apply the settled session as-is.
-// No chain switching, no settle windows, no custom timeouts, no storage
-// cleanup. A second tap while a connect is in flight reuses the same pairing
-// (connectCoreWallet dedupes), so a page never holds two pairings.
+// the official WalletConnect modal, then apply the settled address before a
+// separate one-time operational-network confirmation. No settlement timeout
+// or storage cleanup runs here. A second tap while a connect is in flight
+// reuses the same pairing, so a page never holds two pairings.
 async function connectExternalMobileStandard() {
     sessionStorage.removeItem('artsoul_disconnecting');
     setConnectButtonPending(true);
@@ -2362,6 +2502,7 @@ async function connectExternalMobileStandard() {
             chainId: connected.chainId,
             restored: connected.restored
         });
+        scheduleMobileOperationalNetworkPrompt(coreProvider, 'standard mobile connect');
 
         // Connect-only gesture: SIWE waits for the next protected action so
         // the wallet round trip is never doubled.
@@ -2724,13 +2865,21 @@ window.ensureArtSoulWriteNetwork = async () => {
         }
 
         const currentChainId = await readMobileProviderChainId(provider);
-        if (currentChainId !== BASE_SEPOLIA_CHAIN_ID) {
+        const coreProvider = getConnectedCoreProvider();
+        const requiresCoreConfirmation = provider === coreProvider &&
+            coreSessionNeedsBaseSepoliaConfirmation(coreProvider);
+        if (currentChainId !== BASE_SEPOLIA_CHAIN_ID || requiresCoreConfirmation) {
             walletDebugLog('write guard Base Sepolia switch requested', {
                 fromChainId: currentChainId,
-                toChainId: BASE_SEPOLIA_CHAIN_ID
+                toChainId: BASE_SEPOLIA_CHAIN_ID,
+                requiresCoreConfirmation
             });
             try {
-                await switchEthereumChain(provider, target);
+                if (requiresCoreConfirmation) {
+                    await confirmCoreBaseSepolia(provider, 'write guard');
+                } else {
+                    await switchEthereumChain(provider, target);
+                }
             } catch (error) {
                 walletDebugLog('write guard Base Sepolia switch failed', describeWalletDebugError(error));
                 if (isUserRejectedError(error)) {
@@ -2810,8 +2959,18 @@ window.switchArtSoulNetwork = async (chainId) => {
     activeNetworkSwitchChainId = target.chainId;
 
     try {
-        const currentChainId = await getProviderTruthChainId();
-        if (currentChainId === target.chainId) {
+        const provider = await getSwitchProvider();
+        const coreProvider = getConnectedCoreProvider();
+        const requiresCoreConfirmation = provider === coreProvider &&
+            coreSessionNeedsBaseSepoliaConfirmation(coreProvider);
+        const currentChainId = await getProviderTruthChainId(provider);
+        if (currentChainId === target.chainId && !requiresCoreConfirmation) {
+            await closeNetworkModalAfterConfirmedChain(target.chainId);
+            return true;
+        }
+
+        if (requiresCoreConfirmation) {
+            await confirmCoreBaseSepolia(provider, 'account menu');
             await closeNetworkModalAfterConfirmedChain(target.chainId);
             return true;
         }
@@ -2831,7 +2990,6 @@ window.switchArtSoulNetwork = async (chainId) => {
             }
         }
 
-        const provider = await getSwitchProvider();
         try {
             await switchEthereumChain(provider, target);
         } catch (error) {
@@ -2875,6 +3033,9 @@ window.resetWalletConnection = async () => {
         // Set disconnecting flag to prevent auto-reconnect
         sessionStorage.setItem('artsoul_disconnecting', 'true');
         clearModalIntent();
+        sessionStorage.removeItem(CORE_NETWORK_CONFIRMATION_KEY);
+        sessionStorage.removeItem(CORE_NETWORK_PROMPT_KEY);
+        coreNetworkPromptScheduled = false;
 
         try {
             await Promise.race([
@@ -3366,6 +3527,7 @@ async function initializeAppKit() {
                         address: maskWalletAddress(restored.address),
                         chainId: restoredChainId
                     });
+                    scheduleMobileOperationalNetworkPrompt(restored.provider, 'boot session restore');
                     return;
                 }
 

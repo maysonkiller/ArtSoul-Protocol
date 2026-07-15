@@ -149,6 +149,7 @@ test('only a clean "no session" clears the stored wallet; a restore error keeps 
     // A restored session still binds the disconnect classifier.
     assert.match(completion, /bindCoreProviderDisconnect\(restored\.provider\)/);
     assert.match(completion, /applyConfirmedWalletState/);
+    assert.match(completion, /scheduleMobileOperationalNetworkPrompt\(restored\.provider, 'boot session restore'\)/);
 });
 
 test('disconnect classification: transient and backgrounded drops never wipe; genuine ends do', () => {
@@ -219,14 +220,13 @@ test('restore is chain-tolerant: a session parked on a foreign chain stays conne
     const readSnapshot = coreWallet.match(/export function readCoreSessionSnapshot[\s\S]*?\n\}/)?.[0] || '';
     assert.match(readSnapshot, /getCoreSessionAddress\(instance\)/);
     assert.doesNotMatch(restoreOutcome, /instance\.accounts \|\| \[\]/);
-    // The boot handler applies the restored state as connected without any
-    // chain gate; the 84532 requirement lives only in the write guard.
+    // The boot handler applies the restored address without a chain gate, then
+    // schedules the independent operational-network confirmation.
     const completion = appKit.match(/coreSessionRestoreCompletion = coreSessionRestoreTask\.then[\s\S]*?coreSessionRestoreSettled = true;\s*\n\s*\}\);/)?.[0] || '';
     assert.match(completion, /restoredChainId = resolveCoreSessionChainId\(/);
     assert.match(completion, /applyConfirmedWalletState\(\{\s*\n\s*address: restored\.address,\s*\n\s*chainId: restoredChainId/);
     assert.doesNotMatch(completion, /BASE_SEPOLIA_CHAIN_ID/);
-    // No automatic network switch on restore/navigation: the add/switch cycle
-    // stays confined to explicit connects and the write guard.
+    // Restore does not inline an add/switch cycle or block address hydration.
     assert.doesNotMatch(completion, /ensureExternalMobileBaseSepolia/);
     // The hydration-timeout fallback also reads the address chain-independently.
     const staleClear = appKit.match(/const clearStaleWalletState = async \(\) => \{[\s\S]*?\n        \};/)?.[0] || '';
@@ -243,6 +243,24 @@ test('chainChanged to any network updates the display and never erases the sessi
     assert.doesNotMatch(chainConfirmed, /isConnected: false/);
     assert.doesNotMatch(chainConfirmed, /removeItem\('artsoul_wallet'\)/);
     assert.doesNotMatch(chainConfirmed, /updateNavButtons\(null\)/);
+});
+
+test('core chain inference cannot bypass explicit Base Sepolia confirmation', () => {
+    assert.match(appKit, /CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation'/);
+    assert.match(appKit, /stored\?\.topic !== topic/);
+    assert.match(appKit, /coreSessionNeedsBaseSepoliaConfirmation/);
+    const guard = appKit.match(/window\.ensureArtSoulWriteNetwork = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.match(guard, /currentChainId !== BASE_SEPOLIA_CHAIN_ID \|\| requiresCoreConfirmation/);
+    assert.match(guard, /confirmCoreBaseSepolia\(provider, 'write guard'\)/);
+    const selector = appKit.match(/window\.switchArtSoulNetwork = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.match(selector, /currentChainId === target\.chainId && !requiresCoreConfirmation/);
+    assert.match(selector, /confirmCoreBaseSepolia\(provider, 'account menu'\)/);
+    const confirmNetwork = appKit.match(/async function confirmCoreBaseSepolia[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(confirmNetwork, /addThenSwitchEthereumChain\(provider, target\)/);
+    assert.match(confirmNetwork, /method: 'eth_chainId'/);
+    assert.match(confirmNetwork, /writeCoreNetworkConfirmation\(provider, BASE_SEPOLIA_CHAIN_ID\)/);
+    const scheduledPrompt = appKit.match(/function scheduleMobileOperationalNetworkPrompt[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(scheduledPrompt, /const accepted = await window\.confirm\(/);
 });
 
 test('external mobile header trusts the settled wallet state over AppKit/injected reads', () => {
