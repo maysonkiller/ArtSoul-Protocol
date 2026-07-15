@@ -589,6 +589,28 @@ async function getProviderForWallet(walletAddress) {
     return null;
 }
 
+// Wallet methods that open an approval sheet in the wallet app. On the
+// external-mobile core path the wallet must be foregrounded for the user to see
+// and approve them; without a deep-link handoff the request sits on the relay
+// and the tab looks frozen ("nothing happens"). This is why a like/SIWE
+// personal_sign used to hang while placing a bid worked: a bid first switches
+// network, and only the network-switch path foregrounded the wallet. Route
+// every approval-requiring method through the same handoff so a signature that
+// needs no network switch (like, would-buy, watching, Edit Profile) reaches the
+// wallet too. Read-only methods (eth_accounts, eth_chainId) never handoff.
+const CORE_WALLET_APPROVAL_METHODS = new Set([
+    'personal_sign',
+    'eth_sign',
+    'eth_signtypeddata',
+    'eth_signtypeddata_v1',
+    'eth_signtypeddata_v3',
+    'eth_signtypeddata_v4',
+    'eth_sendtransaction',
+    'eth_signtransaction',
+    'wallet_switchethereumchain',
+    'wallet_addethereumchain'
+]);
+
 window.requestArtSoulWalletProvider = async (provider, request) => {
     if (!request?.method) throw new Error('Wallet request method is required');
 
@@ -601,6 +623,9 @@ window.requestArtSoulWalletProvider = async (provider, request) => {
         if (request.method === 'eth_chainId') {
             const chainId = getLastConfirmedCoreChainId() || resolveCoreSessionChainId(coreProvider);
             return chainId ? `0x${chainId.toString(16)}` : null;
+        }
+        if (CORE_WALLET_APPROVAL_METHODS.has(String(request.method).toLowerCase())) {
+            return requestCoreNetworkMethod(coreProvider, request);
         }
         return requestCoreWalletMethod(coreProvider, request);
     }
@@ -1830,7 +1855,7 @@ function openCoreWalletForApproval(provider, method) {
     });
     if (!approvalUrl) {
         window.ErrorHandler?.showToast?.(
-            'Open your wallet to approve the Base Sepolia request.',
+            'Open your wallet to approve the request.',
             'info'
         );
         return false;
@@ -1840,6 +1865,10 @@ function openCoreWalletForApproval(provider, method) {
     return true;
 }
 
+// Shared approval handoff for every core wallet method that pops a wallet sheet
+// (network switch/add AND signatures/transactions). Dispatches the request over
+// the relay and, if the tab is still foreground after a short grace period,
+// deep-links into the wallet so the user actually sees the prompt.
 async function requestCoreNetworkMethod(provider, request) {
     let settled = false;
     const handoffTimer = setTimeout(() => {
