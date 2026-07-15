@@ -15,12 +15,14 @@ import {
     disconnectCoreWallet,
     getConnectedCoreProvider,
     getCoreProviderInstance,
+    getCoreSessionChainIds,
     getCoreSessionAddress,
     isCoreConnectInFlight,
     isCoreSessionActive,
+    requestCoreWalletMethod,
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=10'
+} from './wallet-core-connect.js?v=11'
 
 // ============================================
 // CONFIGURATION
@@ -153,6 +155,7 @@ const MOBILE_NETWORK_SWITCH_TIMEOUT = 15000;
 const MOBILE_CONNECT_SWITCH_TIMEOUT = 8000;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
+const CORE_NETWORK_CONFIRMATION_TIMEOUT = 30000;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
 const MODAL_CLOSE_RETRY_DELAY = 400;
 const WALLET_STORAGE_VERSION_KEY = 'artsoul_wallet_storage_version';
@@ -776,7 +779,8 @@ async function readMobileProviderChainId(provider) {
     if (!provider?.request) return null;
     const coreProvider = getConnectedCoreProvider() || getCoreProviderInstance();
     if (provider === coreProvider && provider?.session) {
-        return resolveCoreSessionChainId(provider, getLastConfirmedCoreChainId());
+        const confirmedCoreChainId = getLastConfirmedCoreChainId();
+        return confirmedCoreChainId || resolveCoreSessionChainId(provider);
     }
     try {
         const chainId = await requestProviderValueWithin(
@@ -1465,7 +1469,8 @@ async function getProviderTruthChainId(preferredProvider = null) {
     const appKitProvider = preferredProvider || await getAppKitWalletProvider();
     const coreProvider = getConnectedCoreProvider() || getCoreProviderInstance();
     if (appKitProvider === coreProvider && coreProvider?.session) {
-        return resolveCoreSessionChainId(coreProvider, getLastConfirmedCoreChainId());
+        const confirmedCoreChainId = getLastConfirmedCoreChainId();
+        return confirmedCoreChainId || resolveCoreSessionChainId(coreProvider);
     }
     const appKitProviderChainId = await requestProviderChainId(appKitProvider);
     if (appKitProviderChainId) return appKitProviderChainId;
@@ -1785,8 +1790,66 @@ async function addThenSwitchEthereumChain(provider, target) {
     });
 }
 
+async function addThenSwitchCoreEthereumChain(provider, target) {
+    try {
+        walletDebugLog('core Base Sepolia add request started', { chainId: target.chainId });
+        await requestCoreWalletMethod(provider, {
+            method: 'wallet_addEthereumChain',
+            params: [{
+                chainId: target.hexChainId,
+                chainName: target.chainName,
+                nativeCurrency: target.nativeCurrency,
+                rpcUrls: target.rpcUrls,
+                blockExplorerUrls: target.blockExplorerUrls
+            }]
+        });
+        walletDebugLog('core Base Sepolia add request resolved', { chainId: target.chainId });
+    } catch (error) {
+        if (isUserRejectedError(error)) throw error;
+        walletDebugLog('core Base Sepolia add request non-fatal result', describeWalletDebugError(error));
+    }
+
+    walletDebugLog('core Base Sepolia switch request started', { chainId: target.chainId });
+    await requestCoreWalletMethod(provider, {
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: target.hexChainId }]
+    });
+    walletDebugLog('core Base Sepolia switch request resolved', { chainId: target.chainId });
+}
+
+async function waitForCoreBaseSepoliaConfirmation(provider, timeoutMs = CORE_NETWORK_CONFIRMATION_TIMEOUT) {
+    const deadline = createForegroundDeadline(timeoutMs);
+    try {
+        while (!deadline.hasExpired()) {
+            if (document.visibilityState !== 'visible') {
+                await waitForWalletResumeOrDelay(NETWORK_CONFIRMATION_INTERVAL);
+                continue;
+            }
+
+            if (readCoreNetworkConfirmation(provider) === BASE_SEPOLIA_CHAIN_ID) {
+                return BASE_SEPOLIA_CHAIN_ID;
+            }
+
+            const providerChainId = parseChainId(provider?.chainId);
+            const approvedChainIds = getCoreSessionChainIds(provider);
+            if (
+                providerChainId === BASE_SEPOLIA_CHAIN_ID &&
+                approvedChainIds.includes(BASE_SEPOLIA_CHAIN_ID)
+            ) {
+                writeCoreNetworkConfirmation(provider, BASE_SEPOLIA_CHAIN_ID);
+                return BASE_SEPOLIA_CHAIN_ID;
+            }
+
+            await waitForWalletResumeOrDelay(NETWORK_CONFIRMATION_INTERVAL);
+        }
+        return readCoreNetworkConfirmation(provider);
+    } finally {
+        deadline.dispose();
+    }
+}
+
 async function confirmCoreBaseSepolia(provider, source = 'mobile core session') {
-    if (!provider?.session || !provider?.request) {
+    if (!provider?.session || !provider?.signer?.request) {
         throw createWalletConnectError(
             'BASE_SEPOLIA_REQUIRED',
             'This connection must be confirmed on Base Sepolia.'
@@ -1801,15 +1864,14 @@ async function confirmCoreBaseSepolia(provider, source = 'mobile core session') 
             source,
             topic: getCoreSessionTopic(provider)?.slice(0, 8) || null
         });
-        await addThenSwitchEthereumChain(provider, target);
-        const confirmedChainId = parseChainId(await provider.request({ method: 'eth_chainId' }));
+        await addThenSwitchCoreEthereumChain(provider, target);
+        const confirmedChainId = await waitForCoreBaseSepoliaConfirmation(provider);
         if (confirmedChainId !== BASE_SEPOLIA_CHAIN_ID) {
             throw createWalletConnectError(
                 'BASE_SEPOLIA_REQUIRED',
                 'The wallet did not confirm Base Sepolia.'
             );
         }
-        writeCoreNetworkConfirmation(provider, BASE_SEPOLIA_CHAIN_ID);
         applyConfirmedNetwork(BASE_SEPOLIA_CHAIN_ID);
         walletDebugLog('core Base Sepolia confirmation resolved', {
             source,

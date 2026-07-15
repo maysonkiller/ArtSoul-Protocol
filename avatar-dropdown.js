@@ -511,8 +511,8 @@
             if (chainId === 84532 && !baseSepoliaConfirmed) {
                 return {
                     ...networks[84532],
-                    name: 'Confirm Base Sepolia',
-                    balance: 'Switch required',
+                    name: 'Base Sepolia',
+                    balance: 'Tap to switch',
                     currency: '',
                     chainId: null,
                     requiresConfirmation: true
@@ -971,8 +971,8 @@
                 this.baseNetworkIcon = networkInfo.icon;
                 networkInfo = {
                     ...networkInfo,
-                    name: 'Confirm Base Sepolia',
-                    balance: 'Switch required',
+                    name: 'Base Sepolia',
+                    balance: 'Tap to switch',
                     currency: '',
                     chainId: null,
                     requiresConfirmation: true
