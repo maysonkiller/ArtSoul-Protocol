@@ -20,18 +20,18 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=35/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=36/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=10/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=10/);
-    assert.match(walletTest, /appkit-init\.js\?v=35/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=11/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=11/);
+    assert.match(walletTest, /appkit-init\.js\?v=36/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
     assert.match(coreWallet, /WC_ETHEREUM_PROVIDER_VERSION = '2\.23\.10'/);
     assert.match(coreWallet, /esm\.sh\/@walletconnect\/ethereum-provider@\$\{WC_ETHEREUM_PROVIDER_VERSION\}/);
-    assert.match(coreWallet, /chains: \[BASE_SEPOLIA_CHAIN_ID\]/);
-    assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1\]/);
+    assert.doesNotMatch(coreWallet, /chains: \[BASE_SEPOLIA_CHAIN_ID\]/);
+    assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[BASE_SEPOLIA_CHAIN_ID, 8453, 1\]/);
     // The OFFICIAL WalletConnect modal drives wallet choice, deep links, QR —
     // statically imported and pinned by US (showQrModal: false). The
     // provider's built-in runtime modal load silently failed on prod:
@@ -54,6 +54,16 @@ test('mobile external browsers use the standard flow: pinned provider + official
     // appkit-init routes mobile external connects through the standard path.
     assert.match(appKit, /async function connectExternalMobileStandard/);
     assert.match(appKit, /return connectExternalMobileStandard\(\);/);
+});
+
+test('core network methods route through a chain the wallet actually approved', () => {
+    const resolver = coreWallet.match(/export function resolveCoreRequestChainId[\s\S]*?\n\}/)?.[0] || '';
+    const request = coreWallet.match(/export async function requestCoreWalletMethod[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(resolver, /getCoreSessionChainIds\(instance\)/);
+    assert.match(resolver, /approvedChainIds\.includes\(chainId\)/);
+    assert.match(request, /instance\.signer\.request\(request, `eip155:\$\{routeChainId\}`\)/);
+    assert.doesNotMatch(request, /instance\.request\(/);
+    assert.match(coreWallet, /non-fatal WalletConnect SDK provider-route rejection suppressed/);
 });
 
 test('the official modal lifecycle is deterministic: open on display_uri, close on every settle', () => {
