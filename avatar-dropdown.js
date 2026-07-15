@@ -4,6 +4,8 @@
 (function() {
     'use strict';
 
+    const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
+
     const ETHEREUM_NETWORK_ICON = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMiIgZmlsbD0iIzYyN0VFQSIvPjxwYXRoIGQ9Ik0xMiA0TDYgMTJMMTIgMTZMMTggMTJMMTIgNFoiIGZpbGw9IndoaXRlIi8+PHBhdGggZD0iTTEyIDE3TDYgMTNMMTIgMjBMMTggMTNMMTIgMTdaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==';
 
     class AvatarDropdown {
@@ -250,7 +252,8 @@
                     name: networkInfo.name,
                     icon: networkInfo.icon,
                     currency: networkInfo.currency || 'ETH',
-                    balance: networkInfo.balance || '0.0000'
+                    balance: networkInfo.balance || '0.0000',
+                    baseSepoliaConfirmed: networkInfo.baseSepoliaConfirmed === true
                 }));
             } catch {
                 // The live network read remains available without storage.
@@ -502,17 +505,51 @@
             networks[1] = { ...networks[11155111], name: 'Ethereum Mainnet' };
             this.baseNetworkIcon = networks[84532].icon;
 
+            const baseSepoliaConfirmed = typeof window.isArtSoulBaseSepoliaConfirmed === 'function'
+                ? window.isArtSoulBaseSepoliaConfirmed()
+                : chainId === 84532;
+            if (chainId === 84532 && !baseSepoliaConfirmed) {
+                return {
+                    ...networks[84532],
+                    name: 'Confirm Base Sepolia',
+                    balance: 'Switch required',
+                    currency: '',
+                    chainId: null,
+                    requiresConfirmation: true
+                };
+            }
+
             // Get balance
-            let balance = cachedNetwork?.chainId === chainId
-                ? cachedNetwork.balance
-                : '0.0000';
+            let balance = chainId === 84532
+                ? '…'
+                : cachedNetwork?.chainId === chainId
+                    ? cachedNetwork.balance
+                    : '0.0000';
             if (options.includeBalance !== false && chainId && window.currentWalletAddress) {
                 try {
-                    if (provider && provider.request) {
-                        const balanceHex = await provider.request({
-                            method: 'eth_getBalance',
-                            params: [window.currentWalletAddress, 'latest']
+                    let balanceHex = null;
+                    if (chainId === 84532) {
+                        const response = await fetch(BASE_SEPOLIA_RPC_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0',
+                                id: 1,
+                                method: 'eth_getBalance',
+                                params: [walletAddress, 'latest']
+                            })
                         });
+                        if (!response.ok) throw new Error(`Base Sepolia RPC returned ${response.status}`);
+                        const payload = await response.json();
+                        if (payload.error) throw new Error(payload.error.message || 'Base Sepolia balance read failed');
+                        balanceHex = payload.result;
+                    } else if (provider && provider.request) {
+                        balanceHex = await provider.request({
+                            method: 'eth_getBalance',
+                            params: [walletAddress, 'latest']
+                        });
+                    }
+                    if (balanceHex) {
                         balance = (parseInt(balanceHex, 16) / 1e18).toFixed(4);
                     }
                 } catch (error) {
@@ -540,7 +577,12 @@
                 return { name: 'Unsupported', icon: '', color: '#ff6b6b', currency: 'ETH', balance: options.includeBalance === false ? '…' : '0.0000' };
             }
 
-            const networkInfo = { ...network, balance, chainId };
+            const networkInfo = {
+                ...network,
+                balance,
+                chainId,
+                baseSepoliaConfirmed: chainId === 84532 && baseSepoliaConfirmed
+            };
             this.cacheHeaderNetwork(networkInfo, walletAddress, chainId);
             return networkInfo;
         }
@@ -561,7 +603,7 @@
                     icon.style.display = networkInfo.icon ? '' : 'none';
                 }
                 if (name) name.textContent = networkInfo.name;
-                if (balance) balance.textContent = `${networkInfo.balance} ${networkInfo.currency}`;
+                if (balance) balance.textContent = `${networkInfo.balance} ${networkInfo.currency}`.trim();
             }
         }
 
@@ -599,7 +641,7 @@
                 <button
                     type="button"
                     class="dropdown-item network-switcher-btn network-current-row"
-                    onclick="window.AvatarDropdown.toggleNetworkOptions(event)"
+                    onclick="window.AvatarDropdown.handleNetworkRowClick(event)"
                     aria-expanded="false"
                     aria-controls="avatarNetworkOptions"
                 >
@@ -655,6 +697,13 @@
             options.hidden = !willOpen;
             trigger?.setAttribute('aria-expanded', String(willOpen));
             return willOpen;
+        }
+
+        async handleNetworkRowClick(event) {
+            if (window.isArtSoulBaseSepoliaConfirmed?.() === false) {
+                return this.selectNetwork(84532, event);
+            }
+            return this.toggleNetworkOptions(event);
         }
 
         openNetworkOptions() {
@@ -917,7 +966,18 @@
             const isOwnProfile = isProfilePage
                 && (!viewingAddress || viewingAddress.toLowerCase() === storedWallet);
             const shortAddress = `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`;
-            const networkInfo = this.getCachedHeaderNetwork(storedWallet);
+            let networkInfo = this.getCachedHeaderNetwork(storedWallet);
+            if (isMobileUA && networkInfo?.chainId === 84532 && networkInfo.baseSepoliaConfirmed !== true) {
+                this.baseNetworkIcon = networkInfo.icon;
+                networkInfo = {
+                    ...networkInfo,
+                    name: 'Confirm Base Sepolia',
+                    balance: 'Switch required',
+                    currency: '',
+                    chainId: null,
+                    requiresConfirmation: true
+                };
+            }
             container.dataset.avatarRenderKey = 'cached-wallet';
             container.dataset.avatarCacheHydrated = 'true';
             this.pendingRenderKey = 'cached-wallet';
