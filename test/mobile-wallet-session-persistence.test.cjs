@@ -14,8 +14,8 @@ function loadCoreRestoreHarness() {
         .replace(/\bexport\s+/g, '');
     return new Function(
         'window',
-        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, resolveCoreSessionChainId, resolveCoreRequestChainId, requestCoreWalletMethod };`
-    )({ addEventListener() {} });
+        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, resolveCoreSessionChainId, resolveCoreRequestChainId, requestCoreWalletMethod, getCoreWalletApprovalUrl };`
+    )({ addEventListener() {}, location: { origin: 'https://artsoul.vercel.app' } });
 }
 
 test('core session restore distinguishes "no session" from a restore error', () => {
@@ -96,7 +96,7 @@ test('delayed WalletConnect persistence hydration restores before the bounded de
     assert.equal(clock, 300);
 });
 
-test('restored core session never reports a configured chain missing from its namespaces', () => {
+test('restored core session accepts only an explicit switch proof outside its namespaces', () => {
     const { resolveCoreSessionChainId } = loadCoreRestoreHarness();
     const provider = {
         chainId: 84532,
@@ -111,13 +111,15 @@ test('restored core session never reports a configured chain missing from its na
     };
 
     assert.equal(resolveCoreSessionChainId(provider, 8453), 8453);
-    assert.equal(resolveCoreSessionChainId(provider, 84532), null);
+    assert.equal(resolveCoreSessionChainId(provider, null), null);
+    assert.equal(resolveCoreSessionChainId(provider, 84532), 84532);
     provider.chainId = 8453;
-    assert.equal(resolveCoreSessionChainId(provider, 84532), 8453);
+    assert.equal(resolveCoreSessionChainId(provider, null), 8453);
+    assert.equal(resolveCoreSessionChainId(provider, 84532), 84532);
 
-    // Production display and write validation both stop at the namespace-aware
-    // result. They must never fall through to EthereumProvider's configured
-    // `chainId` when the core session is live.
+    // Production display and write validation may reuse only the topic-bound
+    // switch proof. Without it, they never fall through to an SDK-configured
+    // chain that the wallet did not approve.
     assert.match(appKit, /if \(provider === coreProvider && provider\?\.session\) \{\s*\n\s*const confirmedCoreChainId = getLastConfirmedCoreChainId\(\);\s*\n\s*return confirmedCoreChainId \|\| resolveCoreSessionChainId\(provider\);/);
     assert.match(appKit, /if \(appKitProvider === coreProvider && coreProvider\?\.session\) \{\s*\n\s*const confirmedCoreChainId = getLastConfirmedCoreChainId\(\);\s*\n\s*return confirmedCoreChainId \|\| resolveCoreSessionChainId\(coreProvider\);/);
     assert.match(avatar, /if \(provider\) chainId = this\.parseChainId\(providerChainId\);/);
@@ -180,13 +182,12 @@ test('returning from background restarts the relay for a restored core session',
     assert.match(resume, /recheckDeferredCoreDisconnect\(source\)/);
 });
 
-test('mobile header renders the stored wallet optimistically while the restore runs', () => {
+test('mobile header keeps the stable shell until a complete cached identity exists', () => {
     const initializing = avatar.match(/renderInitializingState\(\) \{[\s\S]*?\n        \}/)?.[0] || '';
     assert.match(initializing, /artsoul_wallet/);
     assert.match(initializing, /isMobileUA/);
-    assert.match(initializing, /storedWallet\.slice\(0, 6\)/);
-    // Desktop keeps its resolving state — the optimistic branch is mobile-only.
     assert.match(initializing, /wallet-state-resolving/);
+    assert.doesNotMatch(initializing, /cachedIdentity = \{[\s\S]*?getDefaultAvatar/);
 });
 
 test('a live core session outranks AppKit/injected empty-account events', () => {
@@ -280,10 +281,29 @@ test('core wallet methods bypass a fictitious SDK chain and use an approved sess
     }]);
 });
 
+test('a settled mobile session exposes its wallet approval link without changing connect metadata', () => {
+    const { getCoreWalletApprovalUrl } = loadCoreRestoreHarness();
+    const provider = {
+        session: {
+            peer: {
+                metadata: {
+                    redirect: {
+                        native: 'metamask://',
+                        universal: 'https://metamask.app.link'
+                    }
+                }
+            }
+        }
+    };
+    assert.equal(getCoreWalletApprovalUrl(provider), 'metamask://');
+});
+
 test('core chain inference cannot bypass explicit Base Sepolia confirmation', () => {
-    assert.match(appKit, /CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation'/);
+    assert.match(appKit, /CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2'/);
     assert.match(appKit, /stored\?\.topic !== topic/);
     assert.match(appKit, /coreSessionNeedsBaseSepoliaConfirmation/);
+    const lastConfirmed = appKit.match(/function getLastConfirmedCoreChainId[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(lastConfirmed, /readCoreNetworkConfirmation\(getConnectedCoreProvider\(\)\)/);
     const guard = appKit.match(/window\.ensureArtSoulWriteNetwork = async[\s\S]*?\n\};/)?.[0] || '';
     assert.match(guard, /currentChainId !== BASE_SEPOLIA_CHAIN_ID \|\| requiresCoreConfirmation/);
     assert.match(guard, /confirmCoreBaseSepolia\(provider, 'write guard'\)/);
@@ -291,14 +311,32 @@ test('core chain inference cannot bypass explicit Base Sepolia confirmation', ()
     assert.match(selector, /currentChainId === target\.chainId && !requiresCoreConfirmation/);
     assert.match(selector, /confirmCoreBaseSepolia\(provider, 'account menu'\)/);
     const confirmNetwork = appKit.match(/async function confirmCoreBaseSepolia[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(confirmNetwork, /addThenSwitchCoreEthereumChain\(provider, target\)/);
+    assert.match(confirmNetwork, /switchThenAddCoreEthereumChain\(provider, target\)/);
     assert.match(confirmNetwork, /waitForCoreBaseSepoliaConfirmation\(provider\)/);
     assert.doesNotMatch(confirmNetwork, /method: 'eth_chainId'/);
     assert.match(appKit, /CORE_NETWORK_CONFIRMATION_TIMEOUT = 30000/);
-    assert.match(appKit, /requestCoreWalletMethod\(provider, \{\s*\n\s*method: 'wallet_addEthereumChain'/);
-    assert.match(appKit, /requestCoreWalletMethod\(provider, \{\s*\n\s*method: 'wallet_switchEthereumChain'/);
+    assert.match(appKit, /requestCoreNetworkMethod\(provider, \{\s*\n\s*method: 'wallet_addEthereumChain'/);
+    assert.match(appKit, /requestCoreNetworkMethod\(provider, \{\s*\n\s*method: 'wallet_switchEthereumChain'/);
+    assert.match(appKit, /getCoreWalletApprovalUrl\(provider\)/);
+    const switchFlow = appKit.match(/async function switchThenAddCoreEthereumChain[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(switchFlow.indexOf("method: 'wallet_switchEthereumChain'") < switchFlow.indexOf("method: 'wallet_addEthereumChain'"));
+    assert.match(switchFlow, /isUnknownChainError\(error\)/);
+    assert.match(switchFlow, /writeCoreNetworkConfirmation\(provider, target\.chainId\)/);
     const scheduledPrompt = appKit.match(/function scheduleMobileOperationalNetworkPrompt[\s\S]*?\n\}/)?.[0] || '';
     assert.match(scheduledPrompt, /const accepted = await window\.confirm\(/);
+});
+
+test('network confirmation and SIWE are serialized for the mobile core provider', () => {
+    const authentication = appKit.match(/window\.ensureAuthenticated = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.match(authentication, /if \(authenticationPromise\) return authenticationPromise/);
+    assert.match(authentication, /coreSessionNeedsBaseSepoliaConfirmation\(coreProvider\)/);
+    assert.ok(
+        authentication.indexOf('ensureArtSoulWriteNetwork') < authentication.indexOf("SIWE signature requested"),
+        'Base Sepolia confirmation must finish before SIWE starts'
+    );
+    const authSource = fs.readFileSync(path.join(__dirname, '..', 'supabase-auth.js'), 'utf8');
+    assert.match(authSource, /requestWalletProvider\(activeProvider, \{ method: 'eth_accounts' \}\)/);
+    assert.match(authSource, /requestWalletProvider\(activeProvider, \{\s*\n\s*method: 'personal_sign'/);
 });
 
 test('external mobile header trusts the settled wallet state over AppKit/injected reads', () => {
