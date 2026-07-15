@@ -6,6 +6,19 @@
 
     const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 
+    // This script is loaded synchronously in the document head. Reserve the
+    // connected shell before the header HTML can paint so a saved wallet never
+    // flashes the static guest identity while its final profile is restored.
+    try {
+        const walletHint = String(localStorage.getItem('artsoul_wallet') || '').toLowerCase();
+        const cachedUiState = localStorage.getItem('artsoul_header_ui_state');
+        if (/^0x[a-f0-9]{40}$/.test(walletHint) || cachedUiState === 'connected') {
+            document.documentElement.classList.add('wallet-state-resolving');
+        }
+    } catch {
+        // Storage can be unavailable in privacy-restricted browsers.
+    }
+
     const ETHEREUM_NETWORK_ICON = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMiIgZmlsbD0iIzYyN0VFQSIvPjxwYXRoIGQ9Ik0xMiA0TDYgMTJMMTIgMTZMMTggMTJMMTIgNFoiIGZpbGw9IndoaXRlIi8+PHBhdGggZD0iTTEyIDE3TDYgMTNMMTIgMjBMMTggMTNMMTIgMTdaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==';
 
     class AvatarDropdown {
