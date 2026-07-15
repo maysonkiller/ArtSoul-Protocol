@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=34/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=35/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=9/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=9/);
-    assert.match(walletTest, /appkit-init\.js\?v=34/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=10/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=10/);
+    assert.match(walletTest, /appkit-init\.js\?v=35/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
@@ -143,14 +143,15 @@ test('single-teardown invariant: explicit Disconnect is the only production call
     assert.match(incompleteClear, /\.filter\(\(provider\) => provider !== coreProviderInstance\)/);
 });
 
-test('the standard mobile connect never switches chains, cleans storage, or times out', () => {
+test('the standard mobile connect settles before one separate network-confirmation prompt', () => {
     const standard = appKit.match(/async function connectExternalMobileStandard[\s\S]*?\n\}/)?.[0] || '';
     assert.ok(standard, 'connectExternalMobileStandard must exist');
-    // Connect click = await provider.connect(). Chain is applied AS-IS.
+    // Connect click = await provider.connect(). The address settles first.
     assert.match(standard, /await connectCoreWallet\(\)/);
     assert.match(standard, /applyConfirmedWalletState\(/);
-    // NO add/switch cycle at connect — the write guard is the only place
-    // that ever requests Base Sepolia on this path.
+    assert.match(standard, /scheduleMobileOperationalNetworkPrompt\(coreProvider, 'standard mobile connect'\)/);
+    // The connect function itself never performs an add/switch cycle. The
+    // separately scheduled prompt owns the single user-confirmed request.
     assert.doesNotMatch(standard, /ensureExternalMobileBaseSepolia/);
     assert.doesNotMatch(standard, /wallet_addEthereumChain/);
     assert.doesNotMatch(standard, /wallet_switchEthereumChain/);
@@ -258,6 +259,8 @@ test('injected in-app browsers keep their existing connect flow (out of scope)',
 test('all contract write methods share the Base Sepolia guard', () => {
     assert.match(appKit, /window\.ensureArtSoulWriteNetwork = async/);
     assert.match(appKit, /This action requires Base Sepolia\./);
+    assert.match(appKit, /currentChainId !== BASE_SEPOLIA_CHAIN_ID \|\| requiresCoreConfirmation/);
+    assert.match(appKit, /confirmCoreBaseSepolia\(provider, 'write guard'\)/);
     const guardedMethods = [
         'registerArtwork',
         'createAuction',

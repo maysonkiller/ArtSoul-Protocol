@@ -56,6 +56,12 @@ test('connected account menus render the current network and balance row', () =>
   assert.match(avatarDropdown, /const networkInfo = await this\.getCurrentNetworkInfo\(\{ walletAddress \}\);/);
   assert.match(avatarDropdown, /renderMenuContent\(\{ currentPath, isOwnProfile, networkInfo, connected: true \}\)/);
   assert.match(avatarDropdown, /data-network-balance/);
+  assert.match(avatarDropdown, /BASE_SEPOLIA_RPC_URL = 'https:\/\/sepolia\.base\.org'/);
+  assert.match(avatarDropdown, /name: 'Confirm Base Sepolia'/);
+  assert.match(avatarDropdown, /window\.AvatarDropdown\.handleNetworkRowClick\(event\)/);
+  assert.match(avatarDropdown, /window\.isArtSoulBaseSepoliaConfirmed\?\.\(\) === false/);
+  assert.match(avatarDropdown, /baseSepoliaConfirmed: networkInfo\.baseSepoliaConfirmed === true/);
+  assert.match(avatarDropdown, /networkInfo\.baseSepoliaConfirmed !== true/);
 });
 
 test('account menu uses the compact desktop and mobile width contracts', () => {
@@ -78,7 +84,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=37/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=30/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=31/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
