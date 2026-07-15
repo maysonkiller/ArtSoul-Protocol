@@ -23,6 +23,7 @@ test('guest avatar uses the local ArtSoul image with the generated fallback', ()
 
 test('stored wallet hydration never renders a disconnected guest state', () => {
   assert.match(avatarDropdown, /localStorage\.getItem\('artsoul_wallet'\)/);
+  assert.match(avatarDropdown, /document\.documentElement\.classList\.add\('wallet-state-resolving'\)/);
   assert.match(avatarDropdown, /artsoul_header_identity/);
   assert.match(avatarDropdown, /getCachedHeaderIdentity\(storedWallet\)/);
   assert.match(avatarDropdown, /getCachedHeaderNetwork\(storedWallet\)/);
@@ -85,7 +86,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=37/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=33/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=34/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
