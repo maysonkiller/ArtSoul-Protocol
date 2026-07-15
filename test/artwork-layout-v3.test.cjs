@@ -35,9 +35,9 @@ test('profile identities and live bids are linked, named, timed, and newest firs
 });
 
 test('desktop pins the complete left composition and scrolls the right rail', () => {
-    assert.match(styles, /\.artwork-page-root \{[\s\S]*?height: calc\(100dvh - 105px\);[\s\S]*?overflow: hidden;/);
-    assert.match(styles, /\.artwork-page-left \{[\s\S]*?position: sticky;[\s\S]*?"media context"[\s\S]*?"media ai"[\s\S]*?"trust trust"[\s\S]*?overflow: hidden;/);
-    assert.match(styles, /\.artwork-page-right \{[\s\S]*?height: 100%;[\s\S]*?overflow-y: auto;/);
+    assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.artwork-page-root \{[\s\S]*?height: calc\(100dvh - var\(--site-header-height, 77px\)\);[\s\S]*?overflow: hidden;/);
+    assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.artwork-page-left \{[\s\S]*?position: sticky;[\s\S]*?"media context"[\s\S]*?"media ai"[\s\S]*?"trust trust"[\s\S]*?overflow: hidden;/);
+    assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.artwork-page-right \{[\s\S]*?height: 100%;[\s\S]*?overflow-y: auto;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-context \{[\s\S]*?align-self: start;[\s\S]*?height: fit-content;/);
     assert.match(styles, /\.artwork-page-left \.artwork-detail-frame \{[\s\S]*?width: 100%;[\s\S]*?height: 100%;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-trust \{[\s\S]*?width: 100%;[\s\S]*?height: 160px;/);
@@ -57,7 +57,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=26/);
+    assert.match(html, /unified-styles\.css\?v=37/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -78,33 +78,37 @@ test('mobile scroll order matches the rebuilt blocks and disables motion', () =>
     assert.match(styles, /\.artwork-mobile-context,[\s\S]*?\.artwork-mobile-ai,[\s\S]*?\.artwork-mobile-moderation \{[\s\S]*?width: 100%;/);
     assert.match(styles, /animation: none !important;[\s\S]*?transition: none !important;/);
     assert.match(styles, /\.artwork-page-root \.artwork-mobile-auction \{[\s\S]*?padding: 10px;/);
-    assert.match(styles, /max-height: 36dvh;/);
+    assert.match(styles, /\.artwork-page-left \.artwork-detail-frame \{[\s\S]*?max-height: 30svh;/);
 });
 
 test('header keeps a top-right avatar button during wallet initialization', () => {
-    assert.match(html, /class="artwork-header-spacer flex-1"/);
-    assert.match(html, /class="artwork-header-actions flex items-center gap-3"/);
+    assert.match(html, /class="site-header-row"/);
+    assert.match(html, /class="site-header-logo-zone"/);
+    assert.match(html, /class="site-header-actions"/);
     assert.match(html, /data-avatar-render-key="initializing"/);
     assert.match(html, /class="avatar-button"/);
     assert.match(html, /src="\/default-avatar\.png"/);
     assert.match(html, /data-avatar-name>ArtSoul Guest<\/div>/);
-    assert.match(styles, /\.artwork-header-actions \{[\s\S]*?margin-left: auto;/);
-    assert.match(styles, /body\.classic header \.logo-link > \.site-logo,[\s\S]*?height: 52px !important;[\s\S]*?max-height: 52px !important;/);
-    assert.match(styles, /#navButtons \{[\s\S]*?width: 68px;[\s\S]*?height: 48px;/);
-    assert.match(styles, /#navButtons \.avatar-button img \{[\s\S]*?width: 34px !important;[\s\S]*?height: 34px !important;/);
+    assert.match(styles, /\.site-header-row \{[\s\S]*?grid-template-columns: 172px minmax\(0, 1fr\) 172px;/);
+    assert.match(styles, /\.site-header-actions \{[\s\S]*?justify-content: flex-end;/);
+    assert.match(styles, /\.site-header \.site-logo,[\s\S]*?width: 56px !important;[\s\S]*?height: 56px !important;/);
+    assert.match(styles, /\.site-header #navButtons,[\s\S]*?width: 164px !important;[\s\S]*?height: 42px !important;/);
+    assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons,[\s\S]*?width: 48px !important;[\s\S]*?height: 44px !important;/);
 });
 
 test('images keep their aspect ratio and use an in-page lightbox while video and audio controls remain intact', () => {
     assert.match(styles, /artwork-detail-frame:not\(\.artwork-detail-frame-audio\)[\s\S]*?border-width: 1px 0;[\s\S]*?box-shadow: none;/);
-    assert.match(styles, /\.artwork-page-left \.artwork-detail-media-object,[\s\S]*?object-fit: fill;/);
-    assert.match(styles, /\.artwork-page-left \.artwork-detail-image \{[\s\S]*?object-fit: contain;/);
+    assert.match(styles, /\.artwork-page-left \.artwork-detail-media-object,[\s\S]*?object-fit: cover;/);
+    assert.match(styles, /\.artwork-page-left \.artwork-detail-image \{[\s\S]*?object-fit: cover;/);
     assert.match(source, /className="artwork-detail-media-object artwork-detail-image artwork-detail-image-zoomable"/);
     assert.match(source, /window\.ReactDOM\?\.createPortal\?/);
     assert.match(source, /className="artwork-image-lightbox"/);
     assert.match(source, /className="artwork-image-lightbox-close"/);
     assert.doesNotMatch(source, /href=\{url\}/);
     assert.doesNotMatch(source, /requestFullscreen/);
-    assert.match(styles, /\.artwork-image-lightbox \{[\s\S]*?position: fixed;[\s\S]*?object-fit: contain;/);
+    assert.match(styles, /\.artwork-image-lightbox \{[\s\S]*?position: fixed;/);
+    assert.match(styles, /\.artwork-image-lightbox-media \{[\s\S]*?object-fit: contain;/);
+    assert.match(styles, /\.artwork-detail-video:fullscreen,[\s\S]*?object-fit: contain !important;/);
     assert.doesNotMatch(source, /artwork-detail-audio-title/);
     assert.match(source, /className="artwork-detail-audio-controls"/);
     assert.match(source, /className="artwork-detail-audio-player"/);

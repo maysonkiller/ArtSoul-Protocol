@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const context = vm.createContext({ window: {} });
+const context = vm.createContext({ window: { addEventListener: () => {} } });
 vm.runInContext(
   fs.readFileSync('src/ui/components/artwork-card.js', 'utf8'),
   context,
@@ -15,7 +15,7 @@ const { discoveryStatusInfo } = context.window.ArtSoulArtworkCard;
 test('artwork detail uses the shared card status resolver', () => {
   const detail = fs.readFileSync('artwork.html', 'utf8') + fs.readFileSync('src/entries/artwork.jsx', 'utf8');
   assert.match(detail, /ArtSoulArtworkCard\?\.statusInfo\?\.\(auction \? \{/);
-  assert.match(detail, /\{presentationStatus\.label\}/);
+  assert.match(detail, /\{statusForState\.label\}/);
 });
 
 test('cards use one consistent human-readable label per lifecycle state', () => {

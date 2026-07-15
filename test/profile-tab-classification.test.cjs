@@ -7,10 +7,10 @@ const profile = fs.readFileSync('profile.html', 'utf8') + fs.readFileSync('src/e
 test('profile tabs use strict lifecycle and ownership predicates', () => {
   assert.match(profile, /isLiveAuction\?\.\(artwork\) === true/);
   assert.match(profile, /isMintedArtwork\(artwork\) &&[\s\S]*current_owner_address[\s\S]*creator_id \|\| artwork\.creator/);
-  assert.match(profile, /filterCanonicalProfileArtworks\(projected, walletAddress, 'created'\)/);
-  assert.match(profile, /filterCanonicalProfileArtworks\(projected, walletAddress, 'auction'\)/);
-  assert.match(profile, /filterCanonicalProfileArtworks\(projected, walletAddress, 'sold'\)/);
-  assert.match(profile, /filterCanonicalProfileArtworks\(projected, walletAddress, 'collected'\)/);
+  assert.match(profile, /filterCanonicalProfileArtworks\(projected, walletAddress, galleryType\)/);
+  assert.match(profile, /galleryType === 'auction'/);
+  assert.match(profile, /galleryType === 'sold'/);
+  assert.match(profile, /galleryType === 'owned' \|\| galleryType === 'collected'/);
 });
 
 test('local pending artworks appear only in Created Artworks', () => {
@@ -28,10 +28,11 @@ test('Add New is Created-only and loading uses one neutral skeleton state', () =
 });
 
 test('trust is computed once from the complete creator corpus, independent of tabs', () => {
-  assert.match(profile, /refreshDiscoveryProfile\(profileData\)/);
-  assert.match(profile, /creator: profileData\.wallet_address/);
+  assert.match(profile, /function buildDiscoveryProfile\(profileData, fullArtworkCorpus, genesisState\)/);
   assert.match(profile, /computeTrustProfile\(profileData, fullArtworkCorpus/);
-  assert.doesNotMatch(profile, /refreshDiscoveryProfile\(profile, nextArtworks\)/);
+  assert.match(profile, /Promise\.allSettled\(\[/);
+  assert.match(profile, /buildDiscoveryProfile\(profileData, artworkData\.corpus, genesisState\)/);
+  assert.doesNotMatch(profile, /computeTrustProfile\(profileData, artworkData\.items/);
 });
 
 test('profile omits missing and failed media cards', () => {
