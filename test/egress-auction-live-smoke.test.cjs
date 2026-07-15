@@ -54,7 +54,7 @@ test('auction-live returns a new bid that lands after the caller cursor', async 
     if (path.startsWith('v41_auctions')) {
       return [{ auction_id: '42', artwork_id: '7', chain_id: 84532, status: 'active',
         start_price: '1000000000000000000', current_bid: '1500000000000000000',
-        current_bidder: '0xabc', end_time: '2026-07-10T00:00:00.000Z' }];
+        current_bidder: '0xabc', end_time: new Date(Date.now() + 60_000).toISOString() }];
     }
     return [newBid]; // v41_bids
   });

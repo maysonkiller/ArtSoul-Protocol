@@ -5,7 +5,10 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'components', 'artwork-card.js'), 'utf8');
-const window = { ArtSoulSecurity: { isValidStorageUrl: () => true } };
+const window = {
+    ArtSoulSecurity: { isValidStorageUrl: () => true },
+    addEventListener: () => {}
+};
 vm.runInNewContext(source, { window, document: {} });
 const { mediaType, mediaUrl, posterUrl, mediaDescriptor } = window.ArtSoulArtworkCard;
 

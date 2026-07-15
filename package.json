@@ -8,7 +8,9 @@
     "build": "vite build && npm run verify:build",
     "preview": "vite preview --host 0.0.0.0",
     "verify:build": "node scripts/verify-build.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run test:unit && npm run test:contracts",
+    "test:unit": "node scripts/run-unit-tests.mjs",
+    "test:contracts": "hardhat test test/ArtSoulV41.test.cjs"
   },
   "repository": {
     "type": "git",

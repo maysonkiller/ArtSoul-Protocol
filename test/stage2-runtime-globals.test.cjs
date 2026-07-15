@@ -9,7 +9,7 @@ test('React pages and shared card components use one exposed React runtime', () 
   assert.match(runtime, /window\.React = React/);
   assert.match(runtime, /window\.ReactDOM = Object\.assign/);
 
-  for (const entry of ['gallery.jsx', 'artwork.jsx', 'profile.jsx', 'docs.jsx']) {
+  for (const entry of ['gallery.jsx', 'artwork.jsx', 'profile.jsx', 'docs-protocol.jsx']) {
     const source = read(`src/entries/${entry}`);
     assert.match(source, /from '\.\/react-runtime\.js'/, `${entry} must use the shared runtime`);
     assert.doesNotMatch(source, /from 'react'/, `${entry} must not import another React binding`);
@@ -20,7 +20,7 @@ test('React pages and shared card components use one exposed React runtime', () 
   assert.match(read('src/ui/components/artwork-card.js'), /const React = window\.React/);
 });
 
-test('ArtSoulDB exposes the complete auction API used by profile', () => {
+test('ArtSoulDB exposes the complete auction API and profile uses the canonical projection', () => {
   const client = read('supabase-client.js');
   const profile = read('src/entries/profile.jsx');
 
@@ -28,8 +28,8 @@ test('ArtSoulDB exposes the complete auction API used by profile', () => {
   assert.match(client, /state: projectionAuctionState\(artwork\.status\)/);
   assert.match(client, /highestBidder: artwork\.auction_winner_address \|\| artwork\.current_bidder/);
   assert.match(client, /createAuction,[\s\S]*getAuctions,[\s\S]*getActiveAuctions/);
-  assert.match(profile, /window\.ArtSoulDB\.getAuctions\(\)/);
-  assert.match(profile, /auction\.artwork \|\| await window\.ArtSoulDB\.getArtwork/);
+  assert.match(profile, /db\?\.getPublicProjectionArtworks\?\.\(options\)/);
+  assert.match(profile, /filterCanonicalProfileArtworks\(projected, walletAddress, galleryType\)/);
 });
 
 test('homepage projection work starts immediately and server reads are parallel', () => {
