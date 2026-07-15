@@ -1865,16 +1865,136 @@ function openCoreWalletForApproval(provider, method) {
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Mobile wallet approval prompt
+// While an external-mobile core approval request is in flight, the tab is
+// deep-linked to the wallet and back, which can feel like nothing happened.
+// This non-blocking, static hint tells the user what to do and gives a one-tap
+// way to re-open the wallet. Mobile-only, NO animation (canon), theme colors via
+// var(--c-*) only. It never cancels the request; Hide dismisses only the hint.
+const WALLET_APPROVAL_PROMPT_ID = 'artsoul-wallet-approval-prompt';
+let walletApprovalPromptDepth = 0;
+let walletApprovalReopenHandler = null;
+
+function describeApprovalMethod(method) {
+    const normalized = String(method || '').toLowerCase();
+    if (normalized === 'eth_sendtransaction' || normalized === 'eth_signtransaction') {
+        return 'Confirm the transaction in your wallet to continue.';
+    }
+    if (normalized === 'wallet_switchethereumchain' || normalized === 'wallet_addethereumchain') {
+        return 'Approve the Base Sepolia network request in your wallet.';
+    }
+    if (normalized === 'personal_sign' || normalized === 'eth_sign' || normalized.startsWith('eth_signtypeddata')) {
+        return 'Approve the signature request in your wallet to continue.';
+    }
+    return 'Approve the request in your wallet to continue.';
+}
+
+function getApprovalWalletName() {
+    const name = lastSelectedWallet?.name;
+    return (typeof name === 'string' && name.trim()) ? name.trim() : 'your wallet';
+}
+
+function buildWalletApprovalPrompt() {
+    const overlay = document.createElement('div');
+    overlay.id = WALLET_APPROVAL_PROMPT_ID;
+    overlay.setAttribute('role', 'status');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom, 0px) + 16px);transform:translateX(-50%);width:min(440px, calc(100vw - 24px));box-sizing:border-box;z-index:2147483000;padding:14px 16px;border-radius:14px;background:var(--c-surface);border:1px solid var(--c-border-soft);box-shadow:0 10px 30px var(--c-glow);color:var(--c-text);font-family:Inter, Arial, sans-serif;display:flex;gap:12px;align-items:flex-start;';
+
+    const icon = document.createElement('div');
+    icon.textContent = '\u{1F45B}';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.style.cssText = 'font-size:22px;line-height:1.2;flex:0 0 auto;';
+
+    const body = document.createElement('div');
+    body.style.cssText = 'flex:1 1 auto;min-width:0;';
+
+    const title = document.createElement('div');
+    title.textContent = 'Waiting for your wallet';
+    title.style.cssText = 'font-weight:650;font-size:0.92rem;margin-bottom:2px;';
+
+    const desc = document.createElement('div');
+    desc.setAttribute('data-approval-desc', '');
+    desc.style.cssText = 'font-size:0.82rem;color:var(--c-text-muted);line-height:1.35;';
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;';
+
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.setAttribute('data-approval-open', '');
+    openBtn.style.cssText = 'appearance:none;border:0;border-radius:10px;padding:8px 14px;font-size:0.82rem;font-weight:650;cursor:pointer;background:var(--c-accent);color:var(--c-bg);';
+    openBtn.addEventListener('click', () => {
+        try {
+            walletApprovalReopenHandler?.();
+        } catch (error) {
+            console.warn('Wallet re-open failed:', error);
+        }
+    });
+
+    const hideBtn = document.createElement('button');
+    hideBtn.type = 'button';
+    hideBtn.textContent = 'Hide';
+    hideBtn.style.cssText = 'appearance:none;border:1px solid var(--c-border-soft);border-radius:10px;padding:8px 14px;font-size:0.82rem;font-weight:600;cursor:pointer;background:transparent;color:var(--c-text-muted);';
+    hideBtn.addEventListener('click', () => {
+        document.getElementById(WALLET_APPROVAL_PROMPT_ID)?.remove();
+    });
+
+    actions.appendChild(openBtn);
+    actions.appendChild(hideBtn);
+    body.appendChild(title);
+    body.appendChild(desc);
+    body.appendChild(actions);
+    overlay.appendChild(icon);
+    overlay.appendChild(body);
+    return overlay;
+}
+
+function showWalletApprovalPrompt(provider, method) {
+    if (!isMobileDevice() || isInjectedWalletBrowser()) return false;
+    if (typeof document === 'undefined' || !document.body) return false;
+
+    walletApprovalReopenHandler = () => openCoreWalletForApproval(provider, method);
+    walletApprovalPromptDepth += 1;
+
+    let overlay = document.getElementById(WALLET_APPROVAL_PROMPT_ID);
+    if (!overlay) {
+        overlay = buildWalletApprovalPrompt();
+        document.body.appendChild(overlay);
+    }
+    const desc = overlay.querySelector('[data-approval-desc]');
+    if (desc) desc.textContent = describeApprovalMethod(method);
+    const openBtn = overlay.querySelector('[data-approval-open]');
+    if (openBtn) openBtn.textContent = `Open ${getApprovalWalletName()}`;
+
+    walletDebugLog('wallet approval prompt shown', { method });
+    return true;
+}
+
+function hideWalletApprovalPrompt() {
+    walletApprovalPromptDepth = Math.max(0, walletApprovalPromptDepth - 1);
+    if (walletApprovalPromptDepth > 0) return;
+    walletApprovalReopenHandler = null;
+    document.getElementById(WALLET_APPROVAL_PROMPT_ID)?.remove();
+    walletDebugLog('wallet approval prompt hidden', {});
+}
+
 // Shared approval handoff for every core wallet method that pops a wallet sheet
 // (network switch/add AND signatures/transactions). Dispatches the request over
 // the relay and, if the tab is still foreground after a short grace period,
-// deep-links into the wallet so the user actually sees the prompt.
+// deep-links into the wallet AND shows the waiting hint so the user actually
+// sees the prompt. A fast approval settles before the grace period, so no hint
+// flashes.
 async function requestCoreNetworkMethod(provider, request) {
     let settled = false;
+    let promptShown = false;
     const handoffTimer = setTimeout(() => {
-        if (!settled && document.visibilityState === 'visible') {
+        if (settled) return;
+        if (document.visibilityState === 'visible') {
             openCoreWalletForApproval(provider, request.method);
         }
+        promptShown = showWalletApprovalPrompt(provider, request.method) || promptShown;
     }, 350);
 
     try {
@@ -1882,6 +2002,7 @@ async function requestCoreNetworkMethod(provider, request) {
     } finally {
         settled = true;
         clearTimeout(handoffTimer);
+        if (promptShown) hideWalletApprovalPrompt();
     }
 }
 
