@@ -39,5 +39,6 @@ test('modal is limited to re-auction lifecycle states and contains required fiel
 });
 
 test('upload valuation retry cap remains two manual retries after the initial request', () => {
-    assert.match(upload, /const AI_MANUAL_RETRY_LIMIT = 2;/);
+    assert.match(upload, /const AI_TOTAL_ATTEMPT_LIMIT = 3;/);
+    assert.match(upload, /aiValuationAttemptCount >= AI_TOTAL_ATTEMPT_LIMIT/);
 });

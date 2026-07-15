@@ -24,7 +24,8 @@ function loadDiscoveryService() {
 function loadArtworkCard(signals) {
     const context = vm.createContext({
         window: {
-            ArtSoulDiscovery: { getSocialSignals: () => signals }
+            ArtSoulDiscovery: { getSocialSignals: () => signals },
+            addEventListener: () => {}
         },
         console
     });

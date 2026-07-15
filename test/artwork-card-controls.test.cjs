@@ -49,7 +49,10 @@ function loadDomCardRuntime() {
         createElement: tag => new FakeElement(tag, mediaElements),
         querySelectorAll: () => mediaElements
     };
-    const window = { ArtSoulSecurity: { isValidStorageUrl: () => true } };
+    const window = {
+        ArtSoulSecurity: { isValidStorageUrl: () => true },
+        addEventListener: () => {}
+    };
     vm.runInNewContext(source, { window, document });
     return { api: window.ArtSoulArtworkCard, mediaElements };
 }
