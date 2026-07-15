@@ -119,16 +119,23 @@ async function getBackendSession() {
     return null;
 }
 
-async function getActiveChainId(provider) {
-    try {
-        const rawChainId = await provider?.request?.({ method: 'eth_chainId' });
-        if (typeof rawChainId === 'string' && rawChainId.startsWith('0x')) {
-            return parseInt(rawChainId, 16);
-        }
-        return Number(rawChainId) || 84532;
-    } catch {
-        return 84532;
+async function requestWalletProvider(provider, request) {
+    if (typeof window.requestArtSoulWalletProvider === 'function') {
+        return window.requestArtSoulWalletProvider(provider, request);
     }
+    if (!provider?.request) throw new Error('No wallet provider available');
+    return provider.request(request);
+}
+
+async function getActiveChainId(provider) {
+    const rawChainId = await requestWalletProvider(provider, { method: 'eth_chainId' });
+    const chainId = typeof rawChainId === 'string' && rawChainId.startsWith('0x')
+        ? parseInt(rawChainId, 16)
+        : Number(rawChainId);
+    if (!Number.isFinite(chainId) || chainId <= 0) {
+        throw new Error('The wallet did not return an active network.');
+    }
+    return chainId;
 }
 
 function buildSiweMessage(walletAddress, nonce, chainId) {
@@ -167,7 +174,7 @@ async function authenticateWithWallet(walletAddress, provider) {
             throw new Error('No wallet provider available for authentication');
         }
 
-        const providerAccounts = await activeProvider.request({ method: 'eth_accounts' });
+        const providerAccounts = await requestWalletProvider(activeProvider, { method: 'eth_accounts' });
         const providerWallets = (Array.isArray(providerAccounts) ? providerAccounts : [])
             .map(normalizeWalletAddress);
         const selectedProviderWallet = normalizeWalletAddress(activeProvider.selectedAddress);
@@ -201,7 +208,7 @@ async function authenticateWithWallet(walletAddress, provider) {
         let signature;
 
         if (activeProvider && activeProvider.request) {
-            signature = await activeProvider.request({
+            signature = await requestWalletProvider(activeProvider, {
                 method: 'personal_sign',
                 params: [message, normalizedWallet]
             });
