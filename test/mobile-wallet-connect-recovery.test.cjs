@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=37/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=38/, `${page} must load the standard wallet flow`);
     }
     assert.match(appKit, /wallet-core-connect\.js\?v=12/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=12/);
-    assert.match(walletTest, /appkit-init\.js\?v=37/);
+    assert.match(walletTest, /appkit-init\.js\?v=38/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
@@ -343,4 +343,25 @@ test('mobile external metadata carries NO redirect: the user returns to the SAME
     assert.doesNotMatch(walletTestCore, /redirect\s*:/);
     // Desktop AppKit metadata is untouched (redirect is harmless off-mobile).
     assert.match(appKit, /redirect:\s*\{\s*\n\s*universal: appReturnUrl/);
+});
+
+test('core signatures and transactions foreground the wallet like a network switch', () => {
+    // A like/would-buy/watching/Edit-Profile action signs SIWE with no network
+    // switch. On the external-mobile core path that request must reach the
+    // wallet the same way a switch does — through the deep-link handoff — or it
+    // hangs on the relay and the tab looks frozen ("nothing happens").
+    const approvalSet = appKit.match(/const CORE_WALLET_APPROVAL_METHODS = new Set\(\[[\s\S]*?\]\);/)?.[0] || '';
+    assert.ok(approvalSet, 'CORE_WALLET_APPROVAL_METHODS must exist');
+    for (const method of ['personal_sign', 'eth_signtypeddata_v4', 'eth_sendtransaction', 'wallet_switchethereumchain']) {
+        assert.match(approvalSet, new RegExp(`'${method}'`), `approval set must include ${method}`);
+    }
+    // requestArtSoulWalletProvider routes those approval methods through the
+    // handoff wrapper (requestCoreNetworkMethod), not the raw router.
+    const providerRouter = appKit.match(/window\.requestArtSoulWalletProvider = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.ok(providerRouter, 'requestArtSoulWalletProvider must exist');
+    assert.match(providerRouter, /CORE_WALLET_APPROVAL_METHODS\.has\(String\(request\.method\)\.toLowerCase\(\)\)/);
+    assert.match(providerRouter, /return requestCoreNetworkMethod\(coreProvider, request\);/);
+    // Read-only methods still bypass the handoff.
+    assert.match(providerRouter, /request\.method === 'eth_accounts'/);
+    assert.match(providerRouter, /request\.method === 'eth_chainId'/);
 });
