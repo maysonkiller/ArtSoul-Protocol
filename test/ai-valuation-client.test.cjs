@@ -53,7 +53,7 @@ test('can fail gracefully without prompting for an authentication signature', as
 
     await assert.rejects(
         client.request({ title: 'Re-auction' }, { promptAuthentication: false }),
-        /Estimate unavailable/
+        /wallet authorization is not active/
     );
     assert.equal(promptCount, 0);
     assert.equal(requests.length, 0);
