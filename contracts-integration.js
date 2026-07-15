@@ -75,6 +75,49 @@ function formatTransactionError(error, fallback = 'The transaction could not be 
         .trim() || fallback;
 }
 
+// Wallet methods that pop an approval sheet. On the external-mobile core path
+// the wallet app must be foregrounded (the deep-link handoff owned by
+// window.requestArtSoulWalletProvider) or the request sits on the WalletConnect
+// relay with no prompt and the action hangs — the tx promise never settles, so
+// the button stays disabled. ethers dispatches these on the RAW provider, which
+// bypasses that handoff; route only these through the shared router. Reads stay
+// on the raw provider so gas/nonce/chain routing is unchanged, and desktop or
+// injected providers fall through untouched inside the router.
+const WALLET_APPROVAL_METHODS = new Set([
+    'eth_sendtransaction',
+    'eth_signtransaction',
+    'personal_sign',
+    'eth_sign',
+    'eth_signtypeddata',
+    'eth_signtypeddata_v1',
+    'eth_signtypeddata_v3',
+    'eth_signtypeddata_v4'
+]);
+
+function wrapProviderForWalletApprovals(rawProvider) {
+    if (!rawProvider?.request || typeof window === 'undefined'
+        || typeof window.requestArtSoulWalletProvider !== 'function') {
+        return rawProvider;
+    }
+    return new Proxy(rawProvider, {
+        get(target, prop, receiver) {
+            if (prop === 'request') {
+                return (args) => {
+                    const method = String(args?.method || '').toLowerCase();
+                    if (WALLET_APPROVAL_METHODS.has(method)) {
+                        return window.requestArtSoulWalletProvider(target, args);
+                    }
+                    return target.request(args);
+                };
+            }
+            // Read through to the target so provider getters (session, chainId,
+            // connected, ...) evaluate with the real provider as `this`.
+            const value = target[prop];
+            return typeof value === 'function' ? value.bind(target) : value;
+        }
+    });
+}
+
 const CONTRACTS = buildContractConfig(globalThis.ARTSOUL_CONTRACTS);
 
 const NFT_ABI = [
@@ -153,7 +196,7 @@ class ArtSoulContracts {
 
     async init(provider) {
         try {
-            this.provider = new ethers.BrowserProvider(provider);
+            this.provider = new ethers.BrowserProvider(wrapProviderForWalletApprovals(provider));
             const network = await this.provider.getNetwork();
             const chainId = Number(network.chainId);
 
