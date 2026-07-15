@@ -68,24 +68,64 @@ Trust affects discovery ordering only. It never changes price, floor, ownership,
 Public trust weights:
 
 - Verified: 1x
-- Genesis: 2x
+- Genesis: 1.3x *(Amended 2026-07-13 by founder decision. Superseded value: 2x.)*
 - 100+ settlements: 3x
 - Partner: 5x
 
 Use the highest applicable weight, capped at 5x.
 
+**Genesis trust weight — Amended 2026-07-13 by founder decision.** The Genesis attribute contributes a bounded ×1.3 multiplier and never more. It is a status signal, not control. Other weights (100+ settlements 3x, Partner 5x) still apply through the highest-applicable rule, so a Genesis holder who also earns those keeps the higher weight; but Genesis status **by itself** confers at most ×1.3. Genesis aggregate influence must never be able to decide a contest or ranking alone: discovery rankings and contest outcomes must remain winnable by non-Genesis works on organic community demand. Rationale for lowering 2x → 1.3x: with 10,000 holders forming the early active majority, a 2x Genesis weight would let the Genesis cohort effectively decide "best of week" outcomes, corrupting the very public metrics ArtSoul reports. ×1.3 is a felt privilege without capture.
+
+> **Superseded (kept for history):** The prior canon set Genesis trust weight to 2x with no Genesis-specific ceiling beyond the global 5x cap.
+
 Hidden anti-sybil implementation details, private scoring, operational review rules, and abuse heuristics are intentionally excluded from this public repository.
 
 ## 7. Genesis And Top-100k
 
-- Genesis supply: 10,000.
-- #0000 is founder reserved.
-- #0001 through #9999 are public.
-- Genesis is soulbound and mainnet-only.
-- Genesis is a real art NFT with image and animation metadata.
-- Public eligibility uses the approved Discord role and public activity path.
-- Private anti-sybil implementation details stay outside this repository.
+*Section rewritten — Amended 2026-07-13 by founder decision (final Genesis spec). The prior text is preserved as "Superseded" at the end of this section.*
+
+### 7.1 Contract
+
+- Genesis is a **new, dedicated contract, working name `ArtSoulGenesis`**, designed from scratch as part of the contract rework (see `CONTRACT_REWORK_PLAN.md`).
+- The existing testnet `ProjectNFT` (`0xBd17c875962a3cd34F10405234527a41A90A682B`) is a **transferable 100-supply prototype only**. It is **not** Genesis, is **not** extended into Genesis, and is **not** migrated. It is retired at the mainnet migration.
+
+### 7.2 Supply and nature
+
+- Genesis supply: **10,000** total.
+- **Soulbound (non-transferable). Final.**
+- Mainnet-only. Testnet actions never grant Genesis.
+- Genesis is a real art NFT with image and animation metadata (IPFS).
+- **Never sold.** There is no purchase path.
+
+### 7.3 Allocation (placeholders confirmed 2026-07-13)
+
+- **#0 (index 0):** founder.
+- **RESERVED_TEAM = 200:** team, contributors, developers.
+- **~1,000:** awarded for on-chain activity, **on Base mainnet only** (Base gas is cheap enough that real activity starts on mainnet; testnet activity does not qualify).
+- **~8,799 (remainder):** distributed via contests/rewards in **admin-granted batches** (target cadence ~10 per week; **exact contest cadence is tunable**). The founder enters a wallet address in an admin console and a Genesis is granted; the founder never mints manually as an individual claimant.
+
+Distribution is driven by the eligibility engine and the admin console, not by open self-claim.
+
+### 7.4 Utilities — non-economic only
+
+Genesis confers status and belonging, never an economic edge:
+
+- Signature glow/aura site-wide and on the artwork page (visual tier per §13 / doc 16).
+- Increased weight in the trust system: bounded **×1.3** with a hard cap (see §6).
+- Discord role.
+- Contest eligibility and priority.
+- One undisclosed future utility (exists by design; details withheld).
+
+### 7.5 No fee privileges — Final
+
+- **No fee waiver and no fee discount for Genesis holders. Final.**
+- Rationale (recorded): zero or reduced fees enable wash trading — cycling artworks between a holder's own wallets to inflate volume and traction for free. That corrupts public on-chain metrics, the trust ranking, and starves the Ecosystem/Reward Pool that fees fund. Genesis privileges are therefore visual, social, and discovery-weighted only.
+
+### 7.6 Top-100k
+
 - Top-100k is a separate soulbound numbered profile badge, not a transferable NFT and not an artwork aura.
+
+> **Superseded (kept for history):** The prior canon described Genesis only as "supply 10,000; #0000 founder reserved; #0001–#9999 public; soulbound; mainnet-only; real art NFT; public eligibility via the approved Discord role and public activity path." It implied an open public claim (merkle-style self-mint) and did not define the team reserve, the mainnet-activity/contest split, the admin-console batch distribution, the explicit no-fee-privilege rule, or that Genesis is a new dedicated `ArtSoulGenesis` contract distinct from the `ProjectNFT` prototype.
 
 ## 8. Partner Collections
 
@@ -153,11 +193,44 @@ ProtocolTreasury and EcosystemTreasury are separate from company operating capit
 
 - ProtocolTreasury receives protocol fees.
 - Ecosystem Pool receives the 1% resale allocation.
-- Ecosystem Pool funds emerging-artist grants, community growth, and future token liquidity reserve if ever approved.
+- **Ecosystem Pool funds emerging-artist grants, community growth, and the community reward/contest loop** *(Amended 2026-07-13 by founder decision)*.
 - Ecosystem Pool is never used for team salaries, investor distributions, or passive income.
+
+### 14.1 Ecosystem / Reward Pool as a closed loop — Amended 2026-07-13 by founder decision
+
+The 1% ecosystem allocation accrues from sales and resales and funds community rewards and contests once Genesis distribution matures. This forms a closed loop with **no token involved**: fees → pool → contests → activity → fees.
+
+- Architecture (to be finalized in `CONTRACT_REWORK_PLAN.md`): the pool may be a **module inside Core** rather than a separate contract; the decision is made on security and simplicity grounds and recorded there.
+- The token-liquidity-reserve purpose is **removed** from Ecosystem Pool usage because ArtSoul is token-free (§10). A token remains a possible future phase only and must not be referenced in pool mechanics now.
+
+> **Superseded (kept for history):** The prior canon listed "future token liquidity reserve if ever approved" as an Ecosystem Pool use. That contradicts §10 (token out of canon) and is removed.
+
+### 14.2 Known deployed-contract deviation (to fix in the rework, not a canon change)
+
+The deployed Base Sepolia testnet contracts implement resale as **90% seller / 7.5% creator / 2.5% protocol with no Ecosystem Pool split**, and the NFT stores a **7.5%** royalty. This is a **known prototype deviation** from frozen canon (92.5 / 5.5 / 1 / 1, creator royalty 5.5%), to be corrected in the mainnet contract rework. The deployed testnet contracts are non-canonical prototypes and must not be promoted to mainnet.
 
 ## 15. Public Beta And Mainnet
 
 Public beta may use testnet infrastructure and local or hosted indexers. Mainnet requires persistent indexer operations, monitored infrastructure, RLS-secured data access, and completed legal/founder tasks.
 
 Follow `17_ROADMAP_PHASES.md` and `12_IMPLEMENTATION_BACKLOG.md` in order.
+
+## 16. Pre-Mainnet Migration And Data Reset
+
+*New section — Amended 2026-07-13 by founder decision.*
+
+When the reworked contracts are deployed and testnet validation is complete, a **full migration is performed once, before public launch** (start of Phase D). It is mandatory:
+
+1. Purge all legacy testnet data from the database — artworks, auctions, bids, signals, and derived profile stats — so no stale records remain.
+2. Remove all old contract addresses from config and UI.
+3. Storage: legacy testnet media is removed or archived; freed names may be reused (the same artwork titles can be created fresh on the new contracts).
+4. The indexer resets to the new contracts from their deploy block; no legacy chain is indexed for writes (Ethereum Sepolia stays fully retired).
+5. Verification pass: no leftover connections, endpoints, env vars, or UI references to old contracts or networks remain.
+6. Exercise a full publish → auction → settle → mint → resale cycle on the fresh deployment.
+7. Only after all of the above does the public/marketing phase proceed.
+
+This is the mandatory pre-mainnet migration checklist. It runs after the reworked contracts pass a fresh public-testnet cycle and before any mainnet marketing.
+
+## 17. Phase Status
+
+*Amended 2026-07-13 by founder decision.* The project is in **Phase A: Stabilize Public Testnet** (per the PR #91 audit). Earlier informal references to "Phase B" are corrected: Phase B has not started. Align all roadmap references to Phase A.
