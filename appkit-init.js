@@ -17,12 +17,13 @@ import {
     getCoreProviderInstance,
     getCoreSessionChainIds,
     getCoreSessionAddress,
+    getCoreWalletApprovalUrl,
     isCoreConnectInFlight,
     isCoreSessionActive,
     requestCoreWalletMethod,
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=11'
+} from './wallet-core-connect.js?v=12'
 
 // ============================================
 // CONFIGURATION
@@ -34,7 +35,7 @@ const projectId = '9fdc97f91c02d46a28ca9d185a9e58f2';
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_CAIP_ID = 'eip155:84532';
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
-const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation';
+const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
 const CORE_NETWORK_PROMPT_KEY = 'artsoul_core_network_prompt';
 // Mainnet entries are negotiation-only compatibility routes for mobile
 // WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
@@ -119,7 +120,7 @@ let currentNetwork = null;
 let currentBalance = '0.00';
 let lastProcessedAddress = null;
 let lastProcessedChainId = null;
-let isAuthenticating = false;
+let authenticationPromise = null;
 let lastConfirmedWalletAt = 0;
 let activeNetworkSwitchChainId = null;
 let networkModalIntentUntil = 0;
@@ -494,8 +495,11 @@ function isUnknownChainError(error) {
     const message = `${error?.message || ''} ${error?.data?.message || ''}`.toLowerCase();
     return code === 4902 ||
         code === '4902' ||
+        code === -5105 ||
+        code === '-5105' ||
         message.includes('unrecognized chain') ||
         message.includes('unknown chain') ||
+        message.includes('unsupported chain') ||
         message.includes('not been added') ||
         message.includes('not added');
 }
@@ -584,6 +588,26 @@ async function getProviderForWallet(walletAddress) {
 
     return null;
 }
+
+window.requestArtSoulWalletProvider = async (provider, request) => {
+    if (!request?.method) throw new Error('Wallet request method is required');
+
+    const coreProvider = getConnectedCoreProvider();
+    if (provider && provider === coreProvider && coreProvider?.session) {
+        if (request.method === 'eth_accounts') {
+            const address = normalizeWalletAddress(getCoreSessionAddress(coreProvider));
+            return address ? [address] : [];
+        }
+        if (request.method === 'eth_chainId') {
+            const chainId = getLastConfirmedCoreChainId() || resolveCoreSessionChainId(coreProvider);
+            return chainId ? `0x${chainId.toString(16)}` : null;
+        }
+        return requestCoreWalletMethod(coreProvider, request);
+    }
+
+    if (!provider?.request) throw new Error('Wallet provider is not available');
+    return provider.request(request);
+};
 
 window.getArtSoulWalletProviderSource = (provider) => {
     if (provider && provider === getCoreProviderInstance()) return 'mobile core';
@@ -1571,7 +1595,14 @@ async function handleProviderChainConfirmed(chainId, source = 'provider') {
 
     const coreProvider = getConnectedCoreProvider();
     if (coreProvider?.session && source.includes('core')) {
-        writeCoreNetworkConfirmation(coreProvider, normalizedChainId);
+        if (
+            normalizedChainId === BASE_SEPOLIA_CHAIN_ID &&
+            (coreNetworkConfirmationPromise || getCoreSessionChainIds(coreProvider).includes(BASE_SEPOLIA_CHAIN_ID))
+        ) {
+            writeCoreNetworkConfirmation(coreProvider, normalizedChainId);
+        } else if (normalizedChainId !== BASE_SEPOLIA_CHAIN_ID) {
+            writeCoreNetworkConfirmation(coreProvider, null);
+        }
     }
 
     console.log(`Provider chain confirmed from ${source}:`, normalizedChainId);
@@ -1790,31 +1821,76 @@ async function addThenSwitchEthereumChain(provider, target) {
     });
 }
 
-async function addThenSwitchCoreEthereumChain(provider, target) {
-    try {
-        walletDebugLog('core Base Sepolia add request started', { chainId: target.chainId });
-        await requestCoreWalletMethod(provider, {
-            method: 'wallet_addEthereumChain',
-            params: [{
-                chainId: target.hexChainId,
-                chainName: target.chainName,
-                nativeCurrency: target.nativeCurrency,
-                rpcUrls: target.rpcUrls,
-                blockExplorerUrls: target.blockExplorerUrls
-            }]
-        });
-        walletDebugLog('core Base Sepolia add request resolved', { chainId: target.chainId });
-    } catch (error) {
-        if (isUserRejectedError(error)) throw error;
-        walletDebugLog('core Base Sepolia add request non-fatal result', describeWalletDebugError(error));
+function openCoreWalletForApproval(provider, method) {
+    const approvalUrl = getCoreWalletApprovalUrl(provider);
+    walletDebugLog('core wallet approval handoff', {
+        method,
+        available: Boolean(approvalUrl),
+        scheme: approvalUrl ? approvalUrl.split(':')[0] : null
+    });
+    if (!approvalUrl) {
+        window.ErrorHandler?.showToast?.(
+            'Open your wallet to approve the Base Sepolia request.',
+            'info'
+        );
+        return false;
     }
 
-    walletDebugLog('core Base Sepolia switch request started', { chainId: target.chainId });
-    await requestCoreWalletMethod(provider, {
+    window.location.assign(approvalUrl);
+    return true;
+}
+
+async function requestCoreNetworkMethod(provider, request) {
+    let settled = false;
+    const handoffTimer = setTimeout(() => {
+        if (!settled && document.visibilityState === 'visible') {
+            openCoreWalletForApproval(provider, request.method);
+        }
+    }, 350);
+
+    try {
+        return await requestCoreWalletMethod(provider, request);
+    } finally {
+        settled = true;
+        clearTimeout(handoffTimer);
+    }
+}
+
+async function switchThenAddCoreEthereumChain(provider, target) {
+    try {
+        walletDebugLog('core Base Sepolia switch request started', { chainId: target.chainId });
+        await requestCoreNetworkMethod(provider, {
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: target.hexChainId }]
+        });
+        writeCoreNetworkConfirmation(provider, target.chainId);
+        walletDebugLog('core Base Sepolia switch request resolved', { chainId: target.chainId });
+        return;
+    } catch (error) {
+        if (isUserRejectedError(error) || !isUnknownChainError(error)) throw error;
+        walletDebugLog('core Base Sepolia is not registered in wallet', describeWalletDebugError(error));
+    }
+
+    walletDebugLog('core Base Sepolia add request started', { chainId: target.chainId });
+    await requestCoreNetworkMethod(provider, {
+        method: 'wallet_addEthereumChain',
+        params: [{
+            chainId: target.hexChainId,
+            chainName: target.chainName,
+            nativeCurrency: target.nativeCurrency,
+            rpcUrls: target.rpcUrls,
+            blockExplorerUrls: target.blockExplorerUrls
+        }]
+    });
+    walletDebugLog('core Base Sepolia add request resolved', { chainId: target.chainId });
+
+    walletDebugLog('core Base Sepolia switch request restarted', { chainId: target.chainId });
+    await requestCoreNetworkMethod(provider, {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: target.hexChainId }]
     });
-    walletDebugLog('core Base Sepolia switch request resolved', { chainId: target.chainId });
+    writeCoreNetworkConfirmation(provider, target.chainId);
+    walletDebugLog('core Base Sepolia switch request resolved after add', { chainId: target.chainId });
 }
 
 async function waitForCoreBaseSepoliaConfirmation(provider, timeoutMs = CORE_NETWORK_CONFIRMATION_TIMEOUT) {
@@ -1830,8 +1906,8 @@ async function waitForCoreBaseSepoliaConfirmation(provider, timeoutMs = CORE_NET
                 return BASE_SEPOLIA_CHAIN_ID;
             }
 
-            const providerChainId = parseChainId(provider?.chainId);
             const approvedChainIds = getCoreSessionChainIds(provider);
+            const providerChainId = parseChainId(provider?.chainId);
             if (
                 providerChainId === BASE_SEPOLIA_CHAIN_ID &&
                 approvedChainIds.includes(BASE_SEPOLIA_CHAIN_ID)
@@ -1842,7 +1918,7 @@ async function waitForCoreBaseSepoliaConfirmation(provider, timeoutMs = CORE_NET
 
             await waitForWalletResumeOrDelay(NETWORK_CONFIRMATION_INTERVAL);
         }
-        return readCoreNetworkConfirmation(provider);
+        return null;
     } finally {
         deadline.dispose();
     }
@@ -1864,7 +1940,7 @@ async function confirmCoreBaseSepolia(provider, source = 'mobile core session') 
             source,
             topic: getCoreSessionTopic(provider)?.slice(0, 8) || null
         });
-        await addThenSwitchCoreEthereumChain(provider, target);
+        await switchThenAddCoreEthereumChain(provider, target);
         const confirmedChainId = await waitForCoreBaseSepoliaConfirmation(provider);
         if (confirmedChainId !== BASE_SEPOLIA_CHAIN_ID) {
             throw createWalletConnectError(
@@ -3157,68 +3233,92 @@ window.resetWalletConnection = async () => {
  * Prevents disconnect issues from immediate signature requests
  */
 window.ensureAuthenticated = async () => {
-    // Check if wallet is connected
-    let walletAddress = window.getCurrentWalletAddress?.();
-    const connectedDuringThisRequest = !walletAddress;
-    if (!walletAddress) {
-        walletAddress = await window.safeConnectWallet?.();
-        if (!walletAddress) return false;
-    }
+    if (authenticationPromise) return authenticationPromise;
 
-    // A protected action may be the first thing a visitor taps. On an external
-    // mobile browser, finish that deep-link round trip as connect-only; asking
-    // for SIWE immediately would launch a second wallet request whose response
-    // can be lost when the browser is backgrounded. The next protected action
-    // performs the normal SIWE flow with the already-connected session.
-    if (
-        isMobileDevice() &&
-        !isInjectedWalletBrowser() &&
-        (connectedDuringThisRequest || deferMobileAuthenticationThisTurn)
-    ) {
-        deferMobileAuthenticationThisTurn = false;
-        walletDebugLog('SIWE deferred after external mobile wallet connect', {
-            address: maskWalletAddress(walletAddress)
-        });
-        return false;
-    }
-
-    // Check if already authenticated for this exact wallet. A SIWE session
-    // signed by a previous account must never authorize the new active account.
-    if (window.SupabaseAuth) {
-        await window.SupabaseAuth.invalidateSessionForWalletMismatch?.(walletAddress);
-        const isAuth = await (
-            window.SupabaseAuth.isAuthenticatedForWallet?.(walletAddress) ||
-            window.SupabaseAuth.isAuthenticated?.(walletAddress)
-        );
-        if (isAuth) {
-            console.log('Already authenticated for active wallet');
-            walletDebugLog('SIWE session already valid', { address: walletAddress.toLowerCase() });
-            return true;
+    authenticationPromise = (async () => {
+        let walletAddress = window.getCurrentWalletAddress?.();
+        const connectedDuringThisRequest = !walletAddress;
+        if (!walletAddress) {
+            walletAddress = await window.safeConnectWallet?.();
+            if (!walletAddress) return false;
         }
-    }
 
-    // Authenticate with signature
+        // Finish the external-browser connection before starting another
+        // provider request for the operational network or SIWE.
+        if (
+            isMobileDevice() &&
+            !isInjectedWalletBrowser() &&
+            (connectedDuringThisRequest || deferMobileAuthenticationThisTurn)
+        ) {
+            deferMobileAuthenticationThisTurn = false;
+            walletDebugLog('SIWE deferred after external mobile wallet connect', {
+                address: maskWalletAddress(walletAddress)
+            });
+            return false;
+        }
+
+        // A negotiation-only chain may own the restored session. Confirm Base
+        // first so iOS never receives a network prompt and SIWE concurrently.
+        const coreProvider = getConnectedCoreProvider();
+        if (
+            isMobileDevice() &&
+            !isInjectedWalletBrowser() &&
+            coreProvider?.session &&
+            coreSessionNeedsBaseSepoliaConfirmation(coreProvider)
+        ) {
+            const automaticPromptOwnsFeedback = coreNetworkPromptScheduled;
+            try {
+                await window.ensureArtSoulWriteNetwork?.();
+            } catch (error) {
+                walletDebugLog('SIWE blocked until Base Sepolia is confirmed', describeWalletDebugError(error));
+                if (!automaticPromptOwnsFeedback) {
+                    alert(isUserRejectedError(error)
+                        ? 'Network switch was declined. Base Sepolia is required for this action.'
+                        : 'This action requires Base Sepolia. Open your wallet and approve the network request.');
+                }
+                return false;
+            }
+        }
+
+        if (window.SupabaseAuth) {
+            await window.SupabaseAuth.invalidateSessionForWalletMismatch?.(walletAddress);
+            const isAuth = await (
+                window.SupabaseAuth.isAuthenticatedForWallet?.(walletAddress) ||
+                window.SupabaseAuth.isAuthenticated?.(walletAddress)
+            );
+            if (isAuth) {
+                console.log('Already authenticated for active wallet');
+                walletDebugLog('SIWE session already valid', { address: walletAddress.toLowerCase() });
+                return true;
+            }
+        }
+
+        try {
+            console.log('Requesting signature for authentication...');
+            walletDebugLog('SIWE signature requested', { address: maskWalletAddress(walletAddress) });
+
+            const provider = await getProviderForWallet(walletAddress);
+            if (!provider) throw new Error('The active wallet account is not available in the connected provider.');
+
+            const authResult = await window.SupabaseAuth.authenticateWithWallet(
+                walletAddress,
+                provider
+            );
+            console.log('Authenticated:', authResult.user.id);
+            walletDebugLog('SIWE signature verified', { address: maskWalletAddress(walletAddress) });
+            return true;
+        } catch (error) {
+            console.error('Authentication failed:', error);
+            walletDebugLog('SIWE signature failed', { message: error?.message || String(error) });
+            alert('Authentication was not completed. You are connected and can browse, but protected actions need a wallet signature.');
+            return false;
+        }
+    })();
+
     try {
-        console.log('🔐 Requesting signature for authentication...');
-
-        walletDebugLog('SIWE signature requested', { address: maskWalletAddress(walletAddress) });
-
-        // Sign only with the provider that currently controls the active address.
-        const provider = await getProviderForWallet(walletAddress);
-        if (!provider) throw new Error('The active wallet account is not available in the connected provider.');
-
-        const authResult = await window.SupabaseAuth.authenticateWithWallet(
-            walletAddress,
-            provider
-        );
-        console.log('Authenticated:', authResult.user.id);
-        walletDebugLog('SIWE signature verified', { address: maskWalletAddress(walletAddress) });
-        return true;
-    } catch (error) {
-        console.error('Authentication failed:', error);
-        walletDebugLog('SIWE signature failed', { message: error?.message || String(error) });
-        alert('Authentication was not completed. You are connected and can browse, but protected actions need a wallet signature.');
-        return false;
+        return await authenticationPromise;
+    } finally {
+        authenticationPromise = null;
     }
 };
 

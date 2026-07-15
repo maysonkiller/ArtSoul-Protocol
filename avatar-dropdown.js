@@ -18,7 +18,7 @@
             this.profileCache = new Map();
             this.profileRequests = new Map();
             this.headerIdentityStorageKey = 'artsoul_header_identity';
-            this.headerNetworkStorageKey = 'artsoul_header_network';
+            this.headerNetworkStorageKey = 'artsoul_header_network_v2';
             this.headerStateStorageKey = 'artsoul_header_ui_state';
         }
 
@@ -942,17 +942,9 @@
             const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
             if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
             let cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
-            // Mobile core path (WalletConnect session restore is async on every
-            // page load): a stored wallet renders the connected header
-            // immediately, even without a cached identity — the address is the
-            // optimistic identity. Desktop keeps its resolving state.
+            // Reuse only a complete cached identity. When none exists, keep the
+            // fixed-size shell hidden until the final profile identity arrives.
             const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            if (!cachedIdentity && isMobileUA) {
-                cachedIdentity = {
-                    name: `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`,
-                    avatarUrl: this.getDefaultAvatar()
-                };
-            }
             if (!cachedIdentity) {
                 document.documentElement.classList.add('wallet-state-resolving');
                 container.setAttribute('aria-busy', 'true');
