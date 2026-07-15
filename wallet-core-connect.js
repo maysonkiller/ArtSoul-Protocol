@@ -24,10 +24,11 @@ const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 const CORE_RESTORE_TIMEOUT_MS = 4500;
 const CORE_RESTORE_POLL_INTERVAL_MS = 120;
-// Optional chains let wallets sitting on another network settle the session.
-// Nothing on this path ever requests a chain switch — the write guard
-// (ensureArtSoulWriteNetwork) is the only place that ever asks for 84532.
-const OPTIONAL_CHAIN_IDS = [8453, 1];
+// Keep every negotiation chain optional. Requiring 84532 makes
+// EthereumProvider force its local chainId to Base Sepolia even when the
+// wallet settled a namespace that does not contain it. The app confirms Base
+// Sepolia separately after the address settles and before every write.
+const OPTIONAL_CHAIN_IDS = [BASE_SEPOLIA_CHAIN_ID, 8453, 1];
 
 let settings = { projectId: null, metadata: null, log: null };
 let providerInstance = null;
@@ -134,11 +135,39 @@ export function getCoreSessionChainIds(instance = providerInstance) {
     return [...new Set(chainIds)];
 }
 
-// EthereumProvider initializes `chainId` from the dapp's required chain even
-// when a restored wallet session did not approve that chain. Never present
-// that configured value as live wallet truth. Prefer a provider chain that is
-// actually in the session, then the last confirmed chainChanged value when it
-// is still authorized by the same session.
+export function resolveCoreRequestChainId(instance = providerInstance) {
+    const approvedChainIds = getCoreSessionChainIds(instance);
+    if (!approvedChainIds.length) return null;
+
+    const currentChainId = parseCoreChainId(instance?.chainId);
+    const preferredChainIds = [currentChainId, BASE_SEPOLIA_CHAIN_ID, 8453, 1]
+        .filter(Boolean);
+    return preferredChainIds.find((chainId) => approvedChainIds.includes(chainId)) || approvedChainIds[0];
+}
+
+// EthereumProvider.request() always routes through its local chainId. When a
+// wallet has not approved Base Sepolia yet, that route can be fictitious. Send
+// wallet network methods through an actually approved UniversalProvider route.
+export async function requestCoreWalletMethod(instance, request) {
+    if (!instance?.session || !instance?.signer?.request) {
+        throw new Error('WalletConnect session provider is not available');
+    }
+    if (!request?.method) throw new Error('WalletConnect request method is required');
+
+    const routeChainId = resolveCoreRequestChainId(instance);
+    if (!routeChainId) throw new Error('WalletConnect session has no approved EVM request route');
+
+    coreLog('core wallet method routed', {
+        method: request.method,
+        route: `eip155:${routeChainId}`
+    });
+    return instance.signer.request(request, `eip155:${routeChainId}`);
+}
+
+// Never present an SDK-local chainId as live wallet truth unless the session
+// approved it. Prefer a provider chain that is actually in the session, then
+// the last confirmed chainChanged value when it is still authorized by the
+// same session.
 export function resolveCoreSessionChainId(instance = providerInstance, confirmedChainId = null) {
     const sessionChainIds = getCoreSessionChainIds(instance);
     const providerChainId = parseCoreChainId(instance?.chainId);
@@ -197,11 +226,8 @@ function describeCoreError(error) {
     };
 }
 
-// Diagnostic only: requests route to the provider's CURRENT chainId (84532 by
-// construction — chains: [84532]), and the write guard's switch covers every
-// action. But a wallet may approve namespaces WITHOUT eip155:84532 (observed
-// on prod: MetaMask approved [1,59144,8453,...] while provider chainId was
-// 84532). Surface that gap in one line so field logs show it immediately.
+// A wallet may settle without eip155:84532. Surface that gap in one line so
+// field logs show it immediately; network confirmation owns the routed switch.
 function warnIfWriteChainMissing(instance) {
     try {
         const chains = [...new Set(Object.values(instance?.session?.namespaces || {})
@@ -217,18 +243,28 @@ function warnIfWriteChainMissing(instance) {
     }
 }
 
-// The WalletConnect SDK has a pairing/session topic rotation race that
-// surfaces as an unhandled "No matching key" rejection. In the proven
-// bare-provider session it is non-fatal — swallow it so nothing upstream
-// treats it as a failed connection.
+// Suppress only two known non-fatal SDK rejections: stale topic rotation and
+// the recursive switch triggered by an incoming chainChanged event for a
+// chain that was just added.
 function bindStaleTopicRejectionGuard() {
     if (rejectionGuardBound) return;
     rejectionGuardBound = true;
     window.addEventListener('unhandledrejection', (event) => {
         const message = String(event?.reason?.message || event?.reason || '');
+        const stack = String(event?.reason?.stack || '');
         if (/no matching key/i.test(message)) {
             event.preventDefault();
             coreLog('stale WalletConnect topic rejection suppressed', { message: message.slice(0, 160) });
+            return;
+        }
+        const providerRouteMissing = providerInstance?.session &&
+            /getProvider\([^)]*\)\.request|this\.getProvider/i.test(`${message} ${stack}`) &&
+            /ethereum-provider/i.test(stack);
+        if (providerRouteMissing) {
+            event.preventDefault();
+            coreLog('non-fatal WalletConnect SDK provider-route rejection suppressed', {
+                message: message.slice(0, 160)
+            });
         }
     });
 }
@@ -310,7 +346,6 @@ export async function getCoreEthereumProvider() {
             const EthereumProvider = module.EthereumProvider || module.default;
             const instance = await EthereumProvider.init({
                 projectId: settings.projectId,
-                chains: [BASE_SEPOLIA_CHAIN_ID],
                 optionalChains: OPTIONAL_CHAIN_IDS,
                 showQrModal: false,
                 metadata: settings.metadata,
@@ -320,7 +355,7 @@ export async function getCoreEthereumProvider() {
             providerInstance = instance;
             coreLog('core provider initialized', {
                 version: WC_ETHEREUM_PROVIDER_VERSION,
-                chains: [BASE_SEPOLIA_CHAIN_ID],
+                chains: [],
                 optionalChains: OPTIONAL_CHAIN_IDS,
                 sessionRestorable: Boolean(instance.session)
             });
