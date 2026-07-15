@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=36/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=37/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=11/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=11/);
-    assert.match(walletTest, /appkit-init\.js\?v=36/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=12/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=12/);
+    assert.match(walletTest, /appkit-init\.js\?v=37/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
@@ -332,8 +332,11 @@ test('mobile external metadata carries NO redirect: the user returns to the SAME
     }
     const coreConfig = appKit.match(/configureCoreWallet\(\{[\s\S]*?\}\);/)?.[0] || '';
     assert.match(coreConfig, /metadata: coreWalletMetadata/);
-    // The wallet-core module itself never injects a redirect either.
-    assert.doesNotMatch(coreWallet, /redirect/i);
+    // The core CONNECT metadata never injects a redirect. A live session may
+    // use peer metadata only to open the wallet for network approval.
+    assert.match(coreWallet, /getCoreWalletApprovalUrl/);
+    assert.match(appKit, /openCoreWalletForApproval/);
+    assert.match(appKit, /requestCoreNetworkMethod/);
     // The isolated diagnostic core layer mirrors production: no redirect.
     const walletTestCore = walletTest.match(/async function initializeCoreLayer[\s\S]*?updateCoreStatus\(null, null\);/)?.[0] || '';
     assert.ok(walletTestCore, 'wallet-test core layer must exist');

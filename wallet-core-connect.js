@@ -135,6 +135,27 @@ export function getCoreSessionChainIds(instance = providerInstance) {
     return [...new Set(chainIds)];
 }
 
+export function getCoreWalletApprovalUrl(instance = providerInstance) {
+    const redirect = instance?.session?.peer?.metadata?.redirect || {};
+    const candidates = [redirect.native, redirect.universal].filter(Boolean);
+    for (const candidate of candidates) {
+        try {
+            const url = new URL(String(candidate));
+            if (url.protocol === 'http:' || url.protocol === 'https:') {
+                if (url.origin === window.location.origin) continue;
+            }
+            return url.toString();
+        } catch {
+            // Some wallets publish a native scheme without a URL-compatible
+            // host. It is still safe to use when it is an explicit scheme.
+            if (/^[a-z][a-z0-9+.-]*:\/\//i.test(String(candidate))) {
+                return String(candidate);
+            }
+        }
+    }
+    return null;
+}
+
 export function resolveCoreRequestChainId(instance = providerInstance) {
     const approvedChainIds = getCoreSessionChainIds(instance);
     if (!approvedChainIds.length) return null;
@@ -164,20 +185,18 @@ export async function requestCoreWalletMethod(instance, request) {
     return instance.signer.request(request, `eip155:${routeChainId}`);
 }
 
-// Never present an SDK-local chainId as live wallet truth unless the session
-// approved it. Prefer a provider chain that is actually in the session, then
-// the last confirmed chainChanged value when it is still authorized by the
-// same session.
+// A confirmation supplied by the app represents a successful wallet-approved
+// switch for this exact session topic. It outranks the namespace list because
+// some mobile wallets do not extend that list after adding a test network.
+// Without that proof, never present an SDK-local chainId as wallet truth.
 export function resolveCoreSessionChainId(instance = providerInstance, confirmedChainId = null) {
     const sessionChainIds = getCoreSessionChainIds(instance);
     const providerChainId = parseCoreChainId(instance?.chainId);
     const normalizedConfirmedChainId = parseCoreChainId(confirmedChainId);
 
-    if (!sessionChainIds.length) return normalizedConfirmedChainId || providerChainId;
+    if (normalizedConfirmedChainId) return normalizedConfirmedChainId;
+    if (!sessionChainIds.length) return providerChainId;
     if (providerChainId && sessionChainIds.includes(providerChainId)) return providerChainId;
-    if (normalizedConfirmedChainId && sessionChainIds.includes(normalizedConfirmedChainId)) {
-        return normalizedConfirmedChainId;
-    }
     if (sessionChainIds.length === 1) return sessionChainIds[0];
     return null;
 }
