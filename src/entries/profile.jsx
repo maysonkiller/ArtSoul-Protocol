@@ -1357,10 +1357,8 @@ const { useState, useEffect, useRef } = React;
                                                             rel="noopener noreferrer"
                                                             aria-label="View wallet on BaseScan"
                                                             title="View on BaseScan"
-                                                            className={`inline-flex items-center justify-center w-6 h-6 rounded-md cursor-pointer opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ${
-                                                                isClassic
-                                                                    ? 'text-gray-300 border border-gray-600'
-                                                                    : 'text-cyan-300 border border-cyan-500/30'
+                                                            className={`inline-flex items-center justify-center w-6 h-6 cursor-pointer opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ${
+                                                                isClassic ? 'text-gray-300' : 'text-cyan-300'
                                                             }`}
                                                         >
                                                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
