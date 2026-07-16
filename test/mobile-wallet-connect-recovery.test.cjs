@@ -20,11 +20,24 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=39/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=40/, `${page} must load the standard wallet flow`);
     }
     assert.match(appKit, /wallet-core-connect\.js\?v=12/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=12/);
-    assert.match(walletTest, /appkit-init\.js\?v=39/);
+    assert.match(walletTest, /appkit-init\.js\?v=40/);
+});
+
+test('the on-screen wallet debug overlay is fully removed', () => {
+    // The debug overlay was temporary; with the wallet flow green it is gone.
+    // walletDebugLog keeps only a console + in-memory buffer, no DOM panel.
+    assert.doesNotMatch(appKit, /artsoul-wallet-debug/);
+    assert.doesNotMatch(appKit, /screenshot this panel/);
+    assert.doesNotMatch(appKit, /document\.documentElement\.appendChild\(panel\)/);
+    // The standalone overlay file and its per-page loader are gone.
+    assert.equal(fs.existsSync(path.join(__dirname, '..', 'wallet-debug-overlay.js')), false);
+    for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
+        assert.doesNotMatch(read(page), /wallet-debug-overlay/, `${page} must not load the debug overlay`);
+    }
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {

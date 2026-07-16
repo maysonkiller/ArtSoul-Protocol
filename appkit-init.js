@@ -269,41 +269,10 @@ function walletDebugLog(step, detail = null) {
     };
     walletDebugEntries.push(payload);
     if (walletDebugEntries.length > 300) walletDebugEntries.shift();
+    // Console + in-memory buffer only. The on-screen debug panel was removed
+    // once the wallet flow went green; ArtSoulWalletDebug.snapshot() still
+    // exposes the buffer for console-based diagnosis when the flag is set.
     console.log('[ArtSoulWalletDebug]', payload);
-
-    let panel = document.getElementById('artsoul-wallet-debug');
-    if (!panel) {
-        panel = document.createElement('div');
-        panel.id = 'artsoul-wallet-debug';
-        panel.setAttribute('aria-live', 'polite');
-        panel.style.cssText = [
-            'position:fixed',
-            'left:10px',
-            'right:10px',
-            'bottom:10px',
-            'z-index:2147483647',
-            'max-height:42vh',
-            'overflow:auto',
-            'padding:10px',
-            'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
-            'color:var(--c-text)',
-            'background:var(--c-surface)',
-            'border:1px solid var(--c-border)',
-            'border-radius:8px',
-            'box-shadow:0 0 18px var(--c-glow, transparent)',
-            'white-space:pre-wrap'
-        ].join(';');
-        const heading = document.createElement('div');
-        heading.textContent = 'ARTSOUL WALLET DEBUG • screenshot this panel after the failure';
-        heading.style.cssText = 'position:sticky;top:0;padding:4px 0 8px;font-weight:700;color:var(--c-accent);background:var(--c-surface);z-index:1';
-        panel.appendChild(heading);
-        document.documentElement.appendChild(panel);
-    }
-
-    const line = document.createElement('div');
-    line.textContent = `${payload.time} ${step}${payload.detail ? ` ${JSON.stringify(payload.detail)}` : ''}`;
-    panel.appendChild(line);
-    panel.scrollTop = panel.scrollHeight;
 }
 
 function setMobileCoreRestoreState(nextState, detail = null) {
@@ -359,7 +328,6 @@ window.ArtSoulWalletDebug = {
     },
     disable() {
         localStorage.removeItem('artsoul_wallet_debug');
-        document.getElementById('artsoul-wallet-debug')?.remove();
     },
     log: walletDebugLog,
     snapshot() {
