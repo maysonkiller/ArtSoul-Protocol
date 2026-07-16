@@ -178,12 +178,12 @@ const { useState, useEffect, useRef } = React;
                 return resolver?.(profileData, '') || '';
             }
 
-            // Base Sepolia is the protocol network on testnet; the same path is
-            // valid on Base mainnet at basescan.org after migration.
+            // Base mainnet explorer: the protocol targets Base mainnet, so the
+            // profile address always links to basescan.org.
             function getExplorerAddressUrl(address) {
                 const normalized = String(address || '').trim();
                 if (!/^0x[a-fA-F0-9]{40}$/.test(normalized)) return null;
-                return `https://sepolia.basescan.org/address/${normalized}`;
+                return `https://basescan.org/address/${normalized}`;
             }
 
             async function handleCopyAddress(address) {
@@ -1331,30 +1331,23 @@ const { useState, useEffect, useRef } = React;
                                             </h1>
                                             {profile?.wallet_address && (
                                                 <div className="flex items-center gap-2 mb-3 flex-wrap">
-                                                    <span className="text-xs opacity-60 font-mono break-all">
-                                                        {profile.wallet_address.slice(0, 6)}...{profile.wallet_address.slice(-4)}
-                                                    </span>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleCopyAddress(profile.wallet_address)}
-                                                        aria-label="Copy wallet address"
-                                                        title={addressCopied ? 'Copied' : 'Copy wallet address'}
-                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs cursor-pointer transition-opacity hover:opacity-80 ${
-                                                            isClassic
-                                                                ? 'bg-gray-700 text-gray-200 border border-gray-600'
-                                                                : 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30'
-                                                        }`}
+                                                        aria-label={addressCopied ? 'Wallet address copied' : 'Copy wallet address'}
+                                                        title={addressCopied ? 'Copied' : 'Click to copy address'}
+                                                        className="inline-flex items-center gap-1.5 font-mono text-xs opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 p-0 transition-opacity"
                                                     >
+                                                        <span className="break-all">
+                                                            {profile.wallet_address.slice(0, 6)}...{profile.wallet_address.slice(-4)}
+                                                        </span>
                                                         {addressCopied ? (
-                                                            <>
-                                                                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                                                                <span>Copied</span>
-                                                            </>
+                                                            <span className="inline-flex items-center gap-1 flex-shrink-0">
+                                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                                                <span className="not-italic">Copied</span>
+                                                            </span>
                                                         ) : (
-                                                            <>
-                                                                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                                                <span>Copy</span>
-                                                            </>
+                                                            <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                         )}
                                                     </button>
                                                     {getExplorerAddressUrl(profile.wallet_address) && (
@@ -1364,14 +1357,13 @@ const { useState, useEffect, useRef } = React;
                                                             rel="noopener noreferrer"
                                                             aria-label="View wallet on BaseScan"
                                                             title="View on BaseScan"
-                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs cursor-pointer transition-opacity hover:opacity-80 ${
+                                                            className={`inline-flex items-center justify-center w-6 h-6 rounded-md cursor-pointer opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ${
                                                                 isClassic
-                                                                    ? 'bg-gray-700 text-gray-200 border border-gray-600'
-                                                                    : 'bg-cyan-900/40 text-cyan-300 border border-cyan-500/30'
+                                                                    ? 'text-gray-300 border border-gray-600'
+                                                                    : 'text-cyan-300 border border-cyan-500/30'
                                                             }`}
                                                         >
-                                                            <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
-                                                            <span>BaseScan</span>
+                                                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
                                                         </a>
                                                     )}
                                                 </div>
