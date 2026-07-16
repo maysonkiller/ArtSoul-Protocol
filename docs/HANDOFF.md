@@ -14,11 +14,14 @@ Read these files before changing anything:
 
 1. `AGENTS.md`
 2. `docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`
-3. The relevant split canon file in `docs/canon/`
-4. `docs/canon/12_IMPLEMENTATION_BACKLOG.md`
-5. `docs/canon/17_ROADMAP_PHASES.md`
-6. `docs/PROJECT_STATE.md`
-7. This file
+3. `docs/BACKLOG.md`
+4. The relevant split canon file in `docs/canon/`
+5. `docs/canon/12_IMPLEMENTATION_BACKLOG.md`
+6. `docs/canon/17_ROADMAP_PHASES.md`
+7. `docs/PROJECT_STATE.md`
+8. This file
+
+`docs/BACKLOG.md` is the durable cross-phase work register. Put every new chat, report, review, or partner idea there before implementation; the Canon Bible remains authoritative for architecture.
 
 Current phase: **Phase A, Stabilize Public Testnet**.
 
