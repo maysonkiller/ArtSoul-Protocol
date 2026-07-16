@@ -39,7 +39,7 @@ Exit: stable beta, feedback processed, moderation proven, Snapshot A verified, a
 
 Goal: build, test, and audit the product-grade contract and operations topology.
 
-Complete the Core, ArtworkNFT, ArtSoulGenesis, Partner Collections, Ecosystem Pool, indexer/database, admin/eligibility, aura/badge, and promoted-banner work defined in the backlog and `CONTRACT_REWORK_PLAN.md`. Rehearse the final topology on fresh Base Sepolia contracts and hand privileged roles to rehearsal Safes.
+Complete the Core, ArtworkNFT, ArtSoulGenesis, Partner Collections, Ecosystem Pool, indexer/database, admin/eligibility, and aura/badge work defined in the backlog and `CONTRACT_REWORK_PLAN.md`. Consolidate the existing promoted-banner planning delta into the full Bible before implementing that feature. Rehearse the final topology on fresh Base Sepolia contracts and hand privileged roles to rehearsal Safes.
 
 The following remain explicit planning inputs rather than frozen canon:
 
