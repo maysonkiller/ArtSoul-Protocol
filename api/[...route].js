@@ -60,6 +60,12 @@ function routeFromRequest(req) {
 }
 
 export default async function handler(req, res) {
+  // Authenticated and write routes are private by default. Explicit public
+  // handlers may replace Cache-Control with their documented short-lived cache.
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+
   const route = routeFromRequest(req);
   const routeHandler = ROUTES.get(route);
 

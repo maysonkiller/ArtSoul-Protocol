@@ -13,6 +13,7 @@ import crypto from 'crypto';
 import session from 'express-session';
 import rateLimit from 'express-rate-limit';
 import { resolveIndexerChainConfigs } from '../indexer/chain-config.js';
+import { validateSiweMessage } from './backend.js';
 
 dotenv.config();
 
@@ -55,12 +56,39 @@ function resolveApiIndexerConfig() {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+function allowedApiOrigins() {
+    const configured = readEnv(['API_ALLOWED_ORIGINS', 'OAUTH_ALLOWED_ORIGINS']);
+    const origins = configured
+        ? configured.split(',').map(origin => origin.trim()).filter(Boolean)
+        : ['https://artsoul.vercel.app'];
+
+    if (process.env.NODE_ENV !== 'production') {
+        origins.push('http://localhost:5173', 'http://127.0.0.1:5173');
+    }
+
+    return new Set(origins);
+}
+
+const apiOrigins = allowedApiOrigins();
+
 // Middleware
 app.use(cors({
     credentials: true,
-    origin: true
+    origin(origin, callback) {
+        if (!origin || apiOrigins.has(origin)) {
+            callback(null, true);
+            return;
+        }
+        callback(new Error('CORS origin is not allowed'));
+    }
 }));
 app.use(express.json());
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    next();
+});
 
 const globalApiLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -74,7 +102,11 @@ app.use(session({
     secret: requireEnv(['SESSION_SECRET'], 'SESSION_SECRET'),
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true }
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        sameSite: 'lax'
+    }
 }));
 
 const authLimiter = rateLimit({
@@ -145,19 +177,25 @@ app.post('/auth/verify', authLimiter, async (req, res) => {
             return res.status(400).json({ error: 'INVALID_WALLET' });
         }
 
-        // 1. Cryptographic verification
+        // 1. Bind the signed SIWE message to this request before verifying it.
+        validateSiweMessage(req, {
+            message,
+            wallet: walletAddr,
+            nonce
+        });
+
+        // 2. Cryptographic verification
         const recovered = verifyMessage(message, signature);
         if (recovered.toLowerCase() !== walletAddr) {
             return res.status(401).json({ error: 'INVALID_SIGNATURE' });
         }
 
-        // 2. SIWE Nonce verification
-        if (!message.includes(nonce)) {
-            return res.status(401).json({ error: 'NONCE_NOT_IN_MESSAGE' });
-        }
-
+        // 3. Consume the nonce atomically so concurrent requests cannot replay it.
         const nonceResult = await database.query(
-            `SELECT * FROM siwe_nonces WHERE nonce = $1 AND wallet = $2 AND used = false AND expires_at > now()`,
+            `UPDATE siwe_nonces
+             SET used = true
+             WHERE nonce = $1 AND wallet = $2 AND used = false AND expires_at > now()
+             RETURNING nonce`,
             [nonce, walletAddr]
         );
 
@@ -165,17 +203,17 @@ app.post('/auth/verify', authLimiter, async (req, res) => {
             return res.status(401).json({ error: 'INVALID_OR_EXPIRED_NONCE' });
         }
 
-        // 3. Mark nonce as used (prevent replay)
-        await database.query(
-            `UPDATE siwe_nonces SET used = true WHERE nonce = $1`,
-            [nonce]
-        );
-
         req.session.wallet = walletAddr;
         res.json({ success: true, wallet: walletAddr });
     } catch (error) {
-        console.error('[Auth] Verification failed:', error);
-        res.status(500).json({ error: 'Verification failed', details: error.message });
+        const status = Number(error?.statusCode) || 500;
+        if (status >= 500) {
+            console.error('[Auth] Verification failed:', error);
+        }
+        res.status(status).json({
+            error: error?.code || (status >= 500 ? 'VERIFICATION_FAILED' : 'INVALID_AUTH_REQUEST'),
+            ...(status >= 500 ? {} : { message: error.message })
+        });
     }
 });
 

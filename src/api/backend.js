@@ -18,6 +18,59 @@ export function normalizeWallet(value) {
   return isAddress(value) ? value.toLowerCase() : '';
 }
 
+function firstForwardedHeader(value) {
+  return String(value || '').split(',')[0].trim();
+}
+
+function siweField(lines, name) {
+  const prefix = `${name}:`;
+  const line = lines.find(candidate => candidate.startsWith(prefix));
+  return line ? line.slice(prefix.length).trim() : '';
+}
+
+export function validateSiweMessage(req, { message, wallet, nonce, now = Date.now() }) {
+  const lines = String(message || '').replace(/\r\n/g, '\n').split('\n');
+  const requestHost = firstForwardedHeader(req?.headers?.['x-forwarded-host'] || req?.headers?.host);
+  const requestProtocol = firstForwardedHeader(req?.headers?.['x-forwarded-proto']) ||
+    (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  const expectedOrigin = `${requestProtocol}://${requestHost}`;
+  const messageDomain = String(lines[0] || '').replace(' wants you to sign in with your Ethereum account:', '');
+  const messageWallet = normalizeWallet(lines[1]);
+  const messageNonce = siweField(lines, 'Nonce');
+  const version = siweField(lines, 'Version');
+  const uri = siweField(lines, 'URI');
+  const chainId = Number(siweField(lines, 'Chain ID'));
+  const issuedAt = Date.parse(siweField(lines, 'Issued At'));
+
+  let uriOrigin = '';
+  try {
+    uriOrigin = new URL(uri).origin;
+  } catch {
+    // The validation below reports one stable public error for malformed SIWE input.
+  }
+
+  const valid = Boolean(
+    requestHost &&
+    messageDomain.toLowerCase() === requestHost.toLowerCase() &&
+    messageWallet === normalizeWallet(wallet) &&
+    messageNonce === String(nonce || '') &&
+    version === '1' &&
+    Number.isSafeInteger(chainId) && chainId > 0 &&
+    uriOrigin === expectedOrigin &&
+    Number.isFinite(issuedAt) &&
+    issuedAt <= now + (5 * 60 * 1000)
+  );
+
+  if (!valid) {
+    const error = new Error('The sign-in message does not match this ArtSoul request.');
+    error.statusCode = 401;
+    error.code = 'INVALID_SIWE_MESSAGE';
+    throw error;
+  }
+
+  return { chainId, issuedAt, origin: expectedOrigin };
+}
+
 function readEnv(names) {
   for (const name of names) {
     const value = process.env[name];
