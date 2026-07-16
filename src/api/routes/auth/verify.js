@@ -6,7 +6,8 @@ import {
   readJson,
   sendError,
   setWalletSession,
-  supabaseRest
+  supabaseRest,
+  validateSiweMessage
 } from '../../backend.js';
 
 export default async function handler(req, res) {
@@ -19,6 +20,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'INVALID_AUTH_PAYLOAD' });
     }
 
+    validateSiweMessage(req, { message, wallet, nonce });
+
     const recovered = verifyMessage(message, signature).toLowerCase();
     if (recovered !== wallet) {
       return res.status(401).json({ error: 'INVALID_SIGNATURE' });
@@ -28,16 +31,16 @@ export default async function handler(req, res) {
     }
 
     const rows = await supabaseRest(
-      `siwe_nonces?nonce=eq.${encodeURIComponent(nonce)}&wallet=eq.${wallet}&used=eq.false&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=nonce`
+      `siwe_nonces?nonce=eq.${encodeURIComponent(nonce)}&wallet=eq.${wallet}&used=eq.false&expires_at=gt.${encodeURIComponent(new Date().toISOString())}`,
+      {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: { used: true }
+      }
     );
     if (!rows || rows.length === 0) {
       return res.status(401).json({ error: 'INVALID_OR_EXPIRED_NONCE' });
     }
-
-    await supabaseRest(`siwe_nonces?nonce=eq.${encodeURIComponent(nonce)}`, {
-      method: 'PATCH',
-      body: { used: true }
-    });
 
     setWalletSession(res, wallet);
     res.status(200).json({ success: true, wallet });
