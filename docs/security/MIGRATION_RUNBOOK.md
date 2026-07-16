@@ -18,7 +18,8 @@ The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-mi
 - `security_hardening.sql`: **SUPERSEDED, DO NOT APPLY**. It grants direct authenticated writes that conflict with the current server-write boundary.
 - `rls_wallet_fix.sql`: **SUPERSEDED, DO NOT APPLY**. It depends on legacy authenticated JWT wallet claims and direct client writes.
 - `phase18_7a_supabase_security_hardening.sql`: prior partial classification.
-- `phase18_7b_supabase_security_hardening.sql`: current proposed classification. It is not automatically applied and must pass the procedure below.
+- `phase18_7b_supabase_security_hardening.sql`: current proposed public-schema classification. It is not automatically applied and must pass the procedure below.
+- `phase18_7c_supabase_storage_hardening.sql`: current proposed `storage.objects` policy hardening for the `artworks` bucket. It is not automatically applied and must pass the storage procedure below. Independent of 18.7b; either order is safe, but capture the storage verification (section 8) around it.
 
 ## Existing Production Database
 
@@ -46,6 +47,30 @@ Do not run `node scripts/apply-migrations.js --apply` against production until t
 10. Only after steps 1-9 are evidenced may the live baseline be entered into `artsoul_schema_migrations`. Baseline insertion is a manual database-owner action and is not automated by this repository.
 
 If any verification result is unexpected, stop. Roll back using the database backup or the transaction before continuing; do not edit production until the classification is understood.
+
+## Supabase Storage Hardening (Phase 18.7c)
+
+This targets `storage.objects` policies for the `artworks` bucket only. It does not modify `storage.buckets` or any object data, and it does not touch other buckets.
+
+Background: signed uploads do not need client write policies. The server creates a short-lived signed upload URL with the service_role key (`src/api/routes/upload/file.js` → `supabaseStorageRest('object/upload/sign/...')` in `src/api/backend.js`). The service_role bypasses RLS, and the signed upload token authorizes the single object write on the storage server. Neither path consults an anon/authenticated INSERT/UPDATE/DELETE policy, so removing those policies does not break uploads. Public reads keep working because the bucket is public and one canonical SELECT policy is retained.
+
+Pre-application (do not skip):
+
+1. Confirm a current database backup exists (the same backup taken for 18.7b is sufficient if nothing changed since).
+2. Run section 8 of `sql/verification/phase_a_security_verification.sql`. Export the 8a full inventory, 8b write-policy, 8c select-policy, and 8d aggregate grids with timestamp and environment. Expected before: multiple duplicate SELECT rows and the observed INSERT/UPDATE/DELETE rows; 8d shows `write_policies > 0` and `select_policies > 1`.
+3. Review `phase18_7c_supabase_storage_hardening.sql`. If 8a shows a write or artworks SELECT policy whose name is not in the migration's explicit `DROP` list, confirm the defensive sweep would match it (it references the `artworks` bucket in `qual`/`with_check`); if a bucket-agnostic write policy such as `Authenticated users can upload` also serves another bucket, decide and record whether that bucket should keep direct writes before applying.
+
+Application:
+
+4. Apply `phase18_7c_supabase_storage_hardening.sql` manually in the Supabase SQL editor. It is one transaction.
+
+Post-application:
+
+5. Re-run section 8. Expected after: 8b returns zero rows; 8c returns exactly one row, `artsoul_artworks_public_read`; 8d returns `write_policies = 0` and `select_policies = 1`; `storage.buckets` unchanged (artworks still `public = true`).
+6. Smoke test, in the deployed app, a wallet-authenticated artwork upload (must still succeed through the server signed-URL path) and an unauthenticated public read of an existing artwork object (must still load).
+7. Confirm, using an anon/authenticated client key, that a direct client INSERT/UPDATE/DELETE to `storage.objects` for the artworks bucket is now rejected.
+
+If any post-application result is unexpected, roll back with the transaction or restore from backup; a public bucket with no SELECT policy still serves public downloads, but re-run until 8c shows exactly the canonical policy.
 
 ## Fresh Or Already-Ledgered Environment
 

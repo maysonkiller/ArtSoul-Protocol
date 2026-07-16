@@ -170,3 +170,79 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   const missing = [...createdTables].filter(table => !hardening.includes(`'${table}'`));
   assert.deepEqual(missing, []);
 });
+
+const STORAGE_HARDENING_PATH = 'sql/migrations/phase18_7c_supabase_storage_hardening.sql';
+
+function readStorageHardening() {
+  return fs.readFileSync(path.join(REPO_ROOT, STORAGE_HARDENING_PATH), 'utf8');
+}
+
+test('Phase 18.7c drops every observed artworks storage policy by name', () => {
+  const storage = readStorageHardening();
+  const observedPolicies = [
+    'Anyone can view artworks',
+    'Public Access for artworks',
+    'Public can view',
+    'Authenticated can upload to artworks',
+    'Authenticated users can upload',
+    'Authenticated users can upload to artworks',
+    'Users can update own files in artworks',
+    'Users can delete own files in artworks'
+  ];
+  for (const policy of observedPolicies) {
+    assert.match(
+      storage,
+      new RegExp(`DROP POLICY IF EXISTS "${policy}" ON storage\\.objects`),
+      `expected 18.7c to drop "${policy}"`
+    );
+  }
+});
+
+test('Phase 18.7c retains exactly one artworks SELECT policy and creates no write policy', () => {
+  const storage = readStorageHardening();
+
+  // Exactly one CREATE POLICY, and it is a SELECT policy for the artworks bucket.
+  const createPolicies = storage.match(/CREATE POLICY/g) || [];
+  assert.equal(createPolicies.length, 1);
+  assert.match(storage, /artsoul_artworks_public_read/);
+  assert.match(storage, /FOR SELECT TO public USING \(bucket_id = %L\)/);
+
+  // No client-facing write policy is (re)created.
+  assert.doesNotMatch(storage, /CREATE POLICY[\s\S]*FOR INSERT/i);
+  assert.doesNotMatch(storage, /FOR UPDATE/i);
+  assert.doesNotMatch(storage, /FOR DELETE/i);
+});
+
+test('Phase 18.7c does not modify storage buckets or object data', () => {
+  const storage = readStorageHardening();
+  // It may mention storage.buckets in comments, but must never mutate it or object rows.
+  assert.doesNotMatch(storage, /ALTER\s+TABLE\s+storage\.buckets/i);
+  assert.doesNotMatch(storage, /(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+storage\.buckets/i);
+  assert.doesNotMatch(storage, /(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+storage\.objects/i);
+});
+
+test('the signed server-side upload flow is preserved', () => {
+  const uploadRoute = fs.readFileSync(
+    path.join(REPO_ROOT, 'src/api/routes/upload/file.js'),
+    'utf8'
+  );
+  const backend = fs.readFileSync(path.join(REPO_ROOT, 'src/api/backend.js'), 'utf8');
+
+  // Uploads still go through a server-created signed upload URL.
+  assert.match(uploadRoute, /object\/upload\/sign\//);
+  assert.match(uploadRoute, /assertServiceRoleKey\(\)/);
+  // The signing request is made with the Supabase service role key server-side.
+  assert.match(backend, /supabaseStorageRest/);
+  assert.match(backend, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
+test('the storage verification asserts the post-hardening artworks policy counts', () => {
+  const verification = fs.readFileSync(
+    path.join(REPO_ROOT, 'sql/verification/phase_a_security_verification.sql'),
+    'utf8'
+  );
+  assert.match(verification, /write_policies/);
+  assert.match(verification, /select_policies/);
+  assert.match(verification, /schemaname = 'storage'/);
+  assert.match(verification, /tablename = 'objects'/);
+});

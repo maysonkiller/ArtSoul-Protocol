@@ -27,6 +27,7 @@ Use `node scripts/apply-migrations.js` for a dry run. Existing production databa
 - `security_hardening.sql`: do not apply.
 - `rls_wallet_fix.sql`: do not apply.
 - `phase18_7a_supabase_security_hardening.sql`: prior partial classification.
-- `phase18_7b_supabase_security_hardening.sql`: current reviewed proposal, manual application only.
+- `phase18_7b_supabase_security_hardening.sql`: current reviewed public-schema proposal, manual application only.
+- `phase18_7c_supabase_storage_hardening.sql`: current reviewed `storage.objects` (artworks bucket) proposal, manual application only. Preserves the server-signed upload flow.
 
 All remaining SQL files are feature/manual migrations. Their presence in this directory does not prove they were applied to any environment.
