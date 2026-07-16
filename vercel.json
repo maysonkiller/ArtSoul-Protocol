@@ -12,7 +12,16 @@
       ]
     },
     {
-      "source": "/docs-protocol.html",
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(index|gallery|artwork|profile|upload|docs-protocol)\\.html",
       "headers": [
         {
           "key": "Cache-Control",
