@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=38/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=39/, `${page} must load the standard wallet flow`);
     }
     assert.match(appKit, /wallet-core-connect\.js\?v=12/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=12/);
-    assert.match(walletTest, /appkit-init\.js\?v=38/);
+    assert.match(walletTest, /appkit-init\.js\?v=39/);
 });
 
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
@@ -379,4 +379,28 @@ test('core signatures and transactions foreground the wallet like a network swit
     // Read-only methods still bypass the handoff.
     assert.match(providerRouter, /request\.method === 'eth_accounts'/);
     assert.match(providerRouter, /request\.method === 'eth_chainId'/);
+});
+
+test('a non-blocking waiting hint shows while a mobile approval is in flight', () => {
+    // The deep-link round trip can feel like nothing happened. The hint tells the
+    // user to approve in their wallet and offers a one-tap re-open.
+    assert.match(appKit, /function showWalletApprovalPrompt\(provider, method\)/);
+    assert.match(appKit, /function hideWalletApprovalPrompt\(\)/);
+    // Mobile-only: never renders on desktop / injected in-app browsers.
+    assert.match(appKit, /if \(!isMobileDevice\(\) \|\| isInjectedWalletBrowser\(\)\) return false;/);
+    // requestCoreNetworkMethod shows on the same grace timer as the handoff and
+    // always hides in the finally, but only if it actually showed (balanced).
+    const handoff = appKit.match(/async function requestCoreNetworkMethod\(provider, request\) \{[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(handoff, 'requestCoreNetworkMethod must exist');
+    assert.match(handoff, /promptShown = showWalletApprovalPrompt\(provider, request\.method\) \|\| promptShown;/);
+    assert.match(handoff, /if \(promptShown\) hideWalletApprovalPrompt\(\);/);
+    // The Open button re-triggers the wallet handoff.
+    assert.match(appKit, /walletApprovalReopenHandler = \(\) => openCoreWalletForApproval\(provider, method\);/);
+    // Canon: colors via theme variables, and no animation on the mobile hint.
+    const promptBuilder = appKit.match(/function buildWalletApprovalPrompt\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(promptBuilder, 'buildWalletApprovalPrompt must exist');
+    assert.match(promptBuilder, /var\(--c-surface\)/);
+    assert.match(promptBuilder, /var\(--c-accent\)/);
+    assert.doesNotMatch(promptBuilder, /@keyframes|animation:|transition:/);
+    assert.doesNotMatch(promptBuilder, /#[0-9a-fA-F]{3,6}\b/);
 });
