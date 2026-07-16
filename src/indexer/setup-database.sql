@@ -4,6 +4,9 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Apply migrations in order
+\i sql/migrations/001_core_indexer_schema.sql
+\i sql/migrations/002_auction_state_schema.sql
+\i sql/migrations/003_resilience_schema.sql
 \i src/indexer/migrations/004_distributed_locks.sql
 \i src/indexer/migrations/005_event_idempotency.sql
 \i src/indexer/migrations/006_ownership_observability.sql
