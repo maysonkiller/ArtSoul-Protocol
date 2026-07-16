@@ -48,7 +48,6 @@ const legacyRootAssets = [
     'ui-core.css',
     'unified-styles.css',
     'wallet-core-connect.js',
-    'wallet-debug-overlay.js',
     'wallet-test.js'
 ];
 

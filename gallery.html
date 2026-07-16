@@ -61,24 +61,6 @@
     <script src="src/features/discovery/discovery-service.js?v=1"></script>
     <script src="src/ui/components/artwork-card.js?v=8"></script>
     <script src="avatar-dropdown.js?v=36"></script>
-    <!-- On-screen wallet debug overlay for mobile diagnosis; fetched only when wallet debug is enabled -->
-    <script>
-        (function () {
-            try {
-                var params = new URLSearchParams(location.search);
-                var hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
-                var flag = params.get('walletdebug') || params.get('walletDebug') ||
-                    hashParams.get('walletdebug') || hashParams.get('walletDebug');
-                if (flag === '0') return;
-                if (flag !== '1' && localStorage.getItem('artsoul_wallet_debug') !== '1') return;
-                var script = document.createElement('script');
-                script.src = 'wallet-debug-overlay.js?v=2';
-                document.head.appendChild(script);
-            } catch (error) {
-                // Diagnostics only - never block the page.
-            }
-        })();
-    </script>
     <script type="module" src="appkit-init.js?v=38"></script>
     <style>
         @keyframes spin {
