@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # package-lock.json is generated with npm 11. Node 22 bundles npm 10,
+      # which computes the optional-dependency tree differently and would
+      # reject the lock as out of sync. Pinning npm keeps `npm ci`
+      # deterministic regardless of the npm that ships with the Node runtime.
+      - name: Pin npm to the lockfile generator
+        run: npm install -g npm@11.6.2
+
+      # npm ci performs a clean, lockfile-exact install and fails if
+      # package.json and package-lock.json are out of sync, keeping the
+      # dependency set reproducible across runners.
+      - name: Install dependencies (reproducible)
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Node unit tests
+        run: npm run test:unit
+
+      # The contract suite is the only process that loads Hardhat. Running it
+      # on its own (never through the generic node --test runner and never in
+      # parallel with a second Hardhat process) means the global Hardhat config
+      # directory is created exactly once, which avoids the historical Windows
+      # config-directory EEXIST collision. windows-latest is kept in the matrix
+      # so that determinism stays verified on the affected platform.
+      - name: Hardhat contract tests
+        run: npm run test:contracts
+
+  static-checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Syntax-only gate. On a pull request it checks the JavaScript files the
+      # branch actually changed; on push (no PR base) it falls back to every
+      # tracked JavaScript file so the gate is still meaningful.
+      - name: node --check on changed JavaScript
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${BASE_SHA:-}" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "Checking JavaScript changed since ${BASE_SHA}"
+            mapfile -t files < <(git diff --name-only --diff-filter=ACMR "${BASE_SHA}...HEAD" -- '*.js' '*.cjs' '*.mjs')
+          else
+            echo "No pull-request base available; checking all tracked JavaScript"
+            mapfile -t files < <(git ls-files '*.js' '*.cjs' '*.mjs')
+          fi
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No JavaScript files to check."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            [ -f "$f" ] || continue
+            echo "node --check $f"
+            node --check "$f"
+          done
+
+      - name: git diff --check (whitespace and conflict markers)
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${BASE_SHA:-}" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git diff --check "${BASE_SHA}" HEAD
+          else
+            git diff --check
+          fi
