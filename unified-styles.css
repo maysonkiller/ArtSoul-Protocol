@@ -4532,6 +4532,16 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     max-width: 100%;
 }
 
+/* Desktop only: the social chips (X / Discord) and the Edit Profile button
+   stack in block flow with no gap, so the Future gradient button sat flush
+   against the chips and its skewed edge overlapped the X chip. Give the edit
+   action clear separation. Mobile has its own spacing in the query below. */
+@media (min-width: 769px) {
+    .profile-inline-edit-action {
+        margin-top: 0.85rem;
+    }
+}
+
 @media (max-width: 768px) {
     :root {
         --site-gutter: 14px;
