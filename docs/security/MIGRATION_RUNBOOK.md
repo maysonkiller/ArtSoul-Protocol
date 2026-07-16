@@ -70,6 +70,19 @@ Post-application:
 6. Smoke test, in the deployed app, a wallet-authenticated artwork upload (must still succeed through the server signed-URL path) and an unauthenticated public read of an existing artwork object (must still load).
 7. Confirm, using an anon/authenticated client key, that a direct client INSERT/UPDATE/DELETE to `storage.objects` for the artworks bucket is now rejected.
 
+Bucket guardrails (required defense in depth):
+
+8. In the Supabase Storage dashboard, edit the `artworks` bucket. Do not update Supabase-managed `storage.buckets` rows with handwritten SQL.
+9. Set the file-size limit to **100 MB** (`104857600` bytes).
+10. Set the allowed MIME types to the same boundary enforced by `src/api/routes/upload/file.js`:
+
+    ```text
+    image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/aac,audio/mp4,application/json
+    ```
+
+    `application/json` is required for the metadata upload path. The bucket limit is shared, so the stricter 256 KB metadata limit remains enforced by the server route.
+11. Re-run verification section 8 and retain the bucket row showing the expected limit and MIME allowlist. Smoke-test one supported media upload and one metadata upload. Also verify that an unsupported MIME type and an upload larger than 100 MB are rejected.
+
 If any post-application result is unexpected, roll back with the transaction or restore from backup; a public bucket with no SELECT policy still serves public downloads, but re-run until 8c shows exactly the canonical policy.
 
 ## Fresh Or Already-Ledgered Environment
