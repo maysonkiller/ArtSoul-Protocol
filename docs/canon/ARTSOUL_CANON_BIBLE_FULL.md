@@ -10,7 +10,7 @@ The internal codename is V4.1. Do not expose the version label in user-facing UI
 - The public product reads indexed projections from `/api/public/artworks`.
 - Local pending state is only a temporary bridge after a confirmed transaction while the indexer catches up.
 - Legacy Supabase artwork rows are compatibility/history only and must not become public canonical truth.
-- The canonical chain is Base. Testnets may use Base Sepolia and Ethereum Sepolia during development, but mainnet scope is single-chain Base.
+- The canonical chain is Base. Base Sepolia is the only active product testnet. Historical Ethereum Sepolia records may remain readable during migration work, but Ethereum Sepolia is not an active write network or a selectable product network.
 
 ## 2. Artwork Lifecycle
 
@@ -29,7 +29,7 @@ The internal codename is V4.1. Do not expose the version label in user-facing UI
 
 > **FUTURE / MAINNET REDEPLOY ONLY - NOT CURRENT TESTNET BEHAVIOR**
 
-Expired auctions that received NO bids should auto-finalize on-chain - the protocol should NOT require a separate manual "End Expired Auction" transaction before the work can be re-auctioned. After an auction's time expires with no bids, the work should automatically return to a re-auctionable state. (The current testnet contract requires a manual finalize step; this is to be removed in the next contract version.)
+Expired auctions that received NO bids must become re-auctionable without a user-facing "End Expired Auction" step. A contract cannot execute itself on a timer, so the next contract version must expose deterministic, permissionless finalization that can be triggered lazily by the next interaction, by a motivated creator, or by keeper infrastructure. The caller can trigger the transition but cannot choose its outcome. The current testnet contract's manual user workflow is not the target behavior.
 
 This requirement does not change the no-bid economic outcome: no NFT is minted and no floor is created. It is a contract-state transition requirement for the next mainnet contract version, not a description of the deployed testnet contract.
 
@@ -44,6 +44,14 @@ These values are frozen unless the canon is formally amended before deployment:
 - Bid increment: max(+0.01 ETH, +2.5%).
 - Auction durations: 24h, 36h, or 48h.
 - Settlement window: 24h.
+
+### 3.1 Losing-bidder refund architecture
+
+- Losing bidders receive their refundable deposit obligation in full. The default penalty applies only to the defaulted winner.
+- Finalization records deterministic refund obligations; it must not depend on every losing bidder sending a transaction.
+- Refund execution is bounded and batchable so an auction with many bidders cannot create an unbounded-gas finalization loop.
+- Keeper or protocol automation may process bounded refund batches. A failed transfer becomes an individually withdrawable credit so one recipient cannot block finalization for everyone else.
+- Every terminal auction state must account for each deposit exactly once. Contract tests must cover batching, failed-recipient fallback, idempotency, and double-payment prevention.
 
 ## 4. Lazy Minting And Floor
 
@@ -97,14 +105,16 @@ Hidden anti-sybil implementation details, private scoring, operational review ru
 - Genesis is a real art NFT with image and animation metadata (IPFS).
 - **Never sold.** There is no purchase path.
 
-### 7.3 Allocation (placeholders confirmed 2026-07-13)
+### 7.3 Allocation boundaries (confirmed 2026-07-13)
 
 - **#0 (index 0):** founder.
 - **RESERVED_TEAM = 200:** team, contributors, developers.
 - **~1,000:** awarded for on-chain activity, **on Base mainnet only** (Base gas is cheap enough that real activity starts on mainnet; testnet activity does not qualify).
-- **~8,799 (remainder):** distributed via contests/rewards in **admin-granted batches** (target cadence ~10 per week; **exact contest cadence is tunable**). The founder enters a wallet address in an admin console and a Genesis is granted; the founder never mints manually as an individual claimant.
+- **~8,799 (remainder):** distributed via contests/rewards in **admin-granted batches**.
 
 Distribution is driven by the eligibility engine and the admin console, not by open self-claim.
+
+The numeric grant cadence is an operational policy, not frozen canon. It remains tunable and must not be hard-coded from a roadmap placeholder. Grants must use published eligibility categories, durable grant records, an audit log, and multisig-authorized administration. No single operator receives undocumented discretion to redirect reserved supply.
 
 ### 7.4 Utilities — non-economic only
 
@@ -200,6 +210,8 @@ ProtocolTreasury and EcosystemTreasury are separate from company operating capit
 
 The 1% ecosystem allocation accrues from sales and resales and funds community rewards and contests once Genesis distribution matures. This forms a closed loop with **no token involved**: fees → pool → contests → activity → fees.
 
+The activation threshold for pool-funded contests is not frozen canon. A numeric date, distribution count, or percentage may be proposed during Phase C, but it remains an undecided operational and treasury-governance input until explicitly approved and recorded. Roadmap estimates must not silently become protocol mechanics.
+
 - Architecture (to be finalized in `CONTRACT_REWORK_PLAN.md`): the pool may be a **module inside Core** rather than a separate contract; the decision is made on security and simplicity grounds and recorded there.
 - The token-liquidity-reserve purpose is **removed** from Ecosystem Pool usage because ArtSoul is token-free (§10). A token remains a possible future phase only and must not be referenced in pool mechanics now.
 
@@ -221,16 +233,27 @@ Follow `17_ROADMAP_PHASES.md` and `12_IMPLEMENTATION_BACKLOG.md` in order.
 
 When the reworked contracts are deployed and testnet validation is complete, a **full migration is performed once, before public launch** (start of Phase D). It is mandatory:
 
-1. Purge all legacy testnet data from the database — artworks, auctions, bids, signals, and derived profile stats — so no stale records remain.
-2. Remove all old contract addresses from config and UI.
-3. Storage: legacy testnet media is removed or archived; freed names may be reused (the same artwork titles can be created fresh on the new contracts).
-4. The indexer resets to the new contracts from their deploy block; no legacy chain is indexed for writes (Ethereum Sepolia stays fully retired).
-5. Verification pass: no leftover connections, endpoints, env vars, or UI references to old contracts or networks remain.
-6. Exercise a full publish → auction → settle → mint → resale cycle on the fresh deployment.
-7. Only after all of the above does the public/marketing phase proceed.
+1. Freeze and export **Snapshot A** before any destructive reset. The export must be versioned, reproducible, machine-readable, and durable; include the source cut-off, participating addresses, qualifying public events with timestamps, aggregate counts, and a cryptographic manifest/hash; and be verified from at least two independent durable storage locations. Snapshot A is a community record only and creates no Genesis, token, points, airdrop, or other entitlement.
+2. Prove that the Snapshot A export can be read and independently validated after the application database is reset. Record the verification result and export schema in the migration runbook.
+3. Purge all legacy testnet product data from the live database — artworks, auctions, bids, signals, and derived profile stats — so no stale records remain. The separately preserved Snapshot A export is not re-imported as live product state.
+4. Remove all old contract addresses from config and UI.
+5. Storage: legacy testnet media is removed or archived; freed names may be reused (the same artwork titles can be created fresh on the new contracts).
+6. The indexer resets to the new contracts from their deploy block; no legacy chain is indexed for writes (Ethereum Sepolia stays fully retired).
+7. Verification pass: no leftover connections, endpoints, env vars, or UI references to old contracts or networks remain.
+8. Exercise a full publish → auction → settle → mint → resale cycle on the fresh deployment.
+9. Only after all of the above does the public/marketing phase proceed.
 
 This is the mandatory pre-mainnet migration checklist. It runs after the reworked contracts pass a fresh public-testnet cycle and before any mainnet marketing.
 
-## 17. Phase Status
+## 17. Phase Status And Canonical Phase Model
 
-*Amended 2026-07-13 by founder decision.* The project is in **Phase A: Stabilize Public Testnet** (per the PR #91 audit). Earlier informal references to "Phase B" are corrected: Phase B has not started. Align all roadmap references to Phase A.
+*Aligned 2026-07-16 by founder decision.* The canonical roadmap has four phases:
+
+- **Phase A: Stabilize Public Testnet** (active).
+- **Phase B: Public Beta**.
+- **Phase C: Mainnet Preparation**.
+- **Phase D: Staged Mainnet Launch**.
+
+`17_ROADMAP_PHASES.md` and `12_IMPLEMENTATION_BACKLOG.md` expand this model but remain subordinate to this Bible. They may schedule work; they may not create economics, contract mechanics, Genesis grant cadence, treasury triggers, legal-entity decisions, or product scope that the Bible has not approved.
+
+Earlier informal A–G plans are retired. Their stabilization and testnet work maps to Phase A; beta and cohort work maps to Phase B; contract rework, Genesis, Collections, security review, legal readiness, and final visual work map to Phase C; deployment and staged activation map to Phase D. Historical token or multichain phases have no current mapping and remain out of scope.
