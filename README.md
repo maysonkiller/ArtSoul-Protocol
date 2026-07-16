@@ -47,6 +47,8 @@ The public site can be explored without credentials. Wallet transactions current
 
 The protocol canon lives in `docs/canon/`.
 
+Current and completed work is tracked in the [durable project backlog](docs/BACKLOG.md). New ideas must be recorded there before implementation so chat threads do not become a parallel source of truth.
+
 Important rules:
 
 - Contracts and transaction receipts are protocol truth.
