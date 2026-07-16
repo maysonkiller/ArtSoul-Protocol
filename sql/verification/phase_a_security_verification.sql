@@ -129,7 +129,51 @@ SELECT id, name, public, file_size_limit, allowed_mime_types
 FROM storage.buckets
 ORDER BY id;
 
+-- 8a. Full storage policy inventory (review every row). Export before AND after
+--     Phase 18.7c.
 SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check
 FROM pg_policies
 WHERE schemaname = 'storage'
 ORDER BY tablename, policyname;
+
+-- 8b. Direct client WRITE policies on the artworks bucket. These let a client
+--     write/overwrite/delete objects without the server's validation.
+--     Expected BEFORE Phase 18.7c: the observed INSERT/UPDATE/DELETE rows.
+--     Expected AFTER Phase 18.7c: zero rows.
+SELECT policyname, roles, cmd, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'storage'
+  AND tablename = 'objects'
+  AND cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+  AND (
+        COALESCE(qual, '') ILIKE '%artworks%'
+     OR COALESCE(with_check, '') ILIKE '%artworks%'
+  )
+ORDER BY policyname;
+
+-- 8c. Public SELECT policies referencing the artworks bucket.
+--     Expected BEFORE Phase 18.7c: multiple duplicate rows.
+--     Expected AFTER Phase 18.7c: exactly one row, artsoul_artworks_public_read.
+SELECT policyname, roles, cmd, qual
+FROM pg_policies
+WHERE schemaname = 'storage'
+  AND tablename = 'objects'
+  AND cmd = 'SELECT'
+  AND (
+        COALESCE(qual, '') ILIKE '%artworks%'
+     OR COALESCE(with_check, '') ILIKE '%artworks%'
+  )
+ORDER BY policyname;
+
+-- 8d. Aggregate check. After Phase 18.7c this must return
+--     write_policies = 0 and select_policies = 1.
+SELECT
+    count(*) FILTER (WHERE cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')) AS write_policies,
+    count(*) FILTER (WHERE cmd = 'SELECT') AS select_policies
+FROM pg_policies
+WHERE schemaname = 'storage'
+  AND tablename = 'objects'
+  AND (
+        COALESCE(qual, '') ILIKE '%artworks%'
+     OR COALESCE(with_check, '') ILIKE '%artworks%'
+  );
