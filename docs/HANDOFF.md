@@ -75,66 +75,36 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 
 ## 5. Immediate Priority Queue
 
-Follow this order. One item equals one task and one PR.
+`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. Mobile-wallet acceptance, production overlay removal, and cross-platform CI are recorded there as completed and must not remain in the active queue.
 
-### 1. Verify security and migration state
+### 1. Finish security and migration operational acceptance
 
 - Confirm historical service credentials and any deployer key findings from `SECURITY_PUBLIC_READINESS_REPORT.md` were rotated or retired.
-- Run a current-tree and history secret scan without printing findings to chat or logs.
-- Verify applied Supabase migrations, especially Phase 18 RLS/security and moderation visibility.
+- Apply the reviewed Phase 18.7b and 18.7c changes only through `docs/security/MIGRATION_RUNBOOK.md`, with backup, pre/post evidence, and smoke tests.
+- Configure the documented Supabase Storage bucket guardrails.
+- Reconcile the production migration ledger without automatic adoption.
 - Decide whether repository history remediation is complete.
 
-### 2. Close the mobile wallet acceptance cycle
-
-Use one fresh tab on a real phone:
-
-1. Close every ArtSoul tab.
-2. Open production in external Chrome or Safari.
-3. Connect through the wallet app and manually return to the same browser tab.
-4. Verify the connected identity persists across homepage, gallery, artwork, profile, and upload.
-5. Reload each page.
-6. Background the browser for five minutes and return.
-7. Trigger one protected write such as Like or Bid and confirm the Base Sepolia guard requests at most one network switch.
-8. Explicitly Disconnect and verify the session remains clean.
-
-If any step fails, capture `?walletdebug=1` logs and fix the smallest proven state-machine defect. Do not rewrite the wallet stack.
-
-### 3. Remove production visual wallet diagnostics
-
-Only after item 2 is green:
-
-- Remove visual overlay wiring from production pages.
-- Keep flag-gated console diagnostics where useful.
-- Keep the full visible diagnostic pane on `/wallet-test.html`.
-- Bump cache versions and update tests.
-
-### 4. Restore a green test baseline and add CI
-
-- Repair the 20 current Node-suite failures.
-- Replace the failing placeholder `npm test` script with the canonical suite.
-- Keep Hardhat tests separate from generic Node tests.
-- Add GitHub Actions for build, Node tests, Hardhat tests, and `git diff --check`.
-
-### 5. Fix indexer status configuration drift
+### 2. Fix indexer status configuration drift
 
 `INDEXER_CONFIRMATION_DEPTH=3` is active in runtime, but an existing `indexer_state` row still reports 12. Update the persisted field when configuration changes, add a focused test, and verify `/api/public/indexer-status` matches `/health`.
 
 Do not alter auction confirmation semantics while fixing observability.
 
-### 6. Verify projections and provenance
+### 3. Verify projections and provenance
 
 - Exercise registered, live, no-bid, awaiting-payment, defaulted, sold/minted, listed, and resold states.
 - Verify Creator, First Collector, and Owner are derived from indexed on-chain data.
 - Verify full timeline order and profile links.
 - Verify cards remain creator-focused and do not duplicate ownership rows.
 
-### 7. Complete profile lifecycle and action gating
+### 4. Complete profile lifecycle and action gating
 
 - Re-test created, auction, sold, and collected tabs.
 - Ensure owner-only resale, creator-only re-auction, winner-only settlement, and legacy-chain read-only behavior.
 - Confirm disconnected profile renders immediately without background churn.
 
-### 8. Build moderation/reporting MVP
+### 5. Build moderation/reporting MVP
 
 - Add a Report action on each artwork.
 - Implement complaint submission and notice-and-takedown review state.
@@ -142,16 +112,18 @@ Do not alter auction confirmation semantics while fixing observability.
 - Preserve the existing three-factor moderator access and multisig requirement for irreversible actions.
 - Do not build Content-ID or audio fingerprinting; v1.2 canon explicitly removed that requirement.
 
-### 9. Confirm infrastructure cost and health
+### 6. Confirm infrastructure cost and health
 
 - Monitor Alchemy for at least seven days after PR #90.
 - Confirm usage trends toward less than 30% of the monthly free tier.
 - Add indexer lag, fallback-RPC, API error, Supabase egress, and PM2 restart alerts.
 - Resolve the optional missing `failed_events` table or explicitly retire that metric.
 
-### 10. Enter controlled public beta
+### 7. Complete the Base commitments and beta-entry evidence
 
-Invite trusted testers only after items 1 through 9 meet their acceptance criteria. Track feedback in GitHub Issues rather than chat-only queues.
+- Implement the first-screen value proposition, compact three-step explanation, cached public metrics, and stale-copy cleanup from backlog A-24 through A-28.
+- Publish the controlled-beta checklist from A-23.
+- Invite trusted testers only after the remaining Phase A acceptance criteria pass. Track feedback in GitHub Issues rather than chat-only queues.
 
 ## 6. Local Development Commands
 
