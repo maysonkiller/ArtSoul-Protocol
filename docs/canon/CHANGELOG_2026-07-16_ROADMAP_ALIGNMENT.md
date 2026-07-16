@@ -17,6 +17,7 @@ Authority: founder approval after review of the proposed 2026-07-16 planning fil
 - Any date, count, or percentage that activates pool-funded contests.
 - Any specific legal entity type or jurisdiction.
 - Any fixed Core stability-window duration.
+- Any promoted-banner slot-auction reserve until the existing v1.2 planning delta is consolidated into the full Bible.
 
 These remain tunable or undecided planning inputs until separately approved. A roadmap estimate must never silently become a contract parameter or treasury rule.
 
