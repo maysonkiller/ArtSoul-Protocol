@@ -19,6 +19,7 @@ The reproducible indexer sequence is:
 11. `../../src/indexer/migrations/011_discovery_social_signals.sql`
 12. `../../src/indexer/migrations/012_indexer_base_runtime_tables.sql`
 13. `../../src/indexer/migrations/013_chain_scoped_v41_projections.sql`
+14. `../../src/indexer/migrations/014_schema_aware_reorg_rollback.sql`
 
 Use `node scripts/apply-migrations.js` for a dry run. Existing production databases require manual baseline reconciliation first.
 

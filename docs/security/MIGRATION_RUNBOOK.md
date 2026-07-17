@@ -7,9 +7,9 @@ This runbook is the authoritative operational path for the current ArtSoul repos
 | Location | Purpose | Treatment |
 | --- | --- | --- |
 | `sql/migrations/001_core_indexer_schema.sql` through `003_resilience_schema.sql` | Base indexer schema | First three migrations in the indexer sequence. Managed by `scripts/apply-migrations.js` for fresh or already-ledgered environments. |
-| `src/indexer/migrations/004_*.sql` through `013_*.sql` | Active indexer and V4.1 projections | Remaining ten migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
+| `src/indexer/migrations/004_*.sql` through `014_*.sql` | Active indexer and V4.1 projections | Remaining eleven migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
 | Other files in `sql/migrations/` | Feature, auth, AI, moderation, observability, and security changes | Manually reviewed migrations. Their production status must be recorded explicitly; filename order is not an execution plan. |
-| `migrations/001_ai_integration.sql` | Early AI integration migration | Historical/manual. Verify schema before use; do not assume it belongs to the indexer 001-013 sequence. |
+| `migrations/001_ai_integration.sql` | Early AI integration migration | Historical/manual. Verify schema before use; do not assume it belongs to the indexer 001-014 sequence. |
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.
 
@@ -36,7 +36,7 @@ Do not run `node scripts/apply-migrations.js --apply` against production until t
 
 1. Create a database backup and a schema-only export using the Supabase-supported backup path.
 2. Run `sql/verification/phase_a_security_verification.sql`. Export every result grid with timestamp and project/environment name. Do not include keys.
-3. Compare the live tables, columns, indexes, functions, and views with indexer migrations 001-013. Record each migration as `verified-present`, `verified-absent`, or `requires-review`.
+3. Compare the live tables, columns, indexes, functions, and views with indexer migrations 001-014. Record each migration as `verified-present`, `verified-absent`, or `requires-review`.
 4. Compare SHA-256 checksums from the dry run:
 
    ```bash
@@ -103,7 +103,7 @@ If any post-application result is unexpected, roll back with the transaction or 
    export ARTSOUL_MIGRATION_ENVIRONMENT=preview
    ```
 
-3. List the exact 001-013 sequence and checksums without modifying the database:
+3. List the exact 001-014 sequence and checksums without modifying the database:
 
    ```bash
    node scripts/apply-migrations.js
@@ -125,6 +125,23 @@ The runner:
 - stops on a changed checksum for an applied migration.
 
 Feature/manual migrations still require an explicit reviewed procedure. The indexer runner does not silently execute every SQL file in the repository.
+
+## Production Forward Fix 014
+
+Migration `014_schema_aware_reorg_rollback.sql` replaces only the chain-scoped rollback function. It does not change tables, indexed events, cursors, confirmation depth, or contract data. It prevents rollback from failing when a deployment does not contain the superseded `indexed_auctions` and `indexed_bids` tables.
+
+Production currently predates the checksum ledger. Therefore, do not use `scripts/apply-migrations.js --apply` for this forward fix until the baseline procedure above is complete.
+
+After this migration is merged and the operator has explicit approval to modify production:
+
+1. Create and verify a current database backup.
+2. Record the current `indexer_state` row for chain `84532` and the current row counts for `contract_events`, `v41_artworks`, `v41_auctions`, and `v41_bids`.
+3. Review and apply only `src/indexer/migrations/014_schema_aware_reorg_rollback.sql` in the Supabase SQL editor. The statement is idempotent because it uses `CREATE OR REPLACE FUNCTION`.
+4. Confirm `to_regprocedure('public.rollback_events_from_block(bigint,numeric)')` is present. Do not invoke the rollback function as a smoke test against live indexed blocks.
+5. Restart the Base Sepolia indexer and verify `/health` remains healthy, `confirmationDepthSyncError` is null, and indexed cursors continue advancing.
+6. Monitor the indexer logs through the next real reorg check. The prior `relation "indexed_auctions" does not exist` and `relation "indexed_bids" does not exist` errors must not recur.
+
+Rollback, if required, is a database restore or a new reviewed forward migration. Do not restore the pre-014 function because it is incompatible with the observed production schema.
 
 ## Rollback Policy
 
