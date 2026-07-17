@@ -36,24 +36,25 @@ Do not run `node scripts/apply-migrations.js --apply` against production until t
 
 1. Create a database backup and a schema-only export using the Supabase-supported backup path.
 2. Run `sql/verification/phase_a_security_verification.sql`. Export every result grid with timestamp and project/environment name. Do not include keys.
-3. Compare the live tables, columns, indexes, functions, and views with indexer migrations 001-014. Record each migration as `verified-present`, `verified-absent`, or `requires-review`.
-4. Compare SHA-256 checksums from the dry run:
+3. Run `sql/verification/indexer_migration_baseline_001_014.sql` section-by-section. Export every result grid with timestamp and project/environment name. The script opens a read-only transaction and ends with `ROLLBACK`; never replace it with `COMMIT`.
+4. Compare the live tables, columns, indexes, functions, and views with indexer migrations 001-014. Record each migration as `verified-present`, `verified-absent`, or `requires-review`.
+5. Compare SHA-256 checksums from the dry run:
 
    ```bash
    node scripts/apply-migrations.js
    ```
 
-5. Do **not** insert ledger rows merely because a similarly named table exists. An operator must verify the complete migration effect and checksum first.
-6. Review `phase18_7b_supabase_security_hardening.sql` against the pre-change export. Add any newly discovered table to exactly one classification before applying.
-7. Apply Phase 18.7b manually in the Supabase SQL editor. It is one transaction.
-8. Re-run the verification file. Expected results:
+6. Do **not** insert ledger rows merely because a similarly named table exists. An operator must verify the complete migration effect and checksum first.
+7. Review `phase18_7b_supabase_security_hardening.sql` against the pre-change export. Add any newly discovered table to exactly one classification before applying.
+8. Apply Phase 18.7b manually in the Supabase SQL editor. It is one transaction.
+9. Re-run the verification file. Expected results:
    - no unclassified application-owned table;
    - no public application table with RLS disabled or not forced;
    - no non-SELECT grant for `anon` or `authenticated`;
    - no client grant on an internal table;
    - no unreviewed client-executable `SECURITY DEFINER` function.
-9. Smoke test public reads, profile save, discovery signals, signed upload, moderation access, SIWE sign-in, and indexer health.
-10. Only after steps 1-9 are evidenced may the live baseline be entered into `artsoul_schema_migrations`. Baseline insertion is a manual database-owner action and is not automated by this repository.
+10. Smoke test public reads, profile save, discovery signals, signed upload, moderation access, SIWE sign-in, and indexer health.
+11. Only after steps 1-10 are evidenced may the live baseline be entered into `artsoul_schema_migrations`. Baseline insertion is a manual database-owner action and is not automated by this repository.
 
 If any verification result is unexpected, stop. Roll back using the database backup or the transaction before continuing; do not edit production until the classification is understood.
 
