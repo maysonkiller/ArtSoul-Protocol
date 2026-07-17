@@ -18,8 +18,17 @@ The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-mi
 - `security_hardening.sql`: **SUPERSEDED, DO NOT APPLY**. It grants direct authenticated writes that conflict with the current server-write boundary.
 - `rls_wallet_fix.sql`: **SUPERSEDED, DO NOT APPLY**. It depends on legacy authenticated JWT wallet claims and direct client writes.
 - `phase18_7a_supabase_security_hardening.sql`: prior partial classification.
-- `phase18_7b_supabase_security_hardening.sql`: current proposed public-schema classification. It is not automatically applied and must pass the procedure below.
-- `phase18_7c_supabase_storage_hardening.sql`: current proposed `storage.objects` policy hardening for the `artworks` bucket. It is not automatically applied and must pass the storage procedure below. Independent of 18.7b; either order is safe, but capture the storage verification (section 8) around it.
+- `phase18_7b_supabase_security_hardening.sql`: current public-schema classification. Applied to production on 2026-07-17 after backup and pre-change verification. Other environments must still follow the procedure below.
+- `phase18_7c_supabase_storage_hardening.sql`: current `storage.objects` policy hardening for the `artworks` bucket. Applied to production on 2026-07-17 after backup and pre-change verification. Other environments must still follow the storage procedure below.
+
+## Production Application Record (2026-07-17)
+
+- A custom-format full backup and a separate schema-only backup were created and validated before any write.
+- The complete verification report was captured before and after application.
+- Phase 18.7b and Phase 18.7c each committed as one transaction.
+- Post-change state: all 37 public tables have RLS enabled and forced; client non-SELECT grants are zero; the artworks bucket has zero direct client write policies and exactly one public read policy, `artsoul_artworks_public_read`.
+- Production public API and existing artwork-media reads remained available after application.
+- This record does not reconcile the historical migration ledger and does not complete bucket guardrails or authenticated upload/SIWE smoke tests.
 
 ## Existing Production Database
 
