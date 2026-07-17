@@ -4,6 +4,7 @@ import PostgreSQLDatabase from './postgresql-database.js';
 import IndexerMetrics from './metrics.js';
 import DistributedLock from './distributed-lock.js';
 import { requireEnv, resolveIndexerChainConfigs } from './chain-config.js';
+import { reconcileConfirmationDepth } from './confirmation-depth.js';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -87,6 +88,10 @@ class ProductionIndexer {
         this.confirmationTimer = null;
         this.failedEventsMetricsAvailable = true;
         this.failedEventsMetricsWarningLogged = false;
+        // Set when startup fails to reconcile the persisted confirmation depth.
+        // Surfaced by getHealth() so operators can see the drift without a
+        // separate DB query; never corrupts or resets the cursor.
+        this.confirmationDepthSyncError = null;
 
         // Failed events retry timer
         this.retryTimer = null;
@@ -680,7 +685,43 @@ class ProductionIndexer {
                 console.log(`  Contract: ${state.contract_address}`);
                 console.log(`  Chain ID: ${state.chain_id}`);
             }
+
+            // Reconcile the persisted confirmation depth with the active config
+            // so /health and /api/public/indexer-status report the same value.
+            // Metadata-only and cursor-safe; see reconcileConfirmationDepth.
+            await this._reconcileConfirmationDepth();
         }
+    }
+
+    async _reconcileConfirmationDepth() {
+        const result = await reconcileConfirmationDepth(
+            this.db,
+            this.config.chainId,
+            this.confirmationDepth,
+            {
+                onError: (error) => {
+                    this.confirmationDepthSyncError = {
+                        message: error.message,
+                        configuredDepth: this.confirmationDepth,
+                        at: new Date().toISOString()
+                    };
+                    console.error(JSON.stringify({
+                        phase: 'confirmation_depth_reconcile',
+                        action: 'error',
+                        chainId: this.config.chainId.toString(),
+                        configuredDepth: this.confirmationDepth,
+                        error: error.message
+                    }));
+                }
+            }
+        );
+
+        // Clear a previously recorded error once reconciliation succeeds.
+        if (!result.error) {
+            this.confirmationDepthSyncError = null;
+        }
+
+        return result;
     }
 
     _startConfirmationPolling() {
@@ -848,6 +889,7 @@ class ProductionIndexer {
                     blocksBehind: blocksBehind,
                     isSynced: isSynced,
                     confirmationDepth: this.confirmationDepth,
+                    confirmationDepthSyncError: this.confirmationDepthSyncError,
                     totalEventsIndexed: state.total_events_indexed,
                     unresolvedErrors: errors.length
                 },
