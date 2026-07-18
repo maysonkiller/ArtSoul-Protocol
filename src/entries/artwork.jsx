@@ -2442,7 +2442,9 @@ const { useState, useEffect, useRef } = React;
                     {isResaleModalOpen && (() => {
                         const floorPrice = Number(resaleFloorPrice || 0);
                         const resaleTokenId = artwork.token_id || artwork.tokenId;
-                        const resaleOwnerAddress = artwork.current_owner_address || connectedWalletAddress || '';
+                        // Owner comes from the indexer projection only — never from the
+                        // connected wallet, even though listing is gated to the owner.
+                        const resaleOwnerAddress = artwork.current_owner_address || '';
                         const resaleOwnerShort = resaleOwnerAddress
                             ? `${resaleOwnerAddress.slice(0, 6)}...${resaleOwnerAddress.slice(-4)}`
                             : 'Unavailable';
