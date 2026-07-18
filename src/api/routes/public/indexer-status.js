@@ -140,7 +140,7 @@ export default async function handler(req, res) {
         warnings
       ),
       v41_resale_listings: await query(
-        `v41_resale_listings?select=chain_id,listing_id,token_id,block_number,transaction_hash,indexed_at&chain_id=${CHAIN_FILTER}&order=block_number.desc&limit=200`,
+        `v41_resale_listings?select=chain_id,token_id,block_number,transaction_hash,indexed_at&chain_id=${CHAIN_FILTER}&order=block_number.desc&limit=200`,
         warnings
       )
     };
