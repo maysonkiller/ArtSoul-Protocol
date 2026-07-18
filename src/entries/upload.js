@@ -1,5 +1,10 @@
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
+import {
+    ALLOWED_ARTWORK_MIME_TYPES,
+    MAX_ARTWORK_UPLOAD_BYTES,
+    MAX_ARTWORK_UPLOAD_MB
+} from '../config/upload-policy.js';
 
 let selectedFile = null;
         let uploading = false;
@@ -17,14 +22,8 @@ let selectedFile = null;
         const AI_ANALYSIS_TIMEOUT_MS = 20000;
         const AI_PREVIEW_MAX_DATA_URL_LENGTH = 1800000;
         const AI_TOTAL_ATTEMPT_LIMIT = 3;
-        const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
         const BASE_SEPOLIA_CHAIN_ID = 84532;
-        const SUPPORTED_FILE_TYPES = new Set([
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'video/mp4', 'video/webm', 'video/quicktime',
-            'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav',
-            'audio/ogg', 'audio/aac', 'audio/mp4'
-        ]);
+        const SUPPORTED_FILE_TYPES = new Set(ALLOWED_ARTWORK_MIME_TYPES);
 
         function getTransactionErrorMessage(error, fallback) {
             return window.ArtSoulTransactionErrors?.message?.(error, fallback) ||
@@ -146,8 +145,8 @@ let selectedFile = null;
             if (!Number.isFinite(file.size) || file.size <= 0) {
                 return { code: 'EMPTY_FILE', message: 'This file is empty. Choose a valid artwork file and try again.' };
             }
-            if (file.size > MAX_UPLOAD_BYTES) {
-                return { code: 'FILE_TOO_LARGE', message: 'This file is too large. The maximum size is 100 MB.' };
+            if (file.size > MAX_ARTWORK_UPLOAD_BYTES) {
+                return { code: 'FILE_TOO_LARGE', message: `This file is too large. The maximum size is ${MAX_ARTWORK_UPLOAD_MB} MB.` };
             }
             return null;
         }
@@ -185,7 +184,7 @@ let selectedFile = null;
                 const reason = String(error?.reason || '').toUpperCase();
                 if (reason.includes('FILENAME')) return 'This file name looks auto-generated. Please rename the file to a meaningful title (for example: my-artwork.png) and try again.';
                 if (reason.includes('EMPTY')) return 'This file is empty. Choose a valid artwork file and try again.';
-                if (reason.includes('SIZE')) return 'This file is too large. The maximum size is 100 MB.';
+                if (reason.includes('SIZE')) return `This file is too large. The maximum size is ${MAX_ARTWORK_UPLOAD_MB} MB.`;
                 if (reason.includes('TYPE')) return 'This file type is not supported. Choose a supported image, video, or audio file.';
                 return 'The selected file is not valid. Check its type and size, then try again.';
             }
@@ -247,7 +246,7 @@ let selectedFile = null;
             const directMessages = {
                 FILE_REQUIRED: 'Select an artwork file before continuing.',
                 INVALID_FILENAME: 'This file name looks auto-generated. Please rename the file to a meaningful title (for example: my-artwork.png) and try again.',
-                FILE_TOO_LARGE: 'This file is too large. The maximum size is 100 MB.',
+                FILE_TOO_LARGE: `This file is too large. The maximum size is ${MAX_ARTWORK_UPLOAD_MB} MB.`,
                 UNSUPPORTED_FILE_TYPE: 'This file type is not supported. Choose a supported image, video, or audio file.',
                 WALLET_NOT_CONNECTED: 'Connect your wallet before publishing this artwork.',
                 AUTHORIZATION_REQUIRED: 'Authorize this upload with your wallet signature before publishing.',

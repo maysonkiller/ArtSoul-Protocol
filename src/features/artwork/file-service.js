@@ -1,22 +1,27 @@
 // FileService - Business logic for file handling
 // Centralized file type detection, validation, and preview generation
 
+import {
+    ALLOWED_ARTWORK_MIME_TYPES,
+    MAX_ARTWORK_UPLOAD_BYTES
+} from '../../config/upload-policy.js';
+
 class FileService {
     constructor() {
         // File type mappings
         this.typeMap = {
-            video: ['video/mp4', 'video/webm', 'video/mov', 'video/avi', 'video/mkv'],
-            music: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/m4a', 'audio/flac'],
+            video: ALLOWED_ARTWORK_MIME_TYPES.filter(type => type.startsWith('video/')),
+            music: ALLOWED_ARTWORK_MIME_TYPES.filter(type => type.startsWith('audio/')),
             gif: ['image/gif'],
-            image: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/svg+xml']
+            image: ALLOWED_ARTWORK_MIME_TYPES.filter(type => type.startsWith('image/') && type !== 'image/gif')
         };
 
         // Max file sizes (in bytes)
         this.maxSizes = {
-            image: 50 * 1024 * 1024,  // 50MB
-            video: 200 * 1024 * 1024, // 200MB
-            music: 50 * 1024 * 1024,  // 50MB
-            gif: 20 * 1024 * 1024     // 20MB
+            image: MAX_ARTWORK_UPLOAD_BYTES,
+            video: MAX_ARTWORK_UPLOAD_BYTES,
+            music: MAX_ARTWORK_UPLOAD_BYTES,
+            gif: MAX_ARTWORK_UPLOAD_BYTES
         };
     }
 

@@ -1,6 +1,8 @@
 // ErrorHandler - Centralized error handling
 // Provides user-friendly error messages and logging
 
+import { MAX_ARTWORK_UPLOAD_MB } from '../../config/upload-policy.js';
+
 class ErrorHandler {
     /**
      * Handle error with user-friendly message
@@ -74,7 +76,7 @@ class ErrorHandler {
 
         // File upload errors
         if (error.message?.includes('file size')) {
-            return 'File is too large. Maximum size is 100MB.';
+            return `File is too large. Maximum size is ${MAX_ARTWORK_UPLOAD_MB} MB.`;
         }
 
         if (error.message?.includes('file type')) {
