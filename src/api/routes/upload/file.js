@@ -8,26 +8,15 @@ import {
   requireWallet,
   supabaseStorageRest
 } from '../../backend.js';
+import {
+  ARTWORK_MIME_EXTENSIONS,
+  MAX_ARTWORK_UPLOAD_BYTES,
+  MAX_ARTWORK_UPLOAD_MB,
+  MAX_METADATA_BYTES
+} from '../../../config/upload-policy.js';
 
 const ARTWORKS_BUCKET = 'artworks';
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const MAX_METADATA_BYTES = 256 * 1024;
-const ALLOWED_TYPES = new Map([
-  ['image/jpeg', 'jpg'],
-  ['image/png', 'png'],
-  ['image/gif', 'gif'],
-  ['image/webp', 'webp'],
-  ['video/mp4', 'mp4'],
-  ['video/webm', 'webm'],
-  ['video/quicktime', 'mov'],
-  ['audio/mpeg', 'mp3'],
-  ['audio/mp3', 'mp3'],
-  ['audio/wav', 'wav'],
-  ['audio/x-wav', 'wav'],
-  ['audio/ogg', 'ogg'],
-  ['audio/aac', 'aac'],
-  ['audio/mp4', 'm4a']
-]);
+const ALLOWED_TYPES = new Map(Object.entries(ARTWORK_MIME_EXTENSIONS));
 const METADATA_CONTENT_TYPE = 'application/json';
 
 const SAFE_ERROR_MESSAGES = {
@@ -158,11 +147,11 @@ export default async function handler(req, res) {
         'EMPTY_FILE',
         'This file is empty. Choose a valid artwork file and try again.'
       );
-    } else if (size > MAX_UPLOAD_BYTES) {
+    } else if (size > MAX_ARTWORK_UPLOAD_BYTES) {
       return invalidPayload(
         res,
         'INVALID_FILE_SIZE',
-        'This file is too large. The maximum size is 100 MB.'
+        `This file is too large. The maximum size is ${MAX_ARTWORK_UPLOAD_MB} MB.`
       );
     }
 
@@ -199,7 +188,7 @@ export default async function handler(req, res) {
       signed_upload_url: signedUploadUrl,
       public_url: getPublicStorageUrl(ARTWORKS_BUCKET, path),
       content_type: contentType,
-      max_size: isMetadata ? MAX_METADATA_BYTES : MAX_UPLOAD_BYTES
+      max_size: isMetadata ? MAX_METADATA_BYTES : MAX_ARTWORK_UPLOAD_BYTES
     });
   } catch (error) {
     sendUploadError(res, error);
