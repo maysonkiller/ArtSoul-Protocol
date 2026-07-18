@@ -83,7 +83,7 @@ Post-application:
 Bucket guardrails (required defense in depth):
 
 8. In the Supabase Storage dashboard, edit the `artworks` bucket. Do not update Supabase-managed `storage.buckets` rows with handwritten SQL.
-9. Set the file-size limit to **100 MB** (`104857600` bytes).
+9. Set the file-size limit to **50 MB** (`52428800` bytes). Keep the project spend cap enabled. This is the public-testnet operational boundary while egress is above the included quota, not a frozen product rule.
 10. Set the allowed MIME types to the same boundary enforced by `src/api/routes/upload/file.js`:
 
     ```text
@@ -91,7 +91,9 @@ Bucket guardrails (required defense in depth):
     ```
 
     `application/json` is required for the metadata upload path. The bucket limit is shared, so the stricter 256 KB metadata limit remains enforced by the server route.
-11. Re-run verification section 8 and retain the bucket row showing the expected limit and MIME allowlist. Smoke-test one supported media upload and one metadata upload. Also verify that an unsupported MIME type and an upload larger than 100 MB are rejected.
+11. Re-run verification section 8 and retain the bucket row showing the expected limit and MIME allowlist. Smoke-test one supported media upload and one metadata upload. Also verify that an unsupported MIME type and an upload larger than 50 MB are rejected.
+
+The application, signing API, and bucket must use `src/config/upload-policy.js` as the reviewed source for this boundary. Reconsidering 100 MB requires a separate Phase C decision after usage remains within budget and resumable uploads are tested; do not raise the global limit by disabling the spend cap as a workaround.
 
 If any post-application result is unexpected, roll back with the transaction or restore from backup; a public bucket with no SELECT policy still serves public downloads, but re-run until 8c shows exactly the canonical policy.
 
@@ -143,6 +145,23 @@ After this migration is merged and the operator has explicit approval to modify 
 6. Monitor the indexer logs through the next real reorg check. The prior `relation "indexed_auctions" does not exist` and `relation "indexed_bids" does not exist` errors must not recur.
 
 Rollback, if required, is a database restore or a new reviewed forward migration. Do not restore the pre-014 function because it is incompatible with the observed production schema.
+
+## Clean Mainnet Database Cutover
+
+This procedure implements the mandatory reset in Canon Bible section 16. It does not amend canon. The preferred production topology is a fresh mainnet Supabase project/database so testnet product state cannot leak into mainnet through an incomplete delete.
+
+1. Freeze testnet writes at the announced cut-off and generate Snapshot A with a versioned schema, deterministic ordering, manifest, content hash, timestamp, and chain/deployment identifiers.
+2. Verify Snapshot A independently and store at least two durable copies outside the live testnet database. Snapshot A is an archive/community record and is never imported as mainnet entitlement or live protocol state.
+3. Create final full and schema-only testnet backups. Retain the testnet environment read-only for the approved evidence-retention period.
+4. Create a separate mainnet database/project. Apply the reviewed final schema from migration 001 so its checksum ledger is complete from the first migration; do not copy the testnet ledger or infer migration state from table names.
+5. Configure only audited Base mainnet contract addresses and deployment start blocks. Start the mainnet indexer from those blocks with an empty product projection.
+6. Do not import testnet artworks, auctions, bids, discovery signals, floors, ownership, settlement, trust, moderation outcomes, or derived profile statistics as live mainnet data.
+7. Any proposal to preserve non-economic display-only profile fields requires a separate mapped, reviewed, consent-aware migration. It must not preserve testnet reputation, eligibility, balances, ownership, or protocol outcomes.
+8. Exercise the complete mainnet smoke lifecycle in the new environment before enabling public writes: wallet sign-in, publish, auction, deposit, settlement, lazy mint, resale, indexer projection, public reads, moderation, and Storage upload/read.
+9. Verify there are zero references to testnet contract addresses, RPC networks, object paths, or indexer cursors in the mainnet runtime. Only then switch production traffic.
+10. Archive or remove testnet Storage objects and database state only after Snapshot A, backups, retention, and rollback evidence are verified. Never treat deletion as the backup strategy.
+
+The migration baseline audit for the current testnet database remains historical evidence. Missing superseded `indexed_auctions`/`indexed_bids` tables are not a reason to recreate them, and migration 014 is the forward compatibility fix for that live V4.1 schema.
 
 ## Rollback Policy
 
