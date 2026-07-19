@@ -1,6 +1,6 @@
 # ArtSoul Durable Backlog
 
-Updated: 2026-07-17
+Updated: 2026-07-20
 Canonical phase model: `A-D` from [`docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`](canon/ARTSOUL_CANON_BIBLE_FULL.md) section 17.
 
 This is the repository's durable work register. It consolidates verified completed work, open implementation work, founder-owned inputs, and code-level follow-ups so that ideas do not remain authoritative only in chat sessions or external prompt files.
@@ -63,7 +63,7 @@ This consolidation audited the repository through `main` commit `ab0b1d7`, [`PRO
 | A-26 | Add public artists/auctions/collectors/settled-volume metrics | Canon [A11](canon/12_IMPLEMENTATION_BACKLOG.md); [PR #70](https://github.com/maysonkiller/ArtSoul-Protocol/pull/70) cache precedent | planned | A | Use one precomputed indexer/projection aggregate behind equivalent caching. No page-view RPC fan-out, full-table aggregation or per-card recomputation. |
 | A-27 | Align homepage positioning with ArtSoul as a curation layer | Canon [A11](canon/12_IMPLEMENTATION_BACKLOG.md); [`17_ROADMAP_PHASES.md`](canon/17_ROADMAP_PHASES.md) | planned | A | Collector conviction and discovery, not minting volume, determine what surfaces. |
 | A-28 | Remove stale active-network and trust copy | Canon [A12](canon/12_IMPLEMENTATION_BACKLOG.md); `README.md`; `src/entries/docs-protocol.jsx` | planned | A | README still names Ethereum Sepolia as a current testnet and protocol docs still say Genesis `2x` instead of canonical `1.3x`. No exact “Future production networks” string exists in the current tree; verify deployed footer copy during implementation. Historical Ethereum Sepolia data remains readable. |
-| A-29 | Add a client-side live-auction countdown pill to shared cards | `src/ui/components/artwork-card.js` (`statusInfo`); detail countdown in `src/entries/artwork.jsx` | planned | A | Reuse already-loaded auction end time and a local timer. Zero new API or RPC requests. |
+| A-29 | Add a client-side live-auction countdown pill to shared cards | `src/ui/components/artwork-card.js` (`statusInfo`); detail countdown in `src/entries/artwork.jsx`; [PR #125](https://github.com/maysonkiller/ArtSoul-Protocol/pull/125) | in progress | A | Draft PR #125 reuses the projected auction end time with one shared local timer across card surfaces. Zero new API or RPC requests; merge evidence is still pending. |
 | A-30 | Preserve media preview revival after browser Back navigation | `src/ui/components/artwork-card.js` (`reviveMediaPreviews`, `pageshow`); [PR #47](https://github.com/maysonkiller/ArtSoul-Protocol/pull/47) | done | A | Shared card media is re-prepared after bfcache/back-forward restore across surfaces. |
 | A-31 | Preserve the site-wide ArtSoul audio-disc preview | `src/ui/components/artwork-card.js`; `unified-styles.css`; [PR #47](https://github.com/maysonkiller/ArtSoul-Protocol/pull/47) | done | A | Desktop idle rotates slowly, active playback speeds up, and mobile idle is static. |
 | A-32 | Preserve artwork media fit/fullscreen and mobile ownership-row fixes | [PR #54](https://github.com/maysonkiller/ArtSoul-Protocol/pull/54); `src/entries/artwork.jsx` | done | A | Detail media uses stable cover framing and original-aspect fullscreen behavior; shared card previews were not changed by that fix. |

@@ -394,6 +394,7 @@ const { useState, useEffect, useRef } = React;
                 const price = getProfileArtworkPrice(artwork);
                 const href = getProfileArtworkHref(artwork);
                 const creatorLabel = sharedCards?.creatorLabel;
+                const SharedCountdown = sharedCards?.ReactCountdown;
                 const CardElement = href ? 'a' : 'div';
 
                 return (
@@ -413,6 +414,7 @@ const { useState, useEffect, useRef } = React;
                                 {price && <span className="artsoul-card-price">{price}</span>}
                             </div>
                         </div>
+                        {SharedCountdown && <SharedCountdown artwork={artwork} />}
                     </CardElement>
                 );
             }

@@ -575,6 +575,7 @@ body.future .artwork-page-compact-action {
 }
 
 .artsoul-artwork-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -805,6 +806,39 @@ body.future .artsoul-artwork-card:focus-visible {
     z-index: 2;
     opacity: 1;
     transition: opacity 160ms ease;
+}
+
+.artsoul-card-countdown {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 4;
+    display: inline-flex;
+    min-width: 62px;
+    min-height: 24px;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--c-surface) 90%, transparent);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--c-bg) 55%, transparent);
+    color: var(--c-accent);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.artsoul-card-countdown.is-ended {
+    border-color: var(--c-accent-3);
+    color: var(--c-accent-3);
+}
+
+.future .artsoul-card-countdown {
+    box-shadow: 0 0 12px var(--c-glow), 0 6px 18px color-mix(in srgb, var(--c-bg) 55%, transparent);
 }
 
 .artsoul-card-audio-label {
