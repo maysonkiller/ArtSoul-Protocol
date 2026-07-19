@@ -75,7 +75,8 @@ test('every API query against v41_resale_listings only references migration colu
   const schema = canonicalResaleListingColumns();
   const apiSources = [
     ['src', 'api', 'routes', 'public', 'indexer-status.js'],
-    ['src', 'api', 'routes', 'public', 'artworks.js']
+    ['src', 'api', 'routes', 'public', 'artworks.js'],
+    ['src', 'api', 'routes', 'public', 'artwork-provenance.js']
   ];
 
   for (const segments of apiSources) {

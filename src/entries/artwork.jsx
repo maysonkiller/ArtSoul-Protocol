@@ -276,6 +276,11 @@ const { useState, useEffect, useRef } = React;
             const [bidAmount, setBidAmount] = useState('');
             const [bidActivity, setBidActivity] = useState([]);
             const [bidderProfiles, setBidderProfiles] = useState({});
+            const [provenanceState, setProvenanceState] = useState({
+                status: 'idle',
+                events: [],
+                complete: true
+            });
             const [moderationAccess, setModerationAccess] = useState(null);
             const [moderationReason, setModerationReason] = useState('');
             const [moderationBusy, setModerationBusy] = useState(false);
@@ -1054,6 +1059,95 @@ const { useState, useEffect, useRef } = React;
                 }).format(timestamp);
             }
 
+            function formatProvenanceTime(event) {
+                const timestamp = normalizeTimestampMs(event?.recorded_at);
+                if (!timestamp) return '';
+
+                return new Intl.DateTimeFormat('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }).format(timestamp);
+            }
+
+            function provenanceEventView(event = {}) {
+                const definitions = {
+                    artwork_registered: {
+                        title: 'Artwork published',
+                        role: 'Creator',
+                        address: event.creator_address
+                    },
+                    auction_started: {
+                        title: 'Auction started',
+                        role: 'Creator',
+                        address: event.creator_address,
+                        amount: event.start_price
+                    },
+                    auction_ended: {
+                        title: event.highest_bidder_address ? 'Auction ended' : 'Auction closed without bids',
+                        role: event.highest_bidder_address ? 'Highest Bidder' : '',
+                        address: event.highest_bidder_address,
+                        amount: event.winning_bid
+                    },
+                    settlement_pending: {
+                        title: 'Settlement window opened',
+                        role: 'Highest Bidder',
+                        address: event.highest_bidder_address,
+                        amount: event.final_price
+                    },
+                    settlement_completed: {
+                        title: 'Settled and minted',
+                        role: 'First Collector',
+                        address: event.first_collector_address,
+                        amount: event.final_price
+                    },
+                    settlement_defaulted: {
+                        title: 'Settlement defaulted',
+                        role: 'Highest Bidder',
+                        address: event.highest_bidder_address
+                    },
+                    resale_completed: {
+                        title: 'Resale completed',
+                        role: 'Owner',
+                        address: event.owner_address,
+                        secondaryRole: 'Seller',
+                        secondaryAddress: event.seller_address,
+                        amount: event.price
+                    },
+                    resale_listed: {
+                        title: 'Listed for resale',
+                        role: 'Owner',
+                        address: event.owner_address,
+                        amount: event.price
+                    }
+                };
+                return definitions[event.type] || { title: 'On-chain update' };
+            }
+
+            function transactionExplorerUrl(event = {}) {
+                const hash = String(event.transaction_hash || '').trim();
+                if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) return '';
+                const explorer = Number(artwork?.chain_id) === 11155111
+                    ? 'https://sepolia.etherscan.io'
+                    : 'https://sepolia.basescan.org';
+                return `${explorer}/tx/${encodeURIComponent(hash)}`;
+            }
+
+            function renderProvenanceAddress(role, address) {
+                if (!role || !address || isZeroAddress(address)) return null;
+                return (
+                    <span className="provenance-event-role">
+                        {role}:{' '}
+                        <a href={`profile.html?address=${encodeURIComponent(address)}`}>
+                            {window.ArtSoulDB?.shortWalletAddress?.(address) || `${address.slice(0, 6)}...${address.slice(-4)}`}
+                        </a>
+                    </span>
+                );
+            }
+
             function getTokenExplorerUrl(artworkData) {
                 const tokenId = artworkData?.token_id || artworkData?.tokenId;
                 if (!tokenId) return '';
@@ -1451,6 +1545,26 @@ const { useState, useEffect, useRef } = React;
                         }
                     })();
 
+                    const provenancePromise = (async () => {
+                        if (!isV41CompositeId || !data.chain_id || !data.artwork_id) {
+                            setProvenanceState({ status: 'idle', events: [], complete: true });
+                            return;
+                        }
+
+                        setProvenanceState(current => ({ ...current, status: 'loading' }));
+                        const projection = await window.ArtSoulDB.getArtworkProvenance?.({
+                            chain_id: data.chain_id,
+                            artwork_id: data.artwork_id
+                        });
+                        setProvenanceState(projection
+                            ? {
+                                status: 'ready',
+                                events: Array.isArray(projection.events) ? projection.events : [],
+                                complete: projection.complete !== false
+                            }
+                            : { status: 'unavailable', events: [], complete: false });
+                    })();
+
                     const auctionActionId = getAuctionActionId(data, null);
                     const contractPromise = (async () => {
                         if (!auctionActionId || !window.ArtSoulContracts) return;
@@ -1481,6 +1595,7 @@ const { useState, useEffect, useRef } = React;
                         profilesPromise,
                         votesPromise,
                         interactionPromise,
+                        provenancePromise,
                         contractPromise
                     ]);
 
@@ -2799,6 +2914,67 @@ const { useState, useEffect, useRef } = React;
                                         </button>
                                     </div>
                                 </div>
+
+                                {isV41CompositeId && (
+                                    <section className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">
+                                        <div className="artwork-page-card-heading">
+                                            <h3 id="provenanceTitle" className="artwork-page-card-title">Provenance</h3>
+                                            {provenanceState.status === 'ready' && (
+                                                <span className="text-xs opacity-70">
+                                                    {provenanceState.events.length} {provenanceState.events.length === 1 ? 'event' : 'events'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {provenanceState.status === 'loading' && (
+                                            <p className="provenance-state-copy" role="status">Loading indexer history...</p>
+                                        )}
+                                        {provenanceState.status === 'unavailable' && (
+                                            <p className="provenance-state-copy">Indexer history is temporarily unavailable.</p>
+                                        )}
+                                        {provenanceState.status === 'ready' && provenanceState.events.length === 0 && (
+                                            <p className="provenance-state-copy">No indexer history is available yet.</p>
+                                        )}
+                                        {provenanceState.events.length > 0 && (
+                                            <ol className="provenance-timeline">
+                                                {provenanceState.events.map((event, index) => {
+                                                    const view = provenanceEventView(event);
+                                                    const explorerUrl = transactionExplorerUrl(event);
+                                                    const amount = Number(event?.type === 'auction_started' ? view.amount : view.amount || 0);
+                                                    return (
+                                                        <li
+                                                            key={`${event.type}:${event.transaction_hash || event.block_number}:${event.log_index}:${index}`}
+                                                            className="provenance-event"
+                                                        >
+                                                            <span className="provenance-event-marker" aria-hidden="true" />
+                                                            <div className="provenance-event-main">
+                                                                <strong>{view.title}</strong>
+                                                                {renderProvenanceAddress(view.role, view.address)}
+                                                                {renderProvenanceAddress(view.secondaryRole, view.secondaryAddress)}
+                                                                {formatProvenanceTime(event) && (
+                                                                    <time dateTime={event.recorded_at}>{formatProvenanceTime(event)}</time>
+                                                                )}
+                                                            </div>
+                                                            <div className="provenance-event-meta">
+                                                                {Number.isFinite(amount) && amount > 0 && <span>{view.amount} ETH</span>}
+                                                                {explorerUrl && (
+                                                                    <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
+                                                                        Transaction
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ol>
+                                        )}
+                                        {!provenanceState.complete && provenanceState.status === 'ready' && (
+                                            <p className="provenance-state-copy provenance-state-note">
+                                                This history reached the current display limit. Older indexer events remain preserved.
+                                            </p>
+                                        )}
+                                    </section>
+                                )}
 
                                 {/* Auction Info */}
                                 <div className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">

@@ -233,6 +233,20 @@ async function getLiveAuctionActivity({ chain_id, auction_id, after_block, after
     }
 }
 
+async function getArtworkProvenance({ chain_id, artwork_id } = {}) {
+    if (!chain_id || !artwork_id) return null;
+
+    try {
+        return await backendRead(`/api/public/artwork-provenance${buildQuery({
+            chain_id,
+            artwork_id
+        })}`);
+    } catch (error) {
+        console.warn('[ArtSoulDB] Provenance timeline unavailable:', error.message);
+        return null;
+    }
+}
+
 async function getPublicProjectionArtwork(idOrOptions) {
     const options = typeof idOrOptions === 'string'
         ? { id: idOrOptions, limit: 1 }
@@ -972,6 +986,7 @@ window.ArtSoulDB = {
     getPublicProjectionArtworks,
     getPublicProjectionArtwork,
     getLiveAuctionActivity,
+    getArtworkProvenance,
     getArtworks,
     getAllArtworks,
     getArtwork,
