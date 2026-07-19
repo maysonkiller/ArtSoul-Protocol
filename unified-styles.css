@@ -2615,8 +2615,7 @@ body.future .resale-modal {
     text-overflow: ellipsis;
 }
 
-.artsoul-card-creator,
-.artsoul-card-provenance {
+.artsoul-card-creator {
     margin: -2px 0 0;
     overflow: hidden;
     color: var(--c-text);

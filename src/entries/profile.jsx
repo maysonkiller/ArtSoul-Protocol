@@ -393,7 +393,7 @@ const { useState, useEffect, useRef } = React;
                 const status = getProfileArtworkStatus(artwork);
                 const price = getProfileArtworkPrice(artwork);
                 const href = getProfileArtworkHref(artwork);
-                const SharedProvenance = sharedCards?.ReactProvenance;
+                const creatorLabel = sharedCards?.creatorLabel;
                 const CardElement = href ? 'a' : 'div';
 
                 return (
@@ -405,7 +405,9 @@ const { useState, useEffect, useRef } = React;
                         <ProfileArtworkMedia artwork={artwork} onUnavailable={() => setMediaUnavailable(true)} />
                         <div className="artsoul-card-body">
                             <h4 className="artsoul-card-title">{artwork.title || 'Untitled Artwork'}</h4>
-                            {SharedProvenance && <SharedProvenance artwork={artwork} />}
+                            {creatorLabel && (
+                                <p className="artsoul-card-creator">Creator: {creatorLabel(artwork)}</p>
+                            )}
                             <div className="artsoul-card-meta">
                                 <span className={`artsoul-card-status artsoul-card-status-${status.key}`}>{status.label}</span>
                                 {price && <span className="artsoul-card-price">{price}</span>}

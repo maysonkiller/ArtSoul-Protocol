@@ -25,38 +25,14 @@
         return text.length > 16 ? `${text.slice(0, 8)}...${text.slice(-6)}` : text;
     }
 
+    // Canon doc 05: compact preview cards stay creator-focused. The public
+    // projection enriches creator_name with the creator's public profile
+    // nickname (one batched server-side lookup); a valid address always
+    // falls back to its shortened form, never to "Unknown creator".
     function creatorLabel(artwork = {}) {
         const displayName = artwork.creator_name || artwork.creator_username || artwork.artist_name;
         const address = artwork.creator || artwork.creator_id || artwork.artist_address;
         return String(displayName || shortId(address) || 'Unknown creator');
-    }
-
-    function roleAddress(value) {
-        const text = (value || '').toString().trim();
-        return text && normalize(text) !== ZERO_ADDRESS ? text : '';
-    }
-
-    // Canon rule 11 / Phase A6: First Collector and Owner come ONLY from the
-    // indexer projection fields (auction_winner_address is the completed-
-    // settlement winner; current_owner_address follows completed resales) —
-    // never from auction winner/highest bidder or browser wallet state.
-    // Both roles exist only after mint; absent values render nothing.
-    function provenanceRoles(artwork = {}) {
-        const minted = isMinted(artwork);
-        return Object.freeze({
-            creator: creatorLabel(artwork),
-            firstCollector: minted ? shortId(roleAddress(artwork.auction_winner_address)) : '',
-            owner: minted ? shortId(roleAddress(artwork.current_owner_address)) : ''
-        });
-    }
-
-    function provenanceLines(artwork = {}) {
-        const roles = provenanceRoles(artwork);
-        const lines = [];
-        if (roles.creator) lines.push({ label: 'Creator', value: roles.creator, className: 'artsoul-card-creator' });
-        if (roles.firstCollector) lines.push({ label: 'First Collector', value: roles.firstCollector, className: 'artsoul-card-provenance' });
-        if (roles.owner) lines.push({ label: 'Owner', value: roles.owner, className: 'artsoul-card-provenance' });
-        return lines;
     }
 
     function identityKeys(artwork = {}) {
@@ -515,6 +491,10 @@
         title.className = 'artsoul-card-title';
         title.textContent = artwork.title || 'Untitled Artwork';
 
+        const creator = document.createElement('p');
+        creator.className = 'artsoul-card-creator';
+        creator.textContent = `Creator: ${creatorLabel(artwork)}`;
+
         const meta = document.createElement('div');
         meta.className = 'artsoul-card-meta';
         const badge = document.createElement('span');
@@ -531,12 +511,7 @@
         }
 
         body.appendChild(title);
-        for (const line of provenanceLines(artwork)) {
-            const row = document.createElement('p');
-            row.className = line.className;
-            row.textContent = `${line.label}: ${line.value}`;
-            body.appendChild(row);
-        }
+        body.appendChild(creator);
         body.appendChild(meta);
 
         card.appendChild(createMediaElement(artwork, () => card.remove()));
@@ -690,14 +665,6 @@
         );
     }
 
-    function ReactProvenance({ artwork = {} }) {
-        const React = window.React;
-        const h = React.createElement;
-        return h(React.Fragment, null, provenanceLines(artwork).map(line =>
-            h('p', { key: line.label, className: line.className }, `${line.label}: ${line.value}`)
-        ));
-    }
-
     function ReactCard({ artwork = {}, onOpen = null, actions = null, respectHidden = true, minimal = false, surface = '' }) {
         const React = window.React;
         const h = React.createElement;
@@ -723,7 +690,7 @@
             h(ReactMedia, { artwork, onUnavailable: () => setMediaUnavailable(true) }),
             h('div', { className: 'artsoul-card-body' },
                 h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
-                h(ReactProvenance, { artwork }),
+                h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
@@ -748,8 +715,7 @@
         createMediaElement,
         ReactCard,
         ReactMedia,
-        ReactProvenance,
-        provenanceRoles,
+        creatorLabel,
         statusInfo,
         discoveryStatusInfo,
         isListedForSale,
