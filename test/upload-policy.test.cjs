@@ -52,3 +52,11 @@ test('active upload surfaces consume the shared policy and no longer advertise 1
     assert.doesNotMatch(source, /100\s*MB/i);
   }
 });
+
+test('the production build copies the upload policy required by legacy browser modules', () => {
+  const viteConfig = fs.readFileSync(path.join(ROOT, 'vite.config.js'), 'utf8');
+  const buildVerifier = fs.readFileSync(path.join(ROOT, 'scripts/verify-build.mjs'), 'utf8');
+
+  assert.match(viteConfig, /legacyClientTrees\s*=\s*\[[\s\S]*['"]src\/config['"]/);
+  assert.match(buildVerifier, /dist[^\n]*src\/config\/upload-policy\.js/);
+});
