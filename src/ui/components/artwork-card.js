@@ -3,6 +3,8 @@
 
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     const RECENT_PENDING_MS = 30 * 60 * 1000;
+    const countdownListeners = new Set();
+    let countdownTimerId = null;
 
     function normalize(value) {
         return (value || '').toString().trim().toLowerCase();
@@ -237,6 +239,83 @@
         }
         if (activeAuctionId(artwork) && !expired && !minted) return { key: 'live', label: 'Live' };
         return { key: 'not_minted', label: 'Not yet minted' };
+    }
+
+    function auctionEndTimestamp(artwork = {}) {
+        return toTimestamp(artwork.auction_end_time || artwork.end_time || artwork.endTime);
+    }
+
+    function formatAuctionCountdown(endTime, now = Date.now()) {
+        const remainingMs = Math.max(0, toTimestamp(endTime) - now);
+        if (remainingMs <= 0) return 'Ended';
+
+        const totalSeconds = Math.ceil(remainingMs / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (days > 0) return `${days}d ${String(hours).padStart(2, '0')}h`;
+        if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+        return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+    }
+
+    function countdownInfo(artwork = {}, now = Date.now()) {
+        const endTime = auctionEndTimestamp(artwork);
+        if (!endTime || statusInfo(artwork).key !== 'live') return null;
+        return { endTime, label: formatAuctionCountdown(endTime, now) };
+    }
+
+    function stopCountdownTimerIfIdle() {
+        if (countdownListeners.size || countdownTimerId === null) return;
+        window.clearInterval?.(countdownTimerId);
+        countdownTimerId = null;
+    }
+
+    function tickCountdowns(now = Date.now()) {
+        countdownListeners.forEach(listener => {
+            if (listener(now) === false) countdownListeners.delete(listener);
+        });
+        stopCountdownTimerIfIdle();
+    }
+
+    function subscribeCountdown(listener) {
+        countdownListeners.add(listener);
+        if (countdownTimerId === null && typeof window.setInterval === 'function') {
+            countdownTimerId = window.setInterval(() => tickCountdowns(), 1000);
+        }
+        return () => {
+            countdownListeners.delete(listener);
+            stopCountdownTimerIfIdle();
+        };
+    }
+
+    function countdownAriaLabel(label) {
+        return label === 'Ended' ? 'Auction ended' : `Auction ends in ${label}`;
+    }
+
+    function createCountdownElement(artwork = {}) {
+        const info = countdownInfo(artwork);
+        if (!info) return null;
+
+        const pill = document.createElement('span');
+        pill.className = 'artsoul-card-countdown';
+        pill.dataset.auctionEnd = String(info.endTime);
+        pill.setAttribute('role', 'timer');
+        pill.setAttribute('aria-live', 'off');
+
+        const update = (now = Date.now()) => {
+            if ('isConnected' in pill && !pill.isConnected) return false;
+            const label = formatAuctionCountdown(info.endTime, now);
+            pill.textContent = label;
+            pill.className = `artsoul-card-countdown${label === 'Ended' ? ' is-ended' : ''}`;
+            pill.setAttribute('aria-label', countdownAriaLabel(label));
+            return label !== 'Ended';
+        };
+
+        update();
+        subscribeCountdown(update);
+        return pill;
     }
 
     function discoveryStatusInfo(artwork = {}) {
@@ -516,6 +595,8 @@
 
         card.appendChild(createMediaElement(artwork, () => card.remove()));
         card.appendChild(body);
+        const countdown = createCountdownElement(artwork);
+        if (countdown) card.appendChild(countdown);
         return card;
     }
 
@@ -665,6 +746,34 @@
         );
     }
 
+    function ReactCountdown({ artwork = {} }) {
+        const React = window.React;
+        const h = React.createElement;
+        const endTime = auctionEndTimestamp(artwork);
+        const [display, setDisplay] = React.useState(() => countdownInfo(artwork));
+
+        React.useEffect(() => {
+            const next = countdownInfo(artwork);
+            setDisplay(next);
+            if (!next) return undefined;
+
+            return subscribeCountdown(now => {
+                const label = formatAuctionCountdown(next.endTime, now);
+                setDisplay({ endTime: next.endTime, label });
+                return label !== 'Ended';
+            });
+        }, [endTime, activeAuctionId(artwork), isMinted(artwork), normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state)]);
+
+        if (!display || display.endTime !== endTime) return null;
+        return h('span', {
+            className: `artsoul-card-countdown${display.label === 'Ended' ? ' is-ended' : ''}`,
+            'data-auction-end': String(display.endTime),
+            role: 'timer',
+            'aria-live': 'off',
+            'aria-label': countdownAriaLabel(display.label)
+        }, display.label);
+    }
+
     function ReactCard({ artwork = {}, onOpen = null, actions = null, respectHidden = true, minimal = false, surface = '' }) {
         const React = window.React;
         const h = React.createElement;
@@ -696,7 +805,8 @@
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
                 ),
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
-            )
+            ),
+            h(ReactCountdown, { artwork })
         );
     }
 
@@ -715,8 +825,12 @@
         createMediaElement,
         ReactCard,
         ReactMedia,
+        ReactCountdown,
         creatorLabel,
         statusInfo,
+        auctionEndTimestamp,
+        formatAuctionCountdown,
+        countdownInfo,
         discoveryStatusInfo,
         isListedForSale,
         isHidden,
