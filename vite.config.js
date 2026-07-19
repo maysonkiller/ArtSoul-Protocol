@@ -53,6 +53,7 @@ const legacyRootAssets = [
 
 const legacyClientTrees = [
     'src/ai',
+    'src/config',
     'src/core',
     'src/features',
     'src/services',
