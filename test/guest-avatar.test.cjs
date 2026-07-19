@@ -109,7 +109,7 @@ test('account menu has one stylesheet source and a full-width compact future net
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=38/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /unified-styles\.css\?v=39/, `${page} must use the shared stylesheet cache version`);
     assert.match(html, /avatar-dropdown\.js\?v=36/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }

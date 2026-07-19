@@ -25,6 +25,12 @@
         return text.length > 16 ? `${text.slice(0, 8)}...${text.slice(-6)}` : text;
     }
 
+    function creatorLabel(artwork = {}) {
+        const displayName = artwork.creator_name || artwork.creator_username || artwork.artist_name;
+        const address = artwork.creator || artwork.creator_id || artwork.artist_address;
+        return String(displayName || shortId(address) || 'Unknown creator');
+    }
+
     function identityKeys(artwork = {}) {
         const keys = new Set();
         [
@@ -481,6 +487,10 @@
         title.className = 'artsoul-card-title';
         title.textContent = artwork.title || 'Untitled Artwork';
 
+        const creator = document.createElement('p');
+        creator.className = 'artsoul-card-creator';
+        creator.textContent = `Creator: ${creatorLabel(artwork)}`;
+
         const meta = document.createElement('div');
         meta.className = 'artsoul-card-meta';
         const badge = document.createElement('span');
@@ -497,6 +507,7 @@
         }
 
         body.appendChild(title);
+        body.appendChild(creator);
         body.appendChild(meta);
 
         card.appendChild(createMediaElement(artwork, () => card.remove()));
@@ -675,6 +686,7 @@
             h(ReactMedia, { artwork, onUnavailable: () => setMediaUnavailable(true) }),
             h('div', { className: 'artsoul-card-body' },
                 h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
+                h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
