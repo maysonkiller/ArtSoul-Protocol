@@ -198,7 +198,7 @@ async function projectCards(query = {}) {
   const handler = loadHandler();
   const res = fakeRes();
   await handler({ query }, res);
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   return res.body;
 }
 
