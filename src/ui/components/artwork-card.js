@@ -25,6 +25,10 @@
         return text.length > 16 ? `${text.slice(0, 8)}...${text.slice(-6)}` : text;
     }
 
+    // Canon doc 05: compact preview cards stay creator-focused. The public
+    // projection enriches creator_name with the creator's public profile
+    // nickname (one batched server-side lookup); a valid address always
+    // falls back to its shortened form, never to "Unknown creator".
     function creatorLabel(artwork = {}) {
         const displayName = artwork.creator_name || artwork.creator_username || artwork.artist_name;
         const address = artwork.creator || artwork.creator_id || artwork.artist_address;
@@ -711,6 +715,7 @@
         createMediaElement,
         ReactCard,
         ReactMedia,
+        creatorLabel,
         statusInfo,
         discoveryStatusInfo,
         isListedForSale,

@@ -28,6 +28,7 @@ const DEFAULTED_WINNER = '0xDead000000000000000000000000000000000005';
 const RESALE_BUYER_1 = '0xBb01000000000000000000000000000000000006';
 const RESALE_BUYER_2 = '0xBb02000000000000000000000000000000000007';
 const LEGACY_COLLECTOR = '0x1e9a000000000000000000000000000000000008';
+const GENERATED_NAME_CREATOR = '0xGen0000000000000000000000000000000000009';
 
 function artworkRow(overrides = {}) {
   return {
@@ -67,7 +68,9 @@ const FIXTURES = {
     // 9: hidden by moderation
     artworkRow({ artwork_id: '9' }),
     // Legacy Ethereum Sepolia record sharing protocol id 4 with the Base row
-    artworkRow({ chain_id: 11155111, artwork_id: '4', minted: true, token_id: '400' })
+    artworkRow({ chain_id: 11155111, artwork_id: '4', minted: true, token_id: '400' }),
+    // 10: creator whose profile username is auto-generated (not public)
+    artworkRow({ artwork_id: '10', creator: GENERATED_NAME_CREATOR })
   ],
   v41_auctions: [
     {
@@ -152,6 +155,16 @@ const FIXTURES = {
   artwork_social_signals: [],
   artwork_moderation_visibility: [
     { chain_id: 84532, artwork_id: '9', hidden: true }
+  ],
+  profiles: [
+    {
+      wallet_address: CREATOR.toLowerCase(),
+      username: 'soulpainter',
+      bio: 'private-ish text that must never reach cards',
+      twitter_handle: 'leak',
+      discord_username: 'leak#1'
+    },
+    { wallet_address: GENERATED_NAME_CREATOR.toLowerCase(), username: 'User1a2b' }
   ]
 };
 
@@ -312,4 +325,20 @@ test('hidden artwork direct lookup stays suppressed for non-staff viewers', asyn
   const body = await projectCards({ artwork_id: '9' });
   assert.equal(body.data.length, 0);
   assert.ok(body.suppressed_artwork_ids.includes('v41:84532:9'));
+});
+
+test('cards carry the creator public nickname from one batched profiles lookup', async () => {
+  const body = await projectCards();
+  const card = cardById(body, 'v41:84532:1');
+  assert.equal(card.creator_name, 'soulpainter');
+  // Only the public display name is exposed — no other profile fields leak.
+  for (const field of ['bio', 'twitter_handle', 'discord_username', 'avatar_url', 'username']) {
+    assert.equal(field in card, false, `${field} must not leak into public cards`);
+  }
+});
+
+test('auto-generated usernames never surface as creator attribution', async () => {
+  const body = await projectCards();
+  const card = cardById(body, 'v41:84532:10');
+  assert.equal(card.creator_name, null);
 });

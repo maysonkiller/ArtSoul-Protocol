@@ -316,9 +316,12 @@ const { useState, useEffect, useRef } = React;
 
             function isCollectedArtwork(artwork = {}, ownerAddress = '') {
                 const owner = normalizeAddress(ownerAddress);
-                return isMintedArtwork(artwork) &&
-                    normalizeAddress(artwork.current_owner_address) === owner &&
-                    normalizeAddress(artwork.creator_id || artwork.creator) !== owner;
+                // A creator who buys back their own mint through a completed
+                // resale is still the projected current owner, so Owned must
+                // not exclude creator-owned mints. Ownership comes only from
+                // the indexed current_owner_address, never wallet state.
+                return Boolean(owner) && isMintedArtwork(artwork) &&
+                    normalizeAddress(artwork.current_owner_address) === owner;
             }
 
             function filterCanonicalProfileArtworks(artworks, walletAddress, galleryType = 'created') {
@@ -390,6 +393,7 @@ const { useState, useEffect, useRef } = React;
                 const status = getProfileArtworkStatus(artwork);
                 const price = getProfileArtworkPrice(artwork);
                 const href = getProfileArtworkHref(artwork);
+                const creatorLabel = sharedCards?.creatorLabel;
                 const CardElement = href ? 'a' : 'div';
 
                 return (
@@ -401,6 +405,9 @@ const { useState, useEffect, useRef } = React;
                         <ProfileArtworkMedia artwork={artwork} onUnavailable={() => setMediaUnavailable(true)} />
                         <div className="artsoul-card-body">
                             <h4 className="artsoul-card-title">{artwork.title || 'Untitled Artwork'}</h4>
+                            {creatorLabel && (
+                                <p className="artsoul-card-creator">Creator: {creatorLabel(artwork)}</p>
+                            )}
                             <div className="artsoul-card-meta">
                                 <span className={`artsoul-card-status artsoul-card-status-${status.key}`}>{status.label}</span>
                                 {price && <span className="artsoul-card-price">{price}</span>}

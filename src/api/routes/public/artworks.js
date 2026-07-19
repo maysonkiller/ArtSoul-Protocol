@@ -422,6 +422,39 @@ function moderationVisibilityByArtwork(rows = []) {
   return map;
 }
 
+// Mirrors the client-side ArtSoulProfileDisplay rule: auto-generated
+// "User1a2b"-style usernames are not public nicknames, so cards fall back
+// to the shortened wallet address.
+const GENERATED_PROFILE_USERNAME = /^User[0-9a-fA-F]{4,6}$/;
+
+// One batched public-nickname lookup per snapshot rebuild for the unique
+// creator addresses already inside the cached projection — never per card,
+// never a full-table read. Only the public username is exposed.
+async function creatorNamesByAddress(artworks = [], warnings) {
+  const addresses = [...new Set(
+    artworks
+      .map(artwork => normalizeText(artwork.creator).toLowerCase())
+      .filter(address => address && address !== ZERO_ADDRESS)
+  )];
+  if (!addresses.length) return new Map();
+
+  const rows = await queryTable(
+    'profiles',
+    `select=wallet_address,username&wallet_address=in.(${addresses.map(encodeURIComponent).join(',')})&limit=${addresses.length}`,
+    warnings
+  );
+
+  const map = new Map();
+  for (const row of rows) {
+    const wallet = normalizeText(row.wallet_address).toLowerCase();
+    const username = normalizeText(row.username);
+    if (wallet && username && !GENERATED_PROFILE_USERNAME.test(username)) {
+      map.set(wallet, username);
+    }
+  }
+  return map;
+}
+
 function bidsByAuction(bids = []) {
   const map = new Map();
 
@@ -503,6 +536,7 @@ async function toPublicCard(artwork, maps) {
     description,
     creator: artwork.creator,
     creator_id: artwork.creator,
+    creator_name: maps.creatorNames.get(normalizeText(artwork.creator).toLowerCase()) || null,
     media_url: mediaUrl,
     file_url: mediaUrl,
     animation_url: ['video', 'audio'].includes(mediaType) ? mediaUrl : null,
@@ -604,6 +638,7 @@ function parseDirectLookup(query = {}) {
 
 async function projectTableData(tableData, warnings) {
   const maps = {
+    creatorNames: await creatorNamesByAddress(tableData.v41_artworks, warnings),
     auctions: latestAuctionByArtwork(tableData.v41_auctions),
     settlements: latestCompletedSettlementByArtwork(tableData.v41_settlements),
     resales: resaleByToken(tableData.v41_resale_listings),
