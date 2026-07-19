@@ -15,6 +15,7 @@ import {
 } from '../src/api/routes/oauth.js';
 import profileHandler from '../src/api/routes/profile.js';
 import publicArtworksHandler from '../src/api/routes/public/artworks.js';
+import publicArtworkProvenanceHandler from '../src/api/routes/public/artwork-provenance.js';
 import publicAuctionLiveHandler from '../src/api/routes/public/auction-live.js';
 import publicConfigHandler from '../src/api/routes/public/config.js';
 import publicIndexerStatusHandler from '../src/api/routes/public/indexer-status.js';
@@ -29,6 +30,7 @@ const ROUTES = new Map([
   ['discovery/like', likeHandler],
   ['discovery/signal', signalHandler],
   ['public/artworks', publicArtworksHandler],
+  ['public/artwork-provenance', publicArtworkProvenanceHandler],
   ['public/auction-live', publicAuctionLiveHandler],
   ['public/config', publicConfigHandler],
   ['public/indexer-status', publicIndexerStatusHandler],

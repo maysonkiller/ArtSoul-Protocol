@@ -128,11 +128,19 @@ test('cards omit unsafe media and remove themselves when media loading fails', (
     assert.equal(card.removed, true);
 });
 
-test('card bodies contain only title and status-price metadata', () => {
+test('card bodies contain title, canonical Creator attribution, and status-price metadata', () => {
     const { api } = loadDomCardRuntime();
-    const card = api.createCardElement({ id: 'image', title: 'Image', file_url: 'image.jpg', creator_value: '1' });
+    const card = api.createCardElement({
+        id: 'image',
+        title: 'Image',
+        file_url: 'image.jpg',
+        creator: '0x1000000000000000000000000000000000000001',
+        creator_value: '1'
+    });
     const body = card.children[1];
-    assert.equal(body.children.length, 2);
+    assert.equal(body.children.length, 3);
     assert.equal(body.children[0].className, 'artsoul-card-title');
-    assert.equal(body.children[1].className, 'artsoul-card-meta');
+    assert.equal(body.children[1].className, 'artsoul-card-creator');
+    assert.equal(body.children[1].textContent, 'Creator: 0x100000...000001');
+    assert.equal(body.children[2].className, 'artsoul-card-meta');
 });
