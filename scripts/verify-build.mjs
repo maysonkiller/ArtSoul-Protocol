@@ -25,6 +25,9 @@ const forbiddenBrowserCompilers = [
 ];
 
 await Promise.all(pages.map(page => access(path.join(dist, page))));
+await access(path.join(dist, 'src/config/upload-policy.js')).catch(() => {
+    throw new Error('Missing legacy runtime dependency in dist: src/config/upload-policy.js');
+});
 
 for (const page of pages) {
     const [source, built] = await Promise.all([
