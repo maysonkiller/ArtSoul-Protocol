@@ -15,13 +15,16 @@ Read these files before changing anything:
 1. `AGENTS.md`
 2. `docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`
 3. `docs/BACKLOG.md`
-4. The relevant split canon file in `docs/canon/`
-5. `docs/canon/12_IMPLEMENTATION_BACKLOG.md`
-6. `docs/canon/17_ROADMAP_PHASES.md`
-7. `docs/PROJECT_STATE.md`
-8. This file
+4. `docs/RESOURCE_GATED_WORK.md`
+5. The relevant split canon file in `docs/canon/`
+6. `docs/canon/12_IMPLEMENTATION_BACKLOG.md`
+7. `docs/canon/17_ROADMAP_PHASES.md`
+8. `docs/PROJECT_STATE.md`
+9. This file
 
 `docs/BACKLOG.md` is the durable cross-phase work register. Put every new chat, report, review, or partner idea there before implementation; the Canon Bible remains authoritative for architecture.
+
+`docs/RESOURCE_GATED_WORK.md` records requirements that remain mandatory but are deferred until their external funding, domain, signer, audit, legal, or operating prerequisites exist. Do not silently drop those items or bypass their security gates to reduce cost.
 
 Current phase: **Phase A, Stabilize Public Testnet**.
 
