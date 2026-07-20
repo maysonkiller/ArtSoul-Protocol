@@ -3,6 +3,10 @@ import {
   requireWallet,
   supabaseRest
 } from './backend.js';
+import {
+  isModerationPasskeyEnabled,
+  verifyModerationStepUp
+} from './moderation-passkey.js';
 
 const MODERATION_ROLES = new Set(['admin', 'moderator', 'team']);
 
@@ -60,6 +64,53 @@ export async function getModerationAccess(req, options = {}) {
 
   const role = String(roleRows?.[0]?.role || '').toLowerCase();
   const profile = profileRows?.[0] || null;
+
+  // A8a (founder decision 2026-07-20): with the passkey flag enabled,
+  // moderation requires an active staff role + a valid SIWE session + a
+  // valid 15-minute passkey step-up. X/Discord handles and IDs are profile
+  // and eligibility data ONLY — they never participate in this
+  // authorization decision. Missing configuration fails closed.
+  if (isModerationPasskeyEnabled()) {
+    let stepUp;
+    try {
+      stepUp = await verifyModerationStepUp(req, wallet);
+    } catch (error) {
+      if (strict) throw error;
+      return {
+        wallet,
+        role: MODERATION_ROLES.has(role) ? role : null,
+        canModerate: false,
+        passkeyRequired: true,
+        missingFactors: ['passkey_configuration']
+      };
+    }
+
+    if (strict && !MODERATION_ROLES.has(role)) {
+      throw accessError('Administrative access required', 'ADMIN_REQUIRED', 403);
+    }
+    if (strict && !stepUp.valid) {
+      throw accessError(
+        'A passkey step-up is required for moderation access',
+        stepUp.code || 'STEP_UP_REQUIRED',
+        403
+      );
+    }
+
+    return {
+      wallet,
+      role: MODERATION_ROLES.has(role) ? role : null,
+      canModerate: MODERATION_ROLES.has(role) && stepUp.valid,
+      passkeyRequired: true,
+      stepUpActive: stepUp.valid,
+      missingFactors: stepUp.valid ? [] : ['passkey_step_up']
+    };
+  }
+
+  // TEMPORARY LEGACY BEHAVIOR (flag disabled): the profile/X/Discord factor
+  // path below predates the A8a decision and is scheduled for removal when
+  // ARTSOUL_MODERATION_PASSKEY_ENABLED is activated. It is kept only so
+  // current production moderators are not locked out before founder
+  // passkey enrollment. Social identifiers are NOT authentication factors.
   const factors = {
     profile: Boolean(profile),
     x: Boolean(profile && (

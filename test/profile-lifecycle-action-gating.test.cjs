@@ -474,7 +474,11 @@ function loadModerationAccess({ sessionWallet, roleRows, profileRows, registryDo
     supabaseRest: async (query) => {
       if (registryDown) throw new Error('registry down');
       return query.startsWith('artsoul_staff_roles') ? roleRows : profileRows;
-    }
+    },
+    // A8a: these tests pin the LEGACY (flag disabled) behavior; the enabled
+    // path is covered by test/moderation-passkey-foundation.test.cjs.
+    isModerationPasskeyEnabled: () => false,
+    verifyModerationStepUp: async () => { throw new Error('not reachable with the flag disabled'); }
   });
   const source = moderationAccessSource
     .slice(moderationAccessSource.indexOf('const MODERATION_ROLES'))

@@ -121,7 +121,7 @@ function signPayload(payload) {
   return crypto.createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
-function serializeCookie(name, value, options = {}) {
+export function serializeCookie(name, value, options = {}) {
   const parts = [`${name}=${value}`];
   if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
   if (options.path) parts.push(`Path=${options.path}`);
@@ -131,7 +131,7 @@ function serializeCookie(name, value, options = {}) {
   return parts.join('; ');
 }
 
-function parseCookies(header = '') {
+export function parseCookies(header = '') {
   return header.split(';').reduce((cookies, part) => {
     const index = part.indexOf('=');
     if (index === -1) return cookies;

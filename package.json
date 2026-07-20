@@ -36,6 +36,8 @@
     "test": "test"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
     "abbrev": "^1.0.9",
     "acorn": "^8.16.0",
     "acorn-walk": "^8.3.5",
