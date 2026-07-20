@@ -371,10 +371,17 @@ const { useState, useEffect, useRef } = React;
                 return null;
             }
 
-            function ensureArtworkWriteEnabled() {
+            // Canon rule 13 / Phase A7: legacy Ethereum Sepolia artworks stay
+            // readable but expose no write actions. This pure predicate gates
+            // BOTH action visibility and every click/submit handler.
+            function isArtworkWriteChainSupported() {
                 const artworkChainId = getArtworkWriteChainId();
                 const legacyNetwork = artwork?.network === 'sepolia' || artworkChainId === 11155111;
-                if (legacyNetwork || (!artworkChainId && artwork?.network !== 'baseSepolia')) {
+                return !(legacyNetwork || (!artworkChainId && artwork?.network !== 'baseSepolia'));
+            }
+
+            function ensureArtworkWriteEnabled() {
+                if (!isArtworkWriteChainSupported()) {
                     alert('This artwork is on a legacy network. On-chain actions are disabled for now.');
                     return false;
                 }
@@ -2184,6 +2191,18 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function confirmResaleListing() {
+                // Re-check eligibility at submit time: wallet account or chain
+                // can change while the modal is open, so the open-time checks
+                // in openResaleListingModal are not sufficient on their own.
+                if (!ensureArtworkWriteEnabled()) return;
+                const submitWalletAddress = connectedWalletAddress ||
+                    window.currentWalletAddress ||
+                    window.getCurrentWalletAddress?.();
+                if (!submitWalletAddress || !isSameAddress(submitWalletAddress, artwork.current_owner_address)) {
+                    setResaleModalError('Only the current NFT owner can create a resale listing.');
+                    return;
+                }
+
                 const floorPrice = Number(resaleFloorPrice || 0);
                 const validation = validateResaleModalPrice(resaleModalPrice, floorPrice);
                 if (!validation.valid) {
@@ -2266,6 +2285,11 @@ const { useState, useEffect, useRef } = React;
 
                     const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
                     if (!walletAddress) return;
+
+                    if (isSameAddress(walletAddress, artwork.current_owner_address)) {
+                        alert('You already own this NFT, so it cannot be purchased from yourself.');
+                        return;
+                    }
 
                     // Buy an already minted resale listing.
                     const txHash = await window.ArtSoulContracts.buyResale(
@@ -2359,7 +2383,8 @@ const { useState, useEffect, useRef } = React;
 
             // Check if auction has ended (using service when available)
             const auctionEnded = auction ? isAuctionClosedForBidding(auction) : false;
-            const canEndAuction = auction ? isAuctionEndActionAvailable(auction) : false;
+            const artworkWriteEnabled = isArtworkWriteChainSupported();
+            const canEndAuction = artworkWriteEnabled && auction ? isAuctionEndActionAvailable(auction) : false;
             const currentHighestBidWei = auction ? getAuctionHighestBidWei(auction) : 0n;
             const currentHighestBid = formatWeiToEth(currentHighestBidWei);
             const hasAuctionBids = currentHighestBidWei > 0n || bidActivity.length > 0;
@@ -2381,7 +2406,9 @@ const { useState, useEffect, useRef } = React;
                 poster: ''
             };
             const safeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(resolvedMedia.url) ? resolvedMedia.url : '';
-            const canCreateNewAuction = walletRenderState.settled && canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
+            const canCreateNewAuction = artworkWriteEnabled &&
+                walletRenderState.settled &&
+                canCreateNewAuctionForWallet(artwork, connectedWalletAddress);
             const enteredBidDepositWei = requiredDepositForBidWei(bidAmount);
             const pendingWithdrawalWei = parseEthToWei(withdrawalState.amount) || 0n;
             const showWithdrawableDeposit = walletRenderState.settled &&
@@ -3103,8 +3130,8 @@ const { useState, useEffect, useRef } = React;
                                         </section>
                                         )}
 
-                                        {/* Bid Input (during auction) */}
-                                        {liveAuction && (
+                                        {/* Bid Input (during auction; Base Sepolia artworks only) */}
+                                        {liveAuction && artworkWriteEnabled && (
                                             <div className="mt-6 space-y-3">
                                                 <input
                                                     type="number"
@@ -3137,7 +3164,7 @@ const { useState, useEffect, useRef } = React;
                                             </div>
                                         )}
 
-                                        {(showWithdrawableDeposit || withdrawalState.message) && (
+                                        {artworkWriteEnabled && (showWithdrawableDeposit || withdrawalState.message) && (
                                             <section className="artwork-withdrawal-panel" aria-live="polite">
                                                 {showWithdrawableDeposit && (
                                                     <>
@@ -3200,8 +3227,8 @@ const { useState, useEffect, useRef } = React;
                                             </div>
                                         )}
 
-                                        {/* Settlement button (24h window) */}
-                                        {walletRenderState.settled && awaitingPayment && isSameAddress(connectedWalletAddress, winnerAddress) && (
+                                        {/* Settlement button (24h window; winner only, Base Sepolia artworks only) */}
+                                        {artworkWriteEnabled && walletRenderState.settled && awaitingPayment && isSameAddress(connectedWalletAddress, winnerAddress) && (
                                             <div className="mt-6 space-y-3">
                                                 <div className="artwork-settlement-notice p-4 rounded-lg border-2">
                                                     <div className="flex items-center gap-2 mb-2">
@@ -3232,8 +3259,8 @@ const { useState, useEffect, useRef } = React;
                                             </div>
                                         )}
 
-                                        {/* Resale actions (only after successful settlement/mint) */}
-                                        {resaleEligibility.showOwnerAction && (
+                                        {/* Resale actions (only after successful settlement/mint; Base Sepolia artworks only) */}
+                                        {artworkWriteEnabled && resaleEligibility.showOwnerAction && (
                                             <div className="artwork-auction-next-step mt-4">
                                                 <p>
                                                     List this minted NFT at or above its canonical floor of {resaleFloorPrice || 'pending'} ETH.
@@ -3262,7 +3289,7 @@ const { useState, useEffect, useRef } = React;
                                             </div>
                                         )}
 
-                                        {listedForResale && !connectedWalletOwnsArtwork && (
+                                        {listedForResale && !connectedWalletOwnsArtwork && artworkWriteEnabled && (
                                             <div className="mt-6">
                                                 <button
                                                     onClick={handleDirectPurchase}

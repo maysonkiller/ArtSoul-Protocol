@@ -419,14 +419,26 @@ const { useState, useEffect, useRef } = React;
                 );
             }
 
+            // Canon rule 13 / Phase A7: legacy Ethereum Sepolia artworks stay
+            // readable but never qualify for writes. Writes are Base-only, so
+            // the pending-indexer chain resolver (defaults to Base Sepolia)
+            // is the shared source of the artwork's write chain.
+            function isBaseSepoliaArtwork(artwork = {}) {
+                return resolvePendingArtworkChainId(artwork) === 84532;
+            }
+
             function canCreateNewAuction(artwork = {}, walletAddress = '') {
-                return normalizeAddress(artwork.creator_id || artwork.creator) === normalizeAddress(walletAddress) &&
+                return isBaseSepoliaArtwork(artwork) &&
+                    Boolean(normalizeAddress(walletAddress)) &&
+                    normalizeAddress(artwork.creator_id || artwork.creator) === normalizeAddress(walletAddress) &&
                     !isMintedArtwork(artwork) &&
                     !hasActiveAuction(artwork);
             }
 
             function canListForResale(artwork = {}, walletAddress = '') {
-                return isMintedArtwork(artwork) &&
+                return isBaseSepoliaArtwork(artwork) &&
+                    Boolean(normalizeAddress(walletAddress)) &&
+                    isMintedArtwork(artwork) &&
                     normalizeAddress(artwork.current_owner_address) === normalizeAddress(walletAddress);
             }
 
