@@ -419,14 +419,33 @@ const { useState, useEffect, useRef } = React;
                 );
             }
 
+            // Canon rule 13 / Phase A7: write eligibility fails closed. Only
+            // exact Base Sepolia 84532 evidence qualifies; an explicit chain
+            // id always overrides network labels, and unknown/missing chain
+            // evidence never authorizes a write. resolvePendingArtworkChainId
+            // stays display-only — it defaults unknown chains to Base and
+            // must never gate writes. Locally-created pending drafts store
+            // chain_id 84532 and network "baseSepolia", so they stay eligible.
+            function isBaseSepoliaArtwork(artwork = {}) {
+                const rawChainId = artwork.chain_id ?? artwork.chainId ?? artwork.network_chain_id;
+                if (rawChainId !== undefined && rawChainId !== null && String(rawChainId).trim() !== '') {
+                    return Number(rawChainId) === 84532;
+                }
+                return String(artwork.network || '').trim() === 'baseSepolia';
+            }
+
             function canCreateNewAuction(artwork = {}, walletAddress = '') {
-                return normalizeAddress(artwork.creator_id || artwork.creator) === normalizeAddress(walletAddress) &&
+                return isBaseSepoliaArtwork(artwork) &&
+                    Boolean(normalizeAddress(walletAddress)) &&
+                    normalizeAddress(artwork.creator_id || artwork.creator) === normalizeAddress(walletAddress) &&
                     !isMintedArtwork(artwork) &&
                     !hasActiveAuction(artwork);
             }
 
             function canListForResale(artwork = {}, walletAddress = '') {
-                return isMintedArtwork(artwork) &&
+                return isBaseSepoliaArtwork(artwork) &&
+                    Boolean(normalizeAddress(walletAddress)) &&
+                    isMintedArtwork(artwork) &&
                     normalizeAddress(artwork.current_owner_address) === normalizeAddress(walletAddress);
             }
 

@@ -321,7 +321,7 @@ test('contract transactions foreground the wallet on the mobile core path', () =
 });
 
 test('legacy Ethereum Sepolia artwork writes are blocked without a switch prompt', () => {
-    assert.match(artwork, /This artwork is on a legacy network\. On-chain actions are disabled for now\./);
+    assert.match(artwork, /On-chain actions require Base Sepolia\. This artwork record is readable, but write actions are disabled for it\./);
     assert.doesNotMatch(artwork, /Switch to \$\{networkNames\[artworkNetwork\]/);
     assert.doesNotMatch(artwork, /'sepolia': 11155111,\s*'baseSepolia': 84532/);
 });
