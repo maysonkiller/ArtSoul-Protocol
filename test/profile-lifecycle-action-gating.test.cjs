@@ -24,6 +24,7 @@ const STRANGER = '0x5555555555555555555555555555555555555555';
 
 // Extracts a named function by balanced-brace scanning so the real page
 // logic runs behaviorally (repo pattern from profile-owned-buyback tests).
+// Preserves an `async ` prefix so extracted async handlers stay valid.
 function extractFunction(source, name) {
   const start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `Missing function ${name}`);
@@ -36,7 +37,8 @@ function extractFunction(source, name) {
       if (depth === 0) break;
     }
   }
-  return source.slice(start, index + 1);
+  const prefix = source.slice(Math.max(0, start - 6), start) === 'async ' ? 'async ' : '';
+  return prefix + source.slice(start, index + 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,12 +129,44 @@ function loadArtworkChainPredicate(artwork, v41CompositeId = null) {
   return sandbox.exported.isArtworkWriteChainSupported;
 }
 
-test('artwork page write predicate: Base Sepolia allowed, legacy and unknown chains blocked', () => {
+test('artwork page write predicate: ONLY exact Base Sepolia 84532 qualifies', () => {
   assert.equal(loadArtworkChainPredicate({ chain_id: 84532 })(), true);
   assert.equal(loadArtworkChainPredicate({ network: 'baseSepolia' })(), true);
+  // Legacy testnet, both mainnets, arbitrary and missing chains fail closed.
   assert.equal(loadArtworkChainPredicate({ chain_id: 11155111 })(), false);
   assert.equal(loadArtworkChainPredicate({ network: 'sepolia' })(), false);
+  assert.equal(loadArtworkChainPredicate({ chain_id: 1 })(), false);
+  assert.equal(loadArtworkChainPredicate({ chain_id: 8453 })(), false);
+  assert.equal(loadArtworkChainPredicate({ chain_id: 999999 })(), false);
   assert.equal(loadArtworkChainPredicate({})(), false);
+  // An explicit non-Base chain id overrides a conflicting network label.
+  assert.equal(loadArtworkChainPredicate({ chain_id: 8453, network: 'baseSepolia' })(), false);
+  assert.equal(loadArtworkChainPredicate({ chain_id: 1, network: 'baseSepolia' })(), false);
+});
+
+test('profile write predicates enforce the same strict fail-closed chain matrix', () => {
+  const asCreatorAuction = (artwork) => profilePredicates.canCreateNewAuction(
+    { creator_id: CREATOR, status: 'registered', ...artwork },
+    CREATOR
+  );
+  const asOwnerResale = (artwork) => profilePredicates.canListForResale(
+    { creator_id: CREATOR, minted: true, token_id: '7', current_owner_address: COLLECTOR, ...artwork },
+    COLLECTOR
+  );
+
+  assert.equal(asCreatorAuction({ chain_id: 84532 }), true);
+  assert.equal(asOwnerResale({ chain_id: 84532 }), true);
+  // Locally-created pending drafts (chain_id 84532 + network baseSepolia) stay eligible.
+  assert.equal(asCreatorAuction({ chain_id: 84532, network: 'baseSepolia', source: 'pending_indexer' }), true);
+  // Network metadata qualifies only without a conflicting explicit chain id.
+  assert.equal(asCreatorAuction({ network: 'baseSepolia' }), true);
+  assert.equal(asCreatorAuction({ chain_id: 8453, network: 'baseSepolia' }), false);
+  assert.equal(asOwnerResale({ chain_id: 8453, network: 'baseSepolia' }), false);
+  // Mainnets, legacy, arbitrary, and missing chain evidence never authorize.
+  for (const blocked of [{ chain_id: 1 }, { chain_id: 8453 }, { chain_id: 11155111 }, { chain_id: 424242 }, {}]) {
+    assert.equal(asCreatorAuction(blocked), false, `create-auction must be blocked for ${JSON.stringify(blocked)}`);
+    assert.equal(asOwnerResale(blocked), false, `resale must be blocked for ${JSON.stringify(blocked)}`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -194,9 +228,152 @@ test('re-auction stays creator-only, unminted-only, and lifecycle-restricted', (
 test('resale submit re-checks owner and chain; buyer can never self-purchase', () => {
   const confirm = extractFunction(artworkSource, 'confirmResaleListing');
   assert.match(confirm, /ensureArtworkWriteEnabled\(\)/);
+  assert.match(confirm, /await getLiveProviderAccount\(\)/);
   assert.match(confirm, /isSameAddress\(submitWalletAddress, artwork\.current_owner_address\)/);
+  // The stale rendered/window account snapshot never authorizes the submit.
+  assert.doesNotMatch(confirm, /connectedWalletAddress|window\.currentWalletAddress|getCurrentWalletAddress/);
   const purchase = extractFunction(artworkSource, 'purchaseResaleOnce');
+  assert.match(purchase, /await getLiveProviderAccount\(\)/);
   assert.match(purchase, /isSameAddress\(walletAddress, artwork\.current_owner_address\)/);
+  assert.doesNotMatch(purchase, /window\.currentWalletAddress|getCurrentWalletAddress/);
+});
+
+// ---------------------------------------------------------------------------
+// Live provider account at submit time (behavioral)
+// ---------------------------------------------------------------------------
+
+function liveAccountProvider(accounts) {
+  return {
+    getWalletProvider: async () => ({
+      request: async ({ method }) => (method === 'eth_accounts' ? accounts : [])
+    })
+  };
+}
+
+async function runConfirmResaleListing({ liveAccounts, owner, staleAccount }) {
+  const calls = { errors: [], began: [] };
+  const sandbox = vm.createContext({
+    window: { web3Modal: liveAccountProvider(liveAccounts) },
+    artwork: { current_owner_address: owner, token_id: '7', minted: true },
+    connectedWalletAddress: staleAccount,
+    resaleFloorPrice: '1',
+    resaleModalPrice: '2',
+    setResaleModalError: (message) => calls.errors.push(message),
+    setResaleModalStepLabel: () => {},
+    // Stop after the authorization phase: begin returning false proves the
+    // checks passed without executing the contract path.
+    beginTransactionAction: (action) => { calls.began.push(action); return false; },
+    finishTransactionAction: () => {},
+    ensureArtworkWriteEnabled: () => true,
+    exported: {}
+  });
+  vm.runInContext([
+    extractFunction(artworkSource, 'isSameAddress'),
+    extractFunction(artworkSource, 'getLiveProviderAccount'),
+    extractFunction(artworkSource, 'normalizeResalePriceInput'),
+    extractFunction(artworkSource, 'validateResaleModalPrice'),
+    extractFunction(artworkSource, 'confirmResaleListing'),
+    'exported.confirmResaleListing = confirmResaleListing;'
+  ].join('\n'), sandbox, { filename: 'artwork.jsx confirmResaleListing (extracted)' });
+  await sandbox.exported.confirmResaleListing();
+  return calls;
+}
+
+test('stale rendered owner cannot list when the live provider account differs', async () => {
+  // UI still shows owner A (stale render), but the wallet switched to B.
+  const calls = await runConfirmResaleListing({
+    liveAccounts: [BIDDER],
+    owner: COLLECTOR,
+    staleAccount: COLLECTOR
+  });
+  assert.deepEqual(calls.began, [], 'transaction phase must not start');
+  assert.match(calls.errors.join(' '), /Only the current NFT owner/);
+});
+
+test('the live owner account authorizes the listing even when the render is stale', async () => {
+  const calls = await runConfirmResaleListing({
+    liveAccounts: [COLLECTOR],
+    owner: COLLECTOR,
+    staleAccount: STRANGER
+  });
+  assert.deepEqual(calls.errors, []);
+  assert.deepEqual(calls.began, ['resale-list'], 'authorization must pass on the live account');
+});
+
+test('a missing live provider account blocks the listing gracefully', async () => {
+  const calls = await runConfirmResaleListing({
+    liveAccounts: [],
+    owner: COLLECTOR,
+    staleAccount: COLLECTOR
+  });
+  assert.deepEqual(calls.began, []);
+  assert.match(calls.errors.join(' '), /Connect your wallet/);
+});
+
+async function runPurchaseResaleOnce({ liveAccounts, owner, staleAccount }) {
+  const calls = { alerts: [], buys: [] };
+  const sandbox = vm.createContext({
+    window: {
+      currentWalletAddress: staleAccount,
+      getCurrentWalletAddress: () => staleAccount,
+      ensureWalletConnected: async () => staleAccount,
+      web3Modal: liveAccountProvider(liveAccounts),
+      ArtSoulContracts: {
+        init: async () => {},
+        buyResale: async (...args) => { calls.buys.push(args); return '0xhash'; },
+        getArtwork: async () => ({ tokenId: '7' })
+      },
+      ArtSoulDB: { recordDirectPurchase: async () => {} }
+    },
+    artwork: { blockchain_id: '7', sale_price: '2', current_owner_address: owner },
+    artworkId: 'v41:84532:7',
+    alert: (message) => calls.alerts.push(message),
+    console: { log: () => {}, warn: () => {}, error: () => {} },
+    loadArtwork: () => {},
+    getTransactionErrorMessage: (error, fallback) => fallback,
+    ensureArtworkWriteEnabled: () => true,
+    exported: {}
+  });
+  vm.runInContext([
+    extractFunction(artworkSource, 'isSameAddress'),
+    extractFunction(artworkSource, 'getLiveProviderAccount'),
+    extractFunction(artworkSource, 'purchaseResaleOnce'),
+    'exported.purchaseResaleOnce = purchaseResaleOnce;'
+  ].join('\n'), sandbox, { filename: 'artwork.jsx purchaseResaleOnce (extracted)' });
+  await sandbox.exported.purchaseResaleOnce();
+  return calls;
+}
+
+test('a stale buyer render cannot self-purchase when the live account is the owner', async () => {
+  // UI still shows the Buy button for previous account B, but the wallet
+  // switched back to the indexed owner A.
+  const calls = await runPurchaseResaleOnce({
+    liveAccounts: [COLLECTOR],
+    owner: COLLECTOR,
+    staleAccount: BIDDER
+  });
+  assert.deepEqual(calls.buys, [], 'buyResale must not execute for the owner');
+  assert.match(calls.alerts.join(' '), /already own this NFT/);
+});
+
+test('a live non-owner account completes the resale purchase path', async () => {
+  const calls = await runPurchaseResaleOnce({
+    liveAccounts: [STRANGER],
+    owner: COLLECTOR,
+    staleAccount: COLLECTOR
+  });
+  assert.equal(calls.buys.length, 1, 'buyResale must execute exactly once');
+  assert.match(calls.alerts.join(' '), /Purchase successful/);
+});
+
+test('a missing live provider account blocks the purchase gracefully', async () => {
+  const calls = await runPurchaseResaleOnce({
+    liveAccounts: [],
+    owner: COLLECTOR,
+    staleAccount: BIDDER
+  });
+  assert.deepEqual(calls.buys, []);
+  assert.match(calls.alerts.join(' '), /Connect your wallet/);
 });
 
 // ---------------------------------------------------------------------------
@@ -274,6 +451,12 @@ test('every contract write entry point calls the shared Base Sepolia guard first
 
 // ---------------------------------------------------------------------------
 // Moderation: server-side authorization only (behavioral)
+//
+// These tests verify that authorization is server-side and fails closed on
+// the staff-role registry. The additional profile/X/Discord factor gate that
+// getModerationAccess currently applies is NOT asserted as the accepted
+// moderation model — the canon v1.2 delta supersedes the social-factor gate,
+// and final moderation access alignment belongs to Phase A8.
 // ---------------------------------------------------------------------------
 
 function loadModerationAccess({ sessionWallet, roleRows, profileRows, registryDown = false }) {

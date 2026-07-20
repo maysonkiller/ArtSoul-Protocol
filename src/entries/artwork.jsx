@@ -371,21 +371,40 @@ const { useState, useEffect, useRef } = React;
                 return null;
             }
 
-            // Canon rule 13 / Phase A7: legacy Ethereum Sepolia artworks stay
-            // readable but expose no write actions. This pure predicate gates
-            // BOTH action visibility and every click/submit handler.
+            // Canon rule 13 / Phase A7: on-chain actions exist ONLY on Base
+            // Sepolia 84532. Any other resolved chain — legacy 11155111,
+            // mainnets 1/8453, arbitrary or missing chain evidence — fails
+            // closed while the artwork stays readable. getArtworkWriteChainId
+            // resolves the explicit chain id first, so an explicit non-84532
+            // chain_id always overrides a conflicting network label. This
+            // pure predicate gates BOTH action visibility and every
+            // click/submit handler.
             function isArtworkWriteChainSupported() {
-                const artworkChainId = getArtworkWriteChainId();
-                const legacyNetwork = artwork?.network === 'sepolia' || artworkChainId === 11155111;
-                return !(legacyNetwork || (!artworkChainId && artwork?.network !== 'baseSepolia'));
+                return getArtworkWriteChainId() === 84532;
             }
 
             function ensureArtworkWriteEnabled() {
                 if (!isArtworkWriteChainSupported()) {
-                    alert('This artwork is on a legacy network. On-chain actions are disabled for now.');
+                    alert('On-chain actions require Base Sepolia. This artwork record is readable, but write actions are disabled for it.');
                     return false;
                 }
                 return true;
+            }
+
+            // Submit-time authorization must use the wallet provider's LIVE
+            // account, never the rendered/window snapshot: the account can
+            // change while a modal is open, and the stale value must not
+            // authorize an action for the wrong identity. Read-only probe of
+            // the existing provider — no reconnect or deep-link is triggered.
+            async function getLiveProviderAccount() {
+                try {
+                    const provider = await window.web3Modal?.getWalletProvider?.();
+                    if (!provider?.request) return '';
+                    const accounts = await provider.request({ method: 'eth_accounts' });
+                    return Array.isArray(accounts) && accounts[0] ? String(accounts[0]) : '';
+                } catch {
+                    return '';
+                }
             }
 
             function requiredDepositForBidWei(value) {
@@ -2194,11 +2213,15 @@ const { useState, useEffect, useRef } = React;
                 // Re-check eligibility at submit time: wallet account or chain
                 // can change while the modal is open, so the open-time checks
                 // in openResaleListingModal are not sufficient on their own.
+                // The live provider account is authoritative, never the
+                // rendered or window snapshot.
                 if (!ensureArtworkWriteEnabled()) return;
-                const submitWalletAddress = connectedWalletAddress ||
-                    window.currentWalletAddress ||
-                    window.getCurrentWalletAddress?.();
-                if (!submitWalletAddress || !isSameAddress(submitWalletAddress, artwork.current_owner_address)) {
+                const submitWalletAddress = await getLiveProviderAccount();
+                if (!submitWalletAddress) {
+                    setResaleModalError('Connect your wallet to list this NFT.');
+                    return;
+                }
+                if (!isSameAddress(submitWalletAddress, artwork.current_owner_address)) {
                     setResaleModalError('Only the current NFT owner can create a resale listing.');
                     return;
                 }
@@ -2283,8 +2306,13 @@ const { useState, useEffect, useRef } = React;
 
                     await window.ArtSoulContracts.init(provider);
 
-                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
-                    if (!walletAddress) return;
+                    // The live provider account is authoritative for the
+                    // purchase identity, never the rendered/window snapshot.
+                    const walletAddress = await getLiveProviderAccount();
+                    if (!walletAddress) {
+                        alert('Connect your wallet to buy this NFT.');
+                        return;
+                    }
 
                     if (isSameAddress(walletAddress, artwork.current_owner_address)) {
                         alert('You already own this NFT, so it cannot be purchased from yourself.');
