@@ -120,7 +120,7 @@ Do not alter auction confirmation semantics while fixing observability.
 - Monitor Alchemy for at least seven days after PR #90.
 - Confirm usage trends toward less than 30% of the monthly free tier.
 - Add indexer lag, fallback-RPC, API error, Supabase egress, and PM2 restart alerts.
-- Resolve the optional missing `failed_events` table or explicitly retire that metric.
+- Verify the A-15 fail-closed event-failure model after PR #136 merges. `failed_events` is retired, not created; `event_processing_registry` is the single source of truth and `/health` reports failed/dead events.
 
 ### 7. Complete the Base commitments and beta-entry evidence
 
@@ -268,7 +268,7 @@ Minimum production checks should confirm the presence and policies of:
 - AI valuation tables
 - Artwork moderation visibility and log tables
 - Phase 18 security functions and RLS policies
-- Optional `failed_events` queue, if retained
+- Event processing registry failure states (`failed`, `dead`) - the A-15 source of truth
 
 ## 10. Wallet Invariants
 
@@ -315,7 +315,7 @@ Production pinned versions must stay aligned unless a dedicated upgrade task pro
 - `src/api/server.js` contains Express-era services that are not the Vercel production entrypoint.
 - Public AppKit negotiation includes Base and Ethereum mainnet for wallet compatibility, but this does not authorize writes or change the Base-only product scope.
 - Public `indexer_status.confirmation_depth` is stale after an env-only depth change.
-- The optional `failed_events` production table is missing.
+- The `failed_events` table does not exist and is not required; A-15 retired that dead subsystem in favour of fail-closed `event_processing_registry` retries.
 - The local `.queue-wal/` directory is runtime state and is ignored by Git.
 - Do not delete or overwrite local Hetzner launch scripts and environment files during pull/deploy.
 - Do not describe the Project NFT testnet prototype as canonical Genesis.

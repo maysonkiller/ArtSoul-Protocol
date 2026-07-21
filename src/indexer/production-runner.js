@@ -96,15 +96,10 @@ class ProductionIndexer {
         this.leadershipLossInProgress = false;
         this.catchUpInProgress = false;
         this.confirmationTimer = null;
-        this.failedEventsMetricsAvailable = true;
-        this.failedEventsMetricsWarningLogged = false;
         // Set when startup fails to reconcile the persisted confirmation depth.
         // Surfaced by getHealth() so operators can see the drift without a
         // separate DB query; never corrupts or resets the cursor.
         this.confirmationDepthSyncError = null;
-
-        // Failed events retry timer
-        this.retryTimer = null;
 
         // Webhook configuration
         this.alertWebhook = config.alertWebhook || process.env.ALERT_WEBHOOK;
@@ -225,9 +220,6 @@ class ProductionIndexer {
         // Start confirmation polling
         this._startConfirmationPolling();
 
-        // Start failed events retry
-        this._startFailedEventsRetry();
-
         // Start stuck processor reaper
         this._startStuckProcessorReaper();
 
@@ -306,11 +298,6 @@ class ProductionIndexer {
             this.confirmationTimer = null;
         }
 
-        if (this.retryTimer) {
-            clearInterval(this.retryTimer);
-            this.retryTimer = null;
-        }
-
         if (this.reaperTimer) {
             clearInterval(this.reaperTimer);
             this.reaperTimer = null;
@@ -385,7 +372,7 @@ class ProductionIndexer {
                     this.metrics.updateRpcHealthScore(rpc.url, rpc.healthScore);
                 }
 
-                await this._updateFailedEventsQueueMetric();
+                await this._updateEventFailureMetric();
 
                 // Update block lag
                 const state = await this.syncEngine.getIndexerState();
@@ -404,42 +391,26 @@ class ProductionIndexer {
         }, 5000); // Update every 5 seconds
     }
 
-    _isMissingFailedEventsTable(error) {
-        const message = String(error?.message || '').toLowerCase();
-        const relation = String(error?.relation || error?.table || '').toLowerCase();
-        return (relation === 'failed_events' || message.includes('failed_events')) &&
-            (
-                error?.code === '42P01' ||
-                message.includes('does not exist') ||
-                message.includes('relation') ||
-                message.includes('undefined_table')
-            );
-    }
+    // Truthful replacement for the removed failed_events gauge. Sourced from
+    // event_processing_registry, the single source of truth for event-
+    // processing failures, so it can never report a false zero for a table
+    // that does not exist.
+    async _updateEventFailureMetric() {
+        const rows = await this.db.query(
+            `SELECT processing_status, COUNT(*)::BIGINT AS count
+             FROM event_processing_registry
+             WHERE chain_id = $1
+               AND processing_status IN ('failed', 'dead')
+             GROUP BY processing_status`,
+            [this.config.chainId.toString()]
+        );
 
-    async _updateFailedEventsQueueMetric() {
-        if (!this.failedEventsMetricsAvailable) {
-            this.metrics.updateFailedEventsQueue(0);
-            return;
+        const counts = { failed: 0, dead: 0 };
+        for (const row of rows || []) {
+            counts[row.processing_status] = Number(row.count || 0);
         }
 
-        try {
-            const failedEvents = await this.db.query(
-                'SELECT COUNT(*) as count FROM failed_events WHERE NOT resolved'
-            );
-            this.metrics.updateFailedEventsQueue(Number(failedEvents[0]?.count || 0));
-        } catch (error) {
-            if (!this._isMissingFailedEventsTable(error)) {
-                throw error;
-            }
-
-            this.failedEventsMetricsAvailable = false;
-            this.metrics.updateFailedEventsQueue(0);
-
-            if (!this.failedEventsMetricsWarningLogged) {
-                this.failedEventsMetricsWarningLogged = true;
-                console.warn('[ProductionIndexer] Optional failed_events table is missing; failed-event queue metric disabled.');
-            }
-        }
+        this.metrics.updateEventFailures(counts);
     }
 
     /**
@@ -565,11 +536,6 @@ class ProductionIndexer {
         if (this.confirmationTimer) {
             clearInterval(this.confirmationTimer);
             this.confirmationTimer = null;
-        }
-
-        if (this.retryTimer) {
-            clearInterval(this.retryTimer);
-            this.retryTimer = null;
         }
 
         // Wait for current operations to complete (drain)
@@ -752,28 +718,18 @@ class ProductionIndexer {
                     }
                 }
 
+                // Only confirm when the catch-up for this poll actually
+                // completed. A range that failed closed returns no checkpoint,
+                // and confirming past an unapplied event would mark it as
+                // reorg-safe and permanently skipped.
                 const checkpoint = await this._catchUpToSafeBlock('poll');
-                await this._processConfirmations(checkpoint?.currentBlock);
+                if (checkpoint) {
+                    await this._processConfirmations(checkpoint.currentBlock);
+                }
             } catch (error) {
                 console.error('[ProductionIndexer] Confirmation polling error:', error);
             }
         }, this.pollInterval);
-    }
-
-    _startFailedEventsRetry() {
-        console.log('[ProductionIndexer] Starting failed events retry...');
-
-        // Retry failed events every 5 minutes
-        this.retryTimer = setInterval(async () => {
-            try {
-                const retried = await this.syncEngine.retryFailedEvents();
-                if (retried > 0) {
-                    console.log(`[ProductionIndexer] Retried ${retried} failed events`);
-                }
-            } catch (error) {
-                console.error('[ProductionIndexer] Failed events retry error:', error);
-            }
-        }, 300000); // 5 minutes
     }
 
     async _catchUpToSafeBlock(reason = 'poll') {
@@ -826,7 +782,14 @@ class ProductionIndexer {
             : await this.eventListener.getCurrentBlock();
         const state = await this.syncEngine.getIndexerState();
 
-        const confirmedBlock = currentBlock - this.confirmationDepth;
+        // A block can never be confirmed before it has been indexed. When a
+        // range fails closed, last_indexed_block stops advancing, so this
+        // clamp keeps the confirmation cursor pinned behind the stalled range
+        // instead of declaring unapplied events final.
+        const confirmedBlock = Math.min(
+            currentBlock - this.confirmationDepth,
+            Number(state.last_indexed_block || 0)
+        );
 
         if (confirmedBlock > state.last_confirmed_block) {
             console.log(`[ProductionIndexer] Confirming blocks up to ${confirmedBlock}`);
@@ -865,13 +828,21 @@ class ProductionIndexer {
             const state = await this.syncEngine.getIndexerState();
             const currentBlock = await this.eventListener.getCurrentBlock();
             const errors = await this.syncEngine.getUnresolvedErrors();
+            // Authoritative event-processing failures for THIS chain. A failed
+            // or dead registry row means an event in an already-scanned range
+            // was never applied, so health must not report a clean indexer.
+            const eventFailures = await this.syncEngine.getUnresolvedEventFailures();
 
             const blocksBehind = currentBlock - state.last_indexed_block;
             const isSynced = isIndexerWithinHealthLag(
                 blocksBehind,
                 this.healthMaxBlocksBehind
             );
-            const hasErrors = errors.length > 0;
+            const deadEventCount = eventFailures.filter(
+                row => row.processing_status === 'dead'
+            ).length;
+            const unresolvedErrorCount = errors.length + eventFailures.length;
+            const hasErrors = unresolvedErrorCount > 0;
 
             // Reset error counter if last error was >1 minute ago
             if (Date.now() - this.metrics.lastErrorTime > 60000) {
@@ -906,7 +877,13 @@ class ProductionIndexer {
                     confirmationDepth: this.confirmationDepth,
                     confirmationDepthSyncError: this.confirmationDepthSyncError,
                     totalEventsIndexed: state.total_events_indexed,
-                    unresolvedErrors: errors.length
+                    unresolvedErrors: unresolvedErrorCount,
+                    // Additive breakdown; unresolvedErrors stays the headline
+                    // field and now counts unapplied events too.
+                    eventFailures: {
+                        failed: eventFailures.length - deadEventCount,
+                        dead: deadEventCount
+                    }
                 },
                 metrics: {
                     rpcLatencyMs: Math.round(this.metrics.rpcLatencyMs),

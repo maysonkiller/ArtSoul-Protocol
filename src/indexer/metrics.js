@@ -71,9 +71,13 @@ class IndexerMetrics {
             registers: [this.register]
         });
 
-        this.failedEventsQueue = new promClient.Gauge({
-            name: 'indexer_failed_events_queue_size',
-            help: 'Number of events in dead-letter queue',
+        // Sourced from event_processing_registry (the single source of truth
+        // for event-processing failures). It replaced a gauge backed by the
+        // removed failed_events table, which reported a constant zero.
+        this.eventFailures = new promClient.Gauge({
+            name: 'indexer_unresolved_event_failures',
+            help: 'Unresolved event-processing failures by registry status',
+            labelNames: ['status'], // failed (retryable), dead (retries exhausted)
             registers: [this.register]
         });
 
@@ -142,9 +146,10 @@ class IndexerMetrics {
         this.dbQueryDuration.observe({ query_type: queryType }, durationSeconds);
     }
 
-    // Failed events
-    updateFailedEventsQueue(size) {
-        this.failedEventsQueue.set(size);
+    // Unresolved event-processing failures
+    updateEventFailures({ failed = 0, dead = 0 } = {}) {
+        this.eventFailures.set({ status: 'failed' }, failed);
+        this.eventFailures.set({ status: 'dead' }, dead);
     }
 
     // Block lag
