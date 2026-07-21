@@ -30,7 +30,7 @@ submission.
 | Variable | Meaning |
 | --- | --- |
 | `ARTSOUL_REPORTING_ENABLED` | `true` enables the public button and API. Default/absent = button hidden and API fails closed with `REPORTING_DISABLED`. |
-| `ARTSOUL_REPORT_DAILY_LIMIT` | Required positive integer limiting newly stored reports per wallet across the rolling previous 24 hours. It has no default; choose and record the operational value before activation. Missing/invalid = button hidden and API fails closed. |
+| `ARTSOUL_REPORT_DAILY_LIMIT` | Required positive integer limiting newly stored reports per wallet across the rolling previous 24 hours. The approved controlled-beta starting value is `5`; it remains explicit rather than a code default. Missing/invalid = button hidden and API fails closed. |
 
 Do not set the flag without an explicit daily limit or before applying and verifying the migration. Public
 configuration is cached for up to five minutes, so allow for cache expiry
@@ -56,10 +56,12 @@ after changing the flag or redeploying.
      already submitted.
 6. Record the migration application using the repository's A-02 evidence
    practice.
-7. Choose and record a positive per-wallet daily intake limit. Set
-   `ARTSOUL_REPORT_DAILY_LIMIT` to that value and
+7. Set the approved controlled-beta value
+   `ARTSOUL_REPORT_DAILY_LIMIT=5` and
    `ARTSOUL_REPORTING_ENABLED=true` for the intended Vercel environment, then
    redeploy. The public button remains hidden if either setting is missing.
+   Any later limit change requires observed queue-volume evidence and an
+   update to this runbook; it is operational tuning, not protocol economics.
 8. Verify one controlled submission:
    - open an indexed artwork and select Report;
    - connect and complete SIWE;
