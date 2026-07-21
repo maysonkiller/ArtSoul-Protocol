@@ -19,6 +19,10 @@ const IMAGE = 'postgres:17';
 const STAFF = '0x1111111111111111111111111111111111111111';
 const PK = Buffer.from([1, 2, 3, 4]).toString('base64url');
 
+function wait(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
 function dockerAvailable() {
   try {
     execSync('docker info', { stdio: 'ignore' });
@@ -54,20 +58,30 @@ function esc(value) {
 
 test('A8a atomic RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false : 'Docker is not available' }, async (t) => {
   t.before(() => {
-    execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+    try {
+      execSync(`docker rm -f ${CONTAINER}`, { stdio: 'ignore' });
+    } catch {
+      // The disposable container does not normally exist before the test.
+    }
     execSync(
       `docker run -d --name ${CONTAINER} -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=artsoul ${IMAGE}`,
       { stdio: 'ignore' }
     );
-    // Wait for readiness.
+
+    // pg_isready can report that the server accepts connections before the
+    // requested database is usable. Prove two real queries instead so the
+    // following migration setup cannot race PostgreSQL initialization.
     let ready = false;
-    for (let i = 0; i < 60; i++) {
+    for (let attempt = 0; attempt < 60; attempt++) {
       try {
-        execSync(`docker exec ${CONTAINER} pg_isready -U postgres -d artsoul`, { stdio: 'ignore' });
+        const readinessArgs = ['exec', CONTAINER, 'psql', '-U', 'postgres', '-d', 'artsoul', '-v', 'ON_ERROR_STOP=1', '-c', 'SELECT 1;'];
+        execFileSync('docker', readinessArgs, { stdio: 'ignore' });
+        wait(500);
+        execFileSync('docker', readinessArgs, { stdio: 'ignore' });
         ready = true;
         break;
       } catch {
-        execSync(process.platform === 'win32' ? 'ping -n 2 127.0.0.1 > NUL' : 'sleep 1', { stdio: 'ignore' });
+        wait(500);
       }
     }
     if (!ready) throw new Error('PostgreSQL did not become ready in time');
