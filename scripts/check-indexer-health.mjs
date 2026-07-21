@@ -1,10 +1,11 @@
 import { pathToFileURL } from 'node:url';
+import { DEFAULT_HEALTH_MAX_BLOCKS_BEHIND } from '../src/indexer/health-policy.js';
 
 const DEFAULTS = Object.freeze({
     healthUrl: 'http://127.0.0.1:3001/health',
     expectedChainId: 84532,
     expectedConfirmationDepth: 3,
-    maxBlocksBehind: 10,
+    maxBlocksBehind: DEFAULT_HEALTH_MAX_BLOCKS_BEHIND,
     maxRpcErrorsPerMinute: 5,
     maxResponseAgeMs: 120_000,
     requestTimeoutMs: 10_000
