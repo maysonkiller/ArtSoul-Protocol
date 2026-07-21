@@ -8,6 +8,7 @@ import functionsAiAnalyzeHandler from '../src/api/routes/functions/ai/analyze.js
 import functionsArtworksHandler from '../src/api/routes/functions/artworks.js';
 import functionsAuctionsHandler from '../src/api/routes/functions/auctions.js';
 import artworkVisibilityHandler from '../src/api/routes/moderation/artwork-visibility.js';
+import reportsHandler from '../src/api/routes/moderation/reports.js';
 import passkeyRegisterOptionsHandler from '../src/api/routes/moderation/passkey-register-options.js';
 import passkeyRegisterVerifyHandler from '../src/api/routes/moderation/passkey-register-verify.js';
 import passkeyAuthOptionsHandler from '../src/api/routes/moderation/passkey-auth-options.js';
@@ -46,6 +47,7 @@ const ROUTES = new Map([
   ['functions/artworks', functionsArtworksHandler],
   ['functions/auctions', functionsAuctionsHandler],
   ['moderation/artwork-visibility', artworkVisibilityHandler],
+  ['moderation/reports', reportsHandler],
   ['moderation/passkey-register-options', passkeyRegisterOptionsHandler],
   ['moderation/passkey-register-verify', passkeyRegisterVerifyHandler],
   ['moderation/passkey-auth-options', passkeyAuthOptionsHandler],
