@@ -1,5 +1,12 @@
 import { React, createRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
+
+// A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
+// after the server signals a staff wallet needs passkey step-up/enrollment,
+// so it never ships in the artwork bundle for ordinary visitors.
+function loadWebAuthnBrowser() {
+    return import('@simplewebauthn/browser');
+}
 import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
 import '../../supabase-client.js';
@@ -285,6 +292,12 @@ const { useState, useEffect, useRef } = React;
             const [moderationReason, setModerationReason] = useState('');
             const [moderationBusy, setModerationBusy] = useState(false);
             const [moderationMessage, setModerationMessage] = useState('');
+            // A8a passkey step-up (rendered only when the server says the
+            // feature applies to this staff wallet; inert while the flag is off).
+            const [passkeyAccess, setPasskeyAccess] = useState(null);
+            const [passkeyCredentials, setPasskeyCredentials] = useState(null);
+            const [passkeyBusy, setPasskeyBusy] = useState(false);
+            const [passkeyMessage, setPasskeyMessage] = useState('');
             const [walletRenderState, setWalletRenderState] = useState(() => ({
                 settled: window.artsoulWalletStateSettled === true,
                 address: window.artsoulSettledWalletState?.address || window.currentWalletAddress || null,
@@ -1212,6 +1225,15 @@ const { useState, useEffect, useRef } = React;
                     const result = await response.json().catch(() => ({}));
 
                     if (!response.ok) {
+                        // A8a: a staff wallet with the passkey flag enabled but no
+                        // active 15-minute step-up gets a machine-readable code.
+                        // The API serializes machine codes as { error, message },
+                        // so the code lives in result.error (not result.code).
+                        if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.error)) {
+                            setPasskeyAccess({ required: true, active: false });
+                            setModerationAccess(null);
+                            return false;
+                        }
                         if (options.interactive) {
                             setModerationMessage(result.message || 'This wallet does not have staff moderation access.');
                         }
@@ -1222,6 +1244,9 @@ const { useState, useEffect, useRef } = React;
                         ...result.access,
                         ...(result.data || {})
                     });
+                    if (result.access?.passkeyRequired) {
+                        setPasskeyAccess({ required: true, active: result.access.stepUpActive === true });
+                    }
                     setModerationReason(result.data?.hidden_reason || '');
                     setModerationMessage('');
                     return true;
@@ -1278,6 +1303,94 @@ const { useState, useEffect, useRef } = React;
                     setModerationMessage(error.message || 'Moderation update failed.');
                 } finally {
                     setModerationBusy(false);
+                }
+            }
+
+            async function passkeyApi(path, payload) {
+                const response = await fetch(`/api/moderation/${path}`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload ? JSON.stringify(payload) : undefined
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const error = new Error(result.message || result.error || 'Passkey request failed');
+                    error.code = result.error;
+                    throw error;
+                }
+                return result;
+            }
+
+            async function loadModerationPasskeys() {
+                try {
+                    const response = await fetch('/api/moderation/passkeys', {
+                        method: 'GET',
+                        credentials: 'include'
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (response.ok) setPasskeyCredentials(result.credentials || []);
+                } catch {
+                    // The list is informational; step-up errors surface elsewhere.
+                }
+            }
+
+            async function startPasskeyStepUp() {
+                if (passkeyBusy) return;
+                setPasskeyBusy(true);
+                setPasskeyMessage('');
+                try {
+                    const { startAuthentication } = await loadWebAuthnBrowser();
+                    const optionsResult = await passkeyApi('passkey-auth-options');
+                    const assertion = await startAuthentication({ optionsJSON: optionsResult.options });
+                    await passkeyApi('passkey-auth-verify', { response: assertion });
+                    setPasskeyAccess({ required: true, active: true });
+                    setPasskeyMessage('Moderation session active for 15 minutes.');
+                    await loadModerationVisibility(artwork, { interactive: true });
+                    await loadModerationPasskeys();
+                } catch (error) {
+                    setPasskeyMessage(error.code === 'NO_CREDENTIALS'
+                        ? 'No passkey is enrolled for this wallet yet. Enroll one with a valid token first.'
+                        : error.message || 'Passkey step-up failed.');
+                } finally {
+                    setPasskeyBusy(false);
+                }
+            }
+
+            async function enrollModerationPasskey() {
+                if (passkeyBusy) return;
+                // Enrollment requires the one-time bearer token issued by the
+                // bootstrap runbook or a step-up self-grant.
+                const token = (window.prompt('Paste your one-time enrollment token') || '').trim();
+                if (!token) return;
+                setPasskeyBusy(true);
+                setPasskeyMessage('');
+                try {
+                    const { startRegistration } = await loadWebAuthnBrowser();
+                    const optionsResult = await passkeyApi('passkey-register-options', { token });
+                    const attestation = await startRegistration({ optionsJSON: optionsResult.options });
+                    await passkeyApi('passkey-register-verify', { token, response: attestation });
+                    setPasskeyMessage('Passkey enrolled. Verify it to start a moderation session.');
+                    await loadModerationPasskeys();
+                } catch (error) {
+                    setPasskeyMessage(error.message || 'Passkey enrollment failed.');
+                } finally {
+                    setPasskeyBusy(false);
+                }
+            }
+
+            async function revokeModerationPasskey(credentialId) {
+                if (passkeyBusy) return;
+                setPasskeyBusy(true);
+                setPasskeyMessage('');
+                try {
+                    await passkeyApi('passkeys', { action: 'revoke', credential_id: credentialId });
+                    setPasskeyMessage('Passkey revoked.');
+                    await loadModerationPasskeys();
+                } catch (error) {
+                    setPasskeyMessage(error.message || 'Passkey revocation failed.');
+                } finally {
+                    setPasskeyBusy(false);
                 }
             }
 
@@ -2856,6 +2969,80 @@ const { useState, useEffect, useRef } = React;
 
                             {/* Artwork Info */}
                             <aside className="artwork-page-right">
+                                {/* A8a staff passkey step-up. Rendered only when the server
+                                    reports the passkey requirement for this staff wallet;
+                                    completely absent while the feature flag is disabled. */}
+                                {passkeyAccess?.required && (
+                                    <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff passkey">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                            <h3 className="text-lg font-bold">Staff passkey</h3>
+                                            <span className="moderation-state rounded-full px-3 py-1 text-xs font-bold">
+                                                {passkeyAccess.active ? 'Session active (15 min)' : 'Step-up required'}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {!passkeyAccess.active && (
+                                                <p className="text-sm opacity-80">
+                                                    Verify a registered passkey to open a 15-minute moderation session.
+                                                </p>
+                                            )}
+                                            <button
+                                                type="button"
+                                                className="btn-main w-full"
+                                                disabled={passkeyBusy}
+                                                onClick={startPasskeyStepUp}
+                                            >
+                                                {passkeyBusy ? 'Working...' : 'Verify passkey'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn-secondary w-full"
+                                                disabled={passkeyBusy}
+                                                onClick={enrollModerationPasskey}
+                                            >
+                                                Enroll passkey (grant required)
+                                            </button>
+                                            {passkeyCredentials === null ? (
+                                                <button
+                                                    type="button"
+                                                    className="btn-secondary w-full"
+                                                    disabled={passkeyBusy}
+                                                    onClick={loadModerationPasskeys}
+                                                >
+                                                    Show my passkeys
+                                                </button>
+                                            ) : (
+                                                <ul className="space-y-2 text-sm">
+                                                    {passkeyCredentials.length === 0 && (
+                                                        <li className="opacity-70">No passkeys enrolled yet.</li>
+                                                    )}
+                                                    {passkeyCredentials.map(credential => (
+                                                        <li key={credential.credential_id} className="flex items-center justify-between gap-2">
+                                                            <span className="min-w-0 truncate">
+                                                                {credential.label || `${credential.credential_id.slice(0, 10)}...`}
+                                                                {credential.revoked_at ? ' (revoked)' : ''}
+                                                            </span>
+                                                            {!credential.revoked_at && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-secondary"
+                                                                    disabled={passkeyBusy}
+                                                                    onClick={() => revokeModerationPasskey(credential.credential_id)}
+                                                                >
+                                                                    Revoke
+                                                                </button>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                            {passkeyMessage && (
+                                                <p className="text-sm" role="status">{passkeyMessage}</p>
+                                            )}
+                                        </div>
+                                    </section>
+                                )}
+
                                 {moderationAccess?.canModerate && (
                                     <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
