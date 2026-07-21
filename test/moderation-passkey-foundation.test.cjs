@@ -821,11 +821,17 @@ test('the WebAuthn browser library is lazy-loaded, never a top-level import', ()
   assert.match(client, /await loadWebAuthnBrowser\(\)/);
 });
 
-test('the applied phase18_7b migration is unchanged versus origin/main', () => {
-  const { execSync } = require('node:child_process');
+test('the applied phase18_7b migration is byte-immutable (pinned normalized hash)', () => {
+  // Repository-contained immutability proof: no remote ref is consulted, so
+  // this works in a shallow GitHub Actions PR-merge checkout (no origin/main),
+  // on Windows and Ubuntu, and on local branches. CRLF is normalized to LF so
+  // the hash is line-ending independent.
   const rel = 'sql/migrations/phase18_7b_supabase_security_hardening.sql';
-  // git diff is line-ending agnostic and is the authoritative "unchanged vs
-  // main" proof for an already-applied, immutable historical migration.
-  const diff = execSync(`git diff origin/main -- ${rel}`, { cwd: root, maxBuffer: 10 * 1024 * 1024 }).toString();
-  assert.equal(diff.trim(), '', 'phase18_7b must remain immutable (no diff versus origin/main)');
+  const normalized = fs.readFileSync(path.join(root, rel)).toString('utf8').replace(/\r\n/g, '\n');
+  const digest = crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
+  assert.equal(
+    digest,
+    '172340ffdf9ac7b7b93c3b9b4c05e93a379ef9e035eb7e54aeb2047a6bfbc4d1',
+    'phase18_7b must remain immutable (normalized SHA-256 pinned)'
+  );
 });
