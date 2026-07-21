@@ -89,13 +89,21 @@ test('Protocol Admin and passkey flags fail closed independently', async () => {
   const [{ default: accessHandler }] = await modules;
   const previousAdmin = process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED;
   const previousPasskey = process.env.ARTSOUL_MODERATION_PASSKEY_ENABLED;
+  const previousFetch = global.fetch;
+  const disabledCalls = [];
+  global.fetch = async url => {
+    disabledCalls.push(String(url));
+    return supabaseResponse([]);
+  };
   try {
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'false';
     const disabled = responseHarness();
-    await accessHandler(request('GET', '/api/moderation/access'), disabled);
+    await accessHandler(request('GET', '/api/moderation/access', { cookie: await authCookie() }), disabled);
     assert.equal(disabled.statusCode, 200);
     assert.equal(disabled.body.enabled, false);
     assert.equal(disabled.body.eligible, false);
+    // With the flag off the endpoint answers without any Supabase lookup.
+    assert.equal(disabledCalls.length, 0);
 
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'true';
     process.env.ARTSOUL_MODERATION_PASSKEY_ENABLED = 'false';
@@ -106,6 +114,7 @@ test('Protocol Admin and passkey flags fail closed independently', async () => {
   } finally {
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = previousAdmin;
     process.env.ARTSOUL_MODERATION_PASSKEY_ENABLED = previousPasskey;
+    global.fetch = previousFetch;
   }
 });
 
@@ -270,6 +279,71 @@ test('malformed JSON and stale review versions map to stable client errors', asy
   }
 });
 
+test('reopening into a duplicate pending report maps to a stable 409', async () => {
+  const [, , { default: actionHandler }] = await modules;
+  const cookie = await authCookie({ stepUp: true });
+  const previousFetch = global.fetch;
+  global.fetch = async url => {
+    const value = String(url);
+    if (value.includes('artsoul_staff_roles')) return supabaseResponse([{ role: 'admin' }]);
+    if (value.includes('artsoul_staff_passkeys')) return supabaseResponse([{ credential_id: 'credential-1' }]);
+    if (value.endsWith('/rpc/review_artwork_report')) {
+      return supabaseResponse({ message: 'REPORT_ALREADY_PENDING' }, 400);
+    }
+    return supabaseResponse([]);
+  };
+  try {
+    const res = responseHarness();
+    await actionHandler(request('POST', '/api/moderation/review-action', {
+      cookie,
+      body: {
+        report_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        expected_updated_at: '2026-07-21T10:00:00.000Z',
+        action: 'reopen',
+        reason: 'Re-examining the original complaint.'
+      }
+    }), res);
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.error, 'REPORT_ALREADY_PENDING');
+  } finally {
+    global.fetch = previousFetch;
+  }
+});
+
+test('a raw one-pending unique violation still maps to REPORT_ALREADY_PENDING', async () => {
+  const [, , { default: actionHandler }] = await modules;
+  const cookie = await authCookie({ stepUp: true });
+  const previousFetch = global.fetch;
+  global.fetch = async url => {
+    const value = String(url);
+    if (value.includes('artsoul_staff_roles')) return supabaseResponse([{ role: 'admin' }]);
+    if (value.includes('artsoul_staff_passkeys')) return supabaseResponse([{ credential_id: 'credential-1' }]);
+    if (value.endsWith('/rpc/review_artwork_report')) {
+      return supabaseResponse({
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "idx_artwork_reports_one_pending_category"'
+      }, 409);
+    }
+    return supabaseResponse([]);
+  };
+  try {
+    const res = responseHarness();
+    await actionHandler(request('POST', '/api/moderation/review-action', {
+      cookie,
+      body: {
+        report_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        expected_updated_at: '2026-07-21T10:00:00.000Z',
+        action: 'reopen',
+        reason: 'Re-examining the original complaint.'
+      }
+    }), res);
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.error, 'REPORT_ALREADY_PENDING');
+  } finally {
+    global.fetch = previousFetch;
+  }
+});
+
 test('Protocol Admin UI treats complaint text as untrusted and menu authority as server-owned', () => {
   const page = fs.readFileSync(path.join(ROOT, 'src/entries/admin.jsx'), 'utf8');
   const header = fs.readFileSync(path.join(ROOT, 'avatar-dropdown.js'), 'utf8');
@@ -284,6 +358,17 @@ test('Protocol Admin UI treats complaint text as untrusted and menu authority as
   assert.match(page, /event\.key !== 'Tab'/);
   assert.match(page, /event\.key === 'Escape'/);
   assert.match(page, /previousFocusRef\.current\?\.focus/);
+  // Audit fix P2-2/P2-4: an actioned report offers only resolve/restore, a
+  // closed (dismissed or resolved) report offers reopen, and the queue can
+  // filter the resolved state.
+  const actionedBlock = page.slice(
+    page.indexOf("if (report.status === 'actioned')"),
+    page.indexOf("if (report.status === 'dismissed'")
+  );
+  assert.match(actionedBlock, /onChoose\(report, 'restore'\)/);
+  assert.doesNotMatch(actionedBlock, /'reopen'/);
+  assert.match(page, /report\.status === 'dismissed' \|\| report\.status === 'resolved'/);
+  assert.match(page, /\['pending_review', 'actioned', 'dismissed', 'resolved'\]/);
   assert.match(header, /fetch\('\/api\/moderation\/access'/);
   assert.match(header, /result\.eligible === true/);
   assert.doesNotMatch(header, /localStorage[^\n]*(?:admin|moderator|staff)/i);
@@ -302,4 +387,15 @@ test('A8c SQL preserves independent reports, append-only reasons and serialized 
   assert.match(sql, /INSERT INTO public\.artwork_report_events[\s\S]*normalized_reason/);
   assert.match(sql, /ON DELETE RESTRICT/);
   assert.doesNotMatch(sql, /DELETE FROM public\.artwork_reports|DELETE FROM public\.artwork_report_events/);
+  // Audit fixes P2-1..P2-4: duplicate-pending guard, no reopen from
+  // actioned, a distinct resolved status, and restore semantics that read
+  // the artwork's actual visibility before claiming a restoration.
+  assert.match(sql, /REPORT_ALREADY_PENDING/);
+  assert.match(sql, /other_report\.reporter_wallet = current_report\.reporter_wallet/);
+  assert.match(sql, /other_report\.category = current_report\.category/);
+  assert.match(sql, /normalized_action = 'reopen' AND current_report\.status NOT IN \('dismissed', 'resolved'\)/);
+  assert.match(sql, /next_status := 'resolved';/);
+  assert.match(sql, /'resolved'\s*\)\);/);
+  assert.match(sql, /artwork_was_hidden/);
+  assert.match(sql, /artwork_report_notifications_notification_type_check CHECK \(notification_type IN \([\s\S]*?'REPORT_RESOLVED',/);
 });

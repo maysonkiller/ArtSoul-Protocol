@@ -243,8 +243,29 @@
             this.updateProtocolAdminSlot();
         }
 
-        async refreshProtocolAdminAccess(walletAddress) {
+        // Render-time bookkeeping only: never issues a network request. It
+        // keeps the reserved menu slot in sync and drops any cached result
+        // that belongs to a previous wallet or session.
+        syncProtocolAdminWallet(walletAddress) {
             const wallet = String(walletAddress || '').toLowerCase();
+            const knownWallet = this.protocolAdminWallet || this.protocolAdminRequest?.wallet || null;
+            if (!/^0x[a-f0-9]{40}$/.test(wallet) || (knownWallet && knownWallet !== wallet)) {
+                this.clearProtocolAdminAccess();
+                return;
+            }
+            this.updateProtocolAdminSlot();
+        }
+
+        // Lazy menu discovery: called when the account dropdown opens, at most
+        // one request per wallet for this page lifetime. Eligibility is always
+        // decided by the server; protected admin endpoints still re-check
+        // SIWE + staff role + passkey step-up on every request.
+        async requestProtocolAdminAccessOnce() {
+            const wallet = String(
+                window.currentWalletAddress
+                || window.artsoulSettledWalletState?.address
+                || ''
+            ).toLowerCase();
             if (!/^0x[a-f0-9]{40}$/.test(wallet)) {
                 this.clearProtocolAdminAccess();
                 return false;
@@ -890,7 +911,7 @@
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
-            void this.refreshProtocolAdminAccess(walletAddress);
+            this.syncProtocolAdminWallet(walletAddress);
             this.bindOutsideCloseOnce();
         }
 
@@ -908,6 +929,10 @@
             }
 
             this.isOpen = !this.isOpen;
+
+            // Lazy Protocol Admin discovery: ask the server only when the
+            // menu is actually opened, once per wallet per page lifetime.
+            if (this.isOpen) void this.requestProtocolAdminAccessOnce();
 
             if (menu) {
                 menu.style.display = this.isOpen ? 'block' : 'none';
@@ -1184,7 +1209,7 @@
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
-            void this.refreshProtocolAdminAccess(walletAddress);
+            this.syncProtocolAdminWallet(walletAddress);
             this.bindOutsideCloseOnce();
         }
     }

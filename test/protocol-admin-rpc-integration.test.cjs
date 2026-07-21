@@ -169,10 +169,11 @@ test('A8c review RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false :
     assert.match(review(first, 'hide', 'Copyright evidence verified.'), /\|actioned\|.*\|t$/m);
     assert.match(review(second, 'hide', 'Impersonation evidence verified.'), /\|actioned\|.*\|t$/m);
 
-    assert.match(review(first, 'restore', 'First complaint has been resolved.'), /\|dismissed\|.*\|t$/m);
+    // A valid actioned complaint closes as 'resolved', never 'dismissed'.
+    assert.match(review(first, 'restore', 'First complaint has been resolved.'), /\|resolved\|.*\|t$/m);
     assert.equal(psql('SELECT hidden FROM public.artwork_moderation_visibility WHERE chain_id = 84532 AND artwork_id = 42;'), 't');
 
-    assert.match(review(second, 'restore', 'Final complaint has been resolved.'), /\|dismissed\|.*\|f$/m);
+    assert.match(review(second, 'restore', 'Final complaint has been resolved.'), /\|resolved\|.*\|f$/m);
     assert.equal(psql('SELECT hidden FROM public.artwork_moderation_visibility WHERE chain_id = 84532 AND artwork_id = 42;'), 'f');
     assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_events
       WHERE event_type IN ('REPORT_HIDDEN', 'REPORT_RESOLVED', 'REPORT_RESTORED') AND reason IS NOT NULL;`), '4');
@@ -181,7 +182,71 @@ test('A8c review RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false :
     assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_events
       WHERE event_type = 'REPORT_RESTORED';`), '1');
     assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_notifications
+      WHERE notification_type = 'REPORT_RESOLVED';`), '2');
+    assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_notifications
+      WHERE notification_type = 'REPORT_DISMISSED';`), '0');
+    assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_notifications
       WHERE notification_type = 'ARTWORK_RESTORED';`), '1');
+  });
+
+  await t.test('resolving the final actioned report of an already-visible artwork does not claim a restoration', () => {
+    const reportId = submit(REPORTER_A);
+    assert.match(review(reportId, 'hide', 'Evidence verified.'), /\|actioned\|.*\|t$/m);
+
+    // Staff restores visibility out-of-band (the A-20 visibility path).
+    psql(`SELECT public.set_artwork_moderation_visibility(84532, 42, FALSE, NULL, '${STAFF}');`);
+    assert.equal(psql('SELECT hidden FROM public.artwork_moderation_visibility WHERE chain_id = 84532 AND artwork_id = 42;'), 'f');
+
+    assert.match(review(reportId, 'restore', 'Complaint resolved after manual restore.'), /\|resolved\|.*\|f$/m);
+    assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_events
+      WHERE report_id = '${reportId}' AND event_type = 'REPORT_RESOLVED';`), '1');
+    assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_events
+      WHERE event_type = 'REPORT_RESTORED';`), '0');
+    assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_notifications
+      WHERE notification_type = 'ARTWORK_RESTORED';`), '0');
+    assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_notifications
+      WHERE report_id = '${reportId}' AND notification_type = 'REPORT_RESOLVED';`), '1');
+  });
+
+  await t.test('an actioned report cannot be reopened; closed reports can, once', () => {
+    const reportId = submit(REPORTER_A);
+    assert.match(review(reportId, 'hide', 'Evidence verified.'), /\|actioned\|.*\|t$/m);
+
+    // Reopening an active hide would strand the artwork hidden without an
+    // active report, so it is rejected outright.
+    const blocked = psql(`SELECT * FROM public.review_artwork_report(
+      '${reportId}', '${versionOf(reportId)}', 'reopen', 'Second look requested.', '${STAFF}'
+    );`, { expectError: true });
+    assert.match(blocked, /REPORT_ACTION_NOT_ALLOWED/);
+
+    // resolved -> pending_review is a legal reopen and reactivates review.
+    assert.match(review(reportId, 'restore', 'Complaint resolved.'), /\|resolved\|/m);
+    assert.match(review(reportId, 'reopen', 'New evidence arrived.'), /\|pending_review\|/m);
+    assert.equal(psql(`SELECT COUNT(*) FROM public.artwork_report_events
+      WHERE report_id = '${reportId}' AND event_type = 'REPORT_REOPENED';`), '1');
+  });
+
+  await t.test('reopen fails with REPORT_ALREADY_PENDING when a newer pending duplicate exists', () => {
+    const first = submit(REPORTER_A, 'copyright');
+    assert.match(review(first, 'dismiss', 'Claim was not substantiated.'), /\|dismissed\|/m);
+
+    // The same reporter files a fresh pending report of the same category.
+    const second = submit(REPORTER_A, 'copyright');
+    assert.notEqual(second, first);
+
+    const conflict = psql(`SELECT * FROM public.review_artwork_report(
+      '${first}', '${versionOf(first)}', 'reopen', 'Revisiting the first claim.', '${STAFF}'
+    );`, { expectError: true });
+    assert.match(conflict, /REPORT_ALREADY_PENDING/);
+
+    // Both rows survive as independent records and the first stays dismissed.
+    assert.equal(psql(`SELECT status FROM public.artwork_reports WHERE id = '${first}';`), 'dismissed');
+    assert.equal(psql(`SELECT status FROM public.artwork_reports WHERE id = '${second}';`), 'pending_review');
+    assert.equal(psql('SELECT COUNT(*) FROM public.artwork_reports;'), '2');
+
+    // A different category from the same reporter does not block the reopen.
+    assert.match(review(second, 'dismiss', 'Duplicate of the dismissed claim.'), /\|dismissed\|/m);
+    assert.match(review(first, 'reopen', 'No pending duplicate remains.'), /\|pending_review\|/m);
   });
 
   await t.test('notification failure rolls back the report, visibility and audit transition', () => {

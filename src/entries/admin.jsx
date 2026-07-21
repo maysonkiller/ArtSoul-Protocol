@@ -134,14 +134,15 @@ function ReportActions({ report, onChoose }) {
         );
     }
     if (report.status === 'actioned') {
+        // An actioned report is active: it may only be resolved/restored.
+        // Reopening it would leave the artwork hidden with no active report.
         return (
             <div className="protocol-admin-card-actions">
                 <button type="button" onClick={() => onChoose(report, 'restore')}>Resolve and restore if clear</button>
-                <button type="button" onClick={() => onChoose(report, 'reopen')}>Reopen report</button>
             </div>
         );
     }
-    if (report.status === 'dismissed') {
+    if (report.status === 'dismissed' || report.status === 'resolved') {
         return (
             <div className="protocol-admin-card-actions">
                 <button type="button" onClick={() => onChoose(report, 'reopen')}>Reopen report</button>
@@ -345,7 +346,7 @@ function ProtocolAdminPage() {
                     <div className="protocol-admin-section-heading">
                         <h2 id="reviewQueueTitle">Review queue</h2>
                         <div className="protocol-admin-status-filter">
-                            {['pending_review', 'actioned', 'dismissed'].map(status => (
+                            {['pending_review', 'actioned', 'dismissed', 'resolved'].map(status => (
                                 <button key={status} type="button" className={queueStatus === status ? 'is-active' : ''} onClick={() => changeQueueStatus(status)}>
                                     {status.replace('_', ' ')}
                                 </button>

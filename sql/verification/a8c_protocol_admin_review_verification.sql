@@ -46,6 +46,18 @@ WHERE table_schema = 'public'
   )
 ORDER BY table_name, ordinal_position;
 
+-- The replaced status constraint must accept 'resolved' and the notification
+-- type list must include 'REPORT_RESOLVED'.
+SELECT
+    conname,
+    pg_get_constraintdef(oid) AS definition
+FROM pg_constraint
+WHERE conname IN (
+    'artwork_reports_status_check',
+    'artwork_report_notifications_notification_type_check'
+)
+ORDER BY conname;
+
 SELECT
     table_name,
     grantee,

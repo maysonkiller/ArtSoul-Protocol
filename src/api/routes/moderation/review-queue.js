@@ -2,7 +2,7 @@ import { allowMethods, sendError, supabaseRest } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
 import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
 
-const QUEUE_STATUSES = new Set(['pending_review', 'actioned', 'dismissed', 'withdrawn']);
+const QUEUE_STATUSES = new Set(['pending_review', 'actioned', 'dismissed', 'resolved', 'withdrawn']);
 
 function invalidStatus() {
   const error = new Error('Choose a valid review queue status.');
