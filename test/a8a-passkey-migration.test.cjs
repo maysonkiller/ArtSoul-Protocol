@@ -9,9 +9,12 @@ const path = require('node:path');
 const test = require('node:test');
 
 const root = path.join(__dirname, '..');
-const migration = fs.readFileSync(path.join(root, 'sql', 'migrations', 'a8a_moderation_passkey_foundation.sql'), 'utf8');
-const verification = fs.readFileSync(path.join(root, 'sql', 'verification', 'a8a_passkey_foundation_verification.sql'), 'utf8');
-const bootstrap = fs.readFileSync(path.join(root, 'sql', 'runbooks', 'a8a_bootstrap_enrollment_grant.sql'), 'utf8');
+// Normalize CRLF to LF so structural assertions (indexOf with '\n', slices)
+// are line-ending independent across a Windows CI checkout and Ubuntu/local.
+const readSql = (...segments) => fs.readFileSync(path.join(root, ...segments), 'utf8').replace(/\r\n/g, '\n');
+const migration = readSql('sql', 'migrations', 'a8a_moderation_passkey_foundation.sql');
+const verification = readSql('sql', 'verification', 'a8a_passkey_foundation_verification.sql');
+const bootstrap = readSql('sql', 'runbooks', 'a8a_bootstrap_enrollment_grant.sql');
 
 const TABLES = [
   'artsoul_staff_passkeys',
