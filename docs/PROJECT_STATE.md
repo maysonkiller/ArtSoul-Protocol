@@ -247,7 +247,7 @@ Founder-run checks after PR #90 showed:
 
 `npm run build` failed on the server because Vite, a development dependency, is not installed there. This does not indicate an indexer runtime failure. Frontend builds belong in CI/Vercel or a complete development checkout, not in the production indexer process.
 
-The optional `failed_events` table is missing in production. The indexer degrades safely and disables only the failed-event queue metric, but the schema drift should be resolved before beta. A one-time advisory-lock release warning was also observed during restart; investigate only if it repeats.
+The optional `failed_events` table never existed: no migration ever created it, its retry marked records resolved before replay, and its replay queue had no consumer, so the gauge reported a constant zero. A-15 (PR #136) retires it instead of creating it. That dead subsystem was masking a real defect: a handler failure rolled back the in-transaction registry claim, the follow-up failed/dead UPDATE matched zero rows, and the cursor advanced anyway, permanently skipping the event while `/health` reported `unresolvedErrors: 0`. `event_processing_registry` is now the single source of truth: failures are UPSERTed outside the rolled-back transaction, a range with any unprocessed event advances no cursor and is retried on the next poll, confirmation is clamped to indexed blocks, and `/health` counts failed/dead rows and reports `degraded`. No new table or migration is required. A one-time advisory-lock release warning was also observed during restart; investigate only if it repeats.
 
 ## 7. Deployed Testnet Contracts
 
@@ -352,7 +352,7 @@ The contract suite passes when run through Hardhat with a writable temporary con
 1. Complete the external-mobile wallet acceptance checklist, including same-tab return, five-page navigation, reload, background restoration, one guarded write switch, and explicit disconnect.
 2. Remove the production visual wallet debug overlay only after that checklist is green; keep `/wallet-test.html` intact.
 3. Reconcile runtime confirmation depth with persisted `indexer_state.confirmation_depth`.
-4. Apply or explicitly waive the missing `failed_events` migration.
+4. Verify the A-15 fail-closed event-failure model on Hetzner after PR #136 merges (no `failed_events` migration exists or is needed).
 5. Verify Phase 18 RLS/security migrations in Supabase.
 6. Repair the 20-test baseline and create a real aggregate test command.
 7. Add repository CI for build, focused Node tests, contract tests, and diff/format checks.

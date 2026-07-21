@@ -141,8 +141,7 @@ class PostgreSQLDatabase {
             'block_hashes': true,
             'contract_events': true,
             'indexed_auctions': true,
-            'indexed_bids': true,
-            'failed_events': true
+            'indexed_bids': true
         };
 
         if (!ALLOWED_TABLES[table]) {
@@ -154,8 +153,7 @@ class PostgreSQLDatabase {
             'block_hashes': ['chain_id', 'block_number', 'block_hash', 'parent_hash', 'timestamp'],
             'contract_events': ['chain_id', 'event_name', 'artwork_id', 'block_number', 'transaction_hash', 'log_index', 'event_data', 'indexed_at'],
             'indexed_auctions': ['artwork_id', 'seller', 'starting_price', 'start_time', 'end_time', 'block_number', 'transaction_hash', 'indexed_at', 'last_updated_block', 'last_updated_at'],
-            'indexed_bids': ['artwork_id', 'bidder', 'amount', 'timestamp', 'block_number', 'transaction_hash', 'indexed_at'],
-            'failed_events': ['event_name', 'event_data', 'block_number', 'transaction_hash', 'log_index', 'error_message', 'retry_after']
+            'indexed_bids': ['artwork_id', 'bidder', 'amount', 'timestamp', 'block_number', 'transaction_hash', 'indexed_at']
         };
 
         // Validate columns
