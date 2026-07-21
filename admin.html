@@ -14,18 +14,9 @@
             }
         })();
     </script>
-    <title>Protocol Docs | ArtSoul</title>
-    <meta name="description" content="User documentation for ArtSoul discovery-first auctions, deposit-backed bidding, settlement, lazy minting, fees, trust, and provenance.">
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="ArtSoul">
-    <meta property="og:title" content="ArtSoul Protocol Docs">
-    <meta property="og:description" content="Learn how ArtSoul discovery-first auctions work from publishing through settlement and resale.">
-    <meta property="og:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
-    <meta property="og:url" content="https://artsoul.vercel.app/docs-protocol.html">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="ArtSoul Protocol Docs">
-    <meta name="twitter:description" content="Learn how ArtSoul discovery-first auctions work from publishing through settlement and resale.">
-    <meta name="twitter:image" content="https://artsoul.vercel.app/artsoul-social-preview.png?v=1">
+    <title>Protocol Admin | ArtSoul</title>
+    <meta name="description" content="Secure ArtSoul moderation review workspace.">
+    <meta name="robots" content="noindex,nofollow">
     <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -33,7 +24,6 @@
     <link rel="stylesheet" href="unified-styles.css?v=42">
     <link rel="stylesheet" href="button-effects.css?v=5">
     <link rel="stylesheet" href="mobile-no-motion.css?v=2">
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="src/ui/theme-manager.js"></script>
     <script src="modal-system.js"></script>
     <script type="module" src="supabase-client.js"></script>
@@ -68,7 +58,7 @@
     </header>
     <script>window.AvatarDropdown?.renderInitializingState();</script>
 
-    <div id="app"></div>
-    <script type="module" async src="/src/entries/docs-protocol.jsx"></script>
+    <main id="app" class="protocol-admin-root"></main>
+    <script type="module" async src="/src/entries/admin.jsx"></script>
 </body>
 </html>

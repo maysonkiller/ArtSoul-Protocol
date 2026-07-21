@@ -10,6 +10,7 @@ const pages = [
     'artwork.html',
     'profile.html',
     'upload.html',
+    'admin.html',
     'docs-protocol.html',
     'wallet-test.html',
     'visual-lab.html',
@@ -77,7 +78,7 @@ for (const file of javascriptAssets) {
     }
 }
 
-const expectedEntries = ['index', 'gallery', 'artwork', 'profile', 'upload', 'docs-protocol', 'visual-lab', 'generate-favicon'];
+const expectedEntries = ['index', 'gallery', 'artwork', 'profile', 'upload', 'admin', 'docs-protocol', 'visual-lab', 'generate-favicon'];
 for (const entry of expectedEntries) {
     if (!javascriptAssets.some(file => file.startsWith(`${entry}-`))) {
         throw new Error(`Hashed ${entry} entry was not emitted`);
