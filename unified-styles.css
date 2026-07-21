@@ -2314,6 +2314,194 @@ body.future .gallery-filter-panel {
     padding: 14px;
 }
 
+.report-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 125;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+    background: color-mix(in srgb, var(--c-bg) 84%, transparent);
+}
+
+.report-modal {
+    width: min(100%, 560px);
+    max-height: calc(100vh - 40px);
+    padding: clamp(20px, 4vw, 30px);
+    overflow-y: auto;
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    box-shadow: 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
+}
+
+.future .report-modal {
+    box-shadow: 0 0 28px var(--c-glow), 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
+}
+
+.report-modal-header,
+.report-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.report-modal-header {
+    margin-bottom: 18px;
+}
+
+.report-modal-header h2,
+.report-confirmation h3 {
+    margin: 2px 0 0;
+    color: var(--c-text);
+    font-size: clamp(21px, 4.5vw, 28px);
+    line-height: 1.15;
+}
+
+.report-modal-eyebrow {
+    color: var(--c-accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.report-modal-close {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 50%;
+    background: var(--c-surface-muted);
+    color: var(--c-text);
+    font-size: 24px;
+    line-height: 1;
+}
+
+.report-modal-copy,
+.report-confirmation p {
+    margin: 0 0 16px;
+    color: var(--c-text-muted);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.report-field-label {
+    display: block;
+    margin: 14px 0 7px;
+    color: var(--c-text);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.report-field-label span,
+.report-character-count {
+    color: var(--c-text-muted);
+    font-weight: 500;
+}
+
+.report-field {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 10px;
+    background: var(--c-surface-muted);
+    color: var(--c-text);
+    font: inherit;
+}
+
+.report-field:focus {
+    border-color: var(--c-border);
+    box-shadow: 0 0 0 2px var(--c-glow);
+    outline: none;
+}
+
+.report-details {
+    min-height: 132px;
+    resize: vertical;
+}
+
+.report-character-count {
+    margin: 5px 0 0;
+    font-size: 11px;
+    text-align: right;
+}
+
+.report-confirmation-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 18px;
+    color: var(--c-text);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.report-confirmation-check input {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    accent-color: var(--c-accent);
+}
+
+.report-modal-error {
+    margin: 12px 0 0;
+    color: var(--c-accent-3);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.4;
+}
+
+.report-confirmation {
+    padding: 14px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 12px;
+    background: var(--c-surface-muted);
+}
+
+.report-reference code {
+    color: var(--c-accent);
+    overflow-wrap: anywhere;
+}
+
+.report-modal-actions {
+    justify-content: flex-end;
+    margin-top: 22px;
+}
+
+.report-modal-actions .btn-main,
+.report-modal-actions .btn-secondary {
+    min-width: 128px;
+}
+
+@media (max-width: 600px) {
+    .report-modal-backdrop {
+        align-items: flex-end;
+        padding: 12px;
+    }
+
+    .report-modal {
+        width: 100%;
+        max-height: calc(100svh - 24px);
+        padding: 18px;
+        border-radius: 14px;
+    }
+
+    .report-details {
+        min-height: 108px;
+    }
+
+    .report-modal-actions .btn-main,
+    .report-modal-actions .btn-secondary {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
 .reauction-modal-backdrop {
     position: fixed;
     inset: 0;

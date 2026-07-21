@@ -18,6 +18,22 @@ const { useState, useEffect, useRef } = React;
         const MIN_ABSOLUTE_BID_INCREMENT_WEI = 10000000000000000n;
         const BID_INCREMENT_BPS = 250n;
         const BPS_DENOMINATOR = 10000n;
+        const REPORT_CATEGORIES = [
+            { value: 'copyright', label: 'Copyright or ownership' },
+            { value: 'impersonation', label: 'Impersonation' },
+            { value: 'prohibited_content', label: 'Prohibited or harmful content' },
+            { value: 'spam', label: 'Spam or misleading listing' },
+            { value: 'other', label: 'Other concern' }
+        ];
+
+        function emptyArtworkReport() {
+            return {
+                category: 'copyright',
+                details: '',
+                referenceUrl: '',
+                goodFaithConfirmed: false
+            };
+        }
 
         function normalizeTimestampMs(value) {
             if (value instanceof Date) {
@@ -326,6 +342,12 @@ const { useState, useEffect, useRef } = React;
             const [resaleModalPrice, setResaleModalPrice] = useState('');
             const [resaleModalError, setResaleModalError] = useState('');
             const [resaleModalStepLabel, setResaleModalStepLabel] = useState('');
+            const [reportingEnabled, setReportingEnabled] = useState(false);
+            const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+            const [artworkReport, setArtworkReport] = useState(emptyArtworkReport);
+            const [reportBusy, setReportBusy] = useState(false);
+            const [reportError, setReportError] = useState('');
+            const [reportReceipt, setReportReceipt] = useState(null);
             const [withdrawalState, setWithdrawalState] = useState({
                 status: 'idle',
                 amount: '0',
@@ -337,6 +359,7 @@ const { useState, useEffect, useRef } = React;
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
             const reauctionValuationControllerRef = useRef(null);
+            const reportTriggerRef = useRef(null);
             const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
@@ -582,6 +605,37 @@ const { useState, useEffect, useRef } = React;
                     document.body.style.overflow = previousOverflow;
                 };
             }, [isResaleModalOpen]);
+
+            useEffect(() => {
+                let active = true;
+                window.ArtSoulPublicConfig?.load?.()
+                    .then(config => {
+                        if (active) setReportingEnabled(config?.reportingEnabled === true);
+                    })
+                    .catch(() => {
+                        if (active) setReportingEnabled(false);
+                    });
+                return () => {
+                    active = false;
+                };
+            }, []);
+
+            useEffect(() => {
+                if (!isReportModalOpen) return undefined;
+                const previousOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                const closeOnEscape = event => {
+                    if (event.key === 'Escape' && !reportBusy) {
+                        setIsReportModalOpen(false);
+                        window.requestAnimationFrame(() => reportTriggerRef.current?.focus());
+                    }
+                };
+                window.addEventListener('keydown', closeOnEscape);
+                return () => {
+                    window.removeEventListener('keydown', closeOnEscape);
+                    document.body.style.overflow = previousOverflow;
+                };
+            }, [isReportModalOpen, reportBusy]);
 
             useEffect(() => {
                 void loadPendingWithdrawal();
@@ -1303,6 +1357,81 @@ const { useState, useEffect, useRef } = React;
                     setModerationMessage(error.message || 'Moderation update failed.');
                 } finally {
                     setModerationBusy(false);
+                }
+            }
+
+            function openArtworkReport() {
+                setArtworkReport(emptyArtworkReport());
+                setReportError('');
+                setReportReceipt(null);
+                setIsReportModalOpen(true);
+            }
+
+            function closeArtworkReport() {
+                if (reportBusy) return;
+                setIsReportModalOpen(false);
+                window.requestAnimationFrame(() => reportTriggerRef.current?.focus());
+            }
+
+            async function submitArtworkReport(event) {
+                event.preventDefault();
+                if (reportBusy || !artwork) return;
+
+                const chainId = Number(artwork.chain_id || v41CompositeId?.chainId || 0);
+                const reportArtworkId = String(
+                    artwork.artwork_id ||
+                    artwork.blockchain_id ||
+                    v41CompositeId?.artworkId ||
+                    ''
+                ).trim();
+                if (![84532, 11155111].includes(chainId) || !/^\d{1,78}$/.test(reportArtworkId)) {
+                    setReportError('This artwork record cannot be reported through the current form.');
+                    return;
+                }
+                if (!artworkReport.details.trim()) {
+                    setReportError('Describe the concern before submitting.');
+                    return;
+                }
+                if (!artworkReport.goodFaithConfirmed) {
+                    setReportError('Confirm that the report is accurate and submitted in good faith.');
+                    return;
+                }
+
+                const authenticated = await window.ensureAuthenticated?.();
+                if (!authenticated) {
+                    setReportError('Connect and sign in with your wallet to submit a report.');
+                    return;
+                }
+
+                setReportBusy(true);
+                setReportError('');
+                try {
+                    const response = await fetch('/api/moderation/reports', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chain_id: chainId,
+                            artwork_id: reportArtworkId,
+                            category: artworkReport.category,
+                            details: artworkReport.details.trim(),
+                            reference_url: artworkReport.referenceUrl.trim() || null,
+                            good_faith_confirmed: true
+                        })
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(result.message || 'The report could not be submitted.');
+                    }
+
+                    setReportReceipt({
+                        reference: result.report?.reference || '',
+                        alreadySubmitted: result.alreadySubmitted === true
+                    });
+                } catch (error) {
+                    setReportError(error.message || 'The report could not be submitted.');
+                } finally {
+                    setReportBusy(false);
                 }
             }
 
@@ -2612,6 +2741,156 @@ const { useState, useEffect, useRef } = React;
 
             return (
                 <div className="artwork-page-root">
+                    {isReportModalOpen && (
+                        <div
+                            className="report-modal-backdrop"
+                            role="presentation"
+                            onMouseDown={event => {
+                                if (event.target === event.currentTarget) closeArtworkReport();
+                            }}
+                        >
+                            <section
+                                className="report-modal"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="artworkReportTitle"
+                                aria-describedby="artworkReportDescription"
+                            >
+                                <div className="report-modal-header">
+                                    <div>
+                                        <p className="report-modal-eyebrow">Notice and takedown</p>
+                                        <h2 id="artworkReportTitle">Report this artwork</h2>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="report-modal-close"
+                                        aria-label="Close artwork report"
+                                        onClick={closeArtworkReport}
+                                        disabled={reportBusy}
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+
+                                {reportReceipt ? (
+                                    <div className="report-confirmation" role="status">
+                                        <h3>{reportReceipt.alreadySubmitted ? 'Report already received' : 'Report received'}</h3>
+                                        <p>
+                                            {reportReceipt.alreadySubmitted
+                                                ? 'A report from this wallet for the same artwork and category is already pending review.'
+                                                : 'Your report is stored for moderator review. Submitting a report does not decide ownership or remove on-chain history.'}
+                                        </p>
+                                        {reportReceipt.reference && (
+                                            <p className="report-reference">
+                                                Reference: <code>{reportReceipt.reference}</code>
+                                            </p>
+                                        )}
+                                        <div className="report-modal-actions">
+                                            <button type="button" className="btn-main" onClick={closeArtworkReport}>
+                                                Done
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <form onSubmit={submitArtworkReport}>
+                                        <p id="artworkReportDescription" className="report-modal-copy">
+                                            Report copyright, impersonation, harmful content, spam, or another concern. Reports are reviewed and do not change blockchain ownership.
+                                        </p>
+
+                                        <label className="report-field-label" htmlFor="artworkReportCategory">
+                                            Reason
+                                        </label>
+                                        <select
+                                            id="artworkReportCategory"
+                                            className="report-field"
+                                            value={artworkReport.category}
+                                            onChange={event => setArtworkReport(current => ({
+                                                ...current,
+                                                category: event.target.value
+                                            }))}
+                                            disabled={reportBusy}
+                                            autoFocus
+                                        >
+                                            {REPORT_CATEGORIES.map(category => (
+                                                <option key={category.value} value={category.value}>{category.label}</option>
+                                            ))}
+                                        </select>
+
+                                        <label className="report-field-label" htmlFor="artworkReportDetails">
+                                            Details
+                                        </label>
+                                        <textarea
+                                            id="artworkReportDetails"
+                                            className="report-field report-details"
+                                            value={artworkReport.details}
+                                            onChange={event => setArtworkReport(current => ({
+                                                ...current,
+                                                details: event.target.value
+                                            }))}
+                                            maxLength="2000"
+                                            placeholder="Explain what should be reviewed"
+                                            disabled={reportBusy}
+                                            required
+                                        />
+                                        <p className="report-character-count">{artworkReport.details.length}/2000</p>
+
+                                        <label className="report-field-label" htmlFor="artworkReportReference">
+                                            Supporting URL <span>(optional)</span>
+                                        </label>
+                                        <input
+                                            id="artworkReportReference"
+                                            className="report-field"
+                                            type="url"
+                                            inputMode="url"
+                                            maxLength="500"
+                                            value={artworkReport.referenceUrl}
+                                            onChange={event => setArtworkReport(current => ({
+                                                ...current,
+                                                referenceUrl: event.target.value
+                                            }))}
+                                            placeholder="https://"
+                                            disabled={reportBusy}
+                                        />
+
+                                        <label className="report-confirmation-check">
+                                            <input
+                                                type="checkbox"
+                                                checked={artworkReport.goodFaithConfirmed}
+                                                onChange={event => setArtworkReport(current => ({
+                                                    ...current,
+                                                    goodFaithConfirmed: event.target.checked
+                                                }))}
+                                                disabled={reportBusy}
+                                                required
+                                            />
+                                            <span>I confirm that this report is accurate and submitted in good faith.</span>
+                                        </label>
+
+                                        {reportError && <p className="report-modal-error" role="alert">{reportError}</p>}
+
+                                        <div className="report-modal-actions">
+                                            <button
+                                                type="button"
+                                                className="btn-secondary"
+                                                onClick={closeArtworkReport}
+                                                disabled={reportBusy}
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="btn-main"
+                                                disabled={reportBusy || !artworkReport.details.trim() || !artworkReport.goodFaithConfirmed}
+                                                aria-busy={reportBusy}
+                                            >
+                                                {reportBusy ? 'Submitting...' : 'Submit report'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+                            </section>
+                        </div>
+                    )}
                     {isNewAuctionModalOpen && (
                         <div
                             className="reauction-modal-backdrop"
@@ -3154,6 +3433,16 @@ const { useState, useEffect, useRef } = React;
                                         >
                                             Back
                                         </button>
+                                        {reportingEnabled && (
+                                            <button
+                                                type="button"
+                                                ref={reportTriggerRef}
+                                                onClick={openArtworkReport}
+                                                className="btn-secondary artwork-page-compact-action artwork-page-report"
+                                            >
+                                                Report
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

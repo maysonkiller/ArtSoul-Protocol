@@ -13,7 +13,8 @@ function readPublicConfig() {
 
   return {
     supabaseUrl,
-    supabaseAnonKey
+    supabaseAnonKey,
+    reportingEnabled: String(process.env.ARTSOUL_REPORTING_ENABLED || '').toLowerCase() === 'true'
   };
 }
 
