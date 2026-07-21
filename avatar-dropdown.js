@@ -33,6 +33,9 @@
             this.headerIdentityStorageKey = 'artsoul_header_identity';
             this.headerNetworkStorageKey = 'artsoul_header_network_v2';
             this.headerStateStorageKey = 'artsoul_header_ui_state';
+            this.protocolAdminWallet = null;
+            this.protocolAdminEligible = false;
+            this.protocolAdminRequest = null;
         }
 
         getNavContainer() {
@@ -209,6 +212,103 @@
                 `;
                 })
                 .join('');
+        }
+
+        renderProtocolAdminSlot(currentPath = window.location.pathname) {
+            const isCurrentPage = currentPath.includes('admin.html');
+            const link = this.protocolAdminEligible && !isCurrentPage
+                ? `
+                    <a href="admin.html" class="dropdown-item dropdown-protocol-admin-item">
+                        <span>Protocol Admin</span>
+                    </a>
+                `
+                : '';
+            return `<div class="protocol-admin-menu-slot" data-protocol-admin-slot>${link}</div>`;
+        }
+
+        updateProtocolAdminSlot() {
+            const slot = this.getNavContainer()?.querySelector('[data-protocol-admin-slot]');
+            if (!slot) return;
+            const currentPath = window.location.pathname;
+            slot.innerHTML = this.protocolAdminEligible && !currentPath.includes('admin.html')
+                ? '<a href="admin.html" class="dropdown-item dropdown-protocol-admin-item"><span>Protocol Admin</span></a>'
+                : '';
+            this.applyThemeStyles();
+        }
+
+        clearProtocolAdminAccess() {
+            this.protocolAdminWallet = null;
+            this.protocolAdminEligible = false;
+            this.protocolAdminRequest = null;
+            this.updateProtocolAdminSlot();
+        }
+
+        // Render-time bookkeeping only: never issues a network request. It
+        // keeps the reserved menu slot in sync and drops any cached result
+        // that belongs to a previous wallet or session.
+        syncProtocolAdminWallet(walletAddress) {
+            const wallet = String(walletAddress || '').toLowerCase();
+            const knownWallet = this.protocolAdminWallet || this.protocolAdminRequest?.wallet || null;
+            if (!/^0x[a-f0-9]{40}$/.test(wallet) || (knownWallet && knownWallet !== wallet)) {
+                this.clearProtocolAdminAccess();
+                return;
+            }
+            this.updateProtocolAdminSlot();
+        }
+
+        // Lazy menu discovery: called when the account dropdown opens, at most
+        // one request per wallet for this page lifetime. Eligibility is always
+        // decided by the server; protected admin endpoints still re-check
+        // SIWE + staff role + passkey step-up on every request.
+        async requestProtocolAdminAccessOnce() {
+            const wallet = String(
+                window.currentWalletAddress
+                || window.artsoulSettledWalletState?.address
+                || ''
+            ).toLowerCase();
+            if (!/^0x[a-f0-9]{40}$/.test(wallet)) {
+                this.clearProtocolAdminAccess();
+                return false;
+            }
+            if (this.protocolAdminWallet === wallet) {
+                this.updateProtocolAdminSlot();
+                return this.protocolAdminEligible;
+            }
+            if (this.protocolAdminRequest?.wallet === wallet) return this.protocolAdminRequest.promise;
+
+            const request = fetch('/api/moderation/access', {
+                method: 'GET',
+                credentials: 'include',
+                headers: { Accept: 'application/json' }
+            })
+                .then(async response => {
+                    const result = await response.json().catch(() => ({}));
+                    const activeWallet = String(
+                        window.currentWalletAddress
+                        || window.artsoulSettledWalletState?.address
+                        || ''
+                    ).toLowerCase();
+                    if (activeWallet !== wallet) return false;
+                    this.protocolAdminWallet = wallet;
+                    this.protocolAdminEligible = response.ok
+                        && result.enabled === true
+                        && result.authenticated === true
+                        && result.eligible === true;
+                    this.updateProtocolAdminSlot();
+                    return this.protocolAdminEligible;
+                })
+                .catch(() => {
+                    this.protocolAdminWallet = wallet;
+                    this.protocolAdminEligible = false;
+                    this.updateProtocolAdminSlot();
+                    return false;
+                })
+                .finally(() => {
+                    if (this.protocolAdminRequest?.wallet === wallet) this.protocolAdminRequest = null;
+                });
+
+            this.protocolAdminRequest = { wallet, promise: request };
+            return request;
         }
 
         getCachedHeaderIdentity(walletAddress = '') {
@@ -721,6 +821,7 @@
                 ${networkSection}
                 <div class="avatar-dropdown-navigation">
                     ${this.renderDropdownNavItems({ currentPath, isOwnProfile })}
+                    ${this.renderProtocolAdminSlot(currentPath)}
                     ${accountAction}
                 </div>
             `;
@@ -810,6 +911,7 @@
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
+            this.syncProtocolAdminWallet(walletAddress);
             this.bindOutsideCloseOnce();
         }
 
@@ -827,6 +929,10 @@
             }
 
             this.isOpen = !this.isOpen;
+
+            // Lazy Protocol Admin discovery: ask the server only when the
+            // menu is actually opened, once per wallet per page lifetime.
+            if (this.isOpen) void this.requestProtocolAdminAccessOnce();
 
             if (menu) {
                 menu.style.display = this.isOpen ? 'block' : 'none';
@@ -1058,6 +1164,7 @@
                 stateKey: options.renderKey || 'guest'
             });
             this.commitVisibleState('disconnected');
+            this.clearProtocolAdminAccess();
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
                 `guest:${currentPath}:${isProfilePage}`
@@ -1102,6 +1209,7 @@
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
+            this.syncProtocolAdminWallet(walletAddress);
             this.bindOutsideCloseOnce();
         }
     }
