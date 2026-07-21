@@ -5,6 +5,10 @@ import IndexerMetrics from './metrics.js';
 import DistributedLock from './distributed-lock.js';
 import { requireEnv, resolveIndexerChainConfigs } from './chain-config.js';
 import { reconcileConfirmationDepth } from './confirmation-depth.js';
+import {
+    isIndexerWithinHealthLag,
+    resolveHealthMaxBlocksBehind
+} from './health-policy.js';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +41,9 @@ function resolveProductionIndexerConfig() {
         pollInterval: parseInt(process.env.INDEXER_POLL_INTERVAL || '15000', 10),
         reorgCheckInterval: parseInt(process.env.INDEXER_REORG_CHECK_INTERVAL || '60000', 10),
         reorgSampleSize: parseInt(process.env.INDEXER_REORG_SAMPLE_SIZE || '12', 10),
+        healthMaxBlocksBehind: resolveHealthMaxBlocksBehind(
+            process.env.INDEXER_HEALTH_MAX_BLOCKS_BEHIND
+        ),
         healthPort: parseInt(process.env.INDEXER_HEALTH_PORT || '3001', 10),
         alertWebhook: process.env.ALERT_WEBHOOK
     };
@@ -78,6 +85,9 @@ class ProductionIndexer {
         this.pollInterval = config.pollInterval || 15000;
         this.reorgCheckInterval = config.reorgCheckInterval || 60000;
         this.reorgSampleSize = config.reorgSampleSize || 12;
+        this.healthMaxBlocksBehind = resolveHealthMaxBlocksBehind(
+            config.healthMaxBlocksBehind
+        );
         this.lastReorgCheckAt = 0;
         this.lastObservedBlock = null;
         this.isLeader = false;
@@ -135,6 +145,7 @@ class ProductionIndexer {
         console.log('  Poll Interval:', this.pollInterval, 'ms');
         console.log('  Reorg Check Interval:', this.reorgCheckInterval, 'ms');
         console.log('  Reorg Sample Size:', this.reorgSampleSize, 'blocks');
+        console.log('  Healthy Block Lag:', `< ${this.healthMaxBlocksBehind} blocks`);
         console.log('  Health Port:', config.healthPort);
         console.log('  Alert Webhook:', this.alertWebhook ? 'Configured' : 'Not configured');
         console.log('  Prometheus Metrics:', 'Enabled');
@@ -856,7 +867,10 @@ class ProductionIndexer {
             const errors = await this.syncEngine.getUnresolvedErrors();
 
             const blocksBehind = currentBlock - state.last_indexed_block;
-            const isSynced = blocksBehind < 10;
+            const isSynced = isIndexerWithinHealthLag(
+                blocksBehind,
+                this.healthMaxBlocksBehind
+            );
             const hasErrors = errors.length > 0;
 
             // Reset error counter if last error was >1 minute ago
@@ -888,6 +902,7 @@ class ProductionIndexer {
                     currentBlock: currentBlock,
                     blocksBehind: blocksBehind,
                     isSynced: isSynced,
+                    syncThresholdBlocks: this.healthMaxBlocksBehind,
                     confirmationDepth: this.confirmationDepth,
                     confirmationDepthSyncError: this.confirmationDepthSyncError,
                     totalEventsIndexed: state.total_events_indexed,

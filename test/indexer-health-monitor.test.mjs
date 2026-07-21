@@ -45,7 +45,7 @@ test('fails closed on wrong chain, confirmation drift, lag and unresolved errors
             chainId: 8453,
             confirmationDepth: 12,
             confirmationDepthSyncError: 'database update failed',
-            blocksBehind: 10,
+            blocksBehind: 20,
             isSynced: false,
             unresolvedErrors: 2
         }
@@ -56,6 +56,15 @@ test('fails closed on wrong chain, confirmation drift, lag and unresolved errors
         result.failures.map(({ code }) => code),
         ['CHAIN_ID', 'CONFIRMATION_DEPTH', 'CONFIRMATION_DEPTH_SYNC', 'UNRESOLVED_ERRORS', 'BLOCK_LAG', 'SYNC_STATE']
     );
+});
+
+test('accepts the normal 15-second polling edge without a false block-lag alert', () => {
+    const result = evaluateIndexerHealth(healthyPayload({
+        indexer: { blocksBehind: 11, isSynced: true }
+    }), config, NOW);
+
+    assert.equal(config.maxBlocksBehind, 20);
+    assert.equal(result.ok, true);
 });
 
 test('rejects excessive RPC errors and stale responses', () => {
