@@ -17,7 +17,7 @@ The checker reads the existing indexer `/health` response and exits non-zero whe
 - chain ID is Base Sepolia `84532`;
 - confirmation depth is `3` and has no synchronization error;
 - there are zero unresolved indexer errors;
-- block lag is below `10` and `isSynced` is true;
+- block lag is below `20` and `isSynced` is true;
 - RPC errors in the last minute do not exceed `5`;
 - the response timestamp is no more than two minutes old.
 
@@ -31,7 +31,7 @@ echo $?
 
 Successful output is one JSON line with `"ok":true` and exit code `0`. Failure output contains stable failure codes and exit code `1`. The output intentionally omits the configured endpoint URL so credentials cannot be copied into logs if an operator overrides it incorrectly.
 
-Optional environment overrides are available for a non-production rehearsal only:
+The indexer uses `INDEXER_HEALTH_MAX_BLOCKS_BEHIND=20`; normally keep that production default. The standalone checker also supports these explicit overrides for a non-production rehearsal:
 
 ```text
 ARTSOUL_INDEXER_HEALTH_URL
@@ -43,7 +43,7 @@ ARTSOUL_MONITOR_MAX_RESPONSE_AGE_MS
 ARTSOUL_MONITOR_REQUEST_TIMEOUT_MS
 ```
 
-Production values remain Base Sepolia, depth `3`, lag below `10`, at most `5` RPC errors per minute, response age at most `120000` ms, and request timeout `10000` ms. Do not weaken a threshold merely to make a failing check green.
+Production values remain Base Sepolia, depth `3`, lag below `20`, at most `5` RPC errors per minute, response age at most `120000` ms, and request timeout `10000` ms. The lag boundary allows one normal 15-second polling interval on Base plus confirmation depth and a small scheduling margin. The indexer and standalone checker share the same default. Do not weaken a threshold merely to make a sustained failing check green.
 
 The `/health` handler observes the current block. Do not poll this command more often than once every five minutes; excessive health polling becomes an RPC consumer itself.
 
