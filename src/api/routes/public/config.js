@@ -1,4 +1,5 @@
 import { allowMethods, sendError } from '../../backend.js';
+import { readReportingConfig } from '../../reporting-config.js';
 
 function readPublicConfig() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -14,7 +15,7 @@ function readPublicConfig() {
   return {
     supabaseUrl,
     supabaseAnonKey,
-    reportingEnabled: String(process.env.ARTSOUL_REPORTING_ENABLED || '').toLowerCase() === 'true'
+    reportingEnabled: readReportingConfig().enabled
   };
 }
 

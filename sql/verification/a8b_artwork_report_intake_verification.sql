@@ -23,9 +23,15 @@ WHERE table_schema = 'public'
   AND grantee IN ('anon', 'authenticated')
 ORDER BY table_name, grantee, privilege_type;
 
--- 4) The service-role RPC is SECURITY DEFINER with pinned search_path
---    (expect 1 row with security_definer=true and a search_path config).
-SELECT p.proname, p.prosecdef AS security_definer, p.proconfig
+-- 4) The service-role RPC is SECURITY DEFINER with pinned search_path and
+--    contains both concurrency serialization and the rolling intake bound
+--    (expect 1 row with every boolean true and a search_path config).
+SELECT
+  p.proname,
+  p.prosecdef AS security_definer,
+  p.proconfig,
+  pg_get_functiondef(p.oid) LIKE '%pg_advisory_xact_lock%' AS serializes_reporter,
+  pg_get_functiondef(p.oid) LIKE '%REPORT_DAILY_LIMIT_REACHED%' AS enforces_daily_limit
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'

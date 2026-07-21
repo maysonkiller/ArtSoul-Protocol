@@ -78,7 +78,8 @@ CREATE OR REPLACE FUNCTION public.submit_artwork_report(
     p_category TEXT,
     p_details TEXT,
     p_reference_url TEXT,
-    p_good_faith_confirmed BOOLEAN
+    p_good_faith_confirmed BOOLEAN,
+    p_daily_limit INTEGER
 )
 RETURNS TABLE (
     report_id UUID,
@@ -135,6 +136,10 @@ BEGIN
         RAISE EXCEPTION 'Good-faith confirmation is required';
     END IF;
 
+    IF p_daily_limit IS NULL OR p_daily_limit <= 0 THEN
+        RAISE EXCEPTION 'A positive report intake limit is required';
+    END IF;
+
     IF NOT EXISTS (
         SELECT 1
         FROM public.v41_artworks AS artwork
@@ -142,6 +147,39 @@ BEGIN
           AND artwork.artwork_id = p_artwork_id
     ) THEN
         RAISE EXCEPTION 'Artwork not found';
+    END IF;
+
+    -- Serialize submissions from one wallet so the rolling intake limit and
+    -- pending-report deduplication remain exact under concurrent requests.
+    PERFORM pg_advisory_xact_lock(hashtextextended('artsoul-report:' || normalized_wallet, 0));
+
+    SELECT report.*
+    INTO existing_report
+    FROM public.artwork_reports AS report
+    WHERE report.chain_id = p_chain_id
+      AND report.artwork_id = p_artwork_id
+      AND report.reporter_wallet = normalized_wallet
+      AND report.category = normalized_category
+      AND report.status = 'pending_review'
+    ORDER BY report.created_at DESC
+    LIMIT 1;
+
+    IF existing_report.id IS NOT NULL THEN
+        RETURN QUERY SELECT
+            existing_report.id,
+            existing_report.status,
+            existing_report.created_at,
+            TRUE;
+        RETURN;
+    END IF;
+
+    IF (
+        SELECT COUNT(*)
+        FROM public.artwork_reports AS recent_report
+        WHERE recent_report.reporter_wallet = normalized_wallet
+          AND recent_report.created_at >= NOW() - INTERVAL '24 hours'
+    ) >= p_daily_limit THEN
+        RAISE EXCEPTION 'REPORT_DAILY_LIMIT_REACHED';
     END IF;
 
     INSERT INTO public.artwork_reports (
@@ -211,7 +249,8 @@ REVOKE ALL ON FUNCTION public.submit_artwork_report(
     TEXT,
     TEXT,
     TEXT,
-    BOOLEAN
+    BOOLEAN,
+    INTEGER
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.submit_artwork_report(
     NUMERIC,
@@ -220,5 +259,6 @@ GRANT EXECUTE ON FUNCTION public.submit_artwork_report(
     TEXT,
     TEXT,
     TEXT,
-    BOOLEAN
+    BOOLEAN,
+    INTEGER
 ) TO service_role;

@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { execSync, execFileSync } = require('node:child_process');
+const { execSync, execFileSync, spawn } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const MIGRATION = fs.readFileSync(path.join(ROOT, 'sql/migrations/a8b_artwork_report_intake.sql'), 'utf8');
@@ -44,7 +44,25 @@ function psql(sql, { expectError = false } = {}) {
   }
 }
 
-function submit(category = 'copyright', artworkId = 42) {
+function psqlAsync(sql) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('docker', [
+      'exec', '-i', CONTAINER, 'psql', '-U', 'postgres', '-d', 'artsoul',
+      '-v', 'ON_ERROR_STOP=1', '-tA', '-F', '|', '-c', sql
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', code => {
+      if (code === 0) resolve(stdout.trim());
+      else reject(new Error(`parallel psql failed (${code}): ${stderr}`));
+    });
+  });
+}
+
+function submit(category = 'copyright', artworkId = 42, dailyLimit = 5) {
   return psql(`SELECT report_id, report_status, already_submitted
     FROM public.submit_artwork_report(
       84532,
@@ -53,7 +71,8 @@ function submit(category = 'copyright', artworkId = 42) {
       '${category}',
       'The source artwork predates this upload.',
       'https://example.com/original',
-      TRUE
+      TRUE,
+      ${dailyLimit}
     );`);
 }
 
@@ -121,13 +140,37 @@ test('A8b report RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false :
     assert.equal(psql('SELECT COUNT(*) FROM public.artwork_report_events;'), '1');
   });
 
+  await t.test('two concurrent duplicate submissions resolve to one report and one event', async () => {
+    const sql = `SELECT report_id, report_status, already_submitted
+      FROM public.submit_artwork_report(
+        84532, 42, '${REPORTER}', 'copyright',
+        'Concurrent duplicate concern.', NULL, TRUE, 5
+      );`;
+    const results = await Promise.all([psqlAsync(sql), psqlAsync(sql)]);
+    const ids = results.map(result => result.split('|')[0]);
+    assert.equal(new Set(ids).size, 1);
+    assert.equal(psql('SELECT COUNT(*) FROM public.artwork_reports;'), '1');
+    assert.equal(psql('SELECT COUNT(*) FROM public.artwork_report_events;'), '1');
+  });
+
+  await t.test('the rolling per-wallet limit rejects additional new reports', () => {
+    submit('copyright', 42, 2);
+    submit('spam', 42, 2);
+    const error = psql(`SELECT * FROM public.submit_artwork_report(
+      84532, 42, '${REPORTER}', 'other', 'Third report.', NULL, TRUE, 2
+    );`, { expectError: true });
+    assert.match(error, /REPORT_DAILY_LIMIT_REACHED/);
+    assert.equal(psql('SELECT COUNT(*) FROM public.artwork_reports;'), '2');
+    assert.equal(psql('SELECT COUNT(*) FROM public.artwork_report_events;'), '2');
+  });
+
   await t.test('an audit failure rolls back the new report', () => {
     psql(`CREATE OR REPLACE FUNCTION public._a8b_fail_event() RETURNS trigger LANGUAGE plpgsql AS $f$
       BEGIN RAISE EXCEPTION 'forced event failure'; END; $f$;`);
     psql(`CREATE TRIGGER _a8b_fail_event BEFORE INSERT ON public.artwork_report_events
       FOR EACH ROW EXECUTE FUNCTION public._a8b_fail_event();`);
     const error = psql(`SELECT * FROM public.submit_artwork_report(
-      84532, 42, '${REPORTER}', 'other', 'Review this concern.', NULL, TRUE
+      84532, 42, '${REPORTER}', 'other', 'Review this concern.', NULL, TRUE, 5
     );`, { expectError: true });
     assert.match(error, /forced event failure/);
     assert.equal(psql('SELECT COUNT(*) FROM public.artwork_reports;'), '0');
@@ -136,7 +179,7 @@ test('A8b report RPC integration (PostgreSQL 17)', { skip: HAVE_DOCKER ? false :
 
   await t.test('an unknown artwork is rejected without storing a complaint', () => {
     const error = psql(`SELECT * FROM public.submit_artwork_report(
-      84532, 999, '${REPORTER}', 'copyright', 'Unknown target.', NULL, TRUE
+      84532, 999, '${REPORTER}', 'copyright', 'Unknown target.', NULL, TRUE, 5
     );`, { expectError: true });
     assert.match(error, /Artwork not found/);
     assert.equal(psql('SELECT COUNT(*) FROM public.artwork_reports;'), '0');

@@ -5,8 +5,8 @@ import {
   sendError,
   supabaseRest
 } from '../../backend.js';
+import { readReportingConfig } from '../../reporting-config.js';
 
-const REPORTING_ENABLED = String(process.env.ARTSOUL_REPORTING_ENABLED || '').toLowerCase() === 'true';
 const PUBLIC_ARTWORK_CHAINS = new Set([84532, 11155111]);
 const REPORT_CATEGORIES = new Set([
   'copyright',
@@ -48,8 +48,12 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
 
   try {
-    if (!REPORTING_ENABLED) {
+    const reportingConfig = readReportingConfig();
+    if (!reportingConfig.requested) {
       throw requestError('Artwork reporting is not enabled yet.', 'REPORTING_DISABLED', 503);
+    }
+    if (!reportingConfig.enabled) {
+      throw requestError('Artwork reporting requires an intake limit before activation.', 'REPORTING_LIMIT_NOT_CONFIGURED', 503);
     }
 
     const reporterWallet = requireWallet(req);
@@ -76,19 +80,28 @@ export default async function handler(req, res) {
       throw requestError('Confirm that this report is accurate and submitted in good faith.', 'GOOD_FAITH_REQUIRED');
     }
 
-    const rows = await supabaseRest('rpc/submit_artwork_report', {
-      method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: {
-        p_chain_id: chainId,
-        p_artwork_id: artworkId,
-        p_reporter_wallet: reporterWallet,
-        p_category: category,
-        p_details: details,
-        p_reference_url: referenceUrl || null,
-        p_good_faith_confirmed: true
+    let rows;
+    try {
+      rows = await supabaseRest('rpc/submit_artwork_report', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: {
+          p_chain_id: chainId,
+          p_artwork_id: artworkId,
+          p_reporter_wallet: reporterWallet,
+          p_category: category,
+          p_details: details,
+          p_reference_url: referenceUrl || null,
+          p_good_faith_confirmed: true,
+          p_daily_limit: reportingConfig.dailyLimit
+        }
+      });
+    } catch (error) {
+      if (String(error?.details?.message || error?.message || '').includes('REPORT_DAILY_LIMIT_REACHED')) {
+        throw requestError('This wallet has reached the artwork-report limit for the last 24 hours.', 'REPORT_DAILY_LIMIT_REACHED', 429);
       }
-    });
+      throw error;
+    }
     const report = rows?.[0];
     if (!report?.report_id) {
       throw requestError('The report could not be recorded.', 'REPORT_SUBMISSION_FAILED', 500);

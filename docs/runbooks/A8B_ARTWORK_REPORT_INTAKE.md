@@ -30,8 +30,9 @@ submission.
 | Variable | Meaning |
 | --- | --- |
 | `ARTSOUL_REPORTING_ENABLED` | `true` enables the public button and API. Default/absent = button hidden and API fails closed with `REPORTING_DISABLED`. |
+| `ARTSOUL_REPORT_DAILY_LIMIT` | Required positive integer limiting newly stored reports per wallet across the rolling previous 24 hours. It has no default; choose and record the operational value before activation. Missing/invalid = button hidden and API fails closed. |
 
-Do not set the flag before applying and verifying the migration. Public
+Do not set the flag without an explicit daily limit or before applying and verifying the migration. Public
 configuration is cached for up to five minutes, so allow for cache expiry
 after changing the flag or redeploying.
 
@@ -55,8 +56,10 @@ after changing the flag or redeploying.
      already submitted.
 6. Record the migration application using the repository's A-02 evidence
    practice.
-7. Set `ARTSOUL_REPORTING_ENABLED=true` for the intended Vercel environment
-   and redeploy.
+7. Choose and record a positive per-wallet daily intake limit. Set
+   `ARTSOUL_REPORT_DAILY_LIMIT` to that value and
+   `ARTSOUL_REPORTING_ENABLED=true` for the intended Vercel environment, then
+   redeploy. The public button remains hidden if either setting is missing.
 8. Verify one controlled submission:
    - open an indexed artwork and select Report;
    - connect and complete SIWE;
@@ -78,7 +81,9 @@ reviewed data-retention decision and migration.
 - The form does not request email, legal name, IP address, or social handles.
 - Supporting links are stored but never fetched by the server.
 - A pending report is deduplicated per wallet, artwork, and category.
-- A-22 must render all stored text as untrusted content, add queue-level
-  abuse controls, and preserve append-only staff action evidence.
+- The database serializes each reporter wallet and enforces the configured
+  rolling 24-hour intake cap before storing a new report.
+- A-22 must render all stored text as untrusted content, add queue-level abuse
+  controls beyond the intake cap, and preserve append-only staff action evidence.
 - A valid claim and authorized staff review—not submission volume—determine
   whether an artwork is hidden.
