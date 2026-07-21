@@ -1,16 +1,19 @@
-import { allowMethods, sendError, supabaseRest } from '../../backend.js';
+import { allowMethods, sendError } from '../../backend.js';
 import {
-  findValidEnrollmentGrant,
-  recordAuthEvent,
+  generateGrantToken,
+  hashGrantToken,
+  issueEnrollmentGrantRpc,
   requirePasskeyRouteContext,
   verifyModerationStepUp
 } from '../../moderation-passkey.js';
 
 // A staff member who already holds a VALID passkey step-up may issue ONE
-// single-use, expiring enrollment grant for THEIR OWN wallet to enroll an
-// additional device (founder decision: two independent founder passkeys).
-// This route can never create a bootstrap grant and can never target
-// another wallet, so it is not a wallet-only or delegation bypass.
+// single-use, expiring ADDITIONAL enrollment grant for THEIR OWN wallet to
+// enroll another device (founder decision: two independent founder
+// passkeys). This route can never create a bootstrap grant and can never
+// target another wallet, so it is not a wallet-only or delegation bypass.
+// The raw one-time token is returned exactly once here; only its SHA-256
+// hash is persisted (inside the atomic issue RPC).
 const ADDITIONAL_GRANT_TTL_MS = 15 * 60 * 1000; // bounded by the step-up TTL
 
 export default async function handler(req, res) {
@@ -27,31 +30,19 @@ export default async function handler(req, res) {
       });
     }
 
-    const existing = await findValidEnrollmentGrant(wallet);
-    if (existing) {
-      return res.status(409).json({ error: 'GRANT_ALREADY_PENDING' });
-    }
-
+    const rawToken = generateGrantToken();
     const expiresAt = new Date(Date.now() + ADDITIONAL_GRANT_TTL_MS).toISOString();
-    const rows = await supabaseRest('artsoul_staff_enrollment_grants', {
-      method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: [{
-        target_wallet: wallet,
-        purpose: 'additional',
-        issued_by: wallet,
-        expires_at: expiresAt
-      }]
-    });
-    const grant = rows?.[0];
 
-    await recordAuthEvent(wallet, 'grant_issued', stepUp.credentialId, {
+    await issueEnrollmentGrantRpc({
+      targetWallet: wallet,
       purpose: 'additional',
-      grant_id: grant?.id ?? null,
-      expires_at: expiresAt
+      issuedBy: wallet,
+      tokenHash: hashGrantToken(rawToken),
+      expiresAt
     });
 
-    res.status(200).json({ success: true, expires_at: expiresAt });
+    // The raw token is shown exactly once and never persisted or logged.
+    res.status(200).json({ success: true, token: rawToken, expires_at: expiresAt });
   } catch (error) {
     sendError(res, error);
   }

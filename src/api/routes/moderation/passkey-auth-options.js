@@ -4,7 +4,7 @@ import {
   findWalletCredentials,
   parseStoredTransports,
   requirePasskeyRouteContext,
-  storeChallenge
+  storeAuthenticationChallenge
 } from '../../moderation-passkey.js';
 
 export default async function handler(req, res) {
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       }))
     });
 
-    await storeChallenge(options.challenge, wallet, 'authentication');
+    await storeAuthenticationChallenge(options.challenge, wallet);
     res.status(200).json({ success: true, options });
   } catch (error) {
     sendError(res, error);

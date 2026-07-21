@@ -38,13 +38,15 @@ WHERE table_schema = 'public'
   AND grantee IN ('anon', 'authenticated')
 ORDER BY table_name, grantee;
 
--- 4) The single-bootstrap partial unique index exists (expect 1 row).
-SELECT indexname
+-- 4) The active-bootstrap partial unique index exists (expect 1 row). It is
+--    scoped to unconsumed AND unrevoked rows, so an expired unused bootstrap
+--    grant can still be superseded/replaced.
+SELECT indexname, indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND indexname = 'idx_artsoul_enrollment_grants_single_bootstrap';
+  AND indexname = 'idx_artsoul_enrollment_grants_active_bootstrap';
 
--- 5) Credential IDs are unique (expect a UNIQUE constraint/index on credential_id).
+-- 5) Credential IDs are unique (expect a UNIQUE index on credential_id).
 SELECT indexname, indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
@@ -52,14 +54,53 @@ WHERE schemaname = 'public'
   AND indexdef ILIKE '%UNIQUE%'
   AND indexdef ILIKE '%credential_id%';
 
--- 6) No IP or user-agent columns exist in the audit table (expect 0 rows).
+-- 6) Grants store only a token hash: no raw-token column exists (expect 0).
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'artsoul_staff_enrollment_grants'
+  AND column_name ILIKE '%token%'
+  AND column_name NOT ILIKE '%hash%';
+
+-- 7) No IP or user-agent columns exist in the audit table (expect 0 rows).
 SELECT column_name
 FROM information_schema.columns
 WHERE table_schema = 'public'
   AND table_name = 'artsoul_staff_auth_events'
   AND (column_name ILIKE '%ip%' OR column_name ILIKE '%agent%');
 
--- 7) At most one bootstrap grant exists (expect count 0 before bootstrap, 1 after).
-SELECT COUNT(*) AS bootstrap_grants
-FROM public.artsoul_staff_enrollment_grants
-WHERE purpose = 'bootstrap';
+-- 8) The four atomic RPCs exist, are SECURITY DEFINER, and pin search_path
+--    (expect 4 rows with prosecdef = true and a search_path config).
+SELECT p.proname, p.prosecdef, p.proconfig
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname IN (
+    'a8a_issue_enrollment_grant',
+    'a8a_complete_registration',
+    'a8a_revoke_credential',
+    'a8a_complete_authentication'
+  )
+ORDER BY p.proname;
+
+-- 9) Only service_role may execute the RPCs; anon/authenticated cannot
+--    (expect zero anon/authenticated EXECUTE rows).
+SELECT r.routine_name, p.grantee, p.privilege_type
+FROM information_schema.routine_privileges p
+JOIN information_schema.routines r ON r.specific_name = p.specific_name
+WHERE r.routine_schema = 'public'
+  AND r.routine_name IN (
+    'a8a_issue_enrollment_grant',
+    'a8a_complete_registration',
+    'a8a_revoke_credential',
+    'a8a_complete_authentication'
+  )
+  AND p.grantee IN ('anon', 'authenticated')
+ORDER BY r.routine_name, p.grantee;
+
+-- 10) At most one active bootstrap grant, and bootstrap-consumed count
+--     (expect active_bootstrap <= 1).
+SELECT
+  COUNT(*) FILTER (WHERE purpose = 'bootstrap' AND consumed_at IS NULL AND revoked_at IS NULL) AS active_bootstrap,
+  COUNT(*) FILTER (WHERE purpose = 'bootstrap' AND consumed_at IS NOT NULL) AS consumed_bootstrap
+FROM public.artsoul_staff_enrollment_grants;

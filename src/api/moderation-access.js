@@ -21,6 +21,68 @@ function accessError(message, code, statusCode) {
   return error;
 }
 
+async function fetchActiveRole(wallet) {
+  const roleRows = await supabaseRest(
+    `artsoul_staff_roles?wallet_address=eq.${encodeURIComponent(wallet)}&active=eq.true&select=role&limit=1`
+  );
+  return String(roleRows?.[0]?.role || '').toLowerCase();
+}
+
+// A8a (founder decision 2026-07-20): with the passkey flag enabled,
+// moderation requires ONLY an active staff role + a valid SIWE session + a
+// valid 15-minute passkey step-up. The profiles table is NOT queried at all,
+// so X/Discord data can never participate and a profiles outage can never
+// deny an otherwise valid passkey-protected moderator.
+async function getPasskeyModerationAccess(req, wallet, strict) {
+  let role;
+  try {
+    role = await fetchActiveRole(wallet);
+  } catch (error) {
+    if (strict) {
+      throw accessError(
+        'Moderation role registry is unavailable',
+        'MODERATION_ROLE_REGISTRY_UNAVAILABLE',
+        503
+      );
+    }
+    return { wallet, role: null, canModerate: false, passkeyRequired: true, missingFactors: ['role_registry'] };
+  }
+
+  let stepUp;
+  try {
+    stepUp = await verifyModerationStepUp(req, wallet);
+  } catch (error) {
+    if (strict) throw error;
+    return {
+      wallet,
+      role: MODERATION_ROLES.has(role) ? role : null,
+      canModerate: false,
+      passkeyRequired: true,
+      missingFactors: ['passkey_configuration']
+    };
+  }
+
+  if (strict && !MODERATION_ROLES.has(role)) {
+    throw accessError('Administrative access required', 'ADMIN_REQUIRED', 403);
+  }
+  if (strict && !stepUp.valid) {
+    throw accessError(
+      'A passkey step-up is required for moderation access',
+      stepUp.code || 'STEP_UP_REQUIRED',
+      403
+    );
+  }
+
+  return {
+    wallet,
+    role: MODERATION_ROLES.has(role) ? role : null,
+    canModerate: MODERATION_ROLES.has(role) && stepUp.valid,
+    passkeyRequired: true,
+    stepUpActive: stepUp.valid,
+    missingFactors: stepUp.valid ? [] : ['passkey_step_up']
+  };
+}
+
 export async function getModerationAccess(req, options = {}) {
   const strict = options.strict === true;
   const wallet = strict ? requireWallet(req) : readWalletSession(req);
@@ -32,6 +94,11 @@ export async function getModerationAccess(req, options = {}) {
       canModerate: false,
       missingFactors: ['wallet']
     };
+  }
+
+  // Flag ON: passkey-only authorization; profiles are never queried.
+  if (isModerationPasskeyEnabled()) {
+    return await getPasskeyModerationAccess(req, wallet, strict);
   }
 
   let roleRows;
@@ -64,47 +131,6 @@ export async function getModerationAccess(req, options = {}) {
 
   const role = String(roleRows?.[0]?.role || '').toLowerCase();
   const profile = profileRows?.[0] || null;
-
-  // A8a (founder decision 2026-07-20): with the passkey flag enabled,
-  // moderation requires an active staff role + a valid SIWE session + a
-  // valid 15-minute passkey step-up. X/Discord handles and IDs are profile
-  // and eligibility data ONLY — they never participate in this
-  // authorization decision. Missing configuration fails closed.
-  if (isModerationPasskeyEnabled()) {
-    let stepUp;
-    try {
-      stepUp = await verifyModerationStepUp(req, wallet);
-    } catch (error) {
-      if (strict) throw error;
-      return {
-        wallet,
-        role: MODERATION_ROLES.has(role) ? role : null,
-        canModerate: false,
-        passkeyRequired: true,
-        missingFactors: ['passkey_configuration']
-      };
-    }
-
-    if (strict && !MODERATION_ROLES.has(role)) {
-      throw accessError('Administrative access required', 'ADMIN_REQUIRED', 403);
-    }
-    if (strict && !stepUp.valid) {
-      throw accessError(
-        'A passkey step-up is required for moderation access',
-        stepUp.code || 'STEP_UP_REQUIRED',
-        403
-      );
-    }
-
-    return {
-      wallet,
-      role: MODERATION_ROLES.has(role) ? role : null,
-      canModerate: MODERATION_ROLES.has(role) && stepUp.valid,
-      passkeyRequired: true,
-      stepUpActive: stepUp.valid,
-      missingFactors: stepUp.valid ? [] : ['passkey_step_up']
-    };
-  }
 
   // TEMPORARY LEGACY BEHAVIOR (flag disabled): the profile/X/Discord factor
   // path below predates the A8a decision and is scheduled for removal when

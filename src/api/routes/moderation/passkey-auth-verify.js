@@ -2,8 +2,8 @@ import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { allowMethods, readJson, sendError, supabaseRest } from '../../backend.js';
 import {
   MODERATION_SESSION_TTL_SECONDS,
-  consumeChallenge,
-  recordAuthEvent,
+  completeAuthenticationRpc,
+  consumeAuthenticationChallenge,
   recordAuthEventBestEffort,
   parseStoredTransports,
   requirePasskeyRouteContext,
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     try {
       verification = await verifyAuthenticationResponse({
         response,
-        expectedChallenge: async (challenge) => consumeChallenge(challenge, wallet, 'authentication'),
+        expectedChallenge: async (challenge) => consumeAuthenticationChallenge(challenge, wallet),
         expectedOrigin: config.origin,
         expectedRPID: config.rpId,
         requireUserVerification: true,
@@ -70,20 +70,23 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'AUTHENTICATION_NOT_VERIFIED' });
     }
 
-    await supabaseRest(
-      `artsoul_staff_passkeys?id=eq.${encodeURIComponent(stored.id)}`,
-      {
-        method: 'PATCH',
-        body: {
-          sign_count: verification.authenticationInfo.newCounter,
-          last_used_at: new Date().toISOString()
-        }
-      }
-    );
+    // Atomic: reject a stale counter, advance sign_count/last_used_at, and
+    // write passkey_auth_success in one transaction.
+    const result = await completeAuthenticationRpc({
+      wallet,
+      credentialId,
+      newCounter: verification.authenticationInfo.newCounter
+    });
 
-    await recordAuthEvent(wallet, 'passkey_auth_success', credentialId, null);
+    if (result !== 'OK') {
+      await recordAuthEventBestEffort(wallet, 'passkey_auth_failure', credentialId, {
+        phase: 'authentication_commit',
+        reason: String(result)
+      });
+      return res.status(401).json({ error: result || 'AUTHENTICATION_COMMIT_FAILED' });
+    }
+
     setModerationSession(res, wallet, credentialId);
-
     res.status(200).json({
       success: true,
       expires_in_seconds: MODERATION_SESSION_TTL_SECONDS

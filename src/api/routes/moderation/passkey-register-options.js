@@ -1,11 +1,11 @@
 import { generateRegistrationOptions } from '@simplewebauthn/server';
-import { allowMethods, sendError } from '../../backend.js';
+import { allowMethods, readJson, sendError } from '../../backend.js';
 import {
-  findValidEnrollmentGrant,
+  findGrantByToken,
   findWalletCredentials,
   parseStoredTransports,
   requirePasskeyRouteContext,
-  storeChallenge
+  storeRegistrationChallenge
 } from '../../moderation-passkey.js';
 
 export default async function handler(req, res) {
@@ -14,13 +14,14 @@ export default async function handler(req, res) {
   try {
     const { config, wallet } = await requirePasskeyRouteContext(req);
 
-    // Enrollment always consumes a one-time grant bound to this wallet.
-    // The bootstrap grant is created only by the founder-operated runbook.
-    const grant = await findValidEnrollmentGrant(wallet);
+    // Enrollment requires the SIWE wallet AND possession of the one-time
+    // bearer token. A stolen wallet without the token resolves no grant.
+    const body = await readJson(req);
+    const grant = await findGrantByToken(body?.token, wallet);
     if (!grant) {
       return res.status(403).json({
         error: 'ENROLLMENT_GRANT_REQUIRED',
-        message: 'A valid enrollment grant is required to register a passkey.'
+        message: 'A valid one-time enrollment token is required to register a passkey.'
       });
     }
 
@@ -41,7 +42,9 @@ export default async function handler(req, res) {
       }
     });
 
-    await storeChallenge(options.challenge, wallet, 'registration');
+    // Bind this challenge to the exact grant id so no other pending grant
+    // can be substituted at verification time.
+    await storeRegistrationChallenge(options.challenge, wallet, grant.id);
     res.status(200).json({ success: true, options });
   } catch (error) {
     sendError(res, error);

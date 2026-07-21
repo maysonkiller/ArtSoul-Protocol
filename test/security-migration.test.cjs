@@ -154,8 +154,16 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   ];
   const createdTables = new Set();
 
+  // Migrations that apply their OWN complete RLS + service-role hardening
+  // inline (and are therefore never edited into the historical, already-
+  // applied phase18_7b classifier). Each is verified by its own test.
+  const SELF_HARDENING_MIGRATIONS = new Set([
+    'a8a_moderation_passkey_foundation.sql'
+  ]);
+
   for (const root of sqlRoots) {
     for (const name of fs.readdirSync(root).filter(candidate => candidate.endsWith('.sql'))) {
+      if (SELF_HARDENING_MIGRATIONS.has(name)) continue;
       const sql = fs.readFileSync(path.join(root, name), 'utf8');
       for (const match of sql.matchAll(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(?:public\.)?([a-z0-9_]+)/gi)) {
         createdTables.add(match[1]);
@@ -169,6 +177,24 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   );
   const missing = [...createdTables].filter(table => !hardening.includes(`'${table}'`));
   assert.deepEqual(missing, []);
+});
+
+test('A8a self-hardens its own tables inline so phase18_7b stays immutable', () => {
+  const a8a = fs.readFileSync(
+    path.join(REPO_ROOT, 'sql/migrations/a8a_moderation_passkey_foundation.sql'),
+    'utf8'
+  );
+  for (const table of [
+    'artsoul_staff_passkeys',
+    'artsoul_webauthn_challenges',
+    'artsoul_staff_enrollment_grants',
+    'artsoul_staff_auth_events'
+  ]) {
+    assert.match(a8a, new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}`));
+    assert.match(a8a, new RegExp(`ALTER TABLE public\\.${table} FORCE ROW LEVEL SECURITY;`));
+    assert.match(a8a, new RegExp(`REVOKE ALL ON public\\.${table} FROM PUBLIC, anon, authenticated;`));
+    assert.match(a8a, new RegExp(`GRANT ALL ON public\\.${table} TO service_role;`));
+  }
 });
 
 const STORAGE_HARDENING_PATH = 'sql/migrations/phase18_7c_supabase_storage_hardening.sql';

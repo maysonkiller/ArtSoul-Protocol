@@ -1,10 +1,10 @@
-import { allowMethods, readJson, sendError, supabaseRest } from '../../backend.js';
+import { allowMethods, readJson, sendError } from '../../backend.js';
 import {
   clearModerationSession,
   findWalletCredentials,
   readModerationSession,
-  recordAuthEvent,
   requirePasskeyRouteContext,
+  revokeCredentialRpc,
   verifyModerationStepUp
 } from '../../moderation-passkey.js';
 
@@ -44,24 +44,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'INVALID_REVOCATION_PAYLOAD' });
     }
 
-    const rows = await supabaseRest(
-      `artsoul_staff_passkeys?credential_id=eq.${encodeURIComponent(credentialId)}` +
-        `&wallet_address=eq.${encodeURIComponent(wallet)}` +
-        '&revoked_at=is.null',
-      {
-        method: 'PATCH',
-        headers: { Prefer: 'return=representation' },
-        body: {
-          revoked_at: new Date().toISOString(),
-          revoked_by: wallet
-        }
-      }
-    );
-    if (!rows || rows.length !== 1) {
+    // Atomic revoke with last-key protection and audit inside the RPC.
+    const result = await revokeCredentialRpc({ wallet, credentialId, revokedBy: wallet });
+    if (result === 'LAST_ACTIVE_CREDENTIAL') {
+      return res.status(409).json({
+        error: 'LAST_ACTIVE_CREDENTIAL',
+        message: 'You cannot revoke your last active passkey. Enroll another passkey first.'
+      });
+    }
+    if (result === 'CREDENTIAL_NOT_FOUND') {
       return res.status(404).json({ error: 'CREDENTIAL_NOT_FOUND' });
     }
-
-    await recordAuthEvent(wallet, 'passkey_revoked', credentialId, { revoked_by: wallet });
+    if (result !== 'OK') {
+      return res.status(400).json({ error: result || 'REVOCATION_FAILED' });
+    }
 
     // Revoking the credential behind the CURRENT step-up ends that session.
     const current = readModerationSession(req);

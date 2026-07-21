@@ -1,6 +1,12 @@
 import { React, createRoot } from './react-runtime.js';
-import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
+
+// A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
+// after the server signals a staff wallet needs passkey step-up/enrollment,
+// so it never ships in the artwork bundle for ordinary visitors.
+function loadWebAuthnBrowser() {
+    return import('@simplewebauthn/browser');
+}
 import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
 import '../../supabase-client.js';
@@ -1221,7 +1227,9 @@ const { useState, useEffect, useRef } = React;
                     if (!response.ok) {
                         // A8a: a staff wallet with the passkey flag enabled but no
                         // active 15-minute step-up gets a machine-readable code.
-                        if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.code)) {
+                        // The API serializes machine codes as { error, message },
+                        // so the code lives in result.error (not result.code).
+                        if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.error)) {
                             setPasskeyAccess({ required: true, active: false });
                             setModerationAccess(null);
                             return false;
@@ -1332,6 +1340,7 @@ const { useState, useEffect, useRef } = React;
                 setPasskeyBusy(true);
                 setPasskeyMessage('');
                 try {
+                    const { startAuthentication } = await loadWebAuthnBrowser();
                     const optionsResult = await passkeyApi('passkey-auth-options');
                     const assertion = await startAuthentication({ optionsJSON: optionsResult.options });
                     await passkeyApi('passkey-auth-verify', { response: assertion });
@@ -1341,7 +1350,7 @@ const { useState, useEffect, useRef } = React;
                     await loadModerationPasskeys();
                 } catch (error) {
                     setPasskeyMessage(error.code === 'NO_CREDENTIALS'
-                        ? 'No passkey is enrolled for this wallet yet. Enroll one with a valid grant first.'
+                        ? 'No passkey is enrolled for this wallet yet. Enroll one with a valid token first.'
                         : error.message || 'Passkey step-up failed.');
                 } finally {
                     setPasskeyBusy(false);
@@ -1350,12 +1359,17 @@ const { useState, useEffect, useRef } = React;
 
             async function enrollModerationPasskey() {
                 if (passkeyBusy) return;
+                // Enrollment requires the one-time bearer token issued by the
+                // bootstrap runbook or a step-up self-grant.
+                const token = (window.prompt('Paste your one-time enrollment token') || '').trim();
+                if (!token) return;
                 setPasskeyBusy(true);
                 setPasskeyMessage('');
                 try {
-                    const optionsResult = await passkeyApi('passkey-register-options');
+                    const { startRegistration } = await loadWebAuthnBrowser();
+                    const optionsResult = await passkeyApi('passkey-register-options', { token });
                     const attestation = await startRegistration({ optionsJSON: optionsResult.options });
-                    await passkeyApi('passkey-register-verify', { response: attestation });
+                    await passkeyApi('passkey-register-verify', { token, response: attestation });
                     setPasskeyMessage('Passkey enrolled. Verify it to start a moderation session.');
                     await loadModerationPasskeys();
                 } catch (error) {
