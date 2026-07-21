@@ -8,6 +8,13 @@ import functionsAiAnalyzeHandler from '../src/api/routes/functions/ai/analyze.js
 import functionsArtworksHandler from '../src/api/routes/functions/artworks.js';
 import functionsAuctionsHandler from '../src/api/routes/functions/auctions.js';
 import artworkVisibilityHandler from '../src/api/routes/moderation/artwork-visibility.js';
+import passkeyRegisterOptionsHandler from '../src/api/routes/moderation/passkey-register-options.js';
+import passkeyRegisterVerifyHandler from '../src/api/routes/moderation/passkey-register-verify.js';
+import passkeyAuthOptionsHandler from '../src/api/routes/moderation/passkey-auth-options.js';
+import passkeyAuthVerifyHandler from '../src/api/routes/moderation/passkey-auth-verify.js';
+import passkeysHandler from '../src/api/routes/moderation/passkeys.js';
+import passkeyGrantHandler from '../src/api/routes/moderation/passkey-grant.js';
+import passkeyRecoveryHandler from '../src/api/routes/moderation/passkey-recovery.js';
 import {
   createOAuthCallbackHandler,
   oauthStartHandler,
@@ -39,6 +46,13 @@ const ROUTES = new Map([
   ['functions/artworks', functionsArtworksHandler],
   ['functions/auctions', functionsAuctionsHandler],
   ['moderation/artwork-visibility', artworkVisibilityHandler],
+  ['moderation/passkey-register-options', passkeyRegisterOptionsHandler],
+  ['moderation/passkey-register-verify', passkeyRegisterVerifyHandler],
+  ['moderation/passkey-auth-options', passkeyAuthOptionsHandler],
+  ['moderation/passkey-auth-verify', passkeyAuthVerifyHandler],
+  ['moderation/passkeys', passkeysHandler],
+  ['moderation/passkey-grant', passkeyGrantHandler],
+  ['moderation/passkey-recovery', passkeyRecoveryHandler],
   ['oauth/start', oauthStartHandler],
   ['oauth/callback/discord', createOAuthCallbackHandler('discord')],
   ['oauth/callback/twitter', createOAuthCallbackHandler('twitter')],
