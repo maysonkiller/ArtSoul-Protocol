@@ -18,10 +18,33 @@ contract behavior, auction lifecycle, ownership or wallet connection logic.
 - `a8c_protocol_admin_review.sql`: additive review fields, append-only reasons,
   private notification obligations and serialized per-artwork decisions.
 
+Report state machine (all transitions require a reason):
+
+- `pending_review` -> `actioned` (**hide**; hides the artwork) or
+  `dismissed` (**dismiss**; unfounded claim).
+- `actioned` -> `resolved` (**resolve/restore**). An actioned report is
+  active and can never be reopened; reopening it would strand the artwork
+  hidden with no active report.
+- `dismissed` / `resolved` -> `pending_review` (**reopen**), rejected with
+  `REPORT_ALREADY_PENDING` when the same reporter already has a newer
+  pending report of the same category for the artwork.
+- A valid complaint that was actioned closes as `resolved`, never
+  `dismissed`; the reporter receives a `REPORT_RESOLVED` notification.
+- `REPORT_RESTORED` (audit) and `ARTWORK_RESTORED` (creator notification)
+  are emitted only when resolving the final actioned report actually flips
+  the artwork from hidden to visible, read under the per-artwork lock. If
+  another actioned report still hides it, or it was already visible, the
+  event stays `REPORT_RESOLVED` and no creator notification is created.
+
 The shared account dropdown contains no wallet allowlist and no client-owned
-role. It adds `Protocol Admin` only after the server confirms an active role
-for the current SIWE session. Knowing or manually opening `admin.html` grants
-no authority.
+role. Discovery is lazy: the header render performs no access request; the
+`/api/moderation/access` check runs when the account menu is first opened, at
+most once per wallet per page lifetime, and the cached result is dropped when
+the wallet or session changes. The dropdown adds `Protocol Admin` only after
+the server confirms an active role for the current SIWE session. With
+`ARTSOUL_PROTOCOL_ADMIN_ENABLED=false` the endpoint answers without any
+staff-role lookup. Knowing or manually opening `admin.html` grants no
+authority.
 
 ## Security invariants
 
@@ -35,8 +58,9 @@ Complaint text is rendered as untrusted React text. Each report remains an
 independent row and event chain even when the UI groups reports by artwork.
 Transitions lock the report and serialize by artwork. A stale
 `expected_updated_at` fails with a conflict instead of overwriting another
-moderator. If multiple reports have actioned a hide, resolving one report does
-not expose the artwork while another actioned report remains.
+moderator; a reopen that would duplicate a pending report fails with
+`REPORT_ALREADY_PENDING`. If multiple reports have actioned a hide, resolving
+one report does not expose the artwork while another actioned report remains.
 
 Review state, visibility, append-only decision evidence and notification
 obligations are one transaction. A failed audit or notification insert rolls

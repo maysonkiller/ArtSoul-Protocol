@@ -82,7 +82,12 @@ Verify all of the following before declaring A8 complete:
 - notification failures do not corrupt the review decision;
 - disabling any relevant feature flag fails closed and preserves stored evidence.
 - resolving one of several actioned reports does not expose the artwork until
-  the last actioned report for that artwork is resolved.
+  the last actioned report for that artwork is resolved;
+- an actioned report cannot be reopened, and reopening a closed report is
+  rejected while a newer pending duplicate from the same reporter and
+  category exists;
+- `REPORT_RESTORED` and the creator's `ARTWORK_RESTORED` notification appear
+  only when a resolution actually returned the artwork to public visibility.
 
 ## 5. After controlled-beta observation
 

@@ -19,9 +19,12 @@ function reportId(value) {
 }
 
 function mapReviewError(error) {
-  const detail = String(error?.details?.message || error?.message || '');
+  const detail = String(error?.details?.code || '') + ' ' + String(error?.details?.message || error?.message || '');
   if (detail.includes('REPORT_REVIEW_CONFLICT')) {
     return requestError('This report changed while it was open. Refresh and review the latest state.', 'REPORT_REVIEW_CONFLICT', 409);
+  }
+  if (detail.includes('REPORT_ALREADY_PENDING') || /23505|idx_artwork_reports_one_pending_category/.test(detail)) {
+    return requestError('A newer pending report from the same reporter and category already exists for this artwork.', 'REPORT_ALREADY_PENDING', 409);
   }
   if (detail.includes('REPORT_ACTION_NOT_ALLOWED')) {
     return requestError('This action is not valid for the report\'s current state.', 'REPORT_ACTION_NOT_ALLOWED', 409);
