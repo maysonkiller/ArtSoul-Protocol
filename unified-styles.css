@@ -5329,3 +5329,270 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
         display: none;
     }
 }
+
+/* Protocol Admin: protected, feature-flagged moderation workspace. */
+.protocol-admin-root {
+    min-height: calc(100vh - var(--site-header-height, 96px));
+    background: var(--c-bg);
+    color: var(--c-text);
+}
+
+.protocol-admin-shell {
+    width: min(var(--site-shell-max, 1840px), calc(100% - (2 * var(--site-shell-pad, 30px))));
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3.5rem) 0 4rem;
+}
+
+.protocol-admin-heading,
+.protocol-admin-section-heading,
+.protocol-admin-group > header,
+.protocol-admin-card-meta,
+.protocol-admin-dialog-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.protocol-admin-heading,
+.protocol-admin-gate,
+.protocol-admin-group,
+.protocol-admin-ledger,
+.protocol-admin-dialog {
+    border: 1px solid var(--c-border-soft);
+    border-radius: 18px;
+    background: var(--c-surface);
+}
+
+.protocol-admin-heading,
+.protocol-admin-gate,
+.protocol-admin-group {
+    padding: clamp(1rem, 2.5vw, 1.75rem);
+}
+
+.protocol-admin-heading h1,
+.protocol-admin-gate h1,
+.protocol-admin-section-heading h2,
+.protocol-admin-shell section > h2 {
+    margin: 0;
+    color: var(--c-accent);
+}
+
+.protocol-admin-heading p,
+.protocol-admin-gate p,
+.protocol-admin-section-copy,
+.protocol-admin-empty,
+.protocol-admin-wallet,
+.protocol-admin-ledger span,
+.protocol-admin-card-meta {
+    color: var(--c-text-muted);
+}
+
+.protocol-admin-kicker {
+    margin: 0 0 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.protocol-admin-heading p:last-child,
+.protocol-admin-gate p {
+    margin-bottom: 0;
+}
+
+.protocol-admin-tabs,
+.protocol-admin-status-filter,
+.protocol-admin-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.protocol-admin-tabs {
+    margin: 1rem 0 1.5rem;
+}
+
+.protocol-admin-shell button,
+.protocol-admin-shell a {
+    min-height: 40px;
+}
+
+.protocol-admin-shell button,
+.protocol-admin-group > header a,
+.protocol-admin-report-card > a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 0.55rem 0.9rem;
+    background: var(--c-surface-muted);
+    color: var(--c-accent);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.protocol-admin-shell button:hover,
+.protocol-admin-shell button:focus-visible,
+.protocol-admin-group > header a:hover,
+.protocol-admin-group > header a:focus-visible,
+.protocol-admin-report-card > a:hover,
+.protocol-admin-report-card > a:focus-visible {
+    border-color: var(--c-accent);
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+
+.protocol-admin-shell button:disabled {
+    cursor: wait;
+    opacity: 0.58;
+}
+
+.protocol-admin-tabs button.is-active,
+.protocol-admin-status-filter button.is-active,
+.protocol-admin-primary {
+    background: var(--c-accent);
+    color: var(--c-bg);
+}
+
+.protocol-admin-section-heading {
+    margin-bottom: 1rem;
+}
+
+.protocol-admin-group {
+    margin-bottom: 1rem;
+}
+
+.protocol-admin-group > header {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--c-border-soft);
+}
+
+.protocol-admin-group h3,
+.protocol-admin-group header p {
+    margin: 0;
+}
+
+.protocol-admin-report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 1rem;
+    padding-top: 1rem;
+}
+
+.protocol-admin-report-card {
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 14px;
+    background: var(--c-surface-muted);
+    overflow-wrap: anywhere;
+}
+
+.protocol-admin-card-meta {
+    font-size: 0.8rem;
+}
+
+.protocol-admin-report-text {
+    white-space: pre-wrap;
+}
+
+.protocol-admin-message {
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    background: var(--c-surface-muted);
+}
+
+.protocol-admin-ledger {
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+}
+
+.protocol-admin-ledger > div,
+.protocol-admin-ledger > p {
+    display: grid;
+    grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr) minmax(220px, 1.4fr);
+    gap: 1rem;
+    margin: 0;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--c-border-soft);
+}
+
+.protocol-admin-ledger > :last-child {
+    border-bottom: 0;
+}
+
+.protocol-admin-dialog {
+    width: min(560px, calc(100% - 2rem));
+    padding: 1.25rem;
+    color: var(--c-text);
+}
+
+.protocol-admin-dialog::backdrop {
+    background: color-mix(in srgb, var(--c-bg) 78%, transparent);
+}
+
+.protocol-admin-dialog form {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.protocol-admin-dialog textarea {
+    min-height: 130px;
+    resize: vertical;
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 0.8rem;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font: inherit;
+}
+
+.future .protocol-admin-heading,
+.future .protocol-admin-gate,
+.future .protocol-admin-group,
+.future .protocol-admin-ledger,
+.future .protocol-admin-dialog {
+    box-shadow: 0 0 22px var(--c-glow);
+}
+
+@media (max-width: 720px) {
+    .protocol-admin-shell {
+        width: calc(100% - 1.25rem);
+        padding-top: 1rem;
+    }
+
+    .protocol-admin-heading,
+    .protocol-admin-section-heading,
+    .protocol-admin-group > header,
+    .protocol-admin-card-meta {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .protocol-admin-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .protocol-admin-tabs button,
+    .protocol-admin-status-filter button {
+        min-width: 0;
+    }
+
+    .protocol-admin-ledger > div,
+    .protocol-admin-ledger > p {
+        grid-template-columns: 1fr;
+        gap: 0.3rem;
+    }
+
+    .protocol-admin-dialog-actions {
+        align-items: stretch;
+        flex-direction: column-reverse;
+    }
+}

@@ -32,8 +32,8 @@ Before production activation:
 
 1. Connect and verify the final project domain and WebAuthn RP ID.
 2. Configure and rehearse the Safe-only founder recovery path.
-3. Apply and verify the A8a migration, create the one-time auditable bootstrap
-   grant, and enrol the two independent founder passkeys.
+3. Prepare the reviewed A8a, A8b and A8c migrations. Passkey enrollment and
+   feature activation happen only in the ordered deployment stage below.
 4. Assign each moderator an active least-privilege role and an individually
    enrolled passkey. Do not store private staff wallet assignments in source.
 
@@ -45,12 +45,19 @@ These steps follow `RESOURCE_GATED_WORK.md` and
 Only after the Protocol Admin workflow is operational:
 
 1. Take and verify a current Supabase backup.
-2. Apply `sql/migrations/a8b_artwork_report_intake.sql`.
-3. Run `sql/verification/a8b_artwork_report_intake_verification.sql` and retain
+2. Apply, in order, `sql/migrations/a8a_moderation_passkey_foundation.sql`,
+   `sql/migrations/a8b_artwork_report_intake.sql`, and
+   `sql/migrations/a8c_protocol_admin_review.sql`.
+3. Run the matching read-only A8a, A8b and A8c verification files and retain
    the evidence.
-4. Set `ARTSOUL_REPORT_DAILY_LIMIT=5` and enable the reviewed reporting and
-   passkey feature flags in the intended Vercel environment.
-5. Redeploy and allow the public-config cache to expire.
+4. Configure the final RP ID/origin/name and dedicated moderation-session
+   secret. Enable only the passkey flag, create the one-time auditable
+   bootstrap grant, and enrol the two independent founder passkeys.
+5. Enable `ARTSOUL_PROTOCOL_ADMIN_ENABLED=true`, redeploy, and complete the
+   protected admin acceptance checklist while public reporting remains off.
+6. Set `ARTSOUL_REPORT_DAILY_LIMIT=5` and only then enable
+   `ARTSOUL_REPORTING_ENABLED=true` for the controlled beta.
+7. Redeploy and allow the public-config cache to expire.
 
 Five new reports per reporter wallet across a rolling 24-hour window is the
 approved controlled-beta starting value. It may be tuned later from observed
@@ -73,7 +80,9 @@ Verify all of the following before declaring A8 complete:
 - valid-claim hide/unhide decisions create immutable staff audit evidence;
 - concurrent staff decisions resolve deterministically without lost history;
 - notification failures do not corrupt the review decision;
-- disabling either feature flag fails closed and preserves stored evidence.
+- disabling any relevant feature flag fails closed and preserves stored evidence.
+- resolving one of several actioned reports does not expose the artwork until
+  the last actioned report for that artwork is resolved.
 
 ## 5. After controlled-beta observation
 

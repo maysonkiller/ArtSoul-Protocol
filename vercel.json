@@ -38,7 +38,7 @@
       ]
     },
     {
-      "source": "/(index|gallery|artwork|profile|upload|docs-protocol)\\.html",
+      "source": "/(index|gallery|artwork|profile|upload|admin|docs-protocol)\\.html",
       "headers": [
         {
           "key": "Cache-Control",
