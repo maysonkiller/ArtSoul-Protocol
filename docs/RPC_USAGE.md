@@ -134,4 +134,4 @@ Do not restart any service until `systemctl cat` confirms that it is the ArtSoul
 2. Confirm indexer lag remains below the normal confirmation window and new events appear in projections.
 3. Check Alchemy after one hour and after 24 hours. `eth_getLogs`, `eth_blockNumber`, and `eth_getBlockByNumber` should drop sharply.
 4. Investigate repeated `trying fallback` or `Re-probing primary RPC` logs before raising the poll frequency.
-5. Set an Alchemy usage alert well below the monthly limit. A renewed steady climb indicates another automated consumer or a public-RPC outage.
+5. Follow [`runbooks/A9_INFRA_COST_MONITORING.md`](runbooks/A9_INFRA_COST_MONITORING.md). Alchemy dashboard alerts are unavailable on the Free tier, so keep the hard usage control in place and record the twice-weekly manual review until funded/native alerting is available. A renewed steady climb indicates another automated consumer or a public-RPC outage.
