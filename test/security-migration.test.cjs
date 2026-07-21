@@ -159,7 +159,8 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   // applied phase18_7b classifier). Each is verified by its own test.
   const SELF_HARDENING_MIGRATIONS = new Set([
     'a8a_moderation_passkey_foundation.sql',
-    'a8b_artwork_report_intake.sql'
+    'a8b_artwork_report_intake.sql',
+    'a8c_protocol_admin_review.sql'
   ]);
 
   for (const root of sqlRoots) {
@@ -209,6 +210,21 @@ test('A8b report intake self-hardens complaint and event data inline', () => {
     assert.match(a8b, new RegExp(`REVOKE ALL ON public\\.${table} FROM PUBLIC, anon, authenticated;`));
     assert.match(a8b, new RegExp(`GRANT ALL ON public\\.${table} TO service_role;`));
   }
+});
+
+test('A8c Protocol Admin review self-hardens its notification ledger inline', () => {
+  const a8c = fs.readFileSync(
+    path.join(REPO_ROOT, 'sql/migrations/a8c_protocol_admin_review.sql'),
+    'utf8'
+  );
+  assert.match(a8c, /CREATE TABLE IF NOT EXISTS public\.artwork_report_notifications/);
+  for (const table of ['artwork_reports', 'artwork_report_events', 'artwork_report_notifications']) {
+    assert.match(a8c, new RegExp(`ALTER TABLE public\\.${table} FORCE ROW LEVEL SECURITY;`));
+    assert.match(a8c, new RegExp(`REVOKE ALL ON public\\.${table} FROM PUBLIC, anon, authenticated;`));
+    assert.match(a8c, new RegExp(`GRANT ALL ON public\\.${table} TO service_role;`));
+  }
+  assert.match(a8c, /REVOKE ALL ON FUNCTION public\.review_artwork_report/);
+  assert.match(a8c, /GRANT EXECUTE ON FUNCTION public\.review_artwork_report[\s\S]*TO service_role/);
 });
 
 const STORAGE_HARDENING_PATH = 'sql/migrations/phase18_7c_supabase_storage_hardening.sql';
