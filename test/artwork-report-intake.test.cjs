@@ -11,6 +11,7 @@ process.env.SESSION_SECRET = 'artwork-report-intake-test-secret';
 process.env.SUPABASE_URL = 'https://example.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role';
 process.env.ARTSOUL_REPORTING_ENABLED = 'true';
+process.env.ARTSOUL_REPORT_DAILY_LIMIT = '5';
 
 function moduleUrl(relativePath, suffix = '') {
   return `${pathToFileURL(path.join(ROOT, relativePath)).href}${suffix}`;
@@ -71,17 +72,30 @@ function supabaseResponse(payload, status = 200) {
 }
 
 test('reporting stays fail-closed when the server feature flag is disabled', async () => {
-  await modules;
+  const [{ default: handler }] = await modules;
   process.env.ARTSOUL_REPORTING_ENABLED = 'false';
-  const { default: disabledHandler } = await import(
-    moduleUrl('src/api/routes/moderation/reports.js', `?disabled=${Date.now()}`)
-  );
-  process.env.ARTSOUL_REPORTING_ENABLED = 'true';
+  try {
+    const res = responseHarness();
+    await handler(request({}), res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error, 'REPORTING_DISABLED');
+  } finally {
+    process.env.ARTSOUL_REPORTING_ENABLED = 'true';
+  }
+});
 
-  const res = responseHarness();
-  await disabledHandler(request({}), res);
-  assert.equal(res.statusCode, 503);
-  assert.equal(res.body.error, 'REPORTING_DISABLED');
+test('reporting stays fail-closed until a positive daily intake limit is configured', async () => {
+  const [{ default: handler }] = await modules;
+  const previousLimit = process.env.ARTSOUL_REPORT_DAILY_LIMIT;
+  delete process.env.ARTSOUL_REPORT_DAILY_LIMIT;
+  try {
+    const res = responseHarness();
+    await handler(request({}), res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error, 'REPORTING_LIMIT_NOT_CONFIGURED');
+  } finally {
+    process.env.ARTSOUL_REPORT_DAILY_LIMIT = previousLimit;
+  }
 });
 
 test('an authenticated wallet is required before complaint data reaches Supabase', async () => {
@@ -110,7 +124,9 @@ test('report input fails closed for unsupported chains, categories, URLs, and de
     [{ chain_id: 8453, artwork_id: '9', category: 'copyright', details: 'Concern', good_faith_confirmed: true }, 'UNSUPPORTED_ARTWORK_CHAIN'],
     [{ chain_id: 84532, artwork_id: '9', category: 'invented', details: 'Concern', good_faith_confirmed: true }, 'INVALID_REPORT_CATEGORY'],
     [{ chain_id: 84532, artwork_id: '9', category: 'copyright', details: '', good_faith_confirmed: true }, 'INVALID_REPORT_DETAILS'],
+    [{ chain_id: 84532, artwork_id: '9', category: 'copyright', details: 'x'.repeat(2001), good_faith_confirmed: true }, 'INVALID_REPORT_DETAILS'],
     [{ chain_id: 84532, artwork_id: '9', category: 'copyright', details: 'Concern', reference_url: 'javascript:alert(1)', good_faith_confirmed: true }, 'INVALID_REFERENCE_URL'],
+    [{ chain_id: 84532, artwork_id: '9', category: 'copyright', details: 'Concern', reference_url: `https://example.com/${'x'.repeat(500)}`, good_faith_confirmed: true }, 'INVALID_REFERENCE_URL'],
     [{ chain_id: 84532, artwork_id: '9', category: 'copyright', details: 'Concern', good_faith_confirmed: false }, 'GOOD_FAITH_REQUIRED']
   ];
 
@@ -168,8 +184,31 @@ test('a valid report uses the atomic service-role RPC and returns an opaque refe
       p_category: 'copyright',
       p_details: 'The source artwork predates this upload.',
       p_reference_url: 'https://example.com/original',
-      p_good_faith_confirmed: true
+      p_good_faith_confirmed: true,
+      p_daily_limit: 5
     });
+  } finally {
+    global.fetch = previousFetch;
+  }
+});
+
+test('the database intake-limit signal is returned as a stable 429 response', async () => {
+  const [{ default: handler }] = await modules;
+  const cookie = await sessionCookie();
+  const previousFetch = global.fetch;
+  global.fetch = async () => supabaseResponse({ message: 'REPORT_DAILY_LIMIT_REACHED' }, 400);
+
+  try {
+    const res = responseHarness();
+    await handler(request({
+      chain_id: 84532,
+      artwork_id: '42',
+      category: 'copyright',
+      details: 'A bounded report concern.',
+      good_faith_confirmed: true
+    }, cookie), res);
+    assert.equal(res.statusCode, 429);
+    assert.equal(res.body.error, 'REPORT_DAILY_LIMIT_REACHED');
   } finally {
     global.fetch = previousFetch;
   }
@@ -208,6 +247,9 @@ test('the SQL path is atomic, private, deduplicated, and never auto-hides artwor
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.submit_artwork_report/);
   assert.match(sql, /ON CONFLICT \(chain_id, artwork_id, reporter_wallet, category\)[\s\S]*WHERE status = 'pending_review'[\s\S]*DO NOTHING/);
   assert.match(sql, /INSERT INTO public\.artwork_report_events/);
+  assert.match(sql, /pg_advisory_xact_lock/);
+  assert.match(sql, /created_at >= NOW\(\) - INTERVAL '24 hours'/);
+  assert.match(sql, /REPORT_DAILY_LIMIT_REACHED/);
   assert.match(sql, /ALTER TABLE public\.artwork_reports FORCE ROW LEVEL SECURITY/);
   assert.match(sql, /REVOKE ALL ON public\.artwork_reports FROM PUBLIC, anon, authenticated/);
   assert.doesNotMatch(sql, /set_artwork_moderation_visibility|INSERT INTO public\.artwork_moderation_visibility/);
@@ -232,6 +274,9 @@ test('the artwork UI exposes a flag-gated accessible Report form with no wallet 
 test('the Vercel router and public config expose only the gated report contract', () => {
   const router = fs.readFileSync(path.join(ROOT, 'api/[...route].js'), 'utf8');
   const config = fs.readFileSync(path.join(ROOT, 'src/api/routes/public/config.js'), 'utf8');
+  const reportingConfig = fs.readFileSync(path.join(ROOT, 'src/api/reporting-config.js'), 'utf8');
   assert.match(router, /\['moderation\/reports', reportsHandler\]/);
-  assert.match(config, /reportingEnabled:[\s\S]*ARTSOUL_REPORTING_ENABLED/);
+  assert.match(config, /reportingEnabled: readReportingConfig\(\)\.enabled/);
+  assert.match(reportingConfig, /ARTSOUL_REPORTING_ENABLED/);
+  assert.match(reportingConfig, /ARTSOUL_REPORT_DAILY_LIMIT/);
 });
