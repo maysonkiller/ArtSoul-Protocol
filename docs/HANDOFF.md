@@ -206,6 +206,8 @@ curl -fsS http://127.0.0.1:3001/health
 pm2 logs artsoul-base-sepolia --lines 100 --nostream
 ```
 
+For the accepted fail-closed health thresholds and the no-cost Alchemy/Supabase review cadence, use [`runbooks/A9_INFRA_COST_MONITORING.md`](runbooks/A9_INFRA_COST_MONITORING.md). After its deployment, `npm run --silent monitor:indexer` is the operator check; do not poll it more often than every five minutes because `/health` observes the current block.
+
 Safe deployment after a merged indexer PR:
 
 ```bash
