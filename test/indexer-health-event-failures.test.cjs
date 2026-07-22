@@ -19,7 +19,9 @@ function moduleUrl(relativePath) {
 // Drives the real getHealth() with stubbed collaborators. Only the data
 // sources are faked; the status/aggregation logic under test is the shipped
 // implementation.
-async function getHealth({ eventFailures = [], indexerErrors = [], isRunning = true } = {}) {
+const healthCalls = [];
+
+async function getHealth({ eventFailures = { failed: 0, dead: 0 }, indexerErrors = [], isRunning = true } = {}) {
     const { default: ProductionIndexer } = await import(moduleUrl('src/indexer/production-runner.js'));
     const indexer = Object.create(ProductionIndexer.prototype);
 
@@ -52,8 +54,11 @@ async function getHealth({ eventFailures = [], indexerErrors = [], isRunning = t
         async getUnresolvedErrors() { return indexerErrors; },
         // Chain scoping is enforced by the SQL in the sync engine and covered
         // by indexer-event-failure-integrity.test.cjs; here the stub returns
-        // only active-chain rows, as that query does.
-        async getUnresolvedEventFailures() { return eventFailures; }
+        // only active-chain aggregate counts, as that query does.
+        async getEventFailureCounts() {
+            healthCalls.push('getEventFailureCounts');
+            return eventFailures;
+        }
     };
 
     return await indexer.getHealth();
@@ -67,11 +72,7 @@ test('a clean indexer reports healthy with zero unresolved errors', async () => 
 });
 
 test('a failed registry row makes unresolvedErrors non-zero and health degraded', async () => {
-    const health = await getHealth({
-        eventFailures: [
-            { processing_status: 'failed', transaction_hash: '0xa', log_index: 0 }
-        ]
-    });
+    const health = await getHealth({ eventFailures: { failed: 1, dead: 0 } });
 
     assert.equal(health.indexer.unresolvedErrors, 1);
     assert.equal(health.status, 'degraded');
@@ -79,13 +80,7 @@ test('a failed registry row makes unresolvedErrors non-zero and health degraded'
 });
 
 test('dead rows also degrade health and are reported separately', async () => {
-    const health = await getHealth({
-        eventFailures: [
-            { processing_status: 'dead', transaction_hash: '0xa', log_index: 0 },
-            { processing_status: 'dead', transaction_hash: '0xb', log_index: 1 },
-            { processing_status: 'failed', transaction_hash: '0xc', log_index: 0 }
-        ]
-    });
+    const health = await getHealth({ eventFailures: { failed: 1, dead: 2 } });
 
     assert.equal(health.indexer.unresolvedErrors, 3);
     assert.equal(health.status, 'degraded');
@@ -95,7 +90,7 @@ test('dead rows also degrade health and are reported separately', async () => {
 test('legacy indexer_errors rows still count toward unresolvedErrors', async () => {
     const health = await getHealth({
         indexerErrors: [{ id: 1 }],
-        eventFailures: [{ processing_status: 'failed', transaction_hash: '0xa', log_index: 0 }]
+        eventFailures: { failed: 1, dead: 0 }
     });
 
     assert.equal(health.indexer.unresolvedErrors, 2);
@@ -122,7 +117,7 @@ test('the public health shape stays backward compatible', async () => {
 test('a stopped indexer still reports stopped rather than degraded', async () => {
     const health = await getHealth({
         isRunning: false,
-        eventFailures: [{ processing_status: 'dead', transaction_hash: '0xa', log_index: 0 }]
+        eventFailures: { failed: 0, dead: 1 }
     });
 
     assert.equal(health.status, 'stopped');

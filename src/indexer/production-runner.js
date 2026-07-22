@@ -215,6 +215,12 @@ class ProductionIndexer {
         // Start indexer
         this.isRunning = true;
         await this.syncEngine.start();
+
+        // One authoritative read of the failure registry at startup, so the
+        // gauge is correct before any range runs (and after a restart that
+        // inherited failures from a previous process).
+        await this._refreshEventFailureMetric('startup');
+
         await this._catchUpToSafeBlock('leader_start');
 
         // Start confirmation polling
@@ -372,7 +378,11 @@ class ProductionIndexer {
                     this.metrics.updateRpcHealthScore(rpc.url, rpc.healthScore);
                 }
 
-                await this._updateEventFailureMetric();
+                // The event-failure gauge is intentionally NOT refreshed here.
+                // Failure counts only change when a range is processed, so
+                // polling them every 5 seconds would add ~17k idle
+                // PostgreSQL/Supabase queries per day against the A9 cost
+                // budget. It is refreshed on the events that can change it.
 
                 // Update block lag
                 const state = await this.syncEngine.getIndexerState();
@@ -391,26 +401,29 @@ class ProductionIndexer {
         }, 5000); // Update every 5 seconds
     }
 
-    // Truthful replacement for the removed failed_events gauge. Sourced from
-    // event_processing_registry, the single source of truth for event-
-    // processing failures, so it can never report a false zero for a table
+    // Truthful replacement for the removed failed_events gauge, sourced from
+    // event_processing_registry (the single source of truth for event-
+    // processing failures) so it can never report a false zero for a table
     // that does not exist.
-    async _updateEventFailureMetric() {
-        const rows = await this.db.query(
-            `SELECT processing_status, COUNT(*)::BIGINT AS count
-             FROM event_processing_registry
-             WHERE chain_id = $1
-               AND processing_status IN ('failed', 'dead')
-             GROUP BY processing_status`,
-            [this.config.chainId.toString()]
-        );
-
-        const counts = { failed: 0, dead: 0 };
-        for (const row of rows || []) {
-            counts[row.processing_status] = Number(row.count || 0);
+    //
+    // Event driven, never polled: failure counts change only when a range is
+    // processed, so this runs once at startup and then only after a range
+    // that actually did work or failed. An idle indexer issues zero recurring
+    // failure-registry queries.
+    async _refreshEventFailureMetric(reason) {
+        try {
+            const counts = await this.syncEngine.getEventFailureCounts();
+            this.metrics.updateEventFailures(counts);
+            return counts;
+        } catch (error) {
+            console.error(JSON.stringify({
+                phase: 'event_failure_metric',
+                action: 'refresh_failed',
+                reason,
+                error: error.message
+            }));
+            return null;
         }
-
-        this.metrics.updateEventFailures(counts);
     }
 
     /**
@@ -761,7 +774,17 @@ class ProductionIndexer {
                 confirmationDepth: this.confirmationDepth
             }));
 
-            await this.syncEngine.syncHistoricalEvents(lastIndexedBlock + 1, safeBlock, { currentBlock });
+            const processedCount = await this.syncEngine.syncHistoricalEvents(
+                lastIndexedBlock + 1, safeBlock, { currentBlock }
+            );
+
+            // Only a range that actually applied events can change the failure
+            // counts — including a previously failed event that just recovered
+            // and drove the gauge back down. An empty range queries nothing.
+            if (processedCount > 0) {
+                await this._refreshEventFailureMetric('range_completed');
+            }
+
             return { currentBlock, safeBlock, lastIndexedBlock: safeBlock };
         } catch (error) {
             console.error(JSON.stringify({
@@ -771,6 +794,10 @@ class ProductionIndexer {
                 chainId: this.config.chainId,
                 error: error.message
             }));
+
+            // A failed-closed range recorded new failed/dead rows; refresh so
+            // the gauge shows the stall immediately rather than at next start.
+            await this._refreshEventFailureMetric('range_failed');
         } finally {
             this.catchUpInProgress = false;
         }
@@ -828,20 +855,21 @@ class ProductionIndexer {
             const state = await this.syncEngine.getIndexerState();
             const currentBlock = await this.eventListener.getCurrentBlock();
             const errors = await this.syncEngine.getUnresolvedErrors();
-            // Authoritative event-processing failures for THIS chain. A failed
-            // or dead registry row means an event in an already-scanned range
-            // was never applied, so health must not report a clean indexer.
-            const eventFailures = await this.syncEngine.getUnresolvedEventFailures();
+            // Authoritative event-processing failure COUNTS for THIS chain. A
+            // failed or dead registry row means an event in an already-scanned
+            // range was never applied, so health must not report a clean
+            // indexer. An aggregate, never a row scan: per-row detail is an
+            // operator SQL query documented in the A9 runbook.
+            const eventFailures = await this.syncEngine.getEventFailureCounts();
 
             const blocksBehind = currentBlock - state.last_indexed_block;
             const isSynced = isIndexerWithinHealthLag(
                 blocksBehind,
                 this.healthMaxBlocksBehind
             );
-            const deadEventCount = eventFailures.filter(
-                row => row.processing_status === 'dead'
-            ).length;
-            const unresolvedErrorCount = errors.length + eventFailures.length;
+            const failedEventCount = Number(eventFailures?.failed || 0);
+            const deadEventCount = Number(eventFailures?.dead || 0);
+            const unresolvedErrorCount = errors.length + failedEventCount + deadEventCount;
             const hasErrors = unresolvedErrorCount > 0;
 
             // Reset error counter if last error was >1 minute ago
@@ -881,7 +909,7 @@ class ProductionIndexer {
                     // Additive breakdown; unresolvedErrors stays the headline
                     // field and now counts unapplied events too.
                     eventFailures: {
-                        failed: eventFailures.length - deadEventCount,
+                        failed: failedEventCount,
                         dead: deadEventCount
                     }
                 },

@@ -519,7 +519,7 @@ test('a recovered event becomes completed and releases the cursor', async () => 
     // 105 <= 200 - 3, so the range also confirms and rehashes.
     assert.equal(state.last_confirmed_block, 105);
     assert.notEqual(state.state_hash, '0xseed');
-    assert.equal(await engine.getUnresolvedEventFailures().then(rows => rows.length), 0);
+    assert.deepEqual(await engine.getEventFailureCounts(), { failed: 0, dead: 0 });
 });
 
 test('persistent failures escalate to dead on the existing retry policy and keep failing closed', async () => {
@@ -552,9 +552,7 @@ test('persistent failures escalate to dead on the existing retry policy and keep
     // Dead still blocks the cursor: a poisoned event stalls the indexer
     // visibly instead of being skipped.
     assert.equal(db.indexerState.get(CHAIN_ID).last_indexed_block, 100);
-    const unresolved = await engine.getUnresolvedEventFailures();
-    assert.equal(unresolved.length, 1);
-    assert.equal(unresolved[0].processing_status, 'dead');
+    assert.deepEqual(await engine.getEventFailureCounts(), { failed: 0, dead: 1 });
 });
 
 test('a completed record is never downgraded by a late failure write', async () => {
@@ -580,7 +578,7 @@ test('a completed record is never downgraded by a late failure write', async () 
     const after = registryRow(db, event);
     assert.equal(after.processing_status, 'completed');
     assert.equal(after.processing_error, null);
-    assert.equal(await engine.getUnresolvedEventFailures().then(rows => rows.length), 0);
+    assert.deepEqual(await engine.getEventFailureCounts(), { failed: 0, dead: 0 });
 });
 
 test('the failure record is idempotent when the same failure is replayed', async () => {
@@ -634,9 +632,8 @@ test('unresolved event failures are chain scoped', async () => {
         retry_count: 5
     });
 
-    const rows = await engine.getUnresolvedEventFailures();
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].transaction_hash, event.transactionHash);
+    // Only the active chain's failure is counted.
+    assert.deepEqual(await engine.getEventFailureCounts(), { failed: 1, dead: 0 });
 });
 
 test('the active indexer contains no failed_events runtime path', () => {
@@ -671,7 +668,7 @@ test('the active indexer contains no failed_events runtime path', () => {
 
     const runner = fs.readFileSync(path.join(ROOT, 'src/indexer/production-runner.js'), 'utf8');
     assert.doesNotMatch(runner, /_startFailedEventsRetry|retryTimer/);
-    assert.match(runner, /_updateEventFailureMetric/);
+    assert.match(runner, /_refreshEventFailureMetric/);
 
     const metrics = fs.readFileSync(path.join(ROOT, 'src/indexer/metrics.js'), 'utf8');
     assert.doesNotMatch(metrics, /indexer_failed_events_queue_size/);
