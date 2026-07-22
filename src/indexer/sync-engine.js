@@ -6,6 +6,27 @@ import {
     canonicalArtworkId
 } from './v4-1-event-schema.js';
 
+// Structured failure raised when a historical range could not be fully
+// processed. The caller must NOT advance any cursor for that range; the next
+// poll re-queries the identical range and skips already-completed events
+// through the event_processing_registry idempotency check.
+export class IndexerRangeProcessingError extends Error {
+    constructor({ fromBlock, toBlock, chainId, processedCount, failedCount, failures }) {
+        super(
+            `Indexer range ${fromBlock}-${toBlock} on chain ${chainId} had ${failedCount} ` +
+            `unprocessed event(s); cursor not advanced`
+        );
+        this.name = 'IndexerRangeProcessingError';
+        this.code = 'INDEXER_RANGE_INCOMPLETE';
+        this.chainId = chainId;
+        this.fromBlock = fromBlock;
+        this.toBlock = toBlock;
+        this.processedCount = processedCount;
+        this.failedCount = failedCount;
+        this.failures = failures;
+    }
+}
+
 class IndexerSyncEngine {
     constructor(database, eventListener, metrics = null) {
         this.db = database;
@@ -13,8 +34,6 @@ class IndexerSyncEngine {
         this.metrics = metrics;
         this.chainId = Number(eventListener?.chainId || process.env.ARTSOUL_INDEXER_CHAIN_ID || process.env.CHAIN_ID || 0);
         this.isRunning = false;
-        this.failedEventsTableAvailable = true;
-        this.failedEventsTableWarningLogged = false;
 
         console.log('[IndexerSyncEngine] Initialized');
     }
@@ -70,26 +89,6 @@ class IndexerSyncEngine {
 
     _getEventArtworkId(event) {
         return canonicalArtworkId(event.eventName, event.eventData);
-    }
-
-    _isMissingFailedEventsTable(error) {
-        const message = String(error?.message || '').toLowerCase();
-        const relation = String(error?.relation || error?.table || '').toLowerCase();
-        return (relation === 'failed_events' || message.includes('failed_events')) &&
-            (
-                error?.code === '42P01' ||
-                message.includes('does not exist') ||
-                message.includes('relation') ||
-                message.includes('undefined_table')
-            );
-    }
-
-    _disableFailedEventsTable(reason) {
-        this.failedEventsTableAvailable = false;
-        if (this.failedEventsTableWarningLogged) return;
-
-        this.failedEventsTableWarningLogged = true;
-        console.warn(`[IndexerSyncEngine] Optional failed_events table is missing; ${reason} disabled. Normal event ingestion continues.`);
     }
 
     /**
@@ -285,6 +284,7 @@ class IndexerSyncEngine {
 
         let processedCount = 0;
         let failedCount = 0;
+        const failures = [];
 
         // Process in batches
         for (let i = 0; i < events.length; i += BATCH_SIZE) {
@@ -311,7 +311,51 @@ class IndexerSyncEngine {
             const results = await this._processBatchWithLimit(batch, CONCURRENCY);
 
             processedCount += results.filter(r => r.success).length;
-            failedCount += results.filter(r => !r.success).length;
+            for (const result of results) {
+                if (result.success) continue;
+                failedCount += 1;
+                failures.push({
+                    transactionHash: result.event?.transactionHash,
+                    logIndex: result.event?.logIndex,
+                    eventName: result.event?.eventName,
+                    blockNumber: result.event?.blockNumber,
+                    error: result.error?.message
+                });
+            }
+        }
+
+        // FAIL CLOSED. Every event in the range is processed first so that all
+        // recoverable work lands and every failure is durably recorded in
+        // event_processing_registry, but no cursor may move while any event in
+        // the range is unprocessed. Throwing here — before last_indexed_block,
+        // last_confirmed_block, state_hash and total_events_indexed are
+        // touched — makes the next poll re-query the identical range instead
+        // of silently skipping the failed event. Already-completed events in
+        // that range are skipped idempotently by the registry claim check.
+        if (failedCount > 0) {
+            const rangeError = new IndexerRangeProcessingError({
+                fromBlock,
+                toBlock,
+                chainId: this._chainIdString(),
+                processedCount,
+                failedCount,
+                failures
+            });
+
+            console.error(JSON.stringify({
+                phase: 'sync_historical_events',
+                action: 'range_incomplete',
+                code: rangeError.code,
+                chain_id: rangeError.chainId,
+                from_block: fromBlock,
+                to_block: toBlock,
+                processed_count: processedCount,
+                failed_count: failedCount,
+                cursor_advanced: false,
+                failures
+            }));
+
+            throw rangeError;
         }
 
         // Update state with toBlock (not fromBlock + events.length)
@@ -344,11 +388,8 @@ class IndexerSyncEngine {
             console.log(`[IndexerSyncEngine] Block ${toBlock} confirmed as safe. State hash updated.`);
         }
 
-        if (failedCount > 0) {
-            console.warn(`[IndexerSyncEngine] Synced ${processedCount}/${events.length} events (${failedCount} failed)`);
-        } else {
-            console.log(`[IndexerSyncEngine] Synced ${processedCount}/${events.length} historical events`);
-        }
+        // Reaching this point means every event in the range completed.
+        console.log(`[IndexerSyncEngine] Synced ${processedCount}/${events.length} historical events`);
 
         return processedCount;
     }
@@ -593,13 +634,13 @@ class IndexerSyncEngine {
                 .catch(async (error) => {
                     console.error(`[IndexerSyncEngine] Failed to process event at block ${event.blockNumber}:`, error);
 
-                    // Record failed event processing
+                    // Record failed event processing. The durable failure record
+                    // itself is written by processEvent's rollback handler
+                    // directly into event_processing_registry, which is the
+                    // single source of truth for event-processing failures.
                     if (this.metrics) {
                         this.metrics.recordEventProcessed(event.eventName, false);
                     }
-
-                    // Store in dead-letter queue for retry
-                    await this._storeFailedEvent(event, error);
 
                     return { success: false, event, error };
                 })
@@ -623,115 +664,120 @@ class IndexerSyncEngine {
         return await Promise.all(results);
     }
 
-    async _storeFailedEvent(event, error) {
-        if (!this.failedEventsTableAvailable) {
-            return;
-        }
+    async _processEvent(event) {
+        return this.processEvent(event);
+    }
 
+    /**
+     * Durably record an event-processing failure in event_processing_registry,
+     * the single source of truth for event failures.
+     *
+     * Runs on a pool connection AFTER the processing transaction rolled back,
+     * so it must UPSERT rather than UPDATE: on the first failure the claim row
+     * was created inside that transaction and no longer exists.
+     *
+     * Identity is chain_id + transaction_hash + log_index (the chain-scoped
+     * unique index from migration 013). The write is idempotent — replaying the
+     * same failure yields the same row — and monotonic in retry_count, so a
+     * concurrent worker can never lower it. A record that another worker has
+     * already completed is never downgraded.
+     */
+    async _recordEventFailure({ event, eventHash, workerId, correlationId, retryCount, status, error }) {
         try {
-            // Calculate exponential backoff retry time
-            const baseDelay = 60000; // 1 minute
-            const maxDelay = 3600000; // 1 hour
-
-            await this.db.query(
-                `INSERT INTO failed_events (
-                    event_name, event_data, block_number, transaction_hash, log_index,
-                    error_message, retry_after
-                ) VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '1 minute')
-                ON CONFLICT (transaction_hash, log_index) DO UPDATE SET
-                    error_count = failed_events.error_count + 1,
-                    last_failed_at = NOW(),
-                    error_message = EXCLUDED.error_message,
-                    retry_after = NOW() + (INTERVAL '1 minute' * POWER(2, LEAST(failed_events.error_count, 6)))`,
+            const rows = await this.db.query(
+                `INSERT INTO event_processing_registry (
+                    event_hash, chain_id, transaction_hash, log_index, event_name,
+                    block_number, processing_status, processing_started_at,
+                    processing_error, retry_count, owner_worker_id,
+                    last_heartbeat_at, correlation_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10, NOW(), $11)
+                ON CONFLICT (chain_id, transaction_hash, log_index) DO UPDATE SET
+                    event_hash = CASE
+                        WHEN event_processing_registry.processing_status = 'completed'
+                        THEN event_processing_registry.event_hash
+                        ELSE EXCLUDED.event_hash END,
+                    processing_status = CASE
+                        WHEN event_processing_registry.processing_status = 'completed'
+                        THEN 'completed'
+                        ELSE EXCLUDED.processing_status END,
+                    processing_error = CASE
+                        WHEN event_processing_registry.processing_status = 'completed'
+                        THEN event_processing_registry.processing_error
+                        ELSE EXCLUDED.processing_error END,
+                    retry_count = CASE
+                        WHEN event_processing_registry.processing_status = 'completed'
+                        THEN event_processing_registry.retry_count
+                        ELSE GREATEST(event_processing_registry.retry_count, EXCLUDED.retry_count) END,
+                    owner_worker_id = CASE
+                        WHEN event_processing_registry.processing_status = 'completed'
+                        THEN event_processing_registry.owner_worker_id
+                        ELSE EXCLUDED.owner_worker_id END,
+                    correlation_id = CASE
+                        WHEN event_processing_registry.processing_status = 'completed'
+                        THEN event_processing_registry.correlation_id
+                        ELSE EXCLUDED.correlation_id END
+                RETURNING processing_status, retry_count`,
                 [
-                    event.eventName,
-                    this._serializeEventData(event.eventData),
-                    event.blockNumber,
+                    eventHash,
+                    this._chainIdString(),
                     event.transactionHash,
                     event.logIndex,
-                    error.message
+                    event.eventName,
+                    event.blockNumber,
+                    status,
+                    String(error?.message || 'Unknown event processing error').slice(0, 2000),
+                    retryCount,
+                    workerId,
+                    correlationId
                 ]
             );
 
-            console.log(`[IndexerSyncEngine] Event stored in dead-letter queue: ${event.transactionHash}:${event.logIndex}`);
-        } catch (dlqError) {
-            if (this._isMissingFailedEventsTable(dlqError)) {
-                this._disableFailedEventsTable('failed-event dead-letter queue');
-                return;
-            }
-
-            console.error(`[IndexerSyncEngine] Failed to store in dead-letter queue:`, dlqError);
+            return rows?.[0] || null;
+        } catch (registryError) {
+            // The failure record itself could not be written. The range still
+            // fails closed, so the cursor does not move and the event is
+            // retried; surface this loudly because health would otherwise not
+            // see this specific failure.
+            console.error(JSON.stringify({
+                event_hash: eventHash,
+                chain_id: this._chainIdString(),
+                transaction_hash: event.transactionHash,
+                log_index: event.logIndex,
+                phase: 'registry_failure_record_failed',
+                error: registryError.message
+            }));
+            return null;
         }
     }
 
-    async retryFailedEvents() {
-        if (!this.failedEventsTableAvailable) {
-            return 0;
-        }
+    /**
+     * Authoritative unresolved event-failure counts for the active chain.
+     * 'failed' is retryable; 'dead' exceeded the retry policy and needs an
+     * operator. Both keep /health degraded.
+     *
+     * Deliberately an aggregate: it returns two integers on an indexed,
+     * chain-scoped GROUP BY instead of selecting every failed row into memory,
+     * so a large backlog can never inflate the health response or its cost.
+     * Per-row detail is an operator SQL query documented in the A9 runbook,
+     * not part of the public health payload.
+     */
+    async getEventFailureCounts() {
+        const rows = await this.db.query(
+            `SELECT processing_status, COUNT(*)::BIGINT AS count
+             FROM event_processing_registry
+             WHERE chain_id = $1
+               AND processing_status IN ('failed', 'dead')
+             GROUP BY processing_status`,
+            [this._chainIdString()]
+        );
 
-        // Retry events that are past their retry_after time
-        let failedEvents = [];
-        try {
-            failedEvents = await this.db.query(
-                `SELECT * FROM failed_events
-                 WHERE NOT resolved AND retry_after <= NOW()
-                 ORDER BY first_failed_at ASC
-                 LIMIT 100`
-            );
-        } catch (error) {
-            if (this._isMissingFailedEventsTable(error)) {
-                this._disableFailedEventsTable('failed-event retry');
-                return 0;
-            }
-
-            throw error;
-        }
-
-        if (failedEvents.length === 0) {
-            return 0;
-        }
-
-        console.log(`[IndexerSyncEngine] Enqueueing ${failedEvents.length} failed events for recovery`);
-
-        let enqueuedCount = 0;
-
-        for (const failed of failedEvents) {
-            try {
-                const event = {
-                    eventName: failed.event_name,
-                    eventData: JSON.parse(failed.event_data),
-                    blockNumber: failed.block_number,
-                    transactionHash: failed.transaction_hash,
-                    logIndex: failed.log_index
-                };
-
-                // Instead of processing locally, we move the work to the recovery queue
-                // This allows us to use distributed locks and avoid double-processing
-                await this.db.query(
-                    `UPDATE failed_events SET resolved = TRUE WHERE id = $1`,
-                    [failed.id]
-                );
-
-                // Use a separate queue for recovery to isolate from main indexer flow
-                const { recoveryQueue } = await import('../queue.js');
-                await recoveryQueue.add('replay-event', { event });
-
-                enqueuedCount++;
-            } catch (error) {
-                if (this._isMissingFailedEventsTable(error)) {
-                    this._disableFailedEventsTable('failed-event retry');
-                    return enqueuedCount;
-                }
-
-                console.error(`[IndexerSyncEngine] Failed to enqueue event ${failed.transaction_hash} for recovery:`, error.message);
+        const counts = { failed: 0, dead: 0 };
+        for (const row of rows || []) {
+            if (row.processing_status in counts) {
+                counts[row.processing_status] = Number(row.count || 0);
             }
         }
-
-        return enqueuedCount;
-    }
-
-    async _processEvent(event) {
-        return this.processEvent(event);
+        return counts;
     }
 
     async processEvent(event) {
@@ -999,22 +1045,21 @@ class IndexerSyncEngine {
                 const maxRetries = 5;
                 const shouldDLQ = retryCount >= maxRetries;
 
-                // Mark as failed (outside transaction, best effort)
-                try {
-                    await this.db.query(
-                        `UPDATE event_processing_registry
-                         SET processing_status = $1,
-                             processing_error = $2
-                         WHERE event_hash = $3`,
-                        [shouldDLQ ? 'dead' : 'failed', error.message, eventHash]
-                    );
-                } catch (registryError) {
-                    console.error(JSON.stringify({
-                        event_hash: eventHash,
-                        phase: 'registry_update_failed',
-                        error: registryError.message
-                    }));
-                }
+                // Durably record the failure on a POOL connection, outside the
+                // rolled-back transaction. A plain UPDATE was silently a no-op
+                // on the first-ever failure: the claim INSERT lives inside the
+                // transaction that just rolled back, so no row existed to
+                // update and the failure vanished. UPSERT on the chain-scoped
+                // identity recreates it.
+                await this._recordEventFailure({
+                    event,
+                    eventHash,
+                    workerId,
+                    correlationId,
+                    retryCount,
+                    status: shouldDLQ ? 'dead' : 'failed',
+                    error
+                });
 
                 console.error(JSON.stringify({
                     ...logData,
@@ -1709,45 +1754,6 @@ class IndexerSyncEngine {
         );
 
         console.log(`[IndexerSyncEngine] Indexed ProjectNFTMinted for ${user}`);
-    }
-
-    async _storeRawEvent(event) {
-        try {
-            await this.db.query(
-                `INSERT INTO contract_events (chain_id, event_name, artwork_id, block_number, transaction_hash, log_index, event_data, indexed_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0))
-                 ON CONFLICT (chain_id, transaction_hash, log_index) DO UPDATE SET indexed_at = EXCLUDED.indexed_at`,
-                [
-                    this._chainIdString(),
-                    event.eventName,
-                    this._getEventArtworkId(event),
-                    event.blockNumber,
-                    event.transactionHash,
-                    event.logIndex,
-                    this._serializeEventData(event.eventData),
-                    this._getEventTimestamp(event)
-                ]
-            );
-        } catch (error) {
-            console.error('[IndexerSyncEngine] Failed to store raw event:', error);
-            await this._logError('STORE_RAW_EVENT', event.blockNumber, event.transactionHash, error.message, event);
-        }
-    }
-
-    async _logError(errorType, blockNumber, transactionHash, errorMessage, errorData) {
-        await this.db.query(
-            `INSERT INTO indexer_errors (chain_id, error_type, block_number, transaction_hash, error_message, error_data, occurred_at)
-             VALUES ($1, $2, $3, $4, $5, $6, to_timestamp($7 / 1000.0))`,
-            [
-                this._chainIdString(),
-                errorType,
-                blockNumber,
-                transactionHash,
-                errorMessage,
-                this._serializeEventData(errorData),
-                Date.now()
-            ]
-        );
     }
 
     async getIndexerState() {
