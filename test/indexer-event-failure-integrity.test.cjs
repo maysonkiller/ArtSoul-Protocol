@@ -25,14 +25,11 @@ const ROOT = path.resolve(__dirname, '..');
 const CHAIN_ID = '84532';
 const OTHER_CHAIN_ID = '11155111';
 
-// processEvent runs a 30-second heartbeat loop and awaits it before returning.
-// Collapse only that exact delay so the suite exercises the real code path
-// without waiting 30 seconds per event. Every other timer is untouched.
-const HEARTBEAT_INTERVAL_MS = 30000;
-const realSetTimeout = global.setTimeout;
-global.setTimeout = function patchedSetTimeout(callback, delay, ...args) {
-    return realSetTimeout(callback, delay === HEARTBEAT_INTERVAL_MS ? 1 : delay, ...args);
-};
+// The global.setTimeout 30000->1 shim this suite used to install is gone:
+// processEvent now wakes its heartbeat sleep during teardown (A-41), so every
+// event returns promptly at the production 30000 ms interval without patching
+// global timers. Cancellation behavior is covered by
+// indexer-heartbeat-cancellation.test.cjs.
 
 function moduleUrl(relativePath) {
     return pathToFileURL(path.join(ROOT, relativePath)).href;
