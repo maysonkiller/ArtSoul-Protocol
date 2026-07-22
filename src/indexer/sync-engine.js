@@ -751,20 +751,33 @@ class IndexerSyncEngine {
     }
 
     /**
-     * Authoritative unresolved event-processing failures for the active chain.
-     * Rows in 'failed' are retryable; rows in 'dead' exceeded the retry policy
-     * and require operator attention. Both keep /health degraded.
+     * Authoritative unresolved event-failure counts for the active chain.
+     * 'failed' is retryable; 'dead' exceeded the retry policy and needs an
+     * operator. Both keep /health degraded.
+     *
+     * Deliberately an aggregate: it returns two integers on an indexed,
+     * chain-scoped GROUP BY instead of selecting every failed row into memory,
+     * so a large backlog can never inflate the health response or its cost.
+     * Per-row detail is an operator SQL query documented in the A9 runbook,
+     * not part of the public health payload.
      */
-    async getUnresolvedEventFailures() {
-        return await this.db.query(
-            `SELECT event_hash, transaction_hash, log_index, event_name, block_number,
-                    processing_status, processing_error, retry_count, processing_started_at
+    async getEventFailureCounts() {
+        const rows = await this.db.query(
+            `SELECT processing_status, COUNT(*)::BIGINT AS count
              FROM event_processing_registry
              WHERE chain_id = $1
                AND processing_status IN ('failed', 'dead')
-             ORDER BY block_number ASC, log_index ASC`,
+             GROUP BY processing_status`,
             [this._chainIdString()]
         );
+
+        const counts = { failed: 0, dead: 0 };
+        for (const row of rows || []) {
+            if (row.processing_status in counts) {
+                counts[row.processing_status] = Number(row.count || 0);
+            }
+        }
+        return counts;
     }
 
     async processEvent(event) {

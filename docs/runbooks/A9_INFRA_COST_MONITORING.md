@@ -110,14 +110,30 @@ table and none is required; creating one is not a remediation step.
 - `/health` `indexer.unresolvedErrors` counts active-chain `failed`/`dead`
   registry rows (plus any legacy `indexer_errors` rows) and forces
   `status: degraded`. The additive `indexer.eventFailures` object breaks it down.
+  Both come from one chain-scoped `GROUP BY` aggregate, never a row scan, so a
+  large failure backlog cannot inflate the health response or its cost.
 - Prometheus exposes `indexer_unresolved_event_failures{status="failed"|"dead"}`
   from the same registry source. The old `indexer_failed_events_queue_size`
   gauge is removed; it reported a constant zero for a table that never existed.
+- The gauge is refreshed on events, never polled: once at indexer startup, and
+  then only after a range that applied events or failed closed. An idle indexer
+  performs zero recurring failure-registry queries, which keeps this feature
+  inside the A9 query budget.
 
-Operator check:
+Operator check (`jq` is not installed on the server, so read the raw JSON or
+parse it with Node):
 
 ```bash
-curl -s localhost:3001/health | jq '.status, .indexer.unresolvedErrors, .indexer.eventFailures'
+curl -s localhost:3001/health
+curl -s localhost:3001/health | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d);console.log(h.status, h.indexer.unresolvedErrors, JSON.stringify(h.indexer.eventFailures), h.indexer.lastIndexedBlock, h.indexer.lastConfirmedBlock);})"
+curl -s localhost:3001/metrics | grep indexer_unresolved_event_failures
+```
+
+Per-row detail is deliberately NOT in the health response. When the counts are
+non-zero, get the offending events with the operator query:
+
+```bash
+psql "$DATABASE_URL" -c "SELECT transaction_hash, log_index, event_name, block_number, retry_count, processing_status, processing_error FROM event_processing_registry WHERE chain_id = 84532 AND processing_status IN ('failed','dead') ORDER BY block_number, log_index LIMIT 50;"
 ```
 
 ## Known non-acceptance path
