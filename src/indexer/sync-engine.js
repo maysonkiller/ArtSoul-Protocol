@@ -34,6 +34,11 @@ class IndexerSyncEngine {
         this.metrics = metrics;
         this.chainId = Number(eventListener?.chainId || process.env.ARTSOUL_INDEXER_CHAIN_ID || process.env.CHAIN_ID || 0);
         this.isRunning = false;
+        // In-flight event ownership heartbeat cadence. This is a test seam
+        // ONLY (so behavioral tests can use a short interval without patching
+        // global timers); it is intentionally not an environment/config knob.
+        // Production always runs at 30000 ms.
+        this.heartbeatIntervalMs = 30000;
 
         console.log('[IndexerSyncEngine] Initialized');
     }
@@ -901,11 +906,35 @@ class IndexerSyncEngine {
             // Start heartbeat loop for long-running processing
             let isShuttingDown = false;
 
+            // Wakeable sleep. The pending interval used to be a plain
+            // setTimeout with no external handle, so shutdown could only set a
+            // flag the loop noticed AFTER the full 30s elapsed — every event,
+            // however fast, blocked ~30s in finally before releasing the pool
+            // connection. Capturing the resolver plus the timer lets finally
+            // wake the sleep immediately. It only ever resolves (never
+            // rejects), so no unhandled rejection can arise, and clearTimeout
+            // frees the event loop so a resolved processEvent leaves no timer.
+            let wakeHeartbeat = null;
+            const heartbeatSleep = () => new Promise(resolve => {
+                const timer = setTimeout(() => {
+                    wakeHeartbeat = null;
+                    resolve();
+                }, this.heartbeatIntervalMs);
+                wakeHeartbeat = () => {
+                    clearTimeout(timer);
+                    wakeHeartbeat = null;
+                    resolve();
+                };
+            });
+
             // Heartbeat loop (async, no setInterval issues)
             const heartbeatLoop = async () => {
                 while (!isShuttingDown) {
-                    await new Promise(resolve => setTimeout(resolve, 30000)); // 30 seconds
+                    await heartbeatSleep();
 
+                    // Re-check after waking: a shutdown wake must never start a
+                    // heartbeat UPDATE. This is the ordering that guarantees no
+                    // heartbeat query begins once processEvent is tearing down.
                     if (isShuttingDown) break;
 
                     try {
@@ -1073,10 +1102,14 @@ class IndexerSyncEngine {
 
                 throw error;
             } finally {
-                // Always stop heartbeat on exit (success, error, or return)
+                // Always stop heartbeat on exit (success, error, or return).
+                // Order matters: set shutdown first so a woken sleep breaks
+                // instead of issuing a late UPDATE, then wake the pending
+                // sleep, then await the loop so any UPDATE already in flight
+                // completes, and only then release the connection.
                 isShuttingDown = true;
+                wakeHeartbeat?.();
 
-                // Wait for heartbeat loop to finish cleanly
                 await heartbeatPromise;
 
                 client.release();
