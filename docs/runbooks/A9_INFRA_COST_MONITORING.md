@@ -73,7 +73,9 @@ Acceptance requires:
 - the month-end Alchemy forecast remains inside the hard free-tier limit with operational headroom;
 - Supabase stays inside the funded plan and Spend Cap remains enabled;
 - every failed health check has a linked incident note and resolution;
-- optional `failed_events` handling is explicitly resolved under backlog item A-15.
+- optional `failed_events` handling is resolved under backlog item A-15: the table
+  is retired, `event_processing_registry` is the single source of truth for
+  event-processing failures, and `/health` reports them (see below).
 
 ## Incident response
 
@@ -83,7 +85,56 @@ Acceptance requires:
 | `BLOCK_LAG` or `SYNC_STATE` | Check public Base Sepolia RPC health, fallback logs, PM2 status, and database health. | If the cursor stops advancing, preserve logs and the current cursor before restart. |
 | `RPC_ERRORS` or Alchemy forecast spike | Look for repeated fallback use and newly introduced polling. | Disable the new consumer or revert its deployment; never raise polling frequency as the first response. |
 | Supabase usage spike | Inspect top egress consumers, cache hit behavior, and recent deployments. | Keep Spend Cap enabled; revert the new uncached consumer before considering a plan change. |
-| `UNRESOLVED_ERRORS` or database failure | Preserve the health JSON and recent PM2/database logs. | Treat as a production incident; do not mark A9 evidence green for that interval. |
+| `UNRESOLVED_ERRORS` or database failure | Preserve the health JSON and recent PM2/database logs. Non-zero `unresolvedErrors` with a non-zero `eventFailures` breakdown means at least one event was scanned but never applied, and the cursor is intentionally stalled. | Treat as a production incident; do not mark A9 evidence green for that interval. |
+| Cursor stalled with `eventFailures.dead` above zero | A poisoned event exhausted the retry policy. Capture the offending `transaction_hash`/`log_index` and `processing_error` from `event_processing_registry` before any change. | Fix the handler defect and redeploy; the range is retried automatically. Never clear the row or advance the cursor to "unstick" the indexer - that reintroduces the silent-skip defect A-15 fixed. |
+
+## Event-failure model (A-15)
+
+The indexer fails closed on event-processing errors. There is no `failed_events`
+table and none is required; creating one is not a remediation step.
+
+- `event_processing_registry` is the single source of truth for event-processing
+  failures, scoped by `chain_id` + `transaction_hash` + `log_index`.
+- A handler failure rolls its transaction back and is then recorded by an UPSERT
+  on a separate connection, so the failure survives the rollback. `retry_count`
+  is monotonic and a `completed` record is never downgraded.
+- A range containing any unprocessed event does not advance
+  `last_indexed_block`, `last_confirmed_block`, `state_hash` or
+  `total_events_indexed`. The next poll re-queries the identical range;
+  already-completed events are skipped idempotently.
+- Confirmation is clamped to `last_indexed_block`, so a stalled range can never
+  be marked reorg-safe.
+- After the existing policy of five retries the record becomes `dead`. It keeps
+  the cursor stalled and `/health` degraded on purpose: a persistently bad event
+  must be visible, never silently skipped.
+- `/health` `indexer.unresolvedErrors` counts active-chain `failed`/`dead`
+  registry rows (plus any legacy `indexer_errors` rows) and forces
+  `status: degraded`. The additive `indexer.eventFailures` object breaks it down.
+  Both come from one chain-scoped `GROUP BY` aggregate, never a row scan, so a
+  large failure backlog cannot inflate the health response or its cost.
+- Prometheus exposes `indexer_unresolved_event_failures{status="failed"|"dead"}`
+  from the same registry source. The old `indexer_failed_events_queue_size`
+  gauge is removed; it reported a constant zero for a table that never existed.
+- The gauge is refreshed on events, never polled: once at indexer startup, and
+  then only after a range that applied events or failed closed. An idle indexer
+  performs zero recurring failure-registry queries, which keeps this feature
+  inside the A9 query budget.
+
+Operator check (`jq` is not installed on the server, so read the raw JSON or
+parse it with Node):
+
+```bash
+curl -s localhost:3001/health
+curl -s localhost:3001/health | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d);console.log(h.status, h.indexer.unresolvedErrors, JSON.stringify(h.indexer.eventFailures), h.indexer.lastIndexedBlock, h.indexer.lastConfirmedBlock);})"
+curl -s localhost:3001/metrics | grep indexer_unresolved_event_failures
+```
+
+Per-row detail is deliberately NOT in the health response. When the counts are
+non-zero, get the offending events with the operator query:
+
+```bash
+psql "$DATABASE_URL" -c "SELECT transaction_hash, log_index, event_name, block_number, retry_count, processing_status, processing_error FROM event_processing_registry WHERE chain_id = 84532 AND processing_status IN ('failed','dead') ORDER BY block_number, log_index LIMIT 50;"
+```
 
 ## Known non-acceptance path
 
