@@ -171,3 +171,14 @@ pm2 status
 ```
 
 The monitor must return `"ok":true`, PM2 must keep `artsoul-base-sepolia` online, and `/health.metrics` must contain numeric `rpcLatencyMs` and `rpcErrorsLastMinute` values without the removed `blocksPerSecond` or `eventsPerSecond` placeholders. No `ALERT_WEBHOOK` setting is required; a leftover setting is ignored and may be removed from the operator-managed environment after the new process is verified.
+
+### Production acceptance evidence
+
+A-40 was accepted on 2026-07-22 UTC after PR #138 was deployed to Hetzner at merge commit `711027b`. The production checks showed:
+
+- `monitor:indexer` returned `ok=true` with Base Sepolia chain ID 84532, confirmation depth 3, eight blocks of lag, synced state, zero unresolved event errors, and zero RPC errors in the rolling one-minute window;
+- `/health` returned `healthy`, `syncThresholdBlocks=20`, `eventFailures={failed:0,dead:0}`, `rpcLatencyMs=137`, and `rpcErrorsLastMinute=0`;
+- the removed `blocksPerSecond` and `eventsPerSecond` placeholders were absent;
+- PM2 kept `artsoul-base-sepolia` online while the retired Ethereum Sepolia process remained stopped.
+
+This evidence closes A-40 only. It does not complete the separate seven-day A9 cost-observation window or the explicit Prometheus credential work tracked as A-42.
