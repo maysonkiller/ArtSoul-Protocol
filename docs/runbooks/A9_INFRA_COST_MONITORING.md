@@ -121,13 +121,33 @@ table and none is required; creating one is not a remediation step.
   inside the A9 query budget.
 
 Operator check (`jq` is not installed on the server, so read the raw JSON or
-parse it with Node):
+parse it with Node). The Prometheus endpoint requires the exact Authorization
+header stored in the PM2 process environment; do not print that value:
 
 ```bash
 curl -s localhost:3001/health
 curl -s localhost:3001/health | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d);console.log(h.status, h.indexer.unresolvedErrors, JSON.stringify(h.indexer.eventFailures), h.indexer.lastIndexedBlock, h.indexer.lastConfirmedBlock);})"
-curl -s localhost:3001/metrics | grep indexer_unresolved_event_failures
+
+PID=$(pm2 pid artsoul-base-sepolia)
+METRICS_AUTH_VALUE=$(tr '\0' '\n' < "/proc/$PID/environ" | sed -n 's/^METRICS_AUTH=//p')
+if [ -z "$METRICS_AUTH_VALUE" ]; then
+  echo "WARNING: METRICS_AUTH is unset; using the legacy local-only fallback until A-42 is complete." >&2
+  METRICS_AUTH_VALUE="Basic $(printf 'admin:changeme' | base64 -w0)"
+fi
+curl -fsS -H "Authorization: $METRICS_AUTH_VALUE" localhost:3001/metrics | grep indexer_unresolved_event_failures
+unset METRICS_AUTH_VALUE
 ```
+
+### Production acceptance evidence (2026-07-22)
+
+PR #136 was deployed to the Hetzner Base Sepolia indexer at merge commit
+`32b2d49`. PM2 remained online and resumed from the existing cursor. The
+post-restart `/health` response was `healthy` with confirmation depth 3,
+`lastIndexedBlock=44468365`, `currentBlock=44468369`, four blocks of lag, zero
+unresolved errors, and `eventFailures={failed:0,dead:0}`. The authenticated
+Prometheus endpoint independently exposed both
+`indexer_unresolved_event_failures` gauges at zero. This accepts A-15; it does
+not by itself complete the separate seven-day A9 cost-observation requirement.
 
 Per-row detail is deliberately NOT in the health response. When the counts are
 non-zero, get the offending events with the operator query:

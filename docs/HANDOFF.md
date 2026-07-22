@@ -120,7 +120,7 @@ Do not alter auction confirmation semantics while fixing observability.
 - Monitor Alchemy for at least seven days after PR #90.
 - Confirm usage trends toward less than 30% of the monthly free tier.
 - Add indexer lag, fallback-RPC, API error, Supabase egress, and PM2 restart alerts.
-- Verify the A-15 fail-closed event-failure model after PR #136 merges. `failed_events` is retired, not created; `event_processing_registry` is the single source of truth and `/health` reports failed/dead events.
+- A-15 is production-verified at merge commit `32b2d49`: `failed_events` is retired, `event_processing_registry` is the fail-closed source of truth, health is healthy, and both failed/dead counts are zero in `/health` and authenticated Prometheus output. Continue with A-40/A-41 and the separate seven-day A9 cost evidence.
 
 ### 7. Complete the Base commitments and beta-entry evidence
 
