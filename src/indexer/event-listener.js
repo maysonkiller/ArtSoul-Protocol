@@ -132,14 +132,25 @@ class EventListener {
     }
 
     /**
-     * Public API for monitoring RPC health
-     * Returns an array of { url, healthScore } for all configured endpoints
+     * Public API for monitoring RPC health.
+     * Error counts use the same rolling 60-second window as the circuit
+     * breaker, so health consumers never rely on a detached scalar counter.
      */
     getRpcHealth() {
-        return this.rpcHealth.map(rpc => ({
-            url: rpc.url,
-            healthScore: rpc.healthScore
-        }));
+        const now = Date.now();
+
+        return this.rpcHealth.map(rpc => {
+            rpc.errorWindow = rpc.errorWindow.filter(
+                timestamp => now - timestamp < rpc.errorWindowDuration
+            );
+
+            return {
+                url: rpc.url,
+                healthScore: rpc.healthScore,
+                avgLatencyMs: rpc.avgLatency,
+                errorsLastMinute: rpc.errorWindow.length
+            };
+        });
     }
 
     /**

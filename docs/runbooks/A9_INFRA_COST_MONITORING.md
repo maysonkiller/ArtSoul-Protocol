@@ -156,6 +156,18 @@ non-zero, get the offending events with the operator query:
 psql "$DATABASE_URL" -c "SELECT transaction_hash, log_index, event_name, block_number, retry_count, processing_status, processing_error FROM event_processing_registry WHERE chain_id = 84532 AND processing_status IN ('failed','dead') ORDER BY block_number, log_index LIMIT 50;"
 ```
 
-## Known non-acceptance path
+## In-process alerting decision
 
-`src/indexer/production-runner.js` contains a legacy `ALERT_WEBHOOK` path, but `_checkAlerts()` is not invoked and its legacy scalar throughput/latency fields are not a verified live signal. It is not production alerting evidence. Backlog item A-40 records the focused decision to remove or rehabilitate that path without mixing it into this cost-monitoring task.
+Backlog item A-40 removed the dormant `ALERT_WEBHOOK` and `_checkAlerts()` path. It was never invoked, used thresholds that did not match the 15-second Base Sepolia polling policy, and therefore could not serve as production alerting evidence. Do not restore it without a separately approved, funded delivery channel and a tested alert policy.
+
+The local health checker remains the no-cost operational path. Its RPC error value now comes from the event listener's maintained rolling 60-second windows, while RPC latency is the highest observed moving average across configured endpoints. The unused block/event throughput placeholders were removed from `/health` instead of continuing to report false zeroes.
+
+After merging the focused A-40 change, deploy it with the standard indexer pull, install, build, and PM2 restart procedure. Acceptance requires all of the following after restart:
+
+```bash
+npm run --silent monitor:indexer
+curl -s http://127.0.0.1:3001/health
+pm2 status
+```
+
+The monitor must return `"ok":true`, PM2 must keep `artsoul-base-sepolia` online, and `/health.metrics` must contain numeric `rpcLatencyMs` and `rpcErrorsLastMinute` values without the removed `blocksPerSecond` or `eventsPerSecond` placeholders. No `ALERT_WEBHOOK` setting is required; a leftover setting is ignored and may be removed from the operator-managed environment after the new process is verified.
