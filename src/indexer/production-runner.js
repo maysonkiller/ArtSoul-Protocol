@@ -44,8 +44,7 @@ function resolveProductionIndexerConfig() {
         healthMaxBlocksBehind: resolveHealthMaxBlocksBehind(
             process.env.INDEXER_HEALTH_MAX_BLOCKS_BEHIND
         ),
-        healthPort: parseInt(process.env.INDEXER_HEALTH_PORT || '3001', 10),
-        alertWebhook: process.env.ALERT_WEBHOOK
+        healthPort: parseInt(process.env.INDEXER_HEALTH_PORT || '3001', 10)
     };
 }
 
@@ -101,35 +100,6 @@ class ProductionIndexer {
         // separate DB query; never corrupts or resets the cursor.
         this.confirmationDepthSyncError = null;
 
-        // Webhook configuration
-        this.alertWebhook = config.alertWebhook || process.env.ALERT_WEBHOOK;
-
-        // Alert deduplication
-        this.alertCooldowns = new Map();
-        this.alertCleanupInterval = 600000; // Clean up every 10 minutes
-        this.lastAlertCleanup = Date.now();
-
-        // Performance tracking (legacy, kept for compatibility)
-        this.perfMetrics = {
-            rpcLatencyMs: 0,
-            eventsPerSecond: 0,
-            blocksPerSecond: 0,
-            rpcErrorsLastMinute: 0,
-            lastErrorTime: 0,
-            lastProgressCheck: Date.now(),
-            lastProgressBlock: 0
-        };
-        // Legacy health/alert paths read scalar values from this.metrics.
-        Object.assign(this.metrics, this.perfMetrics);
-
-        // Alert thresholds
-        this.alertThresholds = {
-            minBlocksPerSecond: 100,
-            maxRpcErrorsPerMinute: 5,
-            maxLatencyMs: 10000,
-            progressCheckInterval: 300000  // 5 minutes
-        };
-
         // Start metrics update loop
         this._startMetricsUpdateLoop();
 
@@ -142,7 +112,6 @@ class ProductionIndexer {
         console.log('  Reorg Sample Size:', this.reorgSampleSize, 'blocks');
         console.log('  Healthy Block Lag:', `< ${this.healthMaxBlocksBehind} blocks`);
         console.log('  Health Port:', config.healthPort);
-        console.log('  Alert Webhook:', this.alertWebhook ? 'Configured' : 'Not configured');
         console.log('  Prometheus Metrics:', 'Enabled');
         console.log('  Distributed Lock:', 'Enabled (multi-instance safe)');
     }
@@ -423,102 +392,6 @@ class ProductionIndexer {
                 error: error.message
             }));
             return null;
-        }
-    }
-
-    /**
-     * Send alert via webhook
-     */
-    async _sendAlert(level, message) {
-        const emoji = {
-            'critical': '',
-            'warning': '',
-            'info': ''
-        };
-
-        const fullMessage = `${emoji[level] || '📢'} [${level.toUpperCase()}] ${message}`;
-
-        // Always log to console
-        if (level === 'critical') {
-            console.error(fullMessage);
-        } else if (level === 'warning') {
-            console.warn(fullMessage);
-        } else {
-            console.log(fullMessage);
-        }
-
-        // Alert deduplication - don't send same alert within 5 minutes
-        const alertKey = `${level}:${message}`;
-        const now = Date.now();
-        const lastSent = this.alertCooldowns.get(alertKey);
-
-        if (lastSent && now - lastSent < 300000) {
-            return;
-        }
-
-        this.alertCooldowns.set(alertKey, now);
-
-        // Cleanup old alerts periodically
-        if (now - this.lastAlertCleanup > this.alertCleanupInterval) {
-            for (const [key, timestamp] of this.alertCooldowns.entries()) {
-                if (now - timestamp > 300000) {
-                    this.alertCooldowns.delete(key);
-                }
-            }
-            this.lastAlertCleanup = now;
-        }
-
-        // Fire-and-forget webhook (don't await, don't block)
-        if (this.alertWebhook) {
-            fetch(this.alertWebhook, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: fullMessage,
-                    level: level,
-                    timestamp: new Date().toISOString(),
-                    indexer: {
-                        contract: this.config.contractAddress,
-                        chainId: this.config.chainId
-                    }
-                })
-            }).catch(error => {
-                console.error('[ALERT] Webhook failed (non-blocking):', error.message);
-            });
-        }
-    }
-
-    /**
-     * Check system health and raise alerts
-     */
-    async _checkAlerts(state) {
-        // Alert: Low throughput
-        if (this.metrics.blocksPerSecond > 0 && this.metrics.blocksPerSecond < this.alertThresholds.minBlocksPerSecond) {
-            await this._sendAlert('warning', `Low throughput: ${this.metrics.blocksPerSecond.toFixed(2)} blocks/sec < ${this.alertThresholds.minBlocksPerSecond}`);
-        }
-
-        // Alert: High RPC error rate
-        if (this.metrics.rpcErrorsLastMinute > this.alertThresholds.maxRpcErrorsPerMinute) {
-            await this._sendAlert('critical', `High RPC error rate: ${this.metrics.rpcErrorsLastMinute} errors/min > ${this.alertThresholds.maxRpcErrorsPerMinute}`);
-        }
-
-        // Alert: High latency
-        if (this.metrics.rpcLatencyMs > this.alertThresholds.maxLatencyMs) {
-            await this._sendAlert('critical', `High RPC latency: ${this.metrics.rpcLatencyMs}ms > ${this.alertThresholds.maxLatencyMs}ms`);
-        }
-
-        // Alert: No progress (stuck) - improved detection
-        const now = Date.now();
-        if (now - this.metrics.lastProgressCheck > this.alertThresholds.progressCheckInterval) {
-            const blockProgress = state.last_indexed_block - this.metrics.lastProgressBlock;
-
-            // Alert if less than 5 blocks progress OR blocks/sec < 1
-            if (blockProgress < 5 || this.metrics.blocksPerSecond < 1) {
-                await this._sendAlert('critical', `Indexer stuck: ${blockProgress} blocks in ${this.alertThresholds.progressCheckInterval / 1000}s (${this.metrics.blocksPerSecond.toFixed(2)} blocks/sec)`);
-            }
-
-            this.metrics.lastProgressCheck = now;
-            this.metrics.lastProgressBlock = state.last_indexed_block;
         }
     }
 
@@ -872,10 +745,15 @@ class ProductionIndexer {
             const unresolvedErrorCount = errors.length + failedEventCount + deadEventCount;
             const hasErrors = unresolvedErrorCount > 0;
 
-            // Reset error counter if last error was >1 minute ago
-            if (Date.now() - this.metrics.lastErrorTime > 60000) {
-                this.metrics.rpcErrorsLastMinute = 0;
-            }
+            const rpcHealth = this.eventListener.getRpcHealth();
+            const rpcLatencyMs = rpcHealth.reduce(
+                (highest, rpc) => Math.max(highest, Number(rpc.avgLatencyMs) || 0),
+                0
+            );
+            const rpcErrorsLastMinute = rpcHealth.reduce(
+                (total, rpc) => total + (Number(rpc.errorsLastMinute) || 0),
+                0
+            );
 
             // Determine overall health status
             let status = 'healthy';
@@ -914,10 +792,8 @@ class ProductionIndexer {
                     }
                 },
                 metrics: {
-                    rpcLatencyMs: Math.round(this.metrics.rpcLatencyMs),
-                    blocksPerSecond: parseFloat(this.metrics.blocksPerSecond.toFixed(2)),
-                    eventsPerSecond: parseFloat(this.metrics.eventsPerSecond.toFixed(2)),
-                    rpcErrorsLastMinute: this.metrics.rpcErrorsLastMinute
+                    rpcLatencyMs: Math.round(rpcLatencyMs),
+                    rpcErrorsLastMinute
                 },
                 uptime: Date.now() - new Date(state.started_at).getTime(),
                 version: state.version || '2.0'
