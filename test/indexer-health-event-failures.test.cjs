@@ -30,15 +30,17 @@ async function getHealth({ eventFailures = { failed: 0, dead: 0 }, indexerErrors
     indexer.confirmationDepth = 3;
     indexer.healthMaxBlocksBehind = 50;
     indexer.confirmationDepthSyncError = null;
-    indexer.metrics = {
-        rpcLatencyMs: 1,
-        blocksPerSecond: 1,
-        eventsPerSecond: 1,
-        rpcErrorsLastMinute: 0,
-        lastErrorTime: 0
-    };
+    indexer.metrics = {};
     indexer.db = { async healthCheck() { return { status: 'ok' }; } };
-    indexer.eventListener = { async getCurrentBlock() { return 1000; } };
+    indexer.eventListener = {
+        async getCurrentBlock() { return 1000; },
+        getRpcHealth() {
+            return [
+                { avgLatencyMs: 125.4, errorsLastMinute: 1 },
+                { avgLatencyMs: 90, errorsLastMinute: 2 }
+            ];
+        }
+    };
     indexer.syncEngine = {
         async getIndexerState() {
             return {
@@ -69,6 +71,10 @@ test('a clean indexer reports healthy with zero unresolved errors', async () => 
     assert.equal(health.status, 'healthy');
     assert.equal(health.indexer.unresolvedErrors, 0);
     assert.deepEqual(health.indexer.eventFailures, { failed: 0, dead: 0 });
+    assert.deepEqual(health.metrics, {
+        rpcLatencyMs: 125,
+        rpcErrorsLastMinute: 3
+    });
 });
 
 test('a failed registry row makes unresolvedErrors non-zero and health degraded', async () => {
