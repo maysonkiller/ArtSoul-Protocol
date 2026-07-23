@@ -6,6 +6,11 @@ import DistributedLock from './distributed-lock.js';
 import { requireEnv, resolveIndexerChainConfigs } from './chain-config.js';
 import { reconcileConfirmationDepth } from './confirmation-depth.js';
 import {
+    resolveMetricsAuth,
+    createIndexerHttpServer,
+    listenAsync
+} from './metrics-auth.js';
+import {
     isIndexerWithinHealthLag,
     resolveHealthMaxBlocksBehind
 } from './health-policy.js';
@@ -28,6 +33,9 @@ function resolveProductionIndexerConfig() {
 
     return {
         databaseUrl: requireEnv(['DATABASE_URL'], 'DATABASE_URL'),
+        // Fail closed here, before ProductionIndexer construction, HTTP listen,
+        // or indexer.start(): a missing/blank METRICS_AUTH aborts startup.
+        metricsAuth: resolveMetricsAuth(process.env),
         rpcUrl: chain.rpcUrl,
         readRpcUrls: chain.readRpcUrls,
         contractAddress: chain.coreAddress,
@@ -833,38 +841,20 @@ async function main() {
             process.exit(0);
         });
 
-        // Health check endpoint (start BEFORE indexer to avoid blocking)
-        const http = await import('http');
-        const server = http.createServer(async (req, res) => {
-            if (req.url === '/health') {
-                const health = await indexer.getHealth();
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(health));
-            } else if (req.url === '/metrics') {
-                // Basic auth for metrics endpoint (security)
-                const authHeader = req.headers.authorization;
-                const expectedAuth = process.env.METRICS_AUTH || 'Basic ' + Buffer.from('admin:changeme').toString('base64');
-
-                if (authHeader !== expectedAuth) {
-                    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Metrics"' });
-                    res.end('Unauthorized');
-                    return;
-                }
-
-                const metrics = await indexer.metrics.getMetrics();
-                res.writeHead(200, { 'Content-Type': indexer.metrics.getContentType() });
-                res.end(metrics);
-            } else {
-                res.writeHead(404);
-                res.end('Not Found');
-            }
-        });
+        // Health/metrics endpoint (start BEFORE indexer to avoid blocking).
+        // The credential was resolved and validated during config resolution
+        // and is passed explicitly; the handler never reads process.env.
+        const server = createIndexerHttpServer(indexer, { metricsAuth: config.metricsAuth });
 
         const healthPort = Number.isFinite(config.healthPort) && config.healthPort > 0
             ? config.healthPort
             : 3001;
 
-        server.on('error', (error) => {
+        // Await a successful loopback bind before starting the indexer. A bind
+        // failure (for example EADDRINUSE) must prevent indexer.start().
+        try {
+            await listenAsync(server, healthPort, '127.0.0.1');
+        } catch (error) {
             if (error.code === 'EADDRINUSE') {
                 console.error(
                     `[ProductionIndexer] Health port ${healthPort} is already in use. ` +
@@ -872,12 +862,9 @@ async function main() {
                 );
             }
             throw error;
-        });
-
-        server.listen(healthPort, () => {
-            console.log(`[ProductionIndexer] Health check endpoint listening on port ${healthPort}`);
-            console.log(`[ProductionIndexer] Prometheus metrics endpoint: http://localhost:${healthPort}/metrics`);
-        });
+        }
+        console.log(`[ProductionIndexer] Health check endpoint listening on http://127.0.0.1:${healthPort}`);
+        console.log(`[ProductionIndexer] Prometheus metrics endpoint: http://127.0.0.1:${healthPort}/metrics`);
 
         // Start indexer (this will block in sync loop)
         await indexer.start();
