@@ -120,23 +120,85 @@ table and none is required; creating one is not a remediation step.
   performs zero recurring failure-registry queries, which keeps this feature
   inside the A9 query budget.
 
+The indexer HTTP endpoint binds to loopback only (`127.0.0.1:3001`). `/health`
+is unauthenticated; `/metrics` requires the exact Authorization header stored in
+`METRICS_AUTH`. There is no fallback credential: the indexer refuses to start if
+`METRICS_AUTH` is missing or blank (A-42). Never expose port 3001 publicly and
+never print the credential.
+
 Operator check (`jq` is not installed on the server, so read the raw JSON or
-parse it with Node). The Prometheus endpoint requires the exact Authorization
-header stored in the PM2 process environment; do not print that value:
+parse it with Node):
 
 ```bash
-curl -s localhost:3001/health
-curl -s localhost:3001/health | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d);console.log(h.status, h.indexer.unresolvedErrors, JSON.stringify(h.indexer.eventFailures), h.indexer.lastIndexedBlock, h.indexer.lastConfirmedBlock);})"
+curl -s http://127.0.0.1:3001/health
+curl -s http://127.0.0.1:3001/health | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d);console.log(h.status, h.indexer.unresolvedErrors, JSON.stringify(h.indexer.eventFailures), h.indexer.lastIndexedBlock, h.indexer.lastConfirmedBlock);})"
 
+# The authenticated /metrics read reuses the running process environment; the
+# value is never printed. If METRICS_AUTH is unset the process would not be
+# running, so an empty value here means a misconfiguration to fix, not a
+# fallback to use.
 PID=$(pm2 pid artsoul-base-sepolia)
 METRICS_AUTH_VALUE=$(tr '\0' '\n' < "/proc/$PID/environ" | sed -n 's/^METRICS_AUTH=//p')
 if [ -z "$METRICS_AUTH_VALUE" ]; then
-  echo "WARNING: METRICS_AUTH is unset; using the legacy local-only fallback until A-42 is complete." >&2
-  METRICS_AUTH_VALUE="Basic $(printf 'admin:changeme' | base64 -w0)"
+  echo "ERROR: METRICS_AUTH is not present in the process environment." >&2
+else
+  curl -fsS -H "Authorization: $METRICS_AUTH_VALUE" http://127.0.0.1:3001/metrics | grep indexer_unresolved_event_failures
 fi
-curl -fsS -H "Authorization: $METRICS_AUTH_VALUE" localhost:3001/metrics | grep indexer_unresolved_event_failures
 unset METRICS_AUTH_VALUE
+
+# Prove the endpoint rejects unauthenticated /metrics (expect 401).
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3001/metrics
 ```
+
+### Metrics credential setup and rotation (A-42)
+
+`METRICS_AUTH` lives in `/opt/artsoul/.env.shared` (host-local, chain-independent,
+sourced by every indexer start script). Because that file is sourced by Bash,
+the value MUST be single-quoted. The procedure below never prints the secret,
+keeps exactly one `METRICS_AUTH` line, writes atomically, and leaves the file
+mode `600`:
+
+```bash
+umask 077
+ENV_FILE=/opt/artsoul/.env.shared
+cp -p "$ENV_FILE" "$ENV_FILE.bak.$(date +%Y%m%d%H%M%S)"
+chmod 600 "$ENV_FILE".bak.* 2>/dev/null || true
+TMP=$(mktemp "$ENV_FILE.XXXXXX")
+# Carry every line except any existing METRICS_AUTH, then append exactly one.
+grep -v '^METRICS_AUTH=' "$ENV_FILE" > "$TMP"
+printf "METRICS_AUTH='Basic %s'\n" "$(printf 'metrics:%s' "$(openssl rand -hex 24)" | base64 -w0)" >> "$TMP"
+chmod 600 "$TMP"
+mv "$TMP" "$ENV_FILE"
+# Verify presence and non-empty state only; never display the value.
+grep -q "^METRICS_AUTH='Basic " "$ENV_FILE" && echo "METRICS_AUTH present" || echo "METRICS_AUTH MISSING"
+test "$(grep -c '^METRICS_AUTH=' "$ENV_FILE")" -eq 1 && echo "exactly one entry" || echo "DUPLICATE entries"
+```
+
+Rollout order (the credential must exist before the new code runs, because the
+new code fails closed without it):
+
+1. Add `METRICS_AUTH` to `/opt/artsoul/.env.shared` with the setup command
+   above, while the current code is still running.
+2. Confirm the sourced environment has a non-empty value without printing it:
+   `set -a; . /opt/artsoul/.env.shared; set +a; [ -n "$METRICS_AUTH" ] && echo present || echo MISSING; unset METRICS_AUTH`.
+3. Merge and pull the new code on the host (`git pull --ff-only origin main`).
+4. Build and test: `npm ci`, `npm run build`, `node --test test/indexer-metrics-auth.test.cjs`.
+5. Restart: `pm2 restart artsoul-base-sepolia --update-env`.
+6. Verify authenticated `/metrics` 200, unauthenticated `/metrics` 401, the
+   loopback bind, `npm run --silent monitor:indexer`, and `pm2 status`.
+7. Run `pm2 save` only after acceptance.
+
+Rollback:
+
+- **Credential rotation rollback:** restore a last-known-good `.env.shared.bak.*`
+  that already contains a valid prior `METRICS_AUTH`, then
+  `pm2 restart artsoul-base-sepolia --update-env`. Do not restore a pre-A-42
+  backup that lacks `METRICS_AUTH` — the current code would fail closed and the
+  process would not start.
+- **Code rollback:** a `git` revert to the previous commit removes the
+  requirement, so the environment and code must be rolled back together and in
+  a coordinated order (revert code first if you must run without the credential,
+  otherwise keep the credential in place). There is no migration to undo.
 
 ### Production acceptance evidence (2026-07-22)
 
