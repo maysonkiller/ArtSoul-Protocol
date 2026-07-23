@@ -49,6 +49,18 @@ async function startServer(overrides = {}) {
     return { server, address, baseUrl: `http://127.0.0.1:${address.port}` };
 }
 
+// Close a server whether or not it ever bound, resolving regardless of state
+// so a test's cleanup can never hang or throw.
+function closeServer(server) {
+    return new Promise((resolve) => {
+        if (!server || !server.listening) {
+            resolve();
+            return;
+        }
+        server.close(() => resolve());
+    });
+}
+
 test('resolveMetricsAuth returns the configured header when present', async () => {
     const { resolveMetricsAuth } = await authModule;
     assert.equal(resolveMetricsAuth({ METRICS_AUTH: SECRET }), SECRET);
@@ -80,6 +92,34 @@ test('createIndexerHttpServer refuses to build without a resolved credential', a
             () => createIndexerHttpServer(stubIndexer(), { metricsAuth: bad }),
             /requires a resolved, non-empty metricsAuth/
         );
+    }
+});
+
+test('listenAsync rejects a bind failure (EADDRINUSE) so the indexer will not start', async () => {
+    const { createIndexerHttpServer, listenAsync } = await authModule;
+    // Two independent servers competing for one loopback port. Two active
+    // listeners on the same 127.0.0.1:port fail with EADDRINUSE on both Linux
+    // and Windows (SO_REUSEADDR permits rebinding a TIME_WAIT socket, not a
+    // second live listener), so this is deterministic and cross-platform.
+    const first = createIndexerHttpServer(stubIndexer(), { metricsAuth: SECRET });
+    const second = createIndexerHttpServer(stubIndexer(), { metricsAuth: SECRET });
+    try {
+        await listenAsync(first, 0, '127.0.0.1');
+        const takenPort = first.address().port;
+
+        await assert.rejects(
+            listenAsync(second, takenPort, '127.0.0.1'),
+            (error) => {
+                assert.equal(error.code, 'EADDRINUSE');
+                return true;
+            }
+        );
+
+        // The rejected server never became a listener.
+        assert.equal(second.listening, false);
+    } finally {
+        await closeServer(second);
+        await closeServer(first);
     }
 });
 
