@@ -120,22 +120,165 @@ table and none is required; creating one is not a remediation step.
   performs zero recurring failure-registry queries, which keeps this feature
   inside the A9 query budget.
 
+The indexer HTTP endpoint binds to loopback only (`127.0.0.1:3001`). `/health`
+is unauthenticated; `/metrics` requires the exact Authorization header stored in
+`METRICS_AUTH`. There is no fallback credential: the indexer refuses to start if
+`METRICS_AUTH` is missing or blank (A-42). Never expose port 3001 publicly and
+never print the credential.
+
 Operator check (`jq` is not installed on the server, so read the raw JSON or
-parse it with Node). The Prometheus endpoint requires the exact Authorization
-header stored in the PM2 process environment; do not print that value:
+parse it with Node):
 
 ```bash
-curl -s localhost:3001/health
-curl -s localhost:3001/health | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d);console.log(h.status, h.indexer.unresolvedErrors, JSON.stringify(h.indexer.eventFailures), h.indexer.lastIndexedBlock, h.indexer.lastConfirmedBlock);})"
+curl -s http://127.0.0.1:3001/health
+curl -s http://127.0.0.1:3001/health | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const h=JSON.parse(d);console.log(h.status, h.indexer.unresolvedErrors, JSON.stringify(h.indexer.eventFailures), h.indexer.lastIndexedBlock, h.indexer.lastConfirmedBlock);})"
 
+# The authenticated /metrics read reuses the running process environment; the
+# value is never printed. If METRICS_AUTH is unset the process would not be
+# running, so an empty value here means a misconfiguration to fix, not a
+# fallback to use.
 PID=$(pm2 pid artsoul-base-sepolia)
 METRICS_AUTH_VALUE=$(tr '\0' '\n' < "/proc/$PID/environ" | sed -n 's/^METRICS_AUTH=//p')
 if [ -z "$METRICS_AUTH_VALUE" ]; then
-  echo "WARNING: METRICS_AUTH is unset; using the legacy local-only fallback until A-42 is complete." >&2
-  METRICS_AUTH_VALUE="Basic $(printf 'admin:changeme' | base64 -w0)"
+  echo "ERROR: METRICS_AUTH is not present in the process environment." >&2
+else
+  curl -fsS -H "Authorization: $METRICS_AUTH_VALUE" http://127.0.0.1:3001/metrics | grep indexer_unresolved_event_failures
 fi
-curl -fsS -H "Authorization: $METRICS_AUTH_VALUE" localhost:3001/metrics | grep indexer_unresolved_event_failures
 unset METRICS_AUTH_VALUE
+
+# Prove the endpoint rejects unauthenticated /metrics (expect 401).
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3001/metrics
+```
+
+### Metrics credential setup and rotation (A-42)
+
+`METRICS_AUTH` lives in `/opt/artsoul/.env.shared` (host-local, chain-independent,
+sourced by every indexer start script). Because that file is sourced by Bash,
+the value MUST be single-quoted. The procedure below never prints the secret,
+keeps exactly one `METRICS_AUTH` line, writes atomically, and leaves the file
+mode `600`:
+
+```bash
+umask 077
+ENV_FILE=/opt/artsoul/.env.shared
+cp -p "$ENV_FILE" "$ENV_FILE.bak.$(date +%Y%m%d%H%M%S)"
+chmod 600 "$ENV_FILE".bak.* 2>/dev/null || true
+TMP=$(mktemp "$ENV_FILE.XXXXXX")
+# Carry every line except any existing METRICS_AUTH, then append exactly one.
+grep -v '^METRICS_AUTH=' "$ENV_FILE" > "$TMP"
+printf "METRICS_AUTH='Basic %s'\n" "$(printf 'metrics:%s' "$(openssl rand -hex 24)" | base64 -w0)" >> "$TMP"
+chmod 600 "$TMP"
+mv "$TMP" "$ENV_FILE"
+# Verify presence and non-empty state only; never display the value.
+grep -q "^METRICS_AUTH='Basic " "$ENV_FILE" && echo "METRICS_AUTH present" || echo "METRICS_AUTH MISSING"
+test "$(grep -c '^METRICS_AUTH=' "$ENV_FILE")" -eq 1 && echo "exactly one entry" || echo "DUPLICATE entries"
+```
+
+Rollout order (the credential must exist before the new code runs, because the
+new code fails closed without it):
+
+1. Add `METRICS_AUTH` to `/opt/artsoul/.env.shared` with the setup command
+   above, while the current code is still running.
+2. Confirm the sourced environment has a non-empty value without printing it:
+   `set -a; . /opt/artsoul/.env.shared; set +a; [ -n "$METRICS_AUTH" ] && echo present || echo MISSING; unset METRICS_AUTH`.
+3. Merge and pull the new code on the host (`git pull --ff-only origin main`).
+4. Build and test: `npm ci`, `npm run build`, `node --test test/indexer-metrics-auth.test.cjs`.
+5. Restart: `pm2 restart artsoul-base-sepolia --update-env`.
+6. Run the acceptance verification block below. It asserts authenticated
+   `/metrics` 200, unauthenticated `/metrics` 401, the loopback-only bind,
+   `npm run --silent monitor:indexer`, and `pm2 status`, and exits non-zero if
+   any check fails.
+7. `pm2 save` is chained behind that block with `&&`, so it runs only on a
+   fully successful acceptance. Never run it manually after a reported FAIL.
+
+Rollback:
+
+- **Credential rotation rollback:** restore a last-known-good `.env.shared.bak.*`
+  that already contains a valid prior `METRICS_AUTH`, then
+  `pm2 restart artsoul-base-sepolia --update-env`. Do not restore a pre-A-42
+  backup that lacks `METRICS_AUTH` — the current code would fail closed and the
+  process would not start.
+- **Code rollback:** a `git` revert to the previous commit removes the
+  requirement, so the environment and code must be rolled back together and in
+  a coordinated order (revert code first if you must run without the credential,
+  otherwise keep the credential in place). There is no migration to undo.
+
+Acceptance verification (copy/paste-safe; reads the credential from the running
+process, asserts each condition, and never echoes the value). Run after the
+restart in step 6.
+
+It runs in a subshell so a failed acceptance cannot close the SSH session, it
+accumulates every failure into an exit status, and `pm2 save` is chained behind
+`&&` so it can only run after a fully successful acceptance. A trap always
+removes the temporary response file and unsets the credential variable, on both
+the success and the failure paths:
+
+```bash
+(
+  set -u
+  STATUS=0
+  TMP_METRICS=$(mktemp)
+  cleanup() { rm -f "$TMP_METRICS"; unset METRICS_AUTH_VALUE; }
+  trap cleanup EXIT
+
+  PID=$(pm2 pid artsoul-base-sepolia)
+  METRICS_AUTH_VALUE=$(tr '\0' '\n' < "/proc/$PID/environ" | sed -n 's/^METRICS_AUTH=//p')
+  if [ -z "$METRICS_AUTH_VALUE" ]; then
+    echo "FAIL: METRICS_AUTH is not present in the process environment" >&2
+    STATUS=1
+  else
+    # Unauthenticated /metrics must be exactly 401.
+    UNAUTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/metrics)
+    if [ "$UNAUTH_CODE" = "401" ]; then
+      echo "OK: unauthenticated /metrics = 401"
+    else
+      echo "FAIL: unauthenticated /metrics = $UNAUTH_CODE (expected 401)" >&2
+      STATUS=1
+    fi
+
+    # Authenticated /metrics must be exactly 200 (body to a temp file, never stdout).
+    AUTH_CODE=$(curl -s -o "$TMP_METRICS" -w '%{http_code}' \
+      -H "Authorization: $METRICS_AUTH_VALUE" http://127.0.0.1:3001/metrics)
+    if [ "$AUTH_CODE" = "200" ]; then
+      echo "OK: authenticated /metrics = 200"
+    else
+      echo "FAIL: authenticated /metrics = $AUTH_CODE (expected 200)" >&2
+      STATUS=1
+    fi
+  fi
+
+  # The only listener on port 3001 must be exactly 127.0.0.1:3001. A public
+  # bind, a missing listener, or any extra/duplicate address fails.
+  LISTEN_ADDRS=$(ss -H -ltn 'sport = :3001' | awk '{print $4}' | sort -u)
+  if [ -z "$LISTEN_ADDRS" ]; then
+    echo "FAIL: nothing is listening on port 3001" >&2
+    STATUS=1
+  elif printf '%s\n' "$LISTEN_ADDRS" | grep -Eq '^(0\.0\.0\.0|\*|\[::\]|::):3001$'; then
+    echo "FAIL: /metrics listener is exposed on a public interface: $LISTEN_ADDRS" >&2
+    STATUS=1
+  elif [ "$LISTEN_ADDRS" != "127.0.0.1:3001" ]; then
+    echo "FAIL: unexpected port 3001 listener address(es): $LISTEN_ADDRS" >&2
+    STATUS=1
+  else
+    echo "OK: port 3001 listener is 127.0.0.1:3001 only"
+  fi
+
+  if npm run --silent monitor:indexer; then
+    echo "OK: monitor:indexer reported success"
+  else
+    echo "FAIL: monitor:indexer returned a non-zero status" >&2
+    STATUS=1
+  fi
+
+  pm2 status
+
+  if [ "$STATUS" -eq 0 ]; then
+    echo "ACCEPTANCE: PASS"
+  else
+    echo "ACCEPTANCE: FAIL - do not run pm2 save" >&2
+  fi
+  exit "$STATUS"
+) && pm2 save
 ```
 
 ### Production acceptance evidence (2026-07-22)

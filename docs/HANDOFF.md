@@ -58,7 +58,7 @@ The wallet isolation bench is intentionally excluded from navigation. Keep it un
 | Indexer path | `/opt/artsoul` |
 | Process manager | PM2 |
 | Active process | `artsoul-base-sepolia` |
-| Health endpoint | `http://127.0.0.1:3001/health` on the indexer host |
+| Health endpoint | `http://127.0.0.1:3001/health` on the indexer host (loopback-only bind; `/metrics` requires `METRICS_AUTH`) |
 | Operational chain | Base Sepolia, chain ID 84532 |
 | Legacy read chain | Ethereum Sepolia, chain ID 11155111, process stopped |
 | Wallet UI | Reown AppKit 1.8.21 plus a dedicated external-mobile WalletConnect core path |
@@ -235,6 +235,12 @@ INDEXER_REORG_SAMPLE_SIZE=12
 ARTSOUL_SKIP_EMPTY_BLOCK_HASH_BACKFILL=1
 INDEXER_HEALTH_PORT=3001
 ```
+
+The indexer HTTP server binds to `127.0.0.1` only; port 3001 is never exposed
+publicly. `METRICS_AUTH` is a required secret in `/opt/artsoul/.env.shared`
+(single-quoted, the full Authorization header for `/metrics`); the indexer fails
+closed and will not start without it. See `runbooks/A9_INFRA_COST_MONITORING.md`
+for setup, rotation, and rollback.
 
 `INDEXER_REORG_CHECK_INTERVAL=60000` means one reorg audit every 60 seconds.
 
