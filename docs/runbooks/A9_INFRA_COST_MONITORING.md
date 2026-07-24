@@ -324,7 +324,7 @@ A-40 was accepted on 2026-07-22 UTC after PR #138 was deployed to Hetzner at mer
 - the removed `blocksPerSecond` and `eventsPerSecond` placeholders were absent;
 - PM2 kept `artsoul-base-sepolia` online while the retired Ethereum Sepolia process remained stopped.
 
-This evidence closes A-40 only. It does not complete the separate seven-day A9 cost-observation window or the explicit Prometheus credential work tracked as A-42.
+This evidence closes A-40 only. It does not complete the separate seven-day A9 cost-observation window.
 
 ### Event heartbeat cancellation acceptance
 
@@ -335,4 +335,27 @@ A-41 was accepted on 2026-07-22 UTC after PR #140 was deployed to Hetzner at mer
 - `/health` returned `healthy`, `syncThresholdBlocks=20`, `eventFailures={failed:0,dead:0}`, `rpcLatencyMs=182`, and `rpcErrorsLastMinute=0`;
 - PM2 kept `artsoul-base-sepolia` online while the retired Ethereum Sepolia process remained stopped.
 
-This closes the blocking-sleep defect only. The heartbeat/reaper transactional visibility mismatch remains a separate planned reliability item, A-43. A9 still requires its seven-day cost evidence and the explicit Prometheus credential follow-up tracked as A-42.
+This closes the blocking-sleep defect only. The heartbeat/reaper transactional visibility mismatch remains a separate planned reliability item, A-43. A9 still requires its seven-day cost evidence.
+
+### Metrics credential and loopback-bind acceptance
+
+A-42 was accepted on 2026-07-24 UTC after PR #142 was deployed to Hetzner at
+merge commit `1c37061`. The production-host checks showed:
+
+- the focused `indexer-metrics-auth` suite passed 15/15 after a clean install and
+  successful 10-route production build;
+- the required `METRICS_AUTH` entry was present exactly once in the
+  operator-managed environment, loaded by the running process, and never printed;
+- unauthenticated `/metrics` returned exactly 401 and authenticated `/metrics`
+  returned exactly 200 while its response body stayed out of the terminal;
+- the only listener on port 3001 was `127.0.0.1:3001`;
+- `monitor:indexer` returned `ok=true` for Base Sepolia chain ID 84532 at
+  confirmation depth 3, with seven blocks of lag, synced state, zero unresolved
+  errors, and zero RPC errors in the rolling one-minute window;
+- PM2 kept `artsoul-base-sepolia` online, kept the retired Ethereum Sepolia
+  process stopped, and saved the process list only after the acceptance block
+  returned `PASS`.
+
+This closes A-42. It does not complete the separate seven-day A9
+Alchemy/Supabase cost-observation requirement, and it does not resolve the
+separate A-43 heartbeat/reaper transactional visibility item.
