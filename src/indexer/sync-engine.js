@@ -7,6 +7,7 @@ import {
 } from './v4-1-event-schema.js';
 import {
     EventProcessingLeaseLostError,
+    EventProcessingLeaseUnavailableError,
     claimEventProcessingLease,
     completeEventProcessingLease,
     recordEventProcessingFailure,
@@ -762,15 +763,25 @@ class IndexerSyncEngine {
         };
 
         if (!lease.acquired) {
+            const alreadyCompleted = lease.status === 'completed';
             console.log(JSON.stringify({
                 ...logData,
-                phase: 'skip',
-                reason: lease.status === 'completed'
+                phase: alreadyCompleted ? 'skip' : 'blocked',
+                reason: alreadyCompleted
                     ? 'already_completed'
                     : 'lease_not_acquired',
                 duration_ms: Date.now() - startTime
             }));
-            return;
+            if (alreadyCompleted) {
+                return;
+            }
+
+            // A committed processing claim can survive a process crash. It is
+            // not safe to count that event as processed: doing so would let the
+            // range cursor advance past projections that never committed.
+            // Fail the range closed until the live owner completes or the
+            // reaper marks the expired lease retryable.
+            throw new EventProcessingLeaseUnavailableError(eventHash, lease.status);
         }
 
         console.log(JSON.stringify({

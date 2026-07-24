@@ -20,6 +20,16 @@ export class EventProcessingLeaseLostError extends Error {
     }
 }
 
+export class EventProcessingLeaseUnavailableError extends Error {
+    constructor(eventHash, status) {
+        super(`Event processing lease unavailable for ${eventHash} (status: ${status})`);
+        this.name = 'EventProcessingLeaseUnavailableError';
+        this.code = 'INDEXER_EVENT_LEASE_UNAVAILABLE';
+        this.eventHash = eventHash;
+        this.status = status;
+    }
+}
+
 export async function claimEventProcessingLease(database, {
     eventHash,
     chainId,
@@ -212,11 +222,11 @@ export async function reapStaleEventProcessingLeases(database, {
             FOR UPDATE SKIP LOCKED
         )
         UPDATE event_processing_registry AS registry
-        SET processing_status = 'pending',
+        SET processing_status = 'failed',
             processing_started_at = NULL,
             owner_worker_id = NULL,
             last_heartbeat_at = NULL,
-            retry_count = registry.retry_count + 1
+            processing_error = 'Event processing lease expired before completion'
         FROM stale
         WHERE registry.event_hash = stale.event_hash
         RETURNING

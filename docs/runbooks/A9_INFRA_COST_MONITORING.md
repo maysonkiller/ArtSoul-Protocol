@@ -369,13 +369,19 @@ connection and are fenced by chain, transaction hash, log index, event hash,
 worker ID and the exact processing-attempt timestamp. Completion and failure
 writes use the same fence, so a reaped or superseded attempt cannot commit,
 downgrade or overwrite a newer attempt even when the same worker ID is reused.
+Only a `completed` lease is an idempotent success. A live or otherwise
+unavailable lease fails the scanned range closed, so an indexer restart cannot
+advance the cursor past projection work that rolled back with the old process.
 
-The reaper selects stale rows with `FOR UPDATE SKIP LOCKED`, clears the expired
-owner and attempt timestamp, and returns the previous owner for structured
-evidence. A row locked by a concurrent terminal update is skipped instead of
-blocking the reaper. PostgreSQL timestamps are carried as exact text across the
-JavaScript boundary so the microsecond-resolution attempt fence is not
-truncated to JavaScript `Date` milliseconds.
+The reaper selects stale rows with `FOR UPDATE SKIP LOCKED`, marks the abandoned
+attempt `failed`, clears its expired owner and attempt timestamp, and returns
+the previous owner for structured evidence. This makes an abandoned attempt
+visible in `/health` and Prometheus before the next scan retries it. Reaping
+does not increment `retry_count`; the next actual lease acquisition increments
+it exactly once. A row locked by a concurrent terminal update is skipped
+instead of blocking the reaper. PostgreSQL timestamps are carried as exact
+text across the JavaScript boundary so the microsecond-resolution attempt
+fence is not truncated to JavaScript `Date` milliseconds.
 
 No database migration is required. The design reuses the existing
 `processing_started_at`, `owner_worker_id`, `last_heartbeat_at`,
