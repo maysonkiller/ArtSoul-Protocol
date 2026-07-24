@@ -359,3 +359,115 @@ merge commit `1c37061`. The production-host checks showed:
 This closes A-42. It does not complete the separate seven-day A9
 Alchemy/Supabase cost-observation requirement, and it does not resolve the
 separate A-43 heartbeat/reaper transactional visibility item.
+
+### Committed event-processing lease rollout
+
+A-43 replaces the transactionally invisible ownership claim with a short,
+autocommitted lease acquisition before projection work begins. The projection
+updates still run in one independent transaction. Heartbeats use a pooled
+connection and are fenced by chain, transaction hash, log index, event hash,
+worker ID and the exact processing-attempt timestamp. Completion and failure
+writes use the same fence, so a reaped or superseded attempt cannot commit,
+downgrade or overwrite a newer attempt even when the same worker ID is reused.
+
+The reaper selects stale rows with `FOR UPDATE SKIP LOCKED`, clears the expired
+owner and attempt timestamp, and returns the previous owner for structured
+evidence. A row locked by a concurrent terminal update is skipped instead of
+blocking the reaper. PostgreSQL timestamps are carried as exact text across the
+JavaScript boundary so the microsecond-resolution attempt fence is not
+truncated to JavaScript `Date` milliseconds.
+
+No database migration is required. The design reuses the existing
+`processing_started_at`, `owner_worker_id`, `last_heartbeat_at`,
+`processing_status` and `retry_count` columns. The 30000 ms heartbeat cadence,
+2-minute lease timeout and existing retry/dead policy are unchanged.
+
+Before restarting production, record the current health and cursor:
+
+```bash
+cd /opt/artsoul
+set -e
+
+git status --short
+curl -s http://127.0.0.1:3001/health
+pm2 status
+
+git pull --ff-only origin main
+npm ci
+npm run build
+node --check src/indexer/event-processing-lease.js
+node --check src/indexer/sync-engine.js
+node --check src/indexer/production-runner.js
+node --test \
+  test/indexer-heartbeat-cancellation.test.cjs \
+  test/indexer-event-failure-integrity.test.cjs
+```
+
+The two disposable PostgreSQL 17 integration suites require Docker and are
+expected to run in Linux CI. They may skip on the production host when Docker is
+not installed; a skip there is not a substitute for green Linux CI.
+
+Restart only after the checks above pass:
+
+```bash
+pm2 restart artsoul-base-sepolia --update-env
+
+npm run --silent monitor:indexer
+curl -s http://127.0.0.1:3001/health
+pm2 status
+pm2 logs artsoul-base-sepolia --lines 120 --nostream
+```
+
+Acceptance requires:
+
+- `monitor:indexer` returns `ok=true`;
+- `/health` remains healthy, confirmation depth remains 3, and the cursor does
+  not regress;
+- `eventFailures.failed` and `eventFailures.dead` remain zero unless a real
+  projection failure is separately investigated;
+- PM2 keeps `artsoul-base-sepolia` online and the retired Ethereum Sepolia
+  process stopped;
+- the post-restart log has no new `heartbeat_error`,
+  `heartbeat_lost_ownership`, `rollback_failed` or
+  `registry_failure_record_failed` entry.
+
+Run this read-only verification in the production Supabase SQL Editor:
+
+```sql
+SELECT
+    processing_status,
+    COUNT(*) AS event_count
+FROM public.event_processing_registry
+WHERE chain_id = 84532
+GROUP BY processing_status
+ORDER BY processing_status;
+
+SELECT
+    event_hash,
+    transaction_hash,
+    log_index,
+    owner_worker_id,
+    processing_started_at,
+    last_heartbeat_at
+FROM public.event_processing_registry
+WHERE chain_id = 84532
+  AND processing_status = 'processing'
+  AND (
+      last_heartbeat_at IS NULL
+      OR last_heartbeat_at < NOW() - INTERVAL '2 minutes'
+  )
+ORDER BY processing_started_at;
+```
+
+The second query must return zero rows after at least 4 minutes, which covers
+the 2-minute lease timeout plus the next 2-minute reaper tick. Save PM2 state
+only after every acceptance check passes:
+
+```bash
+pm2 save
+```
+
+Rollback is code-only because A-43 adds no migration. Revert the merged PR on
+GitHub, pull the reverted `main`, rerun the build and focused tests, restart the
+Base Sepolia process, and repeat the health checks. Do not delete or rewrite
+`event_processing_registry` rows during rollback.

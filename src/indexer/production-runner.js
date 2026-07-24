@@ -14,6 +14,7 @@ import {
     isIndexerWithinHealthLag,
     resolveHealthMaxBlocksBehind
 } from './health-policy.js';
+import { reapStaleEventProcessingLeases } from './event-processing-lease.js';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -217,24 +218,9 @@ class ProductionIndexer {
         // Check for stuck events every 2 minutes
         this.reaperTimer = setInterval(async () => {
             try {
-                // Find events stuck in 'processing' with stale heartbeat (> 2 minutes)
-                // This is better than TTL because it detects actual worker death
-                const stuckEvents = await this.db.query(
-                    `UPDATE event_processing_registry
-                     SET processing_status = 'pending',
-                         processing_started_at = NULL,
-                         owner_worker_id = NULL,
-                         retry_count = retry_count + 1
-                     WHERE chain_id = $1
-                       AND processing_status = 'processing'
-                       AND (
-                           last_heartbeat_at < NOW() - INTERVAL '2 minutes'
-                           OR last_heartbeat_at IS NULL
-                       )
-                     RETURNING event_hash, event_name, retry_count, owner_worker_id,
-                               EXTRACT(EPOCH FROM (NOW() - last_heartbeat_at)) as stale_seconds`,
-                    [this.config.chainId.toString()]
-                );
+                const stuckEvents = await reapStaleEventProcessingLeases(this.db, {
+                    chainId: this.config.chainId.toString()
+                });
 
                 if (stuckEvents.length > 0) {
                     console.warn(JSON.stringify({
@@ -245,7 +231,7 @@ class ProductionIndexer {
                             event_hash: e.event_hash,
                             event_name: e.event_name,
                             retry_count: e.retry_count,
-                            previous_owner: e.owner_worker_id,
+                            previous_owner: e.previous_owner,
                             stale_seconds: Math.floor(e.stale_seconds)
                         }))
                     }));
