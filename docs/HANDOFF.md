@@ -120,7 +120,10 @@ Do not alter auction confirmation semantics while fixing observability.
 - Monitor Alchemy for at least seven days after PR #90.
 - Confirm usage trends toward less than 30% of the monthly free tier.
 - Add indexer lag, fallback-RPC, API error, Supabase egress, and PM2 restart alerts.
-- A-15 is production-verified at merge commit `32b2d49`: `failed_events` is retired, `event_processing_registry` is the fail-closed source of truth, health is healthy, and both failed/dead counts are zero in `/health` and authenticated Prometheus output. Continue with A-40/A-41 and the separate seven-day A9 cost evidence.
+- A-15 is production-verified at merge commit `32b2d49`: `failed_events` is retired, `event_processing_registry` is the fail-closed source of truth, health is healthy, and both failed/dead counts are zero in `/health` and authenticated Prometheus output.
+- A-40 and A-41 are production-verified at merge commits `711027b` and `c1decb2`: the dormant alert path is removed, health metrics use real rolling RPC observations, and the event heartbeat is cancellable.
+- A-42 is production-verified at merge commit `1c37061`: `METRICS_AUTH` is explicit and undisclosed, `/metrics` returns 401 without it and 200 with it, port 3001 is loopback-only, the monitor is green, and PM2 was saved only after acceptance passed.
+- A9 remains open for seven consecutive days of Alchemy/Supabase cost evidence. A-43 remains a separate planned reliability item.
 
 ### 7. Complete the Base commitments and beta-entry evidence
 
