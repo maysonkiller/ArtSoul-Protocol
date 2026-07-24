@@ -184,9 +184,12 @@ new code fails closed without it):
 3. Merge and pull the new code on the host (`git pull --ff-only origin main`).
 4. Build and test: `npm ci`, `npm run build`, `node --test test/indexer-metrics-auth.test.cjs`.
 5. Restart: `pm2 restart artsoul-base-sepolia --update-env`.
-6. Verify authenticated `/metrics` 200, unauthenticated `/metrics` 401, the
-   loopback bind, `npm run --silent monitor:indexer`, and `pm2 status`.
-7. Run `pm2 save` only after acceptance.
+6. Run the acceptance verification block below. It asserts authenticated
+   `/metrics` 200, unauthenticated `/metrics` 401, the loopback-only bind,
+   `npm run --silent monitor:indexer`, and `pm2 status`, and exits non-zero if
+   any check fails.
+7. `pm2 save` is chained behind that block with `&&`, so it runs only on a
+   fully successful acceptance. Never run it manually after a reported FAIL.
 
 Rollback:
 
@@ -202,45 +205,80 @@ Rollback:
 
 Acceptance verification (copy/paste-safe; reads the credential from the running
 process, asserts each condition, and never echoes the value). Run after the
-restart in step 6:
+restart in step 6.
+
+It runs in a subshell so a failed acceptance cannot close the SSH session, it
+accumulates every failure into an exit status, and `pm2 save` is chained behind
+`&&` so it can only run after a fully successful acceptance. A trap always
+removes the temporary response file and unsets the credential variable, on both
+the success and the failure paths:
 
 ```bash
-set -u
-PID=$(pm2 pid artsoul-base-sepolia)
-METRICS_AUTH_VALUE=$(tr '\0' '\n' < "/proc/$PID/environ" | sed -n 's/^METRICS_AUTH=//p')
-if [ -z "$METRICS_AUTH_VALUE" ]; then
-  echo "FAIL: METRICS_AUTH is not present in the process environment" >&2
-else
-  # Unauthenticated /metrics must be exactly 401.
-  UNAUTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/metrics)
-  [ "$UNAUTH_CODE" = "401" ] && echo "OK: unauthenticated /metrics = 401" \
-    || echo "FAIL: unauthenticated /metrics = $UNAUTH_CODE" >&2
-
-  # Authenticated /metrics must be exactly 200 (body to a temp file, never stdout).
+(
+  set -u
+  STATUS=0
   TMP_METRICS=$(mktemp)
-  AUTH_CODE=$(curl -s -o "$TMP_METRICS" -w '%{http_code}' \
-    -H "Authorization: $METRICS_AUTH_VALUE" http://127.0.0.1:3001/metrics)
-  [ "$AUTH_CODE" = "200" ] && echo "OK: authenticated /metrics = 200" \
-    || echo "FAIL: authenticated /metrics = $AUTH_CODE" >&2
-  rm -f "$TMP_METRICS"
-fi
-unset METRICS_AUTH_VALUE AUTH_CODE UNAUTH_CODE
+  cleanup() { rm -f "$TMP_METRICS"; unset METRICS_AUTH_VALUE; }
+  trap cleanup EXIT
 
-# The only listener on port 3001 must be 127.0.0.1:3001; fail on any public bind.
-LISTEN_ADDRS=$(ss -H -ltn 'sport = :3001' | awk '{print $4}' | sort -u)
-if printf '%s\n' "$LISTEN_ADDRS" | grep -Eq '^(0\.0\.0\.0|\*|\[::\]|::):3001$'; then
-  echo "FAIL: /metrics listener is exposed on a public interface: $LISTEN_ADDRS" >&2
-elif [ "$LISTEN_ADDRS" = "127.0.0.1:3001" ]; then
-  echo "OK: port 3001 listener is 127.0.0.1:3001 only"
-else
-  echo "FAIL: unexpected port 3001 listener address(es): ${LISTEN_ADDRS:-none}" >&2
-fi
-unset LISTEN_ADDRS
+  PID=$(pm2 pid artsoul-base-sepolia)
+  METRICS_AUTH_VALUE=$(tr '\0' '\n' < "/proc/$PID/environ" | sed -n 's/^METRICS_AUTH=//p')
+  if [ -z "$METRICS_AUTH_VALUE" ]; then
+    echo "FAIL: METRICS_AUTH is not present in the process environment" >&2
+    STATUS=1
+  else
+    # Unauthenticated /metrics must be exactly 401.
+    UNAUTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/metrics)
+    if [ "$UNAUTH_CODE" = "401" ]; then
+      echo "OK: unauthenticated /metrics = 401"
+    else
+      echo "FAIL: unauthenticated /metrics = $UNAUTH_CODE (expected 401)" >&2
+      STATUS=1
+    fi
 
-# Monitor and process status.
-npm run --silent monitor:indexer
-pm2 status
-set +u
+    # Authenticated /metrics must be exactly 200 (body to a temp file, never stdout).
+    AUTH_CODE=$(curl -s -o "$TMP_METRICS" -w '%{http_code}' \
+      -H "Authorization: $METRICS_AUTH_VALUE" http://127.0.0.1:3001/metrics)
+    if [ "$AUTH_CODE" = "200" ]; then
+      echo "OK: authenticated /metrics = 200"
+    else
+      echo "FAIL: authenticated /metrics = $AUTH_CODE (expected 200)" >&2
+      STATUS=1
+    fi
+  fi
+
+  # The only listener on port 3001 must be exactly 127.0.0.1:3001. A public
+  # bind, a missing listener, or any extra/duplicate address fails.
+  LISTEN_ADDRS=$(ss -H -ltn 'sport = :3001' | awk '{print $4}' | sort -u)
+  if [ -z "$LISTEN_ADDRS" ]; then
+    echo "FAIL: nothing is listening on port 3001" >&2
+    STATUS=1
+  elif printf '%s\n' "$LISTEN_ADDRS" | grep -Eq '^(0\.0\.0\.0|\*|\[::\]|::):3001$'; then
+    echo "FAIL: /metrics listener is exposed on a public interface: $LISTEN_ADDRS" >&2
+    STATUS=1
+  elif [ "$LISTEN_ADDRS" != "127.0.0.1:3001" ]; then
+    echo "FAIL: unexpected port 3001 listener address(es): $LISTEN_ADDRS" >&2
+    STATUS=1
+  else
+    echo "OK: port 3001 listener is 127.0.0.1:3001 only"
+  fi
+
+  if npm run --silent monitor:indexer; then
+    echo "OK: monitor:indexer reported success"
+  else
+    echo "FAIL: monitor:indexer returned a non-zero status" >&2
+    STATUS=1
+  fi
+
+  pm2 status
+
+  if [ "$STATUS" -eq 0 ]; then
+    echo "ACCEPTANCE: PASS"
+  else
+    echo "ACCEPTANCE: FAIL - do not run pm2 save" >&2
+  fi
+  exit "$STATUS"
+) && pm2 save
 ```
 
 ### Production acceptance evidence (2026-07-22)
