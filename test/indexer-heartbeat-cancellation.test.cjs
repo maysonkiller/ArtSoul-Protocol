@@ -9,10 +9,9 @@
 //
 // These tests drive the REAL processEvent against a minimal fake database and
 // a controllable handler, and use the instance `heartbeatIntervalMs` seam so
-// no global timer is patched. They assert prompt return, cadence of the
-// heartbeat ATTEMPT (not that it is an effective keep-alive - see A-43), clean
-// cancellation with no late query, lost-ownership shutdown, and exactly-once
-// connection release.
+// no global timer is patched. They assert prompt return, effective heartbeat
+// cadence, clean cancellation with no late query, fenced lost-ownership
+// shutdown, and exactly-once connection release.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -56,13 +55,14 @@ function validEvent(index = 1) {
 
 // Minimal PostgreSQL stand-in covering exactly the statements processEvent
 // issues. It counts heartbeat UPDATEs and client releases, and lets each test
-// choose the rowCount the heartbeat query returns.
+// choose whether the owner-fenced heartbeat succeeds.
 function createFakeDb({ heartbeatRowCount = 1 } = {}) {
+    const registry = new Map();
     const calls = {
         heartbeatQueries: 0,
         releases: 0,
         completedUpdates: 0,
-        failureUpserts: []
+        failureUpdates: []
     };
 
     function runQuery(sql, params) {
@@ -71,23 +71,65 @@ function createFakeDb({ heartbeatRowCount = 1 } = {}) {
         if (/SELECT block_hash FROM block_hashes/i.test(sql)) return [];
 
         if (/INSERT INTO event_processing_registry/i.test(sql)) {
-            if (/RETURNING processing_status, retry_count, owner_worker_id/i.test(sql)) {
-                // Fresh claim: this worker owns a brand-new processing row.
-                return { rows: [{ processing_status: 'processing', retry_count: 0, owner_worker_id: params[6] }] };
-            }
-            // Out-of-transaction failure UPSERT.
-            calls.failureUpserts.push({ status: params[6], at: Date.now() });
-            return [{ processing_status: params[6], retry_count: Number(params[8]) || 0 }];
+            const row = {
+                event_hash: params[0],
+                chain_id: String(params[1]),
+                transaction_hash: params[2],
+                log_index: Number(params[3]),
+                processing_status: 'processing',
+                retry_count: 0,
+                owner_worker_id: params[6],
+                processing_started_at: new Date().toISOString()
+            };
+            registry.set(`${params[1]}:${params[2]}:${params[3]}`, row);
+            return [row];
         }
 
-        if (/UPDATE event_processing_registry/i.test(sql) && /last_heartbeat_at = NOW\(\)/i.test(sql)) {
+        if (/SELECT processing_status, retry_count, owner_worker_id, processing_started_at/i.test(sql)) {
+            const row = registry.get(`${params[0]}:${params[1]}:${params[2]}`);
+            return row ? [row] : [];
+        }
+
+        if (/UPDATE event_processing_registry/i.test(sql) && /SET last_heartbeat_at = clock_timestamp\(\)/i.test(sql)) {
             calls.heartbeatQueries += 1;
-            return { rowCount: heartbeatRowCount, rows: [] };
+            const row = registry.get(`${params[0]}:${params[1]}:${params[2]}`);
+            if (!heartbeatRowCount || !row) {
+                if (row) {
+                    row.processing_status = 'pending';
+                    row.owner_worker_id = null;
+                    row.processing_started_at = null;
+                }
+                return [];
+            }
+            return [{ event_hash: row.event_hash }];
         }
 
         if (/UPDATE event_processing_registry/i.test(sql) && /processing_status = 'completed'/i.test(sql)) {
             calls.completedUpdates += 1;
-            return { rows: [] };
+            const row = registry.get(`${params[0]}:${params[1]}:${params[2]}`);
+            if (!row ||
+                row.event_hash !== params[3] ||
+                row.owner_worker_id !== params[4] ||
+                row.processing_started_at !== params[5] ||
+                row.processing_status !== 'processing') {
+                return [];
+            }
+            row.processing_status = 'completed';
+            return [{ event_hash: row.event_hash }];
+        }
+
+        if (/UPDATE event_processing_registry/i.test(sql) && /SET processing_status = \$7/i.test(sql)) {
+            const row = registry.get(`${params[0]}:${params[1]}:${params[2]}`);
+            if (!row ||
+                row.event_hash !== params[3] ||
+                row.owner_worker_id !== params[4] ||
+                row.processing_started_at !== params[5] ||
+                row.processing_status !== 'processing') {
+                return [];
+            }
+            row.processing_status = params[6];
+            calls.failureUpdates.push({ status: params[6], at: Date.now() });
+            return [{ processing_status: row.processing_status, retry_count: row.retry_count }];
         }
 
         if (/INSERT INTO contract_events/i.test(sql)) return { rows: [] };
@@ -172,16 +214,13 @@ test('a failed event returns promptly after the failure record is persisted', as
 
     assert.ok(elapsed < 5000, `failed processEvent should return promptly, took ${elapsed}ms`);
     // The durable failure record was written before processEvent settled.
-    assert.equal(db.calls.failureUpserts.length, 1);
-    assert.equal(db.calls.failureUpserts[0].status, 'failed');
+    assert.equal(db.calls.failureUpdates.length, 1);
+    assert.equal(db.calls.failureUpdates[0].status, 'failed');
     assert.equal(db.calls.completedUpdates, 0);
     assert.equal(db.calls.releases, 1);
 });
 
-test('a long-running handler still attempts the heartbeat query at the configured cadence', async () => {
-    // NOTE: this proves the heartbeat query is ISSUED at the cadence, not that
-    // it is an effective PostgreSQL keep-alive. The separate-connection /
-    // uncommitted-row visibility mismatch is tracked by backlog item A-43.
+test('a long-running handler refreshes its committed processing lease at the configured cadence', async () => {
     const handlerGate = deferred();
     const { engine, db } = await createEngine({
         heartbeatIntervalMs: 25,
@@ -216,16 +255,10 @@ test('cancellation clears the pending timer and issues no late heartbeat query',
     assert.equal(db.calls.releases, 1);
 });
 
-test('the lost-ownership guard remains present and the loop stays stable across intervals', async () => {
-    // The lost-ownership guard reads `result.rowCount === 0`. In production
-    // `this.db.query` returns `result.rows` (a plain array with no rowCount),
-    // so this guard is latent today — a real zero-row heartbeat is not
-    // observed and the loop keeps beating. A-41 does not touch that path (it
-    // is the ownership/visibility mismatch tracked by A-43); this test pins
-    // the branch's presence in source and proves the long-running loop stays
-    // stable and releases exactly once regardless.
+test('lost ownership stops the heartbeat and prevents the stale attempt from committing', async () => {
     const source = fs.readFileSync(path.join(ROOT, 'src/indexer/sync-engine.js'), 'utf8');
-    assert.match(source, /if \(result\.rowCount === 0\) \{[\s\S]*?isShuttingDown = true;[\s\S]*?break;/);
+    assert.doesNotMatch(source, /result\.rowCount/);
+    assert.match(source, /if \(!refreshed\) \{[\s\S]*?leaseLost = true;[\s\S]*?break;/);
 
     const handlerGate = deferred();
     const { engine, db } = await createEngine({
@@ -238,11 +271,13 @@ test('the lost-ownership guard remains present and the loop stays stable across 
     await new Promise(resolve => setTimeout(resolve, 130));
     const midFlightHeartbeats = db.calls.heartbeatQueries;
     handlerGate.resolve();
-    await processing;
+    await assert.rejects(
+        processing,
+        error => error.code === 'INDEXER_EVENT_LEASE_LOST'
+    );
 
-    // Faithful to production array-return semantics: the loop keeps attempting
-    // heartbeats rather than terminating, and never destabilizes.
-    assert.ok(midFlightHeartbeats >= 1, `expected heartbeat attempts, saw ${midFlightHeartbeats}`);
+    assert.equal(midFlightHeartbeats, 1);
+    assert.equal(db.calls.completedUpdates, 0);
     assert.equal(db.calls.releases, 1);
 });
 

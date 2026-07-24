@@ -5,6 +5,13 @@ import {
     V41_GLOBAL_STATS_EVENTS,
     canonicalArtworkId
 } from './v4-1-event-schema.js';
+import {
+    EventProcessingLeaseLostError,
+    claimEventProcessingLease,
+    completeEventProcessingLease,
+    recordEventProcessingFailure,
+    refreshEventProcessingLease
+} from './event-processing-lease.js';
 
 // Structured failure raised when a historical range could not be fully
 // processed. The caller must NOT advance any cursor for that range; the next
@@ -674,80 +681,19 @@ class IndexerSyncEngine {
     }
 
     /**
-     * Durably record an event-processing failure in event_processing_registry,
-     * the single source of truth for event failures.
-     *
-     * Runs on a pool connection AFTER the processing transaction rolled back,
-     * so it must UPSERT rather than UPDATE: on the first failure the claim row
-     * was created inside that transaction and no longer exists.
-     *
-     * Identity is chain_id + transaction_hash + log_index (the chain-scoped
-     * unique index from migration 013). The write is idempotent — replaying the
-     * same failure yields the same row — and monotonic in retry_count, so a
-     * concurrent worker can never lower it. A record that another worker has
-     * already completed is never downgraded.
+     * Durably record a failure only while this exact processing lease remains
+     * current. A stale attempt must never overwrite a newer owner or completed
+     * work.
      */
-    async _recordEventFailure({ event, eventHash, workerId, correlationId, retryCount, status, error }) {
+    async _recordEventFailure({ lease, status, error }) {
         try {
-            const rows = await this.db.query(
-                `INSERT INTO event_processing_registry (
-                    event_hash, chain_id, transaction_hash, log_index, event_name,
-                    block_number, processing_status, processing_started_at,
-                    processing_error, retry_count, owner_worker_id,
-                    last_heartbeat_at, correlation_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10, NOW(), $11)
-                ON CONFLICT (chain_id, transaction_hash, log_index) DO UPDATE SET
-                    event_hash = CASE
-                        WHEN event_processing_registry.processing_status = 'completed'
-                        THEN event_processing_registry.event_hash
-                        ELSE EXCLUDED.event_hash END,
-                    processing_status = CASE
-                        WHEN event_processing_registry.processing_status = 'completed'
-                        THEN 'completed'
-                        ELSE EXCLUDED.processing_status END,
-                    processing_error = CASE
-                        WHEN event_processing_registry.processing_status = 'completed'
-                        THEN event_processing_registry.processing_error
-                        ELSE EXCLUDED.processing_error END,
-                    retry_count = CASE
-                        WHEN event_processing_registry.processing_status = 'completed'
-                        THEN event_processing_registry.retry_count
-                        ELSE GREATEST(event_processing_registry.retry_count, EXCLUDED.retry_count) END,
-                    owner_worker_id = CASE
-                        WHEN event_processing_registry.processing_status = 'completed'
-                        THEN event_processing_registry.owner_worker_id
-                        ELSE EXCLUDED.owner_worker_id END,
-                    correlation_id = CASE
-                        WHEN event_processing_registry.processing_status = 'completed'
-                        THEN event_processing_registry.correlation_id
-                        ELSE EXCLUDED.correlation_id END
-                RETURNING processing_status, retry_count`,
-                [
-                    eventHash,
-                    this._chainIdString(),
-                    event.transactionHash,
-                    event.logIndex,
-                    event.eventName,
-                    event.blockNumber,
-                    status,
-                    String(error?.message || 'Unknown event processing error').slice(0, 2000),
-                    retryCount,
-                    workerId,
-                    correlationId
-                ]
-            );
-
-            return rows?.[0] || null;
+            return await recordEventProcessingFailure(this.db, lease, { status, error });
         } catch (registryError) {
-            // The failure record itself could not be written. The range still
-            // fails closed, so the cursor does not move and the event is
-            // retried; surface this loudly because health would otherwise not
-            // see this specific failure.
             console.error(JSON.stringify({
-                event_hash: eventHash,
+                event_hash: lease.eventHash,
                 chain_id: this._chainIdString(),
-                transaction_hash: event.transactionHash,
-                log_index: event.logIndex,
+                transaction_hash: lease.transactionHash,
+                log_index: lease.logIndex,
                 phase: 'registry_failure_record_failed',
                 error: registryError.message
             }));
@@ -786,334 +732,245 @@ class IndexerSyncEngine {
     }
 
     async processEvent(event) {
-        // Compute event hash for idempotency
         const eventHash = await this._computeEventHash(event);
-
-        // Wrap in transaction for atomicity
-        const client = await this.db.pool.connect();
         const workerId = process.env.WORKER_ID || `worker-${process.pid}`;
         const correlationId = `${event.transactionHash}-${event.logIndex}`;
         const startTime = Date.now();
+        const lease = await claimEventProcessingLease(this.db, {
+            eventHash,
+            chainId: this._chainIdString(),
+            transactionHash: event.transactionHash,
+            logIndex: event.logIndex,
+            eventName: event.eventName,
+            blockNumber: event.blockNumber,
+            workerId,
+            correlationId
+        });
 
-        await client.query('BEGIN');
+        const logData = {
+            event_hash: eventHash,
+            tx_hash: event.transactionHash,
+            log_index: event.logIndex,
+            event_name: event.eventName,
+            block_number: event.blockNumber,
+            worker_id: workerId,
+            owner_worker_id: lease.workerId,
+            processing_status: lease.status,
+            retry_count: lease.retryCount,
+            correlation_id: correlationId,
+            phase: 'acquire_lease'
+        };
 
-            // Try to acquire lock on event (atomic ownership)
-            const lock = await client.query(
-                `INSERT INTO event_processing_registry (
-                    event_hash, chain_id, transaction_hash, log_index, event_name, block_number,
-                    processing_status, processing_started_at, owner_worker_id,
-                    last_heartbeat_at, correlation_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, 'processing', NOW(), $7, NOW(), $8)
-                ON CONFLICT (chain_id, transaction_hash, log_index) DO UPDATE SET
-                    event_hash = EXCLUDED.event_hash,
-                    processing_status = CASE
-                        WHEN event_processing_registry.processing_status = 'completed' THEN 'completed'
-                        WHEN event_processing_registry.processing_status = 'processing'
-                             AND event_processing_registry.last_heartbeat_at > NOW() - INTERVAL '2 minutes'
-                             THEN event_processing_registry.processing_status
-                        ELSE 'processing'
-                    END,
-                    owner_worker_id = CASE
-                        WHEN event_processing_registry.processing_status = 'completed' THEN event_processing_registry.owner_worker_id
-                        WHEN event_processing_registry.processing_status = 'processing'
-                             AND event_processing_registry.last_heartbeat_at > NOW() - INTERVAL '2 minutes'
-                             THEN event_processing_registry.owner_worker_id
-                        ELSE $7
-                    END,
-                    processing_started_at = CASE
-                        WHEN event_processing_registry.processing_status = 'completed' THEN event_processing_registry.processing_started_at
-                        WHEN event_processing_registry.processing_status = 'processing'
-                             AND event_processing_registry.last_heartbeat_at > NOW() - INTERVAL '2 minutes'
-                             THEN event_processing_registry.processing_started_at
-                        ELSE NOW()
-                    END,
-                    last_heartbeat_at = CASE
-                        WHEN event_processing_registry.processing_status = 'completed' THEN event_processing_registry.last_heartbeat_at
-                        WHEN event_processing_registry.processing_status = 'processing'
-                             AND event_processing_registry.last_heartbeat_at > NOW() - INTERVAL '2 minutes'
-                             THEN event_processing_registry.last_heartbeat_at
-                        ELSE NOW()
-                    END,
-                    retry_count = CASE
-                        WHEN event_processing_registry.processing_status = 'completed' THEN event_processing_registry.retry_count
-                        ELSE event_processing_registry.retry_count + 1
-                    END
-                RETURNING processing_status, retry_count, owner_worker_id`,
-                [
-                    eventHash,
-                    this._chainIdString(),
-                    event.transactionHash,
-                    event.logIndex,
-                    event.eventName,
-                    event.blockNumber,
-                    workerId,
-                    correlationId
-                ]
-            );
-
-            const status = lock.rows[0].processing_status;
-            const retryCount = lock.rows[0].retry_count;
-            const ownerWorkerId = lock.rows[0].owner_worker_id;
-
-            // Structured logging
-            const logData = {
-                event_hash: eventHash,
-                tx_hash: event.transactionHash,
-                log_index: event.logIndex,
-                event_name: event.eventName,
-                block_number: event.blockNumber,
-                worker_id: workerId,
-                owner_worker_id: ownerWorkerId,
-                processing_status: status,
-                retry_count: retryCount,
-                correlation_id: correlationId,
-                phase: 'acquire_lock'
-            };
-
-            // If already completed, skip
-            if (status === 'completed') {
-                await client.query('ROLLBACK');
-                client.release();
-                console.log(JSON.stringify({
-                    ...logData,
-                    phase: 'skip',
-                    reason: 'already_completed',
-                    duration_ms: Date.now() - startTime
-                }));
-                return;
-            }
-
-            // If currently processing by another worker, skip
-            if (status === 'processing' && ownerWorkerId !== workerId) {
-                await client.query('ROLLBACK');
-                client.release();
-                console.log(JSON.stringify({
-                    ...logData,
-                    phase: 'skip',
-                    reason: 'owned_by_other_worker',
-                    duration_ms: Date.now() - startTime
-                }));
-                return;
-            }
-
-            // Now we have exclusive ownership within this transaction
+        if (!lease.acquired) {
             console.log(JSON.stringify({
                 ...logData,
-                phase: 'process',
-                message: 'Processing event'
+                phase: 'skip',
+                reason: lease.status === 'completed'
+                    ? 'already_completed'
+                    : 'lease_not_acquired',
+                duration_ms: Date.now() - startTime
             }));
+            return;
+        }
 
-            // Start heartbeat loop for long-running processing
-            let isShuttingDown = false;
+        console.log(JSON.stringify({
+            ...logData,
+            phase: 'process',
+            message: 'Processing event'
+        }));
 
-            // Wakeable sleep. The pending interval used to be a plain
-            // setTimeout with no external handle, so shutdown could only set a
-            // flag the loop noticed AFTER the full 30s elapsed — every event,
-            // however fast, blocked ~30s in finally before releasing the pool
-            // connection. Capturing the resolver plus the timer lets finally
-            // wake the sleep immediately. It only ever resolves (never
-            // rejects), so no unhandled rejection can arise, and clearTimeout
-            // frees the event loop so a resolved processEvent leaves no timer.
-            let wakeHeartbeat = null;
-            const heartbeatSleep = () => new Promise(resolve => {
-                const timer = setTimeout(() => {
-                    wakeHeartbeat = null;
-                    resolve();
-                }, this.heartbeatIntervalMs);
-                wakeHeartbeat = () => {
-                    clearTimeout(timer);
-                    wakeHeartbeat = null;
-                    resolve();
-                };
-            });
+        let client = null;
+        let transactionStarted = false;
+        let isShuttingDown = false;
+        let wakeHeartbeat = null;
+        let leaseLost = false;
 
-            // Heartbeat loop (async, no setInterval issues)
-            const heartbeatLoop = async () => {
-                while (!isShuttingDown) {
-                    await heartbeatSleep();
+        const heartbeatSleep = () => new Promise(resolve => {
+            const timer = setTimeout(() => {
+                wakeHeartbeat = null;
+                resolve();
+            }, this.heartbeatIntervalMs);
+            wakeHeartbeat = () => {
+                clearTimeout(timer);
+                wakeHeartbeat = null;
+                resolve();
+            };
+        });
 
-                    // Re-check after waking: a shutdown wake must never start a
-                    // heartbeat UPDATE. This is the ordering that guarantees no
-                    // heartbeat query begins once processEvent is tearing down.
-                    if (isShuttingDown) break;
+        const heartbeatPromise = (async () => {
+            while (!isShuttingDown) {
+                await heartbeatSleep();
+                if (isShuttingDown) break;
 
-                    try {
-                        const result = await this.db.query(
-                            `UPDATE event_processing_registry
-                             SET last_heartbeat_at = NOW()
-                             WHERE event_hash = $1 AND owner_worker_id = $2`,
-                            [eventHash, workerId]
-                        );
-
-                        // Check if we still own this event
-                        if (result.rowCount === 0) {
-                            console.error(JSON.stringify({
-                                event_hash: eventHash,
-                                worker_id: workerId,
-                                phase: 'heartbeat_lost_ownership',
-                                message: 'Lost ownership, stopping heartbeat'
-                            }));
-                            isShuttingDown = true;
-                            break;
-                        }
-                    } catch (error) {
+                try {
+                    const refreshed = await refreshEventProcessingLease(this.db, lease);
+                    if (!refreshed) {
+                        leaseLost = true;
                         console.error(JSON.stringify({
                             event_hash: eventHash,
                             worker_id: workerId,
-                            phase: 'heartbeat_error',
-                            error: error.message
+                            phase: 'heartbeat_lost_ownership',
+                            message: 'Lost processing lease, stopping heartbeat'
                         }));
+                        break;
+                    }
+                } catch (error) {
+                    console.error(JSON.stringify({
+                        event_hash: eventHash,
+                        worker_id: workerId,
+                        phase: 'heartbeat_error',
+                        error: error.message
+                    }));
+                }
+            }
+        })();
+
+        let heartbeatStopped = false;
+        const stopHeartbeat = async () => {
+            if (heartbeatStopped) return;
+            heartbeatStopped = true;
+            isShuttingDown = true;
+            wakeHeartbeat?.();
+            await heartbeatPromise;
+        };
+
+        try {
+            client = await this.db.pool.connect();
+            await client.query('BEGIN');
+            transactionStarted = true;
+
+            if (!event.eventData) {
+                throw new Error('Invalid event structure: missing eventData');
+            }
+
+            const required = V41_EVENT_REQUIRED_FIELDS[event.eventName];
+            if (required) {
+                for (const field of required) {
+                    if (event.eventData[field] === undefined) {
+                        throw new Error(`Invalid event structure: missing required field '${field}' for ${event.eventName}`);
                     }
                 }
+            }
+
+            await client.query(
+                `INSERT INTO contract_events (chain_id, event_name, artwork_id, block_number, transaction_hash, log_index, event_data, indexed_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 ON CONFLICT (chain_id, transaction_hash, log_index) DO NOTHING`,
+                [
+                    this._chainIdString(),
+                    event.eventName,
+                    this._getEventArtworkId(event),
+                    event.blockNumber,
+                    event.transactionHash,
+                    event.logIndex,
+                    this._serializeEventData(event.eventData),
+                    new Date(this._getEventTimestamp(event))
+                ]
+            );
+
+            const handlers = {
+                'ArtworkRegistered': this._handleArtworkRegisteredTx.bind(this),
+                'AuctionCreated': this._handleAuctionCreatedTx.bind(this),
+                'BidPlaced': this._handleBidPlacedTx.bind(this),
+                'BidDepositWithdrawn': this._handleBidDepositWithdrawnTx.bind(this),
+                'AuctionExtended': this._handleAuctionExtendedTx.bind(this),
+                'AuctionEnded': this._handleAuctionEndedTx.bind(this),
+                'SettlementCompleted': this._handleSettlementCompletedTx.bind(this),
+                'SettlementDefaulted': this._handleSettlementDefaultedTx.bind(this),
+                'CanonicalFloorUpdated': this._handleCanonicalFloorUpdatedTx.bind(this),
+                'ResaleListed': this._handleResaleListedTx.bind(this),
+                'ResaleCompleted': this._handleResaleCompletedTx.bind(this),
+                'ProjectNFTEligibilityAchieved': this._handleProjectNFTEligibilityAchievedTx.bind(this),
+                'ProjectNFTMinted': this._handleProjectNFTMintedTx.bind(this)
             };
 
-            // Start heartbeat in background
-            const heartbeatPromise = heartbeatLoop();
-
-            try {
-                // Schema validation
-                if (!event.eventData) {
-                    throw new Error('Invalid event structure: missing eventData');
-                }
-
-                // Validate required fields based on the canonical V4.1 event schema.
-                const required = V41_EVENT_REQUIRED_FIELDS[event.eventName];
-                if (required) {
-                    for (const field of required) {
-                        if (event.eventData[field] === undefined) {
-                            throw new Error(`Invalid event structure: missing required field '${field}' for ${event.eventName}`);
-                        }
-                    }
-                }
-
-                // Store raw event
-                await client.query(
-                    `INSERT INTO contract_events (chain_id, event_name, artwork_id, block_number, transaction_hash, log_index, event_data, indexed_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                     ON CONFLICT (chain_id, transaction_hash, log_index) DO NOTHING`,
-                    [
-                        this._chainIdString(),
-                        event.eventName,
-                        this._getEventArtworkId(event),
-                        event.blockNumber,
-                        event.transactionHash,
-                        event.logIndex,
-                        this._serializeEventData(event.eventData),
-                        new Date(this._getEventTimestamp(event))
-                    ]
-                );
-
-                // Process event-specific logic
-                const handlers = {
-                    'ArtworkRegistered': this._handleArtworkRegisteredTx.bind(this),
-                    'AuctionCreated': this._handleAuctionCreatedTx.bind(this),
-                    'BidPlaced': this._handleBidPlacedTx.bind(this),
-                    'BidDepositWithdrawn': this._handleBidDepositWithdrawnTx.bind(this),
-                    'AuctionExtended': this._handleAuctionExtendedTx.bind(this),
-                    'AuctionEnded': this._handleAuctionEndedTx.bind(this),
-                    'SettlementCompleted': this._handleSettlementCompletedTx.bind(this),
-                    'SettlementDefaulted': this._handleSettlementDefaultedTx.bind(this),
-                    'CanonicalFloorUpdated': this._handleCanonicalFloorUpdatedTx.bind(this),
-                    'ResaleListed': this._handleResaleListedTx.bind(this),
-                    'ResaleCompleted': this._handleResaleCompletedTx.bind(this),
-                    'ProjectNFTEligibilityAchieved': this._handleProjectNFTEligibilityAchievedTx.bind(this),
-                    'ProjectNFTMinted': this._handleProjectNFTMintedTx.bind(this)
-                };
-
-                const handler = handlers[event.eventName];
-                if (handler) {
-                    await handler(event, client);
-                }
-
-                // Mark as completed (atomic with transaction)
-                await client.query(
-                    `UPDATE event_processing_registry
-                     SET processing_status = 'completed',
-                         processing_completed_at = NOW()
-                     WHERE event_hash = $1`,
-                    [eventHash]
-                );
-
-                await client.query('COMMIT');
-
-                const duration = Date.now() - startTime;
-                console.log(JSON.stringify({
-                    ...logData,
-                    phase: 'commit',
-                    processing_status: 'completed',
-                    duration_ms: duration,
-                    message: 'Event processed successfully'
-                }));
-
-                // --- CACHE INVALIDATION LAYER ---
-                // Invalidate related cache keys after successful commit
-                const artworkId = this._getEventArtworkId(event);
-                if (artworkId) {
-                    await cacheService.invalidateAuctionState(`${this._chainIdString()}:artwork:${artworkId}`);
-                }
-
-                // Invalidate global stats if this event affects them
-                if (V41_GLOBAL_STATS_EVENTS.has(event.eventName)) {
-                    await cacheService.del(cacheService.keys.stats(`global:${this._chainIdString()}`));
-                }
-                // ---------------------------------
-
-                // Trigger AI analysis after successful indexing
-                await enqueueAIJob(
-                    event.eventName,
-                    event.eventData,
-                    workerId,
-                    correlationId
-                );
-            } catch (error) {
-                await client.query('ROLLBACK');
-
-                const duration = Date.now() - startTime;
-
-                // Determine if this should go to DLQ (after max retries)
-                const maxRetries = 5;
-                const shouldDLQ = retryCount >= maxRetries;
-
-                // Durably record the failure on a POOL connection, outside the
-                // rolled-back transaction. A plain UPDATE was silently a no-op
-                // on the first-ever failure: the claim INSERT lives inside the
-                // transaction that just rolled back, so no row existed to
-                // update and the failure vanished. UPSERT on the chain-scoped
-                // identity recreates it.
-                await this._recordEventFailure({
-                    event,
-                    eventHash,
-                    workerId,
-                    correlationId,
-                    retryCount,
-                    status: shouldDLQ ? 'dead' : 'failed',
-                    error
-                });
-
-                console.error(JSON.stringify({
-                    ...logData,
-                    phase: 'rollback',
-                    processing_status: shouldDLQ ? 'dead' : 'failed',
-                    error_type: error.name,
-                    error_message: error.message,
-                    duration_ms: duration,
-                    will_retry: !shouldDLQ
-                }));
-
-                throw error;
-            } finally {
-                // Always stop heartbeat on exit (success, error, or return).
-                // Order matters: set shutdown first so a woken sleep breaks
-                // instead of issuing a late UPDATE, then wake the pending
-                // sleep, then await the loop so any UPDATE already in flight
-                // completes, and only then release the connection.
-                isShuttingDown = true;
-                wakeHeartbeat?.();
-
-                await heartbeatPromise;
-
-                client.release();
+            const handler = handlers[event.eventName];
+            if (handler) {
+                await handler(event, client);
             }
+
+            await stopHeartbeat();
+            if (leaseLost) {
+                throw new EventProcessingLeaseLostError(eventHash);
+            }
+
+            await completeEventProcessingLease(client, lease);
+            await client.query('COMMIT');
+            transactionStarted = false;
+
+            console.log(JSON.stringify({
+                ...logData,
+                phase: 'commit',
+                processing_status: 'completed',
+                duration_ms: Date.now() - startTime,
+                message: 'Event processed successfully'
+            }));
+
+            const artworkId = this._getEventArtworkId(event);
+            if (artworkId) {
+                await cacheService.invalidateAuctionState(`${this._chainIdString()}:artwork:${artworkId}`);
+            }
+
+            if (V41_GLOBAL_STATS_EVENTS.has(event.eventName)) {
+                await cacheService.del(cacheService.keys.stats(`global:${this._chainIdString()}`));
+            }
+
+            await enqueueAIJob(
+                event.eventName,
+                event.eventData,
+                workerId,
+                correlationId
+            );
+        } catch (error) {
+            if (transactionStarted && client) {
+                try {
+                    await client.query('ROLLBACK');
+                } catch (rollbackError) {
+                    console.error(JSON.stringify({
+                        event_hash: eventHash,
+                        worker_id: workerId,
+                        phase: 'rollback_failed',
+                        error: rollbackError.message
+                    }));
+                }
+                transactionStarted = false;
+            }
+
+            await stopHeartbeat();
+            const maxRetries = 5;
+            const shouldDLQ = lease.retryCount >= maxRetries;
+            const recordedFailure = await this._recordEventFailure({
+                lease,
+                status: shouldDLQ ? 'dead' : 'failed',
+                error
+            });
+
+            console.error(JSON.stringify({
+                ...logData,
+                phase: 'rollback',
+                processing_status: recordedFailure?.processing_status || 'lease_lost',
+                error_type: error.name,
+                error_message: error.message,
+                duration_ms: Date.now() - startTime,
+                will_retry: recordedFailure
+                    ? recordedFailure.processing_status !== 'dead'
+                    : false
+            }));
+
+            throw error;
+        } finally {
+            await stopHeartbeat();
+
+            if (transactionStarted && client) {
+                try {
+                    await client.query('ROLLBACK');
+                } catch {
+                    // The original error is more actionable than cleanup noise.
+                }
+            }
+
+            client?.release();
+        }
     }
 
     /**
