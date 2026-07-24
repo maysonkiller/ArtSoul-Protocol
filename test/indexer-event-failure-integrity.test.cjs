@@ -471,6 +471,59 @@ test('the next poll retries the identical range and never double-applies a compl
     assert.equal(db.stats.handlerCalls.length, handlerCallsAfterFirstPass + 1);
 });
 
+test('a live lease left by a crashed worker keeps the cursor pinned until it is reaped', async () => {
+    const event = makeEvent(1);
+    const { engine, db } = await createEngine({ events: [event] });
+    const key = registryKey(CHAIN_ID, event.transactionHash, event.logIndex);
+
+    db.registry.set(key, {
+        event_hash: 'a'.repeat(64),
+        chain_id: CHAIN_ID,
+        transaction_hash: event.transactionHash,
+        log_index: event.logIndex,
+        event_name: event.eventName,
+        block_number: event.blockNumber,
+        processing_status: 'processing',
+        processing_error: null,
+        retry_count: 0,
+        owner_worker_id: 'worker-before-crash',
+        correlation_id: 'crashed-attempt',
+        processing_started_at: '2026-07-24T10:00:00.123456+00:00',
+        processing_completed_at: null,
+        last_heartbeat_at: new Date().toISOString()
+    });
+
+    await assert.rejects(
+        engine.syncHistoricalEvents(101, 105, { currentBlock: 200 }),
+        error => {
+            assert.equal(error.code, 'INDEXER_RANGE_INCOMPLETE');
+            assert.equal(error.failedCount, 1);
+            assert.match(error.failures[0].error, /lease unavailable/i);
+            return true;
+        }
+    );
+
+    assert.equal(db.indexerState.get(CHAIN_ID).last_indexed_block, 100);
+    assert.equal(db.stats.handlerCalls.length, 0);
+
+    // Model the committed reaper transition. The next scan may now acquire a
+    // new attempt, and retry_count advances exactly once on that acquisition.
+    const abandoned = db.registry.get(key);
+    abandoned.processing_status = 'failed';
+    abandoned.processing_started_at = null;
+    abandoned.owner_worker_id = null;
+    abandoned.last_heartbeat_at = null;
+    abandoned.processing_error = 'Event processing lease expired before completion';
+
+    const processed = await engine.syncHistoricalEvents(101, 105, { currentBlock: 200 });
+
+    assert.equal(processed, 1);
+    assert.equal(db.indexerState.get(CHAIN_ID).last_indexed_block, 105);
+    assert.equal(db.registry.get(key).processing_status, 'completed');
+    assert.equal(db.registry.get(key).retry_count, 1);
+    assert.equal(db.stats.handlerCalls.length, 1);
+});
+
 test('a recovered event becomes completed and releases the cursor', async () => {
     const event = makeEvent(1);
     const { engine, db } = await createEngine({

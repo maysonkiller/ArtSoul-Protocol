@@ -167,6 +167,29 @@ test('a recovered range refreshes the gauge back to zero', async () => {
     assert.deepEqual(calls.gaugeWrites, [{ failed: 0, dead: 0 }]);
 });
 
+test('reaping an abandoned lease refreshes the failure gauge immediately', async () => {
+    const { indexer, calls, setCounts } = await createIndexer();
+    indexer.db.query = async (sql, params) => {
+        assert.match(sql, /SET processing_status = 'failed'/);
+        assert.doesNotMatch(sql, /retry_count\s*=/);
+        assert.deepEqual(params, [String(CHAIN_ID), 120000]);
+        setCounts({ failed: 1, dead: 0 });
+        return [{
+            event_hash: '0xstale',
+            event_name: 'BidPlaced',
+            retry_count: 0,
+            previous_owner: 'worker-before-crash',
+            stale_seconds: 125
+        }];
+    };
+
+    const reaped = await indexer._reapStaleEventProcessingLeases();
+
+    assert.equal(reaped.length, 1);
+    assert.equal(calls.failureCounts, 1);
+    assert.deepEqual(calls.gaugeWrites, [{ failed: 1, dead: 0 }]);
+});
+
 test('an empty range performs no failure-registry query', async () => {
     const { indexer, calls } = await createIndexer({ syncResult: 0 });
 

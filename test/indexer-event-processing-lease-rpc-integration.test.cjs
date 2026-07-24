@@ -195,14 +195,23 @@ test('A-43 committed event-processing leases (PostgreSQL 17)', {
         });
         assert.equal(reaped.length, 1);
         assert.equal(reaped[0].previous_owner, first.workerId);
+        assert.equal(Number(reaped[0].retry_count), 0);
+
+        const abandoned = await pool.query(
+            `SELECT processing_status, retry_count, processing_error
+             FROM event_processing_registry
+             WHERE chain_id = $1 AND transaction_hash = $2 AND log_index = $3`,
+            [CHAIN_ID, first.transactionHash, first.logIndex]
+        );
+        assert.equal(abandoned.rows[0].processing_status, 'failed');
+        assert.equal(abandoned.rows[0].retry_count, 0);
+        assert.match(abandoned.rows[0].processing_error, /lease expired/i);
 
         const second = await leaseApi.claimEventProcessingLease(database, event(3));
         assert.equal(second.acquired, true);
         assert.equal(second.workerId, first.workerId);
-        assert.notEqual(
-            new Date(second.processingStartedAt).toISOString(),
-            new Date(first.processingStartedAt).toISOString()
-        );
+        assert.equal(second.retryCount, 1);
+        assert.notEqual(second.processingStartedAt, first.processingStartedAt);
 
         const staleClient = await pool.connect();
         try {
@@ -223,17 +232,15 @@ test('A-43 committed event-processing leases (PostgreSQL 17)', {
         );
 
         const current = await pool.query(
-            `SELECT processing_status, owner_worker_id, processing_started_at
+            `SELECT processing_status, owner_worker_id,
+                    processing_started_at::TEXT AS processing_started_at
              FROM event_processing_registry
              WHERE chain_id = $1 AND transaction_hash = $2 AND log_index = $3`,
             [CHAIN_ID, second.transactionHash, second.logIndex]
         );
         assert.equal(current.rows[0].processing_status, 'processing');
         assert.equal(current.rows[0].owner_worker_id, second.workerId);
-        assert.equal(
-            current.rows[0].processing_started_at.toISOString(),
-            new Date(second.processingStartedAt).toISOString()
-        );
+        assert.equal(current.rows[0].processing_started_at, second.processingStartedAt);
     });
 
     await t.test('completion is terminal and a late failure cannot downgrade it', async () => {

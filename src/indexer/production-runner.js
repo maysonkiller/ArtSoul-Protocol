@@ -218,24 +218,7 @@ class ProductionIndexer {
         // Check for stuck events every 2 minutes
         this.reaperTimer = setInterval(async () => {
             try {
-                const stuckEvents = await reapStaleEventProcessingLeases(this.db, {
-                    chainId: this.config.chainId.toString()
-                });
-
-                if (stuckEvents.length > 0) {
-                    console.warn(JSON.stringify({
-                        phase: 'reaper',
-                        action: 'recovered_stuck_events',
-                        count: stuckEvents.length,
-                        events: stuckEvents.map(e => ({
-                            event_hash: e.event_hash,
-                            event_name: e.event_name,
-                            retry_count: e.retry_count,
-                            previous_owner: e.previous_owner,
-                            stale_seconds: Math.floor(e.stale_seconds)
-                        }))
-                    }));
-                }
+                await this._reapStaleEventProcessingLeases();
             } catch (error) {
                 console.error(JSON.stringify({
                     phase: 'reaper',
@@ -246,6 +229,30 @@ class ProductionIndexer {
         }, 120000); // Every 2 minutes
 
         console.log('[ProductionIndexer] Stuck processor reaper started (heartbeat-based)');
+    }
+
+    async _reapStaleEventProcessingLeases() {
+        const stuckEvents = await reapStaleEventProcessingLeases(this.db, {
+            chainId: this.config.chainId.toString()
+        });
+
+        if (stuckEvents.length > 0) {
+            console.warn(JSON.stringify({
+                phase: 'reaper',
+                action: 'recovered_stuck_events',
+                count: stuckEvents.length,
+                events: stuckEvents.map(e => ({
+                    event_hash: e.event_hash,
+                    event_name: e.event_name,
+                    retry_count: e.retry_count,
+                    previous_owner: e.previous_owner,
+                    stale_seconds: Math.floor(e.stale_seconds)
+                }))
+            }));
+            await this._refreshEventFailureMetric('stale_lease_reaped');
+        }
+
+        return stuckEvents;
     }
 
     /**
