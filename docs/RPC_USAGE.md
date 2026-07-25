@@ -112,7 +112,7 @@ sudoedit <ARTSOUL_ENV_FILE>
 Apply the environment values from the configuration section. Keep the existing private fallback URL in the server environment and never paste it into Git, chat, shell history, or logs. Then validate and restart:
 
 ```bash
-npm ci
+npx --yes npm@11.6.2 ci
 npm run build
 node --check src/indexer/chain-config.js
 node --check src/indexer/event-listener.js
