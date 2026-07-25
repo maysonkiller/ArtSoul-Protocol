@@ -1,20 +1,12 @@
 // A-15: indexer event-failure integrity.
 //
-// Before this fix an event whose handler threw was silently lost:
-//   1. processEvent claimed the event by INSERTing into
-//      event_processing_registry INSIDE the processing transaction;
-//   2. the handler threw and the transaction rolled back, destroying the
-//      claim row;
-//   3. the follow-up "mark as failed" UPDATE matched zero rows, so no failure
-//      was ever recorded;
-//   4. syncHistoricalEvents advanced last_indexed_block anyway, so the range
-//      was never rescanned and the event was skipped forever;
-//   5. /health reported unresolvedErrors: 0 the whole time.
+// A processing claim is now committed before the projection transaction.
+// Handler rollback therefore leaves a durable, owner-fenced registry row that
+// can be marked failed without allowing a stale attempt to overwrite newer or
+// completed work. A failed range still advances no cursor.
 //
 // These tests drive the real sync engine against an in-memory database that
-// models PostgreSQL transaction semantics (writes inside BEGIN are discarded
-// by ROLLBACK) so the rollback-visibility bug is reproducible, not asserted
-// against a mock that cannot exhibit it.
+// models the committed claim plus transaction-scoped projection writes.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -62,58 +54,16 @@ function createFakeDatabase(options = {}) {
     const indexerErrors = [];
     const contractEvents = [];
     const stats = { commits: 0, rollbacks: 0, handlerCalls: [] };
+    let leaseSequence = 0;
 
     // eventName -> number of remaining forced failures
     const failuresRemaining = new Map(Object.entries(options.failHandlers || {}));
 
-    function applyRegistryUpsert(store, params, { onConflictKeepCompleted }) {
-        const [
-            eventHash, chainId, transactionHash, logIndex, eventName,
-            blockNumber, status, processingError, retryCount, workerId, correlationId
-        ] = params;
-        const key = registryKey(chainId, transactionHash, logIndex);
-        const existing = store.get(key);
-
-        if (!existing) {
-            const row = {
-                event_hash: eventHash,
-                chain_id: String(chainId),
-                transaction_hash: transactionHash,
-                log_index: Number(logIndex),
-                event_name: eventName,
-                block_number: Number(blockNumber),
-                processing_status: status,
-                processing_error: processingError ?? null,
-                retry_count: Number(retryCount) || 0,
-                owner_worker_id: workerId ?? null,
-                correlation_id: correlationId ?? null,
-                processing_started_at: new Date().toISOString(),
-                processing_completed_at: null,
-                last_heartbeat_at: new Date().toISOString()
-            };
-            store.set(key, row);
-            return row;
-        }
-
-        if (onConflictKeepCompleted && existing.processing_status === 'completed') {
-            return existing;
-        }
-
-        existing.event_hash = eventHash;
-        existing.processing_status = status;
-        existing.processing_error = processingError ?? null;
-        existing.retry_count = Math.max(Number(existing.retry_count) || 0, Number(retryCount) || 0);
-        existing.owner_worker_id = workerId ?? null;
-        existing.correlation_id = correlationId ?? null;
-        return existing;
-    }
-
-    // The claim UPSERT from processEvent: preserves completed, otherwise takes
-    // ownership and increments retry_count.
     function applyClaim(store, params) {
         const [eventHash, chainId, transactionHash, logIndex, eventName, blockNumber, workerId, correlationId] = params;
         const key = registryKey(chainId, transactionHash, logIndex);
         const existing = store.get(key);
+        const startedAt = new Date(Date.now() + (++leaseSequence)).toISOString();
 
         if (!existing) {
             const row = {
@@ -128,7 +78,7 @@ function createFakeDatabase(options = {}) {
                 retry_count: 0,
                 owner_worker_id: workerId,
                 correlation_id: correlationId,
-                processing_started_at: new Date().toISOString(),
+                processing_started_at: startedAt,
                 processing_completed_at: null,
                 last_heartbeat_at: new Date().toISOString()
             };
@@ -136,13 +86,21 @@ function createFakeDatabase(options = {}) {
             return row;
         }
 
-        if (existing.processing_status === 'completed') return existing;
+        if (existing.processing_status === 'completed' || existing.processing_status === 'processing') {
+            return null;
+        }
 
         existing.event_hash = eventHash;
+        existing.event_name = eventName;
+        existing.block_number = Number(blockNumber);
         existing.processing_status = 'processing';
+        existing.processing_error = null;
+        existing.processing_completed_at = null;
         existing.owner_worker_id = workerId;
         existing.retry_count = Number(existing.retry_count || 0) + 1;
+        existing.processing_started_at = startedAt;
         existing.last_heartbeat_at = new Date().toISOString();
+        existing.correlation_id = correlationId;
         return existing;
     }
 
@@ -175,38 +133,58 @@ function createFakeDatabase(options = {}) {
         }
 
         if (/INSERT INTO event_processing_registry/i.test(sql)) {
-            // The claim statement is the one that returns the ownership triple.
-            if (/RETURNING processing_status, retry_count, owner_worker_id/i.test(sql)) {
-                const row = applyClaim(store, params);
-                return { rows: [{
-                    processing_status: row.processing_status,
-                    retry_count: row.retry_count,
-                    owner_worker_id: row.owner_worker_id
-                }] };
-            }
-            const row = applyRegistryUpsert(store, params, { onConflictKeepCompleted: true });
-            return [{ processing_status: row.processing_status, retry_count: row.retry_count }];
+            const row = applyClaim(store, params);
+            return row ? [{ ...row }] : [];
         }
 
-        // Heartbeat keep-alive from the processEvent ownership loop. Reporting
-        // zero affected rows makes that loop exit after one tick.
-        if (/UPDATE event_processing_registry/i.test(sql) && /last_heartbeat_at = NOW\(\)/i.test(sql)) {
-            return [];
+        if (/SELECT[\s\S]*processing_status[\s\S]*processing_started_at::TEXT AS processing_started_at[\s\S]*FROM event_processing_registry/i.test(sql)) {
+            const row = store.get(registryKey(params[0], params[1], params[2]));
+            return row ? [{ ...row }] : [];
+        }
+
+        if (/UPDATE event_processing_registry/i.test(sql) && /SET last_heartbeat_at = clock_timestamp\(\)/i.test(sql)) {
+            const row = store.get(registryKey(params[0], params[1], params[2]));
+            if (!row ||
+                row.event_hash !== params[3] ||
+                row.owner_worker_id !== params[4] ||
+                row.processing_started_at !== params[5] ||
+                row.processing_status !== 'processing') {
+                return [];
+            }
+            row.last_heartbeat_at = new Date().toISOString();
+            return [{ event_hash: row.event_hash }];
         }
 
         if (/UPDATE event_processing_registry/i.test(sql) && /processing_status = 'completed'/i.test(sql)) {
-            for (const candidate of [...store.values()]) {
-                if (candidate.event_hash !== params[0]) continue;
-                // Re-read through the store so the write lands on this
-                // transaction's copy-on-write row, never the committed one.
-                const row = store.get(registryKey(
-                    candidate.chain_id, candidate.transaction_hash, candidate.log_index
-                ));
-                row.processing_status = 'completed';
-                row.processing_completed_at = new Date().toISOString();
-                row.processing_error = null;
+            const row = store.get(registryKey(params[0], params[1], params[2]));
+            if (!row ||
+                row.event_hash !== params[3] ||
+                row.owner_worker_id !== params[4] ||
+                row.processing_started_at !== params[5] ||
+                row.processing_status !== 'processing') {
+                return [];
             }
-            return [];
+            row.processing_status = 'completed';
+            row.processing_completed_at = new Date().toISOString();
+            row.processing_error = null;
+            return [{ event_hash: row.event_hash }];
+        }
+
+        if (/UPDATE event_processing_registry/i.test(sql) && /SET processing_status = \$7/i.test(sql)) {
+            const row = store.get(registryKey(params[0], params[1], params[2]));
+            if (!row ||
+                row.event_hash !== params[3] ||
+                row.owner_worker_id !== params[4] ||
+                row.processing_started_at !== params[5] ||
+                row.processing_status !== 'processing') {
+                return [];
+            }
+            row.processing_status = params[6];
+            row.processing_error = params[7];
+            return [{
+                processing_status: row.processing_status,
+                retry_count: row.retry_count
+            }];
         }
 
         if (/SELECT event_hash, transaction_hash/i.test(sql) && /event_processing_registry/i.test(sql)) {
@@ -493,6 +471,59 @@ test('the next poll retries the identical range and never double-applies a compl
     assert.equal(db.stats.handlerCalls.length, handlerCallsAfterFirstPass + 1);
 });
 
+test('a live lease left by a crashed worker keeps the cursor pinned until it is reaped', async () => {
+    const event = makeEvent(1);
+    const { engine, db } = await createEngine({ events: [event] });
+    const key = registryKey(CHAIN_ID, event.transactionHash, event.logIndex);
+
+    db.registry.set(key, {
+        event_hash: 'a'.repeat(64),
+        chain_id: CHAIN_ID,
+        transaction_hash: event.transactionHash,
+        log_index: event.logIndex,
+        event_name: event.eventName,
+        block_number: event.blockNumber,
+        processing_status: 'processing',
+        processing_error: null,
+        retry_count: 0,
+        owner_worker_id: 'worker-before-crash',
+        correlation_id: 'crashed-attempt',
+        processing_started_at: '2026-07-24T10:00:00.123456+00:00',
+        processing_completed_at: null,
+        last_heartbeat_at: new Date().toISOString()
+    });
+
+    await assert.rejects(
+        engine.syncHistoricalEvents(101, 105, { currentBlock: 200 }),
+        error => {
+            assert.equal(error.code, 'INDEXER_RANGE_INCOMPLETE');
+            assert.equal(error.failedCount, 1);
+            assert.match(error.failures[0].error, /lease unavailable/i);
+            return true;
+        }
+    );
+
+    assert.equal(db.indexerState.get(CHAIN_ID).last_indexed_block, 100);
+    assert.equal(db.stats.handlerCalls.length, 0);
+
+    // Model the committed reaper transition. The next scan may now acquire a
+    // new attempt, and retry_count advances exactly once on that acquisition.
+    const abandoned = db.registry.get(key);
+    abandoned.processing_status = 'failed';
+    abandoned.processing_started_at = null;
+    abandoned.owner_worker_id = null;
+    abandoned.last_heartbeat_at = null;
+    abandoned.processing_error = 'Event processing lease expired before completion';
+
+    const processed = await engine.syncHistoricalEvents(101, 105, { currentBlock: 200 });
+
+    assert.equal(processed, 1);
+    assert.equal(db.indexerState.get(CHAIN_ID).last_indexed_block, 105);
+    assert.equal(db.registry.get(key).processing_status, 'completed');
+    assert.equal(db.registry.get(key).retry_count, 1);
+    assert.equal(db.stats.handlerCalls.length, 1);
+});
+
 test('a recovered event becomes completed and releases the cursor', async () => {
     const event = makeEvent(1);
     const { engine, db } = await createEngine({
@@ -563,11 +594,14 @@ test('a completed record is never downgraded by a late failure write', async () 
     // Simulate a straggling worker recording a failure for an event another
     // worker already completed.
     await engine._recordEventFailure({
-        event,
-        eventHash: completed.event_hash,
-        workerId: 'worker-late',
-        correlationId: 'late',
-        retryCount: 9,
+        lease: {
+            eventHash: completed.event_hash,
+            chainId: completed.chain_id,
+            transactionHash: completed.transaction_hash,
+            logIndex: completed.log_index,
+            workerId: completed.owner_worker_id,
+            processingStartedAt: completed.processing_started_at
+        },
         status: 'dead',
         error: new Error('late failure from a lost worker')
     });
@@ -578,30 +612,37 @@ test('a completed record is never downgraded by a late failure write', async () 
     assert.deepEqual(await engine.getEventFailureCounts(), { failed: 0, dead: 0 });
 });
 
-test('the failure record is idempotent when the same failure is replayed', async () => {
+test('a repeated failure write cannot mutate a lease after its first terminal transition', async () => {
     const event = makeEvent(1);
-    const { engine, db } = await createEngine({ events: [event] });
+    const { engine, db } = await createEngine({
+        events: [event],
+        failures: { [`${event.transactionHash}:0`]: 1 }
+    });
 
-    const args = {
-        event,
-        eventHash: '0xdeadbeef',
-        workerId: 'worker-1',
-        correlationId: 'c-1',
-        retryCount: 2,
-        status: 'failed',
-        error: new Error('boom')
-    };
-    await engine._recordEventFailure(args);
+    await assert.rejects(
+        engine.syncHistoricalEvents(101, 105, { currentBlock: 200 }),
+        error => error.code === 'INDEXER_RANGE_INCOMPLETE'
+    );
     const first = { ...registryRow(db, event) };
-    await engine._recordEventFailure(args);
+    const lease = {
+        eventHash: first.event_hash,
+        chainId: first.chain_id,
+        transactionHash: first.transaction_hash,
+        logIndex: first.log_index,
+        workerId: first.owner_worker_id,
+        processingStartedAt: first.processing_started_at
+    };
+    await engine._recordEventFailure({
+        lease,
+        status: 'dead',
+        error: new Error('late duplicate failure')
+    });
     const second = registryRow(db, event);
 
     assert.equal(db.registry.size, 1);
     assert.equal(second.processing_status, first.processing_status);
     assert.equal(second.retry_count, first.retry_count);
-    // retry_count is monotonic: a stale lower count can never lower it.
-    await engine._recordEventFailure({ ...args, retryCount: 0 });
-    assert.equal(registryRow(db, event).retry_count, 2);
+    assert.equal(second.processing_error, first.processing_error);
 });
 
 test('unresolved event failures are chain scoped', async () => {
