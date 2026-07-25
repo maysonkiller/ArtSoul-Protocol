@@ -140,7 +140,7 @@ cd C:\Projects\ArtSoul
 git fetch origin
 git checkout main
 git pull --ff-only origin main
-npm ci
+npx --yes npm@11.6.2 ci
 npm run build
 git diff --check
 ```
@@ -218,7 +218,7 @@ ssh root@46.224.202.18
 cd /opt/artsoul
 git status --short
 git pull --ff-only origin main
-npm ci --omit=dev
+npx --yes npm@11.6.2 ci --omit=dev
 pm2 restart artsoul-base-sepolia --update-env
 pm2 save
 curl -fsS http://127.0.0.1:3001/health
