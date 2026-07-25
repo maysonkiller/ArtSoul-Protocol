@@ -182,7 +182,7 @@ new code fails closed without it):
 2. Confirm the sourced environment has a non-empty value without printing it:
    `set -a; . /opt/artsoul/.env.shared; set +a; [ -n "$METRICS_AUTH" ] && echo present || echo MISSING; unset METRICS_AUTH`.
 3. Merge and pull the new code on the host (`git pull --ff-only origin main`).
-4. Build and test: `npm ci`, `npm run build`, `node --test test/indexer-metrics-auth.test.cjs`.
+4. Build and test: `npx --yes npm@11.6.2 ci`, `npm run build`, `node --test test/indexer-metrics-auth.test.cjs`.
 5. Restart: `pm2 restart artsoul-base-sepolia --update-env`.
 6. Run the acceptance verification block below. It asserts authenticated
    `/metrics` 200, unauthenticated `/metrics` 401, the loopback-only bind,
@@ -399,7 +399,7 @@ curl -s http://127.0.0.1:3001/health
 pm2 status
 
 git pull --ff-only origin main
-npm ci
+npx --yes npm@11.6.2 ci
 npm run build
 node --check src/indexer/event-processing-lease.js
 node --check src/indexer/sync-engine.js
