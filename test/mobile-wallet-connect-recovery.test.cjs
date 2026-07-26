@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=43/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=44/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=13/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=13/);
-    assert.match(walletTest, /appkit-init\.js\?v=43/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=14/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=14/);
+    assert.match(walletTest, /appkit-init\.js\?v=44/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -43,8 +43,12 @@ test('the on-screen wallet debug overlay is fully removed', () => {
 test('mobile external browsers use the standard flow: pinned provider + official WC modal', () => {
     assert.match(coreWallet, /WC_ETHEREUM_PROVIDER_VERSION = '2\.23\.10'/);
     assert.match(coreWallet, /esm\.sh\/@walletconnect\/ethereum-provider@\$\{WC_ETHEREUM_PROVIDER_VERSION\}/);
-    assert.doesNotMatch(coreWallet, /chains: \[BASE_SEPOLIA_CHAIN_ID\]/);
-    assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[BASE_SEPOLIA_CHAIN_ID, 8453, 1\]/);
+    assert.match(coreWallet, /const REQUIRED_CHAIN_IDS = \[BASE_SEPOLIA_CHAIN_ID\]/);
+    assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1\]/);
+    assert.match(coreWallet, /const REQUIRED_METHODS = \['personal_sign', 'eth_sendTransaction'\]/);
+    assert.match(coreWallet, /chains: REQUIRED_CHAIN_IDS/);
+    assert.match(coreWallet, /optionalChains: OPTIONAL_CHAIN_IDS/);
+    assert.match(coreWallet, /methods: REQUIRED_METHODS/);
     // The OFFICIAL WalletConnect modal drives wallet choice, deep links, QR —
     // statically imported and pinned by US (showQrModal: false). The
     // provider's built-in runtime modal load silently failed on prod:
@@ -69,12 +73,31 @@ test('mobile external browsers use the standard flow: pinned provider + official
     assert.match(appKit, /return connectExternalMobileStandard\(\);/);
 });
 
+test('the one-time compatibility migration removes all-optional sessions before core restore', () => {
+    assert.match(appKit, /WALLET_STORAGE_VERSION = 'appkit-1\.8\.21-required-siwe-session-v3'/);
+    const migration = appKit.match(/async function migrateWalletStorageOnce\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(migration, 'wallet storage migration must exist');
+    assert.match(migration, /sdkFragments = \['walletconnect', 'wc@', 'reown', 'appkit', 'wagmi'/);
+    assert.match(migration, /localStorage\.setItem\(WALLET_STORAGE_VERSION_KEY, WALLET_STORAGE_VERSION\)/);
+
+    const initialization = appKit.match(
+        /async function initializeAppKit\(\) \{[\s\S]*?coreSessionRestoreTask = restoreCoreSessionOutcome\(\);/
+    )?.[0] || '';
+    assert.ok(initialization, 'AppKit initialization must start the core restore');
+    assert.ok(
+        initialization.indexOf('await migrateWalletStorageOnce()') <
+        initialization.indexOf('restoreCoreSessionOutcome()'),
+        'incompatible session storage must be migrated before provider restore'
+    );
+});
+
 test('core network methods route through a chain the wallet actually approved', () => {
     const resolver = coreWallet.match(/export function resolveCoreRequestChainId[\s\S]*?\n\}/)?.[0] || '';
     const request = coreWallet.match(/export async function requestCoreWalletMethod[\s\S]*?\n\}/)?.[0] || '';
     assert.match(resolver, /getCoreSessionChainIds\(instance\)/);
     assert.match(resolver, /approvedChainIds\.includes\(chainId\)/);
     assert.match(request, /instance\.signer\.request\(request, `eip155:\$\{routeChainId\}`\)/);
+    assert.match(request, /CORE_METHOD_NOT_APPROVED/);
     assert.doesNotMatch(request, /instance\.request\(/);
     assert.match(coreWallet, /non-fatal WalletConnect SDK provider-route rejection suppressed/);
 });
