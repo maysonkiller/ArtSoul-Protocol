@@ -11,7 +11,7 @@ test('wallet-test exposes an isolated A1 SIWE and upload-policy variant', () => 
   assert.match(html, /layer=auth/);
   assert.match(html, /E: SIWE \+ upload policy/);
   assert.match(html, /never uploads a file or creates a Storage object/);
-  assert.match(html, /wallet-test\.js\?v=7/);
+  assert.match(html, /wallet-test\.js\?v=8/);
 });
 
 test('the A1 auth variant runs SIWE after the production wallet wrapper connects', () => {
@@ -24,6 +24,12 @@ test('the A1 auth variant runs SIWE after the production wallet wrapper connects
   assert.doesNotMatch(layer, /address,\s*\n/);
   assert.match(layer, /address: maskAddress\(address\)/);
   assert.match(layer, /debug: withAuth \? null/);
+});
+
+test('wallet-test masks WalletConnect session topics in copied diagnostics', () => {
+  assert.match(source, /function maskSessionTopic/);
+  assert.match(source, /session topic doesn't exist/);
+  assert.match(source, /if \(\/topic\/i\.test\(key\)\) return \[key, maskSessionTopic\(value\)\]/);
 });
 
 test('the A1 upload-policy smoke sends only invalid JSON requests and requires exact rejections', () => {

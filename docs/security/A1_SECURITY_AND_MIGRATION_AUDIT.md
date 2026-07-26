@@ -99,6 +99,26 @@ After the A1 wallet-test auth variant is deployed:
 
 The two invalid requests are validated before service-role access or signed-URL creation. They do not upload media, create metadata, send a transaction, or create a Storage object.
 
+### Rejected mobile smoke attempt (2026-07-26)
+
+The first production Variant E attempt was rejected and does not count as A1
+acceptance. WalletConnect reported that the cached session topic did not exist,
+but the wrapper still returned a cached wallet address on Ethereum mainnet. The
+SIWE signature was never requested, neither authenticated upload-policy check
+ran, and the wallet did not list ArtSoul as a connected site.
+
+The root cause was a fail-open liveness check that treated
+`provider.session` as proof of an active connection without reconciling its
+topic against the initialized SignClient session store. The remediation
+requires a non-expired topic in that store before any connected state can be
+published. An absent, unreadable, expired, or SDK-rejected topic is discarded
+locally without disconnecting a live remote session, and the next explicit
+Connect action creates a fresh pairing. Session topics are masked in copied
+diagnostics.
+
+Repeat the operator smoke above after the remediation reaches production. A1
+remains open until the exact success evidence in steps 3-5 is captured.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.
