@@ -129,6 +129,18 @@ only to a newly paired session (`restored: false`); a restored live session is
 already the next protected-action gesture and may proceed to serialized network
 confirmation and SIWE.
 
+A second post-remediation phone run again reached a liveness-checked wallet
+address and Base Sepolia. The operator approved a gas-free signature on some
+attempts, but the isolated bench still reported only the combined
+`deferred or not completed` outcome and no policy request ran. The same bench
+also displayed `Account: none` and `provider or relayer absent` because its
+local diagnostic handle was not attached to the production core facade even
+when that facade was live. This attempt is rejected as acceptance evidence. The
+bench must await the production wrapper boot, report the exact SIWE stage and
+sanitized failure, and provide one-tap complete-log copy before the next phone
+run. This is diagnostic hardening only; A1 remains open until the exact success
+criteria above are captured.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.
