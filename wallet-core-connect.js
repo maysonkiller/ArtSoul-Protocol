@@ -24,11 +24,16 @@ const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 const CORE_RESTORE_TIMEOUT_MS = 4500;
 const CORE_RESTORE_POLL_INTERVAL_MS = 120;
-// Keep every negotiation chain optional. Requiring 84532 makes
-// EthereumProvider force its local chainId to Base Sepolia even when the
-// wallet settled a namespace that does not contain it. The app confirms Base
-// Sepolia separately after the address settles and before every write.
-const OPTIONAL_CHAIN_IDS = [BASE_SEPOLIA_CHAIN_ID, 8453, 1];
+// WalletConnect optional permissions are not guaranteed to be approved by a
+// wallet. ArtSoul needs personal_sign for SIWE and eth_sendTransaction for the
+// product lifecycle, so Base Sepolia and those two methods are required by the
+// session proposal. This grants capabilities; it does not replace the explicit
+// Base Sepolia confirmation that still runs before every write. Base Mainnet
+// and Ethereum remain optional read/display networks.
+const REQUIRED_CHAIN_IDS = [BASE_SEPOLIA_CHAIN_ID];
+const OPTIONAL_CHAIN_IDS = [8453, 1];
+const REQUIRED_METHODS = ['personal_sign', 'eth_sendTransaction'];
+const REQUIRED_EVENTS = ['chainChanged', 'accountsChanged'];
 
 let settings = { projectId: null, metadata: null, log: null };
 let providerInstance = null;
@@ -254,6 +259,15 @@ export function getCoreSessionChainIds(instance = providerInstance) {
     return [...new Set(chainIds)];
 }
 
+export function getCoreSessionMethods(instance = providerInstance) {
+    if (!instance?.session) return [];
+    const methods = Object.values(instance.session.namespaces || {})
+        .flatMap((namespace) => namespace?.methods || [])
+        .map((method) => String(method || '').trim())
+        .filter(Boolean);
+    return [...new Set(methods)];
+}
+
 export function getCoreWalletApprovalUrl(instance = providerInstance) {
     const redirect = instance?.session?.peer?.metadata?.redirect || {};
     const candidates = [redirect.native, redirect.universal].filter(Boolean);
@@ -296,6 +310,26 @@ export async function requestCoreWalletMethod(instance, request) {
 
     const routeChainId = resolveCoreRequestChainId(instance);
     if (!routeChainId) throw new Error('WalletConnect session has no approved EVM request route');
+
+    const approvedMethods = getCoreSessionMethods(instance);
+    const normalizedMethod = String(request.method).toLowerCase();
+    const requiredMethod = REQUIRED_METHODS.some(
+        (method) => method.toLowerCase() === normalizedMethod
+    );
+    if (
+        requiredMethod &&
+        !approvedMethods.some((method) => method.toLowerCase() === normalizedMethod)
+    ) {
+        const error = new Error(
+            `WalletConnect session did not approve ${request.method}. Disconnect and reconnect the wallet once.`
+        );
+        error.code = 'CORE_METHOD_NOT_APPROVED';
+        coreLog('core wallet method missing from approved session', {
+            method: request.method,
+            approvedMethods
+        });
+        throw error;
+    }
 
     coreLog('core wallet method routed', {
         method: request.method,
@@ -495,7 +529,10 @@ export async function getCoreEthereumProvider() {
             const EthereumProvider = module.EthereumProvider || module.default;
             const instance = await EthereumProvider.init({
                 projectId: settings.projectId,
+                chains: REQUIRED_CHAIN_IDS,
                 optionalChains: OPTIONAL_CHAIN_IDS,
+                methods: REQUIRED_METHODS,
+                events: REQUIRED_EVENTS,
                 showQrModal: false,
                 metadata: settings.metadata,
                 rpcMap: { [BASE_SEPOLIA_CHAIN_ID]: BASE_SEPOLIA_RPC_URL }
@@ -504,8 +541,10 @@ export async function getCoreEthereumProvider() {
             providerInstance = instance;
             coreLog('core provider initialized', {
                 version: WC_ETHEREUM_PROVIDER_VERSION,
-                chains: [],
+                chains: REQUIRED_CHAIN_IDS,
                 optionalChains: OPTIONAL_CHAIN_IDS,
+                methods: REQUIRED_METHODS,
+                events: REQUIRED_EVENTS,
                 sessionRestorable: Boolean(instance.session)
             });
             return instance;
@@ -564,6 +603,7 @@ export async function restoreCoreSessionOutcome(options = {}) {
         coreLog('core session restored from storage', {
             chainId: restored.chainId,
             namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
+            namespaceMethods: getCoreSessionMethods(instance),
             elapsedMs: Date.now() - startedAt
         });
         return { status: 'restored', session: restored };
@@ -604,7 +644,10 @@ export async function connectCoreWallet() {
             const address = getCoreSessionAddress(instance);
             if (address) {
                 const chainId = resolveCoreSessionChainId(instance);
-                coreLog('core connect reused live session', { chainId });
+                coreLog('core connect reused live session', {
+                    chainId,
+                    namespaceMethods: getCoreSessionMethods(instance)
+                });
                 return {
                     provider: instance,
                     address,
@@ -724,7 +767,8 @@ export async function connectCoreWallet() {
             coreLog('core connect settled', {
                 elapsedMs: Date.now() - startedAt,
                 chainId: result.chainId,
-                namespaceChains: instance.session?.namespaces?.eip155?.chains || null
+                namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
+                namespaceMethods: getCoreSessionMethods(instance)
             });
             warnIfWriteChainMissing(instance);
             return result;

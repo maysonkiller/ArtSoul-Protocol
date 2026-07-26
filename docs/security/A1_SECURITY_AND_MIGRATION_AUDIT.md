@@ -154,6 +154,19 @@ existing shared write guard remains the only path that requires and confirms
 Base Sepolia before a contract write. A1 remains open until a post-deploy phone
 run records verified SIWE and both rejected upload-policy probes.
 
+The first phone run after hex encoding proved that the live session still
+rejected `personal_sign` with `Method not found` before the 350 ms mobile
+approval handoff could open MetaMask. The pinned EthereumProvider had received
+every chain through `optionalChains`; consequently its signing methods were
+optional session permissions and MetaMask could legitimately settle without
+approving `personal_sign`. The next compatibility version requires Base
+Sepolia plus `personal_sign` and `eth_sendTransaction` in the WalletConnect
+proposal, while Base Mainnet and Ethereum remain optional and the write guard
+remains the only authority that confirms the operational chain. The one-time
+wallet-storage migration removes pre-fix local sessions so the next explicit
+Connect creates a permission-complete pairing. A1 remains open pending the
+same production phone acceptance.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.
