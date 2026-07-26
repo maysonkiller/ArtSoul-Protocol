@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=42/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=43/, `${page} must load the standard wallet flow`);
     }
     assert.match(appKit, /wallet-core-connect\.js\?v=13/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=13/);
-    assert.match(walletTest, /appkit-init\.js\?v=42/);
+    assert.match(walletTest, /appkit-init\.js\?v=43/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -187,15 +187,14 @@ test('single-teardown invariant: explicit Disconnect is the only production call
     assert.match(incompleteClear, /\.filter\(\(provider\) => provider !== coreProviderInstance\)/);
 });
 
-test('the standard mobile connect settles before one separate network-confirmation prompt', () => {
+test('the standard mobile connect settles without forcing an operational network', () => {
     const standard = appKit.match(/async function connectExternalMobileStandard[\s\S]*?\n\}/)?.[0] || '';
     assert.ok(standard, 'connectExternalMobileStandard must exist');
-    // Connect click = await provider.connect(). The address settles first.
+    // Connect establishes wallet identity only. The current chain is display
+    // state until an explicit on-chain write invokes the shared write guard.
     assert.match(standard, /await connectCoreWallet\(\)/);
     assert.match(standard, /applyConfirmedWalletState\(/);
-    assert.match(standard, /scheduleMobileOperationalNetworkPrompt\(coreProvider, 'standard mobile connect'\)/);
-    // The connect function itself never performs an add/switch cycle. The
-    // separately scheduled prompt owns the single user-confirmed request.
+    assert.doesNotMatch(standard, /scheduleMobileOperationalNetworkPrompt/);
     assert.doesNotMatch(standard, /ensureExternalMobileBaseSepolia/);
     assert.doesNotMatch(standard, /wallet_addEthereumChain/);
     assert.doesNotMatch(standard, /wallet_switchEthereumChain/);
@@ -290,14 +289,22 @@ test('the two survival mechanisms remain: relay restart on return + provider bri
     assert.match(ensureConnected, /await coreSessionRestoreCompletion/);
 });
 
-test('injected in-app browsers keep their existing connect flow (out of scope)', () => {
+test('desktop and injected connects accept the wallet current chain without switching', () => {
     assert.match(appKit, /async function requestInjectedMobileAccounts/);
-    const ensure = appKit.match(/async function ensureExternalMobileBaseSepolia[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(ensure, /acceptForeignChain/);
     const injected = appKit.match(/if \(injectedMobileConnect\) \{\s*\n\s*walletDebugLog\('mobile injected connect start[\s\S]*?return validated\.address;/)?.[0] || '';
     assert.ok(injected, 'injected mobile connect flow must remain');
-    assert.match(injected, /acceptForeignChain: true/);
-    assert.match(injected, /switchTimeout: MOBILE_CONNECT_SWITCH_TIMEOUT/);
+    assert.match(injected, /requestProviderChainId\(window\.ethereum\)/);
+    assert.match(injected, /notifyForeignChainAccepted\(validated\.chainId\)/);
+    assert.doesNotMatch(injected, /wallet_switchEthereumChain|ensureExternalMobileBaseSepolia/);
+
+    const desktop = appKit.match(/if \(window\.web3Modal\) \{[\s\S]*?return confirmed\.address;/)?.[0] || '';
+    assert.ok(desktop, 'desktop AppKit connect flow must remain');
+    assert.match(desktop, /notifyForeignChainAccepted\(confirmed\.chainId\)/);
+    assert.doesNotMatch(desktop, /wallet_switchEthereumChain|ensureExternalMobileBaseSepolia/);
+    assert.doesNotMatch(
+        appKit,
+        /MOBILE_CONNECT_SWITCH_TIMEOUT|ensureExternalMobileBaseSepolia|waitForMobileBaseSepolia|addThenSwitchEthereumChain/
+    );
 });
 
 test('all contract write methods share the Base Sepolia guard', () => {

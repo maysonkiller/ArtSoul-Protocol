@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const appKit = read('appkit-init.js');
@@ -259,7 +260,7 @@ test('only a clean "no session" clears the stored wallet; a restore error keeps 
     // A restored session still binds the disconnect classifier.
     assert.match(completion, /bindCoreProviderDisconnect\(restored\.provider\)/);
     assert.match(completion, /applyConfirmedWalletState/);
-    assert.match(completion, /scheduleMobileOperationalNetworkPrompt\(restored\.provider, 'boot session restore'\)/);
+    assert.doesNotMatch(completion, /scheduleMobileOperationalNetworkPrompt/);
 });
 
 test('disconnect classification: transient and backgrounded drops never wipe; genuine ends do', () => {
@@ -329,8 +330,8 @@ test('restore is chain-tolerant: a session parked on a foreign chain stays conne
     const readSnapshot = coreWallet.match(/export function readCoreSessionSnapshot[\s\S]*?\n\}/)?.[0] || '';
     assert.match(readSnapshot, /getCoreSessionAddress\(instance\)/);
     assert.doesNotMatch(restoreOutcome, /instance\.accounts \|\| \[\]/);
-    // The boot handler applies the restored address without a chain gate, then
-    // schedules the independent operational-network confirmation.
+    // The boot handler applies the restored address without a chain gate.
+    // Only a later on-chain write requests the operational network.
     const completion = appKit.match(/coreSessionRestoreCompletion = coreSessionRestoreTask\.then[\s\S]*?coreSessionRestoreSettled = true;\s*\n\s*\}\);/)?.[0] || '';
     assert.match(completion, /restoredChainId = resolveCoreSessionChainId\(/);
     assert.match(completion, /applyConfirmedWalletState\(\{\s*\n\s*address: restored\.address,\s*\n\s*chainId: restoredChainId/);
@@ -430,21 +431,100 @@ test('core chain inference cannot bypass explicit Base Sepolia confirmation', ()
     assert.ok(switchFlow.indexOf("method: 'wallet_switchEthereumChain'") < switchFlow.indexOf("method: 'wallet_addEthereumChain'"));
     assert.match(switchFlow, /isUnknownChainError\(error\)/);
     assert.match(switchFlow, /writeCoreNetworkConfirmation\(provider, target\.chainId\)/);
-    const scheduledPrompt = appKit.match(/function scheduleMobileOperationalNetworkPrompt[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(scheduledPrompt, /const accepted = await window\.confirm\(/);
+    assert.doesNotMatch(appKit, /scheduleMobileOperationalNetworkPrompt/);
 });
 
-test('network confirmation and SIWE are serialized for the mobile core provider', () => {
+test('SIWE is chain-tolerant while the shared write guard remains Base Sepolia-only', () => {
     const authentication = appKit.match(/window\.ensureAuthenticated = async[\s\S]*?\n\};/)?.[0] || '';
     assert.match(authentication, /if \(authenticationPromise\) return authenticationPromise/);
-    assert.match(authentication, /coreSessionNeedsBaseSepoliaConfirmation\(coreProvider\)/);
-    assert.ok(
-        authentication.indexOf('ensureArtSoulWriteNetwork') < authentication.indexOf("SIWE signature requested"),
-        'Base Sepolia confirmation must finish before SIWE starts'
-    );
+    assert.doesNotMatch(authentication, /coreSessionNeedsBaseSepoliaConfirmation/);
+    assert.doesNotMatch(authentication, /ensureArtSoulWriteNetwork/);
+    assert.doesNotMatch(authentication, /wallet_switchEthereumChain/);
+    const writeGuard = appKit.match(/window\.ensureArtSoulWriteNetwork = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.match(writeGuard, /BASE_SEPOLIA_CHAIN_ID/);
+    assert.match(writeGuard, /confirmCoreBaseSepolia\(provider, 'write guard'\)/);
+
     const authSource = fs.readFileSync(path.join(__dirname, '..', 'supabase-auth.js'), 'utf8');
     assert.match(authSource, /requestWalletProvider\(activeProvider, \{ method: 'eth_accounts' \}\)/);
     assert.match(authSource, /requestWalletProvider\(activeProvider, \{\s*\n\s*method: 'personal_sign'/);
+    assert.match(authSource, /params: \[utf8ToHex\(message\), normalizedWallet\]/);
+    assert.doesNotMatch(authSource, /method: 'eth_sign'/);
+
+    const encoderSource = authSource.match(/function utf8ToHex\(value\) \{[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(encoderSource, 'the SIWE UTF-8 hex encoder must exist');
+    const utf8ToHex = Function(`${encoderSource}; return utf8ToHex;`)();
+    const message = 'Sign in to ArtSoul. ✓';
+    const encoded = utf8ToHex(message);
+    assert.match(encoded, /^0x[0-9a-f]+$/);
+    assert.equal(Buffer.from(encoded.slice(2), 'hex').toString('utf8'), message);
+});
+
+test('SIWE signs hex UTF-8 while backend verification receives the original plain message', async () => {
+    const authSource = read('supabase-auth.js');
+    const address = '0x1111111111111111111111111111111111111111';
+    const storage = new Map();
+    const walletRequests = [];
+    let verifyBody = null;
+    const response = (status, data) => ({
+        status,
+        ok: status >= 200 && status < 300,
+        text: async () => JSON.stringify(data)
+    });
+    const fetch = async (url, options = {}) => {
+        if (String(url).endsWith('/session')) return response(200, { authenticated: false });
+        if (String(url).includes('/nonce?wallet=')) return response(200, { nonce: 'abc12345' });
+        if (String(url).endsWith('/verify')) {
+            verifyBody = JSON.parse(options.body);
+            return response(200, { wallet: address });
+        }
+        throw new Error(`Unexpected auth request: ${url}`);
+    };
+    const provider = {
+        request: async (request) => {
+            walletRequests.push(request);
+            if (request.method === 'eth_accounts') return [address];
+            if (request.method === 'eth_chainId') return '0x2105';
+            if (request.method === 'personal_sign') return '0xsigned';
+            throw new Error(`Unexpected wallet request: ${request.method}`);
+        }
+    };
+    const window = {
+        location: {
+            host: 'artsoul.vercel.app',
+            origin: 'https://artsoul.vercel.app'
+        },
+        getCurrentWalletAddress: () => address
+    };
+    const localStorage = {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, String(value)),
+        removeItem: (key) => storage.delete(key)
+    };
+
+    vm.runInNewContext(authSource, {
+        window,
+        localStorage,
+        fetch,
+        TextEncoder,
+        console: { log() {}, warn() {}, error() {} },
+        Date,
+        JSON,
+        String,
+        Number,
+        Array,
+        encodeURIComponent
+    });
+    await window.SupabaseAuth.authenticateWithWallet(address, provider);
+
+    const personalSign = walletRequests.find((request) => request.method === 'personal_sign');
+    assert.ok(personalSign, 'personal_sign must be requested');
+    assert.equal(personalSign.params[1], address);
+    assert.match(personalSign.params[0], /^0x[0-9a-f]+$/);
+    const decodedMessage = Buffer.from(personalSign.params[0].slice(2), 'hex').toString('utf8');
+    assert.equal(verifyBody.message, decodedMessage);
+    assert.doesNotMatch(verifyBody.message, /^0x/);
+    assert.match(verifyBody.message, /Chain ID: 8453/);
+    assert.equal(verifyBody.signature, '0xsigned');
 });
 
 test('only a newly paired mobile session defers SIWE; a restored live session proceeds', () => {

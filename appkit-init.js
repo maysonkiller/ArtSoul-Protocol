@@ -36,7 +36,6 @@ const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_CAIP_ID = 'eip155:84532';
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
-const CORE_NETWORK_PROMPT_KEY = 'artsoul_core_network_prompt';
 // Mainnet entries are negotiation-only compatibility routes for mobile
 // WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
 const networks = [baseSepolia, base, mainnet];
@@ -132,7 +131,6 @@ let latestAppKitAccountSnapshot = null;
 let appKitAccountRevision = 0;
 let deferMobileAuthenticationThisTurn = false;
 let coreNetworkConfirmationPromise = null;
-let coreNetworkPromptScheduled = false;
 const walletResumeWaiters = new Set();
 const boundRuntimeProviders = new WeakSet();
 const WALLET_HYDRATION_TIMEOUT = 8000;
@@ -149,11 +147,6 @@ const WALLET_CONNECT_TIMEOUT_MOBILE = 90000;
 const APPKIT_MODAL_OPEN_TIMEOUT = 10000;
 const WALLET_CONFIRMATION_INTERVAL = 400;
 const MOBILE_PROVIDER_REQUEST_TIMEOUT = 5000;
-const MOBILE_NETWORK_SWITCH_TIMEOUT = 15000;
-// Injected in-app browsers only: the one add/switch cycle at connect is a
-// courtesy, not a gate — refusal or timeout accepts the session on its
-// actual chain. The mobile EXTERNAL browser path never switches at connect.
-const MOBILE_CONNECT_SWITCH_TIMEOUT = 8000;
 const NETWORK_CONFIRMATION_TIMEOUT = 10000;
 const NETWORK_CONFIRMATION_INTERVAL = 300;
 const CORE_NETWORK_CONFIRMATION_TIMEOUT = 30000;
@@ -814,179 +807,6 @@ async function readMobileProviderChainId(provider) {
         });
         return parseChainId(provider.chainId || provider.networkVersion);
     }
-}
-
-async function waitForMobileBaseSepolia(provider, switchOutcome, attempt, requireProviderChain = false, timeoutMs = MOBILE_NETWORK_SWITCH_TIMEOUT) {
-    const deadline = createForegroundDeadline(timeoutMs);
-    let lastReportedChainId = null;
-
-    try {
-        while (!deadline.hasExpired() && !attempt?.cancelled) {
-            if (document.visibilityState !== 'visible') {
-                await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
-                continue;
-            }
-
-            const providerChainId = await readMobileProviderChainId(provider);
-            const appKitChainId = getStateChainId(readAppKitAccountSnapshot());
-            const confirmedChainId = providerChainId || appKitChainId;
-            if (confirmedChainId && confirmedChainId !== lastReportedChainId) {
-                lastReportedChainId = confirmedChainId;
-                walletDebugLog('mobile network switch observed chain', {
-                    providerChainId,
-                    appKitChainId
-                });
-            }
-            const baseSepoliaConfirmed = requireProviderChain
-                ? providerChainId === BASE_SEPOLIA_CHAIN_ID
-                : providerChainId === BASE_SEPOLIA_CHAIN_ID || appKitChainId === BASE_SEPOLIA_CHAIN_ID;
-            if (baseSepoliaConfirmed) {
-                return BASE_SEPOLIA_CHAIN_ID;
-            }
-
-            const outcome = await Promise.race([
-                switchOutcome,
-                waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL).then(() => null)
-            ]);
-            if (outcome?.error && !isPendingRequestError(outcome.error)) throw outcome.error;
-            if (outcome) await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
-        }
-
-        return null;
-    } finally {
-        deadline.dispose();
-    }
-}
-
-// Injected in-app browsers and desktop post-connect validation ONLY. The
-// mobile EXTERNAL browser path never calls this — it applies the session
-// chain as-is and leaves 84532 to the write guard.
-// acceptForeignChain (injected mobile connect): the address is what
-// "connected" means — the one add/switch cycle still runs, but refusal,
-// timeout or no response resolves to the session's actual chain instead of
-// failing the attempt. The write guard (ensureArtSoulWriteNetwork) remains
-// the sole Base Sepolia enforcement point.
-async function ensureExternalMobileBaseSepolia(walletState, source, attempt, preferredProvider = null, options = {}) {
-    const { acceptForeignChain = false, switchTimeout = MOBILE_NETWORK_SWITCH_TIMEOUT } = options;
-    while (document.visibilityState !== 'visible' && !attempt?.cancelled) {
-        await waitForWalletResumeOrDelay(WALLET_CONFIRMATION_INTERVAL);
-    }
-    if (attempt?.cancelled) return null;
-
-    const provider = preferredProvider || await getAppKitWalletProviderWithin(MOBILE_PROVIDER_REQUEST_TIMEOUT);
-    if (attempt?.cancelled) return null;
-
-    if (!provider?.request) {
-        throw createWalletConnectError(
-            'MOBILE_PROVIDER_UNAVAILABLE',
-            'The wallet approved the request, but its session provider was not available. Please retry or use the wallet browser.'
-        );
-    }
-    activeWalletProvider = provider;
-    bindRuntimeProviderEvents(provider, preferredProvider ? 'mobile injected provider' : 'external mobile WalletConnect provider');
-
-    let providerAddress = null;
-    const accountDeadline = Date.now() + MOBILE_PROVIDER_REQUEST_TIMEOUT;
-    while (!providerAddress && Date.now() < accountDeadline && !attempt?.cancelled) {
-        const providerAccountsValue = await requestProviderValueWithin(
-            provider,
-            'eth_accounts',
-            [],
-            Math.min(1200, MOBILE_PROVIDER_REQUEST_TIMEOUT)
-        );
-        const providerAccounts = Array.isArray(providerAccountsValue) ? providerAccountsValue : [];
-        providerAddress = normalizeWalletAddress(providerAccounts[0]);
-        if (!providerAddress) await waitForWalletResumeOrDelay(250);
-    }
-    if (!providerAddress || providerAddress !== normalizeWalletAddress(walletState.address)) {
-        throw createWalletConnectError(
-            'MOBILE_ACCOUNT_UNCONFIRMED',
-            'The wallet session did not confirm the selected account. Please retry the connection.'
-        );
-    }
-
-    const providerChainId = await readMobileProviderChainId(provider);
-    const appKitChainId = getStateChainId(walletState.account);
-    const currentChainId = providerChainId;
-    walletDebugLog('external mobile session chain resolved', {
-        source,
-        providerAvailable: true,
-        address: maskWalletAddress(providerAddress),
-        providerChainId,
-        appKitChainId,
-        currentChainId
-    });
-
-    if (currentChainId === BASE_SEPOLIA_CHAIN_ID) {
-        return { ...walletState, address: providerAddress, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
-    }
-    const acceptOnActualChain = (reason) => {
-        walletDebugLog('mobile connect accepted on foreign chain', {
-            source,
-            chainId: currentChainId,
-            reason
-        });
-        return { ...walletState, address: providerAddress, chainId: currentChainId, provider, baseSepoliaConfirmed: false };
-    };
-    if (attempt?.networkSwitchRequested) {
-        if (acceptForeignChain) return acceptOnActualChain('switch already requested this attempt');
-        throw createWalletConnectError(
-            'BASE_SEPOLIA_REQUIRED',
-            'Your wallet is still on another network. Select Base Sepolia and retry.'
-        );
-    }
-    if (attempt) attempt.networkSwitchRequested = true;
-
-    const target = getSupportedNetworkTarget(BASE_SEPOLIA_CHAIN_ID);
-    walletDebugLog('external mobile Base Sepolia switch requested', {
-        source,
-        fromChainId: currentChainId,
-        toChainId: BASE_SEPOLIA_CHAIN_ID,
-        via: preferredProvider ? 'injected provider' : 'WalletConnect provider'
-    });
-
-    const switchOutcome = Promise.resolve()
-        .then(() => addThenSwitchEthereumChain(provider, target))
-        .then(() => ({ complete: true }))
-        .catch((error) => ({ error }));
-
-    let confirmedChainId = null;
-    try {
-        confirmedChainId = await waitForMobileBaseSepolia(
-            provider,
-            switchOutcome,
-            attempt,
-            true,
-            switchTimeout
-        );
-    } catch (error) {
-        if (isUserRejectedError(error)) {
-            if (acceptForeignChain) return acceptOnActualChain('switch declined by user');
-            throw createWalletConnectError(
-                'BASE_SEPOLIA_SWITCH_REJECTED',
-                'Network switch was declined. This action requires Base Sepolia.'
-            );
-        }
-        if (acceptForeignChain) {
-            walletDebugLog('mobile Base Sepolia switch errored; accepting session', describeWalletDebugError(error));
-            return acceptOnActualChain('switch request errored');
-        }
-        throw error;
-    }
-    if (confirmedChainId !== BASE_SEPOLIA_CHAIN_ID) {
-        walletDebugLog('external mobile Base Sepolia switch not confirmed', {
-            source,
-            cancelled: Boolean(attempt?.cancelled)
-        });
-        if (acceptForeignChain) return acceptOnActualChain('switch not confirmed in time');
-        throw createWalletConnectError(
-            'BASE_SEPOLIA_REQUIRED',
-            'The wallet did not switch to Base Sepolia. Select Base Sepolia in the wallet and retry.'
-        );
-    }
-
-    walletDebugLog('external mobile Base Sepolia confirmed', { source });
-    return { ...walletState, address: providerAddress, chainId: BASE_SEPOLIA_CHAIN_ID, provider };
 }
 
 function readWagmiConnectorSnapshot() {
@@ -1793,27 +1613,6 @@ async function switchEthereumChain(provider, target) {
     }
 }
 
-async function addThenSwitchEthereumChain(provider, target) {
-    if (!provider?.request) throw new Error('Wallet provider is not available');
-
-    try {
-        walletDebugLog('Base Sepolia add request started', { chainId: target.chainId });
-        await addEthereumChain(provider, target);
-        walletDebugLog('Base Sepolia add request resolved', { chainId: target.chainId });
-    } catch (error) {
-        if (isUserRejectedError(error)) throw error;
-        // Wallets differ when a chain already exists: some resolve and others
-        // return an "already added" error. In either case, switching is the
-        // authoritative next step.
-        walletDebugLog('Base Sepolia add request non-fatal result', describeWalletDebugError(error));
-    }
-
-    await provider.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: target.hexChainId }]
-    });
-}
-
 function openCoreWalletForApproval(provider, method) {
     const approvalUrl = getCoreWalletApprovalUrl(provider);
     walletDebugLog('core wallet approval handoff', {
@@ -2077,52 +1876,6 @@ async function confirmCoreBaseSepolia(provider, source = 'mobile core session') 
     });
 
     return coreNetworkConfirmationPromise;
-}
-
-function scheduleMobileOperationalNetworkPrompt(provider, source) {
-    if (
-        coreNetworkPromptScheduled ||
-        !isMobileDevice() ||
-        isInjectedWalletBrowser() ||
-        !coreSessionNeedsBaseSepoliaConfirmation(provider)
-    ) return;
-
-    const topic = getCoreSessionTopic(provider);
-    if (!topic) return;
-    try {
-        if (sessionStorage.getItem(CORE_NETWORK_PROMPT_KEY) === topic) return;
-        sessionStorage.setItem(CORE_NETWORK_PROMPT_KEY, topic);
-    } catch {
-        // The prompt can still run when sessionStorage is unavailable.
-    }
-
-    coreNetworkPromptScheduled = true;
-    setTimeout(async () => {
-        try {
-            while (document.visibilityState !== 'visible') {
-                await waitForWalletResumeOrDelay(250);
-            }
-            const accepted = await window.confirm(
-                'ArtSoul uses Base Sepolia for bids, publishing, settlement, and minting. Switch your wallet to Base Sepolia now?'
-            );
-            if (!accepted) {
-                window.ErrorHandler?.showToast?.(
-                    'Connected. Base Sepolia will be requested before your next on-chain action.',
-                    'info'
-                );
-                return;
-            }
-            await confirmCoreBaseSepolia(provider, source);
-        } catch (error) {
-            walletDebugLog('core Base Sepolia confirmation failed', describeWalletDebugError(error));
-            const message = isUserRejectedError(error)
-                ? 'Network switch was declined. Base Sepolia is required for ArtSoul actions.'
-                : `Base Sepolia could not be confirmed: ${error?.message || 'Unknown wallet error'}`;
-            alert(message);
-        } finally {
-            coreNetworkPromptScheduled = false;
-        }
-    }, 0);
 }
 
 function applyConfirmedNetwork(chainId) {
@@ -2726,8 +2479,9 @@ async function openAppKitConnectModal(attempt) {
 }
 
 // STANDARD mobile external-browser connect: await provider.connect() through
-// the official WalletConnect modal, then apply the settled address before a
-// separate one-time operational-network confirmation. No settlement timeout
+// the official WalletConnect modal, then apply the settled address on whichever
+// EVM chain the wallet currently owns. Base Sepolia is enforced later by the
+// shared write guard, never by wallet identity or SIWE. No settlement timeout
 // or storage cleanup runs here. A second tap while a connect is in flight
 // reuses the same pairing, so a page never holds two pairings.
 function shouldDeferMobileAuthentication(connected) {
@@ -2762,8 +2516,6 @@ async function connectExternalMobileStandard() {
             chainId: connected.chainId,
             restored: connected.restored
         });
-        scheduleMobileOperationalNetworkPrompt(coreProvider, 'standard mobile connect');
-
         // A newly paired session gets one connect-only gesture so SIWE never
         // competes with the wallet round trip. Reusing an already-live session
         // is the protected action's next gesture and must be allowed to
@@ -2999,20 +2751,12 @@ window.safeConnectWallet = async () => {
                 );
             }
             const chainId = await requestProviderChainId(window.ethereum);
-            const validated = await ensureExternalMobileBaseSepolia({
+            const validated = {
                 address: connectedAddress,
                 chainId,
-                account: { address: connectedAddress, chainId }
-            }, 'mobile injected provider', attempt, window.ethereum, {
-                acceptForeignChain: true,
-                switchTimeout: MOBILE_CONNECT_SWITCH_TIMEOUT
-            });
-            if (!validated) {
-                throw attempt.failure || createWalletConnectError(
-                    'MOBILE_ACCOUNT_UNCONFIRMED',
-                    'The wallet session did not confirm the selected account. Please retry the connection.'
-                );
-            }
+                provider: window.ethereum
+            };
+            activeWalletProvider = window.ethereum;
             await handleProviderChainConfirmed(validated.chainId, 'mobile injected provider');
             await handleProviderAccountsChanged([validated.address], 'mobile injected provider', window.ethereum);
             notifyForeignChainAccepted(validated.chainId);
@@ -3040,33 +2784,14 @@ window.safeConnectWallet = async () => {
                 );
             }
 
-            let finalized = confirmed;
-            if (confirmed.chainId !== BASE_SEPOLIA_CHAIN_ID) {
-                finalized = await ensureExternalMobileBaseSepolia(
-                    {
-                        address: confirmed.address,
-                        chainId: confirmed.chainId,
-                        account: { address: confirmed.address, chainId: confirmed.chainId }
-                    },
-                    'desktop post-connect network validation',
-                    attempt,
-                    confirmed.provider || await getAppKitWalletProviderWithin(MOBILE_PROVIDER_REQUEST_TIMEOUT)
-                );
-                if (!finalized?.address) {
-                    throw attempt.failure || createWalletConnectError(
-                        'BASE_SEPOLIA_REQUIRED',
-                        'This connection requires Base Sepolia.'
-                    );
-                }
-            }
-
             clearModalIntent();
             await safeCloseModal('wallet connected');
+            notifyForeignChainAccepted(confirmed.chainId);
             walletDebugLog('wallet connection confirmed', {
-                address: maskWalletAddress(finalized.address),
-                chainId: finalized.chainId
+                address: maskWalletAddress(confirmed.address),
+                chainId: confirmed.chainId
             });
-            return finalized.address;
+            return confirmed.address;
         } else {
             throw createWalletConnectError(
                 'APPKIT_NOT_READY',
@@ -3298,8 +3023,6 @@ window.resetWalletConnection = async () => {
         sessionStorage.setItem('artsoul_disconnecting', 'true');
         clearModalIntent();
         sessionStorage.removeItem(CORE_NETWORK_CONFIRMATION_KEY);
-        sessionStorage.removeItem(CORE_NETWORK_PROMPT_KEY);
-        coreNetworkPromptScheduled = false;
 
         try {
             await Promise.race([
@@ -3381,29 +3104,6 @@ window.ensureAuthenticated = async () => {
                 address: maskWalletAddress(walletAddress)
             });
             return false;
-        }
-
-        // A negotiation-only chain may own the restored session. Confirm Base
-        // first so iOS never receives a network prompt and SIWE concurrently.
-        const coreProvider = getConnectedCoreProvider();
-        if (
-            isMobileDevice() &&
-            !isInjectedWalletBrowser() &&
-            coreProvider?.session &&
-            coreSessionNeedsBaseSepoliaConfirmation(coreProvider)
-        ) {
-            const automaticPromptOwnsFeedback = coreNetworkPromptScheduled;
-            try {
-                await window.ensureArtSoulWriteNetwork?.();
-            } catch (error) {
-                walletDebugLog('SIWE blocked until Base Sepolia is confirmed', describeWalletDebugError(error));
-                if (!automaticPromptOwnsFeedback) {
-                    alert(isUserRejectedError(error)
-                        ? 'Network switch was declined. Base Sepolia is required for this action.'
-                        : 'This action requires Base Sepolia. Open your wallet and approve the network request.');
-                }
-                return false;
-            }
         }
 
         if (window.SupabaseAuth) {
@@ -3815,7 +3515,6 @@ async function initializeAppKit() {
                         address: maskWalletAddress(restored.address),
                         chainId: restoredChainId
                     });
-                    scheduleMobileOperationalNetworkPrompt(restored.provider, 'boot session restore');
                     return;
                 }
 

@@ -153,6 +153,11 @@ function buildSiweMessage(walletAddress, nonce, chainId) {
     ].join('\n');
 }
 
+function utf8ToHex(value) {
+    const bytes = new TextEncoder().encode(String(value));
+    return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
 // ============================================
 // WALLET SIGNATURE AUTHENTICATION
 // ============================================
@@ -210,12 +215,12 @@ async function authenticateWithWallet(walletAddress, provider) {
         if (activeProvider && activeProvider.request) {
             signature = await requestWalletProvider(activeProvider, {
                 method: 'personal_sign',
-                params: [message, normalizedWallet]
+                params: [utf8ToHex(message), normalizedWallet]
             });
         } else if (window.ethereum) {
             signature = await window.ethereum.request({
                 method: 'personal_sign',
-                params: [message, normalizedWallet]
+                params: [utf8ToHex(message), normalizedWallet]
             });
         } else {
             throw new Error('No wallet provider available');

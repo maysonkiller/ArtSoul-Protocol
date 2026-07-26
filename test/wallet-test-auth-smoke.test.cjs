@@ -13,7 +13,7 @@ test('wallet-test exposes an isolated A1 SIWE and upload-policy variant', () => 
   assert.match(html, /never uploads a file or creates a Storage object/);
   assert.match(html, /id="walletTestCopy"/);
   assert.match(html, /Copy complete log/);
-  assert.match(html, /wallet-test\.js\?v=10/);
+  assert.match(html, /wallet-test\.js\?v=11/);
 });
 
 test('the A1 auth variant runs SIWE after the production wallet wrapper connects', () => {
@@ -49,14 +49,12 @@ test('wallet-test copies the complete status and log with an iOS-compatible fall
   assert.match(source, /copyButton\.addEventListener\('click', copyCompleteLog\)/);
 });
 
-test('wallet-test distinguishes deliberate deferral from SIWE and network failures', () => {
+test('wallet-test distinguishes deliberate deferral from SIWE failures', () => {
   assert.match(source, /const A1_AUTH_DIAGNOSTIC_STEPS = new Set/);
   assert.match(source, /SIWE deferred after external mobile wallet connect/);
-  assert.match(source, /SIWE blocked until Base Sepolia is confirmed/);
   assert.match(source, /SIWE signature failed/);
   assert.match(source, /outcome: 'deferred'/);
   assert.match(source, /outcome: 'failed'/);
-  assert.match(source, /outcome: 'network-blocked'/);
   assert.match(source, /SIWE did not complete\. Tap Copy complete log/);
 });
 
