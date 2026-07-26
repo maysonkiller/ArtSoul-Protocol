@@ -447,6 +447,26 @@ test('network confirmation and SIWE are serialized for the mobile core provider'
     assert.match(authSource, /requestWalletProvider\(activeProvider, \{\s*\n\s*method: 'personal_sign'/);
 });
 
+test('only a newly paired mobile session defers SIWE; a restored live session proceeds', () => {
+    const helperSource = appKit.match(
+        /function shouldDeferMobileAuthentication\(connected\) \{[\s\S]*?\n\}/
+    )?.[0] || '';
+    assert.ok(helperSource, 'mobile SIWE deferral predicate must exist');
+    const shouldDefer = Function(`${helperSource}; return shouldDeferMobileAuthentication;`)();
+
+    assert.equal(shouldDefer({ restored: false }), true);
+    assert.equal(shouldDefer({ restored: true }), false);
+    assert.equal(shouldDefer(null), false);
+
+    const standardConnect = appKit.match(
+        /async function connectExternalMobileStandard\(\) \{[\s\S]*?\n\}/
+    )?.[0] || '';
+    assert.match(
+        standardConnect,
+        /if \(shouldDeferMobileAuthentication\(connected\)\) \{[\s\S]*?deferMobileAuthenticationThisTurn = true/
+    );
+});
+
 test('external mobile header trusts the settled wallet state over AppKit/injected reads', () => {
     // Unconfirmed sync() calls (nav rebuild, late module load) must not flip
     // a live core-path wallet to Connect Wallet just because AppKit and

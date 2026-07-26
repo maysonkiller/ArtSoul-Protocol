@@ -2730,6 +2730,10 @@ async function openAppKitConnectModal(attempt) {
 // separate one-time operational-network confirmation. No settlement timeout
 // or storage cleanup runs here. A second tap while a connect is in flight
 // reuses the same pairing, so a page never holds two pairings.
+function shouldDeferMobileAuthentication(connected) {
+    return connected?.restored === false;
+}
+
 async function connectExternalMobileStandard() {
     sessionStorage.removeItem('artsoul_disconnecting');
     setConnectButtonPending(true);
@@ -2760,12 +2764,16 @@ async function connectExternalMobileStandard() {
         });
         scheduleMobileOperationalNetworkPrompt(coreProvider, 'standard mobile connect');
 
-        // Connect-only gesture: SIWE waits for the next protected action so
-        // the wallet round trip is never doubled.
-        deferMobileAuthenticationThisTurn = true;
-        setTimeout(() => {
-            deferMobileAuthenticationThisTurn = false;
-        }, 0);
+        // A newly paired session gets one connect-only gesture so SIWE never
+        // competes with the wallet round trip. Reusing an already-live session
+        // is the protected action's next gesture and must be allowed to
+        // continue to Base confirmation and SIWE.
+        if (shouldDeferMobileAuthentication(connected)) {
+            deferMobileAuthenticationThisTurn = true;
+            setTimeout(() => {
+                deferMobileAuthenticationThisTurn = false;
+            }, 0);
+        }
         return connected.address;
     } catch (error) {
         // User closed the official modal or rejected in the wallet: settle
