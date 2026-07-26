@@ -477,3 +477,29 @@ Rollback is code-only because A-43 adds no migration. Revert the merged PR on
 GitHub, pull the reverted `main`, rerun the build and focused tests, restart the
 Base Sepolia process, and repeat the health checks. Do not delete or rewrite
 `event_processing_registry` rows during rollback.
+
+### Committed event-processing lease production acceptance
+
+A-43 was accepted on 2026-07-26 UTC after the implementation from PR #144 was
+deployed on Hetzner with the reproducible npm-install repair from PR #145. The
+production-host evidence showed:
+
+- the pinned npm 11.6.2 clean install and ten-route production build completed;
+- the focused heartbeat-cancellation and failure-integrity suite passed 19/19;
+- PM2 restarted `artsoul-base-sepolia` successfully while the retired
+  `artsoul-eth-sepolia` process remained stopped;
+- the indexed cursor advanced from block 44641103 to 44641118 across the
+  deployment, with no regression;
+- `monitor:indexer` returned `ok=true`, and `/health` remained `healthy` at
+  confirmation depth 3 with four blocks of lag, zero unresolved errors, zero
+  rolling RPC errors, and `eventFailures={failed:0,dead:0}`;
+- the post-restart log contained no new `heartbeat_error`,
+  `heartbeat_lost_ownership`, `rollback_failed`, or
+  `registry_failure_record_failed` entry;
+- the production registry contained 90 Base Sepolia rows, all `completed`, and
+  the stale-processing query returned zero rows after the full lease timeout
+  plus reaper interval;
+- the accepted PM2 process list was saved.
+
+This closes A-43. It does not complete the separate seven-consecutive-day A9
+Alchemy/Supabase cost-observation requirement.
