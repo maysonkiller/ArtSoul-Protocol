@@ -36,6 +36,7 @@ let providerInitPromise = null;
 let connectPromise = null;
 let rejectionGuardBound = false;
 let modalInstance = null;
+let lastStaleSessionTopicRejection = null;
 
 // ONE modal instance per page, constructed on the first connect (the
 // projectId only arrives via configureCoreWallet, after module init). The
@@ -78,11 +79,11 @@ export function isCoreConnectInFlight() {
 }
 
 export function isCoreSessionActive() {
-    return Boolean(providerInstance?.session);
+    return getCoreSessionLiveness(providerInstance).live;
 }
 
 export function getConnectedCoreProvider() {
-    return providerInstance?.session ? providerInstance : null;
+    return getCoreSessionLiveness(providerInstance).live ? providerInstance : null;
 }
 
 // The provider instance regardless of session state. An IN-FLIGHT connect()
@@ -101,7 +102,7 @@ export function getCoreProviderInstance() {
 // address chain-independently from the session namespaces: the address is what
 // "connected" means; the network is the write-guard's business.
 export function getCoreSessionAddress(instance = providerInstance) {
-    if (!instance?.session) return null;
+    if (!getCoreSessionLiveness(instance).live) return null;
     const liveAccount = (instance.accounts || []).filter(Boolean)[0] || null;
     if (liveAccount) return liveAccount;
     const namespaceAccounts = Object.values(instance.session.namespaces || {})
@@ -121,6 +122,124 @@ export function parseCoreChainId(value) {
     if (caipMatch) return Number(caipMatch[1]);
     const parsed = text.startsWith('0x') ? parseInt(text, 16) : parseInt(text, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function maskCoreTopic(value) {
+    const topic = String(value || '');
+    if (!topic) return null;
+    if (topic.length <= 12) return '[redacted-topic]';
+    return `${topic.slice(0, 8)}...${topic.slice(-4)}`;
+}
+
+function readCoreSessionStore(instance) {
+    const store = instance?.signer?.client?.session;
+    if (typeof store?.getAll !== 'function') {
+        return { available: false, sessions: [] };
+    }
+    try {
+        const sessions = store.getAll();
+        return {
+            available: true,
+            sessions: Array.isArray(sessions) ? sessions : []
+        };
+    } catch (error) {
+        coreLog('core session store read failed', describeCoreError(error));
+        return { available: true, readFailed: true, sessions: [] };
+    }
+}
+
+// `provider.session` is a cached UniversalProvider field, not proof that the
+// SignClient still owns that topic. WalletConnect documents
+// "session topic doesn't exist" as a missing/disconnected session. Verify the
+// cached topic against the initialized SignClient store. The pinned SDK exposes
+// this store; if it is absent or unreadable, connected state cannot be proven.
+export function getCoreSessionLiveness(instance = providerInstance, nowMs = Date.now()) {
+    const session = instance?.session || null;
+    const topic = String(session?.topic || '');
+    if (!session || !topic) {
+        return { live: false, topic: topic || null, reason: 'provider-session-missing' };
+    }
+
+    const expiry = Number(session.expiry || 0);
+    if (Number.isFinite(expiry) && expiry > 0 && expiry <= Math.floor(nowMs / 1000)) {
+        return { live: false, topic, reason: 'session-expired' };
+    }
+
+    const storeState = readCoreSessionStore(instance);
+    if (!storeState.available) {
+        return { live: false, topic, reason: 'session-store-unavailable' };
+    }
+    if (storeState.readFailed) {
+        return { live: false, topic, reason: 'session-store-read-failed' };
+    }
+    const stored = storeState.sessions.some(
+        (candidate) => String(candidate?.topic || '') === topic
+    );
+    return {
+        live: stored,
+        topic,
+        reason: stored ? 'session-store-confirmed' : 'session-topic-missing'
+    };
+}
+
+function extractMissingSessionTopic(message) {
+    const match = String(message || '').match(
+        /session topic doesn't exist:\s*["']?([a-z0-9_-]{12,})/i
+    );
+    return match?.[1] || null;
+}
+
+function getMatchingStaleSessionRejection(instance, sinceMs = 0) {
+    const rejected = lastStaleSessionTopicRejection;
+    const currentTopic = String(instance?.session?.topic || '');
+    if (!rejected?.topic || !currentTopic) return null;
+    if (rejected.at < sinceMs || rejected.topic !== currentTopic) return null;
+    return rejected;
+}
+
+function createCoreSessionNotLiveError(reason) {
+    const error = new Error(
+        'WalletConnect did not establish a live session. Return to ArtSoul and tap Connect again.'
+    );
+    error.code = 'CORE_SESSION_NOT_LIVE';
+    error.reason = reason;
+    return error;
+}
+
+// This is NOT a remote disconnect and never runs for a live session. It only
+// drops a cached UniversalProvider session after the SignClient store proves
+// that the topic is absent/expired, or after the SDK itself rejects that exact
+// topic as missing. The next user tap can then create a fresh pairing.
+export async function discardInvalidCoreSession(instance = providerInstance, options = {}) {
+    const liveness = getCoreSessionLiveness(instance, options.nowMs);
+    const forcedTopic = String(options.rejectedTopic || '');
+    const forceExactRejectedTopic = Boolean(
+        forcedTopic &&
+        liveness.topic &&
+        forcedTopic === liveness.topic
+    );
+    if (!instance?.session || (liveness.live && !forceExactRejectedTopic)) return false;
+
+    const cleanup = instance?.signer?.cleanup;
+    if (typeof cleanup !== 'function') {
+        throw createCoreSessionNotLiveError('session-cleanup-unavailable');
+    }
+
+    coreLog('invalid WalletConnect session discarded locally', {
+        topic: maskCoreTopic(liveness.topic),
+        reason: forceExactRejectedTopic ? 'sdk-rejected-session-topic' : liveness.reason
+    });
+    try {
+        await cleanup.call(instance.signer);
+        instance.reset?.();
+        if (lastStaleSessionTopicRejection?.topic === liveness.topic) {
+            lastStaleSessionTopicRejection = null;
+        }
+        return true;
+    } catch (error) {
+        coreLog('invalid WalletConnect session cleanup failed', describeCoreError(error));
+        throw createCoreSessionNotLiveError('session-cleanup-failed');
+    }
 }
 
 export function getCoreSessionChainIds(instance = providerInstance) {
@@ -206,7 +325,7 @@ function waitForCoreDelay(ms) {
 }
 
 export function readCoreSessionSnapshot(instance = providerInstance) {
-    if (!instance?.session) return null;
+    if (!getCoreSessionLiveness(instance).live) return null;
     const address = getCoreSessionAddress(instance);
     if (!address) return null;
     return {
@@ -262,9 +381,11 @@ function warnIfWriteChainMissing(instance) {
     }
 }
 
-// Suppress only two known non-fatal SDK rejections: stale topic rotation and
-// the recursive switch triggered by an incoming chainChanged event for a
-// chain that was just added.
+// Classify the known stale-topic SDK rejection before suppressing browser
+// unhandled-rejection noise. A missing session topic is fatal to that cached
+// session and is checked before any connected state can be published.
+// The provider-route rejection remains non-fatal: it is the recursive switch
+// triggered by an incoming chainChanged event for a chain that was just added.
 function bindStaleTopicRejectionGuard() {
     if (rejectionGuardBound) return;
     rejectionGuardBound = true;
@@ -272,8 +393,17 @@ function bindStaleTopicRejectionGuard() {
         const message = String(event?.reason?.message || event?.reason || '');
         const stack = String(event?.reason?.stack || '');
         if (/no matching key/i.test(message)) {
+            const topic = extractMissingSessionTopic(message);
+            if (topic) {
+                lastStaleSessionTopicRejection = { topic, at: Date.now() };
+            }
             event.preventDefault();
-            coreLog('stale WalletConnect topic rejection suppressed', { message: message.slice(0, 160) });
+            coreLog(
+                topic
+                    ? 'missing WalletConnect session topic detected'
+                    : 'non-session WalletConnect stale-key rejection suppressed',
+                { topic: maskCoreTopic(topic) }
+            );
             return;
         }
         const providerRouteMissing = providerInstance?.session &&
@@ -421,6 +551,9 @@ export async function restoreCoreSessionOutcome(options = {}) {
             pollIntervalMs: options.pollIntervalMs
         });
         if (!restored) {
+            if (instance?.session && !getCoreSessionLiveness(instance).live) {
+                await discardInvalidCoreSession(instance);
+            }
             coreLog('core session restore completed without a session', {
                 elapsedMs: Date.now() - startedAt,
                 providerSessionPresent: Boolean(instance?.session),
@@ -459,6 +592,13 @@ export async function connectCoreWallet() {
 
     connectPromise = (async () => {
         const instance = await getCoreEthereumProvider();
+
+        if (instance.session) {
+            const rejected = getMatchingStaleSessionRejection(instance);
+            await discardInvalidCoreSession(instance, {
+                rejectedTopic: rejected?.topic || null
+            });
+        }
 
         if (instance.session) {
             const address = getCoreSessionAddress(instance);
@@ -562,12 +702,25 @@ export async function connectCoreWallet() {
             connectTask.catch(() => {});
             await Promise.race([connectTask, attemptAborted]);
             markAttemptSettled('connect() resolved');
+            const rejected = getMatchingStaleSessionRejection(instance, startedAt);
+            const liveness = getCoreSessionLiveness(instance);
+            if (!liveness.live || rejected) {
+                await discardInvalidCoreSession(instance, {
+                    rejectedTopic: rejected?.topic || null
+                });
+                throw createCoreSessionNotLiveError(
+                    rejected ? 'sdk-rejected-session-topic' : liveness.reason
+                );
+            }
             const result = {
                 provider: instance,
                 address: getCoreSessionAddress(instance),
                 chainId: resolveCoreSessionChainId(instance),
                 restored: false
             };
+            if (!result.address) {
+                throw createCoreSessionNotLiveError('session-address-missing');
+            }
             coreLog('core connect settled', {
                 elapsedMs: Date.now() - startedAt,
                 chainId: result.chainId,
