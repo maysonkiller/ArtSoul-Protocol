@@ -119,6 +119,16 @@ diagnostics.
 Repeat the operator smoke above after the remediation reaches production. A1
 remains open until the exact success evidence in steps 3-5 is captured.
 
+The first post-remediation rerun confirmed that the stale topic no longer
+published a false connected address. A later explicit attempt established a
+live wallet address and confirmed Base Sepolia (`84532`), but SIWE was still
+deferred and neither policy request ran. The follow-up root cause was narrower:
+the mobile wrapper re-armed its one-turn SIWE deferral even when
+`connectCoreWallet()` reused an already-live session. The deferral must apply
+only to a newly paired session (`restored: false`); a restored live session is
+already the next protected-action gesture and may proceed to serialized network
+confirmation and SIWE.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.
