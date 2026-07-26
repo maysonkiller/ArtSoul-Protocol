@@ -586,7 +586,7 @@ async function initializeAppKitModalLayer() {
 // official WalletConnect modal (showQrModal: false) that appkit-init.js
 // uses. Only the logging wrapper differs.
 async function initializeCoreLayer() {
-    const core = await import('/wallet-core-connect.js?v=14');
+    const core = await import('/wallet-core-connect.js?v=15');
     core.configureCoreWallet({
         projectId: PROJECT_ID,
         // Mirrors production: the mobile external path carries NO redirect —
@@ -674,7 +674,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=44');
+    await import('/appkit-init.js?v=45');
     await window.__artsoulAppKitBootPromise;
     modal = window.web3Modal || null;
     log('ArtSoul appkit wrapper ready', {

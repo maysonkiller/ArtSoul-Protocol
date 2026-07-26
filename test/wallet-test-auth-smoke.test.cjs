@@ -13,7 +13,7 @@ test('wallet-test exposes an isolated A1 SIWE and upload-policy variant', () => 
   assert.match(html, /never uploads a file or creates a Storage object/);
   assert.match(html, /id="walletTestCopy"/);
   assert.match(html, /Copy complete log/);
-  assert.match(html, /wallet-test\.js\?v=12/);
+  assert.match(html, /wallet-test\.js\?v=13/);
 });
 
 test('the A1 auth variant runs SIWE after the production wallet wrapper connects', () => {

@@ -19,6 +19,13 @@ import { WalletConnectModal } from 'https://esm.sh/@walletconnect/modal@2.7.0?bu
 const WC_ETHEREUM_PROVIDER_VERSION = '2.23.10';
 const WC_ETHEREUM_PROVIDER_URL = `https://esm.sh/@walletconnect/ethereum-provider@${WC_ETHEREUM_PROVIDER_VERSION}?bundle`;
 const WC_MODAL_VERSION = '2.7.0';
+// Keep the external-mobile WalletConnect client in one stable ArtSoul-owned
+// storage namespace. Older builds shared the SDK default namespace with
+// AppKit and previous connection experiments. On iOS those IndexedDB records
+// cannot always be enumerated or deleted, and UniversalProvider restores the
+// first stored session. A versioned, deterministic prefix gives this path one
+// clean source of truth without breaking persistence on later page loads.
+export const CORE_STORAGE_PREFIX = 'artsoul-mobile-core-v4';
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
@@ -268,6 +275,19 @@ export function getCoreSessionMethods(instance = providerInstance) {
     return [...new Set(methods)];
 }
 
+export function getCoreSessionStoreDiagnostics(instance = providerInstance) {
+    const storeState = readCoreSessionStore(instance);
+    const sessions = storeState.sessions || [];
+    return {
+        storagePrefix: CORE_STORAGE_PREFIX,
+        storeAvailable: storeState.available,
+        readFailed: Boolean(storeState.readFailed),
+        sessionCount: sessions.length,
+        currentTopic: maskCoreTopic(instance?.session?.topic),
+        storedTopics: sessions.map((session) => maskCoreTopic(session?.topic)).filter(Boolean)
+    };
+}
+
 export function getCoreWalletApprovalUrl(instance = providerInstance) {
     const redirect = instance?.session?.peer?.metadata?.redirect || {};
     const candidates = [redirect.native, redirect.universal].filter(Boolean);
@@ -335,7 +355,27 @@ export async function requestCoreWalletMethod(instance, request) {
         method: request.method,
         route: `eip155:${routeChainId}`
     });
-    return instance.signer.request(request, `eip155:${routeChainId}`);
+    try {
+        return await instance.signer.request(request, `eip155:${routeChainId}`);
+    } catch (error) {
+        const methodUnavailable = requiredMethod && (
+            Number(error?.code) === -32601 ||
+            /method not found/i.test(String(error?.message || error || ''))
+        );
+        if (!methodUnavailable) throw error;
+
+        const mismatch = new Error(
+            `The WalletConnect session cannot execute ${request.method}. Reconnect the wallet to create a fresh ArtSoul session.`
+        );
+        mismatch.code = 'CORE_METHOD_RUNTIME_MISMATCH';
+        mismatch.cause = error;
+        coreLog('core wallet method rejected by the approved peer session', {
+            method: request.method,
+            route: `eip155:${routeChainId}`,
+            ...getCoreSessionStoreDiagnostics(instance)
+        });
+        throw mismatch;
+    }
 }
 
 // A confirmation supplied by the app represents a successful wallet-approved
@@ -529,6 +569,7 @@ export async function getCoreEthereumProvider() {
             const EthereumProvider = module.EthereumProvider || module.default;
             const instance = await EthereumProvider.init({
                 projectId: settings.projectId,
+                customStoragePrefix: CORE_STORAGE_PREFIX,
                 chains: REQUIRED_CHAIN_IDS,
                 optionalChains: OPTIONAL_CHAIN_IDS,
                 methods: REQUIRED_METHODS,
@@ -545,7 +586,8 @@ export async function getCoreEthereumProvider() {
                 optionalChains: OPTIONAL_CHAIN_IDS,
                 methods: REQUIRED_METHODS,
                 events: REQUIRED_EVENTS,
-                sessionRestorable: Boolean(instance.session)
+                sessionRestorable: Boolean(instance.session),
+                sessionStore: getCoreSessionStoreDiagnostics(instance)
             });
             return instance;
         })().catch((error) => {
@@ -604,6 +646,7 @@ export async function restoreCoreSessionOutcome(options = {}) {
             chainId: restored.chainId,
             namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
             namespaceMethods: getCoreSessionMethods(instance),
+            sessionStore: getCoreSessionStoreDiagnostics(instance),
             elapsedMs: Date.now() - startedAt
         });
         return { status: 'restored', session: restored };
@@ -646,7 +689,8 @@ export async function connectCoreWallet() {
                 const chainId = resolveCoreSessionChainId(instance);
                 coreLog('core connect reused live session', {
                     chainId,
-                    namespaceMethods: getCoreSessionMethods(instance)
+                    namespaceMethods: getCoreSessionMethods(instance),
+                    sessionStore: getCoreSessionStoreDiagnostics(instance)
                 });
                 return {
                     provider: instance,
@@ -768,7 +812,8 @@ export async function connectCoreWallet() {
                 elapsedMs: Date.now() - startedAt,
                 chainId: result.chainId,
                 namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
-                namespaceMethods: getCoreSessionMethods(instance)
+                namespaceMethods: getCoreSessionMethods(instance),
+                sessionStore: getCoreSessionStoreDiagnostics(instance)
             });
             warnIfWriteChainMissing(instance);
             return result;

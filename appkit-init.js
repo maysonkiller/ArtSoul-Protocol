@@ -23,7 +23,7 @@ import {
     requestCoreWalletMethod,
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=14'
+} from './wallet-core-connect.js?v=15'
 
 // ============================================
 // CONFIGURATION
@@ -153,10 +153,11 @@ const CORE_NETWORK_CONFIRMATION_TIMEOUT = 30000;
 const NETWORK_MODAL_INTENT_WINDOW = 120000;
 const MODAL_CLOSE_RETRY_DELAY = 400;
 const WALLET_STORAGE_VERSION_KEY = 'artsoul_wallet_storage_version';
-// v3 invalidates the old all-optional WalletConnect proposal. Those sessions
-// could be live while legitimately omitting personal_sign, which made mobile
-// SIWE fail before MetaMask could display the approval request.
-const WALLET_STORAGE_VERSION = 'appkit-1.8.21-required-siwe-session-v3';
+// v4 clears the local wallet hint before the external-mobile provider moves
+// into its stable ArtSoul-only WalletConnect storage namespace. iOS may hide
+// SDK IndexedDB databases from enumeration, so correctness no longer depends
+// on this best-effort migration deleting every legacy topic.
+const WALLET_STORAGE_VERSION = 'appkit-1.8.21-isolated-core-session-v4';
 const FEATURED_WALLETS = {
     base: 'fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa',
     metamask: 'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96',
