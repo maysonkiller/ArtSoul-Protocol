@@ -49,6 +49,20 @@ function maskAddress(value) {
         : address || null;
 }
 
+function maskSessionTopic(value) {
+    const topic = String(value || '');
+    if (!topic) return null;
+    if (topic.length <= 12) return '[redacted-topic]';
+    return `${topic.slice(0, 8)}...${topic.slice(-4)}`;
+}
+
+function sanitizeDiagnosticText(value) {
+    return String(value || '').replace(
+        /(session topic doesn't exist:\s*["']?)([a-z0-9_-]{12,})/gi,
+        (_, prefix, topic) => `${prefix}${maskSessionTopic(topic)}`
+    );
+}
+
 function parseChainId(value) {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -62,8 +76,10 @@ function describeError(error) {
     return {
         name: error?.name || 'Error',
         code: error?.code ?? null,
-        message: error?.message || String(error),
-        stack: String(error?.stack || '').split('\n').slice(0, 4).join(' | ') || null
+        message: sanitizeDiagnosticText(error?.message || String(error)),
+        stack: sanitizeDiagnosticText(
+            String(error?.stack || '').split('\n').slice(0, 4).join(' | ')
+        ) || null
     };
 }
 
@@ -200,6 +216,7 @@ function safeDetail(detail) {
     return Object.fromEntries(Object.entries(detail).map(([key, value]) => {
         if (/token|signature|secret/i.test(key) || /^projectid$/i.test(key)) return [key, '[redacted]'];
         if (/address/i.test(key)) return [key, maskAddress(value)];
+        if (/topic/i.test(key)) return [key, maskSessionTopic(value)];
         if (value instanceof Error) return [key, describeError(value)];
         return [key, value];
     }));
@@ -512,7 +529,7 @@ async function initializeAppKitModalLayer() {
 // official WalletConnect modal (showQrModal: false) that appkit-init.js
 // uses. Only the logging wrapper differs.
 async function initializeCoreLayer() {
-    const core = await import('/wallet-core-connect.js?v=12');
+    const core = await import('/wallet-core-connect.js?v=13');
     core.configureCoreWallet({
         projectId: PROJECT_ID,
         // Mirrors production: the mobile external path carries NO redirect —
@@ -600,7 +617,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=40');
+    await import('/appkit-init.js?v=41');
     log('ArtSoul appkit wrapper imported', {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function'
