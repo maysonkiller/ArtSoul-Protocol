@@ -19,12 +19,12 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit-adapter-wagmi@1\.8\.21\?bundle/);
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
-    for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=44/, `${page} must load the standard wallet flow`);
+    for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
+        assert.match(read(page), /appkit-init\.js\?v=45/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=14/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=14/);
-    assert.match(walletTest, /appkit-init\.js\?v=44/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=15/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=15/);
+    assert.match(walletTest, /appkit-init\.js\?v=45/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -46,6 +46,9 @@ test('mobile external browsers use the standard flow: pinned provider + official
     assert.match(coreWallet, /const REQUIRED_CHAIN_IDS = \[BASE_SEPOLIA_CHAIN_ID\]/);
     assert.match(coreWallet, /const OPTIONAL_CHAIN_IDS = \[8453, 1\]/);
     assert.match(coreWallet, /const REQUIRED_METHODS = \['personal_sign', 'eth_sendTransaction'\]/);
+    assert.match(coreWallet, /CORE_STORAGE_PREFIX = 'artsoul-mobile-core-v4'/);
+    assert.match(coreWallet, /customStoragePrefix: CORE_STORAGE_PREFIX/);
+    assert.doesNotMatch(coreWallet, /customStoragePrefix:\s*(?:crypto|Date|Math)\./);
     assert.match(coreWallet, /chains: REQUIRED_CHAIN_IDS/);
     assert.match(coreWallet, /optionalChains: OPTIONAL_CHAIN_IDS/);
     assert.match(coreWallet, /methods: REQUIRED_METHODS/);
@@ -73,8 +76,8 @@ test('mobile external browsers use the standard flow: pinned provider + official
     assert.match(appKit, /return connectExternalMobileStandard\(\);/);
 });
 
-test('the one-time compatibility migration removes all-optional sessions before core restore', () => {
-    assert.match(appKit, /WALLET_STORAGE_VERSION = 'appkit-1\.8\.21-required-siwe-session-v3'/);
+test('the one-time compatibility migration resets local hints before isolated core restore', () => {
+    assert.match(appKit, /WALLET_STORAGE_VERSION = 'appkit-1\.8\.21-isolated-core-session-v4'/);
     const migration = appKit.match(/async function migrateWalletStorageOnce\(\) \{[\s\S]*?\n\}/)?.[0] || '';
     assert.ok(migration, 'wallet storage migration must exist');
     assert.match(migration, /sdkFragments = \['walletconnect', 'wc@', 'reown', 'appkit', 'wagmi'/);

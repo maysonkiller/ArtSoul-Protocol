@@ -15,7 +15,7 @@ function loadCoreRestoreHarness() {
         .replace(/\bexport\s+/g, '');
     return new Function(
         'window',
-        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, getCoreSessionLiveness, discardInvalidCoreSession, resolveCoreSessionChainId, resolveCoreRequestChainId, getCoreSessionMethods, requestCoreWalletMethod, getCoreWalletApprovalUrl };`
+        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, getCoreSessionLiveness, discardInvalidCoreSession, resolveCoreSessionChainId, resolveCoreRequestChainId, getCoreSessionMethods, getCoreSessionStoreDiagnostics, requestCoreWalletMethod, getCoreWalletApprovalUrl };`
     )({ addEventListener() {}, location: { origin: 'https://artsoul.vercel.app' } });
 }
 
@@ -420,6 +420,75 @@ test('a session that omitted optional personal_sign fails clearly before RPC rou
         (error) => error?.code === 'CORE_METHOD_NOT_APPROVED'
     );
     assert.equal(routed, false);
+});
+
+test('session-store diagnostics expose duplicate topics only in masked form', () => {
+    const { getCoreSessionStoreDiagnostics } = loadCoreRestoreHarness();
+    const provider = {
+        session: {
+            topic: 'current-session-topic-1234567890'
+        },
+        signer: {
+            client: {
+                session: {
+                    getAll: () => [
+                        { topic: 'current-session-topic-1234567890' },
+                        { topic: 'stale-session-topic-0987654321' }
+                    ]
+                }
+            }
+        }
+    };
+
+    assert.deepEqual(getCoreSessionStoreDiagnostics(provider), {
+        storagePrefix: 'artsoul-mobile-core-v4',
+        storeAvailable: true,
+        readFailed: false,
+        sessionCount: 2,
+        currentTopic: 'current-...7890',
+        storedTopics: ['current-...7890', 'stale-se...4321']
+    });
+});
+
+test('an approved method rejected by the peer is reported as a runtime session mismatch', async () => {
+    const { requestCoreWalletMethod } = loadCoreRestoreHarness();
+    const provider = {
+        chainId: 84532,
+        session: {
+            topic: 'single-session-topic-1234567890',
+            namespaces: {
+                eip155: {
+                    chains: ['eip155:84532'],
+                    accounts: ['eip155:84532:0x6ec800000000000000000000000000000000989b'],
+                    methods: ['personal_sign', 'eth_sendTransaction']
+                }
+            }
+        },
+        signer: {
+            client: {
+                session: {
+                    getAll: () => [{ topic: 'single-session-topic-1234567890' }]
+                }
+            },
+            request: async () => {
+                const error = new Error('Method not found');
+                error.code = -32601;
+                throw error;
+            }
+        }
+    };
+
+    await assert.rejects(
+        requestCoreWalletMethod(provider, {
+            method: 'personal_sign',
+            params: ['0x417274536f756c', '0x6ec800000000000000000000000000000000989b']
+        }),
+        (error) => (
+            error?.code === 'CORE_METHOD_RUNTIME_MISMATCH' &&
+            /fresh ArtSoul session/i.test(error.message) &&
+            error.cause?.code === -32601
+        )
+    );
 });
 
 test('a settled mobile session exposes its wallet approval link without changing connect metadata', () => {
