@@ -167,6 +167,31 @@ wallet-storage migration removes pre-fix local sessions so the next explicit
 Connect creates a permission-complete pairing. A1 remains open pending the
 same production phone acceptance.
 
+The next phone run proved that proposal permissions alone did not create a new
+pairing. The client reported `restored: true`, the local namespace listed both
+required methods, and `personal_sign` was routed correctly, but the peer still
+returned JSON-RPC `Method not found`. Two different masked session topics also
+appeared during one page lifecycle. This is evidence of multiple historical
+WalletConnect sessions in the shared SDK store, not a SIWE message-format or
+Base-network failure. In the pinned UniversalProvider 2.23.10 implementation,
+provider initialization without an explicit session restores the first record
+returned by `client.session.getAll()`. The existing migration could not make
+that selection deterministic because iOS WebKit may not expose WalletConnect
+IndexedDB databases through `indexedDB.databases()`, yet the migration marker
+was still persisted.
+
+The external-mobile provider now uses one deterministic, versioned
+`customStoragePrefix` owned by ArtSoul. This isolates it from legacy AppKit and
+earlier diagnostic sessions while preserving normal reload persistence inside
+the new namespace. Provider, restore, reuse, connect, and peer-method-failure
+diagnostics record only the session count and masked topics. A peer that
+advertises a required method but rejects it at runtime is surfaced as
+`CORE_METHOD_RUNTIME_MISMATCH`; the client does not fall back to deprecated
+`eth_sign` or silently reinterpret the SIWE payload. The next phone run must
+begin with no restored account, establish one fresh pairing, record
+`restored: false`, then complete SIWE and both negative upload-policy probes.
+A1 remains open until that production evidence is captured.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.
