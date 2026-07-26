@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=40/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=41/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=12/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=12/);
-    assert.match(walletTest, /appkit-init\.js\?v=40/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=13/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=13/);
+    assert.match(walletTest, /appkit-init\.js\?v=41/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -77,6 +77,27 @@ test('core network methods route through a chain the wallet actually approved', 
     assert.match(request, /instance\.signer\.request\(request, `eip155:\$\{routeChainId\}`\)/);
     assert.doesNotMatch(request, /instance\.request\(/);
     assert.match(coreWallet, /non-fatal WalletConnect SDK provider-route rejection suppressed/);
+});
+
+test('a cached session topic must still exist in the SignClient store before connected state is published', () => {
+    assert.match(coreWallet, /export function getCoreSessionLiveness/);
+    assert.match(coreWallet, /store\.getAll\(\)/);
+    assert.match(coreWallet, /session-topic-missing/);
+    assert.match(coreWallet, /session-expired/);
+    assert.match(coreWallet, /export async function discardInvalidCoreSession/);
+    assert.match(coreWallet, /await cleanup\.call\(instance\.signer\)/);
+    assert.match(coreWallet, /instance\.reset\?\.\(\)/);
+    assert.match(coreWallet, /CORE_SESSION_NOT_LIVE/);
+
+    const connect = coreWallet.match(/export async function connectCoreWallet[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(connect, /await discardInvalidCoreSession\(instance/);
+    assert.match(connect, /const liveness = getCoreSessionLiveness\(instance\)/);
+    assert.match(connect, /if \(!liveness\.live \|\| rejected\)/);
+    assert.ok(
+        connect.indexOf('if (!liveness.live || rejected)') <
+        connect.indexOf('const result = {'),
+        'the live-topic guard must run before the connection result is returned'
+    );
 });
 
 test('the official modal lifecycle is deterministic: open on display_uri, close on every settle', () => {

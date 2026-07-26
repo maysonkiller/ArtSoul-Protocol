@@ -14,7 +14,7 @@ function loadCoreRestoreHarness() {
         .replace(/\bexport\s+/g, '');
     return new Function(
         'window',
-        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, resolveCoreSessionChainId, resolveCoreRequestChainId, requestCoreWalletMethod, getCoreWalletApprovalUrl };`
+        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, getCoreSessionLiveness, discardInvalidCoreSession, resolveCoreSessionChainId, resolveCoreRequestChainId, requestCoreWalletMethod, getCoreWalletApprovalUrl };`
     )({ addEventListener() {}, location: { origin: 'https://artsoul.vercel.app' } });
 }
 
@@ -73,7 +73,18 @@ test('delayed WalletConnect persistence hydration restores before the bounded de
     const { waitForCoreSessionSnapshot } = loadCoreRestoreHarness();
     let clock = 0;
     let polls = 0;
-    const provider = { session: null, accounts: [], chainId: 84532 };
+    const provider = {
+        session: null,
+        accounts: [],
+        chainId: 84532,
+        signer: {
+            client: {
+                session: {
+                    getAll: () => provider.session ? [provider.session] : []
+                }
+            }
+        }
+    };
     const snapshot = await waitForCoreSessionSnapshot(provider, {
         timeoutMs: 4500,
         pollIntervalMs: 100,
@@ -83,6 +94,8 @@ test('delayed WalletConnect persistence hydration restores before the bounded de
             polls += 1;
             if (polls === 3) {
                 provider.session = {
+                    topic: 'hydrated-session-topic',
+                    expiry: Math.floor(Date.now() / 1000) + 3600,
                     namespaces: {
                         eip155: { accounts: ['eip155:84532:0x6ec800000000000000000000000000000000989b'] }
                     }
@@ -94,6 +107,101 @@ test('delayed WalletConnect persistence hydration restores before the bounded de
     assert.equal(snapshot.address, '0x6ec800000000000000000000000000000000989b');
     assert.equal(snapshot.chainId, 84532);
     assert.equal(clock, 300);
+});
+
+test('stale or expired core sessions are rejected and only dead local state is discarded', async () => {
+    const {
+        getCoreSessionLiveness,
+        discardInvalidCoreSession,
+        readCoreSessionSnapshot
+    } = loadCoreRestoreHarness();
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600;
+    const staleSession = {
+        topic: 'stale-session-topic',
+        expiry: futureExpiry,
+        namespaces: {
+            eip155: {
+                chains: ['eip155:1'],
+                accounts: ['eip155:1:0x6ec800000000000000000000000000000000989b']
+            }
+        }
+    };
+    let staleCleanupCalls = 0;
+    let staleResetCalls = 0;
+    const staleSigner = {
+        session: staleSession,
+        client: { session: { getAll: () => [] } },
+        async cleanup() {
+            staleCleanupCalls += 1;
+            this.session = undefined;
+        }
+    };
+    const staleProvider = {
+        get session() { return staleSigner.session; },
+        signer: staleSigner,
+        accounts: [staleSession.namespaces.eip155.accounts[0].split(':')[2]],
+        chainId: 1,
+        reset() { staleResetCalls += 1; }
+    };
+
+    assert.deepEqual(getCoreSessionLiveness(staleProvider), {
+        live: false,
+        topic: 'stale-session-topic',
+        reason: 'session-topic-missing'
+    });
+    assert.equal(readCoreSessionSnapshot(staleProvider), null);
+    assert.equal(await discardInvalidCoreSession(staleProvider), true);
+    assert.equal(staleCleanupCalls, 1);
+    assert.equal(staleResetCalls, 1);
+    assert.equal(staleProvider.session, undefined);
+
+    const liveSession = {
+        ...staleSession,
+        topic: 'live-session-topic'
+    };
+    let liveCleanupCalls = 0;
+    const liveProvider = {
+        session: liveSession,
+        accounts: ['0x6ec800000000000000000000000000000000989b'],
+        chainId: 1,
+        signer: {
+            client: { session: { getAll: () => [liveSession] } },
+            async cleanup() { liveCleanupCalls += 1; }
+        }
+    };
+    assert.equal(getCoreSessionLiveness(liveProvider).live, true);
+    assert.equal(readCoreSessionSnapshot(liveProvider).address, liveProvider.accounts[0]);
+    assert.equal(await discardInvalidCoreSession(liveProvider), false);
+    assert.equal(liveCleanupCalls, 0, 'a live session must never be cleaned up');
+
+    const unverifiableProvider = {
+        ...liveProvider,
+        signer: {}
+    };
+    assert.equal(
+        getCoreSessionLiveness(unverifiableProvider).reason,
+        'session-store-unavailable'
+    );
+    assert.equal(
+        getCoreSessionLiveness(unverifiableProvider).live,
+        false,
+        'a cached provider session without a SignClient store must fail closed'
+    );
+
+    const expiredSession = {
+        ...liveSession,
+        topic: 'expired-session-topic',
+        expiry: Math.floor(Date.now() / 1000) - 1
+    };
+    const expiredProvider = {
+        ...liveProvider,
+        session: expiredSession,
+        signer: {
+            ...liveProvider.signer,
+            client: { session: { getAll: () => [expiredSession] } }
+        }
+    };
+    assert.equal(getCoreSessionLiveness(expiredProvider).reason, 'session-expired');
 });
 
 test('restored core session accepts only an explicit switch proof outside its namespaces', () => {
