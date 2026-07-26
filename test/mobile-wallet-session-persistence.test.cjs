@@ -15,7 +15,7 @@ function loadCoreRestoreHarness() {
         .replace(/\bexport\s+/g, '');
     return new Function(
         'window',
-        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, getCoreSessionLiveness, discardInvalidCoreSession, resolveCoreSessionChainId, resolveCoreRequestChainId, requestCoreWalletMethod, getCoreWalletApprovalUrl };`
+        `${executableSource}\nreturn { waitForCoreSessionSnapshot, readCoreSessionSnapshot, getCoreSessionLiveness, discardInvalidCoreSession, resolveCoreSessionChainId, resolveCoreRequestChainId, getCoreSessionMethods, requestCoreWalletMethod, getCoreWalletApprovalUrl };`
     )({ addEventListener() {}, location: { origin: 'https://artsoul.vercel.app' } });
 }
 
@@ -388,6 +388,38 @@ test('core wallet methods bypass a fictitious SDK chain and use an approved sess
         },
         route: 'eip155:8453'
     }]);
+});
+
+test('a session that omitted optional personal_sign fails clearly before RPC routing', async () => {
+    const { getCoreSessionMethods, requestCoreWalletMethod } = loadCoreRestoreHarness();
+    let routed = false;
+    const provider = {
+        chainId: 84532,
+        session: {
+            namespaces: {
+                eip155: {
+                    chains: ['eip155:84532'],
+                    accounts: ['eip155:84532:0x6ec800000000000000000000000000000000989b'],
+                    methods: ['eth_sendTransaction']
+                }
+            }
+        },
+        signer: {
+            request: async () => {
+                routed = true;
+            }
+        }
+    };
+
+    assert.deepEqual(getCoreSessionMethods(provider), ['eth_sendTransaction']);
+    await assert.rejects(
+        requestCoreWalletMethod(provider, {
+            method: 'personal_sign',
+            params: ['0x417274536f756c', '0x6ec800000000000000000000000000000000989b']
+        }),
+        (error) => error?.code === 'CORE_METHOD_NOT_APPROVED'
+    );
+    assert.equal(routed, false);
 });
 
 test('a settled mobile session exposes its wallet approval link without changing connect metadata', () => {
