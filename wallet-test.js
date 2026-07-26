@@ -670,11 +670,11 @@ async function initializeArtSoulLayer(withAuth) {
         await import('/supabase-client.js?wallettest=1');
         log('layer module loaded', { src: '/supabase-client.js' });
         log('layer module requested', { src: '/supabase-auth.js' });
-        await import('/supabase-auth.js?wallettest=1');
+        await import('/supabase-auth.js?wallettest=2');
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=42');
+    await import('/appkit-init.js?v=43');
     await window.__artsoulAppKitBootPromise;
     modal = window.web3Modal || null;
     log('ArtSoul appkit wrapper ready', {
@@ -737,7 +737,6 @@ const A1_AUTH_DIAGNOSTIC_STEPS = new Set([
     'core connect settled',
     'standard mobile connect settled',
     'SIWE deferred after external mobile wallet connect',
-    'SIWE blocked until Base Sepolia is confirmed',
     'transaction provider selected',
     'SIWE signature requested',
     'core wallet method routed',
@@ -760,20 +759,12 @@ function summarizeA1AuthenticationAttempt(startSequence) {
         }));
     const findLast = (step) => [...entries].reverse().find((entry) => entry.step === step);
     const failure = findLast('SIWE signature failed');
-    const networkBlock = findLast('SIWE blocked until Base Sepolia is confirmed');
     const deferred = findLast('SIWE deferred after external mobile wallet connect');
 
     if (failure) {
         return {
             outcome: 'failed',
             reason: failure.detail?.message || 'SIWE signature or verification failed.',
-            diagnostics: entries
-        };
-    }
-    if (networkBlock) {
-        return {
-            outcome: 'network-blocked',
-            reason: networkBlock.detail?.message || 'Base Sepolia was not confirmed.',
             diagnostics: entries
         };
     }
