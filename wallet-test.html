@@ -33,7 +33,7 @@
         .wallet-test-title { margin: 0 0 6px; font-size: 1.15rem; }
         .wallet-test-note { margin: 0; color: var(--c-text-muted); font-size: 0.84rem; }
         .wallet-test-status { margin-top: 10px; font: 0.78rem/1.45 ui-monospace, monospace; }
-        #walletTestConnect {
+        .wallet-test-action {
             width: 100%;
             min-height: 48px;
             border: 1px solid var(--c-accent);
@@ -44,7 +44,11 @@
             font-weight: 700;
             cursor: pointer;
         }
-        #walletTestConnect:disabled { opacity: 0.65; cursor: wait; }
+        .wallet-test-action:disabled { opacity: 0.65; cursor: wait; }
+        #walletTestCopy {
+            border-color: var(--c-border);
+            color: var(--c-text-muted);
+        }
         .wallet-test-variants {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -94,9 +98,10 @@
             <a class="wallet-test-variant" href="?walletdebug=1&amp;layer=appkit-modal">D: Official AppKit modal</a>
             <a class="wallet-test-variant wallet-test-variant-auth" href="?walletdebug=1&amp;layer=auth">E: SIWE + upload policy</a>
         </nav>
-        <button id="walletTestConnect" type="button">Connect with bare AppKit</button>
+        <button id="walletTestConnect" class="wallet-test-action" type="button">Connect with bare AppKit</button>
+        <button id="walletTestCopy" class="wallet-test-action" type="button">Copy complete log</button>
         <pre id="walletTestLog" aria-live="polite"></pre>
     </main>
-    <script type="module" src="wallet-test.js?v=9"></script>
+    <script type="module" src="wallet-test.js?v=10"></script>
 </body>
 </html>

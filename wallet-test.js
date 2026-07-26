@@ -35,10 +35,12 @@ const networks = layer === 'appkit-modal' || variant !== 'multi'
 const logElement = document.getElementById('walletTestLog');
 const statusElement = document.getElementById('walletTestStatus');
 const connectButton = document.getElementById('walletTestConnect');
+const copyButton = document.getElementById('walletTestCopy');
 let sequence = 0;
 let modal = null;
 let adapter = null;
 let transportRestartPromise = null;
+let copyFeedbackTimer = null;
 const diagnosticClients = new WeakSet();
 const diagnosticRelayers = new WeakSet();
 
@@ -57,10 +59,12 @@ function maskSessionTopic(value) {
 }
 
 function sanitizeDiagnosticText(value) {
-    return String(value || '').replace(
-        /(session topic doesn't exist:\s*["']?)([a-z0-9_-]{12,})/gi,
-        (_, prefix, topic) => `${prefix}${maskSessionTopic(topic)}`
-    );
+    return String(value || '')
+        .replace(
+            /(session topic doesn't exist:\s*["']?)([a-z0-9_-]{12,})/gi,
+            (_, prefix, topic) => `${prefix}${maskSessionTopic(topic)}`
+        )
+        .replace(/0x[a-f0-9]{40}/gi, (address) => maskAddress(address));
 }
 
 function parseChainId(value) {
@@ -211,15 +215,21 @@ async function restartRelayTransport(source) {
     return transportRestartPromise;
 }
 
-function safeDetail(detail) {
-    if (!detail || typeof detail !== 'object') return detail ?? null;
-    return Object.fromEntries(Object.entries(detail).map(([key, value]) => {
-        if (/token|signature|secret/i.test(key) || /^projectid$/i.test(key)) return [key, '[redacted]'];
-        if (/address/i.test(key)) return [key, maskAddress(value)];
-        if (/topic/i.test(key)) return [key, maskSessionTopic(value)];
-        if (value instanceof Error) return [key, describeError(value)];
-        return [key, value];
-    }));
+function safeDetail(detail, key = '') {
+    if (/token|signature|secret/i.test(key) || /^projectid$/i.test(key)) return '[redacted]';
+    if (/address/i.test(key)) return maskAddress(detail);
+    if (/topic/i.test(key)) return maskSessionTopic(detail);
+    if (detail instanceof Error) return describeError(detail);
+    if (typeof detail === 'string') return sanitizeDiagnosticText(detail);
+    if (Array.isArray(detail)) return detail.slice(0, 40).map((value) => safeDetail(value));
+    if (detail && typeof detail === 'object') {
+        return Object.fromEntries(
+            Object.entries(detail)
+                .slice(0, 40)
+                .map(([entryKey, value]) => [entryKey, safeDetail(value, entryKey)])
+        );
+    }
+    return detail ?? null;
 }
 
 function log(step, detail = null) {
@@ -238,6 +248,53 @@ function log(step, detail = null) {
     logElement.scrollTop = logElement.scrollHeight;
     console.log('[WalletIsolationTest]', payload);
 }
+
+function completeLogText() {
+    return [
+        'Wallet connection isolation test',
+        statusElement.textContent.trim(),
+        '',
+        logElement.textContent.trim()
+    ].join('\n');
+}
+
+function copyWithTextarea(value) {
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', '');
+    textarea.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) throw new Error('The browser did not copy the log.');
+}
+
+async function copyCompleteLog() {
+    const value = completeLogText();
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(value);
+        } else {
+            copyWithTextarea(value);
+        }
+        copyButton.textContent = 'Complete log copied';
+    } catch {
+        try {
+            copyWithTextarea(value);
+            copyButton.textContent = 'Complete log copied';
+        } catch {
+            copyButton.textContent = 'Copy failed — retry';
+        }
+    }
+    clearTimeout(copyFeedbackTimer);
+    copyFeedbackTimer = setTimeout(() => {
+        copyButton.textContent = 'Copy complete log';
+    }, 2500);
+}
+
+copyButton.addEventListener('click', copyCompleteLog);
 
 function accountSnapshot(account = modal?.getAccount?.()) {
     const address = account?.address || account?.allAccounts?.[0]?.address || null;
@@ -618,9 +675,12 @@ async function initializeArtSoulLayer(withAuth) {
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
     await import('/appkit-init.js?v=42');
-    log('ArtSoul appkit wrapper imported', {
+    await window.__artsoulAppKitBootPromise;
+    modal = window.web3Modal || null;
+    log('ArtSoul appkit wrapper ready', {
         modalAvailable: Boolean(window.web3Modal),
-        safeConnectAvailable: typeof window.safeConnectWallet === 'function'
+        safeConnectAvailable: typeof window.safeConnectWallet === 'function',
+        account: accountSnapshot(window.web3Modal?.getAccount?.())
     });
     connectButton.textContent = withAuth
         ? 'Connect, sign in, and run A1 smoke'
@@ -629,22 +689,30 @@ async function initializeArtSoulLayer(withAuth) {
         log('ArtSoul Connect click entered');
         connectButton.disabled = true;
         try {
+            const debugStartSequence = window.ArtSoulWalletDebug?.snapshot?.().at(-1)?.sequence || 0;
             const address = await window.safeConnectWallet?.();
             log('ArtSoul Connect resolved', {
                 address: maskAddress(address),
                 chainId: window.getCurrentChainId?.() || null,
+                account: accountSnapshot(window.web3Modal?.getAccount?.()),
                 debug: withAuth ? null : (window.ArtSoulWalletDebug?.snapshot?.().slice(-3) || [])
             });
             if (!withAuth || !address) return;
 
             const authenticated = await window.ensureAuthenticated?.();
             if (!authenticated) {
-                log('A1 authentication deferred or not completed', {
+                const authOutcome = summarizeA1AuthenticationAttempt(debugStartSequence);
+                log('A1 authentication not completed', {
                     address: maskAddress(address),
-                    instruction: 'Tap the button again after returning from the wallet.'
+                    ...authOutcome
                 });
-                statusElement.textContent = 'Connected. Tap again to complete SIWE and run the A1 checks.';
-                connectButton.textContent = 'Complete SIWE and run A1 smoke';
+                if (authOutcome.outcome === 'deferred') {
+                    statusElement.textContent = 'Connected. Tap again to complete SIWE and run the A1 checks.';
+                    connectButton.textContent = 'Complete SIWE and run A1 smoke';
+                } else {
+                    statusElement.textContent = 'SIWE did not complete. Tap Copy complete log and send the result.';
+                    connectButton.textContent = 'Retry SIWE and run A1 smoke';
+                }
                 return;
             }
 
@@ -662,6 +730,65 @@ async function initializeArtSoulLayer(withAuth) {
         }
     });
     updateStatus();
+}
+
+const A1_AUTH_DIAGNOSTIC_STEPS = new Set([
+    'core connect reused live session',
+    'core connect settled',
+    'standard mobile connect settled',
+    'SIWE deferred after external mobile wallet connect',
+    'SIWE blocked until Base Sepolia is confirmed',
+    'transaction provider selected',
+    'SIWE signature requested',
+    'core wallet method routed',
+    'core wallet approval handoff',
+    'SIWE signature failed',
+    'SIWE signature verified',
+    'SIWE session already valid'
+]);
+
+function summarizeA1AuthenticationAttempt(startSequence) {
+    const entries = (window.ArtSoulWalletDebug?.snapshot?.() || [])
+        .filter((entry) => Number(entry?.sequence || 0) > startSequence)
+        .filter((entry) => A1_AUTH_DIAGNOSTIC_STEPS.has(entry?.step))
+        .slice(-16)
+        .map((entry) => ({
+            sequence: entry.sequence,
+            elapsedMs: entry.elapsedMs,
+            step: entry.step,
+            detail: safeDetail(entry.detail)
+        }));
+    const findLast = (step) => [...entries].reverse().find((entry) => entry.step === step);
+    const failure = findLast('SIWE signature failed');
+    const networkBlock = findLast('SIWE blocked until Base Sepolia is confirmed');
+    const deferred = findLast('SIWE deferred after external mobile wallet connect');
+
+    if (failure) {
+        return {
+            outcome: 'failed',
+            reason: failure.detail?.message || 'SIWE signature or verification failed.',
+            diagnostics: entries
+        };
+    }
+    if (networkBlock) {
+        return {
+            outcome: 'network-blocked',
+            reason: networkBlock.detail?.message || 'Base Sepolia was not confirmed.',
+            diagnostics: entries
+        };
+    }
+    if (deferred) {
+        return {
+            outcome: 'deferred',
+            reason: 'A newly paired external-wallet session receives one connect-only gesture.',
+            diagnostics: entries
+        };
+    }
+    return {
+        outcome: 'incomplete',
+        reason: 'Authentication returned without a verified SIWE session.',
+        diagnostics: entries
+    };
 }
 
 const A1_UPLOAD_POLICY_CASES = Object.freeze([
