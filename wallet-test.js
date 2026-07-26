@@ -605,21 +605,103 @@ async function initializeArtSoulLayer(withAuth) {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function'
     });
-    connectButton.textContent = withAuth ? 'Connect with wrapper + auth' : 'Connect with ArtSoul wrapper';
+    connectButton.textContent = withAuth
+        ? 'Connect, sign in, and run A1 smoke'
+        : 'Connect with ArtSoul wrapper';
     connectButton.addEventListener('click', async () => {
         log('ArtSoul Connect click entered');
+        connectButton.disabled = true;
         try {
             const address = await window.safeConnectWallet?.();
             log('ArtSoul Connect resolved', {
-                address,
+                address: maskAddress(address),
                 chainId: window.getCurrentChainId?.() || null,
-                debug: window.ArtSoulWalletDebug?.snapshot?.().slice(-3) || []
+                debug: withAuth ? null : (window.ArtSoulWalletDebug?.snapshot?.().slice(-3) || [])
             });
+            if (!withAuth || !address) return;
+
+            const authenticated = await window.ensureAuthenticated?.();
+            if (!authenticated) {
+                log('A1 authentication deferred or not completed', {
+                    address: maskAddress(address),
+                    instruction: 'Tap the button again after returning from the wallet.'
+                });
+                statusElement.textContent = 'Connected. Tap again to complete SIWE and run the A1 checks.';
+                connectButton.textContent = 'Complete SIWE and run A1 smoke';
+                return;
+            }
+
+            log('A1 SIWE authenticated', { address: maskAddress(address) });
+            await runA1UploadPolicySmoke();
+            statusElement.textContent = 'A1 auth smoke passed: SIWE + MIME/size rejection.';
+            connectButton.textContent = 'Run A1 auth smoke again';
         } catch (error) {
             log('ArtSoul Connect rejected', describeError(error));
+            if (withAuth) {
+                statusElement.textContent = `A1 auth smoke failed: ${error?.message || error}`;
+            }
+        } finally {
+            connectButton.disabled = false;
         }
     });
     updateStatus();
+}
+
+const A1_UPLOAD_POLICY_CASES = Object.freeze([
+    {
+        label: 'unsupported MIME',
+        expectedReason: 'UNSUPPORTED_FILE_TYPE',
+        payload: {
+            kind: 'media',
+            file_name: 'a1-invalid-type.txt',
+            content_type: 'text/plain',
+            size: 1
+        }
+    },
+    {
+        label: 'greater than 50 MB',
+        expectedReason: 'INVALID_FILE_SIZE',
+        payload: {
+            kind: 'media',
+            file_name: 'a1-oversize.png',
+            content_type: 'image/png',
+            size: 50 * 1024 * 1024 + 1
+        }
+    }
+]);
+
+async function requestA1UploadPolicyRejection(testCase) {
+    const response = await fetch('/api/upload/file', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testCase.payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    const passed = response.status === 400 &&
+        data?.error === 'INVALID_UPLOAD_PAYLOAD' &&
+        data?.reason === testCase.expectedReason &&
+        !data?.signed_upload_url &&
+        !data?.token;
+
+    log('A1 upload policy result', {
+        case: testCase.label,
+        status: response.status,
+        error: data?.error || null,
+        reason: data?.reason || null,
+        signedUploadReturned: Boolean(data?.signed_upload_url || data?.token),
+        passed
+    });
+
+    if (!passed) {
+        throw new Error(`A1 ${testCase.label} rejection did not match the expected policy boundary.`);
+    }
+}
+
+async function runA1UploadPolicySmoke() {
+    for (const testCase of A1_UPLOAD_POLICY_CASES) {
+        await requestA1UploadPolicyRejection(testCase);
+    }
 }
 
 bindLifecycleLogs();

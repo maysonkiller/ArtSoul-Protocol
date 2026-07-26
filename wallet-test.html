@@ -63,6 +63,7 @@
             text-decoration: none;
             font-weight: 700;
         }
+        .wallet-test-variant-auth { grid-column: 1 / -1; }
         #walletTestLog {
             min-height: 52vh;
             max-height: 62vh;
@@ -83,7 +84,7 @@
     <main class="wallet-test-shell">
         <section class="wallet-test-card">
             <h1 class="wallet-test-title">Wallet connection isolation test</h1>
-            <p class="wallet-test-note">Not linked from ArtSoul. No artwork, profile, Supabase, or contract code runs in the default bare layer.</p>
+            <p class="wallet-test-note">Not linked from ArtSoul. No artwork, profile, Supabase, or contract code runs in the default bare layer. Variant E signs in and sends only two invalid upload-policy requests; it never uploads a file or creates a Storage object.</p>
             <div id="walletTestStatus" class="wallet-test-status">Starting...</div>
         </section>
         <nav class="wallet-test-variants" aria-label="WalletConnect proposal variants">
@@ -91,10 +92,11 @@
             <a class="wallet-test-variant" href="?walletdebug=1&amp;variant=multi">B: Sepolia + Base + Mainnet</a>
             <a class="wallet-test-variant" href="?walletdebug=1&amp;layer=core">C: Core production path</a>
             <a class="wallet-test-variant" href="?walletdebug=1&amp;layer=appkit-modal">D: Official AppKit modal</a>
+            <a class="wallet-test-variant wallet-test-variant-auth" href="?walletdebug=1&amp;layer=auth">E: SIWE + upload policy</a>
         </nav>
         <button id="walletTestConnect" type="button">Connect with bare AppKit</button>
         <pre id="walletTestLog" aria-live="polite"></pre>
     </main>
-    <script type="module" src="wallet-test.js?v=6"></script>
+    <script type="module" src="wallet-test.js?v=7"></script>
 </body>
 </html>

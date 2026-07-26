@@ -87,6 +87,18 @@ Read-only checks on 2026-07-26 returned:
 
 No new artwork or Storage object was created by the verification. Mobile SIWE and the two authenticated negative-policy requests remain separate acceptance evidence.
 
+### Remaining mobile operator smoke
+
+After the A1 wallet-test auth variant is deployed:
+
+1. On the phone, open `https://artsoul.vercel.app/wallet-test.html?walletdebug=1&layer=auth`.
+2. Tap **Connect, sign in, and run A1 smoke**, approve the Base Sepolia connection, and return to the same browser tab.
+3. If the page says authentication was deferred, tap **Complete SIWE and run A1 smoke** and approve the gas-free SIWE signature.
+4. Accept the run only when the page reports `A1 auth smoke passed` and the visible log contains two `A1 upload policy result` entries with HTTP 400, `passed: true`, and no signed upload returned.
+5. Copy the visible log into the private operations record. It masks the wallet address and contains no secret, file, signed URL, or Storage token.
+
+The two invalid requests are validated before service-role access or signed-URL creation. They do not upload media, create metadata, send a transaction, or create a Storage object.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.
