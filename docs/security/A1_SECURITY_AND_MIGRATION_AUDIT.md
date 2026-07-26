@@ -141,6 +141,19 @@ sanitized failure, and provide one-tap complete-log copy before the next phone
 run. This is diagnostic hardening only; A1 remains open until the exact success
 criteria above are captured.
 
+The first phone run with the hardened bench then proved the WalletConnect
+session itself healthy: the same address survived relay restarts, both Base
+Mainnet and Base Sepolia changes were reported accurately, and the restored
+session was reused. Every SIWE attempt failed specifically at `personal_sign`
+with `Method not found`. The client had passed the human-readable SIWE text
+directly even though MetaMask and WalletConnect require the message parameter
+to be hex-encoded UTF-8. The remediation encodes only the RPC parameter while
+retaining the original plain-text message for backend EIP-4361 validation.
+Wallet connection and SIWE no longer force an operational-chain change; the
+existing shared write guard remains the only path that requires and confirms
+Base Sepolia before a contract write. A1 remains open until a post-deploy phone
+run records verified SIWE and both rejected upload-policy probes.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.
