@@ -278,13 +278,15 @@ export function getCoreSessionMethods(instance = providerInstance) {
 export function getCoreSessionStoreDiagnostics(instance = providerInstance) {
     const storeState = readCoreSessionStore(instance);
     const sessions = storeState.sessions || [];
+    const providerNamespaceMethods = instance?.signer?.rpcProviders?.eip155?.namespace?.methods;
     return {
         storagePrefix: CORE_STORAGE_PREFIX,
         storeAvailable: storeState.available,
         readFailed: Boolean(storeState.readFailed),
         sessionCount: sessions.length,
         currentTopic: maskCoreTopic(instance?.session?.topic),
-        storedTopics: sessions.map((session) => maskCoreTopic(session?.topic)).filter(Boolean)
+        storedTopics: sessions.map((session) => maskCoreTopic(session?.topic)).filter(Boolean),
+        universalProviderNamespaceReady: Array.isArray(providerNamespaceMethods)
     };
 }
 
@@ -319,11 +321,12 @@ export function resolveCoreRequestChainId(instance = providerInstance) {
     return preferredChainIds.find((chainId) => approvedChainIds.includes(chainId)) || approvedChainIds[0];
 }
 
-// EthereumProvider.request() always routes through its local chainId. When a
-// wallet has not approved Base Sepolia yet, that route can be fictitious. Send
-// wallet network methods through an actually approved UniversalProvider route.
+// Route every wallet method through an actually approved session chain.
+// Required signing/write methods use SignClient directly after checking the
+// authoritative session permissions; network-management methods keep the
+// UniversalProvider behavior that updates its local chain state.
 export async function requestCoreWalletMethod(instance, request) {
-    if (!instance?.session || !instance?.signer?.request) {
+    if (!instance?.session || !instance?.signer) {
         throw new Error('WalletConnect session provider is not available');
     }
     if (!request?.method) throw new Error('WalletConnect request method is required');
@@ -351,11 +354,39 @@ export async function requestCoreWalletMethod(instance, request) {
         throw error;
     }
 
+    const directSignClient = requiredMethod ? instance.signer?.client : null;
+    if (requiredMethod && typeof directSignClient?.request !== 'function') {
+        const error = new Error(
+            `WalletConnect SignClient is unavailable for required method ${request.method}.`
+        );
+        error.code = 'CORE_SIGN_CLIENT_UNAVAILABLE';
+        throw error;
+    }
+    if (!requiredMethod && typeof instance.signer?.request !== 'function') {
+        throw new Error('WalletConnect session provider request is not available');
+    }
+
+    const transport = requiredMethod ? 'sign-client' : 'universal-provider';
     coreLog('core wallet method routed', {
         method: request.method,
-        route: `eip155:${routeChainId}`
+        route: `eip155:${routeChainId}`,
+        transport
     });
     try {
+        if (requiredMethod) {
+            // UniversalProvider reconstructs its local EIP-155 provider from a
+            // separately persisted namespace record. A session can settle in
+            // SignClient while that local record is absent (observed after an
+            // iOS deep-link race), leaving `namespace.methods` undefined even
+            // though the authoritative session approved the method. Required
+            // wallet methods already passed the session permission check
+            // above, so route them through SignClient's public request API.
+            return await directSignClient.request({
+                topic: instance.session.topic,
+                chainId: `eip155:${routeChainId}`,
+                request
+            });
+        }
         return await instance.signer.request(request, `eip155:${routeChainId}`);
     } catch (error) {
         const methodUnavailable = requiredMethod && (

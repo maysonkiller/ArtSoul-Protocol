@@ -35,12 +35,14 @@ const networks = layer === 'appkit-modal' || variant !== 'multi'
 const logElement = document.getElementById('walletTestLog');
 const statusElement = document.getElementById('walletTestStatus');
 const connectButton = document.getElementById('walletTestConnect');
+const disconnectButton = document.getElementById('walletTestDisconnect');
 const copyButton = document.getElementById('walletTestCopy');
 let sequence = 0;
 let modal = null;
 let adapter = null;
 let transportRestartPromise = null;
 let copyFeedbackTimer = null;
+let disconnectDiagnosticSession = null;
 const diagnosticClients = new WeakSet();
 const diagnosticRelayers = new WeakSet();
 
@@ -295,6 +297,21 @@ async function copyCompleteLog() {
 }
 
 copyButton.addEventListener('click', copyCompleteLog);
+disconnectButton.addEventListener('click', async () => {
+    if (!disconnectDiagnosticSession) return;
+    disconnectButton.disabled = true;
+    log('diagnostic disconnect entered', { layer });
+    try {
+        const disconnected = await disconnectDiagnosticSession();
+        log('diagnostic disconnect settled', { disconnected: Boolean(disconnected) });
+        statusElement.textContent = 'Diagnostic wallet session disconnected. Tap Connect to create a fresh pairing.';
+    } catch (error) {
+        log('diagnostic disconnect failed', describeError(error));
+        statusElement.textContent = `Diagnostic disconnect failed: ${error?.message || error}`;
+    } finally {
+        disconnectButton.disabled = false;
+    }
+});
 
 function accountSnapshot(account = modal?.getAccount?.()) {
     const address = account?.address || account?.allAccounts?.[0]?.address || null;
@@ -586,7 +603,7 @@ async function initializeAppKitModalLayer() {
 // official WalletConnect modal (showQrModal: false) that appkit-init.js
 // uses. Only the logging wrapper differs.
 async function initializeCoreLayer() {
-    const core = await import('/wallet-core-connect.js?v=15');
+    const core = await import('/wallet-core-connect.js?v=16');
     core.configureCoreWallet({
         projectId: PROJECT_ID,
         // Mirrors production: the mobile external path carries NO redirect —
@@ -612,6 +629,12 @@ async function initializeCoreLayer() {
         ].join('\n');
     };
     updateCoreStatus(null, null);
+    disconnectDiagnosticSession = async () => {
+        const disconnected = await core.disconnectCoreWallet();
+        updateCoreStatus(null, null);
+        return disconnected;
+    };
+    disconnectButton.hidden = false;
 
     const restored = await core.restoreCoreSession();
     if (restored?.address) {
@@ -674,7 +697,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=45');
+    await import('/appkit-init.js?v=46');
     await window.__artsoulAppKitBootPromise;
     modal = window.web3Modal || null;
     log('ArtSoul appkit wrapper ready', {
@@ -682,6 +705,14 @@ async function initializeArtSoulLayer(withAuth) {
         safeConnectAvailable: typeof window.safeConnectWallet === 'function',
         account: accountSnapshot(window.web3Modal?.getAccount?.())
     });
+    disconnectDiagnosticSession = async () => {
+        const disconnected = await window.resetWalletConnection?.();
+        connectButton.textContent = withAuth
+            ? 'Connect, sign in, and run A1 smoke'
+            : 'Connect with ArtSoul wrapper';
+        return disconnected;
+    };
+    disconnectButton.hidden = false;
     connectButton.textContent = withAuth
         ? 'Connect, sign in, and run A1 smoke'
         : 'Connect with ArtSoul wrapper';

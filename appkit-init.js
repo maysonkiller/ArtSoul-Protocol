@@ -23,7 +23,7 @@ import {
     requestCoreWalletMethod,
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=15'
+} from './wallet-core-connect.js?v=16'
 
 // ============================================
 // CONFIGURATION
