@@ -43,6 +43,15 @@ let adapter = null;
 let transportRestartPromise = null;
 let copyFeedbackTimer = null;
 let disconnectDiagnosticSession = null;
+let diagnosticLifecycleReader = null;
+
+function readDiagnosticLifecycle() {
+    try {
+        return diagnosticLifecycleReader?.() ?? null;
+    } catch (error) {
+        return { error: describeError(error) };
+    }
+}
 const diagnosticClients = new WeakSet();
 const diagnosticRelayers = new WeakSet();
 
@@ -297,19 +306,42 @@ async function copyCompleteLog() {
 }
 
 copyButton.addEventListener('click', copyCompleteLog);
+// The diagnostic Disconnect reports WHAT it actually did. "disconnected: true"
+// for a page that had nothing to disconnect is what made two consecutive taps
+// look identical and hid the real lifecycle. Every tap now names the outcome
+// and the resulting lifecycle state.
+function describeDisconnectOutcome(outcome) {
+    if (outcome && typeof outcome === 'object') {
+        return {
+            disconnected: Boolean(outcome.disconnected),
+            hadSession: outcome.hadSession ?? null,
+            reason: outcome.reason || null,
+            cancelledAttempts: outcome.cancelledAttempts ?? null
+        };
+    }
+    return { disconnected: Boolean(outcome), hadSession: null, reason: null, cancelledAttempts: null };
+}
+
 disconnectButton.addEventListener('click', async () => {
     if (!disconnectDiagnosticSession) return;
     disconnectButton.disabled = true;
-    log('diagnostic disconnect entered', { layer });
+    disconnectButton.textContent = 'Disconnecting...';
+    log('diagnostic disconnect entered', { layer, lifecycle: readDiagnosticLifecycle() });
     try {
-        const disconnected = await disconnectDiagnosticSession();
-        log('diagnostic disconnect settled', { disconnected: Boolean(disconnected) });
-        statusElement.textContent = 'Diagnostic wallet session disconnected. Tap Connect to create a fresh pairing.';
+        const outcome = describeDisconnectOutcome(await disconnectDiagnosticSession());
+        const lifecycle = readDiagnosticLifecycle();
+        log('diagnostic disconnect settled', { ...outcome, lifecycle });
+        statusElement.textContent = outcome.hadSession === false
+            ? 'No wallet session was active. Tap Connect to create a fresh pairing.'
+            : (outcome.disconnected
+                ? 'Diagnostic wallet session disconnected. Tap Connect to create a fresh pairing.'
+                : `Disconnect did not complete (${outcome.reason || 'unknown'}). The session topic is invalidated locally.`);
     } catch (error) {
         log('diagnostic disconnect failed', describeError(error));
         statusElement.textContent = `Diagnostic disconnect failed: ${error?.message || error}`;
     } finally {
         disconnectButton.disabled = false;
+        disconnectButton.textContent = 'Disconnect diagnostic session';
     }
 });
 
@@ -603,7 +635,7 @@ async function initializeAppKitModalLayer() {
 // official WalletConnect modal (showQrModal: false) that appkit-init.js
 // uses. Only the logging wrapper differs.
 async function initializeCoreLayer() {
-    const core = await import('/wallet-core-connect.js?v=16');
+    const core = await import('/wallet-core-connect.js?v=17');
     core.configureCoreWallet({
         projectId: PROJECT_ID,
         // Mirrors production: the mobile external path carries NO redirect —
@@ -618,21 +650,28 @@ async function initializeCoreLayer() {
         log: (step, detail) => log(step, detail)
     });
 
+    diagnosticLifecycleReader = () => ({
+        state: core.getCoreLifecycleState(),
+        connectInFlight: core.isCoreConnectInFlight(),
+        sessionActive: core.isCoreSessionActive()
+    });
+
     const updateCoreStatus = (address, chainId) => {
         statusElement.textContent = [
             'Layer: core (production mobile path)',
             'Provider: @walletconnect/ethereum-provider 2.23.10 + pinned official WC modal 2.7.0',
             `Chains: eip155:${EXPECTED_CHAIN_ID} required; 8453, 1 optional`,
             `Origin: ${window.location.origin}`,
+            `Lifecycle: ${core.getCoreLifecycleState()}`,
             `Account: ${maskAddress(address) || 'none'}`,
             `Chain: ${chainId || 'unknown'}${chainId === EXPECTED_CHAIN_ID ? ' (Base Sepolia)' : ''}`
         ].join('\n');
     };
     updateCoreStatus(null, null);
     disconnectDiagnosticSession = async () => {
-        const disconnected = await core.disconnectCoreWallet();
+        const outcome = await core.disconnectCoreWalletOutcome();
         updateCoreStatus(null, null);
-        return disconnected;
+        return outcome;
     };
     disconnectButton.hidden = false;
 
@@ -697,9 +736,10 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=46');
+    await import('/appkit-init.js?v=47');
     await window.__artsoulAppKitBootPromise;
     modal = window.web3Modal || null;
+    diagnosticLifecycleReader = () => window.getArtSoulWalletLifecycle?.() ?? null;
     log('ArtSoul appkit wrapper ready', {
         modalAvailable: Boolean(window.web3Modal),
         safeConnectAvailable: typeof window.safeConnectWallet === 'function',
