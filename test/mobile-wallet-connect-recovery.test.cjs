@@ -3,7 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+// Normalize line endings: these are structural assertions over source text and
+// must read identically on a CRLF checkout (Windows CI) and an LF one.
+const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8').replace(/\r\n/g, '\n');
 const appKit = read('appkit-init.js');
 const contracts = read('contracts-integration.js');
 const artwork = read(path.join('src', 'entries', 'artwork.jsx'));
