@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=45/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=46/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=15/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=15/);
-    assert.match(walletTest, /appkit-init\.js\?v=45/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=16/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=16/);
+    assert.match(walletTest, /appkit-init\.js\?v=46/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -94,13 +94,15 @@ test('the one-time compatibility migration resets local hints before isolated co
     );
 });
 
-test('core network methods route through a chain the wallet actually approved', () => {
+test('core wallet methods use the approved route and the correct SDK transport', () => {
     const resolver = coreWallet.match(/export function resolveCoreRequestChainId[\s\S]*?\n\}/)?.[0] || '';
     const request = coreWallet.match(/export async function requestCoreWalletMethod[\s\S]*?\n\}/)?.[0] || '';
     assert.match(resolver, /getCoreSessionChainIds\(instance\)/);
     assert.match(resolver, /approvedChainIds\.includes\(chainId\)/);
+    assert.match(request, /directSignClient\.request\(\{\s*topic: instance\.session\.topic,\s*chainId: `eip155:\$\{routeChainId\}`/);
     assert.match(request, /instance\.signer\.request\(request, `eip155:\$\{routeChainId\}`\)/);
     assert.match(request, /CORE_METHOD_NOT_APPROVED/);
+    assert.match(request, /CORE_SIGN_CLIENT_UNAVAILABLE/);
     assert.doesNotMatch(request, /instance\.request\(/);
     assert.match(coreWallet, /non-fatal WalletConnect SDK provider-route rejection suppressed/);
 });
