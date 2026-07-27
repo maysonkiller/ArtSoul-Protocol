@@ -446,8 +446,60 @@ test('session-store diagnostics expose duplicate topics only in masked form', ()
         readFailed: false,
         sessionCount: 2,
         currentTopic: 'current-...7890',
-        storedTopics: ['current-...7890', 'stale-se...4321']
+        storedTopics: ['current-...7890', 'stale-se...4321'],
+        universalProviderNamespaceReady: false
     });
+});
+
+test('an approved personal_sign bypasses an incomplete UniversalProvider namespace', async () => {
+    const { requestCoreWalletMethod } = loadCoreRestoreHarness();
+    const requests = [];
+    const provider = {
+        chainId: 84532,
+        session: {
+            topic: 'single-session-topic-1234567890',
+            namespaces: {
+                eip155: {
+                    chains: ['eip155:84532'],
+                    accounts: ['eip155:84532:0x6ec800000000000000000000000000000000989b'],
+                    methods: ['personal_sign', 'eth_sendTransaction']
+                }
+            }
+        },
+        signer: {
+            rpcProviders: {
+                eip155: {
+                    namespace: {
+                        chains: ['eip155:84532'],
+                        accounts: ['eip155:84532:0x6ec800000000000000000000000000000000989b']
+                    }
+                }
+            },
+            client: {
+                session: {
+                    getAll: () => [{ topic: 'single-session-topic-1234567890' }]
+                },
+                request: async (payload) => {
+                    requests.push(payload);
+                    return '0xsigned';
+                }
+            },
+            request: async () => {
+                throw new Error('UniversalProvider must not handle required wallet methods');
+            }
+        }
+    };
+    const request = {
+        method: 'personal_sign',
+        params: ['0x417274536f756c', '0x6ec800000000000000000000000000000000989b']
+    };
+
+    assert.equal(await requestCoreWalletMethod(provider, request), '0xsigned');
+    assert.deepEqual(requests, [{
+        topic: 'single-session-topic-1234567890',
+        chainId: 'eip155:84532',
+        request
+    }]);
 });
 
 test('an approved method rejected by the peer is reported as a runtime session mismatch', async () => {
@@ -468,12 +520,15 @@ test('an approved method rejected by the peer is reported as a runtime session m
             client: {
                 session: {
                     getAll: () => [{ topic: 'single-session-topic-1234567890' }]
+                },
+                request: async () => {
+                    const error = new Error('Method not found');
+                    error.code = -32601;
+                    throw error;
                 }
             },
             request: async () => {
-                const error = new Error('Method not found');
-                error.code = -32601;
-                throw error;
+                throw new Error('UniversalProvider must not handle required wallet methods');
             }
         }
     };

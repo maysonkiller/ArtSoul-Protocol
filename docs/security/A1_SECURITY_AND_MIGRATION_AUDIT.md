@@ -192,6 +192,24 @@ begin with no restored account, establish one fresh pairing, record
 `restored: false`, then complete SIWE and both negative upload-policy probes.
 A1 remains open until that production evidence is captured.
 
+The first v4 phone run confirmed that storage isolation itself worked:
+`artsoul-mobile-core-v4` contained exactly one live topic and the authoritative
+session approved `personal_sign`. SIWE then failed locally before a wallet
+request with `undefined is not an object (evaluating
+'this.namespace.methods.includes')`. This is a separate UniversalProvider
+rehydration defect. Its local EIP-155 provider reconstructs `namespace.methods`
+from a separately persisted provider namespace; an iOS deep-link race can
+settle the SignClient session while leaving that local record incomplete.
+
+Required methods are now permission-checked against the authoritative session
+and sent through SignClient's public `request({ topic, chainId, request })`
+API. Network-management methods remain on UniversalProvider because it owns
+the local chain-state update. This avoids private SDK mutation, preserves the
+single approved topic, and keeps the Base Sepolia write guard unchanged. The
+isolated test page also exposes an explicit diagnostic Disconnect action so an
+operator can deliberately create a fresh pairing without clearing browser
+storage manually. A1 remains open pending the same phone acceptance.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.

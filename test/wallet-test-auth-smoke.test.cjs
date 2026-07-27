@@ -13,7 +13,8 @@ test('wallet-test exposes an isolated A1 SIWE and upload-policy variant', () => 
   assert.match(html, /never uploads a file or creates a Storage object/);
   assert.match(html, /id="walletTestCopy"/);
   assert.match(html, /Copy complete log/);
-  assert.match(html, /wallet-test\.js\?v=13/);
+  assert.match(html, /id="walletTestDisconnect"/);
+  assert.match(html, /wallet-test\.js\?v=14/);
 });
 
 test('the A1 auth variant runs SIWE after the production wallet wrapper connects', () => {
@@ -47,6 +48,13 @@ test('wallet-test copies the complete status and log with an iOS-compatible fall
   assert.match(source, /function copyWithTextarea/);
   assert.match(source, /document\.execCommand\('copy'\)/);
   assert.match(source, /copyButton\.addEventListener\('click', copyCompleteLog\)/);
+});
+
+test('wallet-test can explicitly disconnect the isolated diagnostic session', () => {
+  assert.match(source, /disconnectButton\.addEventListener\('click'/);
+  assert.match(source, /await window\.resetWalletConnection\?\.\(\)/);
+  assert.match(source, /await core\.disconnectCoreWallet\(\)/);
+  assert.match(source, /Diagnostic wallet session disconnected/);
 });
 
 test('wallet-test distinguishes deliberate deferral from SIWE failures', () => {
