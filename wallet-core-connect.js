@@ -9,6 +9,26 @@
 // modal makes its whole lifecycle deterministic.
 // The provider's persisted session is the single source of truth for
 // "connected" on this path. AppKit remains the desktop and injected path.
+//
+// LIFECYCLE OWNERSHIP (deterministic, single-flight)
+// This module owns exactly one connect attempt and one accepted session topic
+// at a time. Three facts about @walletconnect/ethereum-provider 2.23.10 and
+// @walletconnect/universal-provider 2.23.10 shape the design:
+//   1. `UniversalProvider.abortPairingAttempt()` is a documented NO-OP
+//      ("abortPairingAttempt is deprecated. This is now a no-op."). An
+//      in-flight `EthereumProvider.connect()` therefore CANNOT be cancelled.
+//      Every started SDK connect is followed to completion and its outcome is
+//      either adopted or torn down — never abandoned.
+//   2. `EthereumProvider.connect()` has no re-entrancy guard. A second call
+//      publishes a SECOND session proposal (a second pairing and a second
+//      session topic), and `UniversalProvider.connect()` unsubscribes every
+//      existing pairing topic on entry, which sabotages the first attempt.
+//      Only ONE SDK connect task may exist per page; later taps join it and
+//      reuse the SAME pairing URI.
+//   3. `EthereumProvider.setAccounts()` filters accounts by the SDK-local
+//      `chainId`, and `reset()` drops that chainId to 1. SDK-local chain state
+//      is therefore never wallet truth. Address AND chain are read from ONE
+//      snapshot of the authoritative SignClient session.
 // ============================================
 
 // Pinned OFFICIAL modal (wcm-* custom elements — no collision with the
@@ -41,14 +61,64 @@ const REQUIRED_CHAIN_IDS = [BASE_SEPOLIA_CHAIN_ID];
 const OPTIONAL_CHAIN_IDS = [8453, 1];
 const REQUIRED_METHODS = ['personal_sign', 'eth_sendTransaction'];
 const REQUIRED_EVENTS = ['chainChanged', 'accountsChanged'];
+// Readiness gate: a Connect attempt may not report success until the
+// authoritative session can actually run SIWE. eth_sendTransaction is NOT part
+// of the gate — browsing on a foreign chain stays allowed and the write guard
+// owns the Base Sepolia requirement at write time.
+const READINESS_METHODS = ['personal_sign'];
+// Tombstoned topics are remembered so a late relay message or a late SDK
+// settle can never re-promote a topic this page already abandoned.
+const MAX_TOMBSTONED_TOPICS = 32;
 
-let settings = { projectId: null, metadata: null, log: null };
+// The complete external-mobile wallet lifecycle. `siwe-signing` and
+// `authenticated` are driven by the app layer (SIWE lives in appkit-init.js /
+// SupabaseAuth); every other transition is owned here.
+export const CORE_LIFECYCLE = Object.freeze({
+    DISCONNECTED: 'disconnected',
+    PAIRING: 'pairing',
+    WAITING_FOR_WALLET: 'waiting-for-wallet',
+    SETTLING_SESSION: 'settling-session',
+    CONNECTED: 'connected',
+    SIWE_SIGNING: 'siwe-signing',
+    AUTHENTICATED: 'authenticated',
+    DISCONNECTING: 'disconnecting'
+});
+const APP_DRIVEN_LIFECYCLE_STATES = new Set([
+    CORE_LIFECYCLE.SIWE_SIGNING,
+    CORE_LIFECYCLE.AUTHENTICATED,
+    CORE_LIFECYCLE.CONNECTED
+]);
+
+let settings = {
+    projectId: null,
+    metadata: null,
+    log: null,
+    onLifecycle: null,
+    onSessionAdopted: null,
+    // Test seam only. Production leaves this undefined and the pinned CDN
+    // module below is imported instead.
+    createProvider: null
+};
 let providerInstance = null;
 let providerInitPromise = null;
-let connectPromise = null;
 let rejectionGuardBound = false;
 let modalInstance = null;
-let lastStaleSessionTopicRejection = null;
+let lifecycleState = CORE_LIFECYCLE.DISCONNECTED;
+
+// ---- single-flight connect state -------------------------------------
+// activeAttempt   : the app-level attempt a caller is awaiting (double taps
+//                   reuse its promise).
+// sdkConnectTask  : the ONE live EthereumProvider.connect() promise. It can
+//                   outlive activeAttempt because the SDK cannot be cancelled.
+// sdkConnectWaiters: every attempt that joined the live SDK task, so the late
+//                   settle can tell "a caller still owns this" from "nobody
+//                   is waiting — adopt or tear down".
+let attemptSequence = 0;
+let activeAttempt = null;
+let sdkConnectTask = null;
+const sdkConnectWaiters = new Set();
+let disconnectPromise = null;
+const tombstonedTopics = [];
 
 // ONE modal instance per page, constructed on the first connect (the
 // projectId only arrives via configureCoreWallet, after module init). The
@@ -86,8 +156,38 @@ export function configureCoreWallet(config = {}) {
     settings = { ...settings, ...config };
 }
 
+// ---- lifecycle -------------------------------------------------------
+
+export function getCoreLifecycleState() {
+    return lifecycleState;
+}
+
+function setCoreLifecycleState(next, detail = null) {
+    if (lifecycleState === next) return lifecycleState;
+    const previous = lifecycleState;
+    lifecycleState = next;
+    coreLog('core wallet lifecycle', { from: previous, to: next, ...(detail || {}) });
+    try {
+        settings.onLifecycle?.(next, { from: previous, ...(detail || {}) });
+    } catch {
+        // Lifecycle observers must never break the connection flow.
+    }
+    return lifecycleState;
+}
+
+// The app layer owns SIWE. It may only move between connected/signing/
+// authenticated — it can never claim a connection this module has not proven.
+export function setCoreAuthLifecycleState(next) {
+    if (!APP_DRIVEN_LIFECYCLE_STATES.has(next)) return lifecycleState;
+    if (!isCoreSessionActive()) return lifecycleState;
+    return setCoreLifecycleState(next, { source: 'app' });
+}
+
 export function isCoreConnectInFlight() {
-    return Boolean(connectPromise);
+    // The relay transport restart on browser resume depends on this: an SDK
+    // task that outlived a cancelled attempt still needs the socket reopened
+    // so the wallet approval can land in THIS tab.
+    return Boolean(activeAttempt || sdkConnectTask);
 }
 
 export function isCoreSessionActive() {
@@ -106,24 +206,66 @@ export function getCoreProviderInstance() {
     return providerInstance;
 }
 
+// ---- topic tombstones ------------------------------------------------
+
+function tombstoneCoreTopic(topic) {
+    const value = String(topic || '');
+    if (!value || tombstonedTopics.includes(value)) return;
+    tombstonedTopics.push(value);
+    while (tombstonedTopics.length > MAX_TOMBSTONED_TOPICS) tombstonedTopics.shift();
+    coreLog('WalletConnect topic tombstoned', { topic: maskCoreTopic(value) });
+}
+
+export function isCoreTopicTombstoned(topic) {
+    const value = String(topic || '');
+    return Boolean(value) && tombstonedTopics.includes(value);
+}
+
+// ---- authoritative session reads -------------------------------------
+
+// Every eip155 account the APPROVED session carries, paired with the chain it
+// was approved on. This is the only snapshot address and chain are read from,
+// so a connected wallet can never be published with a chain from a different
+// point in time.
+export function readCoreSessionAccounts(session) {
+    const entries = [];
+    for (const namespace of Object.values(session?.namespaces || {})) {
+        for (const account of namespace?.accounts || []) {
+            const match = String(account).match(/^eip155:(\d+):(0x[a-fA-F0-9]{40})$/);
+            if (!match) continue;
+            const chainId = Number(match[1]);
+            if (!Number.isFinite(chainId) || chainId <= 0) continue;
+            entries.push({ chainId, address: match[2] });
+        }
+    }
+    return entries;
+}
+
+function selectCoreAccount(accounts, preferredChainId = null) {
+    if (!accounts?.length) return null;
+    const preferred = preferredChainId
+        ? accounts.find((entry) => entry.chainId === preferredChainId)
+        : null;
+    if (preferred) return preferred;
+    return accounts.find((entry) => entry.chainId === BASE_SEPOLIA_CHAIN_ID) || accounts[0];
+}
+
 // The SDK's `instance.accounts` is filtered by the provider's CURRENT chainId
 // (setAccounts drops every namespace account whose chain differs), and that
-// chainId is persisted across page loads. A session whose wallet sits on a
-// foreign network (observed: MetaMask parked on 8453) therefore reports []
-// while the session record — with the address — is alive in storage. Read the
-// address chain-independently from the session namespaces: the address is what
-// "connected" means; the network is the write-guard's business.
+// chainId is persisted across page loads and reset to 1 by the SDK's reset().
+// A session whose wallet sits on a foreign network (observed: MetaMask parked
+// on 8453) therefore reports [] while the session record — with the address —
+// is alive in storage. Read the address chain-independently from the session
+// namespaces: the address is what "connected" means; the network is the
+// write-guard's business.
 export function getCoreSessionAddress(instance = providerInstance) {
     if (!getCoreSessionLiveness(instance).live) return null;
-    const liveAccount = (instance.accounts || []).filter(Boolean)[0] || null;
-    if (liveAccount) return liveAccount;
-    const namespaceAccounts = Object.values(instance.session.namespaces || {})
-        .flatMap((namespace) => namespace?.accounts || []);
-    for (const account of namespaceAccounts) {
-        const match = String(account).match(/^eip155:\d+:(0x[a-fA-F0-9]{40})$/);
-        if (match) return match[1];
-    }
-    return null;
+    const account = selectCoreAccount(
+        readCoreSessionAccounts(instance.session),
+        parseCoreChainId(instance?.chainId)
+    );
+    if (account) return account.address;
+    return (instance.accounts || []).filter(Boolean)[0] || null;
 }
 
 export function parseCoreChainId(value) {
@@ -172,6 +314,13 @@ export function getCoreSessionLiveness(instance = providerInstance, nowMs = Date
         return { live: false, topic: topic || null, reason: 'provider-session-missing' };
     }
 
+    // A topic this page abandoned (explicit disconnect, proven-dead cache, or
+    // an SDK "no matching key" rejection) can never become current again, no
+    // matter which late callback carries it.
+    if (isCoreTopicTombstoned(topic)) {
+        return { live: false, topic, reason: 'session-topic-tombstoned' };
+    }
+
     const expiry = Number(session.expiry || 0);
     if (Number.isFinite(expiry) && expiry > 0 && expiry <= Math.floor(nowMs / 1000)) {
         return { live: false, topic, reason: 'session-expired' };
@@ -194,43 +343,88 @@ export function getCoreSessionLiveness(instance = providerInstance, nowMs = Date
     };
 }
 
-function extractMissingSessionTopic(message) {
-    const match = String(message || '').match(
-        /session topic doesn't exist:\s*["']?([a-z0-9_-]{12,})/i
+// THE readiness gate. One read of the authoritative SignClient session answers
+// every question a Connect attempt must answer before it may report success:
+// is the topic live, does it carry an account, is that account on an approved
+// EVM chain, and did the wallet approve the signing method SIWE needs.
+export function readAuthoritativeCoreSession(instance = providerInstance, options = {}) {
+    const liveness = getCoreSessionLiveness(instance, options.nowMs);
+    const snapshot = {
+        live: liveness.live,
+        ready: false,
+        topic: liveness.topic,
+        address: null,
+        chainId: null,
+        approvedChainIds: [],
+        approvedMethods: [],
+        missingMethods: [],
+        reason: liveness.reason
+    };
+    if (!liveness.live) return snapshot;
+
+    snapshot.approvedChainIds = getCoreSessionChainIds(instance);
+    snapshot.approvedMethods = getCoreSessionMethods(instance);
+
+    const account = selectCoreAccount(
+        readCoreSessionAccounts(instance.session),
+        parseCoreChainId(options.confirmedChainId) || parseCoreChainId(instance?.chainId)
     );
-    return match?.[1] || null;
+    if (!account) {
+        snapshot.reason = 'session-address-missing';
+        return snapshot;
+    }
+    snapshot.address = account.address;
+    // Chain-tolerant: ANY approved EVM chain is a valid connection. Base
+    // Sepolia is requested by the write guard, never here.
+    snapshot.chainId = resolveCoreSessionChainId(instance, options.confirmedChainId) || account.chainId;
+    if (!snapshot.chainId) {
+        snapshot.reason = 'session-chain-missing';
+        return snapshot;
+    }
+
+    snapshot.missingMethods = READINESS_METHODS.filter((method) => (
+        !snapshot.approvedMethods.some((approved) => approved.toLowerCase() === method)
+    ));
+    if (snapshot.missingMethods.length) {
+        snapshot.reason = 'session-method-not-approved';
+        return snapshot;
+    }
+
+    snapshot.ready = true;
+    snapshot.reason = 'session-ready';
+    return snapshot;
 }
 
-function getMatchingStaleSessionRejection(instance, sinceMs = 0) {
-    const rejected = lastStaleSessionTopicRejection;
-    const currentTopic = String(instance?.session?.topic || '');
-    if (!rejected?.topic || !currentTopic) return null;
-    if (rejected.at < sinceMs || rejected.topic !== currentTopic) return null;
-    return rejected;
+// An explicit Disconnect that lands while a connect attempt is pending is a
+// user cancellation, not a failure: it settles the attempt immediately (4001,
+// so the app layer stays silent) instead of leaving the button pending until
+// the uncancellable SDK task finishes.
+function createConnectCancelledError(reason) {
+    const error = new Error('Connection request cancelled: the wallet was disconnected.');
+    error.code = 4001;
+    error.reason = reason;
+    return error;
 }
 
-function createCoreSessionNotLiveError(reason) {
+function createCoreSessionNotLiveError(reason, detail = null) {
     const error = new Error(
         'WalletConnect did not establish a live session. Return to ArtSoul and tap Connect again.'
     );
     error.code = 'CORE_SESSION_NOT_LIVE';
     error.reason = reason;
+    if (detail) error.detail = detail;
     return error;
 }
 
-// This is NOT a remote disconnect and never runs for a live session. It only
-// drops a cached UniversalProvider session after the SignClient store proves
-// that the topic is absent/expired, or after the SDK itself rejects that exact
-// topic as missing. The next user tap can then create a fresh pairing.
+// This is NOT a remote disconnect. It drops a cached UniversalProvider session
+// after the SignClient store proves the topic is absent/expired/tombstoned, or
+// when the explicit user Disconnect could not reach the peer (`force`). The
+// topic is tombstoned so no late callback can resurrect it, and the next user
+// tap creates a fresh pairing.
 export async function discardInvalidCoreSession(instance = providerInstance, options = {}) {
     const liveness = getCoreSessionLiveness(instance, options.nowMs);
-    const forcedTopic = String(options.rejectedTopic || '');
-    const forceExactRejectedTopic = Boolean(
-        forcedTopic &&
-        liveness.topic &&
-        forcedTopic === liveness.topic
-    );
-    if (!instance?.session || (liveness.live && !forceExactRejectedTopic)) return false;
+    const force = Boolean(options.force);
+    if (!instance?.session || (liveness.live && !force)) return false;
 
     const cleanup = instance?.signer?.cleanup;
     if (typeof cleanup !== 'function') {
@@ -239,14 +433,12 @@ export async function discardInvalidCoreSession(instance = providerInstance, opt
 
     coreLog('invalid WalletConnect session discarded locally', {
         topic: maskCoreTopic(liveness.topic),
-        reason: forceExactRejectedTopic ? 'sdk-rejected-session-topic' : liveness.reason
+        reason: force ? 'forced-local-teardown' : liveness.reason
     });
+    tombstoneCoreTopic(liveness.topic);
     try {
         await cleanup.call(instance.signer);
         instance.reset?.();
-        if (lastStaleSessionTopicRejection?.topic === liveness.topic) {
-            lastStaleSessionTopicRejection = null;
-        }
         return true;
     } catch (error) {
         coreLog('invalid WalletConnect session cleanup failed', describeCoreError(error));
@@ -286,6 +478,7 @@ export function getCoreSessionStoreDiagnostics(instance = providerInstance) {
         sessionCount: sessions.length,
         currentTopic: maskCoreTopic(instance?.session?.topic),
         storedTopics: sessions.map((session) => maskCoreTopic(session?.topic)).filter(Boolean),
+        tombstonedTopicCount: tombstonedTopics.length,
         universalProviderNamespaceReady: Array.isArray(providerNamespaceMethods)
     };
 }
@@ -412,15 +605,22 @@ export async function requestCoreWalletMethod(instance, request) {
 // A confirmation supplied by the app represents a successful wallet-approved
 // switch for this exact session topic. It outranks the namespace list because
 // some mobile wallets do not extend that list after adding a test network.
-// Without that proof, never present an SDK-local chainId as wallet truth.
+// After that: the SDK-local chainId only when the session actually approved it,
+// then the chain of the very account this path reports as connected. A live
+// account is NEVER published without a chain — `EthereumProvider.reset()` sets
+// the SDK-local chainId to 1, and taking that gap as "unknown chain" is what
+// produced connected addresses with a null network.
 export function resolveCoreSessionChainId(instance = providerInstance, confirmedChainId = null) {
+    const normalizedConfirmedChainId = parseCoreChainId(confirmedChainId);
+    if (normalizedConfirmedChainId) return normalizedConfirmedChainId;
+
     const sessionChainIds = getCoreSessionChainIds(instance);
     const providerChainId = parseCoreChainId(instance?.chainId);
-    const normalizedConfirmedChainId = parseCoreChainId(confirmedChainId);
-
-    if (normalizedConfirmedChainId) return normalizedConfirmedChainId;
     if (!sessionChainIds.length) return providerChainId;
     if (providerChainId && sessionChainIds.includes(providerChainId)) return providerChainId;
+
+    const account = selectCoreAccount(readCoreSessionAccounts(instance?.session), providerChainId);
+    if (account) return account.chainId;
     if (sessionChainIds.length === 1) return sessionChainIds[0];
     return null;
 }
@@ -486,11 +686,25 @@ function warnIfWriteChainMissing(instance) {
     }
 }
 
-// Classify the known stale-topic SDK rejection before suppressing browser
-// unhandled-rejection noise. A missing session topic is fatal to that cached
-// session and is checked before any connected state can be published.
-// The provider-route rejection remains non-fatal: it is the recursive switch
-// triggered by an incoming chainChanged event for a chain that was just added.
+function extractMissingSessionTopic(message) {
+    const match = String(message || '').match(
+        /session topic doesn't exist:\s*["']?([a-z0-9_-]{12,})/i
+    );
+    return match?.[1] || null;
+}
+
+// Neutralize the known stale-topic SDK rejection at the browser boundary.
+// Source (proven from @walletconnect/ethereum-provider 2.23.10):
+// `EthereumProvider.switchEthereumChain()` fires `this.request(...)` WITHOUT
+// awaiting or catching it, and it is called from the inbound `chainChanged`
+// session_event handler. When the wallet emits chainChanged for a topic the
+// SignClient store no longer holds, SignClient's `isValidSessionTopic` throws
+// "No matching key. session topic doesn't exist: <topic>" straight into an
+// unhandled rejection. It is pure noise about a topic we do not own: suppress
+// it, tombstone the topic so it can never become current, and never let it
+// destroy a session the authoritative store still confirms.
+// The provider-route rejection remains non-fatal for the same reason: it is
+// the recursive switch triggered by a chainChanged for a chain just added.
 function bindStaleTopicRejectionGuard() {
     if (rejectionGuardBound) return;
     rejectionGuardBound = true;
@@ -499,13 +713,14 @@ function bindStaleTopicRejectionGuard() {
         const stack = String(event?.reason?.stack || '');
         if (/no matching key/i.test(message)) {
             const topic = extractMissingSessionTopic(message);
-            if (topic) {
-                lastStaleSessionTopicRejection = { topic, at: Date.now() };
-            }
+            // Only a topic the authoritative store cannot confirm is
+            // tombstoned. A store-confirmed live session is never destroyed by
+            // an SDK rejection.
+            if (topic && !isCoreSessionTopicStored(topic)) tombstoneCoreTopic(topic);
             event.preventDefault();
             coreLog(
                 topic
-                    ? 'missing WalletConnect session topic detected'
+                    ? 'stale WalletConnect session topic neutralized'
                     : 'non-session WalletConnect stale-key rejection suppressed',
                 { topic: maskCoreTopic(topic) }
             );
@@ -521,6 +736,12 @@ function bindStaleTopicRejectionGuard() {
             });
         }
     });
+}
+
+function isCoreSessionTopicStored(topic) {
+    const storeState = readCoreSessionStore(providerInstance);
+    if (!storeState.available || storeState.readFailed) return false;
+    return storeState.sessions.some((session) => String(session?.topic || '') === String(topic));
 }
 
 function bindProviderDiagnostics(instance) {
@@ -546,6 +767,17 @@ function bindProviderDiagnostics(instance) {
         } catch {
             coreLog('core provider event binding unavailable', { eventName });
         }
+    }
+
+    // A session the wallet ended is dead for good: tombstone it here so no
+    // queued relay message or late settle can promote it back to current.
+    try {
+        instance.on('session_delete', (payload) => {
+            tombstoneCoreTopic(payload?.topic || payload?.data || instance?.session?.topic);
+            setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'session_delete' });
+        });
+    } catch {
+        coreLog('core provider event binding unavailable', { eventName: 'session_delete tombstone' });
     }
 
     const client = instance?.signer?.client || null;
@@ -595,10 +827,7 @@ export async function getCoreEthereumProvider() {
     if (!providerInitPromise) {
         providerInitPromise = (async () => {
             bindStaleTopicRejectionGuard();
-            coreLog('core provider module import started', { version: WC_ETHEREUM_PROVIDER_VERSION });
-            const module = await import(WC_ETHEREUM_PROVIDER_URL);
-            const EthereumProvider = module.EthereumProvider || module.default;
-            const instance = await EthereumProvider.init({
+            const options = {
                 projectId: settings.projectId,
                 customStoragePrefix: CORE_STORAGE_PREFIX,
                 chains: REQUIRED_CHAIN_IDS,
@@ -608,7 +837,16 @@ export async function getCoreEthereumProvider() {
                 showQrModal: false,
                 metadata: settings.metadata,
                 rpcMap: { [BASE_SEPOLIA_CHAIN_ID]: BASE_SEPOLIA_RPC_URL }
-            });
+            };
+            let instance;
+            if (typeof settings.createProvider === 'function') {
+                instance = await settings.createProvider(options);
+            } else {
+                coreLog('core provider module import started', { version: WC_ETHEREUM_PROVIDER_VERSION });
+                const module = await import(WC_ETHEREUM_PROVIDER_URL);
+                const EthereumProvider = module.EthereumProvider || module.default;
+                instance = await EthereumProvider.init(options);
+            }
             bindProviderDiagnostics(instance);
             providerInstance = instance;
             coreLog('core provider initialized', {
@@ -666,6 +904,7 @@ export async function restoreCoreSessionOutcome(options = {}) {
             if (instance?.session && !getCoreSessionLiveness(instance).live) {
                 await discardInvalidCoreSession(instance);
             }
+            setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'restore found no session' });
             coreLog('core session restore completed without a session', {
                 elapsedMs: Date.now() - startedAt,
                 providerSessionPresent: Boolean(instance?.session),
@@ -673,10 +912,16 @@ export async function restoreCoreSessionOutcome(options = {}) {
             });
             return { status: 'none', session: null };
         }
+        const authoritative = readAuthoritativeCoreSession(instance);
+        setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { reason: 'restored from storage' });
         coreLog('core session restored from storage', {
             chainId: restored.chainId,
             namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
-            namespaceMethods: getCoreSessionMethods(instance),
+            namespaceMethods: authoritative.approvedMethods,
+            // A restored session that cannot sign is NOT torn down at boot (no
+            // user gesture); the SIWE route reports CORE_METHOD_NOT_APPROVED
+            // and the next explicit Connect replaces it.
+            signingReady: authoritative.ready,
             sessionStore: getCoreSessionStoreDiagnostics(instance),
             elapsedMs: Date.now() - startedAt
         });
@@ -692,194 +937,424 @@ export async function restoreCoreSession() {
     return outcome.session;
 }
 
+// ---- the one SDK connect task ----------------------------------------
+
+// `EthereumProvider.connect()` has no re-entrancy guard and
+// `UniversalProvider.connect()` unsubscribes every existing pairing topic on
+// entry. Calling it twice therefore produces two proposals, two pairings and
+// two session topics while breaking the first attempt's inbound channel — the
+// exact "two topics, both emitting events" failure. Exactly one task exists per
+// page; every later tap joins it and reuses the SAME pairing URI.
+function startCoreSdkConnect(instance, attempt) {
+    sdkConnectWaiters.add(attempt);
+    if (sdkConnectTask) {
+        attempt.joinedExistingPairing = true;
+        coreLog('joining the in-flight WalletConnect pairing', {
+            attemptId: attempt.id,
+            waiters: sdkConnectWaiters.size
+        });
+        return sdkConnectTask;
+    }
+
+    const task = Promise.resolve()
+        .then(() => instance.connect())
+        .finally(() => {
+            if (sdkConnectTask === task) sdkConnectTask = null;
+        });
+    sdkConnectTask = task;
+    // The SDK cannot be cancelled (abortPairingAttempt is a no-op in 2.23.10),
+    // so every task outcome is accounted for: adopted when the user approved
+    // after cancelling our attempt, torn down when they disconnected, and
+    // always observed so it can never surface as an unhandled rejection.
+    task.then(
+        () => void finalizeLateCoreSdkConnect(instance),
+        (error) => {
+            const waiters = [...sdkConnectWaiters];
+            sdkConnectWaiters.clear();
+            if (waiters.some((waiter) => !waiter.cancelled)) return;
+            coreLog('WalletConnect pairing ended without a session', describeCoreError(error));
+            if (!isCoreSessionActive()) {
+                setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'pairing ended' });
+            }
+        }
+    );
+    return task;
+}
+
+// The SDK task settled. If any attempt is still awaiting it, that caller owns
+// the outcome and publishes it. Otherwise the attempt was cancelled while the
+// wallet round trip stayed alive: adopt the session the user really approved,
+// or tear it down when the cancellation was an explicit Disconnect.
+async function finalizeLateCoreSdkConnect(instance) {
+    const waiters = [...sdkConnectWaiters];
+    sdkConnectWaiters.clear();
+    if (waiters.some((waiter) => !waiter.cancelled)) return;
+
+    const tombstoned = waiters.some((waiter) => waiter.tombstoned);
+    const snapshot = readAuthoritativeCoreSession(instance);
+    if (!snapshot.live) {
+        coreLog('cancelled WalletConnect attempt ended without a live session', {
+            reason: snapshot.reason
+        });
+        if (!isCoreSessionActive()) {
+            setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'cancelled attempt ended' });
+        }
+        return;
+    }
+
+    if (tombstoned) {
+        coreLog('late WalletConnect session settled after Disconnect; tearing it down', {
+            topic: maskCoreTopic(snapshot.topic)
+        });
+        await disconnectCoreWalletOutcome({ cancelPendingAttempt: false, reason: 'late settle after disconnect' });
+        return;
+    }
+
+    if (!snapshot.ready) {
+        coreLog('late WalletConnect session is not SIWE-capable; not adopted', {
+            topic: maskCoreTopic(snapshot.topic),
+            reason: snapshot.reason,
+            missingMethods: snapshot.missingMethods
+        });
+        return;
+    }
+
+    setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { reason: 'late settle adopted' });
+    coreLog('late WalletConnect session adopted after a cancelled attempt', {
+        topic: maskCoreTopic(snapshot.topic),
+        chainId: snapshot.chainId
+    });
+    warnIfWriteChainMissing(instance);
+    try {
+        settings.onSessionAdopted?.({
+            provider: instance,
+            address: snapshot.address,
+            chainId: snapshot.chainId,
+            restored: false,
+            adopted: true
+        });
+    } catch (error) {
+        coreLog('late WalletConnect session adoption handler failed', describeCoreError(error));
+    }
+}
+
 // The standard connect: await provider.connect() while OUR official modal
 // shows the pairing. The modal handles wallet choice, deep linking and QR.
 // No timeout marks the attempt failed — the user approves at their own pace.
 // A second tap while a connect is in flight reuses the SAME promise (and
 // therefore the same pairing): a page never holds two pairings for one
 // attempt, and the URI is never regenerated within an attempt.
-export async function connectCoreWallet() {
-    if (connectPromise) {
-        coreLog('core connect already in flight; reusing the active pairing', {});
-        return connectPromise;
+// Deliberately NOT an async function: an async wrapper would hand every tap a
+// fresh promise object, and "repeated taps reuse the same promise" is the
+// invariant that keeps one attempt from becoming two pairings.
+export function connectCoreWallet() {
+    if (activeAttempt) {
+        coreLog('core connect already in flight; reusing the active attempt', {
+            attemptId: activeAttempt.id
+        });
+        return activeAttempt.promise;
     }
 
-    connectPromise = (async () => {
-        const instance = await getCoreEthereumProvider();
+    const attempt = {
+        id: ++attemptSequence,
+        cancelled: false,
+        tombstoned: false,
+        joinedExistingPairing: false,
+        startedAt: Date.now()
+    };
+    activeAttempt = attempt;
+    attempt.promise = runCoreConnectAttempt(attempt).finally(() => {
+        if (activeAttempt === attempt) activeAttempt = null;
+    });
+    // The caller still receives the rejection; this only keeps the internal
+    // reference from surfacing as unhandled when nobody awaits it.
+    attempt.promise.catch(() => {});
+    return attempt.promise;
+}
 
-        if (instance.session) {
-            const rejected = getMatchingStaleSessionRejection(instance);
-            await discardInvalidCoreSession(instance, {
-                rejectedTopic: rejected?.topic || null
-            });
-        }
+function throwIfAttemptCancelled(attempt) {
+    if (!attempt.cancelled) return;
+    throw createConnectCancelledError('cancelled-before-pairing');
+}
 
-        if (instance.session) {
-            const address = getCoreSessionAddress(instance);
-            if (address) {
-                const chainId = resolveCoreSessionChainId(instance);
-                coreLog('core connect reused live session', {
-                    chainId,
-                    namespaceMethods: getCoreSessionMethods(instance),
-                    sessionStore: getCoreSessionStoreDiagnostics(instance)
-                });
-                return {
-                    provider: instance,
-                    address,
-                    chainId,
-                    restored: true
-                };
-            }
-        }
+async function runCoreConnectAttempt(attempt) {
+    const instance = await getCoreEthereumProvider();
+    throwIfAttemptCancelled(attempt);
 
-        const modal = getCoreWalletModal();
-        const startedAt = Date.now();
-
-        // Modal lifecycle for THIS attempt, idempotent and total: display_uri
-        // opens the official modal with the pairing URI; closeModal() fires on
-        // EVERY settle signal — the awaited connect() resolution, the provider
-        // 'connect' event, accountsChanged carrying an address — whichever
-        // lands first, plus a final close when the attempt ends. Every close
-        // (and every close failure) is logged, and later signals retry a
-        // failed close, so the Connecting view can never outlive a settled
-        // session. A failure to open is a real rejection of the attempt —
-        // never a silent pending connect.
-        let rejectAttempt = () => {};
-        const attemptAborted = new Promise((_, reject) => {
-            rejectAttempt = reject;
+    // 1. An authoritative, SIWE-capable session IS the answer. Never pair over
+    // a live session: EthereumProvider.connect() would settle a second topic.
+    const existing = readAuthoritativeCoreSession(instance);
+    if (existing.ready) {
+        setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { reason: 'existing session reused' });
+        coreLog('core connect reused live session', {
+            chainId: existing.chainId,
+            namespaceMethods: existing.approvedMethods,
+            sessionStore: getCoreSessionStoreDiagnostics(instance)
         });
-        // A late rejection after the race already settled (e.g. an openModal
-        // failure landing post-settle) must not surface as unhandled.
-        attemptAborted.catch(() => {});
-        let attemptSettled = false;
-        const closeAttemptModal = (reason) => {
-            try {
-                modal.closeModal();
-                coreLog(`wc modal closed (${reason})`, {});
-            } catch (error) {
-                coreLog('wc modal close failed', { reason, ...describeCoreError(error) });
-            }
+        return {
+            provider: instance,
+            address: existing.address,
+            chainId: existing.chainId,
+            restored: true
         };
-        const markAttemptSettled = (reason) => {
-            attemptSettled = true;
-            closeAttemptModal(reason);
-        };
-        const handleDisplayUri = (uri) => {
-            if (attemptSettled) return;
-            Promise.resolve()
-                .then(() => modal.openModal({ uri }))
-                .then(() => {
-                    coreLog('official modal opened', {});
-                    // The wcm open resolves from a readiness poll and can land
-                    // AFTER a fast settle: close again so a late open never
-                    // resurrects the Connecting view.
-                    if (attemptSettled) closeAttemptModal('settle landed during modal open');
-                })
-                .catch((error) => {
-                    coreLog('official modal open failed', describeCoreError(error));
-                    rejectAttempt(error);
-                });
-        };
-        const handleConnectSettleSignal = () => markAttemptSettled('provider connect event');
-        const handleAccountsSettleSignal = (accounts) => {
-            const hasAddress = (Array.isArray(accounts) ? accounts : []).filter(Boolean).length > 0;
-            if (hasAddress) markAttemptSettled('accountsChanged with address');
-        };
-        instance.on('display_uri', handleDisplayUri);
-        instance.on('connect', handleConnectSettleSignal);
-        instance.on('accountsChanged', handleAccountsSettleSignal);
-        // Modal close is NEVER destructive. Re-read the LIVE state at close
-        // time (never a captured snapshot): with a session settled — or any
-        // settle signal already landed — the close is just the modal going
-        // away, and nothing happens. Only a true mid-flight close cancels the
-        // attempt so the Connect button is immediately reusable: abort the
-        // pairing loop (abortPairingAttempt only sets a loop flag inside the
-        // signer — it cannot delete a settled session or touch storage) and
-        // settle as a user rejection. Never a disconnect, never a WalletConnect
-        // storage write, never a hint clear — the user's explicit Disconnect
-        // stays the only teardown on this path.
-        const unsubscribeModal = modal.subscribeModal((state) => {
-            if (state?.open) return;
-            if (instance.session || attemptSettled) {
-                coreLog('wc modal closed with a live session; no action', {});
-                return;
-            }
-            coreLog('official modal closed without a session; attempt cancelled', {});
-            try {
-                instance.signer?.abortPairingAttempt?.();
-            } catch {
-                // Abort is best effort; the rejection below settles the attempt.
-            }
-            rejectAttempt(createModalClosedError());
-        });
+    }
 
+    if (instance.session && !existing.live) {
+        // Proven dead by the authoritative store (or tombstoned): local cache
+        // only, no remote disconnect.
+        await discardInvalidCoreSession(instance);
+    } else if (instance.session && !existing.ready) {
+        // Live but unusable — most often a session the wallet settled without
+        // personal_sign. Replacing it is the whole point of this explicit user
+        // tap, and it must be a REAL disconnect: leaving it in the SignClient
+        // store would let EthereumProvider.connect() add a second topic beside
+        // it. This is the only non-Disconnect teardown and it is user-driven.
+        coreLog('live WalletConnect session cannot sign; replacing it on user request', {
+            topic: maskCoreTopic(existing.topic),
+            reason: existing.reason,
+            missingMethods: existing.missingMethods
+        });
+        await disconnectCoreWalletOutcome({
+            cancelPendingAttempt: false,
+            reason: 'unusable session replaced'
+        });
+    }
+
+    setCoreLifecycleState(CORE_LIFECYCLE.PAIRING, { attemptId: attempt.id });
+
+    const modal = getCoreWalletModal();
+    const startedAt = Date.now();
+
+    // Modal lifecycle for THIS attempt, idempotent and total: display_uri
+    // opens the official modal with the pairing URI; closeModal() fires on
+    // EVERY settle signal — the awaited connect() resolution, the provider
+    // 'connect' event, accountsChanged carrying an address — whichever
+    // lands first, plus a final close when the attempt ends. Every close
+    // (and every close failure) is logged, and later signals retry a
+    // failed close, so the Connecting view can never outlive a settled
+    // session. A failure to open is a real rejection of the attempt —
+    // never a silent pending connect.
+    let rejectAttempt = () => {};
+    const attemptAborted = new Promise((_, reject) => {
+        rejectAttempt = reject;
+    });
+    // Disconnect settles a pending attempt through this hook.
+    attempt.abort = rejectAttempt;
+    // A late rejection after the race already settled (e.g. an openModal
+    // failure landing post-settle) must not surface as unhandled.
+    attemptAborted.catch(() => {});
+    let attemptSettled = false;
+    const closeAttemptModal = (reason) => {
         try {
-            const connectTask = instance.connect();
-            // If the attempt is cancelled, the losing connect() may reject
-            // much later (aborted pairing loop) — keep it observed.
-            connectTask.catch(() => {});
-            await Promise.race([connectTask, attemptAborted]);
-            markAttemptSettled('connect() resolved');
-            const rejected = getMatchingStaleSessionRejection(instance, startedAt);
-            const liveness = getCoreSessionLiveness(instance);
-            if (!liveness.live || rejected) {
-                await discardInvalidCoreSession(instance, {
-                    rejectedTopic: rejected?.topic || null
-                });
-                throw createCoreSessionNotLiveError(
-                    rejected ? 'sdk-rejected-session-topic' : liveness.reason
-                );
-            }
-            const result = {
-                provider: instance,
-                address: getCoreSessionAddress(instance),
-                chainId: resolveCoreSessionChainId(instance),
-                restored: false
-            };
-            if (!result.address) {
-                throw createCoreSessionNotLiveError('session-address-missing');
-            }
-            coreLog('core connect settled', {
-                elapsedMs: Date.now() - startedAt,
-                chainId: result.chainId,
-                namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
-                namespaceMethods: getCoreSessionMethods(instance),
-                sessionStore: getCoreSessionStoreDiagnostics(instance)
-            });
-            warnIfWriteChainMissing(instance);
-            return result;
-        } finally {
-            try {
-                instance.removeListener?.('display_uri', handleDisplayUri);
-                instance.removeListener?.('connect', handleConnectSettleSignal);
-                instance.removeListener?.('accountsChanged', handleAccountsSettleSignal);
-            } catch {
-                // Listener teardown must never mask the connect outcome.
-            }
-            try {
-                unsubscribeModal?.();
-            } catch {
-                // Same: teardown is best effort.
-            }
-            closeAttemptModal('attempt finalized');
+            modal.closeModal();
+            coreLog(`wc modal closed (${reason})`, {});
+        } catch (error) {
+            coreLog('wc modal close failed', { reason, ...describeCoreError(error) });
         }
-    })().finally(() => {
-        connectPromise = null;
+    };
+    const markAttemptSettled = (reason) => {
+        attemptSettled = true;
+        closeAttemptModal(reason);
+    };
+    const handleDisplayUri = (uri) => {
+        if (attemptSettled || attempt.cancelled) return;
+        setCoreLifecycleState(CORE_LIFECYCLE.WAITING_FOR_WALLET, { attemptId: attempt.id });
+        Promise.resolve()
+            .then(() => modal.openModal({ uri }))
+            .then(() => {
+                coreLog('official modal opened', {});
+                // The wcm open resolves from a readiness poll and can land
+                // AFTER a fast settle: close again so a late open never
+                // resurrects the Connecting view.
+                if (attemptSettled) closeAttemptModal('settle landed during modal open');
+            })
+            .catch((error) => {
+                coreLog('official modal open failed', describeCoreError(error));
+                rejectAttempt(error);
+            });
+    };
+    const handleConnectSettleSignal = () => markAttemptSettled('provider connect event');
+    const handleAccountsSettleSignal = (accounts) => {
+        const hasAddress = (Array.isArray(accounts) ? accounts : []).filter(Boolean).length > 0;
+        if (hasAddress) markAttemptSettled('accountsChanged with address');
+    };
+    instance.on('display_uri', handleDisplayUri);
+    instance.on('connect', handleConnectSettleSignal);
+    instance.on('accountsChanged', handleAccountsSettleSignal);
+    // Modal close is NEVER destructive. Re-read the LIVE state at close
+    // time (never a captured snapshot): with a session settled — or any
+    // settle signal already landed — the close is just the modal going
+    // away, and nothing happens. Only a true mid-flight close cancels the
+    // ATTEMPT so the Connect button is immediately reusable. It cannot
+    // cancel the SDK (abortPairingAttempt is a no-op in 2.23.10), so the
+    // pairing keeps running and its outcome is adopted or torn down by
+    // finalizeLateCoreSdkConnect. Never a disconnect, never a WalletConnect
+    // storage write, never a hint clear — the user's explicit Disconnect
+    // stays the only teardown on this path.
+    const unsubscribeModal = modal.subscribeModal((state) => {
+        if (state?.open) return;
+        if (instance.session || attemptSettled) {
+            coreLog('wc modal closed with a live session; no action', {});
+            return;
+        }
+        coreLog('official modal closed without a session; attempt cancelled', {});
+        attempt.cancelled = true;
+        rejectAttempt(createModalClosedError());
     });
 
-    return connectPromise;
+    try {
+        throwIfAttemptCancelled(attempt);
+        const joinedPairingUri = sdkConnectTask ? (instance.signer?.uri || null) : null;
+        const connectTask = startCoreSdkConnect(instance, attempt);
+        // Joining a live pairing must re-show the SAME uri: the SDK already
+        // emitted display_uri for it and will not emit it again.
+        if (joinedPairingUri) handleDisplayUri(joinedPairingUri);
+        await Promise.race([connectTask, attemptAborted]);
+        sdkConnectWaiters.delete(attempt);
+        markAttemptSettled('connect() resolved');
+        setCoreLifecycleState(CORE_LIFECYCLE.SETTLING_SESSION, { attemptId: attempt.id });
+
+        // Authoritative readiness, not "connect() resolved", decides success.
+        const settled = readAuthoritativeCoreSession(instance);
+        if (!settled.ready) {
+            if (!settled.live) await discardInvalidCoreSession(instance);
+            setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: settled.reason });
+            throw createCoreSessionNotLiveError(settled.reason, {
+                missingMethods: settled.missingMethods,
+                approvedChainIds: settled.approvedChainIds
+            });
+        }
+
+        setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { attemptId: attempt.id });
+        coreLog('core connect settled', {
+            elapsedMs: Date.now() - startedAt,
+            chainId: settled.chainId,
+            namespaceChains: instance.session?.namespaces?.eip155?.chains || null,
+            namespaceMethods: settled.approvedMethods,
+            joinedExistingPairing: attempt.joinedExistingPairing,
+            sessionStore: getCoreSessionStoreDiagnostics(instance)
+        });
+        warnIfWriteChainMissing(instance);
+        return {
+            provider: instance,
+            address: settled.address,
+            chainId: settled.chainId,
+            restored: false
+        };
+    } catch (error) {
+        if (!isCoreSessionActive() && lifecycleState !== CORE_LIFECYCLE.DISCONNECTING) {
+            setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, {
+                reason: error?.code === 4001 ? 'attempt cancelled' : 'attempt failed'
+            });
+        }
+        throw error;
+    } finally {
+        try {
+            instance.removeListener?.('display_uri', handleDisplayUri);
+            instance.removeListener?.('connect', handleConnectSettleSignal);
+            instance.removeListener?.('accountsChanged', handleAccountsSettleSignal);
+        } catch {
+            // Listener teardown must never mask the connect outcome.
+        }
+        try {
+            unsubscribeModal?.();
+        } catch {
+            // Same: teardown is best effort.
+        }
+        closeAttemptModal('attempt finalized');
+    }
 }
 
 // Explicit user disconnect is the ONLY place session/storage teardown happens
-// on this path.
+// on this path. Repeated taps are idempotent: the second tap joins the first
+// outcome instead of starting a second teardown, and a disconnect with nothing
+// to disconnect is reported as such instead of as a successful teardown.
+export async function disconnectCoreWalletOutcome(options = {}) {
+    if (disconnectPromise) {
+        coreLog('core disconnect already in flight; reusing it', {});
+        return disconnectPromise;
+    }
+    disconnectPromise = runCoreDisconnect(options).finally(() => {
+        disconnectPromise = null;
+    });
+    return disconnectPromise;
+}
+
+// Boolean-compatible wrapper for existing callers.
 export async function disconnectCoreWallet() {
-    if (!providerInstance?.session) return false;
+    const outcome = await disconnectCoreWalletOutcome();
+    return outcome.disconnected;
+}
+
+async function runCoreDisconnect(options = {}) {
+    const instance = providerInstance;
+    const cancelPendingAttempt = options.cancelPendingAttempt !== false;
+    let cancelledAttempts = 0;
+
+    if (cancelPendingAttempt) {
+        // Disconnect invalidates the current attempt AND every attempt waiting
+        // on the uncancellable SDK task, so a late settle is torn down instead
+        // of restoring connected UI behind the user's back. Each attempt is
+        // settled at once so the Connect button is immediately reusable and
+        // `activeAttempt` is released for a fresh tap.
+        const pending = new Set(sdkConnectWaiters);
+        if (activeAttempt) pending.add(activeAttempt);
+        for (const attempt of pending) {
+            attempt.cancelled = true;
+            attempt.tombstoned = true;
+            cancelledAttempts += 1;
+            try {
+                attempt.abort?.(createConnectCancelledError('disconnected-during-connect'));
+            } catch {
+                // Aborting is best effort; the flags above are authoritative.
+            }
+        }
+    }
+
+    const topic = String(instance?.session?.topic || '');
+    if (!instance?.session) {
+        setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: options.reason || 'no active session' });
+        coreLog('core disconnect found no active session', { cancelledAttempts });
+        return {
+            disconnected: false,
+            hadSession: false,
+            reason: 'no-active-session',
+            cancelledAttempts,
+            topic: null
+        };
+    }
+
+    setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTING, { reason: options.reason || 'user disconnect' });
+    tombstoneCoreTopic(topic);
     try {
-        await providerInstance.disconnect();
-        coreLog('core session disconnected');
-        return true;
+        await instance.disconnect();
+        setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'session disconnected' });
+        coreLog('core session disconnected', { topic: maskCoreTopic(topic), cancelledAttempts });
+        return {
+            disconnected: true,
+            hadSession: true,
+            reason: 'session-disconnected',
+            cancelledAttempts,
+            topic
+        };
     } catch (error) {
         coreLog('core session disconnect failed', describeCoreError(error));
-        return false;
+        // The peer may already be gone. The topic is tombstoned either way, so
+        // the local cache must not survive as "connected" after the user asked
+        // to disconnect.
+        try {
+            await discardInvalidCoreSession(instance, { force: true });
+        } catch (cleanupError) {
+            coreLog('core session local teardown failed', describeCoreError(cleanupError));
+        }
+        setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'disconnect failed' });
+        return {
+            disconnected: false,
+            hadSession: true,
+            reason: 'disconnect-failed',
+            cancelledAttempts,
+            topic,
+            error
+        };
     }
 }

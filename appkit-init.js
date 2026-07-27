@@ -15,6 +15,7 @@ import {
     disconnectCoreWallet,
     getConnectedCoreProvider,
     getCoreProviderInstance,
+    getCoreLifecycleState,
     getCoreSessionChainIds,
     getCoreSessionAddress,
     getCoreWalletApprovalUrl,
@@ -22,8 +23,9 @@ import {
     isCoreSessionActive,
     requestCoreWalletMethod,
     resolveCoreSessionChainId,
-    restoreCoreSessionOutcome
-} from './wallet-core-connect.js?v=16'
+    restoreCoreSessionOutcome,
+    setCoreAuthLifecycleState
+} from './wallet-core-connect.js?v=17'
 
 // ============================================
 // CONFIGURATION
@@ -106,7 +108,14 @@ const networkMap = {
 configureCoreWallet({
     projectId,
     metadata: coreWalletMetadata,
-    log: (step, detail) => walletDebugLog(step, detail)
+    log: (step, detail) => walletDebugLog(step, detail),
+    // The WalletConnect SDK cannot cancel an in-flight connect
+    // (UniversalProvider.abortPairingAttempt is a no-op in 2.23.10). When the
+    // user closes the modal but still approves in the wallet, the session that
+    // really exists is handed here instead of settling behind a disconnected
+    // UI. A cancellation caused by explicit Disconnect never reaches this.
+    onSessionAdopted: (connected) => void applyCoreConnectedSession(connected, 'late settle adoption'),
+    onLifecycle: (state, detail) => walletDebugLog('core wallet lifecycle state', { state, ...detail })
 });
 
 // ============================================
@@ -597,6 +606,20 @@ window.requestArtSoulWalletProvider = async (provider, request) => {
 
     if (!provider?.request) throw new Error('Wallet provider is not available');
     return provider.request(request);
+};
+
+// One unambiguous read of the external-mobile wallet lifecycle for the
+// diagnostic page and field logs: what state the connection is in, what the
+// authoritative session says, and whether an attempt is still running.
+window.getArtSoulWalletLifecycle = () => {
+    const coreProvider = getConnectedCoreProvider();
+    return {
+        state: getCoreLifecycleState(),
+        connectInFlight: isCoreConnectInFlight(),
+        sessionActive: isCoreSessionActive(),
+        address: normalizeWalletAddress(getCoreSessionAddress(coreProvider)) || null,
+        chainId: resolveCoreSessionChainId(coreProvider, getLastConfirmedCoreChainId())
+    };
 };
 
 window.getArtSoulWalletProviderSource = (provider) => {
@@ -1127,8 +1150,25 @@ async function processWalletResume(source) {
     scheduleWalletReconciliation(source, 0);
 }
 
+// Returning to a backgrounded iOS tab fires pageshow, visibilitychange AND
+// focus within a few milliseconds of each other. Reconciling once per event
+// restarted the relay transport and re-read every provider two or three times
+// per resume. Coalesce the whole burst into ONE reconciliation that names all
+// of its triggers. This is a debounce over duplicate signals, never a
+// correctness delay: nothing waits on the timer to make a decision.
+const WALLET_RESUME_BURST_WINDOW_MS = 250;
+let walletResumeBurstTimer = null;
+let walletResumeBurstSources = [];
+
 function notifyWalletResume(source) {
-    void processWalletResume(source);
+    if (!walletResumeBurstSources.includes(source)) walletResumeBurstSources.push(source);
+    if (walletResumeBurstTimer) return;
+    walletResumeBurstTimer = setTimeout(() => {
+        walletResumeBurstTimer = null;
+        const burst = walletResumeBurstSources.join(' + ');
+        walletResumeBurstSources = [];
+        void processWalletResume(burst);
+    }, WALLET_RESUME_BURST_WINDOW_MS);
 }
 
 function waitForWalletResumeOrDelay(delay) {
@@ -2492,34 +2532,42 @@ function shouldDeferMobileAuthentication(connected) {
     return connected?.restored === false;
 }
 
+// The single place a proven core session becomes ArtSoul wallet state. Both
+// the awaited connect and the adopted late settle land here, so a session can
+// never be published two different ways.
+function applyCoreConnectedSession(connected, source) {
+    if (!connected?.address) return null;
+    const coreProvider = connected.provider;
+    activeWalletProvider = coreProvider;
+    bindRuntimeProviderEvents(coreProvider, 'core walletconnect provider');
+    bindWalletConnectDiagnostics(coreProvider, 'core walletconnect provider');
+    bindCoreProviderDisconnect(coreProvider);
+
+    // Apply the session exactly as the wallet settled it — the write
+    // guard is the only place that ever requests Base Sepolia.
+    applyConfirmedWalletState({
+        address: connected.address,
+        chainId: connected.chainId
+    });
+    walletDebugLog('standard mobile connect settled', {
+        source,
+        address: maskWalletAddress(connected.address),
+        chainId: connected.chainId,
+        restored: connected.restored
+    });
+    return connected.address;
+}
+
 async function connectExternalMobileStandard() {
     sessionStorage.removeItem('artsoul_disconnecting');
     setConnectButtonPending(true);
     walletDebugLog('standard mobile connect entered', {});
     try {
         const connected = await connectCoreWallet();
-        if (!connected?.address) {
+        if (!applyCoreConnectedSession(connected, 'connect')) {
             walletDebugLog('standard mobile connect returned no address', {});
             return null;
         }
-
-        const coreProvider = connected.provider;
-        activeWalletProvider = coreProvider;
-        bindRuntimeProviderEvents(coreProvider, 'core walletconnect provider');
-        bindWalletConnectDiagnostics(coreProvider, 'core walletconnect provider');
-        bindCoreProviderDisconnect(coreProvider);
-
-        // Apply the session exactly as the wallet settled it — the write
-        // guard is the only place that ever requests Base Sepolia.
-        applyConfirmedWalletState({
-            address: connected.address,
-            chainId: connected.chainId
-        });
-        walletDebugLog('standard mobile connect settled', {
-            address: maskWalletAddress(connected.address),
-            chainId: connected.chainId,
-            restored: connected.restored
-        });
         // A newly paired session gets one connect-only gesture so SIWE never
         // competes with the wallet round trip. Reusing an already-live session
         // is the protected action's next gesture and must be allowed to
@@ -3125,6 +3173,7 @@ window.ensureAuthenticated = async () => {
 
         try {
             console.log('Requesting signature for authentication...');
+            setCoreAuthLifecycleState('siwe-signing');
             walletDebugLog('SIWE signature requested', { address: maskWalletAddress(walletAddress) });
 
             const provider = await getProviderForWallet(walletAddress);
@@ -3135,10 +3184,12 @@ window.ensureAuthenticated = async () => {
                 provider
             );
             console.log('Authenticated:', authResult.user.id);
+            setCoreAuthLifecycleState('authenticated');
             walletDebugLog('SIWE signature verified', { address: maskWalletAddress(walletAddress) });
             return true;
         } catch (error) {
             console.error('Authentication failed:', error);
+            setCoreAuthLifecycleState('connected');
             walletDebugLog('SIWE signature failed', { message: error?.message || String(error) });
             alert('Authentication was not completed. You are connected and can browse, but protected actions need a wallet signature.');
             return false;

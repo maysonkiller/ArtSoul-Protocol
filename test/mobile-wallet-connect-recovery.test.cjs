@@ -20,11 +20,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=46/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=47/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=16/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=16/);
-    assert.match(walletTest, /appkit-init\.js\?v=46/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=17/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=17/);
+    assert.match(walletTest, /appkit-init\.js\?v=47/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -108,95 +108,112 @@ test('core wallet methods use the approved route and the correct SDK transport',
 });
 
 test('a cached session topic must still exist in the SignClient store before connected state is published', () => {
-    assert.match(coreWallet, /export function getCoreSessionLiveness/);
+    assert.match(coreWallet, /function getCoreSessionLiveness/);
     assert.match(coreWallet, /store\.getAll\(\)/);
     assert.match(coreWallet, /session-topic-missing/);
     assert.match(coreWallet, /session-expired/);
-    assert.match(coreWallet, /export async function discardInvalidCoreSession/);
+    assert.match(coreWallet, /session-topic-tombstoned/);
+    assert.match(coreWallet, /async function discardInvalidCoreSession/);
     assert.match(coreWallet, /await cleanup\.call\(instance\.signer\)/);
     assert.match(coreWallet, /instance\.reset\?\.\(\)/);
     assert.match(coreWallet, /CORE_SESSION_NOT_LIVE/);
 
-    const connect = coreWallet.match(/export async function connectCoreWallet[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(connect, /await discardInvalidCoreSession\(instance/);
-    assert.match(connect, /const liveness = getCoreSessionLiveness\(instance\)/);
-    assert.match(connect, /if \(!liveness\.live \|\| rejected\)/);
+    // Readiness is decided by ONE authoritative read of the SignClient
+    // session, and that read runs before any connected result is returned.
+    const attempt = coreWallet.match(/async function runCoreConnectAttempt[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(attempt, 'runCoreConnectAttempt must exist');
+    assert.match(attempt, /const settled = readAuthoritativeCoreSession\(instance\);/);
+    assert.match(attempt, /if \(!settled\.ready\) \{/);
     assert.ok(
-        connect.indexOf('if (!liveness.live || rejected)') <
-        connect.indexOf('const result = {'),
-        'the live-topic guard must run before the connection result is returned'
+        attempt.indexOf('if (!settled.ready)') < attempt.lastIndexOf('return {\n            provider: instance,'),
+        'the readiness gate must run before the connection result is returned'
     );
+    const readiness = coreWallet.match(/function readAuthoritativeCoreSession[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(readiness, /getCoreSessionLiveness\(instance/);
+    assert.match(readiness, /session-address-missing/);
+    assert.match(readiness, /session-chain-missing/);
+    assert.match(readiness, /session-method-not-approved/);
+    // SIWE capability is part of readiness; the write chain is not.
+    assert.match(coreWallet, /const READINESS_METHODS = \['personal_sign'\];/);
 });
 
 test('the official modal lifecycle is deterministic: open on display_uri, close on every settle', () => {
-    const connect = coreWallet.match(/export async function connectCoreWallet[\s\S]*?\n\}/)?.[0] || '';
-    assert.ok(connect, 'connectCoreWallet must exist');
+    const attempt = coreWallet.match(/async function runCoreConnectAttempt[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(attempt, 'runCoreConnectAttempt must exist');
     // display_uri -> openModal({ uri }); an open failure rejects the attempt
     // instead of pending silently.
-    assert.match(connect, /instance\.on\('display_uri', handleDisplayUri\)/);
-    assert.match(connect, /modal\.openModal\(\{ uri \}\)/);
-    assert.match(connect, /rejectAttempt\(error\)/);
-    // Manual close without a session aborts the pairing and settles the
-    // attempt as a user rejection (4001) — the button is reusable at once.
-    assert.match(connect, /modal\.subscribeModal/);
-    assert.match(connect, /abortPairingAttempt/);
-    assert.match(connect, /rejectAttempt\(createModalClosedError\(\)\)/);
+    assert.match(attempt, /instance\.on\('display_uri', handleDisplayUri\)/);
+    assert.match(attempt, /modal\.openModal\(\{ uri \}\)/);
+    assert.match(attempt, /rejectAttempt\(error\)/);
+    // Manual close without a session settles the attempt as a user rejection
+    // (4001) — the button is reusable at once.
+    assert.match(attempt, /modal\.subscribeModal/);
+    assert.match(attempt, /rejectAttempt\(createModalClosedError\(\)\)/);
     assert.match(coreWallet, /error\.code = 4001;/);
     // closeModal fires on EVERY settle signal — the awaited connect()
     // resolution, the provider 'connect' event, accountsChanged with an
     // address — whichever lands first, and every close is logged.
-    assert.match(connect, /markAttemptSettled\('connect\(\) resolved'\)/);
-    assert.match(connect, /instance\.on\('connect', handleConnectSettleSignal\)/);
-    assert.match(connect, /instance\.on\('accountsChanged', handleAccountsSettleSignal\)/);
-    assert.match(connect, /markAttemptSettled\('provider connect event'\)/);
-    assert.match(connect, /markAttemptSettled\('accountsChanged with address'\)/);
-    assert.match(connect, /coreLog\(`wc modal closed \(\$\{reason\}\)`/);
-    assert.match(connect, /wc modal close failed/);
+    assert.match(attempt, /markAttemptSettled\('connect\(\) resolved'\)/);
+    assert.match(attempt, /instance\.on\('connect', handleConnectSettleSignal\)/);
+    assert.match(attempt, /instance\.on\('accountsChanged', handleAccountsSettleSignal\)/);
+    assert.match(attempt, /markAttemptSettled\('provider connect event'\)/);
+    assert.match(attempt, /markAttemptSettled\('accountsChanged with address'\)/);
+    assert.match(attempt, /coreLog\(`wc modal closed \(\${reason}\)`/);
+    assert.match(attempt, /wc modal close failed/);
     // A late openModal resolution can never resurrect the Connecting view.
-    assert.match(connect, /settle landed during modal open/);
+    assert.match(attempt, /settle landed during modal open/);
     // Every attempt end tears down: listeners off, modal subscription off,
     // final close.
-    assert.match(connect, /removeListener\?\.\('display_uri', handleDisplayUri\)/);
-    assert.match(connect, /removeListener\?\.\('connect', handleConnectSettleSignal\)/);
-    assert.match(connect, /removeListener\?\.\('accountsChanged', handleAccountsSettleSignal\)/);
-    assert.match(connect, /unsubscribeModal\?\.\(\)/);
-    assert.match(connect, /modal\.closeModal\(\)/);
-    assert.match(connect, /closeAttemptModal\('attempt finalized'\)/);
+    assert.match(attempt, /removeListener\?\.\('display_uri', handleDisplayUri\)/);
+    assert.match(attempt, /removeListener\?\.\('connect', handleConnectSettleSignal\)/);
+    assert.match(attempt, /removeListener\?\.\('accountsChanged', handleAccountsSettleSignal\)/);
+    assert.match(attempt, /unsubscribeModal\?\.\(\)/);
+    assert.match(attempt, /modal\.closeModal\(\)/);
+    assert.match(attempt, /closeAttemptModal\('attempt finalized'\)/);
     // A connect failure is always surfaced in the production handler.
     assert.match(appKit, /walletDebugLog\('standard connect rejected'/);
-    assert.match(appKit, /alert\(`Wallet connection failed: \$\{error\?\.message \|\| error\}`\)/);
+    assert.match(appKit, /alert\(`Wallet connection failed: \${error\?\.message \|\| error}`\)/);
 });
 
 test('modal close is never destructive: closed after settle keeps the session; closed mid-flight only cancels the attempt', () => {
-    const connect = coreWallet.match(/export async function connectCoreWallet[\s\S]*?\n\}/)?.[0] || '';
-    assert.ok(connect, 'connectCoreWallet must exist');
-    const closeHandler = connect.match(/const unsubscribeModal = modal\.subscribeModal\(\(state\) => \{[\s\S]*?\n\s{8}\}\);/)?.[0] || '';
+    const attempt = coreWallet.match(/async function runCoreConnectAttempt[\s\S]*?\n\}/)?.[0] || '';
+    const closeHandler = attempt.match(/const unsubscribeModal = modal\.subscribeModal\(\(state\) => \{[\s\S]*?\n\s{4}\}\);/)?.[0] || '';
     assert.ok(closeHandler, 'the modal close handler must exist');
     // The handler re-reads the LIVE session state at close time — never a
     // captured snapshot — and a close after settle does nothing.
     assert.match(closeHandler, /if \(instance\.session \|\| attemptSettled\) \{/);
     assert.match(closeHandler, /wc modal closed with a live session; no action/);
-    // Mid-flight close does exactly one thing: cancel the attempt (4001) so
-    // the button is reusable. abortPairingAttempt only flags the signer's
-    // pairing loop — it cannot delete a settled session.
+    // Mid-flight close does exactly two things: mark the attempt cancelled and
+    // settle it (4001). The SDK pairing cannot be cancelled
+    // (abortPairingAttempt is a no-op in 2.23.10), so its outcome is adopted or
+    // torn down by finalizeLateCoreSdkConnect — never abandoned, never a
+    // session deletion from here.
+    assert.match(closeHandler, /attempt\.cancelled = true;/);
     assert.match(closeHandler, /rejectAttempt\(createModalClosedError\(\)\)/);
-    // The handler (and the whole module outside disconnectCoreWallet) never
-    // disconnects the provider or touches WalletConnect storage or hints.
     assert.doesNotMatch(closeHandler, /\.disconnect\(/);
     assert.doesNotMatch(closeHandler, /removeItem|localStorage|sessionStorage|indexedDB/);
-    assert.doesNotMatch(connect, /\.disconnect\(/);
+    assert.doesNotMatch(attempt, /instance\.disconnect\(\)/);
     assert.doesNotMatch(coreWallet, /localStorage|sessionStorage|indexedDB/);
+    assert.match(coreWallet, /async function finalizeLateCoreSdkConnect/);
+    assert.match(coreWallet, /late WalletConnect session adopted after a cancelled attempt/);
     // A cancelled attempt releases the in-flight slot for the next tap.
-    assert.match(coreWallet, /\.finally\(\(\) => \{\s*\n\s*connectPromise = null;/);
+    assert.match(coreWallet, /if \(activeAttempt === attempt\) activeAttempt = null;/);
 });
 
-test('single-teardown invariant: explicit Disconnect is the only production caller of core teardown', () => {
+test('single-teardown invariant: session teardown stays on explicit, user-driven paths', () => {
     // provider.disconnect() exists in exactly ONE place in the core module —
-    // inside disconnectCoreWallet.
-    const coreDisconnectCalls = coreWallet.match(/providerInstance\.disconnect\(\)/g) || [];
-    assert.equal(coreDisconnectCalls.length, 1, 'provider.disconnect() must live only in disconnectCoreWallet');
-    const disconnectFn = coreWallet.match(/export async function disconnectCoreWallet[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(disconnectFn, /providerInstance\.disconnect\(\)/);
+    // inside the disconnect implementation.
+    const coreDisconnectCalls = coreWallet.match(/instance\.disconnect\(\)/g) || [];
+    assert.equal(coreDisconnectCalls.length, 1, 'provider.disconnect() must live only in runCoreDisconnect');
+    const disconnectFn = coreWallet.match(/async function runCoreDisconnect[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(disconnectFn, /await instance\.disconnect\(\);/);
+    // Every internal teardown goes through that same single implementation and
+    // is user-driven: the explicit Disconnect, the late settle after a
+    // Disconnect, and replacing a live session that cannot sign.
+    const teardownCallers = coreWallet.match(/disconnectCoreWalletOutcome\(\{/g) || [];
+    assert.equal(teardownCallers.length, 2, 'only the late-settle and unusable-session paths call the teardown internally');
+    assert.match(coreWallet, /late WalletConnect session settled after Disconnect; tearing it down/);
+    assert.match(coreWallet, /live WalletConnect session cannot sign; replacing it on user request/);
     // appkit-init calls disconnectCoreWallet exactly once — inside the
     // explicit user Disconnect (resetWalletConnection).
     const appKitDisconnectCalls = appKit.match(/disconnectCoreWallet\(\)/g) || [];
@@ -217,25 +234,29 @@ test('single-teardown invariant: explicit Disconnect is the only production call
 
 test('the standard mobile connect settles without forcing an operational network', () => {
     const standard = appKit.match(/async function connectExternalMobileStandard[\s\S]*?\n\}/)?.[0] || '';
+    const apply = appKit.match(/function applyCoreConnectedSession[\s\S]*?\n\}/)?.[0] || '';
     assert.ok(standard, 'connectExternalMobileStandard must exist');
+    assert.ok(apply, 'applyCoreConnectedSession must exist');
     // Connect establishes wallet identity only. The current chain is display
     // state until an explicit on-chain write invokes the shared write guard.
     assert.match(standard, /await connectCoreWallet\(\)/);
-    assert.match(standard, /applyConfirmedWalletState\(/);
-    assert.doesNotMatch(standard, /scheduleMobileOperationalNetworkPrompt/);
-    assert.doesNotMatch(standard, /ensureExternalMobileBaseSepolia/);
-    assert.doesNotMatch(standard, /wallet_addEthereumChain/);
-    assert.doesNotMatch(standard, /wallet_switchEthereumChain/);
-    assert.doesNotMatch(standard, /BASE_SEPOLIA_CHAIN_ID/);
-    // NO settle windows, custom deadlines, or reconciliation loops.
-    assert.doesNotMatch(standard, /waitForWalletChainSettle/);
-    assert.doesNotMatch(standard, /createForegroundDeadline/);
-    assert.doesNotMatch(standard, /WALLET_CONNECT_TIMEOUT/);
-    // NO storage cleanup on any outcome of this path (the sessionStorage
-    // disconnect-flag reset is not cleanup; it re-enables connecting).
-    assert.doesNotMatch(standard, /clearWalletConnectionCache/);
-    assert.doesNotMatch(standard, /clearIncompleteWalletConnectState/);
-    assert.doesNotMatch(standard, /localStorage\.removeItem/);
+    assert.match(apply, /applyConfirmedWalletState\(/);
+    for (const source of [standard, apply]) {
+        assert.doesNotMatch(source, /scheduleMobileOperationalNetworkPrompt/);
+        assert.doesNotMatch(source, /ensureExternalMobileBaseSepolia/);
+        assert.doesNotMatch(source, /wallet_addEthereumChain/);
+        assert.doesNotMatch(source, /wallet_switchEthereumChain/);
+        assert.doesNotMatch(source, /BASE_SEPOLIA_CHAIN_ID/);
+        // NO settle windows, custom deadlines, or reconciliation loops.
+        assert.doesNotMatch(source, /waitForWalletChainSettle/);
+        assert.doesNotMatch(source, /createForegroundDeadline/);
+        assert.doesNotMatch(source, /WALLET_CONNECT_TIMEOUT/);
+        // NO storage cleanup on any outcome of this path (the sessionStorage
+        // disconnect-flag reset is not cleanup; it re-enables connecting).
+        assert.doesNotMatch(source, /clearWalletConnectionCache/);
+        assert.doesNotMatch(source, /clearIncompleteWalletConnectState/);
+        assert.doesNotMatch(source, /localStorage\.removeItem/);
+    }
     // The provider module never requests a chain switch either.
     assert.doesNotMatch(coreWallet, /wallet_switchEthereumChain/);
     assert.doesNotMatch(coreWallet, /wallet_addEthereumChain/);
@@ -244,13 +265,23 @@ test('the standard mobile connect settles without forcing an operational network
 test('one provider instance, one pairing: an in-flight connect is reused, never replaced', () => {
     // Singleton provider init.
     assert.match(coreWallet, /if \(providerInstance\) return providerInstance;/);
-    // A second tap reuses the SAME connect promise (and pairing).
-    const connect = coreWallet.match(/export async function connectCoreWallet[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(connect, /if \(connectPromise\) \{/);
-    assert.match(connect, /return connectPromise;/);
-    assert.match(connect, /reusing the active pairing/);
+    // A second tap reuses the SAME attempt promise (and pairing). The
+    // dispatcher is intentionally not async so the promise identity holds.
+    const connect = coreWallet.match(/export function connectCoreWallet\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+    assert.ok(connect, 'connectCoreWallet must be a plain function');
+    assert.match(connect, /if \(activeAttempt\) \{/);
+    assert.match(connect, /return activeAttempt\.promise;/);
+    assert.match(connect, /reusing the active attempt/);
+    // And exactly one SDK connect task exists per page: later attempts join it
+    // instead of publishing a second proposal.
+    const sdk = coreWallet.match(/function startCoreSdkConnect[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(sdk, /if \(sdkConnectTask\) \{/);
+    assert.match(sdk, /return sdkConnectTask;/);
+    assert.match(sdk, /joining the in-flight WalletConnect pairing/);
+    const instanceConnectCalls = coreWallet.match(/instance\.connect\(\)/g) || [];
+    assert.equal(instanceConnectCalls.length, 1, 'EthereumProvider.connect() has exactly one call site');
     // No proposal/pairing/session deletion anywhere in the module.
-    assert.doesNotMatch(coreWallet, /pairing\.delete|session\.delete|cleanupPendingPairings/);
+    assert.doesNotMatch(coreWallet, /pairing\.delete|session\.delete\(/);
 });
 
 test('no failure or cleanup path clears WalletConnect storage with a live session', () => {

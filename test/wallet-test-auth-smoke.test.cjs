@@ -53,8 +53,24 @@ test('wallet-test copies the complete status and log with an iOS-compatible fall
 test('wallet-test can explicitly disconnect the isolated diagnostic session', () => {
   assert.match(source, /disconnectButton\.addEventListener\('click'/);
   assert.match(source, /await window\.resetWalletConnection\?\.\(\)/);
-  assert.match(source, /await core\.disconnectCoreWallet\(\)/);
+  assert.match(source, /await core\.disconnectCoreWalletOutcome\(\)/);
   assert.match(source, /Diagnostic wallet session disconnected/);
+});
+
+test('the diagnostic disconnect reports its real outcome and the resulting lifecycle', () => {
+  // Two consecutive taps used to log an identical "disconnected: true" even
+  // when the second had nothing to disconnect. The outcome now names what
+  // happened and the lifecycle state it produced.
+  assert.match(source, /function describeDisconnectOutcome/);
+  assert.match(source, /hadSession: outcome\.hadSession \?\? null/);
+  assert.match(source, /cancelledAttempts: outcome\.cancelledAttempts \?\? null/);
+  assert.match(source, /log\('diagnostic disconnect settled', \{ \.\.\.outcome, lifecycle \}\)/);
+  assert.match(source, /No wallet session was active\./);
+  assert.match(source, /Disconnect did not complete/);
+  assert.match(source, /function readDiagnosticLifecycle/);
+  assert.match(source, /window\.getArtSoulWalletLifecycle\?\.\(\)/);
+  assert.match(source, /state: core\.getCoreLifecycleState\(\)/);
+  assert.match(source, /`Lifecycle: \$\{core\.getCoreLifecycleState\(\)\}`/);
 });
 
 test('wallet-test distinguishes deliberate deferral from SIWE failures', () => {

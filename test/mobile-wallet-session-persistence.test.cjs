@@ -205,7 +205,7 @@ test('stale or expired core sessions are rejected and only dead local state is d
     assert.equal(getCoreSessionLiveness(expiredProvider).reason, 'session-expired');
 });
 
-test('restored core session accepts only an explicit switch proof outside its namespaces', () => {
+test('restored core session never presents an SDK-local chain the wallet did not approve', () => {
     const { resolveCoreSessionChainId } = loadCoreRestoreHarness();
     const provider = {
         chainId: 84532,
@@ -219,12 +219,23 @@ test('restored core session accepts only an explicit switch proof outside its na
         }
     };
 
+    // An explicit, topic-bound switch proof always wins.
     assert.equal(resolveCoreSessionChainId(provider, 8453), 8453);
-    assert.equal(resolveCoreSessionChainId(provider, null), null);
     assert.equal(resolveCoreSessionChainId(provider, 84532), 84532);
+    // Without that proof the SDK-local chainId (84532 here) is NOT approved by
+    // the session and is never presented. The chain of the account this path
+    // reports as connected is session truth and comes from the SAME snapshot as
+    // the address, so a connected wallet is never left without a network.
+    assert.equal(resolveCoreSessionChainId(provider, null), 8453);
     provider.chainId = 8453;
     assert.equal(resolveCoreSessionChainId(provider, null), 8453);
     assert.equal(resolveCoreSessionChainId(provider, 84532), 84532);
+    // With no account at all there is nothing to present.
+    const emptyProvider = {
+        chainId: 84532,
+        session: { namespaces: { eip155: { chains: ['eip155:1', 'eip155:8453'], accounts: [] } } }
+    };
+    assert.equal(resolveCoreSessionChainId(emptyProvider, null), null);
 
     // Production display and write validation may reuse only the topic-bound
     // switch proof. Without it, they never fall through to an SDK-configured
@@ -321,8 +332,10 @@ test('restore is chain-tolerant: a session parked on a foreign chain stays conne
     // address must be read chain-independently from the session namespaces.
     assert.match(coreWallet, /export function getCoreSessionAddress/);
     const helper = coreWallet.match(/export function getCoreSessionAddress[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(helper, /namespaces/);
-    assert.match(helper, /eip155:\\d\+/);
+    assert.match(helper, /readCoreSessionAccounts\(instance\.session\)/);
+    const accountReader = coreWallet.match(/export function readCoreSessionAccounts[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(accountReader, /namespaces/);
+    assert.match(accountReader, /eip155:\(\\d\+\)/);
     // restoreCoreSessionOutcome resolves through the bounded snapshot helper,
     // which reads the address chain-independently from session namespaces.
     const restoreOutcome = coreWallet.match(/export async function restoreCoreSessionOutcome[\s\S]*?\n\}/)?.[0] || '';
@@ -447,6 +460,7 @@ test('session-store diagnostics expose duplicate topics only in masked form', ()
         sessionCount: 2,
         currentTopic: 'current-...7890',
         storedTopics: ['current-...7890', 'stale-se...4321'],
+        tombstonedTopicCount: 0,
         universalProviderNamespaceReady: false
     });
 });
