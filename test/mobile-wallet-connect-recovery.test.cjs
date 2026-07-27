@@ -209,13 +209,24 @@ test('single-teardown invariant: session teardown stays on explicit, user-driven
     assert.equal(coreDisconnectCalls.length, 1, 'provider.disconnect() must live only in runCoreDisconnect');
     const disconnectFn = coreWallet.match(/async function runCoreDisconnect[\s\S]*?\n\}/)?.[0] || '';
     assert.match(disconnectFn, /await instance\.disconnect\(\);/);
+    // The PUBLIC SignClient disconnect that clears leftover stored sessions is
+    // confined to the same implementation.
+    const clientDisconnectCalls = coreWallet.match(/client\.disconnect\(\{/g) || [];
+    assert.equal(clientDisconnectCalls.length, 1, 'SignClient.disconnect() must live only in runCoreDisconnect');
+    assert.match(disconnectFn, /await client\.disconnect\(\{\s*\n\s*topic: leftoverTopic,/);
     // Every internal teardown goes through that same single implementation and
-    // is user-driven: the explicit Disconnect, the late settle after a
-    // Disconnect, and replacing a live session that cannot sign.
+    // is user-driven: the late settle after a Disconnect, replacing a live
+    // session that cannot sign, and reconciling a duplicated store on an
+    // explicit Connect. Passive boot never calls it.
     const teardownCallers = coreWallet.match(/disconnectCoreWalletOutcome\(\{/g) || [];
-    assert.equal(teardownCallers.length, 2, 'only the late-settle and unusable-session paths call the teardown internally');
+    assert.equal(teardownCallers.length, 3, 'only the three explicit, user-driven paths call the teardown internally');
     assert.match(coreWallet, /late WalletConnect session settled after Disconnect; tearing it down/);
     assert.match(coreWallet, /live WalletConnect session cannot sign; replacing it on user request/);
+    assert.match(coreWallet, /duplicate ArtSoul WalletConnect sessions reconciled on Connect/);
+    // Passive boot restore fails closed instead of deleting anything.
+    const restore = coreWallet.match(/export async function restoreCoreSessionOutcome[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(restore, /status: 'conflict'/);
+    assert.doesNotMatch(restore, /disconnectCoreWalletOutcome/);
     // appkit-init calls disconnectCoreWallet exactly once — inside the
     // explicit user Disconnect (resetWalletConnection).
     const appKitDisconnectCalls = appKit.match(/disconnectCoreWallet\(\)/g) || [];

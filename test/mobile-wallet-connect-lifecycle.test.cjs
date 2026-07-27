@@ -18,6 +18,9 @@ const TOPIC_B = 'eeeeeeeeffffffff1111111122222222';
 const CORE_EXPORTS = [
     'CORE_LIFECYCLE',
     'configureCoreWallet',
+    'getAcceptedCoreTopic',
+    'getCoreStoredSessionTopics',
+    'readCoreSessionConflict',
     'connectCoreWallet',
     'disconnectCoreWallet',
     'disconnectCoreWalletOutcome',
@@ -30,6 +33,7 @@ const CORE_EXPORTS = [
     'isCoreSessionActive',
     'isCoreTopicTombstoned',
     'readAuthoritativeCoreSession',
+    'discardInvalidCoreSession',
     'requestCoreWalletMethod',
     'resolveCoreSessionChainId',
     'restoreCoreSessionOutcome',
@@ -71,10 +75,24 @@ function buildSession(overrides = {}) {
     };
 }
 
-function createFakeProvider() {
+function createFakeProvider(options = {}) {
     const handlers = new Map();
     const storedSessions = [];
     let connectDeferred = null;
+
+    // Mirrors SignClient.disconnect(): deletes the session from the store and
+    // throws for a topic the store does not hold (MISMATCHED_TOPIC). It does
+    // NOT touch UniversalProvider's cached `session` — the engine deletes with
+    // emitEvent: false, so only the provider's own disconnect()/cleanup clears
+    // that cache. Keeping the fake faithful is what makes the cleanup-failure
+    // cases meaningful.
+    const clientDisconnect = async ({ topic }) => {
+        provider.clientDisconnectCalls.push(topic);
+        if (options.failClientDisconnect) throw new Error('relay unavailable');
+        const index = storedSessions.findIndex((session) => session.topic === topic);
+        if (index < 0) throw new Error(`Session or pairing topic not found: ${topic}`);
+        storedSessions.splice(index, 1);
+    };
 
     const provider = {
         session: null,
@@ -86,19 +104,24 @@ function createFakeProvider() {
         cleanupCalls: 0,
         signClientRequests: [],
         signerRequests: [],
+        clientDisconnectCalls: [],
         signer: {
-            uri: null,
+            // NOTE: deliberately no `uri` field — the module must never read it.
             client: {
                 session: { getAll: () => storedSessions.slice() },
                 request: async (args) => {
                     provider.signClientRequests.push(args);
                     return '0xsignature';
+                },
+                ...(options.omitClientDisconnect ? {} : { disconnect: clientDisconnect })
+            },
+            ...(options.omitCleanup ? {} : {
+                cleanup: async () => {
+                    provider.cleanupCalls += 1;
+                    if (options.failCleanup) throw new Error('storage locked');
+                    provider.session = null;
                 }
-            },
-            cleanup: async () => {
-                provider.cleanupCalls += 1;
-                provider.session = null;
-            },
+            }),
             request: async (args, chain) => {
                 provider.signerRequests.push({ args, chain });
                 return null;
@@ -126,6 +149,7 @@ function createFakeProvider() {
         },
         async disconnect() {
             provider.disconnectCalls += 1;
+            if (options.failProviderDisconnect) throw new Error('relay unavailable');
             const topic = provider.session?.topic;
             const index = storedSessions.findIndex((session) => session.topic === topic);
             if (index >= 0) storedSessions.splice(index, 1);
@@ -137,7 +161,6 @@ function createFakeProvider() {
         for (const handler of handlers.get(name) || []) handler(payload);
     };
     provider.__emitDisplayUri = (uri) => {
-        provider.signer.uri = uri;
         provider.__emit('display_uri', uri);
     };
     provider.__settle = (session = buildSession()) => {
@@ -147,7 +170,10 @@ function createFakeProvider() {
     };
     provider.__storeSession = (session) => {
         storedSessions.push(session);
+        return session;
     };
+    provider.__storedTopics = () => storedSessions.map((session) => session.topic);
+    provider.__storedCount = () => storedSessions.length;
     provider.__resolveConnect = (value) => connectDeferred?.resolve(value);
     provider.__rejectConnect = (error) => connectDeferred?.reject(error);
     provider.__connectPending = () => Boolean(connectDeferred);
@@ -212,7 +238,7 @@ function loadCoreWallet(options = {}) {
         `${executable}\nreturn { ${CORE_EXPORTS.join(', ')} };`
     )(win);
 
-    const provider = options.provider || createFakeProvider();
+    const provider = options.provider || createFakeProvider(options.providerOptions);
     const logs = [];
     const adopted = [];
     const lifecycle = [];
@@ -660,6 +686,331 @@ test('only the mobile external browser takes the core path', () => {
     // Reconciliation from AppKit/Wagmi/injected reads stays off the core path.
     const reconciliation = appKitSource.match(/function scheduleWalletReconciliation[\s\S]*?\n\}/)?.[0] || '';
     assert.match(reconciliation, /if \(isMobileDevice\(\) && !isInjectedWalletBrowser\(\)\) return;/);
+});
+
+// ---------------------------------------------------------------------------
+// BLOCKER 1 — a store that really holds TWO live ArtSoul sessions.
+// Reproduces production: topics 7138... and 81b7... coexisting in the isolated
+// artsoul-mobile-core-v4 store after the iOS deep-link race.
+// ---------------------------------------------------------------------------
+
+
+// A real page always boots the provider (restore) before the user can tap
+// anything. Tests that start from a pre-populated store do the same.
+async function bootProvider(api) {
+    return api.restoreCoreSessionOutcome({ timeoutMs: 50 });
+}
+
+function seedTwoStoredSessions(provider, { currentTopic = TOPIC_A } = {}) {
+    const first = buildSession({ topic: TOPIC_A });
+    const second = buildSession({ topic: TOPIC_B });
+    provider.__storeSession(first);
+    provider.__storeSession(second);
+    provider.session = currentTopic === TOPIC_A ? first : (currentTopic === TOPIC_B ? second : null);
+    return { first, second };
+}
+
+test('two stored sessions with provider.session = A are a conflict, and nothing is published', () => {
+    const provider = createFakeProvider();
+    seedTwoStoredSessions(provider, { currentTopic: TOPIC_A });
+    const { api } = loadCoreWallet({ provider });
+
+    assert.deepEqual(api.getCoreStoredSessionTopics(provider).sort(), [TOPIC_A, TOPIC_B].sort());
+    const conflict = api.readCoreSessionConflict(provider);
+    assert.equal(conflict.resolved, false);
+    assert.equal(conflict.topics.length, 2);
+
+    // The topic is in the store, yet it is NOT live: which one is current is
+    // unknown, so the path fails closed instead of guessing.
+    const liveness = api.getCoreSessionLiveness(provider);
+    assert.equal(liveness.live, false);
+    assert.equal(liveness.reason, 'session-store-duplicate');
+    assert.equal(api.readAuthoritativeCoreSession(provider).ready, false);
+    assert.equal(api.isCoreSessionActive(), false);
+    assert.equal(api.getAcceptedCoreTopic(), null);
+});
+
+test('two stored sessions with provider.session = null are still a conflict the store owns', async () => {
+    const provider = createFakeProvider();
+    seedTwoStoredSessions(provider, { currentTopic: null });
+    const { api } = loadCoreWallet({ provider });
+
+    assert.equal(provider.session, null);
+    assert.equal(api.readCoreSessionConflict(provider).topics.length, 2);
+
+    // Passive boot must NOT delete healthy sessions: fail closed with a stable
+    // diagnostic instead.
+    const outcome = await api.restoreCoreSessionOutcome({ timeoutMs: 200 });
+    assert.equal(outcome.status, 'conflict');
+    assert.equal(outcome.reason, 'duplicate-stored-sessions');
+    assert.equal(outcome.topicCount, 2);
+    assert.equal(outcome.session, null);
+    assert.equal(provider.__storedCount(), 2, 'boot deletes nothing');
+    assert.equal(provider.disconnectCalls, 0);
+    assert.deepEqual(provider.clientDisconnectCalls, []);
+
+    // A Disconnect with a null provider.session still has work to do.
+    const disconnect = await api.disconnectCoreWalletOutcome();
+    assert.equal(disconnect.hadSession, true);
+    assert.equal(disconnect.disconnected, true);
+    assert.equal(disconnect.remainingSessionCount, 0);
+    assert.equal(provider.__storedCount(), 0);
+});
+
+test('explicit Disconnect leaves zero ArtSoul sessions in the dedicated store', async () => {
+    const provider = createFakeProvider();
+    seedTwoStoredSessions(provider, { currentTopic: TOPIC_A });
+    const { api } = loadCoreWallet({ provider });
+    assert.equal((await bootProvider(api)).status, 'conflict');
+
+    const outcome = await api.disconnectCoreWalletOutcome();
+    assert.equal(outcome.disconnected, true);
+    assert.equal(outcome.hadSession, true);
+    assert.deepEqual(outcome.topics.sort(), [TOPIC_A, TOPIC_B].sort());
+    assert.equal(outcome.remainingSessionCount, 0);
+
+    // The cached provider session went through the provider; the leftover went
+    // through the PUBLIC SignClient disconnect API.
+    assert.equal(provider.disconnectCalls, 1);
+    assert.deepEqual(provider.clientDisconnectCalls, [TOPIC_B]);
+    assert.deepEqual(provider.__storedTopics(), []);
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_A), true);
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_B), true);
+    assert.equal(api.getAcceptedCoreTopic(), null);
+});
+
+test('a reload after Disconnect cannot restore a leftover topic', async () => {
+    const provider = createFakeProvider();
+    seedTwoStoredSessions(provider, { currentTopic: TOPIC_A });
+    const first = loadCoreWallet({ provider });
+    await bootProvider(first.api);
+    await first.api.disconnectCoreWalletOutcome();
+    assert.equal(provider.__storedCount(), 0);
+
+    // Simulate the next page load: a brand-new module instance (no in-memory
+    // tombstones) over the SAME store, exactly like UniversalProvider adopting
+    // client.session.getAll()[0] on boot.
+    const reloaded = loadCoreWallet({ provider });
+    const outcome = await reloaded.api.restoreCoreSessionOutcome({ timeoutMs: 200 });
+    assert.equal(outcome.status, 'none');
+    assert.equal(outcome.session, null);
+    assert.equal(reloaded.api.isCoreSessionActive(), false);
+});
+
+test('a tombstoned current topic never lets another stored topic take its place', async () => {
+    const provider = createFakeProvider();
+    const { second } = seedTwoStoredSessions(provider, { currentTopic: TOPIC_A });
+    const { api } = loadCoreWallet({ provider });
+
+    // Accept A explicitly (an explicit Connect reconciles first, so emulate the
+    // post-reconciliation state directly by connecting to a single session).
+    const singleProvider = createFakeProvider();
+    const singleApi = loadCoreWallet({ provider: singleProvider });
+    const connectPromise = singleApi.api.connectCoreWallet();
+    await flush();
+    singleProvider.__emitDisplayUri('wc:pairing-a');
+    await flush();
+    singleProvider.__settle(buildSession({ topic: TOPIC_A }));
+    singleProvider.__resolveConnect();
+    await connectPromise;
+    assert.equal(singleApi.api.getAcceptedCoreTopic(), TOPIC_A);
+
+    // The accepted topic is disconnected; a leftover B is then pushed into the
+    // provider cache by a late SDK callback. It must not become current.
+    singleProvider.__storeSession(buildSession({ topic: TOPIC_B }));
+    await singleApi.api.disconnectCoreWalletOutcome();
+    singleProvider.session = buildSession({ topic: TOPIC_B });
+    const liveness = singleApi.api.getCoreSessionLiveness(singleProvider);
+    assert.equal(liveness.live, false);
+    assert.equal(liveness.reason, 'session-topic-tombstoned');
+    assert.equal(singleApi.api.isCoreSessionActive(), false);
+
+    // And in the untouched two-session provider, B cannot replace A either.
+    provider.session = second;
+    assert.equal(api.getCoreSessionLiveness(provider).live, false);
+});
+
+test('a duplicate session event cannot replace the accepted topic', async () => {
+    const { api, provider } = loadCoreWallet();
+    const connectPromise = api.connectCoreWallet();
+    await flush();
+    provider.__emitDisplayUri('wc:pairing-a');
+    await flush();
+    provider.__settle(buildSession({ topic: TOPIC_A }));
+    provider.__resolveConnect();
+    await connectPromise;
+    assert.equal(api.getAcceptedCoreTopic(), TOPIC_A);
+
+    // A second settle lands (duplicate proposal accepted by the wallet): it is
+    // written to the store and overwrites the SDK's cached session.
+    provider.__settle(buildSession({ topic: TOPIC_B }));
+    const liveness = api.getCoreSessionLiveness(provider);
+    assert.equal(liveness.live, false);
+    assert.equal(liveness.reason, 'session-topic-not-accepted');
+    assert.equal(api.readAuthoritativeCoreSession(provider).ready, false);
+    assert.equal(api.getAcceptedCoreTopic(), TOPIC_A, 'the accepted topic is unchanged');
+});
+
+test('an explicit Connect reconciles a duplicated store before creating a pairing', async () => {
+    const provider = createFakeProvider();
+    seedTwoStoredSessions(provider, { currentTopic: TOPIC_A });
+    const { api } = loadCoreWallet({ provider });
+    assert.equal((await bootProvider(api)).status, 'conflict');
+
+    const connectPromise = api.connectCoreWallet();
+    await flush();
+
+    // Both leftovers are gone BEFORE the new pairing starts.
+    assert.equal(provider.__storedCount(), 0);
+    assert.equal(provider.connectCalls, 1);
+
+    const freshTopic = 'ffffffff00000000ffffffff00000000';
+    provider.__emitDisplayUri('wc:pairing-fresh');
+    await flush();
+    provider.__settle(buildSession({ topic: freshTopic }));
+    provider.__resolveConnect();
+    const connected = await connectPromise;
+
+    assert.equal(connected.address, ADDRESS);
+    assert.equal(api.getAcceptedCoreTopic(), freshTopic);
+    assert.deepEqual(provider.__storedTopics(), [freshTopic]);
+    assert.equal(api.isCoreSessionActive(), true);
+});
+
+// ---------------------------------------------------------------------------
+// BLOCKER 2 — the pairing URI is ArtSoul-owned, captured from `display_uri`.
+// ---------------------------------------------------------------------------
+
+test('a second Connect after a modal close reopens the cached display_uri', async () => {
+    const { api, provider, modals } = loadCoreWallet();
+    const first = api.connectCoreWallet();
+    await flush();
+    provider.__emitDisplayUri('wc:pairing-a');
+    await flush();
+    modals[0].__userClose();
+    await assert.rejects(first, (error) => error.code === 4001);
+
+    const second = api.connectCoreWallet();
+    await flush();
+    assert.deepEqual(modals[0].openCalls, ['wc:pairing-a', 'wc:pairing-a']);
+    assert.equal(provider.connectCalls, 1);
+
+    provider.__settle(buildSession());
+    provider.__resolveConnect();
+    await second;
+});
+
+test('an attempt that joins before display_uri arrives still receives it', async () => {
+    const { api, provider, modals } = loadCoreWallet();
+    const first = api.connectCoreWallet();
+    await flush();
+    // No display_uri yet: cancel and re-tap.
+    modals[0].__userClose();
+    await assert.rejects(first, (error) => error.code === 4001);
+
+    const second = api.connectCoreWallet();
+    await flush();
+    assert.deepEqual(modals[0].openCalls, [], 'nothing to show yet');
+
+    provider.__emitDisplayUri('wc:pairing-late');
+    await flush();
+    assert.deepEqual(modals[0].openCalls, ['wc:pairing-late']);
+    assert.equal(provider.connectCalls, 1);
+
+    provider.__settle(buildSession());
+    provider.__resolveConnect();
+    await second;
+});
+
+test('a settled or rejected SDK task clears the cached URI and a new task cannot reuse it', async () => {
+    const { api, provider, modals } = loadCoreWallet();
+
+    // Task 1 rejects (wallet refused / proposal expired).
+    const first = api.connectCoreWallet();
+    await flush();
+    provider.__emitDisplayUri('wc:pairing-a');
+    await flush();
+    provider.__rejectConnect(new Error('Proposal expired'));
+    await assert.rejects(first);
+    await flush();
+
+    // Task 2 must NOT reopen the dead pairing.
+    const second = api.connectCoreWallet();
+    await flush();
+    assert.equal(provider.connectCalls, 2, 'a settled task is replaced, not joined');
+    assert.deepEqual(modals[0].openCalls, ['wc:pairing-a'], 'no stale URI is re-shown');
+
+    provider.__emitDisplayUri('wc:pairing-b');
+    await flush();
+    assert.deepEqual(modals[0].openCalls, ['wc:pairing-a', 'wc:pairing-b']);
+
+    provider.__settle(buildSession());
+    provider.__resolveConnect();
+    await second;
+
+    // After a SUCCESSFUL task the cache is cleared too: a later attempt on a
+    // live session reuses it and never reopens a pairing view.
+    const third = await api.connectCoreWallet();
+    assert.equal(third.restored, true);
+    assert.deepEqual(modals[0].openCalls, ['wc:pairing-a', 'wc:pairing-b']);
+});
+
+test('the module never reads the internal signer.uri field', () => {
+    assert.doesNotMatch(
+        coreWalletSource.replace(/\/\/[^\n]*/g, ''),
+        /signer[^\n]*\.uri/,
+        'signer.uri is an internal UniversalProvider field'
+    );
+    assert.match(coreWalletSource, /let sdkPairingUri = null;/);
+    assert.match(coreWalletSource, /instance\.on\('display_uri', capturePairingUri\)/);
+});
+
+// ---------------------------------------------------------------------------
+// Private-cleanup compatibility: signer.cleanup is not a public SDK contract.
+// ---------------------------------------------------------------------------
+
+test('an unavailable signer.cleanup cannot report a successful disconnect', async () => {
+    const provider = createFakeProvider({ omitCleanup: true, failProviderDisconnect: true });
+    provider.__settle(buildSession({ topic: TOPIC_A }));
+    const { api } = loadCoreWallet({ provider });
+    assert.equal((await bootProvider(api)).status, 'restored');
+
+    const outcome = await api.disconnectCoreWalletOutcome();
+    assert.equal(outcome.disconnected, false, 'a teardown that could not complete is never reported as success');
+    assert.equal(outcome.hadSession, true);
+    assert.equal(outcome.reason, 'disconnect-incomplete');
+    assert.ok(outcome.remainingSessionCount >= 0);
+
+    // ...and the session it could not tear down is still unpublishable.
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_A), true);
+    assert.equal(api.getCoreSessionLiveness(provider).reason, 'session-topic-tombstoned');
+    assert.equal(api.isCoreSessionActive(), false);
+    assert.equal(api.getAcceptedCoreTopic(), null);
+});
+
+test('a failing signer.cleanup yields a stable diagnostic, never a connected session', async () => {
+    const provider = createFakeProvider({ failCleanup: true, failProviderDisconnect: true });
+    provider.__settle(buildSession({ topic: TOPIC_A }));
+    const { api } = loadCoreWallet({ provider });
+    assert.equal((await bootProvider(api)).status, 'restored');
+
+    const outcome = await api.disconnectCoreWalletOutcome();
+    assert.equal(outcome.disconnected, false);
+    assert.equal(outcome.reason, 'disconnect-incomplete');
+    assert.equal(provider.cleanupCalls, 1);
+    assert.equal(api.isCoreSessionActive(), false);
+
+    // The same guarantee for a proven-dead session whose cleanup is missing.
+    const bare = createFakeProvider({ omitCleanup: true });
+    const staleSession = buildSession({ topic: TOPIC_B });
+    bare.session = staleSession; // present on the provider, absent from the store
+    const second = loadCoreWallet({ provider: bare });
+    await assert.rejects(
+        second.api.discardInvalidCoreSession(bare),
+        (error) => error.code === 'CORE_SESSION_NOT_LIVE' && error.reason === 'session-cleanup-unavailable'
+    );
+    assert.equal(second.api.isCoreTopicTombstoned(TOPIC_B), true);
+    assert.equal(second.api.isCoreSessionActive(), false);
 });
 
 // Lifecycle surface.

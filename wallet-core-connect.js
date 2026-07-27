@@ -116,9 +116,19 @@ let lifecycleState = CORE_LIFECYCLE.DISCONNECTED;
 let attemptSequence = 0;
 let activeAttempt = null;
 let sdkConnectTask = null;
+// The pairing URI of the CURRENT sdkConnectTask, captured from the PUBLIC
+// `display_uri` event. `signer.uri` is an internal UniversalProvider field and
+// is never read. Lifetime is bound to one task: cleared when that exact task is
+// created, settles or rejects, so a new task can never reuse an old URI.
+let sdkPairingUri = null;
 const sdkConnectWaiters = new Set();
 let disconnectPromise = null;
 const tombstonedTopics = [];
+// THE accepted-topic invariant. At most ONE stored topic is ever the current
+// ArtSoul session. It is set only when a session passes the authoritative
+// readiness gate (connect, restore, adoption) and cleared only by teardown.
+// While it is set, no other topic — however it arrives — can be published.
+let acceptedSessionTopic = null;
 
 // ONE modal instance per page, constructed on the first connect (the
 // projectId only arrives via configureCoreWallet, after module init). The
@@ -221,6 +231,61 @@ export function isCoreTopicTombstoned(topic) {
     return Boolean(value) && tombstonedTopics.includes(value);
 }
 
+// ---- the accepted-topic invariant ------------------------------------
+
+export function getAcceptedCoreTopic() {
+    return acceptedSessionTopic;
+}
+
+function setAcceptedCoreTopic(topic, reason) {
+    const value = String(topic || '');
+    if (!value || acceptedSessionTopic === value) return acceptedSessionTopic;
+    acceptedSessionTopic = value;
+    coreLog('accepted ArtSoul WalletConnect topic set', { topic: maskCoreTopic(value), reason });
+    return acceptedSessionTopic;
+}
+
+function clearAcceptedCoreTopic(reason) {
+    if (!acceptedSessionTopic) return;
+    coreLog('accepted ArtSoul WalletConnect topic cleared', {
+        topic: maskCoreTopic(acceptedSessionTopic),
+        reason
+    });
+    acceptedSessionTopic = null;
+}
+
+// Every session the ArtSoul-DEDICATED store holds, minus topics this page has
+// already abandoned. `customStoragePrefix: artsoul-mobile-core-v4` means this
+// store is created and written by this provider alone: AppKit runs its own
+// default namespace and is not even instantiated on the external mobile path,
+// so enumerating this store can never reach an unrelated wallet session.
+export function getCoreStoredSessionTopics(instance = providerInstance) {
+    const storeState = readCoreSessionStore(instance);
+    if (!storeState.available || storeState.readFailed) return [];
+    return [...new Set(
+        storeState.sessions
+            .map((session) => String(session?.topic || ''))
+            .filter(Boolean)
+    )].filter((topic) => !isCoreTopicTombstoned(topic));
+}
+
+// Two or more live ArtSoul sessions in one dedicated store is a conflict: the
+// iOS deep-link race produced exactly this (topics 7138... and 81b7...).
+// `resolved` means one of them is already the accepted topic, so the extras are
+// leftovers that can never be published; otherwise nothing may be published at
+// all until an explicit Connect or Disconnect reconciles the store.
+export function readCoreSessionConflict(instance = providerInstance) {
+    const topics = getCoreStoredSessionTopics(instance);
+    if (topics.length <= 1) return null;
+    return {
+        topics,
+        accepted: acceptedSessionTopic && topics.includes(acceptedSessionTopic)
+            ? acceptedSessionTopic
+            : null,
+        resolved: Boolean(acceptedSessionTopic && topics.includes(acceptedSessionTopic))
+    };
+}
+
 // ---- authoritative session reads -------------------------------------
 
 // Every eip155 account the APPROVED session carries, paired with the chain it
@@ -321,6 +386,13 @@ export function getCoreSessionLiveness(instance = providerInstance, nowMs = Date
         return { live: false, topic, reason: 'session-topic-tombstoned' };
     }
 
+    // The accepted-topic invariant. Once a topic has been accepted, a second
+    // settle, a duplicate session event, or an SDK cache overwrite carrying a
+    // DIFFERENT topic is a leftover — never the current session.
+    if (acceptedSessionTopic && topic !== acceptedSessionTopic) {
+        return { live: false, topic, reason: 'session-topic-not-accepted' };
+    }
+
     const expiry = Number(session.expiry || 0);
     if (Number.isFinite(expiry) && expiry > 0 && expiry <= Math.floor(nowMs / 1000)) {
         return { live: false, topic, reason: 'session-expired' };
@@ -336,11 +408,19 @@ export function getCoreSessionLiveness(instance = providerInstance, nowMs = Date
     const stored = storeState.sessions.some(
         (candidate) => String(candidate?.topic || '') === topic
     );
-    return {
-        live: stored,
-        topic,
-        reason: stored ? 'session-store-confirmed' : 'session-topic-missing'
-    };
+    if (!stored) {
+        return { live: false, topic, reason: 'session-topic-missing' };
+    }
+
+    // Nothing has been accepted yet and the dedicated store holds more than one
+    // live ArtSoul session: which one is current is genuinely unknown, so fail
+    // closed. Nothing is deleted here — reconciliation needs an explicit
+    // Connect or Disconnect gesture.
+    if (!acceptedSessionTopic && getCoreStoredSessionTopics(instance).length > 1) {
+        return { live: false, topic, reason: 'session-store-duplicate' };
+    }
+
+    return { live: true, topic, reason: 'session-store-confirmed' };
 }
 
 // THE readiness gate. One read of the authoritative SignClient session answers
@@ -426,8 +506,17 @@ export async function discardInvalidCoreSession(instance = providerInstance, opt
     const force = Boolean(options.force);
     if (!instance?.session || (liveness.live && !force)) return false;
 
+    // Tombstone FIRST. A discard that cannot complete must still leave the
+    // topic unpublishable — an unavailable or failing SDK cleanup may never
+    // resurrect this session as connected.
+    tombstoneCoreTopic(liveness.topic);
+    if (acceptedSessionTopic === liveness.topic) clearAcceptedCoreTopic('session discarded');
+
     const cleanup = instance?.signer?.cleanup;
     if (typeof cleanup !== 'function') {
+        coreLog('WalletConnect local session cleanup is unavailable', {
+            topic: maskCoreTopic(liveness.topic)
+        });
         throw createCoreSessionNotLiveError('session-cleanup-unavailable');
     }
 
@@ -435,7 +524,6 @@ export async function discardInvalidCoreSession(instance = providerInstance, opt
         topic: maskCoreTopic(liveness.topic),
         reason: force ? 'forced-local-teardown' : liveness.reason
     });
-    tombstoneCoreTopic(liveness.topic);
     try {
         await cleanup.call(instance.signer);
         instance.reset?.();
@@ -773,7 +861,9 @@ function bindProviderDiagnostics(instance) {
     // queued relay message or late settle can promote it back to current.
     try {
         instance.on('session_delete', (payload) => {
-            tombstoneCoreTopic(payload?.topic || payload?.data || instance?.session?.topic);
+            const deleted = String(payload?.topic || payload?.data || instance?.session?.topic || '');
+            tombstoneCoreTopic(deleted);
+            if (acceptedSessionTopic === deleted) clearAcceptedCoreTopic('session_delete');
             setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'session_delete' });
         });
     } catch {
@@ -893,6 +983,28 @@ export async function restoreCoreSessionOutcome(options = {}) {
             if (initTimeoutId) clearTimeout(initTimeoutId);
         }
 
+        // Fail closed on a duplicated store. Boot is a PASSIVE path: it must
+        // never pick a winner and never delete healthy sessions without a user
+        // gesture. Report a stable diagnostic instead and let an explicit
+        // Connect (reconcile + fresh pairing) or Disconnect (clear the store)
+        // resolve it.
+        const conflict = readCoreSessionConflict(instance);
+        if (conflict && !conflict.resolved) {
+            setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'duplicate stored sessions' });
+            coreLog('core session restore found duplicate ArtSoul sessions', {
+                sessionTopics: conflict.topics.map(maskCoreTopic),
+                sessionCount: conflict.topics.length,
+                resolution: 'explicit Connect or Disconnect required',
+                elapsedMs: Date.now() - startedAt
+            });
+            return {
+                status: 'conflict',
+                session: null,
+                reason: 'duplicate-stored-sessions',
+                topicCount: conflict.topics.length
+            };
+        }
+
         const remainingMs = Math.max(0, timeoutMs - (Date.now() - startedAt));
         // Chain-independent: a session parked on a foreign chain (accounts
         // getter filtered empty) is still a connected wallet, not "no session".
@@ -913,6 +1025,7 @@ export async function restoreCoreSessionOutcome(options = {}) {
             return { status: 'none', session: null };
         }
         const authoritative = readAuthoritativeCoreSession(instance);
+        setAcceptedCoreTopic(instance.session?.topic, 'restored from storage');
         setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { reason: 'restored from storage' });
         coreLog('core session restored from storage', {
             chainId: restored.chainId,
@@ -951,17 +1064,42 @@ function startCoreSdkConnect(instance, attempt) {
         attempt.joinedExistingPairing = true;
         coreLog('joining the in-flight WalletConnect pairing', {
             attemptId: attempt.id,
-            waiters: sdkConnectWaiters.size
+            waiters: sdkConnectWaiters.size,
+            pairingUriCached: Boolean(sdkPairingUri)
         });
         return sdkConnectTask;
     }
 
+    // A new task starts with NO cached URI: the previous task's pairing is
+    // dead and must never be re-shown. The URI is captured from the public
+    // `display_uri` event, never from the SDK's internal `signer.uri`.
+    sdkPairingUri = null;
+    let capturingTask = null;
+    const capturePairingUri = (uri) => {
+        if (sdkConnectTask !== capturingTask) return;
+        sdkPairingUri = String(uri || '') || null;
+    };
+
     const task = Promise.resolve()
         .then(() => instance.connect())
         .finally(() => {
-            if (sdkConnectTask === task) sdkConnectTask = null;
+            try {
+                instance.removeListener?.('display_uri', capturePairingUri);
+            } catch {
+                // Teardown is best effort.
+            }
+            if (sdkConnectTask === task) {
+                sdkConnectTask = null;
+                sdkPairingUri = null;
+            }
         });
+    capturingTask = task;
     sdkConnectTask = task;
+    try {
+        instance.on('display_uri', capturePairingUri);
+    } catch {
+        coreLog('core provider event binding unavailable', { eventName: 'display_uri capture' });
+    }
     // The SDK cannot be cancelled (abortPairingAttempt is a no-op in 2.23.10),
     // so every task outcome is accounted for: adopted when the user approved
     // after cancelling our attempt, torn down when they disconnected, and
@@ -1019,6 +1157,7 @@ async function finalizeLateCoreSdkConnect(instance) {
         return;
     }
 
+    setAcceptedCoreTopic(snapshot.topic, 'late settle adopted');
     setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { reason: 'late settle adopted' });
     coreLog('late WalletConnect session adopted after a cancelled attempt', {
         topic: maskCoreTopic(snapshot.topic),
@@ -1081,10 +1220,27 @@ async function runCoreConnectAttempt(attempt) {
     const instance = await getCoreEthereumProvider();
     throwIfAttemptCancelled(attempt);
 
+    // 0. An explicit Connect gesture is the deterministic reconciliation point
+    // for a store that ended up with more than one ArtSoul session (the iOS
+    // deep-link race). Nothing is guessed: every session in this dedicated
+    // store is ended, then a single fresh pairing is created.
+    const conflict = readCoreSessionConflict(instance);
+    if (conflict && !conflict.resolved) {
+        coreLog('duplicate ArtSoul WalletConnect sessions reconciled on Connect', {
+            topics: conflict.topics.map(maskCoreTopic)
+        });
+        await disconnectCoreWalletOutcome({
+            cancelPendingAttempt: false,
+            reason: 'duplicate sessions reconciled on Connect'
+        });
+        throwIfAttemptCancelled(attempt);
+    }
+
     // 1. An authoritative, SIWE-capable session IS the answer. Never pair over
     // a live session: EthereumProvider.connect() would settle a second topic.
     const existing = readAuthoritativeCoreSession(instance);
     if (existing.ready) {
+        setAcceptedCoreTopic(existing.topic, 'existing session reused');
         setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { reason: 'existing session reused' });
         coreLog('core connect reused live session', {
             chainId: existing.chainId,
@@ -1204,7 +1360,9 @@ async function runCoreConnectAttempt(attempt) {
 
     try {
         throwIfAttemptCancelled(attempt);
-        const joinedPairingUri = sdkConnectTask ? (instance.signer?.uri || null) : null;
+        // ArtSoul-owned cache of the CURRENT task's pairing URI. Never
+        // `signer.uri` — that is an internal UniversalProvider field.
+        const joinedPairingUri = sdkConnectTask ? sdkPairingUri : null;
         const connectTask = startCoreSdkConnect(instance, attempt);
         // Joining a live pairing must re-show the SAME uri: the SDK already
         // emitted display_uri for it and will not emit it again.
@@ -1225,6 +1383,7 @@ async function runCoreConnectAttempt(attempt) {
             });
         }
 
+        setAcceptedCoreTopic(settled.topic, 'connect settled');
         setCoreLifecycleState(CORE_LIFECYCLE.CONNECTED, { attemptId: attempt.id });
         coreLog('core connect settled', {
             elapsedMs: Date.now() - startedAt,
@@ -1287,7 +1446,14 @@ export async function disconnectCoreWallet() {
 }
 
 async function runCoreDisconnect(options = {}) {
-    const instance = providerInstance;
+    // Boot starts the provider init before the user can tap anything, and a
+    // Disconnect landing inside that window must still reach the store — not
+    // silently no-op and leave every ArtSoul session behind. If no init was
+    // ever started there is genuinely no store to clear.
+    let instance = providerInstance;
+    if (!instance && providerInitPromise) {
+        instance = await providerInitPromise.catch(() => null);
+    }
     const cancelPendingAttempt = options.cancelPendingAttempt !== false;
     let cancelledAttempts = 0;
 
@@ -1311,8 +1477,15 @@ async function runCoreDisconnect(options = {}) {
         }
     }
 
-    const topic = String(instance?.session?.topic || '');
-    if (!instance?.session) {
+    // The store is ArtSoul-dedicated, so "disconnect" means every session in
+    // it — not only the one UniversalProvider happens to have cached. A leftover
+    // stored topic is exactly what survives a Disconnect and gets restored on
+    // the next page load (UniversalProvider.createClient() adopts
+    // `client.session.getAll()[0]`).
+    const providerTopic = String(instance?.session?.topic || '');
+    const topics = [...new Set([providerTopic, ...getCoreStoredSessionTopics(instance)].filter(Boolean))];
+    if (!topics.length) {
+        clearAcceptedCoreTopic(options.reason || 'no active session');
         setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: options.reason || 'no active session' });
         coreLog('core disconnect found no active session', { cancelledAttempts });
         return {
@@ -1320,41 +1493,89 @@ async function runCoreDisconnect(options = {}) {
             hadSession: false,
             reason: 'no-active-session',
             cancelledAttempts,
-            topic: null
+            topic: null,
+            topics: [],
+            remainingSessionCount: 0
         };
     }
 
     setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTING, { reason: options.reason || 'user disconnect' });
-    tombstoneCoreTopic(topic);
-    try {
-        await instance.disconnect();
-        setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'session disconnected' });
-        coreLog('core session disconnected', { topic: maskCoreTopic(topic), cancelledAttempts });
-        return {
-            disconnected: true,
-            hadSession: true,
-            reason: 'session-disconnected',
-            cancelledAttempts,
-            topic
-        };
-    } catch (error) {
-        coreLog('core session disconnect failed', describeCoreError(error));
-        // The peer may already be gone. The topic is tombstoned either way, so
-        // the local cache must not survive as "connected" after the user asked
-        // to disconnect.
+    // Tombstone BEFORE any network call: whatever the relay does, none of these
+    // topics may be published as connected again.
+    for (const candidate of topics) tombstoneCoreTopic(candidate);
+    clearAcceptedCoreTopic(options.reason || 'user disconnect');
+
+    const failures = [];
+    // The cached provider session goes through the provider so UniversalProvider
+    // also drops its own session/namespace state.
+    if (providerTopic && instance?.session) {
         try {
-            await discardInvalidCoreSession(instance, { force: true });
-        } catch (cleanupError) {
-            coreLog('core session local teardown failed', describeCoreError(cleanupError));
+            await instance.disconnect();
+            coreLog('core session disconnected', { topic: maskCoreTopic(providerTopic) });
+        } catch (error) {
+            failures.push({ topic: providerTopic, error });
+            coreLog('core session disconnect failed', {
+                topic: maskCoreTopic(providerTopic),
+                ...describeCoreError(error)
+            });
+            // The peer may already be gone. The local cache must not survive as
+            // "connected" after the user asked to disconnect.
+            try {
+                await discardInvalidCoreSession(instance, { force: true });
+            } catch (cleanupError) {
+                failures.push({ topic: providerTopic, error: cleanupError, local: true });
+                coreLog('core session local teardown failed', describeCoreError(cleanupError));
+            }
         }
-        setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: 'disconnect failed' });
-        return {
-            disconnected: false,
-            hadSession: true,
-            reason: 'disconnect-failed',
-            cancelledAttempts,
-            topic,
-            error
-        };
     }
+
+    // Everything still in the dedicated store goes through the PUBLIC
+    // SignClient disconnect API.
+    const client = instance?.signer?.client;
+    for (const leftover of readCoreSessionStore(instance).sessions || []) {
+        const leftoverTopic = String(leftover?.topic || '');
+        if (!leftoverTopic) continue;
+        tombstoneCoreTopic(leftoverTopic);
+        if (typeof client?.disconnect !== 'function') {
+            failures.push({ topic: leftoverTopic, error: new Error('SignClient disconnect is unavailable') });
+            continue;
+        }
+        try {
+            await client.disconnect({
+                topic: leftoverTopic,
+                reason: { code: 6000, message: 'User disconnected.' }
+            });
+            coreLog('leftover ArtSoul WalletConnect session disconnected', {
+                topic: maskCoreTopic(leftoverTopic)
+            });
+        } catch (error) {
+            failures.push({ topic: leftoverTopic, error });
+            coreLog('leftover ArtSoul WalletConnect session disconnect failed', {
+                topic: maskCoreTopic(leftoverTopic),
+                ...describeCoreError(error)
+            });
+        }
+    }
+
+    const remainingSessionCount = (readCoreSessionStore(instance).sessions || []).length;
+    const disconnected = failures.length === 0 && remainingSessionCount === 0;
+    setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, {
+        reason: disconnected ? 'session disconnected' : 'disconnect incomplete'
+    });
+    coreLog('core disconnect settled', {
+        topics: topics.map(maskCoreTopic),
+        cancelledAttempts,
+        failureCount: failures.length,
+        remainingSessionCount
+    });
+    return {
+        disconnected,
+        hadSession: true,
+        reason: disconnected ? 'session-disconnected' : 'disconnect-incomplete',
+        cancelledAttempts,
+        topic: providerTopic || topics[0],
+        topics,
+        remainingSessionCount,
+        ...(failures.length ? { error: failures[0].error } : {})
+    };
 }
