@@ -3580,6 +3580,16 @@ async function initializeAppKit() {
                 if (outcome.status === 'none') {
                     setMobileCoreRestoreState('disconnected', { reason: 'bounded restore found no session' });
                     localStorage.removeItem('artsoul_wallet');
+                } else if (outcome.status === 'conflict') {
+                    // The dedicated store holds more than one ArtSoul session.
+                    // Boot refuses to pick a winner and refuses to delete any of
+                    // them: the UI settles to guest with the hint intact, and the
+                    // user's next explicit Connect or Disconnect reconciles it.
+                    setMobileCoreRestoreState('failed', { reason: 'duplicate stored sessions' });
+                    walletDebugLog('core session restore blocked by duplicate sessions', {
+                        topicCount: outcome.topicCount ?? null,
+                        resolution: 'explicit Connect or Disconnect required'
+                    });
                 } else {
                     setMobileCoreRestoreState('failed', { reason: 'provider restore error' });
                 }
