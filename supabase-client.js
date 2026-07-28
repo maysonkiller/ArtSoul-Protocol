@@ -210,6 +210,7 @@ async function getPublicProjectionArtworks(options = {}) {
         rows.suppressed_artwork_ids = Array.isArray(result.suppressed_artwork_ids)
             ? result.suppressed_artwork_ids
             : [];
+        rows.public_metrics = result.public_metrics || null;
         return rows;
     } catch (error) {
         console.warn('[ArtSoulDB] V4.1 projection feed unavailable:', error.message);

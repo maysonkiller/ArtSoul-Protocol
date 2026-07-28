@@ -671,6 +671,33 @@ let morphActive = false;
             }
         }
 
+        function renderHomepageMetrics(metrics) {
+            const section = document.getElementById('homepageMetrics');
+            if (!section) return;
+
+            const values = {
+                artists_onboarded: Number(metrics?.artists_onboarded),
+                auctions_completed: Number(metrics?.auctions_completed),
+                unique_collectors: Number(metrics?.unique_collectors)
+            };
+            const hasCounts = Object.values(values).every(Number.isFinite);
+            const settledVolume = String(metrics?.settled_volume_eth ?? '').trim();
+
+            if (!hasCounts || !settledVolume) {
+                section.dataset.metricsState = 'unavailable';
+                return;
+            }
+
+            for (const [key, value] of Object.entries(values)) {
+                const element = section.querySelector(`[data-public-metric="${key}"]`);
+                if (element) element.textContent = Math.max(0, value).toLocaleString('en-US');
+            }
+
+            const volumeElement = section.querySelector('[data-public-metric="settled_volume_eth"]');
+            if (volumeElement) volumeElement.textContent = `${settledVolume} ETH`;
+            section.dataset.metricsState = 'ready';
+        }
+
         // Load artworks on page load
         async function loadHomeArtworks() {
             const gallery = document.getElementById('artworkGallery');
@@ -683,6 +710,7 @@ let morphActive = false;
                 }
 
                 let artworks = await db.getPublicProjectionArtworks({ limit: 100 });
+                renderHomepageMetrics(artworks?.public_metrics);
                 const suppressedArtworkIds = new Set(
                     (artworks?.suppressed_artwork_ids || []).map(value => String(value).toLowerCase())
                 );
