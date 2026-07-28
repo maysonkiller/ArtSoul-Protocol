@@ -64,7 +64,40 @@ A9 is not complete merely because the checker and this runbook exist. Record at 
 
 | UTC date | Indexer check | Alchemy CU used / limit | Alchemy forecast | Top RPC methods | Supabase egress | Spend Cap | Operator / notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Pending | Pending | Pending | Pending | Pending | Pending | Must remain enabled | Start after this runbook is deployed |
+| 2026-07-22 | Pass: A-15/A-40/A-41 production checks | 1.1K / 30M | 22.9M month end | `eth_chainId`, `eth_getBlockByNumber`, `eth_blockNumber`, `eth_getLogs` | 41.0 MB uncached / 24.9 MB cached | Enabled | Retrospective provider-dashboard sample |
+| 2026-07-23 | No failed check or incident recorded; adjacent accepted probes were green | 470 / 30M | 22.9M month end | Same seven-day method set | 49.5 MB uncached / 2.2 MB cached | Enabled | Retrospective provider-dashboard sample |
+| 2026-07-24 | Pass: A-42 production acceptance | 1.1K / 30M | 22.9M month end | Same seven-day method set | 41.5 MB uncached / 19.2 MB cached | Enabled | Retrospective provider-dashboard sample |
+| 2026-07-25 | Pass: PM2 online; health healthy, lag 5, zero unresolved errors | 0 / 30M | 22.9M month end | Same seven-day method set | 41.1 MB uncached / 12.8 MB cached | Enabled | Retrospective provider-dashboard sample |
+| 2026-07-26 | Pass: A-43 production acceptance | 430 / 30M | 22.9M month end | Same seven-day method set | 51.9 MB uncached / 2.7 MB cached | Enabled | Retrospective provider-dashboard sample |
+| 2026-07-27 | No failed check or incident recorded; adjacent accepted probes were green | 11.1K / 30M | 22.9M month end | Same seven-day method set | 41.1 MB uncached / 17.3 MB cached | Enabled | Retrospective provider-dashboard sample |
+| 2026-07-28 | Pass: public cached status running, lag 0, no warnings | 0 / 30M (partial UTC day) | 22.9M month end | Same seven-day method set | 59.4 MB uncached / 676.6 MB cached (partial UTC day) | Enabled | Retrospective provider-dashboard sample |
+
+### Cost-observation acceptance — 2026-07-28
+
+The 2026-07-22 through 2026-07-28 UTC observation window is accepted:
+
+- Alchemy reported 14.1K CUs for the seven-day window, 100% request success
+  over the last 24 hours, and peak throughput of 17.3 of 500 CU/s. Current
+  monthly usage was 20,037,130 of 30M CUs and the dashboard forecast was
+  22.9M, leaving 7.1M CUs of forecast headroom. Custom usage/error alerts
+  remained unavailable on the current plan: the dashboard upgrade prompt
+  reported zero included custom alerts, so the 30M hard limit and the manual
+  Tuesday/Friday review remain the no-cost controls.
+- ArtSoul-only Supabase uncached egress stayed in a narrow 41.0–59.4 MB/day
+  range. Cached egress had one 676.6 MB partial-day spike on 2026-07-28, not a
+  repeated upward trend; even repeating that observed maximum for 31 days
+  would be about 21 GB, below 9% of the 250 GB cached-egress allowance.
+- The current billing-cycle ArtSoul totals were 0.246 GB uncached egress,
+  0.764 GB cached egress, and 0.084 GB storage. Organization totals were
+  0.264 GB uncached and 0.764 GB cached, each below 1% of the funded Pro-plan
+  allowance. Spend Cap remained enabled. The dashboard grace notice refers to
+  the previous over-quota cycle; the current cycle is inside quota.
+- Durable production checkpoints on 2026-07-22, 2026-07-24, 2026-07-25,
+  2026-07-26, and 2026-07-28 were green. The retrospective provider data
+  contains no failed health signal for the two intervening dates; the table
+  says so explicitly instead of inventing daily operator runs.
+- No API key, service-role key, access token, endpoint credential, email
+  address, payment detail, or wallet secret is stored in this evidence.
 
 Acceptance requires:
 
