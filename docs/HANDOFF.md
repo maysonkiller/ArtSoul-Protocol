@@ -125,7 +125,7 @@ Do not alter auction confirmation semantics while fixing observability.
 - A-15 is production-verified at merge commit `32b2d49`: `failed_events` is retired, `event_processing_registry` is the fail-closed source of truth, health is healthy, and both failed/dead counts are zero in `/health` and authenticated Prometheus output.
 - A-40 and A-41 are production-verified at merge commits `711027b` and `c1decb2`: the dormant alert path is removed, health metrics use real rolling RPC observations, and the event heartbeat is cancellable.
 - A-42 is production-verified at merge commit `1c37061`: `METRICS_AUTH` is explicit and undisclosed, `/metrics` returns 401 without it and 200 with it, port 3001 is loopback-only, the monitor is green, and PM2 was saved only after acceptance passed.
-- A9 remains open for seven consecutive days of Alchemy/Supabase cost evidence. A-43 remains a separate planned reliability item.
+- A9 was accepted on 2026-07-28 after the 2026-07-22 through 2026-07-28 Alchemy/Supabase observation window. Alchemy forecast 22.9M of the 30M hard limit; ArtSoul-only Supabase uncached egress stayed at 41.0–59.4 MB/day, current-cycle uncached/cached totals were 0.246/0.764 GB, and Spend Cap remained enabled. Continue the Tuesday/Friday checks in `runbooks/A9_INFRA_COST_MONITORING.md`; A-43 is already separately accepted.
 
 ### 7. Complete the Base commitments and beta-entry evidence
 
