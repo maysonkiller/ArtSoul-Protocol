@@ -42,6 +42,16 @@ function loadHandler() {
         }];
       case 'artwork_moderation_visibility':
         return [{ chain_id: 84532, artwork_id: '7', hidden: false }];
+      case 'v41_public_metrics':
+        return [{
+          chain_id: 84532,
+          artists_onboarded: '12',
+          auctions_completed: '8',
+          unique_collectors: '5',
+          settled_volume_wei: '3250000000000000000',
+          last_updated_block: '456',
+          updated_at: FUTURE_ISO
+        }];
       default:
         return [];
     }
@@ -94,10 +104,21 @@ test('cold-cache list response is CDN-cacheable and non-empty', async () => {
   assert.ok(modCall, 'moderation visibility table is queried');
   assert.ok(modCall.includes('select=chain_id,artwork_id,hidden'), 'narrow moderation select');
   assert.ok(!calls.some(p => p.includes('select=*')), 'no select=* anywhere in the projection build');
+  assert.equal(res.body.public_metrics.chain_id, 84532);
+  assert.equal(res.body.public_metrics.artists_onboarded, 12);
+  assert.equal(res.body.public_metrics.auctions_completed, 8);
+  assert.equal(res.body.public_metrics.unique_collectors, 5);
+  assert.equal(res.body.public_metrics.settled_volume_eth, '3.25');
+  assert.equal(res.body.public_metrics.as_of_block, 456);
+  assert.equal(res.body.public_metrics.updated_at, FUTURE_ISO);
+  const metricsCalls = calls.filter(p => tableOf(p) === 'v41_public_metrics');
+  assert.equal(metricsCalls.length, 1, 'one precomputed aggregate row is read per cached snapshot');
+  assert.match(metricsCalls[0], /chain_id=eq\.84532&limit=1/);
+  assert.doesNotMatch(metricsCalls[0], /select=\*/);
 });
 
 test('direct artwork lookup is private+no-store and carries fresh bids', async () => {
-  const { handler } = loadHandler();
+  const { handler, calls } = loadHandler();
   const res = fakeRes();
   await handler({ query: { artwork_id: '7' } }, res);
 
@@ -108,5 +129,6 @@ test('direct artwork lookup is private+no-store and carries fresh bids', async (
   assert.ok(Array.isArray(card.bids) && card.bids.length === 1, 'direct lookup attaches bids');
   assert.equal(card.bids[0].bidder, '0xBidder');
   assert.equal(card.bids[0].bid_amount, '1.5'); // wei -> eth
+  assert.equal(res.body.public_metrics, null, 'private direct lookup does not fetch or expose homepage metrics');
   assert.equal(res.headers['cache-control'], 'private, no-store');
 });

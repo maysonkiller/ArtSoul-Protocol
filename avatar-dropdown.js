@@ -612,12 +612,6 @@
                     icon: ETHEREUM_NETWORK_ICON,
                     color: '#627EEA',
                     currency: 'ETH'
-                },
-                2025: {
-                    name: 'Rialo',
-                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTIiIGZpbGw9IiMwMDAwMDAiLz4KPHBhdGggZD0iTTEyLjUgOC4yQzEyLjIgOC4xOCAxMS44NSA3Ljk1IDExLjY1IDcuNjVDMTEuMzUgNy4yIDExLjI1IDYuNSAxMS41NSA2QzExLjk1IDUuMyAxMi41IDUuMTUgMTMuMDUgNS4yQzEzLjUgNS4yIDE0LjUgNS4yMiAxNS4xIDUuMjJDMTUuMzUgNS4yMiAxNS41NSA1LjI0IDE1Ljc1IDUuMkMxNi4yIDUuMTIgMTYuNiA0Ljg1IDE2Ljg1IDQuNUMxNy4zIDMuODUgMTcuMTUgMi45IDE2LjU1IDIuNUMxNi4yIDIuMjUgMTUuOCAyLjE1IDE1LjQgMi4xMkMxNS4yIDIuMSAxNSAyLjA4IDE0Ljg1IDIuMDJDMTQuMyAxLjggMTMuOSAxLjMgMTMuNzUgMC44QzEzLjY1IDAuNTUgMTMuNjUgMC4yOCAxMy42IDAuMDJDMTMuNDUgLTAuNSAxMyAtMC45IDEyLjUgLTFDMTIuMzUgLTEuMDUgMTIuMiAtMS4wOCAxMi4wNSAtMS4wOEMxMC41IC0xLjEgOCAtMS4xNSA3LjUgLTEuMTVDNi44IC0xLjE3IDYuMTUgLTAuNjUgNiAwLjAyQzUuOCAwLjcgNi4xNSAxLjQ1IDYuOCAxLjhDNy4xIDEuOTUgNy4zIDEuOTggNy42IDEuOTdDOC41IDEuOTggOC40NSAyIDguOTUgMi4wMkM5LjU1IDEuOTggMTAuMiAyLjMgMTAuNSAyLjlDMTEuMTUgNC4yIDEwLjIgNS4yIDkgNS4xMkM3LjUgNS4xNSA2LjggNS4xMyA0LjUgNS4xM0M0LjEgNS4xNCAzLjg1IDUuMSAzLjUgNS4yMkMyLjUgNS41IDIgNi41IDIuMiA3LjRDMi40IDggMi45IDguNDUgMy41IDguNkM0LjMgOC43IDUuNSA4LjY1IDcuNSA4LjY4QzggOC42OCA4LjMgOC42OCA4LjUgOC42OEM4LjY1IDguNjggOC44IDguNyA4Ljk1IDguNzVDOS44IDguOTUgMTAuMzUgOS43NSAxMC4zIDEwLjZDMTAuMyAxMS4yIDEwLjMgMTMuNSAxMC4zIDE0LjVDMTAuMyAxNC44NSAxMC4zNSAxNS4yIDEwLjU1IDE1LjU1QzExIDE2LjUgMTIuMiAxNi44NSAxMyAxNi4zQzEzLjYgMTUuOSAxMy43NSAxNS4yIDEzLjcgMTQuNEMxMy43IDEzLjYgMTMuNyAxMi4yIDEzLjcgMTEuNUMxMy44IDEwLjIgMTMgOS4zIDEyLjUgOS4yVjguMloiIGZpbGw9IiNBOURERDMiLz4KPC9zdmc+Cg==',
-                    color: '#A9DDD3',
-                    currency: 'RIA'
                 }
             };
 
@@ -737,7 +731,9 @@
             // chainId is intentionally null while a mobile session still awaits
             // a Base Sepolia confirmation).
             const alreadyOnBaseSepolia = Number(currentChainId) === 84532 || requiresConfirmation === true;
-            const baseSepoliaOption = alreadyOnBaseSepolia ? '' : `
+            if (alreadyOnBaseSepolia) return '';
+            return `
+                <div id="avatarNetworkOptions" class="avatar-network-options" hidden>
                     <button
                         type="button"
                         class="dropdown-item avatar-network-option"
@@ -745,21 +741,6 @@
                     >
                         <img src="${this.baseNetworkIcon || ''}" alt="" aria-hidden="true" />
                         <span class="network-option-name">Base Sepolia</span>
-                    </button>
-            `;
-            return `
-                <div id="avatarNetworkOptions" class="avatar-network-options avatar-network-future-options" hidden>
-                    ${baseSepoliaOption}
-                    <button
-                        type="button"
-                        class="dropdown-item avatar-network-option is-disabled"
-                        disabled
-                        aria-disabled="true"
-                        title="Coming soon"
-                    >
-                        <img src="${ETHEREUM_NETWORK_ICON}" alt="" aria-hidden="true" />
-                        <span class="network-option-name">ETH Sepolia</span>
-                        <span class="network-soon-badge">SOON</span>
                     </button>
                 </div>
             `;
@@ -776,24 +757,52 @@
         }
 
         renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false, connected = false }) {
-            const networkSection = networkInfo ? `
-                <button
-                    type="button"
-                    class="dropdown-item network-switcher-btn network-current-row"
-                    onclick="window.AvatarDropdown.handleNetworkRowClick(event)"
-                    aria-expanded="false"
-                    aria-controls="avatarNetworkOptions"
-                >
+            const networkOptions = networkInfo
+                ? this.renderNetworkOptions(networkInfo.chainId, networkInfo.requiresConfirmation)
+                : '';
+            const networkRowContent = networkInfo ? `
                     <img src="${networkInfo.icon}" alt="${networkInfo.name}" onerror="this.style.display='none'" />
                     <div class="network-switcher-copy">
                         <div><span data-network-name>${networkInfo.name}</span></div>
                         <div data-network-balance>${networkInfo.balance} ${networkInfo.currency}</div>
                     </div>
+            ` : '';
+            let networkCurrentRow = '';
+            if (networkInfo?.requiresConfirmation) {
+                networkCurrentRow = `
+                    <button
+                        type="button"
+                        class="dropdown-item network-switcher-btn network-current-row"
+                        onclick="window.AvatarDropdown.handleNetworkRowClick(event)"
+                    >
+                        ${networkRowContent}
+                    </button>
+                `;
+            } else if (networkOptions) {
+                networkCurrentRow = `
+                    <button
+                        type="button"
+                        class="dropdown-item network-switcher-btn network-current-row"
+                        onclick="window.AvatarDropdown.handleNetworkRowClick(event)"
+                        aria-expanded="false"
+                        aria-controls="avatarNetworkOptions"
+                    >
+                        ${networkRowContent}
                     <svg width="16" height="16" viewBox="0 0 16 16" class="network-options-arrow menu-chevron" aria-hidden="true">
                         <path d="M4 6l4 4 4-4"></path>
                     </svg>
-                </button>
-                ${this.renderNetworkOptions(networkInfo.chainId, networkInfo.requiresConfirmation)}
+                    </button>
+                `;
+            } else if (networkInfo) {
+                networkCurrentRow = `
+                    <div class="dropdown-item network-switcher-btn network-current-row" role="status">
+                        ${networkRowContent}
+                    </div>
+                `;
+            }
+            const networkSection = networkInfo ? `
+                ${networkCurrentRow}
+                ${networkOptions}
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
 

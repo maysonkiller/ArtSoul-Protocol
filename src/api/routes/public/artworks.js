@@ -311,6 +311,21 @@ function countByChain(rows = []) {
   }, {});
 }
 
+function normalizePublicMetrics(rows = []) {
+  const row = rows.find(candidate => chainId(candidate.chain_id) === 84532);
+  if (!row) return null;
+
+  return {
+    chain_id: 84532,
+    artists_onboarded: toNumber(row.artists_onboarded),
+    auctions_completed: toNumber(row.auctions_completed),
+    unique_collectors: toNumber(row.unique_collectors),
+    settled_volume_eth: weiToEth(row.settled_volume_wei),
+    as_of_block: toNumber(row.last_updated_block) || null,
+    updated_at: row.updated_at || null
+  };
+}
+
 function latestAuctionByArtwork(auctions = []) {
   const map = new Map();
   for (const auction of auctions) {
@@ -636,7 +651,7 @@ function parseDirectLookup(query = {}) {
   return null;
 }
 
-async function projectTableData(tableData, warnings) {
+async function projectTableData(tableData, warnings, publicMetrics = null) {
   const maps = {
     creatorNames: await creatorNamesByAddress(tableData.v41_artworks, warnings),
     auctions: latestAuctionByArtwork(tableData.v41_auctions),
@@ -658,7 +673,7 @@ async function projectTableData(tableData, warnings) {
     return acc;
   }, {});
 
-  return { cards, bids: maps.bids, diagnostics, warnings };
+  return { cards, bids: maps.bids, diagnostics, warnings, publicMetrics };
 }
 
 async function buildDirectProjectionSnapshot({ chain, artworkId }) {
@@ -746,7 +761,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
     v41_trust_signals: [],
     artwork_social_signals: artworkSocialSignals,
     artwork_moderation_visibility: artworkModerationVisibility
-  }, warnings);
+  }, warnings, null);
 }
 
 async function buildProjectionSnapshot() {
@@ -762,7 +777,8 @@ async function buildProjectionSnapshot() {
     v41FloorHistory,
     v41TrustSignals,
     artworkSocialSignals,
-    artworkModerationVisibility
+    artworkModerationVisibility,
+    publicMetricRows
   ] = await Promise.all([
     queryTable(
       'v41_artworks',
@@ -811,6 +827,12 @@ async function buildProjectionSnapshot() {
       'artwork_moderation_visibility',
       `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&limit=1000`,
       warnings
+    ),
+    queryTable(
+      'v41_public_metrics',
+      'select=chain_id,artists_onboarded,auctions_completed,unique_collectors,settled_volume_wei,last_updated_block,updated_at' +
+        '&chain_id=eq.84532&limit=1',
+      warnings
     )
   ]);
   const tableData = {
@@ -826,7 +848,7 @@ async function buildProjectionSnapshot() {
     artwork_moderation_visibility: artworkModerationVisibility
   };
 
-  return projectTableData(tableData, warnings);
+  return projectTableData(tableData, warnings, normalizePublicMetrics(publicMetricRows));
 }
 
 // One projection rebuild per instance per TTL window; every request inside the
@@ -872,7 +894,7 @@ export default async function handler(req, res) {
   try {
     const requestQuery = req.query || {};
     const directLookup = parseDirectLookup(requestQuery);
-    const { cards, bids, diagnostics, warnings } = directLookup
+    const { cards, bids, diagnostics, warnings, publicMetrics } = directLookup
       ? await getDirectProjectionSnapshot(directLookup)
       : await getProjectionSnapshot();
     const suppressedArtworkIds = cards
@@ -907,6 +929,7 @@ export default async function handler(req, res) {
       data,
       count: data.length,
       suppressed_artwork_ids: suppressedArtworkIds,
+      public_metrics: isDirectArtworkLookup ? null : publicMetrics,
       diagnostics,
       warnings
     });

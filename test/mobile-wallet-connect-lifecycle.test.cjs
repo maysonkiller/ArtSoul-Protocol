@@ -851,6 +851,47 @@ test('a duplicate session event cannot replace the accepted topic', async () => 
     assert.equal(api.getAcceptedCoreTopic(), TOPIC_A, 'the accepted topic is unchanged');
 });
 
+test('explicit Connect repairs a duplicate that overwrote the accepted provider cache', async () => {
+    const { api, provider } = loadCoreWallet();
+    const firstConnect = api.connectCoreWallet();
+    await flush();
+    provider.__emitDisplayUri('wc:pairing-a');
+    await flush();
+    provider.__settle(buildSession({ topic: TOPIC_A }));
+    provider.__resolveConnect();
+    await firstConnect;
+    assert.equal(api.getAcceptedCoreTopic(), TOPIC_A);
+
+    // Another tab or a late pre-fix proposal settles B. The accepted topic A is
+    // still in the dedicated store, but UniversalProvider's cache now points at
+    // B. This is a conflict even though A remains identifiable.
+    provider.__settle(buildSession({ topic: TOPIC_B }));
+    const conflict = api.readCoreSessionConflict(provider);
+    assert.equal(conflict.resolved, true);
+    assert.equal(api.getCoreSessionLiveness(provider).reason, 'session-topic-not-accepted');
+
+    const repairedConnect = api.connectCoreWallet();
+    await flush();
+
+    // Explicit Connect must end BOTH topics before starting one fresh pairing.
+    assert.equal(provider.disconnectCalls, 1, 'the cached duplicate B is disconnected');
+    assert.deepEqual(provider.clientDisconnectCalls, [TOPIC_A], 'accepted A is also reconciled');
+    assert.deepEqual(provider.__storedTopics(), []);
+    assert.equal(provider.connectCalls, 2);
+
+    const freshTopic = 'ffffffff00000000ffffffff00000000';
+    provider.__emitDisplayUri('wc:pairing-fresh');
+    await flush();
+    provider.__settle(buildSession({ topic: freshTopic }));
+    provider.__resolveConnect();
+    const connected = await repairedConnect;
+
+    assert.equal(connected.address, ADDRESS);
+    assert.equal(api.getAcceptedCoreTopic(), freshTopic);
+    assert.deepEqual(provider.__storedTopics(), [freshTopic]);
+    assert.equal(api.isCoreSessionActive(), true);
+});
+
 test('an explicit Connect reconciles a duplicated store before creating a pairing', async () => {
     const provider = createFakeProvider();
     seedTwoStoredSessions(provider, { currentTopic: TOPIC_A });

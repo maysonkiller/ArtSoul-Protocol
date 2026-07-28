@@ -983,7 +983,7 @@ export async function restoreCoreSessionOutcome(options = {}) {
             if (initTimeoutId) clearTimeout(initTimeoutId);
         }
 
-        // Fail closed on a duplicated store. Boot is a PASSIVE path: it must
+        // Fail closed on an unresolved duplicated store. Boot is a PASSIVE path: it must
         // never pick a winner and never delete healthy sessions without a user
         // gesture. Report a stable diagnostic instead and let an explicit
         // Connect (reconcile + fresh pairing) or Disconnect (clear the store)
@@ -1225,9 +1225,10 @@ async function runCoreConnectAttempt(attempt) {
     // deep-link race). Nothing is guessed: every session in this dedicated
     // store is ended, then a single fresh pairing is created.
     const conflict = readCoreSessionConflict(instance);
-    if (conflict && !conflict.resolved) {
+    if (conflict) {
         coreLog('duplicate ArtSoul WalletConnect sessions reconciled on Connect', {
-            topics: conflict.topics.map(maskCoreTopic)
+            topics: conflict.topics.map(maskCoreTopic),
+            acceptedTopicPresent: conflict.resolved
         });
         await disconnectCoreWalletOutcome({
             cancelPendingAttempt: false,
