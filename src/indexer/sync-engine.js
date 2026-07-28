@@ -899,6 +899,7 @@ class IndexerSyncEngine {
             if (handler) {
                 await handler(event, client);
             }
+            await this._recordPublicMetricEventTx(event, client);
 
             await stopHeartbeat();
             if (leaseLost) {
@@ -1081,6 +1082,62 @@ class IndexerSyncEngine {
         );
 
         console.log(`[IndexerSyncEngine] Indexed ArtworkRegistered for artwork ${artworkId}`);
+    }
+
+    async _recordPublicMetricEventTx(event, client) {
+        const metric = {
+            participantType: null,
+            participantAddress: null,
+            auctionsCompletedDelta: 0,
+            settledVolumeDelta: '0'
+        };
+
+        switch (event.eventName) {
+            case 'ArtworkRegistered':
+                metric.participantType = 'artist';
+                metric.participantAddress = event.eventData.creator;
+                break;
+            case 'AuctionEnded':
+                if (!this._isZeroAddress(event.eventData.winner)) return false;
+                metric.auctionsCompletedDelta = 1;
+                break;
+            case 'SettlementCompleted':
+                metric.participantType = 'collector';
+                metric.participantAddress = event.eventData.winner;
+                metric.auctionsCompletedDelta = 1;
+                metric.settledVolumeDelta = this._asString(event.eventData.finalPrice);
+                break;
+            case 'SettlementDefaulted':
+                metric.auctionsCompletedDelta = 1;
+                break;
+            case 'ResaleCompleted':
+                metric.participantType = 'collector';
+                metric.participantAddress = event.eventData.buyer;
+                metric.settledVolumeDelta = this._asString(event.eventData.price);
+                break;
+            default:
+                return false;
+        }
+
+        const result = await client.query(
+            `SELECT public.record_v41_public_metric_event(
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, to_timestamp($10 / 1000.0)
+             ) AS inserted`,
+            [
+                this._chainIdString(),
+                event.transactionHash,
+                event.logIndex,
+                event.eventName,
+                metric.participantType,
+                metric.participantAddress,
+                metric.auctionsCompletedDelta,
+                metric.settledVolumeDelta,
+                event.blockNumber,
+                this._eventTimestampSqlValue(event)
+            ]
+        );
+
+        return result.rows?.[0]?.inserted === true;
     }
 
     async _handleAuctionCreatedTx(event, client) {
