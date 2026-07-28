@@ -97,7 +97,7 @@ const sections = [
         content: (
             <>
                 <p>Likes, Would Buy, Watching, auction participation, and successful settlement help the community understand interest around an artwork.</p>
-                <p>Public trust uses the highest applicable weight: Verified 1x, Genesis 2x, 100 or more settlements 3x, and Partner 5x. Trust is capped at 5x.</p>
+                <p>Public trust uses the highest applicable weight: Verified 1x, Genesis 1.3x, 100 or more settlements 3x, and Partner 5x. Trust is capped at 5x.</p>
                 <p>Trust affects discovery only. It never changes price, floor, ownership, settlement, royalties, or treasury rules.</p>
             </>
         )

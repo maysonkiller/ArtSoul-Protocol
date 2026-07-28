@@ -63,7 +63,7 @@ Important rules:
 - Frontend: static HTML, React inline pages, CSS theme system.
 - Wallet: AppKit / injected wallet providers.
 - Contracts: Solidity, Hardhat, OpenZeppelin.
-- Chain: Base for mainnet scope; Base Sepolia and Ethereum Sepolia may be used during testnet.
+- Chain: Base Sepolia is the only active product testnet; Base is the canonical production chain. Historical Ethereum Sepolia records are read-only migration compatibility.
 - Backend/API: Vercel serverless routes.
 - Storage and database: Supabase/Postgres.
 - Indexer: Node.js projection worker.

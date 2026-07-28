@@ -43,21 +43,16 @@ test('current network stays unique while foreign sessions expose an explicit Bas
   assert.match(avatarDropdown, /Number\(currentChainId\) === 84532/);
   assert.match(avatarDropdown, /window\.AvatarDropdown\.selectNetwork\(84532, event\)/);
   assert.match(avatarDropdown, /<span class="network-option-name">Base Sepolia<\/span>/);
-  assert.match(avatarDropdown, /<span class="network-option-name">ETH Sepolia<\/span>/);
-  assert.match(avatarDropdown, /<img src="\$\{ETHEREUM_NETWORK_ICON\}" alt="" aria-hidden="true" \/>/);
-  assert.match(avatarDropdown, /network-soon-badge">SOON/);
-  const ethereumStart = avatarDropdown.indexOf('class="dropdown-item avatar-network-option is-disabled"');
-  const ethereumOption = ethereumStart >= 0
-    ? avatarDropdown.slice(ethereumStart, avatarDropdown.indexOf('</button>', ethereumStart))
-    : '';
-  assert.doesNotMatch(ethereumOption, /network-option-indicator/);
+  assert.doesNotMatch(avatarDropdown, /<span class="network-option-name">ETH Sepolia<\/span>/);
+  assert.doesNotMatch(avatarDropdown, /network-soon-badge">SOON/);
   assert.doesNotMatch(avatarDropdown, /avatar-network-option is-active/);
   // The Base Sepolia switch option must not duplicate the current row while a
   // mobile session is still on the "Tap to switch" (requiresConfirmation) state,
   // where chainId is intentionally null. The row itself is the switch control.
   assert.match(avatarDropdown, /renderNetworkOptions\(currentChainId, requiresConfirmation = false\)/);
   assert.match(avatarDropdown, /Number\(currentChainId\) === 84532 \|\| requiresConfirmation === true/);
-  assert.match(avatarDropdown, /renderNetworkOptions\(networkInfo\.chainId, networkInfo\.requiresConfirmation\)/);
+  assert.match(avatarDropdown, /const networkOptions = networkInfo[\s\S]*?this\.renderNetworkOptions\(networkInfo\.chainId, networkInfo\.requiresConfirmation\)/);
+  assert.match(avatarDropdown, /else if \(networkInfo\) \{[\s\S]*?role="status"/);
   // The stable menu key encodes the network state so the options list rebuilds
   // when the wallet confirms Base Sepolia — otherwise the stale option survives.
   assert.match(avatarDropdown, /networkMenuKeySegment\(networkInfo\)/);
@@ -97,7 +92,7 @@ test('account menu uses the compact desktop and mobile width contracts', () => {
   assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
 
-test('account menu has one stylesheet source and a full-width compact future network row', () => {
+test('account menu has one stylesheet source and a full-width compact network row', () => {
   assert.doesNotMatch(avatarDropdown, /document\.head\.appendChild\(style\)/);
   assert.doesNotMatch(avatarDropdown, /class="dropdown-item[^\"]*"\s+style=/);
   assert.match(unifiedStyles, /network-current-row,[\s\S]*?avatar-network-option \{[\s\S]*?border-color: var\(--c-border-soft\)/);
@@ -111,7 +106,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=42/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=38/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=39/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
