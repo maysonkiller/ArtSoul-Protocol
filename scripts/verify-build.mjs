@@ -42,6 +42,11 @@ for (const page of pages) {
         }
     }
 
+    const asyncModulePattern = /<script\b(?=[^>]*\btype=["']module["'])(?=[^>]*\basync\b)[^>]*>/i;
+    if (asyncModulePattern.test(source) || asyncModulePattern.test(built)) {
+        throw new Error(`${page} contains an async module entry that can execute before its DOM mount point exists`);
+    }
+
     if (!built.includes('/assets/')) {
         throw new Error(`${page} does not reference a hashed build asset`);
     }
@@ -85,4 +90,4 @@ for (const entry of expectedEntries) {
     }
 }
 
-console.log(`Verified ${pages.length} built HTML routes with no in-browser Babel.`);
+console.log(`Verified ${pages.length} built HTML routes with no in-browser Babel or async module-entry mount races.`);
