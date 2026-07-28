@@ -1,17 +1,23 @@
 # ArtSoul Testnet Bug Report Template
 
-Use this template for every public testnet bug report. Include as much detail as possible. Never include private keys, seed phrases, RPC URLs, database URLs, or service keys.
+Use this template only when the
+[controlled-beta GitHub issue form](https://github.com/maysonkiller/ArtSoul-Protocol/issues/new?template=controlled-beta-bug.yml)
+is unavailable. Include as much detail as possible. Never include private keys,
+seed phrases, WalletConnect session topics, authenticated credentials, RPC URLs
+containing keys, database URLs, or service keys.
+
+Security, privacy, copyright, and suspected credential exposure must be sent
+privately through the beta invitation channel, not through a public issue.
 
 ## Summary
 
 Short description:
 
-Severity:
+Suggested priority (final priority is assigned during triage):
 
-- Blocker
-- High
-- Medium
-- Low
+- P1 — safety, authorization, economic truth, or core-lifecycle blocker
+- P2 — important defect with a safe workaround
+- P3 — non-blocking polish or clarity problem
 
 ## Environment
 
@@ -20,7 +26,6 @@ Page URL:
 Network:
 
 - Base Sepolia
-- Ethereum Sepolia
 - Wrong/other network
 
 Wallet used:
@@ -112,6 +117,8 @@ Do not include:
 - Private key
 - Seed phrase
 - RPC URL with secret token
+- WalletConnect session topic
+- Authenticated metrics credential
 - Supabase service role key
 - Database URL
 - Any other secret
