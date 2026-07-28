@@ -131,12 +131,12 @@ test('the credentialed standalone API uses an exact CORS allowlist', () => {
   assert.match(standaloneServer, /apiOrigins\.has\(origin\)/);
 });
 
-test('the indexer migration runner covers the complete 001 through 014 sequence', async () => {
+test('the indexer migration runner covers the complete 001 through 015 sequence', async () => {
   const { listIndexerMigrations } = await modules;
   const migrations = listIndexerMigrations();
   assert.deepEqual(
     migrations.map(migration => migration.number),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   );
 
   const setupSql = fs.readFileSync(path.join(REPO_ROOT, 'src/indexer/setup-database.sql'), 'utf8');
@@ -160,7 +160,8 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   const SELF_HARDENING_MIGRATIONS = new Set([
     'a8a_moderation_passkey_foundation.sql',
     'a8b_artwork_report_intake.sql',
-    'a8c_protocol_admin_review.sql'
+    'a8c_protocol_admin_review.sql',
+    '015_public_metrics_projection.sql'
   ]);
 
   for (const root of sqlRoots) {
@@ -225,6 +226,25 @@ test('A8c Protocol Admin review self-hardens its notification ledger inline', ()
   }
   assert.match(a8c, /REVOKE ALL ON FUNCTION public\.review_artwork_report/);
   assert.match(a8c, /GRANT EXECUTE ON FUNCTION public\.review_artwork_report[\s\S]*TO service_role/);
+});
+
+test('A11 public metrics projection self-hardens its aggregate and backing ledger', () => {
+  const metrics = fs.readFileSync(
+    path.join(REPO_ROOT, 'src/indexer/migrations/015_public_metrics_projection.sql'),
+    'utf8'
+  );
+  for (const table of [
+    'v41_public_metric_participants',
+    'v41_public_metric_events',
+    'v41_public_metrics'
+  ]) {
+    assert.match(metrics, new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}`));
+    assert.match(metrics, new RegExp(`ALTER TABLE public\\.${table} FORCE ROW LEVEL SECURITY;`));
+    assert.match(metrics, new RegExp(`REVOKE ALL ON public\\.${table} FROM PUBLIC, anon, authenticated;`));
+    assert.match(metrics, new RegExp(`GRANT ALL ON public\\.${table} TO service_role;`));
+  }
+  assert.match(metrics, /REVOKE ALL ON FUNCTION public\.record_v41_public_metric_event\(/);
+  assert.match(metrics, /GRANT EXECUTE ON FUNCTION public\.record_v41_public_metric_event\([\s\S]*TO service_role;/);
 });
 
 const STORAGE_HARDENING_PATH = 'sql/migrations/phase18_7c_supabase_storage_hardening.sql';
