@@ -2,7 +2,7 @@
 
 Updated: 2026-07-28
 
-Repository baseline: `main` at `c159001`
+Production code baseline: `main` includes `c159001`
 
 Companion state document: `docs/PROJECT_STATE.md`
 
