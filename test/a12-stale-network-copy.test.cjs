@@ -73,3 +73,21 @@ test('all consumers receive the updated shared runtime assets', () => {
     assert.match(read(path), /contracts-integration\.js\?v=7/, path);
   }
 });
+
+test('A12 production acceptance is durable and reconciled across handoff and backlogs', () => {
+  const acceptance = read('docs/testnet/A12_NETWORK_COPY_ACCEPTANCE.md');
+  const canonBacklog = read('docs/canon/12_IMPLEMENTATION_BACKLOG.md');
+  const durableBacklog = read('docs/BACKLOG.md');
+  const handoff = read('docs/HANDOFF.md');
+
+  assert.match(acceptance, /Accepted: 2026-07-28/);
+  assert.match(acceptance, /a351d7da27d1f05679446f15bc2955dea61aa8f6/);
+  assert.match(acceptance, /c1590016cdf983e82504f954c217febb97b43806/);
+  assert.match(acceptance, /required no Supabase schema or data migration, no database backup, and no Hetzner restart/);
+
+  assert.match(canonBacklog, /- \[x\] \*\*A12 — Remove stale network copy\.\*\* Accepted 2026-07-28/);
+  assert.match(durableBacklog, /\| A-28 \|[^|]+\|[^|]+\| done \| A \|/);
+  assert.match(durableBacklog, /\| A-44 \|[^|]+\|[^|]+\| done \| A \|/);
+  assert.match(handoff, /Repository baseline: `main` at `c159001`/);
+  assert.match(handoff, /A2-A6, A9, A11, and A12 are accepted/);
+});
