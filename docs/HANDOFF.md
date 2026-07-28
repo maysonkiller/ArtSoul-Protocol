@@ -41,6 +41,8 @@ Do not start Phase C contract work, Genesis implementation, a token, points, air
 | Wallet isolation bench | `https://artsoul.vercel.app/wallet-test.html?walletdebug=1` |
 | Public indexer status | `https://artsoul.vercel.app/api/public/indexer-status` |
 | Public projection API | `https://artsoul.vercel.app/api/public/artworks` |
+| Controlled-beta entry | [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md) |
+| Controlled-beta issue form | `https://github.com/maysonkiller/ArtSoul-Protocol/issues/new?template=controlled-beta-bug.yml` |
 | Project X account | `https://x.com/ArtSoulProtocol` |
 | Community | `https://t.me/ArtSoulCommunity` |
 
@@ -128,7 +130,9 @@ Do not alter auction confirmation semantics while fixing observability.
 ### 7. Complete the Base commitments and beta-entry evidence
 
 - Implement the first-screen value proposition, compact three-step explanation, cached public metrics, and stale-copy cleanup from backlog A-24 through A-28.
-- Publish the controlled-beta checklist from A-23.
+- Complete the evidence gates in
+  [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md); the
+  entry pack is prepared but remains NO-GO while Phase A blockers are open.
 - Invite trusted testers only after the remaining Phase A acceptance criteria pass. Track feedback in GitHub Issues rather than chat-only queues.
 
 ## 6. Local Development Commands
