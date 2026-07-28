@@ -2,7 +2,7 @@
 
 Updated: 2026-07-28
 
-Repository baseline: `main` at `8f7a9d2`
+Repository baseline: `main` at `c159001`
 
 Companion state document: `docs/PROJECT_STATE.md`
 
@@ -80,7 +80,7 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 
 ## 5. Immediate Priority Queue
 
-`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. Mobile-wallet acceptance, production overlay removal, and cross-platform CI are recorded there as completed and must not remain in the active queue.
+`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. A2-A6, A9, A11, and A12 are accepted. A12 production evidence, including the module-entry correction discovered during acceptance, is in `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
 
 ### 1. Finish security and migration operational acceptance
 
@@ -114,7 +114,7 @@ Do not alter auction confirmation semantics while fixing observability.
 - Add a Report action on each artwork.
 - Implement complaint submission and notice-and-takedown review state.
 - Add a review queue and audit trail.
-- Preserve the existing three-factor moderator access and multisig requirement for irreversible actions.
+- Use server-confirmed staff roles plus the approved 15-minute passkey step-up; X and Discord handles are not authentication factors. Preserve the multisig requirement for irreversible actions.
 - Do not build Content-ID or audio fingerprinting; v1.2 canon explicitly removed that requirement.
 
 ### 6. Confirm infrastructure cost and health
@@ -129,7 +129,7 @@ Do not alter auction confirmation semantics while fixing observability.
 
 ### 7. Complete the Base commitments and beta-entry evidence
 
-- A11 and backlog A-24 through A-27 were accepted on production on 2026-07-28 through PR #160 and `runbooks/A11_PUBLIC_METRICS_ROLLOUT.md`. Migration 015, the cached aggregate, public API, responsive homepage, Hetzner health, advancing cursor, and saved PM2 state all passed. Continue with the separate stale-copy cleanup in A-28/A12.
+- A11, A12, and backlog A-24 through A-28 were accepted on production on 2026-07-28 through PRs #160, #162, and #163. Migration 015, the cached aggregate, public API, responsive homepage, active-network copy, canonical Genesis trust copy, React entry scheduling, Hetzner health, advancing cursor, and saved PM2 state passed. See `runbooks/A11_PUBLIC_METRICS_ROLLOUT.md` and `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
 - Complete the evidence gates in
   [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md); the
   entry pack is prepared but remains NO-GO while Phase A blockers are open.
@@ -175,7 +175,7 @@ node --check wallet-core-connect.js
 node --check contracts-integration.js
 ```
 
-`npm run build` already runs the route verifier. A successful build must report nine HTML routes and no in-browser Babel.
+`npm run build` already runs the route verifier. A successful build must report ten HTML routes and no in-browser Babel or async module-entry mount races.
 
 ## 7. Vercel Deployment
 
