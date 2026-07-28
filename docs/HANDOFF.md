@@ -1,8 +1,8 @@
 # ArtSoul Engineering Handoff
 
-Updated: 2026-07-15
+Updated: 2026-07-28
 
-Repository baseline: `main` at `fdd9518`
+Repository baseline: `main` at `8f7a9d2`
 
 Companion state document: `docs/PROJECT_STATE.md`
 
@@ -129,7 +129,7 @@ Do not alter auction confirmation semantics while fixing observability.
 
 ### 7. Complete the Base commitments and beta-entry evidence
 
-- Implement the first-screen value proposition, compact three-step explanation, cached public metrics, and stale-copy cleanup from backlog A-24 through A-28.
+- A11 and backlog A-24 through A-27 were accepted on production on 2026-07-28 through PR #160 and `runbooks/A11_PUBLIC_METRICS_ROLLOUT.md`. Migration 015, the cached aggregate, public API, responsive homepage, Hetzner health, advancing cursor, and saved PM2 state all passed. Continue with the separate stale-copy cleanup in A-28/A12.
 - Complete the evidence gates in
   [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md); the
   entry pack is prepared but remains NO-GO while Phase A blockers are open.
