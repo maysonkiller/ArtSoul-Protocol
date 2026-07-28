@@ -88,6 +88,6 @@ test('A12 production acceptance is durable and reconciled across handoff and bac
   assert.match(canonBacklog, /- \[x\] \*\*A12 — Remove stale network copy\.\*\* Accepted 2026-07-28/);
   assert.match(durableBacklog, /\| A-28 \|[^|]+\|[^|]+\| done \| A \|/);
   assert.match(durableBacklog, /\| A-44 \|[^|]+\|[^|]+\| done \| A \|/);
-  assert.match(handoff, /Repository baseline: `main` at `c159001`/);
+  assert.match(handoff, /Production code baseline: `main` includes `c159001`/);
   assert.match(handoff, /A2-A6, A9, A11, and A12 are accepted/);
 });
