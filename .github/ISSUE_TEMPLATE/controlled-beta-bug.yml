@@ -1,0 +1,164 @@
+name: Controlled beta bug
+description: Report a reproducible defect found during an invited ArtSoul Base Sepolia test window.
+title: "[Controlled beta]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing ArtSoul. Use testnet information only. Never post a seed phrase, private key, session topic, authenticated credential, RPC URL containing a key, database URL, or service key. Report security, privacy, copyright, or credential exposure privately through your invitation channel instead of this public form.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety acknowledgement
+      options:
+        - label: I used testnet funds and removed personal information and secrets from this report.
+          required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Suggested priority
+      description: Triage will confirm the final priority.
+      options:
+        - P1 — safety, authorization, economic truth, or core-lifecycle blocker
+        - P2 — important defect with a safe workaround
+        - P3 — non-blocking polish or clarity problem
+    validations:
+      required: true
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Test role
+      options:
+        - Creator
+        - Bidder or collector
+        - Current NFT owner
+        - Viewer
+        - Moderator
+        - Operator
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Wallet connection or authentication
+        - Publish artwork
+        - Auction creation
+        - Bidding
+        - Auction ending
+        - Settlement and mint
+        - Resale listing or purchase
+        - Gallery, profile, or artwork display
+        - Provenance or indexer data
+        - Reporting or moderation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Page URL
+      placeholder: https://artsoul.vercel.app/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include device, operating system, browser and version, wallet app and version, and whether an in-app browser was used.
+      placeholder: |
+        Device:
+        OS:
+        Browser and version:
+        Wallet and version:
+        Network shown by the wallet:
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Reproducibility
+      options:
+        - Every attempt
+        - More than once
+        - Once
+        - Unable to retry safely
+    validations:
+      required: true
+
+  - type: input
+    id: timestamp
+    attributes:
+      label: Timestamp and timezone
+      placeholder: 2026-07-28 18:30 Europe/Warsaw
+    validations:
+      required: true
+
+  - type: textarea
+    id: public_identifiers
+    attributes:
+      label: Public testnet identifiers
+      description: Optional public wallet address, transaction hash, block number, artwork ID, auction ID, or token ID. Do not post secrets.
+      placeholder: |
+        Wallet address:
+        Transaction hash:
+        Block:
+        Artwork / auction / token ID:
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Add screenshots, video, or diagnostic output after removing personal information, session topics, credentials, and private URLs.
+
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery and impact
+      description: Explain whether the journey is blocked and whether refresh, return from the wallet, disconnect/reconnect, or another supported browser changes the result.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: final_check
+    attributes:
+      label: Final check
+      options:
+        - label: I searched open issues for the same defect.
+          required: true
+        - label: I can be contacted through the controlled-beta invitation channel if private follow-up is needed.
+          required: true

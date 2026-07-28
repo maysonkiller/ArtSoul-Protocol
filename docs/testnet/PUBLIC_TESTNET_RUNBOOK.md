@@ -2,6 +2,13 @@
 
 Last updated: 2026-05-31
 
+> Historical record: this document describes the May 2026 dual-testnet
+> validation period and is not the operating authority for a new test window.
+> Ethereum Sepolia is now legacy read-only, several readiness statements below
+> have been superseded, and hard-coded auction reservations are no longer valid.
+> Use [`CONTROLLED_BETA_ENTRY.md`](CONTROLLED_BETA_ENTRY.md) for current entry
+> gates and [`TESTER_GUIDE.md`](TESTER_GUIDE.md) during an approved window.
+
 ## Purpose
 
 This runbook is the operating guide for ArtSoul public testnet preparation. It documents what is live, what has already been tested, what is still experimental, and the rules testers and operators must follow.

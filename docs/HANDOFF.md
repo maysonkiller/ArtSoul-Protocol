@@ -1,8 +1,8 @@
 # ArtSoul Engineering Handoff
 
-Updated: 2026-07-15
+Updated: 2026-07-28
 
-Repository baseline: `main` at `fdd9518`
+Production code baseline: `main` includes `c159001`
 
 Companion state document: `docs/PROJECT_STATE.md`
 
@@ -41,6 +41,8 @@ Do not start Phase C contract work, Genesis implementation, a token, points, air
 | Wallet isolation bench | `https://artsoul.vercel.app/wallet-test.html?walletdebug=1` |
 | Public indexer status | `https://artsoul.vercel.app/api/public/indexer-status` |
 | Public projection API | `https://artsoul.vercel.app/api/public/artworks` |
+| Controlled-beta entry | [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md) |
+| Controlled-beta issue form | `https://github.com/maysonkiller/ArtSoul-Protocol/issues/new?template=controlled-beta-bug.yml` |
 | Project X account | `https://x.com/ArtSoulProtocol` |
 | Community | `https://t.me/ArtSoulCommunity` |
 
@@ -78,7 +80,7 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 
 ## 5. Immediate Priority Queue
 
-`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. Mobile-wallet acceptance, production overlay removal, and cross-platform CI are recorded there as completed and must not remain in the active queue.
+`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. A2-A6, A9, A11, and A12 are accepted. A12 production evidence, including the module-entry correction discovered during acceptance, is in `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
 
 ### 1. Finish security and migration operational acceptance
 
@@ -112,7 +114,7 @@ Do not alter auction confirmation semantics while fixing observability.
 - Add a Report action on each artwork.
 - Implement complaint submission and notice-and-takedown review state.
 - Add a review queue and audit trail.
-- Preserve the existing three-factor moderator access and multisig requirement for irreversible actions.
+- Use server-confirmed staff roles plus the approved 15-minute passkey step-up; X and Discord handles are not authentication factors. Preserve the multisig requirement for irreversible actions.
 - Do not build Content-ID or audio fingerprinting; v1.2 canon explicitly removed that requirement.
 
 ### 6. Confirm infrastructure cost and health
@@ -123,12 +125,14 @@ Do not alter auction confirmation semantics while fixing observability.
 - A-15 is production-verified at merge commit `32b2d49`: `failed_events` is retired, `event_processing_registry` is the fail-closed source of truth, health is healthy, and both failed/dead counts are zero in `/health` and authenticated Prometheus output.
 - A-40 and A-41 are production-verified at merge commits `711027b` and `c1decb2`: the dormant alert path is removed, health metrics use real rolling RPC observations, and the event heartbeat is cancellable.
 - A-42 is production-verified at merge commit `1c37061`: `METRICS_AUTH` is explicit and undisclosed, `/metrics` returns 401 without it and 200 with it, port 3001 is loopback-only, the monitor is green, and PM2 was saved only after acceptance passed.
-- A9 remains open for seven consecutive days of Alchemy/Supabase cost evidence. A-43 remains a separate planned reliability item.
+- A9 was accepted on 2026-07-28 after the 2026-07-22 through 2026-07-28 Alchemy/Supabase observation window. Alchemy forecast 22.9M of the 30M hard limit; ArtSoul-only Supabase uncached egress stayed at 41.0–59.4 MB/day, current-cycle uncached/cached totals were 0.246/0.764 GB, and Spend Cap remained enabled. Continue the Tuesday/Friday checks in `runbooks/A9_INFRA_COST_MONITORING.md`; A-43 is already separately accepted.
 
 ### 7. Complete the Base commitments and beta-entry evidence
 
-- Implement the first-screen value proposition, compact three-step explanation, cached public metrics, and stale-copy cleanup from backlog A-24 through A-28.
-- Publish the controlled-beta checklist from A-23.
+- A11, A12, and backlog A-24 through A-28 were accepted on production on 2026-07-28 through PRs #160, #162, and #163. Migration 015, the cached aggregate, public API, responsive homepage, active-network copy, canonical Genesis trust copy, React entry scheduling, Hetzner health, advancing cursor, and saved PM2 state passed. See `runbooks/A11_PUBLIC_METRICS_ROLLOUT.md` and `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
+- Complete the evidence gates in
+  [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md); the
+  entry pack is prepared but remains NO-GO while Phase A blockers are open.
 - Invite trusted testers only after the remaining Phase A acceptance criteria pass. Track feedback in GitHub Issues rather than chat-only queues.
 
 ## 6. Local Development Commands
@@ -171,7 +175,7 @@ node --check wallet-core-connect.js
 node --check contracts-integration.js
 ```
 
-`npm run build` already runs the route verifier. A successful build must report nine HTML routes and no in-browser Babel.
+`npm run build` already runs the route verifier. A successful build must report ten HTML routes and no in-browser Babel or async module-entry mount races.
 
 ## 7. Vercel Deployment
 

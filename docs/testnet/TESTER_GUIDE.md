@@ -1,6 +1,10 @@
 # ArtSoul Testnet Tester Guide
 
-Last updated: 2026-05-31
+Last updated: 2026-07-28
+
+Use this guide only during an operator-approved controlled-beta window. The
+entry gates, support path, severity definitions, and current go/no-go status
+live in [`CONTROLLED_BETA_ENTRY.md`](CONTROLLED_BETA_ENTRY.md).
 
 ## Before You Start
 
@@ -13,12 +17,14 @@ Recommended wallets:
 - MetaMask Mobile
 - WalletConnect-compatible wallet
 
-Supported test networks:
+Active test network:
 
 - Base Sepolia
-- Ethereum Sepolia
 
-You will need testnet ETH on the network you are testing.
+Historical Ethereum Sepolia artwork may remain readable, but it is not an
+active write or selectable product network. Base mainnet and Ethereum mainnet
+may appear in wallet negotiation for compatibility; they are not active product
+networks. You will need Base Sepolia test ETH.
 
 ## What You Are Testing
 
@@ -43,34 +49,44 @@ Discovery signals such as Like, Would Buy, and Watching affect discovery only. T
 3. Click `Connect Wallet`.
 4. Approve the wallet connection.
 5. Confirm the site shows your connected wallet/profile state.
+6. When a protected action asks you to sign in, approve the wallet signature.
 
 Expected result:
 
 - The wallet button changes from guest state to connected state.
 - You can open the dropdown.
 - Disconnect remains visible in the dropdown.
+- A protected action is unavailable until the wallet signature succeeds.
 
-## Switch Networks
+## Network behavior
 
-Use the site network switcher when possible.
+Connecting a wallet is not itself a protocol write. The site may allow a wallet
+on another EVM network to connect for browsing. Every protocol write must still
+require Base Sepolia.
 
-Test both:
+Test:
 
-- Base Sepolia
-- Ethereum Sepolia
+- connect while the wallet is already on Base Sepolia;
+- connect while the wallet is on another EVM network, then attempt a write;
+- approve a Base Sepolia switch when the wallet supports it;
+- reject the switch and confirm no write is submitted;
+- open a historical Ethereum Sepolia artwork and confirm it is read-only.
 
 Expected result:
 
-- Wallet asks for approval if needed.
-- Missing chain is added if the wallet supports it.
-- Site updates after provider-confirmed chain change.
-- Network modal should not remain stuck.
+- Browsing does not silently submit a transaction.
+- The write path asks for Base Sepolia when needed.
+- Missing Base Sepolia configuration is added only with wallet approval when
+  the wallet supports that method.
+- The UI updates only after the provider confirms the chain.
+- Rejecting or failing the switch leaves the page usable and submits no write.
+- A network prompt does not remain stuck.
 
 If the wallet refuses the switch, record:
 
 - Wallet app
 - Browser/device
-- Network you tried to switch to
+- Network active before the attempted write
 - Console error if available
 
 ## Publish Artwork
@@ -153,13 +169,11 @@ Expected result:
 - Resale purchase transfers ownership.
 - Royalty and platform fee events are emitted.
 
-## Important Default Auction Warning
+## Assigned test records
 
-Do not settle Base Sepolia `auctionId=2`.
-
-That auction is reserved for the settlement-default test path. It must remain unsettled after it ends so operators can test `SettlementDefaulted`.
-
-If you accidentally interact with that auction, report it immediately with the transaction hash.
+Use only the artwork and auction IDs assigned by the operator for the current
+window. Do not rely on historical instructions that reserve a hard-coded
+auction ID; those records can change between test windows.
 
 ## Discovery Signals
 
@@ -181,16 +195,18 @@ Expected result:
 - Do not use mainnet assets.
 - Do not share seed phrases or private keys.
 - Do not self-bid.
-- Do not try to settle the default test auction.
+- Do not interact with an unassigned auction.
 - Do not spam transactions.
 - Do not assume testnet NFT ownership has mainnet value.
 - Do not treat testnet activity as final Genesis eligibility.
 
 ## Reporting Bugs
 
-Use the bug report template in:
-
-`docs/testnet/BUG_REPORT_TEMPLATE.md`
+Open a
+[controlled-beta bug report](https://github.com/maysonkiller/ArtSoul-Protocol/issues/new?template=controlled-beta-bug.yml).
+If GitHub is unavailable, use
+[`BUG_REPORT_TEMPLATE.md`](BUG_REPORT_TEMPLATE.md) and send the completed copy
+through the invitation channel.
 
 Include:
 
@@ -205,3 +221,7 @@ Include:
 - Screenshot/video
 - Transaction hash if any
 - Console error if any
+
+Security, privacy, copyright, and suspected credential exposure must not be
+reported in a public issue. Stop the affected flow and use the private
+invitation channel.
