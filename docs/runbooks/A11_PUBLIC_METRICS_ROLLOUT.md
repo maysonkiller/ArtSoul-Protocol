@@ -213,6 +213,10 @@ collectors, and volume.
 - The production browser also reported the existing Tailwind CDN and unused
   Reown font-preload warnings. They do not invalidate A11 and are retained in
   backlog A-38 for a focused dependency/performance pass.
+- The evidence PR CI passed on Windows and Ubuntu. Its only annotation was the
+  existing GitHub Actions Node 20 deprecation warning for
+  `actions/checkout@v4` and `actions/setup-node@v4`; A-38 retains that upgrade
+  task.
 
 ### Hetzner indexer
 
