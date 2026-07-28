@@ -167,6 +167,75 @@ values render without horizontal overflow. Only then run:
 pm2 save
 ```
 
+## Production acceptance evidence — 2026-07-28
+
+A11 was accepted against the production Base Sepolia stack after PR #160 merged
+as commit `8f7a9d232d86a4f5d50f595aecba88e684f5d6c3`.
+
+### Repository, backup, and migration
+
+- The post-merge GitHub Actions run `30383058540` passed.
+- Supabase physical backup `2026-07-28T02:49:50.202Z` was `COMPLETED`
+  before the production change.
+- The exact merged
+  `src/indexer/migrations/015_public_metrics_projection.sql` file was applied
+  with SHA-256
+  `fc5f2157bce250679ea5bf69213a6e7caa110326e05406bd56a7359b0730c5a8`.
+- Production does not currently contain
+  `public.artsoul_schema_migrations`. No partial or invented migration-ledger
+  entry was created; full baseline reconciliation remains a separate migration
+  operations task.
+- RLS and FORCE RLS were enabled on all three migration-015 tables.
+
+The installed aggregate row for chain `84532` contained:
+
+| Metric | Accepted value |
+| --- | ---: |
+| Artists onboarded | 3 |
+| Auctions completed | 13 |
+| Unique collectors | 3 |
+| Settled volume | 13,100,000,000,000,000 wei |
+| Last updated block | 44,387,549 |
+
+The operator-only source cross-check returned `true` for artists, auctions,
+collectors, and volume.
+
+### Public API and homepage
+
+- Vercel production deployment `5644476281` completed successfully.
+- `/api/public/artworks?limit=1` returned chain `84532`, 3 artists, 13
+  completed auctions, 3 unique collectors, `0.0131 ETH` settled volume, block
+  `44387549`, and no projection warning.
+- The production homepage rendered the same values with no console error.
+- At `1280x900`, the metrics rendered in four columns and the steps in three
+  columns. At `390x844`, metrics rendered as a `2x2` grid and steps as one
+  column. Neither viewport had horizontal overflow.
+- The production browser also reported the existing Tailwind CDN and unused
+  Reown font-preload warnings. They do not invalidate A11 and are retained in
+  backlog A-38 for a focused dependency/performance pass.
+- The evidence PR CI passed on Windows and Ubuntu. Its only annotation was the
+  existing GitHub Actions Node 20 deprecation warning for
+  `actions/checkout@v4` and `actions/setup-node@v4`; A-38 retains that upgrade
+  task.
+
+### Hetzner indexer
+
+- `/opt/artsoul` fast-forwarded to the accepted merge commit.
+- `npm ci` completed and `npm run build` verified 10 HTML routes.
+- `artsoul-base-sepolia` restarted online while `artsoul-eth-sepolia` remained
+  stopped.
+- `monitor:indexer` returned `ok=true`; `/health` reported chain `84532`,
+  confirmation depth `3`, zero unresolved failures, and zero failed/dead event
+  records.
+- The indexed cursor advanced from block `44746178` to `44746185` during the
+  acceptance interval.
+- Recent logs contained no `record_v41_public_metric_event` or migration error.
+- The public API returned the accepted aggregate, and the PM2 process list was
+  saved only after every check passed.
+
+This evidence closes canonical A11 and durable backlog A-24 through A-27. It
+does not close A10 controlled-beta entry or A12 stale network copy.
+
 ## Rollback
 
 If the database acceptance fails, do not restart the updated indexer. Preserve
