@@ -1,10 +1,10 @@
 # ArtSoul Wallet QA Checklist
 
-Last updated: 2026-05-31
+Last updated: 2026-07-28
 
 ## Purpose
 
-This checklist verifies wallet/runtime readiness before public testnet expansion. Run it on Base Sepolia and Ethereum Sepolia where applicable.
+This checklist verifies wallet/runtime readiness before public testnet expansion. Base Sepolia is the only active product testnet. Historical Ethereum Sepolia artwork is covered only by the read-only compatibility check.
 
 Do not use real funds. Use testnet-only wallets and testnet ETH.
 
@@ -18,7 +18,6 @@ Do not use real funds. Use testnet-only wallets and testnet ETH.
 - [ ] Reconnect after disconnect.
 - [ ] Refresh with wallet connected.
 - [ ] Switch to Base Sepolia from site.
-- [ ] Switch to Ethereum Sepolia from site.
 - [ ] Wrong-network flow shows a clear recovery path.
 - [ ] Account change updates UI state.
 - [ ] Chain change updates UI state.
@@ -32,7 +31,6 @@ Do not use real funds. Use testnet-only wallets and testnet ETH.
 - [ ] Reconnect after disconnect.
 - [ ] Refresh with wallet connected.
 - [ ] Switch to Base Sepolia from site.
-- [ ] Switch to Ethereum Sepolia from site.
 - [ ] Wrong-network flow shows a clear recovery path.
 - [ ] Account change updates UI state.
 - [ ] Chain change updates UI state.
@@ -47,7 +45,6 @@ Do not use real funds. Use testnet-only wallets and testnet ETH.
 - [ ] Reconnect after app switch.
 - [ ] Refresh with wallet connected.
 - [ ] Switch to Base Sepolia from site.
-- [ ] Switch to Ethereum Sepolia from site.
 - [ ] Wallet app receives network approval prompt.
 - [ ] Returning from wallet app restores page state.
 - [ ] No stuck AppKit/network modal.
@@ -60,7 +57,6 @@ Do not use real funds. Use testnet-only wallets and testnet ETH.
 - [ ] Disconnect from wallet clears site state.
 - [ ] Reconnect after page refresh.
 - [ ] Switch to Base Sepolia from site.
-- [ ] Switch to Ethereum Sepolia from site.
 - [ ] Wrong-network flow does not loop.
 - [ ] Modal closes after provider-confirmed chain change.
 - [ ] Returning from wallet app does not leave stale overlay.
@@ -115,7 +111,6 @@ Do not use real funds. Use testnet-only wallets and testnet ETH.
 ### Network Switching
 
 - [ ] Site-driven switch to Base Sepolia works.
-- [ ] Site-driven switch to Ethereum Sepolia works.
 - [ ] Missing chain add flow works where wallet supports it.
 - [ ] User rejection leaves modal usable.
 - [ ] Wrong-network state does not block guest browsing.
@@ -155,8 +150,6 @@ Run only with test wallets and testnet ETH.
 - [ ] Buy resale from a different wallet.
 - [ ] Confirm ownership transfer.
 
-Do not settle Base Sepolia `auctionId=2`; it is reserved for default-path testing.
-
 ## Failure Evidence To Capture
 
 For every failure, capture:
@@ -188,5 +181,4 @@ Wallet QA can pass for limited public testnet when:
 - Mobile wallet app switching can delay provider events.
 - In-app browsers may block injected providers or deep links.
 - Supabase social signal persistence may fall back until GRANT/RLS policies are finalized.
-- Ethereum Sepolia has not yet completed settlement/default/resale parity.
-- Base default path is still pending timer completion.
+- Historical Ethereum Sepolia artwork must remain readable while all write actions stay disabled.

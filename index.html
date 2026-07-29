@@ -222,9 +222,9 @@
             }
         }
     </style>
-    <script src="avatar-dropdown.js?v=38"></script>
+    <script src="avatar-dropdown.js?v=39"></script>
     <script src="contracts-config.js?v=1"></script>
-    <script type="module" src="contracts-integration.js?v=6"></script>
+    <script type="module" src="contracts-integration.js?v=7"></script>
     <script type="module" src="appkit-init.js?v=46"></script>
     <link rel="stylesheet" href="mobile-no-motion.css?v=2">
 </head>
@@ -267,7 +267,7 @@
                 Discovery-First Auctions<br class="home-hero-break"/>for Digital Art
             </h1>
             <p class="text-base md:text-xl font-light opacity-90 mb-5 max-w-2xl mx-auto">
-                Publish artwork, build collector demand, and mint only after settlement.
+                Collector demand comes before minting. Publish artwork, build conviction through an auction, and mint only after settlement.
             </p>
             <div class="home-hero-actions flex flex-wrap gap-4 justify-center">
                 <a href="gallery.html" class="btn-main text-lg px-7 py-3">
@@ -278,6 +278,31 @@
                 </a>
             </div>
         </div>
+
+        <section id="homepageMetrics" class="home-metrics-section" aria-labelledby="homepageMetricsTitle" aria-live="polite" data-metrics-state="loading">
+            <div class="home-section-heading home-metrics-heading">
+                <p class="home-section-kicker">Live Base Sepolia proof</p>
+                <h2 id="homepageMetricsTitle">Protocol activity</h2>
+            </div>
+            <dl class="home-metrics-grid">
+                <div><dt>Artists onboarded</dt><dd data-public-metric="artists_onboarded">—</dd></div>
+                <div><dt>Auctions completed</dt><dd data-public-metric="auctions_completed">—</dd></div>
+                <div><dt>Unique collectors</dt><dd data-public-metric="unique_collectors">—</dd></div>
+                <div><dt>Settled volume</dt><dd data-public-metric="settled_volume_eth">—</dd></div>
+            </dl>
+        </section>
+
+        <section class="home-protocol-section home-how-section" aria-labelledby="howItWorksTitle">
+            <div class="home-section-heading">
+                <p class="home-section-kicker">Demand before minting</p>
+                <h2 id="howItWorksTitle">Three steps from art to NFT</h2>
+            </div>
+            <ol class="home-how-strip">
+                <li><span>1</span><strong>Publish</strong><small>Register original artwork without minting an NFT</small></li>
+                <li><span>2</span><strong>Build Collector Demand</strong><small>Auction and discovery signals reveal conviction</small></li>
+                <li><span>3</span><strong>Settle and Mint</strong><small>The NFT exists only after successful settlement</small></li>
+            </ol>
+        </section>
 
         <!-- Discovery Spotlight -->
         <div class="home-spotlight mb-12">
@@ -298,20 +323,6 @@
             </div>
         </div>
 
-        <section class="home-protocol-section" aria-labelledby="howItWorksTitle">
-            <div class="home-section-heading">
-                <p class="home-section-kicker">From artwork to NFT</p>
-                <h2 id="howItWorksTitle">How it works</h2>
-            </div>
-            <ol class="home-how-strip">
-                <li><span>1</span><strong>Publish</strong><small>Upload and register artwork</small></li>
-                <li><span>2</span><strong>AI Value Guidance</strong><small>Gemini guidance only</small></li>
-                <li><span>3</span><strong>Auction</strong><small>Choose 24, 36, or 48 hours</small></li>
-                <li><span>4</span><strong>Discovery and Trust</strong><small>Signals shape visibility only</small></li>
-                <li><span>5</span><strong>Mint After Settlement</strong><small>The NFT exists after payment</small></li>
-            </ol>
-        </section>
-
         <section id="homepageFeaturedSection" class="home-protocol-section" aria-labelledby="homepageFeaturedTitle" hidden>
             <div class="home-section-heading home-section-heading-row">
                 <div>
@@ -331,8 +342,8 @@
             </div>
             <div class="home-highlight-grid">
                 <article>
-                    <h3>Trust and Community Signals</h3>
-                    <p>Likes, Would Buy, Watching, and trust weights guide discovery only.</p>
+                    <h3>Collector-Led Curation</h3>
+                    <p>Collector conviction and discovery signals—not minting volume—determine what surfaces.</p>
                 </article>
                 <article>
                     <h3>Discovery Rank</h3>
@@ -373,12 +384,11 @@
                         <a href="https://github.com/maysonkiller/ArtSoul-Protocol" target="_blank" class="hover:opacity-100">GitHub</a>
                         <a href="mailto:maysonkiller@gmail.com" class="hover:opacity-100">maysonkiller@gmail.com</a>
                     </div>
-                    <!-- Networks -->
+                    <!-- Network -->
                     <div class="footer-column">
-                        <h3>Supported Networks</h3>
-                        <p>Base Sepolia (testnet)</p>
-                        <p>Ethereum Sepolia (testnet)</p>
-                        <p>Future production networks</p>
+                        <h3>Network</h3>
+                        <p>Base Sepolia (active testnet)</p>
+                        <p>Base (production chain)</p>
                     </div>
                 </div>
                 <div class="text-center text-sm pt-4 border-t" style="border-color: currentColor; opacity: 0.5;">
@@ -486,7 +496,7 @@
     </div>
 
     <!-- Theme Functions -->
-    <script type="module" async src="/src/entries/index.js"></script>
+    <script type="module" src="/src/entries/index.js"></script>
 
     <!-- Theme Validation (Development Mode) -->
     <script>

@@ -3891,6 +3891,7 @@ body.future .site-header {
 }
 
 .home-protocol-section,
+.home-metrics-section,
 .home-protocol-cta {
     width: 100%;
     margin: 0 0 1.5rem;
@@ -3903,6 +3904,53 @@ body.future .site-header {
 
 .home-protocol-section[hidden] {
     display: none !important;
+}
+
+.home-metrics-section {
+    display: grid;
+    grid-template-columns: minmax(150px, 0.8fr) minmax(0, 2.2fr);
+    align-items: center;
+    gap: 1rem;
+}
+
+.home-metrics-heading {
+    margin-bottom: 0;
+}
+
+.home-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.55rem;
+    margin: 0;
+}
+
+.home-metrics-grid > div {
+    min-width: 0;
+    padding: 0.7rem;
+    background: var(--c-surface-muted);
+    border: 1px solid var(--c-border-soft);
+    border-radius: 0.75rem;
+}
+
+.home-metrics-grid dt {
+    color: var(--c-text-muted);
+    font-size: 0.66rem;
+    line-height: 1.25;
+}
+
+.home-metrics-grid dd {
+    margin: 0.25rem 0 0;
+    overflow: hidden;
+    color: var(--c-accent);
+    font-size: clamp(0.9rem, 1.8vw, 1.2rem);
+    font-weight: 750;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-metrics-section[data-metrics-state="unavailable"] .home-metrics-grid dd {
+    color: var(--c-text-muted);
 }
 
 .home-section-heading {
@@ -3965,7 +4013,7 @@ body.future .site-header {
 
 .home-how-strip {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.55rem;
     margin: 0;
     padding: 0;
@@ -4054,12 +4102,17 @@ body.future .site-header {
 }
 
 .future .home-protocol-section,
+.future .home-metrics-section,
 .future .home-protocol-cta {
     box-shadow: 0 0 18px var(--c-glow);
 }
 
 @media (max-width: 900px) {
-    .home-how-strip {
+    .home-metrics-section {
+        grid-template-columns: 1fr;
+    }
+
+    .home-metrics-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -4070,6 +4123,7 @@ body.future .site-header {
 
 @media (max-width: 640px) {
     .home-protocol-section,
+    .home-metrics-section,
     .home-protocol-cta {
         margin-bottom: 1rem;
         padding: 0.8rem;
@@ -4825,6 +4879,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 #homeSection .home-spotlight,
 #homeSection .gallery,
 #homeSection .home-protocol-section,
+#homeSection .home-metrics-section,
 #homeSection .home-protocol-cta,
 #homeSection .home-featured-row {
     box-sizing: border-box;
@@ -4869,6 +4924,7 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 
 #homeSection .home-spotlight,
 #homeSection .home-protocol-section,
+#homeSection .home-metrics-section,
 #homeSection .home-protocol-cta {
     position: relative;
     clear: both;

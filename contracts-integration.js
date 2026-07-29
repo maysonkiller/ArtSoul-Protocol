@@ -206,7 +206,7 @@ class ArtSoulContracts {
             } else if (chainId === CONTRACTS.sepolia.chainId) {
                 networkKey = 'sepolia';
             } else {
-                throw new Error(`Unsupported network. Please switch to Base Sepolia (${CONTRACTS.baseSepolia.chainId}) or Ethereum Sepolia (${CONTRACTS.sepolia.chainId})`);
+                throw new Error(`Unsupported network. Please switch to Base Sepolia (${CONTRACTS.baseSepolia.chainId})`);
             }
 
             this.currentNetwork = networkKey;
