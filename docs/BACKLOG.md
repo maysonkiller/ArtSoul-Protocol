@@ -1,6 +1,6 @@
 # ArtSoul Durable Backlog
 
-Updated: 2026-07-20
+Updated: 2026-07-29
 Canonical phase model: `A-D` from [`docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`](canon/ARTSOUL_CANON_BIBLE_FULL.md) section 17.
 
 This is the repository's durable work register. It consolidates verified completed work, open implementation work, founder-owned inputs, and code-level follow-ups so that ideas do not remain authoritative only in chat sessions or external prompt files.
@@ -122,6 +122,7 @@ This consolidation audited the repository through `main` commit `ab0b1d7`, [`PRO
 | C-23 | Complete legal, privacy, IP and operational readiness | Canon [C14](canon/12_IMPLEMENTATION_BACKLOG.md) | blocked-on-founder | C | Counsel/founder-owned inputs; engineering may implement approved technical requirements only after decisions exist. |
 | C-24 | Perform the final premium visual/accessibility pass | Canon [C15](canon/12_IMPLEMENTATION_BACKLOG.md) | planned | C | Homepage, cards, artwork, aura, responsive and accessibility polish occurs after functionality is stable. |
 | C-25 | Approve a funded mainnet launch and operating envelope | Canon [C14/D3](canon/12_IMPLEMENTATION_BACKLOG.md); [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md) | blocked-on-founder | C | Before launch approval, current quotes and committed funds must cover independent review, domain/email, Safes/signers, rehearsal and mainnet gas, monitoring, backups, incident response, legal readiness, renewals, and a defined operating runway. Applications or expected grants are not committed funds. |
+| C-26 | Build `Support the artist` as an event-only creator-donation path | Founder decision recorded in [`SUPPORT_THE_ARTIST_DESIGN.md`](canon/SUPPORT_THE_ARTIST_DESIGN.md); Canon Bible [sections 6, 11, 14 and 17](canon/ARTSOUL_CANON_BIBLE_FULL.md); Canon [C1, C7, C8, C11-C13](canon/12_IMPLEMENTATION_BACKLOG.md) | planned | C | Documentation only during Phase A. In Phase C, add a minimal audited contract that verifies the artwork's canonical creator, forwards 100% immediately with no custody or protocol fee, emits the donation/message/anonymity event, and stores no history. Index it through the bounded event filter and cached projection path. A non-empty message requires the configurable `0.0005 ETH` initial threshold, reconfirmed at deployment with no oracle; messages are plain text, limited to 140 user-visible characters, never linkified, and may be hidden on-site through complaint-driven moderation while remaining public on-chain. Donations never affect Trust, discovery, floor, price, ownership, settlement, royalties, treasury accounting, or any protocol outcome. No Phase B version. Before implementation, create the dated canon consolidation for Trust/discovery neutrality, message moderation, treasury bypass, and the additional contract in the Phase C topology. |
 
 ## Phase D - Staged Mainnet Launch
 
