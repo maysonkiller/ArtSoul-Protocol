@@ -32,7 +32,7 @@ A compact `Support the artist` button opens a modal containing:
 - a wallet confirmation step;
 - a clear notice that support is voluntary, irreversible, non-refundable, and provides no protocol benefit.
 
-The anonymous notice must also state that the donor address remains publicly visible on-chain. Anonymity changes only the ArtSoul display label.
+The anonymous notice must also state that the donor address remains publicly visible on-chain. The `anonymous` flag applies exclusively to the donor's public label inside ArtSoul: ArtSoul donation views must not expose that donor's profile name or address, while the artwork identity, creator identity, and verified recipient remain unchanged and explicit.
 
 Under the button, the artwork page shows one compact line for the largest successful donation:
 
