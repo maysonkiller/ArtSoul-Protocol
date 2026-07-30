@@ -531,7 +531,59 @@ test('a second tap after a cancelled attempt joins the live pairing instead of p
     assert.equal(api.isCoreTopicTombstoned(TOPIC_B), false);
 });
 
-// 11. Stale-topic "No matching key".
+// 11. MetaMask Mobile can emit an event for the NEW session topic before the
+// SignClient store commits it. The SDK surfaces "No matching key" during that
+// short window; the topic must survive until the authoritative settle.
+test('an early missing-key rejection cannot tombstone the session currently being settled', async () => {
+    const { api, provider, logs, dispatchUnhandledRejection } = loadCoreWallet();
+    const connectPromise = api.connectCoreWallet();
+    await flush();
+    provider.__emitDisplayUri('wc:pairing-a');
+    await flush();
+
+    const prevented = dispatchUnhandledRejection(
+        new Error(`No matching key. session topic doesn't exist: ${TOPIC_A}`)
+    );
+    assert.equal(prevented, true);
+    assert.equal(
+        api.isCoreTopicTombstoned(TOPIC_A),
+        false,
+        'a topic observed during the live SDK task is undecided until settle'
+    );
+
+    provider.__settle(buildSession({ topic: TOPIC_A }));
+    provider.__resolveConnect();
+    const connected = await connectPromise;
+
+    assert.equal(connected.address, ADDRESS);
+    assert.equal(api.isCoreSessionActive(), true);
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_A), false);
+    assert.ok(logs.some((entry) => entry.step === 'early WalletConnect session topic deferred until settle'));
+    assert.ok(logs.some((entry) => entry.step === 'deferred WalletConnect topic confirmed by settled session'));
+});
+
+test('a genuinely stale topic observed during pairing is tombstoned after a different session settles', async () => {
+    const { api, provider, dispatchUnhandledRejection } = loadCoreWallet();
+    const connectPromise = api.connectCoreWallet();
+    await flush();
+    provider.__emitDisplayUri('wc:pairing-a');
+    await flush();
+
+    dispatchUnhandledRejection(
+        new Error(`No matching key. session topic doesn't exist: ${TOPIC_B}`)
+    );
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_B), false);
+
+    provider.__settle(buildSession({ topic: TOPIC_A }));
+    provider.__resolveConnect();
+    await connectPromise;
+
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_B), true);
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_A), false);
+    assert.equal(api.isCoreSessionActive(), true);
+});
+
+// 12. Stale-topic "No matching key" outside pairing.
 test('a stale-topic SDK rejection is neutralized and can never destroy a live session', async () => {
     const { api, provider, dispatchUnhandledRejection } = loadCoreWallet();
     const connectPromise = api.connectCoreWallet();

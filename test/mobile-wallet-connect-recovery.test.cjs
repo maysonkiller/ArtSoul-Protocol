@@ -22,11 +22,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=47/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=48/, `${page} must load the standard wallet flow`);
     }
     assert.match(appKit, /wallet-core-connect\.js\?v=17/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=17/);
-    assert.match(walletTest, /appkit-init\.js\?v=47/);
+    assert.match(walletTest, /appkit-init\.js\?v=48/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
