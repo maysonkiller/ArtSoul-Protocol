@@ -19,6 +19,71 @@ function loadCoreRestoreHarness() {
     )({ addEventListener() {}, location: { origin: 'https://artsoul.vercel.app' } });
 }
 
+function loadSwitchProviderHarness({
+    initialCoreProvider = null,
+    connectedCoreProvider = initialCoreProvider,
+    mobile = true,
+    injected = false,
+    connectedAddress = '0x6ec800000000000000000000000000000000989b',
+    appKitProvider = null,
+    injectedProvider = null
+} = {}) {
+    const source = appKit.match(
+        /async function getSwitchProvider[\s\S]*?\r?\n\}\r?\n\r?\nfunction markNetworkModalIntent/
+    )?.[0]?.replace(/\r?\n\r?\nfunction markNetworkModalIntent$/, '') || '';
+    assert.ok(source, 'getSwitchProvider must be extractable');
+    let coreProvider = initialCoreProvider;
+    let connectCalls = 0;
+    let appKitCalls = 0;
+    const window = {
+        ethereum: injectedProvider,
+        safeConnectWallet: async () => {
+            connectCalls += 1;
+            coreProvider = connectedCoreProvider;
+            return connectedAddress;
+        }
+    };
+    const getSwitchProvider = new Function(
+        'getConnectedCoreProvider',
+        'isMobileDevice',
+        'isInjectedWalletBrowser',
+        'getAppKitWalletProvider',
+        'window',
+        `${source}; return getSwitchProvider;`
+    )(
+        () => coreProvider,
+        () => mobile,
+        () => injected,
+        async () => {
+            appKitCalls += 1;
+            return appKitProvider;
+        },
+        window
+    );
+    return {
+        getSwitchProvider,
+        get connectCalls() { return connectCalls; },
+        get appKitCalls() { return appKitCalls; }
+    };
+}
+
+function loadNetworkSwitchFailureFormatter() {
+    const source = appKit.match(
+        /function describeNetworkSwitchFailure[\s\S]*?\r?\n\}\r?\n\r?\nasync function getAppKitWalletProvider/
+    )?.[0]?.replace(/\r?\n\r?\nasync function getAppKitWalletProvider$/, '') || '';
+    assert.ok(source, 'describeNetworkSwitchFailure must be extractable');
+    return new Function(
+        'isUserRejectedError',
+        'isPendingRequestError',
+        'getWalletErrorCode',
+        `${source}; return describeNetworkSwitchFailure;`
+    )(
+        (error) => error?.code === 4001,
+        (error) => error?.code === -32002,
+        (error) => error?.code ?? null
+    );
+}
+
 test('core session restore distinguishes "no session" from a restore error', () => {
     assert.match(coreWallet, /export async function restoreCoreSessionOutcome/);
     assert.match(coreWallet, /export async function waitForCoreSessionSnapshot/);
@@ -45,10 +110,61 @@ test('external mobile runs one WalletConnect client and exposes only a compatibi
     assert.match(runtimeSelection, /modal = createAppKit\(config\)/);
 
     const facade = appKit.match(/function createExternalMobileCoreFacade\(\) \{[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(facade, /getConnectedCoreProvider\(\) \|\| getCoreProviderInstance\(\)/);
+    assert.match(facade, /getWalletProvider: async \(\) => getConnectedCoreProvider\(\)/);
+    assert.doesNotMatch(facade, /getConnectedCoreProvider\(\) \|\| getCoreProviderInstance\(\)/);
     assert.match(facade, /getAccount: readAccount/);
     assert.match(facade, /open: async \(\) => window\.safeConnectWallet/);
     assert.match(facade, /disconnect: async \(\) => false/);
+});
+
+test('external-mobile network switching never uses a disconnected WalletConnect provider', async () => {
+    const staleProvider = {
+        request() {
+            throw new Error('Please call connect() before request()');
+        }
+    };
+    const liveProvider = { request: async () => '0x14a34' };
+    const harness = loadSwitchProviderHarness({
+        initialCoreProvider: null,
+        connectedCoreProvider: liveProvider,
+        appKitProvider: staleProvider
+    });
+
+    const provider = await harness.getSwitchProvider({ connectIfMissing: true });
+    assert.equal(provider, liveProvider);
+    assert.equal(harness.connectCalls, 1, 'the missing session is reconnected once');
+    assert.equal(harness.appKitCalls, 0, 'the disconnected compatibility provider is never selected');
+});
+
+test('external-mobile network switching fails closed when reconnect is not authorized', async () => {
+    const harness = loadSwitchProviderHarness({
+        initialCoreProvider: null,
+        connectedCoreProvider: null,
+        appKitProvider: { request: async () => 'stale' }
+    });
+
+    assert.equal(await harness.getSwitchProvider(), null);
+    assert.equal(harness.connectCalls, 0);
+    assert.equal(harness.appKitCalls, 0);
+});
+
+test('network switch errors never expose SDK call-order internals in the UI', () => {
+    const describeNetworkSwitchFailure = loadNetworkSwitchFailureFormatter();
+    const message = describeNetworkSwitchFailure(
+        new Error('Please call connect() before request()'),
+        { chainName: 'Base Sepolia' }
+    );
+
+    assert.equal(
+        message,
+        'Your wallet session expired. Reconnect the wallet, then select Base Sepolia again.'
+    );
+    assert.doesNotMatch(message, /connect\(\)|request\(\)/);
+
+    const selector = appKit.match(/window\.switchArtSoulNetwork = async[\s\S]*?\n\};/)?.[0] || '';
+    assert.match(selector, /getSwitchProvider\(\{ connectIfMissing: true \}\)/);
+    assert.match(selector, /alert\(describeNetworkSwitchFailure\(error, target\)\)/);
+    assert.doesNotMatch(selector, /Failed to switch network: \$\{error/);
 });
 
 test('restore race: no page-load timer decides "disconnected" before the core restore settles', () => {
@@ -205,7 +321,7 @@ test('stale or expired core sessions are rejected and only dead local state is d
     assert.equal(getCoreSessionLiveness(expiredProvider).reason, 'session-expired');
 });
 
-test('restored core session accepts only an explicit switch proof outside its namespaces', () => {
+test('restored core session never presents an SDK-local chain the wallet did not approve', () => {
     const { resolveCoreSessionChainId } = loadCoreRestoreHarness();
     const provider = {
         chainId: 84532,
@@ -219,12 +335,23 @@ test('restored core session accepts only an explicit switch proof outside its na
         }
     };
 
+    // An explicit, topic-bound switch proof always wins.
     assert.equal(resolveCoreSessionChainId(provider, 8453), 8453);
-    assert.equal(resolveCoreSessionChainId(provider, null), null);
     assert.equal(resolveCoreSessionChainId(provider, 84532), 84532);
+    // Without that proof the SDK-local chainId (84532 here) is NOT approved by
+    // the session and is never presented. The chain of the account this path
+    // reports as connected is session truth and comes from the SAME snapshot as
+    // the address, so a connected wallet is never left without a network.
+    assert.equal(resolveCoreSessionChainId(provider, null), 8453);
     provider.chainId = 8453;
     assert.equal(resolveCoreSessionChainId(provider, null), 8453);
     assert.equal(resolveCoreSessionChainId(provider, 84532), 84532);
+    // With no account at all there is nothing to present.
+    const emptyProvider = {
+        chainId: 84532,
+        session: { namespaces: { eip155: { chains: ['eip155:1', 'eip155:8453'], accounts: [] } } }
+    };
+    assert.equal(resolveCoreSessionChainId(emptyProvider, null), null);
 
     // Production display and write validation may reuse only the topic-bound
     // switch proof. Without it, they never fall through to an SDK-configured
@@ -321,8 +448,10 @@ test('restore is chain-tolerant: a session parked on a foreign chain stays conne
     // address must be read chain-independently from the session namespaces.
     assert.match(coreWallet, /export function getCoreSessionAddress/);
     const helper = coreWallet.match(/export function getCoreSessionAddress[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(helper, /namespaces/);
-    assert.match(helper, /eip155:\\d\+/);
+    assert.match(helper, /readCoreSessionAccounts\(instance\.session\)/);
+    const accountReader = coreWallet.match(/export function readCoreSessionAccounts[\s\S]*?\n\}/)?.[0] || '';
+    assert.match(accountReader, /namespaces/);
+    assert.match(accountReader, /eip155:\(\\d\+\)/);
     // restoreCoreSessionOutcome resolves through the bounded snapshot helper,
     // which reads the address chain-independently from session namespaces.
     const restoreOutcome = coreWallet.match(/export async function restoreCoreSessionOutcome[\s\S]*?\n\}/)?.[0] || '';
@@ -447,6 +576,7 @@ test('session-store diagnostics expose duplicate topics only in masked form', ()
         sessionCount: 2,
         currentTopic: 'current-...7890',
         storedTopics: ['current-...7890', 'stale-se...4321'],
+        tombstonedTopicCount: 0,
         universalProviderNamespaceReady: false
     });
 });
@@ -749,5 +879,46 @@ test('explicit disconnect does not resurrect: cache clear runs before restore st
     // Disconnect settles the UI in place — never via reload/redirect.
     const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
     assert.match(reset, /disconnectCoreWallet\(\)/);
+    assert.match(reset, /await window\.SupabaseAuth\?\.signOut\?\.\(\)/);
+    assert.ok(
+        reset.indexOf('await window.SupabaseAuth?.signOut?.()') < reset.indexOf('disconnectCoreWallet()'),
+        'explicit Disconnect must revoke the SIWE session before the wallet session is removed'
+    );
     assert.doesNotMatch(reset, /location\./);
+});
+
+test('explicit disconnect revokes the SIWE session before wallet teardown', async () => {
+    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    const calls = [];
+    const sessionValues = new Map();
+    const context = {
+        window: {
+            SupabaseAuth: {
+                signOut: async () => calls.push('siwe-sign-out')
+            },
+            web3Modal: null
+        },
+        sessionStorage: {
+            setItem: (key, value) => sessionValues.set(key, value),
+            removeItem: (key) => sessionValues.delete(key)
+        },
+        clearModalIntent() {},
+        CORE_NETWORK_CONFIRMATION_KEY: 'network-confirmation',
+        walletDebugLog() {},
+        disconnectCoreWallet: async () => calls.push('wallet-disconnect'),
+        clearWalletConnectionCache: async () => calls.push('cache-clear'),
+        setMobileCoreRestoreState() {},
+        updateNavButtons() {},
+        updateNetworkBadge() {},
+        dispatchWalletStateChanged() {},
+        safeCloseModal: async () => {},
+        scheduleModalCloseRetries() {},
+        setTimeout,
+        console
+    };
+    vm.runInNewContext(reset, context, { filename: 'appkit-init.resetWalletConnection.js' });
+
+    assert.equal(await context.window.resetWalletConnection(), true);
+    assert.deepEqual(calls, ['siwe-sign-out', 'wallet-disconnect', 'cache-clear']);
+    assert.equal(sessionValues.has('artsoul_disconnecting'), false);
 });
