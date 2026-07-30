@@ -25,7 +25,7 @@ import {
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome,
     setCoreAuthLifecycleState
-} from './wallet-core-connect.js?v=17'
+} from './wallet-core-connect.js?v=18'
 
 // ============================================
 // CONFIGURATION

@@ -831,6 +831,56 @@ test('explicit Disconnect leaves zero ArtSoul sessions in the dedicated store', 
     assert.equal(api.getAcceptedCoreTopic(), null);
 });
 
+test('explicit Disconnect physically removes a tombstoned topic hidden from liveness reads', async () => {
+    const provider = createFakeProvider();
+    const { api, dispatchUnhandledRejection } = loadCoreWallet({ provider });
+    await bootProvider(api);
+
+    dispatchUnhandledRejection(
+        new Error(`No matching key. session topic doesn't exist: ${TOPIC_A}`)
+    );
+    provider.__storeSession(buildSession({ topic: TOPIC_A }));
+    assert.equal(api.isCoreTopicTombstoned(TOPIC_A), true);
+    assert.deepEqual(api.getCoreStoredSessionTopics(provider), []);
+    assert.deepEqual(provider.__storedTopics(), [TOPIC_A], 'the raw store still owns the topic');
+
+    const outcome = await api.disconnectCoreWalletOutcome();
+    assert.equal(outcome.hadSession, true);
+    assert.equal(outcome.disconnected, true);
+    assert.equal(outcome.remainingSessionCount, 0);
+    assert.deepEqual(outcome.topics, [TOPIC_A]);
+    assert.deepEqual(provider.clientDisconnectCalls, [TOPIC_A]);
+    assert.deepEqual(provider.__storedTopics(), []);
+});
+
+test('explicit Connect removes a tombstoned orphan before publishing a fresh proposal', async () => {
+    const provider = createFakeProvider();
+    const { api, dispatchUnhandledRejection } = loadCoreWallet({ provider });
+    await bootProvider(api);
+    dispatchUnhandledRejection(
+        new Error(`No matching key. session topic doesn't exist: ${TOPIC_A}`)
+    );
+    provider.__storeSession(buildSession({ topic: TOPIC_A }));
+
+    const connectPromise = api.connectCoreWallet();
+    await flush();
+
+    assert.deepEqual(provider.clientDisconnectCalls, [TOPIC_A]);
+    assert.deepEqual(provider.__storedTopics(), []);
+    assert.equal(provider.connectCalls, 1, 'the fresh pairing starts only after raw-store cleanup');
+
+    const freshTopic = 'ffffffff00000000ffffffff00000000';
+    provider.__emitDisplayUri('wc:pairing-fresh');
+    await flush();
+    provider.__settle(buildSession({ topic: freshTopic }));
+    provider.__resolveConnect();
+    const connected = await connectPromise;
+
+    assert.equal(connected.address, ADDRESS);
+    assert.deepEqual(provider.__storedTopics(), [freshTopic]);
+    assert.equal(api.getAcceptedCoreTopic(), freshTopic);
+});
+
 test('a reload after Disconnect cannot restore a leftover topic', async () => {
     const provider = createFakeProvider();
     seedTwoStoredSessions(provider, { currentTopic: TOPIC_A });

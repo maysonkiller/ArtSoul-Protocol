@@ -22,11 +22,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
         assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
     }
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=48/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=49/, `${page} must load the standard wallet flow`);
     }
-    assert.match(appKit, /wallet-core-connect\.js\?v=17/);
-    assert.match(walletTest, /wallet-core-connect\.js\?v=17/);
-    assert.match(walletTest, /appkit-init\.js\?v=48/);
+    assert.match(appKit, /wallet-core-connect\.js\?v=18/);
+    assert.match(walletTest, /wallet-core-connect\.js\?v=18/);
+    assert.match(walletTest, /appkit-init\.js\?v=49/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {
@@ -216,13 +216,15 @@ test('single-teardown invariant: session teardown stays on explicit, user-driven
     assert.match(disconnectFn, /await client\.disconnect\(\{\s*\n\s*topic: leftoverTopic,/);
     // Every internal teardown goes through that same single implementation and
     // is user-driven: the late settle after a Disconnect, replacing a live
-    // session that cannot sign, and reconciling a duplicated store on an
-    // explicit Connect. Passive boot never calls it.
+    // session that cannot sign, and reconciling either a duplicated store or
+    // raw tombstoned leftovers on an explicit Connect. Passive boot never
+    // calls it.
     const teardownCallers = coreWallet.match(/disconnectCoreWalletOutcome\(\{/g) || [];
-    assert.equal(teardownCallers.length, 3, 'only the three explicit, user-driven paths call the teardown internally');
+    assert.equal(teardownCallers.length, 4, 'only the four explicit, user-driven paths call the teardown internally');
     assert.match(coreWallet, /late WalletConnect session settled after Disconnect; tearing it down/);
     assert.match(coreWallet, /live WalletConnect session cannot sign; replacing it on user request/);
     assert.match(coreWallet, /duplicate ArtSoul WalletConnect sessions reconciled on Connect/);
+    assert.match(coreWallet, /orphaned ArtSoul WalletConnect sessions reconciled on Connect/);
     // Passive boot restore fails closed instead of deleting anything.
     const restore = coreWallet.match(/export async function restoreCoreSessionOutcome[\s\S]*?\n\}/)?.[0] || '';
     assert.match(restore, /status: 'conflict'/);
