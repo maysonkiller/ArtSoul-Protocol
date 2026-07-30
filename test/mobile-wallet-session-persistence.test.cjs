@@ -763,5 +763,46 @@ test('explicit disconnect does not resurrect: cache clear runs before restore st
     // Disconnect settles the UI in place — never via reload/redirect.
     const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
     assert.match(reset, /disconnectCoreWallet\(\)/);
+    assert.match(reset, /await window\.SupabaseAuth\?\.signOut\?\.\(\)/);
+    assert.ok(
+        reset.indexOf('await window.SupabaseAuth?.signOut?.()') < reset.indexOf('disconnectCoreWallet()'),
+        'explicit Disconnect must revoke the SIWE session before the wallet session is removed'
+    );
     assert.doesNotMatch(reset, /location\./);
+});
+
+test('explicit disconnect revokes the SIWE session before wallet teardown', async () => {
+    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    const calls = [];
+    const sessionValues = new Map();
+    const context = {
+        window: {
+            SupabaseAuth: {
+                signOut: async () => calls.push('siwe-sign-out')
+            },
+            web3Modal: null
+        },
+        sessionStorage: {
+            setItem: (key, value) => sessionValues.set(key, value),
+            removeItem: (key) => sessionValues.delete(key)
+        },
+        clearModalIntent() {},
+        CORE_NETWORK_CONFIRMATION_KEY: 'network-confirmation',
+        walletDebugLog() {},
+        disconnectCoreWallet: async () => calls.push('wallet-disconnect'),
+        clearWalletConnectionCache: async () => calls.push('cache-clear'),
+        setMobileCoreRestoreState() {},
+        updateNavButtons() {},
+        updateNetworkBadge() {},
+        dispatchWalletStateChanged() {},
+        safeCloseModal: async () => {},
+        scheduleModalCloseRetries() {},
+        setTimeout,
+        console
+    };
+    vm.runInNewContext(reset, context, { filename: 'appkit-init.resetWalletConnection.js' });
+
+    assert.equal(await context.window.resetWalletConnection(), true);
+    assert.deepEqual(calls, ['siwe-sign-out', 'wallet-disconnect', 'cache-clear']);
+    assert.equal(sessionValues.has('artsoul_disconnecting'), false);
 });
