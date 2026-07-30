@@ -265,14 +265,19 @@ function clearAcceptedCoreTopic(reason) {
 // store is created and written by this provider alone: AppKit runs its own
 // default namespace and is not even instantiated on the external mobile path,
 // so enumerating this store can never reach an unrelated wallet session.
-export function getCoreStoredSessionTopics(instance = providerInstance) {
+function getAllCoreStoredSessionTopics(instance = providerInstance) {
     const storeState = readCoreSessionStore(instance);
     if (!storeState.available || storeState.readFailed) return [];
     return [...new Set(
         storeState.sessions
             .map((session) => String(session?.topic || ''))
             .filter(Boolean)
-    )].filter((topic) => !isCoreTopicTombstoned(topic));
+    )];
+}
+
+export function getCoreStoredSessionTopics(instance = providerInstance) {
+    return getAllCoreStoredSessionTopics(instance)
+        .filter((topic) => !isCoreTopicTombstoned(topic));
 }
 
 // Two or more live ArtSoul sessions in one dedicated store is a conflict: the
@@ -1316,6 +1321,23 @@ async function runCoreConnectAttempt(attempt) {
         });
     }
 
+    // A tombstoned or otherwise orphaned topic is intentionally invisible to
+    // liveness/conflict reads, but it still occupies the dedicated SignClient
+    // store. An explicit Connect must physically remove every such leftover
+    // before publishing a new proposal, otherwise the next settle creates a
+    // raw two-session store even though only one topic is eligible for UI use.
+    const orphanedTopics = getAllCoreStoredSessionTopics(instance);
+    if (orphanedTopics.length) {
+        coreLog('orphaned ArtSoul WalletConnect sessions reconciled on Connect', {
+            topics: orphanedTopics.map(maskCoreTopic)
+        });
+        await disconnectCoreWalletOutcome({
+            cancelPendingAttempt: false,
+            reason: 'orphaned sessions reconciled on Connect'
+        });
+        throwIfAttemptCancelled(attempt);
+    }
+
     setCoreLifecycleState(CORE_LIFECYCLE.PAIRING, { attemptId: attempt.id });
 
     const modal = getCoreWalletModal();
@@ -1524,7 +1546,9 @@ async function runCoreDisconnect(options = {}) {
     // the next page load (UniversalProvider.createClient() adopts
     // `client.session.getAll()[0]`).
     const providerTopic = String(instance?.session?.topic || '');
-    const topics = [...new Set([providerTopic, ...getCoreStoredSessionTopics(instance)].filter(Boolean))];
+    // Teardown must enumerate the RAW dedicated store. Tombstones prevent a
+    // topic from becoming UI state; they must never exempt it from deletion.
+    const topics = [...new Set([providerTopic, ...getAllCoreStoredSessionTopics(instance)].filter(Boolean))];
     if (!topics.length) {
         clearAcceptedCoreTopic(options.reason || 'no active session');
         setCoreLifecycleState(CORE_LIFECYCLE.DISCONNECTED, { reason: options.reason || 'no active session' });
