@@ -3080,6 +3080,17 @@ window.resetWalletConnection = async () => {
         clearModalIntent();
         sessionStorage.removeItem(CORE_NETWORK_CONFIRMATION_KEY);
 
+        // Explicit Disconnect is also an application logout. The mobile core
+        // path does not receive AppKit's account callback, so relying on that
+        // callback leaves the backend SIWE cookie valid after WalletConnect is
+        // gone. Clear authentication before tearing down the wallet session.
+        try {
+            await window.SupabaseAuth?.signOut?.();
+            walletDebugLog('SIWE session cleared on explicit disconnect', {});
+        } catch (authDisconnectError) {
+            console.warn('Authentication sign-out during disconnect failed:', authDisconnectError);
+        }
+
         try {
             await Promise.race([
                 disconnectCoreWallet(),
