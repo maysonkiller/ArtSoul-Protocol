@@ -488,6 +488,26 @@ function isPendingRequestError(error) {
         message.includes('previous request');
 }
 
+function describeNetworkSwitchFailure(error, target) {
+    if (isUserRejectedError(error)) {
+        return `Network switch was declined. Select ${target.chainName} to continue.`;
+    }
+    if (isPendingRequestError(error)) {
+        return 'A network request is already waiting in your wallet. Open the wallet and approve it.';
+    }
+    const code = String(getWalletErrorCode(error) || error?.code || '');
+    const message = String(error?.message || '').toLowerCase();
+    if (
+        code === 'CORE_SESSION_NOT_LIVE' ||
+        code === 'WALLET_SESSION_REQUIRED' ||
+        message.includes('connect() before request()') ||
+        message.includes('did not establish a live session')
+    ) {
+        return `Your wallet session expired. Reconnect the wallet, then select ${target.chainName} again.`;
+    }
+    return `Could not switch to ${target.chainName}. Reconnect the wallet and try again.`;
+}
+
 async function getAppKitWalletProvider() {
     try {
         const provider = await (modal?.getWalletProvider?.() || window.web3Modal?.getWalletProvider?.());
@@ -1305,7 +1325,23 @@ async function requestInjectedMobileAccounts() {
     }
 }
 
-async function getSwitchProvider() {
+async function getSwitchProvider({ connectIfMissing = false } = {}) {
+    // External mobile browsers have one authoritative WalletConnect client.
+    // Never return its initialized-but-disconnected provider instance: calling
+    // request() on it produces an SDK-internal connection-order error and
+    // cannot switch a wallet network.
+    const coreProvider = getConnectedCoreProvider();
+    if (coreProvider) return coreProvider;
+
+    if (isMobileDevice() && !isInjectedWalletBrowser()) {
+        if (!connectIfMissing) return null;
+        const connectedAddress = await window.safeConnectWallet?.();
+        const connectedCoreProvider = getConnectedCoreProvider();
+        return connectedAddress && connectedCoreProvider
+            ? connectedCoreProvider
+            : null;
+    }
+
     const appKitProvider = await getAppKitWalletProvider();
     return appKitProvider || window.ethereum || null;
 }
@@ -2473,7 +2509,10 @@ function createExternalMobileCoreFacade() {
             };
         },
         getChainId: () => readAccount().chainId,
-        getWalletProvider: async () => getConnectedCoreProvider() || getCoreProviderInstance(),
+        // A provider without a store-confirmed session is not a wallet
+        // provider. Returning the initialized core instance here leaked a
+        // disconnected object into legacy switch/read paths.
+        getWalletProvider: async () => getConnectedCoreProvider(),
         open: async () => window.safeConnectWallet?.(),
         // resetWalletConnection owns the sole core teardown. This method is a
         // compatibility no-op because that reset calls disconnectCoreWallet
@@ -2901,7 +2940,7 @@ window.ensureArtSoulWriteNetwork = async () => {
 
     writeNetworkGuardPromise = (async () => {
         const target = getSupportedNetworkTarget(BASE_SEPOLIA_CHAIN_ID);
-        const provider = await getSwitchProvider();
+        const provider = await getSwitchProvider({ connectIfMissing: true });
         if (!provider?.request || !target) {
             throw createWalletConnectError(
                 'BASE_SEPOLIA_REQUIRED',
@@ -3004,7 +3043,13 @@ window.switchArtSoulNetwork = async (chainId) => {
     activeNetworkSwitchChainId = target.chainId;
 
     try {
-        const provider = await getSwitchProvider();
+        const provider = await getSwitchProvider({ connectIfMissing: true });
+        if (!provider?.request) {
+            throw createWalletConnectError(
+                'WALLET_SESSION_REQUIRED',
+                'A live wallet session is required to switch networks.'
+            );
+        }
         const coreProvider = getConnectedCoreProvider();
         const requiresCoreConfirmation = provider === coreProvider &&
             coreSessionNeedsBaseSepoliaConfirmation(coreProvider);
@@ -3039,7 +3084,7 @@ window.switchArtSoulNetwork = async (chainId) => {
             await switchEthereumChain(provider, target);
         } catch (error) {
             if (isPendingRequestError(error)) {
-                alert('Please approve the pending network request in your wallet.');
+                alert(describeNetworkSwitchFailure(error, target));
                 return false;
             }
             if (!isUnknownChainError(error)) throw error;
@@ -3062,7 +3107,7 @@ window.switchArtSoulNetwork = async (chainId) => {
         return false;
     } catch (error) {
         console.error('Network switch failed:', error);
-        alert(`Failed to switch network: ${error?.message || 'Unknown wallet error'}`);
+        alert(describeNetworkSwitchFailure(error, target));
         return false;
     } finally {
         activeNetworkSwitchChainId = null;
