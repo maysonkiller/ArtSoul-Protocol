@@ -963,7 +963,11 @@ function bindWalletConnectDiagnostics(provider, source = 'WalletConnect provider
             client.on?.(eventName, (event) => {
                 walletDebugLog(`WalletConnect ${eventName}`, {
                     source,
-                    topic: event?.topic || event?.params?.topic || null,
+                    topic: event?.topic ||
+                        event?.session?.topic ||
+                        event?.params?.topic ||
+                        event?.params?.session?.topic ||
+                        null,
                     method: event?.method || event?.params?.request?.method || null,
                     error: event?.error ? describeWalletDebugError(event.error) : null,
                     reason: event?.reason || event?.params?.reason || null

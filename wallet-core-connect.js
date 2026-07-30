@@ -124,6 +124,12 @@ let sdkPairingUri = null;
 const sdkConnectWaiters = new Set();
 let disconnectPromise = null;
 const tombstonedTopics = [];
+// MetaMask Mobile can emit a session_event for the topic it is settling a few
+// seconds BEFORE SignClient persists that session. During the one live SDK
+// connect task, "topic missing from store" is therefore not yet proof that the
+// topic is stale. Defer that decision until connect() has settled, then compare
+// every observed topic with the authoritative provider/session store.
+const deferredMissingTopics = new Set();
 // THE accepted-topic invariant. At most ONE stored topic is ever the current
 // ArtSoul session. It is set only when a session passes the authoritative
 // readiness gate (connect, restore, adoption) and cleared only by teardown.
@@ -801,14 +807,25 @@ function bindStaleTopicRejectionGuard() {
         const stack = String(event?.reason?.stack || '');
         if (/no matching key/i.test(message)) {
             const topic = extractMissingSessionTopic(message);
-            // Only a topic the authoritative store cannot confirm is
-            // tombstoned. A store-confirmed live session is never destroyed by
-            // an SDK rejection.
-            if (topic && !isCoreSessionTopicStored(topic)) tombstoneCoreTopic(topic);
+            // During pairing, MetaMask Mobile may emit chainChanged for the NEW
+            // topic before SignClient's session store is committed. Tombstoning
+            // it at this instant poisons the valid session that arrives moments
+            // later. While the one SDK connect task is alive, suppress the SDK
+            // rejection but defer the stale/live decision until connect()
+            // settles. Outside pairing, a store-missing topic is proven stale.
+            if (topic && !isCoreSessionTopicStored(topic)) {
+                if (sdkConnectTask) {
+                    deferredMissingTopics.add(topic);
+                } else {
+                    tombstoneCoreTopic(topic);
+                }
+            }
             event.preventDefault();
             coreLog(
-                topic
-                    ? 'stale WalletConnect session topic neutralized'
+                topic && sdkConnectTask
+                    ? 'early WalletConnect session topic deferred until settle'
+                    : topic
+                        ? 'stale WalletConnect session topic neutralized'
                     : 'non-session WalletConnect stale-key rejection suppressed',
                 { topic: maskCoreTopic(topic) }
             );
@@ -830,6 +847,26 @@ function isCoreSessionTopicStored(topic) {
     const storeState = readCoreSessionStore(providerInstance);
     if (!storeState.available || storeState.readFailed) return false;
     return storeState.sessions.some((session) => String(session?.topic || '') === String(topic));
+}
+
+function reconcileDeferredMissingTopics(instance, reason) {
+    if (!deferredMissingTopics.size) return;
+    const currentTopic = String(instance?.session?.topic || '');
+    for (const topic of deferredMissingTopics) {
+        if (topic === currentTopic || isCoreSessionTopicStored(topic)) {
+            coreLog('deferred WalletConnect topic confirmed by settled session', {
+                topic: maskCoreTopic(topic),
+                reason
+            });
+            continue;
+        }
+        tombstoneCoreTopic(topic);
+        coreLog('deferred WalletConnect topic confirmed stale after settle', {
+            topic: maskCoreTopic(topic),
+            reason
+        });
+    }
+    deferredMissingTopics.clear();
 }
 
 function bindProviderDiagnostics(instance) {
@@ -1107,6 +1144,7 @@ function startCoreSdkConnect(instance, attempt) {
     task.then(
         () => void finalizeLateCoreSdkConnect(instance),
         (error) => {
+            reconcileDeferredMissingTopics(instance, 'SDK connect rejected');
             const waiters = [...sdkConnectWaiters];
             sdkConnectWaiters.clear();
             if (waiters.some((waiter) => !waiter.cancelled)) return;
@@ -1128,6 +1166,7 @@ async function finalizeLateCoreSdkConnect(instance) {
     sdkConnectWaiters.clear();
     if (waiters.some((waiter) => !waiter.cancelled)) return;
 
+    reconcileDeferredMissingTopics(instance, 'late SDK connect settled');
     const tombstoned = waiters.some((waiter) => waiter.tombstoned);
     const snapshot = readAuthoritativeCoreSession(instance);
     if (!snapshot.live) {
@@ -1372,6 +1411,7 @@ async function runCoreConnectAttempt(attempt) {
         sdkConnectWaiters.delete(attempt);
         markAttemptSettled('connect() resolved');
         setCoreLifecycleState(CORE_LIFECYCLE.SETTLING_SESSION, { attemptId: attempt.id });
+        reconcileDeferredMissingTopics(instance, 'SDK connect resolved');
 
         // Authoritative readiness, not "connect() resolved", decides success.
         const settled = readAuthoritativeCoreSession(instance);

@@ -163,7 +163,11 @@ function bindWalletConnectDiagnostics(provider, source = 'isolation provider') {
             'session_expire',
             'session_event'
         ].forEach((eventName) => client.on?.(eventName, (event) => log(eventName, {
-            topic: event?.topic || event?.params?.topic || null,
+            topic: event?.topic ||
+                event?.session?.topic ||
+                event?.params?.topic ||
+                event?.params?.session?.topic ||
+                null,
             method: event?.method || event?.params?.request?.method || null,
             reason: event?.reason || event?.params?.reason || null,
             error: event?.error ? describeError(event.error) : null
@@ -736,7 +740,7 @@ async function initializeArtSoulLayer(withAuth) {
         log('layer module loaded', { src: '/supabase-auth.js' });
     }
     log('ArtSoul appkit wrapper import requested', { withAuth });
-    await import('/appkit-init.js?v=47');
+    await import('/appkit-init.js?v=48');
     await window.__artsoulAppKitBootPromise;
     modal = window.web3Modal || null;
     diagnosticLifecycleReader = () => window.getArtSoulWalletLifecycle?.() ?? null;
