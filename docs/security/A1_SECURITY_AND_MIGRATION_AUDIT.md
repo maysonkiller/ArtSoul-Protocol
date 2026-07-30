@@ -210,6 +210,31 @@ isolated test page also exposes an explicit diagnostic Disconnect action so an
 operator can deliberately create a fresh pairing without clearing browser
 storage manually. A1 remains open pending the same phone acceptance.
 
+### External-mobile runtime accepted on production (2026-07-30)
+
+PR #156 consolidated the external-mobile lifecycle around one authoritative
+WalletConnect core, rejected stale topics, purged orphaned sessions, revoked
+SIWE on explicit disconnect, and prevented an initialized-but-disconnected
+provider from reaching the network-switch path. Before requesting Base Sepolia,
+the client now requires a live session or performs one normal reconnect. Raw SDK
+connection-order failures are converted to actionable user-facing copy.
+
+After merge commit `a2c82f2` reached production, the operator completed a real
+iPhone Chrome + MetaMask run on the normal ArtSoul site. Pairing and same-tab
+return completed, a session remained live, and selecting Base Sepolia while the
+wallet was on Ethereum Mainnet completed the switch. Base Sepolia then remained
+the only selectable ArtSoul product network, and selecting the already-active
+network was a no-op. Neither of the previously reported raw failures was
+reproduced.
+
+The run did not request a fresh signature, which is consistent with reuse of an
+existing authenticated SIWE session. It also did not execute the two
+authenticated negative upload-policy probes. This is accepted evidence for the
+wallet runtime and wrong-network recovery defect, recorded in
+`docs/testnet/MOBILE_WALLET_PRODUCTION_ACCEPTANCE_2026-07-30.md`; it is not the
+remaining A1 auth smoke. A1 stays open for the exact fresh-SIWE and policy-probe
+criteria below and for the private credential attestation.
+
 ### Production RLS verification status (pre-change audit complete)
 
 The complete verification file was run directly against production on 2026-07-16 inside an explicit read-only transaction with a statement timeout and mandatory rollback. No schema, data, policy, grant, function, or Storage setting was changed.

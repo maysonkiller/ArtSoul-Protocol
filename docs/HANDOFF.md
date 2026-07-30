@@ -46,7 +46,7 @@ Do not start Phase C contract work, Genesis implementation, a token, points, air
 | Project X account | `https://x.com/ArtSoulProtocol` |
 | Community | `https://t.me/ArtSoulCommunity` |
 
-The wallet isolation bench is intentionally excluded from navigation. Keep it until production external-mobile acceptance and post-cleanup regression testing are complete.
+The wallet isolation bench is intentionally excluded from navigation. The external-mobile runtime and wrong-network recovery path passed production acceptance on 2026-07-30 through PR #156. Keep the bench until A1 also captures a fresh production mobile SIWE signature and both authenticated negative upload-policy probes, then perform the post-acceptance cleanup as a separate task.
 
 ## 3. Production Topology
 
@@ -63,7 +63,7 @@ The wallet isolation bench is intentionally excluded from navigation. Keep it un
 | Health endpoint | `http://127.0.0.1:3001/health` on the indexer host (loopback-only bind; `/metrics` requires `METRICS_AUTH`) |
 | Operational chain | Base Sepolia, chain ID 84532 |
 | Legacy read chain | Ethereum Sepolia, chain ID 11155111, process stopped |
-| Wallet UI | Reown AppKit 1.8.21 plus a dedicated external-mobile WalletConnect core path |
+| Wallet UI | Reown AppKit 1.8.21 plus a dedicated external-mobile WalletConnect core path; production runtime and Base Sepolia recovery accepted 2026-07-30 |
 | AI guidance | Gemini 2.5 Flash-Lite through a server-side API route |
 
 ## 4. Base Sepolia Contracts
