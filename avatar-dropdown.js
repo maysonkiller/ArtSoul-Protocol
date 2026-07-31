@@ -605,6 +605,11 @@
                 // issue no further requests.
                 this.profile = profile;
                 this.resolvedIdentityWallet = normalizedWallet;
+                // Persisting the header identity happens here, behind the guard,
+                // never inside the shared request: a superseded read for a
+                // previous wallet must not overwrite the stored identity of the
+                // wallet that is actually connected now.
+                if (profile) this.cacheHeaderIdentity(profile, walletAddress);
 
                 if (!profile) {
                     if (this.pendingRenderKey !== renderKey) return;
@@ -640,9 +645,15 @@
             const request = Promise.resolve()
                 .then(() => window.ArtSoulDB.getProfile(walletAddress))
                 .then(profile => {
-                    this.profileCache.set(cacheKey, profile || null);
+                    // Only cache a result that still describes the active wallet.
+                    // A read that was superseded by a wallet switch must not
+                    // reintroduce the previous wallet after
+                    // beginIdentityTransition() removed it. Persisting the header
+                    // identity is init()'s job, behind its generation guard.
+                    if (this.identityWallet === cacheKey) {
+                        this.profileCache.set(cacheKey, profile || null);
+                    }
                     if (profile) {
-                        this.cacheHeaderIdentity(profile, walletAddress);
                         console.log('👤 Profile loaded:', profile.username || walletAddress);
                     } else {
                         console.log('👤 No profile found for wallet:', walletAddress);
@@ -1174,6 +1185,13 @@
         /**
          * Re-attempt a connected identity whose profile read never succeeded.
          *
+         * Called only from deliberate, bounded events: opening the account menu.
+         * The other recovery paths are a genuine wallet-state event and an
+         * explicit refresh(), both of which go through sync(). Arbitrary DOM
+         * mutations are deliberately NOT a retry trigger — the nav observer
+         * watches the whole document, so that would amplify a failing backend
+         * into one request per unrelated render.
+         *
          * Bounded by design: it runs only while the active wallet is still
          * unresolved, loadProfileOnce() collapses concurrent reads per wallet,
          * and a completed read (profile found or confirmed absent) closes the
@@ -1382,15 +1400,18 @@
         if (container && window.artsoulWalletStateSettled !== true && container.dataset.avatarCacheHydrated !== 'true') {
             window.AvatarDropdown.renderInitializingState();
         } else if (container && !container.querySelector('.avatar-button')) {
-            // The shared header was replaced (page hydration, React re-render).
-            // Rebuild it from the live wallet state so a connected identity is
-            // never restored as a guest.
+            // The shared header was actually removed or replaced (page
+            // hydration, React re-render). Rebuild it from the live wallet state
+            // so a connected identity is never restored as a guest.
+            //
+            // This is the ONLY thing the observer acts on. It watches the whole
+            // document, so treating an arbitrary mutation as a retry opportunity
+            // would turn every unrelated React render into another profile
+            // request while the identity is unresolved — an unbounded
+            // event-driven retry loop. Recovery instead runs on deliberate,
+            // bounded events: account-menu open, a genuine wallet-state event,
+            // and explicit refresh().
             syncCurrentMenu();
-        } else if (container) {
-            // The button survived but its identity may still be unresolved from
-            // a failed profile read. A DOM change is a free, event-driven point
-            // to retry; recoverUnresolvedIdentity() no-ops once resolved.
-            window.AvatarDropdown.recoverUnresolvedIdentity();
         }
     });
 

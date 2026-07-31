@@ -1,4 +1,4 @@
-// A-44 shared header avatar/identity consistency.
+// A-45 shared header avatar/identity consistency.
 //
 // Production symptom (iPhone Chrome): the account menu showed Base Sepolia, a
 // balance and Disconnect — so the wallet was connected — while the circular
@@ -261,6 +261,57 @@ test('a late profile response for the previous wallet never overwrites the curre
   assert.doesNotMatch(harness.avatarSrc(), /avatar-a/, 'wallet A avatar must not leak');
 });
 
+test('a superseded response never rewrites stored identity or component cache', async () => {
+  // Deterministic ordering with independently controlled promises: wallet B must
+  // resolve BEFORE wallet A. Releasing both together (as the test above does)
+  // hides the defect, because A's write lands before B's.
+  const harness = connectedHarness({});
+  const rows = {
+    [WALLET_A]: { wallet_address: WALLET_A, username: 'Alpha', avatar_url: AVATAR_A },
+    [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B }
+  };
+  const gates = {};
+  for (const wallet of [WALLET_A, WALLET_B]) {
+    let release;
+    gates[wallet] = { promise: new Promise(resolve => { release = resolve; }) };
+    gates[wallet].release = () => release(rows[wallet]);
+  }
+  harness.setProfileBehaviour(wallet => gates[wallet].promise);
+
+  // 1 — start wallet A's read, 2 — switch to wallet B while it is in flight.
+  connect(harness, WALLET_A);
+  connect(harness, WALLET_B);
+
+  // 3 — resolve B first.
+  gates[WALLET_B].release();
+  await harness.flush();
+
+  // 4 — UI and stored identity are B.
+  assert.equal(harness.avatarSrc(), AVATAR_B);
+  assert.equal(harness.avatarName(), 'Bravo');
+  assert.equal(JSON.parse(harness.storage.get('artsoul_header_identity')).wallet, WALLET_B);
+
+  // 5 — wallet A's superseded response lands afterwards.
+  gates[WALLET_A].release();
+  await harness.flush();
+
+  // 6 — the UI is still B.
+  assert.equal(harness.avatarSrc(), AVATAR_B, 'superseded A must not repaint the header');
+  assert.equal(harness.avatarName(), 'Bravo');
+  assert.equal(harness.dropdown.profile?.wallet_address, WALLET_B);
+  assertConnectedIdentity(harness, WALLET_B);
+
+  // 7 — the stored identity is still B, and B's own identity was not erased.
+  const stored = JSON.parse(harness.storage.get('artsoul_header_identity'));
+  assert.equal(stored.wallet, WALLET_B);
+  assert.equal(stored.avatarUrl, AVATAR_B);
+
+  // 8 — the superseded result did not reintroduce A into component state.
+  assert.equal(harness.dropdown.profileCache.has(WALLET_A), false, 'A must not be re-cached');
+  assert.equal(harness.dropdown.identityWallet, WALLET_B);
+  assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET_B);
+});
+
 // 10 — disconnect after a connected profile state
 test('disconnect clears wallet-bound identity and renders guest deterministically', async () => {
   const harness = connectedHarness({
@@ -370,6 +421,76 @@ test('opening the account menu recovers an unresolved identity exactly once', as
   harness.dropdown.toggle();
   await harness.flush();
   assert.equal(harness.profileCalls.length, readsAfterRecovery);
+});
+
+test('unrelated document mutations never amplify into repeated profile reads', async () => {
+  // The observer watches document.documentElement with subtree: true, so every
+  // unrelated React render is a mutation. Treating those as retry opportunities
+  // would turn a persistently failing backend into an unbounded event-driven
+  // retry loop — no timer needed.
+  const harness = connectedHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  harness.setProfileBehaviour(() => Promise.reject(new Error('profile backend down')));
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+  const readsAfterFailure = harness.profileCalls.length;
+  assert.equal(readsAfterFailure, 1);
+  assert.equal(harness.dropdown.resolvedIdentityWallet, null, 'identity must stay unresolved');
+
+  // The header survived; only unrelated page content changed.
+  for (let i = 0; i < 5; i += 1) {
+    harness.triggerMutationObservers();
+    await harness.flush();
+  }
+
+  assert.equal(
+    harness.profileCalls.length,
+    readsAfterFailure,
+    'a surviving header plus unrelated mutations must not start another read'
+  );
+  // The connected fallback is still correct throughout.
+  assertConnectedIdentity(harness, WALLET_A);
+});
+
+test('a removed shared header still rebuilds and recovers, without repeated reads', async () => {
+  const harness = connectedHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  let attempts = 0;
+  harness.setProfileBehaviour(() => {
+    attempts += 1;
+    if (attempts === 1) return Promise.reject(new Error('profile backend down'));
+    return undefined;
+  });
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+  assert.match(harness.avatarSrc(), GENERATED_FALLBACK);
+  assert.equal(harness.profileCalls.length, 1);
+
+  // Unrelated mutations still cost nothing.
+  harness.triggerMutationObservers();
+  await harness.flush();
+  assert.equal(harness.profileCalls.length, 1);
+
+  // The header is genuinely removed — the intended rebuild path recovers it.
+  harness.navButtons.innerHTML = '';
+  harness.triggerMutationObservers();
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assert.equal(harness.avatarName(), 'Founder');
+  assertConnectedIdentity(harness, WALLET_A);
+  const readsAfterRebuild = harness.profileCalls.length;
+
+  // Once resolved, further mutations are free again.
+  for (let i = 0; i < 5; i += 1) {
+    harness.triggerMutationObservers();
+    await harness.flush();
+  }
+  assert.equal(harness.profileCalls.length, readsAfterRebuild);
 });
 
 test('a wallet with no profile row resolves and stays cheap', async () => {
