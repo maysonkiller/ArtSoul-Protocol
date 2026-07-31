@@ -30,6 +30,16 @@
             this.pendingRenderKey = null;
             this.profileCache = new Map();
             this.profileRequests = new Map();
+            // Identity bookkeeping. The render key encodes only wallet + chain,
+            // so it cannot express "this wallet is connected but its profile
+            // identity has not been resolved yet". Without that distinction a
+            // single failed profile read leaves the connected header on the
+            // generated ArtSoul fallback for the whole page lifetime, because
+            // sync() early-returns on the unchanged key and appkit-init
+            // de-duplicates identical wallet-state events at the source.
+            this.identityGeneration = 0;
+            this.identityWallet = null;
+            this.resolvedIdentityWallet = null;
             this.headerIdentityStorageKey = 'artsoul_header_identity';
             this.headerNetworkStorageKey = 'artsoul_header_network_v2';
             this.headerStateStorageKey = 'artsoul_header_ui_state';
@@ -126,6 +136,12 @@
                 image.onerror = () => {
                     image.onerror = null;
                     image.src = fallback;
+                    // The fallback is now on screen, so the stamped content key
+                    // would otherwise claim the requested avatar rendered
+                    // successfully and make every later render a no-op. Stamp a
+                    // distinct failed key instead: the next render for the same
+                    // (or a newer) avatar URL re-requests the image exactly once.
+                    button.dataset.avatarContentKey = `${contentKey}|image-error`;
                     if (image.complete) revealAvatar();
                 };
                 if (image.complete) revealAvatar();
@@ -492,7 +508,23 @@
             const renderKey = this.getRenderKey(confirmedAddress, options);
             const hasMenuButton = !!container.querySelector('.avatar-button');
 
-            if (!options.refreshProfile && hasMenuButton && container.dataset.avatarRenderKey === renderKey) {
+            // A wallet transition (connect, switch, disconnect) invalidates every
+            // identity bound to the previous wallet, so a late response or a
+            // cached profile can never leak the previous avatar.
+            if (this.identityWallet !== confirmedAddress) {
+                this.beginIdentityTransition(confirmedAddress);
+            }
+
+            // Connected but the profile identity has not resolved yet (failed or
+            // never attempted read): the header is showing the connected-user
+            // fallback. Keep this render path open so the identity can still be
+            // recovered — the key alone cannot express that difference.
+            const identityUnresolved = !!confirmedAddress && this.resolvedIdentityWallet !== confirmedAddress;
+
+            if (!options.refreshProfile
+                && !identityUnresolved
+                && hasMenuButton
+                && container.dataset.avatarRenderKey === renderKey) {
                 return true;
             }
 
@@ -500,11 +532,28 @@
             this.pendingRenderKey = renderKey;
 
             if (confirmedAddress) {
-                this.init(confirmedAddress, { renderKey, walletAddress: confirmedAddress });
+                this.init(confirmedAddress, {
+                    renderKey,
+                    walletAddress: confirmedAddress,
+                    // Without forwarding this flag refresh() could never bust the
+                    // component cache, so a saved profile or avatar never reached
+                    // the shared header.
+                    refreshProfile: options.refreshProfile === true
+                });
                 return true;
             }
 
             return this.renderConnectButton({ renderKey });
+        }
+
+        // Drop every piece of state bound to the previous wallet and open a new
+        // identity generation. Responses issued for an older generation are
+        // discarded on arrival.
+        beginIdentityTransition(nextWallet) {
+            this.identityGeneration += 1;
+            this.identityWallet = nextWallet || null;
+            this.resolvedIdentityWallet = null;
+            this.profile = null;
         }
 
         /**
@@ -523,12 +572,30 @@
             if (container) container.dataset.avatarRenderKey = renderKey;
             this.pendingRenderKey = renderKey;
 
+            const normalizedWallet = walletAddress.toLowerCase();
+            if (this.identityWallet !== normalizedWallet) {
+                this.beginIdentityTransition(normalizedWallet);
+            }
+            const generation = this.identityGeneration;
+            // A response is applied only while it still describes the active
+            // wallet. A slow read for wallet A that lands after a switch to
+            // wallet B is discarded instead of overwriting B's identity.
+            const isCurrent = () => this.identityGeneration === generation
+                && this.identityWallet === normalizedWallet;
+
             try {
-                this.profile = await this.loadProfileOnce(walletAddress, {
+                const profile = await this.loadProfileOnce(walletAddress, {
                     refresh: options.refreshProfile === true
                 });
 
-                if (!this.profile) {
+                if (!isCurrent()) return;
+                // A completed read — profile found or confirmed absent — resolves
+                // the identity. Repeat wallet-state events then stay cheap and
+                // issue no further requests.
+                this.profile = profile;
+                this.resolvedIdentityWallet = normalizedWallet;
+
+                if (!profile) {
                     if (this.pendingRenderKey !== renderKey) return;
                     await this.renderWalletInfo(walletAddress, { renderKey });
                     return;
@@ -539,8 +606,9 @@
             } catch (error) {
                 console.error(' Failed to load profile:', error);
                 console.log('👤 Falling back to wallet info due to error');
-                // Show wallet info on error instead of connect button
-                if (this.pendingRenderKey !== renderKey) return;
+                // The identity stays unresolved so a later render can retry.
+                // Meanwhile the connected-user fallback is shown — never guest.
+                if (!isCurrent() || this.pendingRenderKey !== renderKey) return;
                 await this.renderWalletInfo(walletAddress, { renderKey });
             }
         }
@@ -569,6 +637,13 @@
                         console.log('👤 No profile found for wallet:', walletAddress);
                     }
                     return profile || null;
+                })
+                .catch(error => {
+                    // Never cache a failed read. ArtSoulDB.getProfile keeps only a
+                    // 15s read cache, so a permanent component-level entry here
+                    // would outlive the real cache and block every recovery.
+                    this.profileCache.delete(cacheKey);
+                    throw error;
                 })
                 .finally(() => {
                     this.profileRequests.delete(cacheKey);
@@ -941,7 +1016,10 @@
 
             // Lazy Protocol Admin discovery: ask the server only when the
             // menu is actually opened, once per wallet per page lifetime.
-            if (this.isOpen) void this.requestProtocolAdminAccessOnce();
+            if (this.isOpen) {
+                void this.requestProtocolAdminAccessOnce();
+                this.recoverUnresolvedIdentity();
+            }
 
             if (menu) {
                 menu.style.display = this.isOpen ? 'block' : 'none';
@@ -1078,7 +1156,30 @@
          * Update profile (call after profile changes)
          */
         async refresh(walletAddress) {
-            return this.sync(walletAddress, { refreshProfile: true, confirmed: true });
+            const wallet = walletAddress || window.currentWalletAddress || null;
+            return this.sync(wallet, { refreshProfile: true, confirmed: true });
+        }
+
+        /**
+         * Re-attempt a connected identity whose profile read never succeeded.
+         *
+         * Bounded by design: it runs only while the active wallet is still
+         * unresolved, loadProfileOnce() collapses concurrent reads per wallet,
+         * and a completed read (profile found or confirmed absent) closes the
+         * path for the rest of the page lifetime. There is no timer and no poll.
+         */
+        recoverUnresolvedIdentity() {
+            if (window.artsoulWalletStateSettled !== true) return false;
+            const wallet = String(
+                window.currentWalletAddress
+                || window.artsoulSettledWalletState?.address
+                || ''
+            ).toLowerCase();
+            if (!/^0x[a-f0-9]{40}$/.test(wallet)) return false;
+            if (this.resolvedIdentityWallet === wallet) return false;
+            if (this.profileRequests.has(wallet)) return false;
+            this.init(wallet, { walletAddress: wallet, confirmed: true });
+            return true;
         }
 
         renderInitializingState() {
@@ -1162,6 +1263,12 @@
                 container.dataset.avatarRenderKey = options.renderKey;
                 this.pendingRenderKey = options.renderKey;
             }
+
+            // Disconnect must leave no wallet-bound identity behind, in memory or
+            // in storage, so the next connect cannot reuse a previous avatar.
+            this.beginIdentityTransition(null);
+            this.profileCache.clear();
+            this.clearCachedHeaderIdentity();
 
             const currentPath = window.location.pathname;
             const isProfilePage = currentPath.includes('profile.html');
@@ -1266,7 +1373,15 @@
         if (container && window.artsoulWalletStateSettled !== true && container.dataset.avatarCacheHydrated !== 'true') {
             window.AvatarDropdown.renderInitializingState();
         } else if (container && !container.querySelector('.avatar-button')) {
+            // The shared header was replaced (page hydration, React re-render).
+            // Rebuild it from the live wallet state so a connected identity is
+            // never restored as a guest.
             syncCurrentMenu();
+        } else if (container) {
+            // The button survived but its identity may still be unresolved from
+            // a failed profile read. A DOM change is a free, event-driven point
+            // to retry; recoverUnresolvedIdentity() no-ops once resolved.
+            window.AvatarDropdown.recoverUnresolvedIdentity();
         }
     });
 

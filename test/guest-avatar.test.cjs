@@ -106,7 +106,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=42/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=39/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=40/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
@@ -130,6 +130,35 @@ test('account and network controls share one SVG chevron contract', () => {
   assert.equal((avatarDropdown.match(/class="[^"]*menu-chevron[^"]*"/g) || []).length, 2);
   assert.match(unifiedStyles, /\.menu-chevron \{[\s\S]*?stroke: currentColor;/);
   assert.match(unifiedStyles, /network-current-row\[aria-expanded="true"\][\s\S]*?rotate\(180deg\)/);
+});
+
+test('a connected identity can always be re-resolved and never sticks on the fallback', () => {
+  // A-44: the render key encodes only wallet + chain, so it cannot express
+  // "connected but the profile identity never resolved". sync() must keep the
+  // render path open while the active wallet is unresolved, and must forward
+  // the cache-busting flag so refresh() can actually re-read the profile.
+  assert.match(avatarDropdown, /this\.resolvedIdentityWallet = null;/);
+  assert.match(avatarDropdown, /const identityUnresolved = !!confirmedAddress && this\.resolvedIdentityWallet !== confirmedAddress;/);
+  assert.match(avatarDropdown, /!options\.refreshProfile\s*\n\s*&& !identityUnresolved/);
+  assert.match(avatarDropdown, /refreshProfile: options\.refreshProfile === true/);
+  // A failed read must never be cached: ArtSoulDB keeps only a 15s read cache,
+  // so a permanent component entry would outlive it and block every recovery.
+  assert.match(avatarDropdown, /this\.profileCache\.delete\(cacheKey\);\s*\n\s*throw error;/);
+  // Recovery is event-driven only — no timer, no polling.
+  assert.match(avatarDropdown, /recoverUnresolvedIdentity\(\) \{/);
+  assert.doesNotMatch(avatarDropdown, /setInterval\(/);
+});
+
+test('wallet transitions invalidate identity so a late response cannot leak an avatar', () => {
+  assert.match(avatarDropdown, /beginIdentityTransition\(nextWallet\) \{[\s\S]*?this\.identityGeneration \+= 1;[\s\S]*?this\.profile = null;/);
+  assert.match(avatarDropdown, /const isCurrent = \(\) => this\.identityGeneration === generation\s*\n\s*&& this\.identityWallet === normalizedWallet;/);
+  assert.match(avatarDropdown, /if \(!isCurrent\(\)\) return;/);
+  // Disconnect clears wallet-bound identity in memory and in storage.
+  assert.match(avatarDropdown, /this\.beginIdentityTransition\(null\);\s*\n\s*this\.profileCache\.clear\(\);\s*\n\s*this\.clearCachedHeaderIdentity\(\);/);
+});
+
+test('an avatar image failure records the failure instead of claiming a successful render', () => {
+  assert.match(avatarDropdown, /button\.dataset\.avatarContentKey = `\$\{contentKey\}\|image-error`;/);
 });
 
 test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
