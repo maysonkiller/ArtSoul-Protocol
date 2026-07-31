@@ -550,10 +550,21 @@
         // identity generation. Responses issued for an older generation are
         // discarded on arrival.
         beginIdentityTransition(nextWallet) {
+            const previousWallet = this.identityWallet;
             this.identityGeneration += 1;
             this.identityWallet = nextWallet || null;
             this.resolvedIdentityWallet = null;
             this.profile = null;
+
+            // Leaving a real wallet — disconnect or an address switch — must
+            // leave no wallet-bound identity behind, in memory or in storage, so
+            // the next wallet cannot inherit the previous avatar. Hydration
+            // renders start from a null wallet and clear nothing, which keeps
+            // the A-05 cached-identity flicker guard intact.
+            if (previousWallet && previousWallet !== this.identityWallet) {
+                this.profileCache.delete(previousWallet);
+                this.clearCachedHeaderIdentity();
+            }
         }
 
         /**
@@ -1264,11 +1275,9 @@
                 this.pendingRenderKey = options.renderKey;
             }
 
-            // Disconnect must leave no wallet-bound identity behind, in memory or
-            // in storage, so the next connect cannot reuse a previous avatar.
+            // Guest is a wallet transition too: beginIdentityTransition() drops
+            // the identity bound to the wallet we are leaving, if there was one.
             this.beginIdentityTransition(null);
-            this.profileCache.clear();
-            this.clearCachedHeaderIdentity();
 
             const currentPath = window.location.pathname;
             const isProfilePage = currentPath.includes('profile.html');
