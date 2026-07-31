@@ -291,6 +291,25 @@ test('disconnect clears wallet-bound identity and renders guest deterministicall
   assertConnectedIdentity(harness, WALLET_A);
 });
 
+test('an early guest hydration render preserves a stored identity (A-05 flicker guard)', async () => {
+  // renderConnectButton also runs during hydration before the wallet settles.
+  // Clearing the stored identity there would repaint guest on the next load.
+  const harness = createAvatarHarness({
+    userAgent: IPHONE_UA,
+    pathname: '/gallery.html',
+    settled: false,
+    storage: {
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_A, name: 'Founder', avatarUrl: AVATAR_A })
+    }
+  });
+
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+
+  assert.equal(harness.uiState(), 'disconnected');
+  assert.ok(harness.storage.get('artsoul_header_identity'), 'stored identity must survive guest hydration');
+});
+
 // 11 — profile fetch failure and later recovery (the production defect)
 test('a failed profile read keeps a connected fallback and recovers on a later refresh', async () => {
   const harness = connectedHarness({

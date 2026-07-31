@@ -154,7 +154,10 @@ test('wallet transitions invalidate identity so a late response cannot leak an a
   assert.match(avatarDropdown, /const isCurrent = \(\) => this\.identityGeneration === generation\s*\n\s*&& this\.identityWallet === normalizedWallet;/);
   assert.match(avatarDropdown, /if \(!isCurrent\(\)\) return;/);
   // Disconnect clears wallet-bound identity in memory and in storage.
-  assert.match(avatarDropdown, /this\.beginIdentityTransition\(null\);\s*\n\s*this\.profileCache\.clear\(\);\s*\n\s*this\.clearCachedHeaderIdentity\(\);/);
+  // Only leaving a real wallet clears the stored identity, so the
+  // early-hydration guest render cannot reintroduce the A-05 flicker.
+  assert.match(avatarDropdown, /const previousWallet = this\.identityWallet;/);
+  assert.match(avatarDropdown, /if \(previousWallet && previousWallet !== this\.identityWallet\) \{\s*\n\s*this\.profileCache\.delete\(previousWallet\);\s*\n\s*this\.clearCachedHeaderIdentity\(\);/);
 });
 
 test('an avatar image failure records the failure instead of claiming a successful render', () => {
