@@ -144,15 +144,28 @@ test('a connected identity can always be re-resolved and never sticks on the fal
   // A failed read must never be cached: ArtSoulDB keeps only a 15s read cache,
   // so a permanent component entry would outlive it and block every recovery.
   assert.match(avatarDropdown, /this\.profileCache\.delete\(cacheKey\);\s*\n\s*throw error;/);
-  // Recovery is event-driven only — no timer, no polling.
+  // Recovery runs on deliberate bounded events only — no timer, no polling, and
+  // no retry driven by arbitrary document mutations (the nav observer watches
+  // the whole document, so that would amplify a failing backend into one
+  // request per unrelated render).
   assert.match(avatarDropdown, /recoverUnresolvedIdentity\(\) \{/);
   assert.doesNotMatch(avatarDropdown, /setInterval\(/);
+  assert.equal((avatarDropdown.match(/recoverUnresolvedIdentity\(\)/g) || []).length, 2);
+  const navObserver = avatarDropdown.match(/const navObserver = new MutationObserver\(\(\) => \{[\s\S]*?\n    \}\);/)?.[0] || '';
+  assert.ok(navObserver, 'the nav observer must exist');
+  assert.doesNotMatch(navObserver, /recoverUnresolvedIdentity/);
 });
 
 test('wallet transitions invalidate identity so a late response cannot leak an avatar', () => {
   assert.match(avatarDropdown, /beginIdentityTransition\(nextWallet\) \{[\s\S]*?this\.identityGeneration \+= 1;[\s\S]*?this\.profile = null;/);
   assert.match(avatarDropdown, /const isCurrent = \(\) => this\.identityGeneration === generation\s*\n\s*&& this\.identityWallet === normalizedWallet;/);
   assert.match(avatarDropdown, /if \(!isCurrent\(\)\) return;/);
+  // Persistence happens behind the guard, never inside the shared request, so a
+  // superseded read cannot overwrite the stored identity or re-cache the
+  // previous wallet after beginIdentityTransition() removed it.
+  assert.match(avatarDropdown, /if \(profile\) this\.cacheHeaderIdentity\(profile, walletAddress\);/);
+  assert.match(avatarDropdown, /if \(this\.identityWallet === cacheKey\) \{\s*\n\s*this\.profileCache\.set\(cacheKey, profile \|\| null\);/);
+  assert.equal((avatarDropdown.match(/this\.cacheHeaderIdentity\(/g) || []).length, 1);
   // Disconnect clears wallet-bound identity in memory and in storage.
   // Only leaving a real wallet clears the stored identity, so the
   // early-hydration guest render cannot reintroduce the A-05 flicker.
