@@ -352,7 +352,7 @@ function createAvatarHarness(options = {}) {
     shortWalletAddress
   };
 
-  context.window.ArtSoulDB = {
+  const artSoulDb = {
     getProfile(walletAddress) {
       const wallet = String(walletAddress || '').toLowerCase();
       profileCalls.push(wallet);
@@ -366,6 +366,12 @@ function createAvatarHarness(options = {}) {
       return Promise.resolve(profiles.get(wallet) || null);
     }
   };
+
+  // The real browser ordering: avatar-dropdown.js is a synchronous head script
+  // while supabase-client.js is a deferred module, so ArtSoulDB can be missing
+  // when a wallet is confirmed. Passing dbReady:false reproduces that race;
+  // every earlier suite keeps the ready-from-the-start default.
+  if (options.dbReady !== false) context.window.ArtSoulDB = artSoulDb;
 
   vm.runInNewContext(SOURCE, context, { filename: 'avatar-dropdown.js' });
 
@@ -383,6 +389,22 @@ function createAvatarHarness(options = {}) {
     storage,
 
     setAccessResponse(factory) { accessResponse = factory; },
+
+    /**
+     * Assign window.ArtSoulDB and announce readiness exactly as
+     * supabase-client.js does. Returns the number of dispatches so a test can
+     * fire duplicates and assert the read count stays bounded.
+     */
+    makeDbReady({ dispatch = true } = {}) {
+      context.window.ArtSoulDB = artSoulDb;
+      if (dispatch) harness.dispatchDbReady();
+      return context.window.ArtSoulDB;
+    },
+
+    /** Dispatch 'artsoul:db-ready' without touching window.ArtSoulDB. */
+    dispatchDbReady() {
+      context.window.dispatchEvent(new context.CustomEvent('artsoul:db-ready'));
+    },
 
     /** Install a per-call profile read behaviour (return undefined to fall through). */
     setProfileBehaviour(fn) { profileBehaviour = fn; },

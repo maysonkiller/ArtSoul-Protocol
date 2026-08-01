@@ -106,7 +106,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=42/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=40/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=41/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
@@ -133,7 +133,7 @@ test('account and network controls share one SVG chevron contract', () => {
 });
 
 test('a connected identity can always be re-resolved and never sticks on the fallback', () => {
-  // A-44: the render key encodes only wallet + chain, so it cannot express
+  // A-45: the render key encodes only wallet + chain, so it cannot express
   // "connected but the profile identity never resolved". sync() must keep the
   // render path open while the active wallet is unresolved, and must forward
   // the cache-busting flag so refresh() can actually re-read the profile.
@@ -148,12 +148,43 @@ test('a connected identity can always be re-resolved and never sticks on the fal
   // no retry driven by arbitrary document mutations (the nav observer watches
   // the whole document, so that would amplify a failing backend into one
   // request per unrelated render).
-  assert.match(avatarDropdown, /recoverUnresolvedIdentity\(\) \{/);
+  assert.match(avatarDropdown, /recoverUnresolvedIdentity\(options = \{\}\) \{/);
   assert.doesNotMatch(avatarDropdown, /setInterval\(/);
-  assert.equal((avatarDropdown.match(/recoverUnresolvedIdentity\(\)/g) || []).length, 2);
+  assert.doesNotMatch(avatarDropdown, /setTimeout\([^)]*recoverUnresolvedIdentity/);
   const navObserver = avatarDropdown.match(/const navObserver = new MutationObserver\(\(\) => \{[\s\S]*?\n    \}\);/)?.[0] || '';
   assert.ok(navObserver, 'the nav observer must exist');
   assert.doesNotMatch(navObserver, /recoverUnresolvedIdentity/);
+});
+
+test('the ArtSoulDB readiness signal is announced once and consumed without polling', () => {
+  const supabaseClient = fs.readFileSync('supabase-client.js', 'utf8');
+  // Dispatched only AFTER the complete public API is assigned.
+  assert.ok(
+    supabaseClient.indexOf("new CustomEvent('artsoul:db-ready')")
+      > supabaseClient.indexOf('window.ArtSoulDB = {'),
+    'readiness must be announced after the full ArtSoulDB API is assigned'
+  );
+  assert.equal((supabaseClient.match(/artsoul:db-ready/g) || []).length, 1);
+
+  // The header checks immediately first, then listens once. No polling.
+  assert.match(avatarDropdown, /const DB_READY_EVENT = 'artsoul:db-ready';/);
+  assert.match(avatarDropdown, /isProfileBackendReady = \(\) => typeof window\.ArtSoulDB\?\.getProfile === 'function'/);
+  assert.match(avatarDropdown, /if \(!isProfileBackendReady\(\)\) \{\s*\n\s*this\.armProfileBackendRecovery\(\);/);
+  assert.match(avatarDropdown, /if \(this\.profileBackendListener\) return false;/);
+  // Automatic recoveries are hard-capped per wallet generation.
+  assert.match(avatarDropdown, /const MAX_AUTOMATIC_IDENTITY_RECOVERIES = 2;/);
+  assert.match(avatarDropdown, /if \(this\.automaticRecoveries >= MAX_AUTOMATIC_IDENTITY_RECOVERIES\) return false;/);
+});
+
+test('the stylized "A" identity is gone from the shared header', () => {
+  // The generated data-URI read as a third identity state and was mistaken for
+  // a stale cached avatar. One canonical neutral avatar remains.
+  assert.doesNotMatch(avatarDropdown, /getDefaultAvatar/);
+  assert.doesNotMatch(avatarDropdown, /data:image\/svg\+xml,\$\{encodeURIComponent/);
+  assert.doesNotMatch(avatarDropdown, /logoGradient/);
+  assert.match(avatarDropdown, /const NEUTRAL_AVATAR_URL = '\/default-avatar\.png';/);
+  // A stale image error from a superseded render must not touch the current one.
+  assert.match(avatarDropdown, /if \(button\.dataset\.avatarContentKey !== contentKey\) return;/);
 });
 
 test('wallet transitions invalidate identity so a late response cannot leak an avatar', () => {
