@@ -6,6 +6,24 @@
 
     const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 
+    // The one canonical ArtSoul avatar visual. It is used for the guest state
+    // and for a connected wallet whose profile has no avatar; connectedness is
+    // carried by the name, the address row and the menu, never by the image.
+    // The previously generated stylized "A" data-URI is gone: it read as a
+    // third identity and was mistaken for a stale cached avatar.
+    const NEUTRAL_AVATAR_URL = '/default-avatar.png';
+
+    // supabase-client.js announces 'artsoul:db-ready' once, after the complete
+    // window.ArtSoulDB API is assigned.
+    const DB_READY_EVENT = 'artsoul:db-ready';
+    // Hard ceiling on AUTOMATIC identity recoveries per wallet generation. A
+    // wallet transition resets it. Explicit user actions (opening the menu,
+    // refresh() after a profile save) are separate and stay idempotent through
+    // the in-flight request map.
+    const MAX_AUTOMATIC_IDENTITY_RECOVERIES = 2;
+
+    const isProfileBackendReady = () => typeof window.ArtSoulDB?.getProfile === 'function';
+
     // This script is loaded synchronously in the document head. Reserve the
     // connected shell before the header HTML can paint so a saved wallet never
     // flashes the static guest identity while its final profile is restored.
@@ -40,6 +58,10 @@
             this.identityGeneration = 0;
             this.identityWallet = null;
             this.resolvedIdentityWallet = null;
+            // Automatic (ArtSoulDB readiness) recoveries used by the current
+            // wallet generation, and the single readiness listener.
+            this.automaticRecoveries = 0;
+            this.profileBackendListener = null;
             this.headerIdentityStorageKey = 'artsoul_header_identity';
             this.headerNetworkStorageKey = 'artsoul_header_network_v2';
             this.headerStateStorageKey = 'artsoul_header_ui_state';
@@ -112,8 +134,8 @@
             const image = button.querySelector('[data-avatar-image]');
             const nameNode = button.querySelector('[data-avatar-name]');
             const addressNode = button.querySelector('[data-avatar-address]');
-            const fallback = this.getDefaultAvatar();
-            const nextAvatarUrl = avatarUrl || '/default-avatar.png';
+            const fallback = NEUTRAL_AVATAR_URL;
+            const nextAvatarUrl = avatarUrl || NEUTRAL_AVATAR_URL;
             const nextName = name || 'ArtSoul Guest';
             const currentAddress = addressNode?.hidden ? '' : (addressNode?.textContent || '');
             const contentAlreadyMatches = image?.getAttribute('src') === nextAvatarUrl
@@ -135,6 +157,11 @@
                 image.alt = avatarAlt || nextName || 'ArtSoul';
                 image.onerror = () => {
                     image.onerror = null;
+                    // A late error from a previous wallet's avatar must never
+                    // touch the identity now on screen. Every render stamps a
+                    // fresh content key, so a mismatch proves this callback
+                    // belongs to a superseded render.
+                    if (button.dataset.avatarContentKey !== contentKey) return;
                     image.src = fallback;
                     // The fallback is now on screen, so the stamped content key
                     // would otherwise claim the requested avatar rendered
@@ -555,6 +582,9 @@
             this.identityWallet = nextWallet || null;
             this.resolvedIdentityWallet = null;
             this.profile = null;
+            // A new wallet gets its own recovery budget; work still in flight
+            // for the previous generation is discarded by the isCurrent() guard.
+            this.automaticRecoveries = 0;
 
             // Leaving a real wallet — disconnect or an address switch — must
             // leave no wallet-bound identity behind, in memory or in storage, so
@@ -594,6 +624,18 @@
             const isCurrent = () => this.identityGeneration === generation
                 && this.identityWallet === normalizedWallet;
 
+            // The header is a synchronous head script; supabase-client.js is a
+            // deferred module, so a wallet can be confirmed before ArtSoulDB
+            // exists. That is an UNRESOLVED identity, not a failed profile:
+            // render the connected shell, arm the one-shot readiness listener
+            // and let 'artsoul:db-ready' finish the job.
+            if (!isProfileBackendReady()) {
+                this.armProfileBackendRecovery();
+                if (this.pendingRenderKey !== renderKey) return;
+                await this.renderWalletInfo(walletAddress, { renderKey, resolved: false });
+                return;
+            }
+
             try {
                 const profile = await this.loadProfileOnce(walletAddress, {
                     refresh: options.refreshProfile === true
@@ -623,9 +665,10 @@
                 console.error(' Failed to load profile:', error);
                 console.log('👤 Falling back to wallet info due to error');
                 // The identity stays unresolved so a later render can retry.
-                // Meanwhile the connected-user fallback is shown — never guest.
+                // Meanwhile the connected shell is shown — never guest, and the
+                // last avatar confirmed for THIS address is kept if there is one.
                 if (!isCurrent() || this.pendingRenderKey !== renderKey) return;
-                await this.renderWalletInfo(walletAddress, { renderKey });
+                await this.renderWalletInfo(walletAddress, { renderKey, resolved: false });
             }
         }
 
@@ -643,7 +686,18 @@
 
             console.log('👤 Initializing avatar dropdown for wallet:', walletAddress);
             const request = Promise.resolve()
-                .then(() => window.ArtSoulDB.getProfile(walletAddress))
+                .then(() => {
+                    // Defensive: init() gates on isProfileBackendReady() before
+                    // reaching here. An unready backend must surface as an
+                    // unresolved identity, never as a TypeError that the caller
+                    // would mistake for a definitive "no profile".
+                    if (!isProfileBackendReady()) {
+                        const error = new Error('ArtSoul profile backend is not ready yet.');
+                        error.code = 'PROFILE_BACKEND_UNAVAILABLE';
+                        throw error;
+                    }
+                    return window.ArtSoulDB.getProfile(walletAddress);
+                })
                 .then(profile => {
                     // Only cache a result that still describes the active wallet.
                     // A read that was superseded by a wallet switch must not
@@ -1129,40 +1183,6 @@
             }
         }
 
-        getThemeColor(variableName, fallback) {
-            try {
-                return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim() || fallback;
-            } catch {
-                return fallback;
-            }
-        }
-
-        /**
-         * Get default avatar (first letter of username or generic icon)
-         */
-        getDefaultAvatar() {
-            // Use ArtSoul logo as default avatar (same as header logo)
-            // Beautiful gradient with transparent background
-            const primary = this.getThemeColor('--c-accent', 'currentColor');
-            const secondary = this.getThemeColor('--c-accent-2', primary);
-            const svg = `data:image/svg+xml,${encodeURIComponent(`
-                <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:${primary};stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:${secondary};stop-opacity:1" />
-                        </linearGradient>
-                    </defs>
-                    <!-- Outer circle with gradient border -->
-                    <circle cx="20" cy="20" r="18" fill="none" stroke="url(#logoGradient)" stroke-width="2"/>
-                    <!-- Inner artistic "A" shape -->
-                    <path d="M20 8 L28 28 L24 28 L22 22 L18 22 L16 28 L12 28 Z M19 18 L21 18 L20 13 Z"
-                          fill="url(#logoGradient)"/>
-                </svg>
-            `)}`;
-            return svg;
-        }
-
         getProfileDisplayName(profile, walletAddress) {
             const resolver = window.ArtSoulProfileDisplay?.displayName || window.ArtSoulDB?.displayName;
             const fallback = walletAddress ? 'ArtSoul User' : 'ArtSoul Guest';
@@ -1171,7 +1191,7 @@
 
         getProfileAvatarUrl(profile) {
             const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-            return resolver?.(profile, this.getDefaultAvatar()) || this.getDefaultAvatar();
+            return resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
         }
 
         /**
@@ -1183,21 +1203,40 @@
         }
 
         /**
+         * Arm the one-shot ArtSoulDB readiness listener.
+         *
+         * Registered at most once per page: the listener itself is idempotent
+         * and every recovery it triggers is capped per wallet generation, so
+         * duplicate 'artsoul:db-ready' dispatches cannot become a request
+         * storm. No timer, no polling, no DOM-mutation retry.
+         */
+        armProfileBackendRecovery() {
+            if (this.profileBackendListener) return false;
+            this.profileBackendListener = () => {
+                this.recoverUnresolvedIdentity({ automatic: true });
+            };
+            window.addEventListener(DB_READY_EVENT, this.profileBackendListener);
+            return true;
+        }
+
+        /**
          * Re-attempt a connected identity whose profile read never succeeded.
          *
-         * Called only from deliberate, bounded events: opening the account menu.
-         * The other recovery paths are a genuine wallet-state event and an
-         * explicit refresh(), both of which go through sync(). Arbitrary DOM
-         * mutations are deliberately NOT a retry trigger — the nav observer
-         * watches the whole document, so that would amplify a failing backend
-         * into one request per unrelated render.
+         * Automatic callers (ArtSoulDB readiness) pass { automatic: true } and
+         * are capped at MAX_AUTOMATIC_IDENTITY_RECOVERIES per wallet
+         * generation. Deliberate callers — opening the account menu, a genuine
+         * wallet-state event, explicit refresh() — are uncapped but stay
+         * idempotent through the in-flight request map. Arbitrary DOM mutations
+         * are deliberately NOT a trigger: the nav observer watches the whole
+         * document, so that would amplify a failing backend into one request
+         * per unrelated render.
          *
          * Bounded by design: it runs only while the active wallet is still
          * unresolved, loadProfileOnce() collapses concurrent reads per wallet,
          * and a completed read (profile found or confirmed absent) closes the
          * path for the rest of the page lifetime. There is no timer and no poll.
          */
-        recoverUnresolvedIdentity() {
+        recoverUnresolvedIdentity(options = {}) {
             if (window.artsoulWalletStateSettled !== true) return false;
             const wallet = String(
                 window.currentWalletAddress
@@ -1205,8 +1244,13 @@
                 || ''
             ).toLowerCase();
             if (!/^0x[a-f0-9]{40}$/.test(wallet)) return false;
+            if (this.identityWallet !== wallet) return false;
             if (this.resolvedIdentityWallet === wallet) return false;
             if (this.profileRequests.has(wallet)) return false;
+            if (options.automatic === true) {
+                if (this.automaticRecoveries >= MAX_AUTOMATIC_IDENTITY_RECOVERIES) return false;
+                this.automaticRecoveries += 1;
+            }
             this.init(wallet, { walletAddress: wallet, confirmed: true });
             return true;
         }
@@ -1318,7 +1362,18 @@
         }
 
         /**
-         * Render wallet info when connected but no profile
+         * Render the connected header without a resolved profile.
+         *
+         * options.resolved === false means the identity is still UNRESOLVED
+         * (ArtSoulDB not ready, or the read failed). Then a header identity
+         * cached for THIS exact normalized address is reused, so a returning
+         * user keeps their real avatar instead of flashing a neutral one.
+         * options.resolved !== false means the backend answered definitively
+         * that this wallet has no profile/avatar: the canonical neutral avatar
+         * is correct and a stale cached avatar must NOT be resurrected.
+         *
+         * Either way the row stays unmistakably connected — address, network,
+         * balance and Disconnect — and never renders the guest identity.
          */
         async renderWalletInfo(walletAddress, options = {}) {
             const navButtons = this.getNavContainer();
@@ -1332,7 +1387,11 @@
             const currentWallet = walletAddress?.toLowerCase();
             const isOwnProfile = isProfilePage && (!viewingAddress || viewingAddress.toLowerCase() === currentWallet);
 
-            const avatarUrl = this.getDefaultAvatar();
+            const cachedIdentity = options.resolved === false
+                ? this.getCachedHeaderIdentity(currentWallet)
+                : null;
+            const avatarUrl = cachedIdentity?.avatarUrl || NEUTRAL_AVATAR_URL;
+            const displayedName = cachedIdentity?.name || 'ArtSoul User';
             const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
             const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
@@ -1340,8 +1399,8 @@
 
             this.updateStableButton({
                 avatarUrl,
-                avatarAlt: 'ArtSoul User',
-                name: 'ArtSoul User',
+                avatarAlt: displayedName,
+                name: displayedName,
                 address: shortAddress,
                 stateKey: options.renderKey || `wallet:${currentWallet}`
             });

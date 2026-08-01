@@ -37,7 +37,19 @@ const SHARED_HEADER_PAGES = [
   'docs-protocol.html'
 ];
 
-const GENERATED_FALLBACK = /^data:image\/svg\+xml,/;
+// The one canonical ArtSoul avatar. The previously generated stylized "A"
+// data-URI was removed: it read as a third identity state and was mistaken for
+// a stale cached avatar.
+const NEUTRAL_AVATAR = '/default-avatar.png';
+const STYLIZED_A = /^data:image\/svg\+xml,/;
+
+/** No surface may ever paint the retired stylized "A". */
+function assertNoStylizedA(harness) {
+  assert.doesNotMatch(harness.avatarSrc(), STYLIZED_A, 'the stylized "A" must never render');
+  for (const src of harness.imageLoads) {
+    assert.doesNotMatch(src, STYLIZED_A, 'the stylized "A" must never even be requested');
+  }
+}
 
 function connectedHarness(options = {}) {
   const harness = createAvatarHarness({
@@ -90,7 +102,8 @@ test('connected wallet without an avatar shows the connected-user fallback, neve
   connect(harness, WALLET_A);
   await harness.flush();
 
-  assert.match(harness.avatarSrc(), GENERATED_FALLBACK);
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assertNoStylizedA(harness);
   assert.equal(harness.avatarName(), 'Founder');
   assertConnectedIdentity(harness, WALLET_A);
 });
@@ -143,7 +156,8 @@ test('an avatar image error falls back but never suppresses a later retry', asyn
   await harness.flush();
 
   // The fallback is displayed, but the wallet still reads as connected.
-  assert.match(harness.avatarSrc(), GENERATED_FALLBACK);
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assertNoStylizedA(harness);
   assertConnectedIdentity(harness, WALLET_A);
   assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 1);
   // The stamped key records the failure instead of claiming a successful render.
@@ -377,7 +391,8 @@ test('a failed profile read keeps a connected fallback and recovers on a later r
   await harness.flush();
 
   // The exact production symptom: connected menu, generated fallback avatar.
-  assert.match(harness.avatarSrc(), GENERATED_FALLBACK);
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assertNoStylizedA(harness);
   assert.equal(harness.avatarName(), 'ArtSoul User');
   assertConnectedIdentity(harness, WALLET_A);
   assert.match(harness.menuHtml(), /Base Sepolia/);
@@ -406,7 +421,8 @@ test('opening the account menu recovers an unresolved identity exactly once', as
 
   connect(harness, WALLET_A);
   await harness.flush();
-  assert.match(harness.avatarSrc(), GENERATED_FALLBACK);
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assertNoStylizedA(harness);
 
   // Recovery path 2: the founder opens the account menu (a user gesture, the
   // moment the defect was actually noticed in production).
@@ -467,7 +483,8 @@ test('a removed shared header still rebuilds and recovers, without repeated read
 
   connect(harness, WALLET_A);
   await harness.flush();
-  assert.match(harness.avatarSrc(), GENERATED_FALLBACK);
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assertNoStylizedA(harness);
   assert.equal(harness.profileCalls.length, 1);
 
   // Unrelated mutations still cost nothing.
@@ -510,6 +527,246 @@ test('a wallet with no profile row resolves and stays cheap', async () => {
   harness.triggerMutationObservers();
   await harness.flush();
   assert.equal(harness.profileCalls.length, reads);
+});
+
+// ---------------------------------------------------------------------------
+// ArtSoulDB readiness race (A-45 P1-2 / P1-3).
+//
+// avatar-dropdown.js is a synchronous head script; supabase-client.js is a
+// deferred module. A wallet can therefore be confirmed before window.ArtSoulDB
+// exists. That is an UNRESOLVED identity — not a failed profile, not guest —
+// and it must resolve itself when the backend announces readiness.
+// ---------------------------------------------------------------------------
+
+test('a wallet confirmed before ArtSoulDB exists renders connected, never guest and never a stylized A', async () => {
+  const harness = connectedHarness({
+    dbReady: false,
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  assert.equal(harness.context.window.ArtSoulDB, undefined);
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  // No exception escaped and no profile read was attempted against a missing API.
+  assert.equal(harness.profileCalls.length, 0);
+  assertConnectedIdentity(harness, WALLET_A);
+  assert.notEqual(harness.uiState(), 'disconnected');
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assertNoStylizedA(harness);
+  assert.equal(harness.dropdown.resolvedIdentityWallet, null, 'identity must stay unresolved');
+});
+
+test('ArtSoulDB readiness resolves the avatar without opening the menu or any wallet event', async () => {
+  const harness = connectedHarness({
+    dbReady: false,
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+
+  // Only the readiness signal — no menu toggle, no wallet-state event, no DOM
+  // rebuild, no mutation observer.
+  harness.makeDbReady();
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET_A);
+  assert.equal(harness.dropdown.isOpen, false, 'the menu was never opened');
+  assertConnectedIdentity(harness, WALLET_A);
+  assertNoStylizedA(harness);
+});
+
+test('duplicate ArtSoulDB readiness signals stay deterministically bounded', async () => {
+  const harness = connectedHarness({ dbReady: false });
+  // The backend is ready but every read fails, so the identity never resolves
+  // and each duplicate signal is a fresh recovery opportunity.
+  harness.setProfileBehaviour(() => Promise.reject(new Error('profile backend down')));
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+  assert.equal(harness.profileCalls.length, 0);
+
+  harness.makeDbReady();
+  await harness.flush();
+  for (let i = 0; i < 10; i += 1) {
+    harness.dispatchDbReady();
+    await harness.flush();
+  }
+
+  // Hard ceiling: MAX_AUTOMATIC_IDENTITY_RECOVERIES per wallet generation.
+  assert.equal(harness.profileCalls.length, 2, 'automatic recoveries must be capped at 2');
+  assert.equal(harness.dropdown.automaticRecoveries, 2);
+  assertConnectedIdentity(harness, WALLET_A);
+  assertNoStylizedA(harness);
+});
+
+test('a wallet change resets the recovery budget and isolates the previous wallet', async () => {
+  const harness = connectedHarness({
+    dbReady: false,
+    profiles: { [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  connect(harness, WALLET_B);
+  await harness.flush();
+  assert.equal(harness.dropdown.automaticRecoveries, 0, 'a new wallet gets a fresh budget');
+
+  harness.makeDbReady();
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_B);
+  assert.equal(harness.profileCalls.every(wallet => wallet === WALLET_B), true, 'wallet A must never be read');
+  assertConnectedIdentity(harness, WALLET_B);
+});
+
+test('a late profile response for the previous wallet cannot render or persist after readiness', async () => {
+  const harness = connectedHarness({
+    profiles: {
+      [WALLET_A]: { wallet_address: WALLET_A, username: 'Alpha', avatar_url: AVATAR_A },
+      [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B }
+    }
+  });
+  const gates = {};
+  for (const wallet of [WALLET_A, WALLET_B]) {
+    let release;
+    gates[wallet] = { promise: new Promise(resolve => { release = resolve; }) };
+    gates[wallet].release = () => release(
+      wallet === WALLET_A
+        ? { wallet_address: WALLET_A, username: 'Alpha', avatar_url: AVATAR_A }
+        : { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B }
+    );
+  }
+  harness.setProfileBehaviour(wallet => gates[wallet].promise);
+
+  connect(harness, WALLET_A);
+  connect(harness, WALLET_B);
+  gates[WALLET_B].release();
+  await harness.flush();
+  assert.equal(harness.avatarSrc(), AVATAR_B);
+
+  gates[WALLET_A].release();
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_B, 'wallet A must not render over B');
+  assert.equal(JSON.parse(harness.storage.get('artsoul_header_identity')).wallet, WALLET_B);
+  assert.equal(harness.dropdown.profileCache.has(WALLET_A), false);
+});
+
+test('a disconnect while a profile read is pending cannot restore the connected avatar', async () => {
+  const harness = connectedHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const release = harness.holdProfileReads();
+
+  connect(harness, WALLET_A);
+  // The user disconnects while wallet A's read is still in flight.
+  harness.context.window.currentWalletAddress = null;
+  harness.context.window.artsoulSettledWalletState = { address: null, chainId: null, isConnected: false };
+  harness.dispatchWalletState({ address: null, chainId: null, isConnected: false });
+  await harness.flush();
+  assert.equal(harness.uiState(), 'disconnected');
+
+  // Wallet A's response lands after the disconnect.
+  release();
+  await harness.flush();
+
+  assert.equal(harness.uiState(), 'disconnected', 'a late read must not reconnect the header');
+  assert.equal(harness.avatarName(), 'ArtSoul Guest');
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(harness.avatarAddress(), '');
+  assert.equal(harness.dropdown.profile, null);
+  assert.equal(harness.storage.get('artsoul_header_identity'), undefined);
+
+  // A readiness signal after the disconnect must not resurrect anything.
+  harness.dispatchDbReady();
+  await harness.flush();
+  assert.equal(harness.uiState(), 'disconnected');
+});
+
+test('ArtSoulDB already ready before initialization resolves normally', async () => {
+  const harness = connectedHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  assert.notEqual(harness.context.window.ArtSoulDB, undefined);
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assert.equal(harness.profileCalls.length, 1);
+  assert.equal(harness.dropdown.automaticRecoveries, 0, 'no recovery was needed');
+  assertConnectedIdentity(harness, WALLET_A);
+});
+
+test('an unresolved identity keeps the cached avatar only for the same normalized address', async () => {
+  // Wallet A's identity is cached from an earlier visit, but the header is
+  // restoring wallet B: B must NOT inherit A's avatar.
+  const harness = connectedHarness({
+    dbReady: false,
+    storage: {
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_A, name: 'Alpha', avatarUrl: AVATAR_A })
+    }
+  });
+
+  connect(harness, WALLET_B);
+  await harness.flush();
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR, 'wallet A avatar must not leak to wallet B');
+  assert.doesNotMatch(harness.avatarSrc(), /avatar-a/);
+  assertConnectedIdentity(harness, WALLET_B);
+
+  // The same wallet, however, keeps its own confirmed avatar while unresolved.
+  const sameWallet = connectedHarness({
+    dbReady: false,
+    storage: {
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_A, name: 'Alpha', avatarUrl: AVATAR_A })
+    }
+  });
+  connect(sameWallet, WALLET_A);
+  await sameWallet.flush();
+  assert.equal(sameWallet.avatarSrc(), AVATAR_A);
+  assert.equal(sameWallet.avatarName(), 'Alpha');
+  assertConnectedIdentity(sameWallet, WALLET_A);
+});
+
+test('a definitively absent profile uses the neutral avatar and never a stale cached one', async () => {
+  const harness = connectedHarness({
+    storage: {
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_A, name: 'Alpha', avatarUrl: AVATAR_A })
+    }
+  });
+  // ArtSoulDB is ready and answers definitively: this wallet has no profile.
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET_A);
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR, 'a definitive answer must not reuse the cache');
+  assert.equal(harness.avatarName(), 'ArtSoul User');
+  assertNoStylizedA(harness);
+  assertConnectedIdentity(harness, WALLET_A);
+});
+
+test('a stale image error from the previous wallet cannot overwrite the current one', async () => {
+  const harness = connectedHarness({
+    profiles: {
+      [WALLET_A]: { wallet_address: WALLET_A, username: 'Alpha', avatar_url: AVATAR_A },
+      [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B }
+    },
+    failingImages: [AVATAR_A]
+  });
+
+  connect(harness, WALLET_A);
+  connect(harness, WALLET_B);
+  await harness.flush();
+
+  // Wallet B is on screen; wallet A's image error must not have replaced it.
+  assert.equal(harness.avatarSrc(), AVATAR_B);
+  assert.equal(harness.avatarName(), 'Bravo');
+  assert.doesNotMatch(harness.button().dataset.avatarContentKey, /image-error/);
+  assertConnectedIdentity(harness, WALLET_B);
 });
 
 // 12 — one consistent asset version across every shared-header page
