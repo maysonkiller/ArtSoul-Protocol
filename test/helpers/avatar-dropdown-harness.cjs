@@ -276,8 +276,19 @@ function createAvatarHarness(options = {}) {
   const context = {
     console: { log() {}, warn() {}, error() {} },
     URLSearchParams,
-    setTimeout: (fn) => { if (typeof fn === 'function') pendingTimeouts.push(fn); return 0; },
-    clearTimeout() {},
+    // Deterministic timers: the delay is recorded but never waited on, so a
+    // bounded backoff stays testable without wall-clock time. Ids start at 1 so
+    // a live timer is never falsy. clearTimeout genuinely removes the entry.
+    setTimeout: (fn, delay = 0) => {
+        if (typeof fn !== 'function') return 0;
+        const id = ++timeoutSequence;
+        pendingTimeouts.push({ id, fn, delay });
+        return id;
+    },
+    clearTimeout: (id) => {
+        const index = pendingTimeouts.findIndex(entry => entry.id === id);
+        if (index >= 0) pendingTimeouts.splice(index, 1);
+    },
     localStorage,
     navigator: { userAgent: options.userAgent || 'node-test' },
     MutationObserver: class {
@@ -311,6 +322,8 @@ function createAvatarHarness(options = {}) {
   };
 
   const pendingTimeouts = [];
+  const scheduledDelays = [];
+  let timeoutSequence = 0;
 
   context.window = context;
   context.window.location = {
@@ -401,6 +414,12 @@ function createAvatarHarness(options = {}) {
       return context.window.ArtSoulDB;
     },
 
+    /** Delays of every timer that actually fired, in firing order. */
+    firedDelays() { return [...scheduledDelays]; },
+
+    /** Timers scheduled but not yet fired (a cancelled timer is gone). */
+    pendingTimerCount() { return pendingTimeouts.length; },
+
     /** Dispatch 'artsoul:db-ready' without touching window.ArtSoulDB. */
     dispatchDbReady() {
       context.window.dispatchEvent(new context.CustomEvent('artsoul:db-ready'));
@@ -476,7 +495,11 @@ function createAvatarHarness(options = {}) {
             image.dispatchEvent({ type: 'load' });
           }
         }
-        while (pendingTimeouts.length > 0) pendingTimeouts.shift()();
+        while (pendingTimeouts.length > 0) {
+          const entry = pendingTimeouts.shift();
+          scheduledDelays.push(entry.delay);
+          entry.fn();
+        }
         await new Promise(resolve => setImmediate(resolve));
       }
     }

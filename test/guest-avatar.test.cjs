@@ -106,7 +106,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=42/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=41/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=42/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
@@ -149,8 +149,16 @@ test('a connected identity can always be re-resolved and never sticks on the fal
   // the whole document, so that would amplify a failing backend into one
   // request per unrelated render).
   assert.match(avatarDropdown, /recoverUnresolvedIdentity\(options = \{\}\) \{/);
+  // A transient rejection from an already-ready backend is repaired by a
+  // FINITE pre-declared backoff, never by a poll: no interval, one pending
+  // retry at a time, and the same per-generation budget as every other
+  // automatic recovery.
   assert.doesNotMatch(avatarDropdown, /setInterval\(/);
-  assert.doesNotMatch(avatarDropdown, /setTimeout\([^)]*recoverUnresolvedIdentity/);
+  assert.match(avatarDropdown, /const AUTOMATIC_RECOVERY_BACKOFF_MS = \[400, 1600\];/);
+  assert.match(avatarDropdown, /if \(this\.recoveryTimer !== null\) return false;/);
+  assert.match(avatarDropdown, /if \(this\.automaticRecoveries >= MAX_AUTOMATIC_IDENTITY_RECOVERIES\) return false;\s*\n\s*const delay/);
+  assert.match(avatarDropdown, /if \(this\.identityGeneration !== generation\) return;/);
+  assert.match(avatarDropdown, /this\.cancelAutomaticRecovery\(\);/);
   const navObserver = avatarDropdown.match(/const navObserver = new MutationObserver\(\(\) => \{[\s\S]*?\n    \}\);/)?.[0] || '';
   assert.ok(navObserver, 'the nav observer must exist');
   assert.doesNotMatch(navObserver, /recoverUnresolvedIdentity/);
