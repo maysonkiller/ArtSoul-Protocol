@@ -380,17 +380,17 @@ test('a failed profile read keeps a connected fallback and recovers on a later r
   const harness = connectedHarness({
     profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
   });
-  let attempts = 0;
-  harness.setProfileBehaviour(() => {
-    attempts += 1;
-    if (attempts === 1) return Promise.reject(new Error('profile backend unavailable'));
-    return undefined;
-  });
+  // The backend stays down long enough to exhaust the bounded retry schedule,
+  // so the unresolved shell can be observed before any recovery lands.
+  let healthy = false;
+  harness.setProfileBehaviour(() => (
+    healthy ? undefined : Promise.reject(new Error('profile backend unavailable'))
+  ));
 
   connect(harness, WALLET_A);
   await harness.flush();
 
-  // The exact production symptom: connected menu, generated fallback avatar.
+  // The exact production symptom: connected menu, neutral avatar, no identity.
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assertNoStylizedA(harness);
   assert.equal(harness.avatarName(), 'ArtSoul User');
@@ -399,9 +399,13 @@ test('a failed profile read keeps a connected fallback and recovers on a later r
   // The failure must not be cached, or every later attempt would be a no-op.
   assert.equal(harness.dropdown.profileCache.has(WALLET_A), false);
   assert.equal(harness.dropdown.resolvedIdentityWallet, null);
+  // The automatic budget is spent; nothing is still armed.
+  assert.equal(harness.profileCalls.length, 3);
+  assert.equal(harness.pendingTimerCount(), 0);
 
-  // Recovery path 1: the next wallet-state event retries.
-  harness.dispatchWalletState({ address: WALLET_A, chainId: 84532, isConnected: true });
+  // Recovery path: an explicit refresh() once the backend is healthy again.
+  healthy = true;
+  await harness.dropdown.refresh(WALLET_A);
   await harness.flush();
   assert.equal(harness.avatarSrc(), AVATAR_A);
   assert.equal(harness.avatarName(), 'Founder');
@@ -412,20 +416,22 @@ test('opening the account menu recovers an unresolved identity exactly once', as
   const harness = connectedHarness({
     profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
   });
-  let attempts = 0;
-  harness.setProfileBehaviour(() => {
-    attempts += 1;
-    if (attempts === 1) return Promise.reject(new Error('profile backend unavailable'));
-    return undefined;
-  });
+  // Keep the backend down until the bounded automatic schedule is exhausted,
+  // so this test still proves the user-gesture path rather than the timer.
+  let healthy = false;
+  harness.setProfileBehaviour(() => (
+    healthy ? undefined : Promise.reject(new Error('profile backend unavailable'))
+  ));
 
   connect(harness, WALLET_A);
   await harness.flush();
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assertNoStylizedA(harness);
+  assert.equal(harness.profileCalls.length, 3, 'automatic budget spent');
 
-  // Recovery path 2: the founder opens the account menu (a user gesture, the
-  // moment the defect was actually noticed in production).
+  // Recovery path: the founder opens the account menu. A user gesture is not
+  // capped by the automatic budget.
+  healthy = true;
   harness.dropdown.toggle();
   await harness.flush();
   assert.equal(harness.avatarSrc(), AVATAR_A);
@@ -451,8 +457,10 @@ test('unrelated document mutations never amplify into repeated profile reads', a
 
   connect(harness, WALLET_A);
   await harness.flush();
+  // The bounded automatic schedule has run to completion: 1 initial + 2 retries.
   const readsAfterFailure = harness.profileCalls.length;
-  assert.equal(readsAfterFailure, 1);
+  assert.equal(readsAfterFailure, 3);
+  assert.equal(harness.pendingTimerCount(), 0);
   assert.equal(harness.dropdown.resolvedIdentityWallet, null, 'identity must stay unresolved');
 
   // The header survived; only unrelated page content changed.
@@ -474,25 +482,24 @@ test('a removed shared header still rebuilds and recovers, without repeated read
   const harness = connectedHarness({
     profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
   });
-  let attempts = 0;
-  harness.setProfileBehaviour(() => {
-    attempts += 1;
-    if (attempts === 1) return Promise.reject(new Error('profile backend down'));
-    return undefined;
-  });
+  let healthy = false;
+  harness.setProfileBehaviour(() => (
+    healthy ? undefined : Promise.reject(new Error('profile backend down'))
+  ));
 
   connect(harness, WALLET_A);
   await harness.flush();
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assertNoStylizedA(harness);
-  assert.equal(harness.profileCalls.length, 1);
+  assert.equal(harness.profileCalls.length, 3, 'automatic budget spent');
 
-  // Unrelated mutations still cost nothing.
+  // Unrelated mutations still cost nothing once the schedule is exhausted.
   harness.triggerMutationObservers();
   await harness.flush();
-  assert.equal(harness.profileCalls.length, 1);
+  assert.equal(harness.profileCalls.length, 3);
 
   // The header is genuinely removed — the intended rebuild path recovers it.
+  healthy = true;
   harness.navButtons.innerHTML = '';
   harness.triggerMutationObservers();
   await harness.flush();
@@ -767,6 +774,125 @@ test('a stale image error from the previous wallet cannot overwrite the current 
   assert.equal(harness.avatarName(), 'Bravo');
   assert.doesNotMatch(harness.button().dataset.avatarContentKey, /image-error/);
   assertConnectedIdentity(harness, WALLET_B);
+});
+
+// ---------------------------------------------------------------------------
+// Transient rejection from an ALREADY-READY backend (A-45 final blocker).
+//
+// 'artsoul:db-ready' cannot repair this path: supabase-client.js announces it
+// exactly once, and on this path it has already fired. Without a retry of its
+// own the identity stayed unresolved until the user opened the account menu.
+// ---------------------------------------------------------------------------
+
+test('a transient profile rejection self-heals without opening the account menu', async () => {
+  const harness = connectedHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  let attempts = 0;
+  harness.setProfileBehaviour(() => {
+    attempts += 1;
+    if (attempts === 1) return Promise.reject(new Error('transient network blip'));
+    return undefined;
+  });
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_A, 'the avatar must repair itself');
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET_A);
+  assert.equal(harness.dropdown.isOpen, false, 'the menu was never opened');
+  assert.equal(harness.profileCalls.length, 2);
+  assert.equal(harness.dropdown.automaticRecoveries, 1);
+  assertConnectedIdentity(harness, WALLET_A);
+  assertNoStylizedA(harness);
+});
+
+test('a permanently failing backend is capped at three reads per wallet generation', async () => {
+  const harness = connectedHarness({});
+  harness.setProfileBehaviour(() => Promise.reject(new Error('profile backend down')));
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  // One initial read plus MAX_AUTOMATIC_IDENTITY_RECOVERIES retries, then the
+  // schedule stops permanently. A finite backoff, never a poll.
+  assert.equal(harness.profileCalls.length, 3, 'reads must stop at 1 + 2');
+  assert.equal(harness.dropdown.automaticRecoveries, 2);
+  assert.deepEqual(harness.firedDelays(), [400, 1600], 'a pre-declared finite backoff');
+  assert.equal(harness.pendingTimerCount(), 0, 'no retry may stay armed');
+
+  // Further prodding costs nothing.
+  harness.dispatchDbReady();
+  harness.triggerMutationObservers();
+  await harness.flush();
+  assert.equal(harness.profileCalls.length, 3);
+
+  // The wallet still reads as connected throughout.
+  assertConnectedIdentity(harness, WALLET_A);
+  assertNoStylizedA(harness);
+  assert.equal(harness.dropdown.resolvedIdentityWallet, null);
+});
+
+test('only one retry is ever pending at a time', async () => {
+  const harness = connectedHarness({});
+  harness.setProfileBehaviour(() => Promise.reject(new Error('profile backend down')));
+
+  connect(harness, WALLET_A);
+  // Repeated wallet-state events while the first read is failing must not stack
+  // timers on top of the one already scheduled.
+  for (let i = 0; i < 5; i += 1) {
+    harness.dispatchWalletState({ address: WALLET_A, chainId: 84532, isConnected: true });
+  }
+  await harness.flush();
+
+  assert.equal(harness.pendingTimerCount(), 0);
+  assert.ok(harness.profileCalls.length <= 3, `reads must stay capped, saw ${harness.profileCalls.length}`);
+});
+
+test('a wallet switch discards the pending retry of the previous wallet', async () => {
+  const harness = connectedHarness({
+    profiles: { [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B } }
+  });
+  harness.setProfileBehaviour(wallet => (
+    wallet === WALLET_A ? Promise.reject(new Error('wallet A backend down')) : undefined
+  ));
+
+  connect(harness, WALLET_A);
+  connect(harness, WALLET_B);
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_B);
+  assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET_B);
+  // Wallet A's retry budget and timer went with its generation.
+  assert.equal(harness.profileCalls.filter(wallet => wallet === WALLET_A).length, 1);
+  assert.equal(harness.pendingTimerCount(), 0);
+  assertConnectedIdentity(harness, WALLET_B);
+});
+
+test('a disconnect discards the pending retry and cannot be revived by it', async () => {
+  const harness = connectedHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  let attempts = 0;
+  harness.setProfileBehaviour(() => {
+    attempts += 1;
+    if (attempts === 1) return Promise.reject(new Error('transient blip'));
+    return undefined;
+  });
+
+  connect(harness, WALLET_A);
+  // Disconnect before the scheduled retry can run.
+  harness.context.window.currentWalletAddress = null;
+  harness.context.window.artsoulSettledWalletState = { address: null, chainId: null, isConnected: false };
+  harness.dispatchWalletState({ address: null, chainId: null, isConnected: false });
+  await harness.flush();
+
+  assert.equal(harness.uiState(), 'disconnected');
+  assert.equal(harness.avatarName(), 'ArtSoul Guest');
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(harness.dropdown.profile, null);
+  assert.equal(harness.pendingTimerCount(), 0);
 });
 
 // 12 — one consistent asset version across every shared-header page

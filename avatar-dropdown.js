@@ -21,6 +21,11 @@
     // refresh() after a profile save) are separate and stay idempotent through
     // the in-flight request map.
     const MAX_AUTOMATIC_IDENTITY_RECOVERIES = 2;
+    // Backoff for the retry after a failed profile read, one entry per allowed
+    // automatic recovery. This is a finite, pre-declared schedule — not a poll:
+    // it fires at most MAX_AUTOMATIC_IDENTITY_RECOVERIES times per wallet
+    // generation and then stops for the rest of the page lifetime.
+    const AUTOMATIC_RECOVERY_BACKOFF_MS = [400, 1600];
 
     const isProfileBackendReady = () => typeof window.ArtSoulDB?.getProfile === 'function';
 
@@ -62,6 +67,7 @@
             // wallet generation, and the single readiness listener.
             this.automaticRecoveries = 0;
             this.profileBackendListener = null;
+            this.recoveryTimer = null;
             this.headerIdentityStorageKey = 'artsoul_header_identity';
             this.headerNetworkStorageKey = 'artsoul_header_network_v2';
             this.headerStateStorageKey = 'artsoul_header_ui_state';
@@ -583,8 +589,10 @@
             this.resolvedIdentityWallet = null;
             this.profile = null;
             // A new wallet gets its own recovery budget; work still in flight
-            // for the previous generation is discarded by the isCurrent() guard.
+            // for the previous generation is discarded by the isCurrent() guard,
+            // and any pending retry for the wallet we are leaving is dropped.
             this.automaticRecoveries = 0;
+            this.cancelAutomaticRecovery();
 
             // Leaving a real wallet — disconnect or an address switch — must
             // leave no wallet-bound identity behind, in memory or in storage, so
@@ -664,10 +672,16 @@
             } catch (error) {
                 console.error(' Failed to load profile:', error);
                 console.log('👤 Falling back to wallet info due to error');
-                // The identity stays unresolved so a later render can retry.
+                if (!isCurrent()) return;
+                // A transient rejection from an already-ready backend cannot be
+                // repaired by 'artsoul:db-ready' — supabase-client.js announces
+                // that exactly once. Without a retry of its own the identity
+                // would stay unresolved until the user opened the account menu,
+                // which is precisely the behaviour A-45 must remove.
+                this.scheduleAutomaticRecovery();
                 // Meanwhile the connected shell is shown — never guest, and the
                 // last avatar confirmed for THIS address is kept if there is one.
-                if (!isCurrent() || this.pendingRenderKey !== renderKey) return;
+                if (this.pendingRenderKey !== renderKey) return;
                 await this.renderWalletInfo(walletAddress, { renderKey, resolved: false });
             }
         }
@@ -1210,6 +1224,37 @@
          * duplicate 'artsoul:db-ready' dispatches cannot become a request
          * storm. No timer, no polling, no DOM-mutation retry.
          */
+        /**
+         * Schedule the single pending retry after a failed profile read.
+         *
+         * Bounded by construction: it shares the per-generation budget with the
+         * readiness-driven recovery (MAX_AUTOMATIC_IDENTITY_RECOVERIES), never
+         * stacks more than one pending retry, and the callback re-checks the
+         * identity generation so a wallet change or disconnect discards it.
+         * Total profile reads per wallet generation stay at 1 + 2 = 3.
+         */
+        scheduleAutomaticRecovery() {
+            if (this.recoveryTimer !== null) return false;
+            if (this.automaticRecoveries >= MAX_AUTOMATIC_IDENTITY_RECOVERIES) return false;
+            const delay = AUTOMATIC_RECOVERY_BACKOFF_MS[this.automaticRecoveries]
+                ?? AUTOMATIC_RECOVERY_BACKOFF_MS[AUTOMATIC_RECOVERY_BACKOFF_MS.length - 1];
+            const generation = this.identityGeneration;
+            this.recoveryTimer = setTimeout(() => {
+                this.recoveryTimer = null;
+                // The authoritative guard: clearTimeout is only hygiene, this
+                // check is what makes a superseded wallet impossible to revive.
+                if (this.identityGeneration !== generation) return;
+                this.recoverUnresolvedIdentity({ automatic: true });
+            }, delay);
+            return true;
+        }
+
+        cancelAutomaticRecovery() {
+            if (this.recoveryTimer === null) return;
+            clearTimeout(this.recoveryTimer);
+            this.recoveryTimer = null;
+        }
+
         armProfileBackendRecovery() {
             if (this.profileBackendListener) return false;
             this.profileBackendListener = () => {
