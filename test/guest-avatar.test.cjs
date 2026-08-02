@@ -17,8 +17,9 @@ const sharedHeaderPages = [
 test('guest avatar uses the local ArtSoul image with the generated fallback', () => {
   assert.equal(fs.existsSync('default-avatar.png'), true);
   assert.match(avatarDropdown, /src="\/default-avatar\.png"/);
-  assert.match(avatarDropdown, /image\.onerror = \(\) => \{/);
-  assert.match(avatarDropdown, /image\.src = fallback;/);
+  // A failed avatar decode falls back to the canonical ArtSoul image without
+  // changing connection semantics; the visible <img> is never blanked.
+  assert.match(avatarDropdown, /preloader\.onerror = \(\) => commit\(fallback \|\| NEUTRAL_AVATAR_URL, true\);/);
   assert.match(avatarDropdown, /getProfileAvatarUrl\(profile\)/);
 });
 
@@ -105,8 +106,8 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=42/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=42/, `${page} must use the shared menu cache version`);
+    assert.match(html, /unified-styles\.css\?v=43/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=43/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
@@ -114,8 +115,16 @@ test('every product page loads the same account menu and stylesheet versions', (
 test('stable button hydration does not reassign identical avatar content', () => {
   assert.match(avatarDropdown, /const contentAlreadyMatches =/);
   assert.match(avatarDropdown, /if \(contentAlreadyMatches\) \{[\s\S]*?button\.dataset\.avatarContentKey = contentKey;[\s\S]*?return structure;/);
-  assert.match(avatarDropdown, /image\.classList\.add\('avatar-image-loading'\)/);
-  assert.match(unifiedStyles, /avatar-button > img\.avatar-image-loading \{[\s\S]*?visibility: hidden !important;/);
+  // The account-button avatar is decoded off-screen and swapped in one step.
+  // The retired 'avatar-image-loading' hook blanked the live <img> on every
+  // document navigation, which is exactly the flicker it was meant to prevent.
+  assert.doesNotMatch(avatarDropdown, /avatar-image-loading/);
+  assert.doesNotMatch(unifiedStyles, /avatar-image-loading/);
+  assert.match(avatarDropdown, /commitAvatarImage\(button, image, \{ nextUrl, alt, contentKey, fallback, identity \}\) \{/);
+  // The previous avatar is only kept during the decode while it still belongs
+  // to the account being rendered, so one wallet never wears another's avatar.
+  assert.match(avatarDropdown, /image\.dataset\.avatarIdentity !== identity/);
+  assert.match(avatarDropdown, /preloader\.src = nextUrl;/);
 });
 
 test('header typography and menu interaction geometry are shared across pages', () => {
