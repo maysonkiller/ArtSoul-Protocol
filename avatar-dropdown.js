@@ -29,6 +29,13 @@
 
     const isProfileBackendReady = () => typeof window.ArtSoulDB?.getProfile === 'function';
 
+    const WALLET_ADDRESS_PATTERN = /^0x[a-f0-9]{40}$/;
+    // What the head boot script is allowed to turn into a document-level image
+    // fetch: HTTPS, or a single-slash root-relative path on this origin. A
+    // leading '//' is protocol-relative (a foreign origin), and every other
+    // scheme — http:, data:, javascript:, blob: — is rejected outright.
+    const PRELOADABLE_AVATAR_URL = /^(?:https:\/\/[^/\s]|\/(?!\/))/;
+
     // This script is loaded synchronously in the document head. Reserve the
     // connected shell before the header HTML can paint so a saved wallet never
     // flashes the static guest identity while its final profile is restored.
@@ -39,18 +46,35 @@
     try {
         const walletHint = String(localStorage.getItem('artsoul_wallet') || '').toLowerCase();
         const cachedUiState = localStorage.getItem('artsoul_header_ui_state');
-        if (/^0x[a-f0-9]{40}$/.test(walletHint) || cachedUiState === 'connected') {
+        const hasWalletHint = WALLET_ADDRESS_PATTERN.test(walletHint);
+        if (hasWalletHint || cachedUiState === 'connected') {
             document.documentElement.classList.add('wallet-state-resolving');
-            // Start fetching the cached avatar with the document itself instead
-            // of after the header has been parsed. On a repeat navigation the
-            // response is already in the HTTP cache, so the one swap from the
-            // canonical avatar to the user's own avatar lands within the first
-            // paints instead of hundreds of milliseconds later. Platform
-            // preload hint only — it changes no identity and grants nothing.
-            const cachedAvatarUrl = JSON.parse(
-                localStorage.getItem('artsoul_header_identity') || 'null'
-            )?.avatarUrl;
-            if (typeof cachedAvatarUrl === 'string' && /^(https?:\/\/|\/)/.test(cachedAvatarUrl)) {
+        }
+
+        // Start fetching the cached avatar with the document itself instead of
+        // after the header has been parsed. On a repeat navigation the response
+        // is already in the HTTP cache, so the one swap from the canonical
+        // avatar to the user's own avatar lands within the first paints instead
+        // of hundreds of milliseconds later.
+        //
+        // The hint is bound to the wallet it belongs to: an identity stored for
+        // a DIFFERENT wallet, or one with no validated wallet hint at all, must
+        // not become a document-level fetch. It is a platform hint only — it
+        // changes no identity, authorizes nothing, and a rejected value simply
+        // means the avatar is fetched later by the component itself.
+        if (hasWalletHint && cachedUiState === 'connected') {
+            let cachedIdentity = null;
+            try {
+                cachedIdentity = JSON.parse(localStorage.getItem('artsoul_header_identity') || 'null');
+            } catch {
+                // A corrupted entry is simply not a preload candidate.
+            }
+            const cachedWallet = String(cachedIdentity?.wallet || '').toLowerCase();
+            const cachedAvatarUrl = cachedIdentity?.avatarUrl;
+            if (WALLET_ADDRESS_PATTERN.test(cachedWallet)
+                && cachedWallet === walletHint
+                && typeof cachedAvatarUrl === 'string'
+                && PRELOADABLE_AVATAR_URL.test(cachedAvatarUrl)) {
                 const preloadLink = document.createElement('link');
                 preloadLink.rel = 'preload';
                 preloadLink.as = 'image';
@@ -204,19 +228,31 @@
          * Swap the account-button avatar without ever blanking it.
          *
          * Assigning a new src to a live <img> discards the rendered frame
-         * immediately: the browser paints an empty box until the replacement has
-         * decoded. Across full-document navigation that is guaranteed to happen,
+         * immediately: the browser paints an empty box until the replacement is
+         * ready. Across full-document navigation that is guaranteed to happen,
          * because every document starts from the static markup and the user's own
-         * avatar is a separate resource. The header therefore decodes the next
-         * avatar in a detached image first and swaps only once it can paint, so
-         * the visible button goes canonical-avatar -> final avatar in one step,
-         * with no intermediate empty frame and no hidden image.
+         * avatar is a separate resource. The header therefore loads AND DECODES
+         * the next avatar in a detached image first and assigns it to the visible
+         * one only once it can paint, so the button goes canonical-avatar ->
+         * final avatar in one step, with no intermediate empty frame and no
+         * hidden image.
          *
-         * A decode failure keeps the canonical ArtSoul avatar and stamps a
-         * distinct failed key, so the next render for the same (or a newer) URL
-         * re-requests the image exactly once instead of treating it as rendered.
-         * Connection semantics are untouched either way: the name, the address,
-         * the network row and Disconnect are what carry connectedness.
+         * 'load' alone is not that guarantee: it fires when the resource has
+         * arrived, while the bitmap may still be decoding, so a commit on 'load'
+         * can still hand the compositor an image it cannot paint yet.
+         * HTMLImageElement.decode() is the promise that resolves only when the
+         * frame is ready. Where it is unavailable, the 'load' event remains the
+         * safe fallback — it is strictly no worse than the behaviour it replaces.
+         *
+         * A load error or a decode rejection keeps the canonical ArtSoul avatar
+         * and stamps a distinct failed key, so the next render for the same (or a
+         * newer) URL re-requests the image exactly once instead of treating it as
+         * rendered. Connection semantics are untouched either way: the name, the
+         * address, the network row and Disconnect are what carry connectedness.
+         *
+         * Every asynchronous boundary — load, decode settlement — re-checks the
+         * stamped content key, so a late result from a superseded render or a
+         * previous wallet can never reach the visible image.
          */
         commitAvatarImage(button, image, { nextUrl, alt, contentKey, fallback, identity }) {
             image.alt = alt || 'ArtSoul';
@@ -235,11 +271,10 @@
 
             if (image.getAttribute('src') === nextUrl) return;
 
+            const neutral = fallback || NEUTRAL_AVATAR_URL;
+            const isCurrentRender = () => button.dataset.avatarContentKey === contentKey;
             const commit = (url, failed) => {
-                // A late result from a previous wallet's avatar must never touch
-                // the identity now on screen. Every render stamps a fresh content
-                // key, so a mismatch proves this callback is superseded.
-                if (button.dataset.avatarContentKey !== contentKey) return;
+                if (!isCurrentRender()) return;
                 if (failed) button.dataset.avatarContentKey = `${contentKey}|image-error`;
                 if (image.getAttribute('src') !== url) image.src = url;
             };
@@ -247,8 +282,18 @@
             const preloader = typeof Image === 'function'
                 ? new Image()
                 : document.createElement('img');
-            preloader.onload = () => commit(nextUrl, false);
-            preloader.onerror = () => commit(fallback || NEUTRAL_AVATAR_URL, true);
+            preloader.onerror = () => commit(neutral, true);
+            preloader.onload = () => {
+                if (!isCurrentRender()) return;
+                if (typeof preloader.decode !== 'function') {
+                    commit(nextUrl, false);
+                    return;
+                }
+                preloader.decode().then(
+                    () => commit(nextUrl, false),
+                    () => commit(neutral, true)
+                );
+            };
             preloader.src = nextUrl;
         }
 

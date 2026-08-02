@@ -17,9 +17,11 @@ const sharedHeaderPages = [
 test('guest avatar uses the local ArtSoul image with the generated fallback', () => {
   assert.equal(fs.existsSync('default-avatar.png'), true);
   assert.match(avatarDropdown, /src="\/default-avatar\.png"/);
-  // A failed avatar decode falls back to the canonical ArtSoul image without
-  // changing connection semantics; the visible <img> is never blanked.
-  assert.match(avatarDropdown, /preloader\.onerror = \(\) => commit\(fallback \|\| NEUTRAL_AVATAR_URL, true\);/);
+  // A failed avatar load OR decode falls back to the canonical ArtSoul image
+  // without changing connection semantics; the visible <img> is never blanked.
+  assert.match(avatarDropdown, /const neutral = fallback \|\| NEUTRAL_AVATAR_URL;/);
+  assert.match(avatarDropdown, /preloader\.onerror = \(\) => commit\(neutral, true\);/);
+  assert.match(avatarDropdown, /\(\) => commit\(neutral, true\)\s*\);/);
   assert.match(avatarDropdown, /getProfileAvatarUrl\(profile\)/);
 });
 
@@ -200,8 +202,11 @@ test('the stylized "A" identity is gone from the shared header', () => {
   assert.doesNotMatch(avatarDropdown, /data:image\/svg\+xml,\$\{encodeURIComponent/);
   assert.doesNotMatch(avatarDropdown, /logoGradient/);
   assert.match(avatarDropdown, /const NEUTRAL_AVATAR_URL = '\/default-avatar\.png';/);
-  // A stale image error from a superseded render must not touch the current one.
-  assert.match(avatarDropdown, /if \(button\.dataset\.avatarContentKey !== contentKey\) return;/);
+  // A stale image result from a superseded render must not touch the current
+  // one, at any asynchronous boundary — load, decode settlement or error.
+  assert.match(avatarDropdown, /const isCurrentRender = \(\) => button\.dataset\.avatarContentKey === contentKey;/);
+  assert.match(avatarDropdown, /const commit = \(url, failed\) => \{\s*if \(!isCurrentRender\(\)\) return;/);
+  assert.match(avatarDropdown, /preloader\.onload = \(\) => \{\s*if \(!isCurrentRender\(\)\) return;/);
 });
 
 test('wallet transitions invalidate identity so a late response cannot leak an avatar', () => {
