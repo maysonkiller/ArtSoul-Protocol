@@ -1031,4 +1031,11 @@ window.ArtSoulDB = {
     getCreatorSales
 };
 
+// Readiness signal. The shared header is a synchronous head script, so it can
+// confirm a wallet before this module has evaluated. Announcing readiness
+// exactly once — after the COMPLETE public API above is assigned — lets the
+// header resolve the identity it deferred, without polling and without forcing
+// a render-blocking Supabase script into every page head.
+window.dispatchEvent(new CustomEvent('artsoul:db-ready'));
+
 console.log('📦 ArtSoul Database Client loaded');
