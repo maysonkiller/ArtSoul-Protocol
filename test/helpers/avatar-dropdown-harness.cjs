@@ -108,6 +108,14 @@ class FakeElement {
     this.onload = null;
     this.onerror = null;
     this._src = '';
+    // HTMLImageElement.decode(). It is a SEPARATE lifecycle stage from 'load':
+    // the resource can have arrived while the bitmap is still decoding, which is
+    // exactly the window a commit-on-load would paint into. A harness whose
+    // images support decode() must therefore let a test hold the two apart.
+    // Omitted entirely when the harness models a browser without decode().
+    if (tagName === 'img' && ownerHarness && ownerHarness.supportsDecode !== false) {
+      this.decode = () => ownerHarness.queueImageDecode(this, this._src);
+    }
   }
 
   get rel() { return this.attributes.rel || ''; }
@@ -211,12 +219,17 @@ class FakeElement {
  * options.settled         - initial window.artsoulWalletStateSettled
  * options.profiles        - map of lowercased wallet -> profile row
  * options.failingImages   - Set of image sources that must fail to load
+ * options.failingDecodes  - Set of image sources that LOAD but fail to decode
+ * options.supportsDecode  - false models a browser without Image.decode()
  * options.staticShellHtml - static #navButtons markup a product page ships, so
  *                           the harness can model what the browser paints
  *                           before avatar-dropdown.js touches anything
  */
 function createAvatarHarness(options = {}) {
   const harness = {};
+  // Read by FakeElement while building the static shell, so it must be known
+  // before the first image element exists.
+  harness.supportsDecode = options.supportsDecode !== false;
 
   const accessCalls = [];
   const profileCalls = [];
@@ -237,9 +250,16 @@ function createAvatarHarness(options = {}) {
     Object.entries(options.profiles || {}).map(([wallet, profile]) => [wallet.toLowerCase(), profile])
   );
   const failingImages = new Set(options.failingImages || []);
+  const failingDecodes = new Set(options.failingDecodes || []);
   // Pending image resolutions, drained by flush(). Mirrors a browser deferring
   // load/error until after the synchronous render completed.
   const pendingImages = [];
+  // Pending decode() settlements. Held separately from load so a test can
+  // observe the window where the resource has arrived but the bitmap is not
+  // ready to paint — the exact window a commit-on-load would paint into.
+  const pendingDecodes = [];
+  const decodeCalls = [];
+  let decodesDeferred = false;
   // Profile reads can be held open to model a slow mobile response.
   let profileGate = null;
   let profileBehaviour = null;
@@ -247,6 +267,16 @@ function createAvatarHarness(options = {}) {
   harness.queueImageLoad = (image, source) => {
     pendingImages.push({ image, source });
   };
+
+  harness.queueImageDecode = (image, source) => new Promise((resolve, reject) => {
+    // A source that never loaded, or one flagged as undecodable, rejects with
+    // an EncodingError exactly as the platform does.
+    const fails = failingImages.has(source) || failingDecodes.has(source);
+    pendingDecodes.push({
+      source,
+      settle: () => (fails ? reject(new Error(`decode failed for ${source}`)) : resolve())
+    });
+  });
 
   // Observer invoked at every point the component could have committed a
   // visible change, so a test can record the full visible-state history instead
@@ -490,6 +520,24 @@ function createAvatarHarness(options = {}) {
     failImage(source) { failingImages.add(source); },
     allowImage(source) { failingImages.delete(source); },
 
+    failDecode(source) { failingDecodes.add(source); },
+    allowDecode(source) { failingDecodes.delete(source); },
+
+    /** Sources whose decode() was actually awaited, in call order. */
+    decodeCalls,
+
+    /**
+     * Stop flush() from settling decode(), so a test can drive a load to
+     * completion and assert that the visible image has NOT changed yet.
+     */
+    deferDecodes() { decodesDeferred = true; },
+
+    /** Resume decode settlement; the next flush() drains what is pending. */
+    releaseDecodes() { decodesDeferred = false; },
+
+    /** decode() promises that have been requested but not settled. */
+    pendingDecodeCount() { return pendingDecodes.length; },
+
     /** The stable account button element, or null before first render. */
     button() { return navButtons.querySelector('.avatar-button'); },
 
@@ -554,6 +602,12 @@ function createAvatarHarness(options = {}) {
             if (typeof image.onload === 'function') image.onload.call(image, { type: 'load' });
             image.dispatchEvent({ type: 'load' });
           }
+          notifyCommit();
+        }
+        while (!decodesDeferred && pendingDecodes.length > 0) {
+          const entry = pendingDecodes.shift();
+          decodeCalls.push(entry.source);
+          entry.settle();
           notifyCommit();
         }
         while (pendingTimeouts.length > 0) {

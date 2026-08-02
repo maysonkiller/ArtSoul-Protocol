@@ -378,8 +378,8 @@ test('an avatar that fails to load keeps the connected shell and never blanks', 
   await harness.flush();
 
   assertNeverFlickers(history, 'failed avatar');
-  // The broken URL was never assigned to the visible <img>: it was decoded
-  // off-screen, failed there, and the canonical image simply stayed.
+  // The broken URL was never assigned to the visible <img>: it was loaded in a
+  // detached image, failed there, and the canonical image simply stayed.
   assert.deepEqual(transitions(history, 'imgSrc'), [NEUTRAL_AVATAR]);
   assert.equal(harness.avatarName(), 'Founder');
   assert.equal(harness.uiState(), 'connected', 'a decode failure must not change connection semantics');
@@ -529,12 +529,246 @@ test('a guest boot issues no preload hint and no resolving state', () => {
   assert.equal(harness.documentElement.classList.contains('wallet-state-resolving'), false);
 });
 
-test('a non-http cached avatar value is never turned into a preload hint', () => {
-  // The stored value is only ever a URL the profile itself produced, but a
-  // hostile or corrupted entry must not become a document-level fetch.
+/** The preload hints a boot with this storage would emit. */
+function preloadHints(storage) {
+  const harness = bootHarness({ settled: false, storage });
+  return harness.document.head.children.filter(node => node.attributes.rel === 'preload');
+}
+
+test('the preload hint is emitted only for the cached wallet the hint itself names', () => {
+  // Accepted: a validated wallet hint, a connected cached UI state, and an
+  // identity stored for exactly that wallet with an HTTPS avatar.
+  const accepted = preloadHints(cachedIdentityStorage(WALLET_A, 'Founder', AVATAR_A));
+  assert.equal(accepted.length, 1);
+  assert.equal(accepted[0].attributes.href, AVATAR_A);
+
+  // A root-relative avatar on this origin is equally acceptable.
+  const rootRelative = preloadHints(cachedIdentityStorage(WALLET_A, 'Founder', '/avatars/founder.png'));
+  assert.equal(rootRelative.length, 1);
+  assert.equal(rootRelative[0].attributes.href, '/avatars/founder.png');
+});
+
+test('the preload hint is refused whenever it is not bound to the validated wallet', () => {
+  const refused = {
+    'identity stored for another wallet': {
+      artsoul_wallet: WALLET_A,
+      artsoul_header_ui_state: 'connected',
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_B, name: 'Bravo', avatarUrl: AVATAR_B })
+    },
+    'no wallet hint, only a connected cached state': {
+      artsoul_header_ui_state: 'connected',
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_A, name: 'Founder', avatarUrl: AVATAR_A })
+    },
+    'wallet hint present but the cached state is not connected': {
+      artsoul_wallet: WALLET_A,
+      artsoul_header_ui_state: 'disconnected',
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_A, name: 'Founder', avatarUrl: AVATAR_A })
+    },
+    'malformed wallet hint': {
+      artsoul_wallet: '0xnot-an-address',
+      artsoul_header_ui_state: 'connected',
+      artsoul_header_identity: JSON.stringify({ wallet: WALLET_A, name: 'Founder', avatarUrl: AVATAR_A })
+    },
+    'malformed identity JSON': {
+      artsoul_wallet: WALLET_A,
+      artsoul_header_ui_state: 'connected',
+      artsoul_header_identity: '{"wallet":'
+    },
+    'identity with no wallet': {
+      artsoul_wallet: WALLET_A,
+      artsoul_header_ui_state: 'connected',
+      artsoul_header_identity: JSON.stringify({ name: 'Founder', avatarUrl: AVATAR_A })
+    },
+    'identity with a malformed wallet': {
+      artsoul_wallet: WALLET_A,
+      artsoul_header_ui_state: 'connected',
+      artsoul_header_identity: JSON.stringify({ wallet: '0xzz', name: 'Founder', avatarUrl: AVATAR_A })
+    }
+  };
+
+  for (const [label, storage] of Object.entries(refused)) {
+    assert.equal(preloadHints(storage).length, 0, `${label} must not become a document-level fetch`);
+  }
+});
+
+test('the preload hint refuses every URL that is not HTTPS or root-relative on this origin', () => {
+  const refusedUrls = [
+    '//cdn.artsoul.test/avatar-a.png',          // protocol-relative: a foreign origin
+    'http://cdn.artsoul.test/avatar-a.png',     // cleartext external
+    'data:image/png;base64,AAAA',
+    'javascript:alert(1)',
+    'blob:https://cdn.artsoul.test/abcd',
+    'https:/cdn.artsoul.test/avatar.png',       // malformed HTTPS
+    'avatar-a.png',                             // relative, not root-relative
+    ''
+  ];
+  for (const url of refusedUrls) {
+    assert.equal(
+      preloadHints(cachedIdentityStorage(WALLET_A, 'Founder', url)).length,
+      0,
+      `${url || '<empty>'} must not become a document-level fetch`
+    );
+  }
+});
+
+test('a refused preload hint still leaves the cached identity purely visual', () => {
+  // Refusing the hint must not change what the header renders or what it grants:
+  // the cached identity is restored for continuity and authorizes nothing.
   const harness = bootHarness({
     settled: false,
-    storage: cachedIdentityStorage(WALLET_A, 'Founder', 'javascript:alert(1)')
+    storage: cachedIdentityStorage(WALLET_A, 'Founder', 'http://cdn.artsoul.test/avatar-a.png')
   });
+  harness.dropdown.renderInitializingState();
   assert.equal(harness.document.head.children.length, 0);
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.context.window.currentWalletAddress, undefined);
+  assert.equal(harness.context.window.artsoulWalletStateSettled, false);
+  assert.equal(harness.dropdown.resolvedIdentityWallet, null);
+});
+
+// ---------------------------------------------------------------------------
+// 10 — load is not decode
+//
+// 'load' fires when the resource has arrived; the bitmap can still be decoding.
+// Committing on 'load' can therefore still hand the compositor an image it
+// cannot paint yet, which is the very frame this PR exists to remove. The
+// visible <img> must change only after decode() settles.
+// ---------------------------------------------------------------------------
+
+test('a completed load with a pending decode leaves the visible image untouched', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const { history, record } = track(harness);
+  harness.deferDecodes();
+
+  record();
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  // The resource has arrived and decode() was requested, but has not settled.
+  assert.ok(harness.imageLoads.includes(AVATAR_A), 'the detached image must have loaded');
+  assert.equal(harness.pendingDecodeCount(), 1, 'decode must still be pending');
+  assert.equal(harness.decodeCalls.length, 0, 'no decode has settled yet');
+  // The visible image is unchanged: still the canonical avatar, never blank.
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR, 'load alone must not commit');
+  assertNeverFlickers(history, 'load pending decode');
+  // Identity text is already correct; only the picture waits.
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.uiState(), 'connected');
+
+  // 2 — the swap happens only once decode resolves.
+  harness.releaseDecodes();
+  await harness.flush();
+
+  assert.deepEqual(harness.decodeCalls, [AVATAR_A]);
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assertNeverFlickers(history, 'decode resolved');
+  assertMonotonic(history, 'imgSrc', 'decode resolved');
+  assert.deepEqual(transitions(history, 'imgSrc'), [NEUTRAL_AVATAR, AVATAR_A]);
+});
+
+test('a decode rejection keeps the canonical fallback and changes no connection semantics', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } },
+    // The resource loads; only the bitmap is undecodable.
+    failingDecodes: [AVATAR_A]
+  });
+  const { history, record } = track(harness);
+
+  record();
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  assert.ok(harness.imageLoads.includes(AVATAR_A), 'the load itself succeeded');
+  assert.deepEqual(harness.decodeCalls, [AVATAR_A], 'the decode was attempted');
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR, 'an undecodable avatar must not reach the visible image');
+  assert.deepEqual(transitions(history, 'imgSrc'), [NEUTRAL_AVATAR], 'and must never blank it');
+  assertNeverFlickers(history, 'decode rejection');
+  // Connection semantics are untouched.
+  assert.equal(harness.uiState(), 'connected');
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.avatarAddress(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
+  assert.match(harness.menuHtml(), /Disconnect/);
+  assert.doesNotMatch(harness.menuHtml(), /Connect Wallet/);
+  // The failure is recorded so a later render re-requests the avatar once.
+  assert.match(harness.button().dataset.avatarContentKey, /\|image-error$/);
+});
+
+test('a decode that settles after a wallet switch cannot modify the current wallet', async () => {
+  const harness = bootHarness({
+    profiles: {
+      [WALLET_A]: { wallet_address: WALLET_A, username: 'Alpha', avatar_url: AVATAR_A },
+      [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B }
+    }
+  });
+  const { history, record } = track(harness);
+  harness.deferDecodes();
+
+  record();
+  connect(harness, WALLET_A);
+  await harness.flush();
+  // Wallet A's resource has arrived; its decode is still in flight.
+  assert.equal(harness.pendingDecodeCount(), 1);
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+
+  connect(harness, WALLET_B);
+  await harness.flush();
+
+  // Both decodes settle, A's first — its commit must be rejected outright.
+  harness.releaseDecodes();
+  await harness.flush();
+
+  assert.ok(harness.decodeCalls.includes(AVATAR_A), 'wallet A did settle its decode');
+  assert.equal(harness.avatarSrc(), AVATAR_B, 'a stale decode must not repaint the current wallet');
+  assert.equal(harness.avatarName(), 'Bravo');
+  assert.equal(harness.avatarAddress(), `${WALLET_B.slice(0, 6)}...${WALLET_B.slice(-4)}`);
+  assertNeverFlickers(history, 'stale decode after a wallet switch');
+  for (const state of history) {
+    if (state.address === `${WALLET_B.slice(0, 6)}...${WALLET_B.slice(-4)}`) {
+      assert.notEqual(state.imgSrc, AVATAR_A, 'wallet B must never wear wallet A avatar');
+    }
+  }
+});
+
+test('a browser without Image.decode() falls back to the load event and still never blanks', async () => {
+  const harness = bootHarness({
+    supportsDecode: false,
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const { history, record } = track(harness);
+
+  record();
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  assert.equal(harness.decodeCalls.length, 0, 'decode() does not exist in this browser');
+  assert.equal(harness.avatarSrc(), AVATAR_A, 'the load event remains the safe fallback');
+  assert.equal(harness.avatarName(), 'Founder');
+  assertNeverFlickers(history, 'no decode support');
+  assertMonotonic(history, 'imgSrc', 'no decode support');
+  assert.deepEqual(transitions(history, 'imgSrc'), [NEUTRAL_AVATAR, AVATAR_A]);
+
+  // A failing image still falls back correctly without decode().
+  const failing = bootHarness({
+    supportsDecode: false,
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } },
+    failingImages: [AVATAR_A]
+  });
+  connect(failing, WALLET_A);
+  await failing.flush();
+  assert.equal(failing.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(failing.uiState(), 'connected');
+  assert.match(failing.button().dataset.avatarContentKey, /\|image-error$/);
+});
+
+test('the component awaits decode before touching the visible image', () => {
+  // Source contract behind the behavioural cases above: the commit is reached
+  // only through decode(), and a rejection routes to the canonical fallback.
+  const component = fs.readFileSync(path.join(ROOT, 'avatar-dropdown.js'), 'utf8');
+  assert.match(
+    component,
+    /preloader\.decode\(\)\.then\(\s*\(\) => commit\(nextUrl, false\),\s*\(\) => commit\(neutral, true\)\s*\);/
+  );
+  assert.match(component, /if \(typeof preloader\.decode !== 'function'\) \{\s*commit\(nextUrl, false\);/);
 });
