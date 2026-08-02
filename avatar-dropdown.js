@@ -32,11 +32,31 @@
     // This script is loaded synchronously in the document head. Reserve the
     // connected shell before the header HTML can paint so a saved wallet never
     // flashes the static guest identity while its final profile is restored.
+    //
+    // 'wallet-state-resolving' withholds the identity TEXT only. The canonical
+    // ArtSoul avatar in the static markup stays visible, so the account button
+    // is never an empty pill — see the matching rule in unified-styles.css.
     try {
         const walletHint = String(localStorage.getItem('artsoul_wallet') || '').toLowerCase();
         const cachedUiState = localStorage.getItem('artsoul_header_ui_state');
         if (/^0x[a-f0-9]{40}$/.test(walletHint) || cachedUiState === 'connected') {
             document.documentElement.classList.add('wallet-state-resolving');
+            // Start fetching the cached avatar with the document itself instead
+            // of after the header has been parsed. On a repeat navigation the
+            // response is already in the HTTP cache, so the one swap from the
+            // canonical avatar to the user's own avatar lands within the first
+            // paints instead of hundreds of milliseconds later. Platform
+            // preload hint only — it changes no identity and grants nothing.
+            const cachedAvatarUrl = JSON.parse(
+                localStorage.getItem('artsoul_header_identity') || 'null'
+            )?.avatarUrl;
+            if (typeof cachedAvatarUrl === 'string' && /^(https?:\/\/|\/)/.test(cachedAvatarUrl)) {
+                const preloadLink = document.createElement('link');
+                preloadLink.rel = 'preload';
+                preloadLink.as = 'image';
+                preloadLink.href = cachedAvatarUrl;
+                document.head?.appendChild(preloadLink);
+            }
         }
     } catch {
         // Storage can be unavailable in privacy-restricted browsers.
@@ -153,31 +173,22 @@
                 return structure;
             }
 
+            // Stamped before the image work so the asynchronous commit below can
+            // recognise its own render, and so a superseded render is rejected.
+            button.dataset.avatarContentKey = contentKey;
+
             if (image) {
-                const revealAvatar = () => image.classList.remove('avatar-image-loading');
-                if (image.getAttribute('src') !== nextAvatarUrl) {
-                    image.classList.add('avatar-image-loading');
-                    image.addEventListener('load', revealAvatar, { once: true });
-                }
-                image.src = nextAvatarUrl;
-                image.alt = avatarAlt || nextName || 'ArtSoul';
-                image.onerror = () => {
-                    image.onerror = null;
-                    // A late error from a previous wallet's avatar must never
-                    // touch the identity now on screen. Every render stamps a
-                    // fresh content key, so a mismatch proves this callback
-                    // belongs to a superseded render.
-                    if (button.dataset.avatarContentKey !== contentKey) return;
-                    image.src = fallback;
-                    // The fallback is now on screen, so the stamped content key
-                    // would otherwise claim the requested avatar rendered
-                    // successfully and make every later render a no-op. Stamp a
-                    // distinct failed key instead: the next render for the same
-                    // (or a newer) avatar URL re-requests the image exactly once.
-                    button.dataset.avatarContentKey = `${contentKey}|image-error`;
-                    if (image.complete) revealAvatar();
-                };
-                if (image.complete) revealAvatar();
+                this.commitAvatarImage(button, image, {
+                    nextUrl: nextAvatarUrl,
+                    alt: avatarAlt || nextName,
+                    contentKey,
+                    fallback,
+                    // The account the image belongs to. Derived from the visible
+                    // address (empty for guest) because it is identical across
+                    // every render path for the same wallet, unlike the render
+                    // key, which also encodes the chain and the render source.
+                    identity: address || 'guest'
+                });
             }
             if (nameNode) nameNode.textContent = nextName;
             if (addressNode) {
@@ -186,8 +197,59 @@
                 addressNode.setAttribute('aria-hidden', address ? 'false' : 'true');
             }
 
-            button.dataset.avatarContentKey = contentKey;
             return structure;
+        }
+
+        /**
+         * Swap the account-button avatar without ever blanking it.
+         *
+         * Assigning a new src to a live <img> discards the rendered frame
+         * immediately: the browser paints an empty box until the replacement has
+         * decoded. Across full-document navigation that is guaranteed to happen,
+         * because every document starts from the static markup and the user's own
+         * avatar is a separate resource. The header therefore decodes the next
+         * avatar in a detached image first and swaps only once it can paint, so
+         * the visible button goes canonical-avatar -> final avatar in one step,
+         * with no intermediate empty frame and no hidden image.
+         *
+         * A decode failure keeps the canonical ArtSoul avatar and stamps a
+         * distinct failed key, so the next render for the same (or a newer) URL
+         * re-requests the image exactly once instead of treating it as rendered.
+         * Connection semantics are untouched either way: the name, the address,
+         * the network row and Disconnect are what carry connectedness.
+         */
+        commitAvatarImage(button, image, { nextUrl, alt, contentKey, fallback, identity }) {
+            image.alt = alt || 'ArtSoul';
+
+            // Keeping the previous avatar during the decode is only correct while
+            // it still belongs to the account being rendered. On a wallet change
+            // it would put one account's avatar next to another's name and
+            // address, so the canonical ArtSoul image takes over in the same
+            // frame as the new identity text. It is a local, already-decoded
+            // asset the document has painted, so this is a swap, not a blank.
+            if (image.dataset.avatarIdentity !== identity
+                && image.getAttribute('src') !== NEUTRAL_AVATAR_URL) {
+                image.src = NEUTRAL_AVATAR_URL;
+            }
+            image.dataset.avatarIdentity = identity;
+
+            if (image.getAttribute('src') === nextUrl) return;
+
+            const commit = (url, failed) => {
+                // A late result from a previous wallet's avatar must never touch
+                // the identity now on screen. Every render stamps a fresh content
+                // key, so a mismatch proves this callback is superseded.
+                if (button.dataset.avatarContentKey !== contentKey) return;
+                if (failed) button.dataset.avatarContentKey = `${contentKey}|image-error`;
+                if (image.getAttribute('src') !== url) image.src = url;
+            };
+
+            const preloader = typeof Image === 'function'
+                ? new Image()
+                : document.createElement('img');
+            preloader.onload = () => commit(nextUrl, false);
+            preloader.onerror = () => commit(fallback || NEUTRAL_AVATAR_URL, true);
+            preloader.src = nextUrl;
         }
 
         updateStableMenu(html, menuKey) {

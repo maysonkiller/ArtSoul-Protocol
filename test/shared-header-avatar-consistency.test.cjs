@@ -168,7 +168,11 @@ test('an avatar image error falls back but never suppresses a later retry', asyn
   await harness.flush();
 
   assert.equal(harness.avatarSrc(), AVATAR_A);
-  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 2);
+  // Two requests per successful render: the off-screen decode, then the visible
+  // <img> assignment that the browser serves from the same cache entry. The
+  // failed first attempt contributed one. What matters is that the retry
+  // actually re-requested the avatar instead of being suppressed.
+  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 3);
 });
 
 // 5 — profile/avatar update while wallet and chain are unchanged

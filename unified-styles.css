@@ -4687,9 +4687,12 @@ html.future .site-header .logo-link > .site-logo {
     transition: none !important;
 }
 
-/* Keep the fixed account-button shell visible while AppKit restores a saved
-   session, but never paint a guest or address-only identity underneath it. */
-html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
+/* Keep the fixed account-button shell AND the canonical ArtSoul avatar visible
+   while AppKit restores a saved session; only the identity TEXT is withheld, so
+   no guest or address-only identity is painted underneath it. Hiding the whole
+   button content instead produced an empty pill on every document navigation —
+   on mobile, where .avatar-info is display:none, nothing was left at all. */
+html.wallet-state-resolving .site-header #navButtons .avatar-info > * {
     visibility: hidden !important;
 }
 
@@ -4701,10 +4704,6 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     min-height: 30px !important;
     max-height: 30px !important;
     flex: 0 0 30px !important;
-}
-
-.site-header #navButtons .avatar-button > img.avatar-image-loading {
-    visibility: hidden !important;
 }
 
 .site-header #navButtons .avatar-info {

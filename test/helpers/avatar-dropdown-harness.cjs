@@ -105,9 +105,17 @@ class FakeElement {
     // <img> semantics: `complete` mirrors a decoded image and flips only when
     // the harness resolves the requested source.
     this.complete = false;
+    this.onload = null;
     this.onerror = null;
     this._src = '';
   }
+
+  get rel() { return this.attributes.rel || ''; }
+  set rel(value) { this.attributes.rel = String(value); }
+  get as() { return this.attributes.as || ''; }
+  set as(value) { this.attributes.as = String(value); }
+  get href() { return this.attributes.href || ''; }
+  set href(value) { this.attributes.href = String(value); }
 
   set innerHTML(value) {
     this._innerHTML = String(value);
@@ -203,6 +211,9 @@ class FakeElement {
  * options.settled         - initial window.artsoulWalletStateSettled
  * options.profiles        - map of lowercased wallet -> profile row
  * options.failingImages   - Set of image sources that must fail to load
+ * options.staticShellHtml - static #navButtons markup a product page ships, so
+ *                           the harness can model what the browser paints
+ *                           before avatar-dropdown.js touches anything
  */
 function createAvatarHarness(options = {}) {
   const harness = {};
@@ -237,11 +248,28 @@ function createAvatarHarness(options = {}) {
     pendingImages.push({ image, source });
   };
 
+  // Observer invoked at every point the component could have committed a
+  // visible change, so a test can record the full visible-state history instead
+  // of only the settled state.
+  let commitObserver = null;
+  const notifyCommit = () => { if (commitObserver) commitObserver(); };
+
   const documentElement = new FakeElement('html', harness);
   const body = new FakeElement('body', harness);
   const navButtons = new FakeElement('div', harness);
   navButtons.id = 'navButtons';
   body.appendChild(navButtons);
+  // The static shell every product page ships inside #navButtons. Materialising
+  // it reproduces the real first paint: the browser has already painted the
+  // canonical avatar before a single line of component code runs.
+  if (options.staticShellHtml) {
+    navButtons.innerHTML = options.staticShellHtml;
+    navButtons.dataset.avatarRenderKey = 'initializing';
+    // The static markup is part of the document: it is already decoded when the
+    // first paint happens, exactly like a browser serving it from cache.
+    const shellImage = navButtons.querySelector('[data-avatar-image]');
+    if (shellImage) shellImage.complete = true;
+  }
 
   const storage = new Map(Object.entries(options.storage || {}));
   const localStorage = {
@@ -290,6 +318,12 @@ function createAvatarHarness(options = {}) {
         if (index >= 0) pendingTimeouts.splice(index, 1);
     },
     localStorage,
+    // The shared header decodes the next avatar in a detached image before it
+    // swaps the visible one, so the harness must provide the same constructor
+    // the browser does.
+    Image: class {
+      constructor() { return new FakeElement('img', harness); }
+    },
     navigator: { userAgent: options.userAgent || 'node-test' },
     MutationObserver: class {
       constructor(callback) { this.callback = callback; mutationObservers.push(this); }
@@ -420,6 +454,19 @@ function createAvatarHarness(options = {}) {
     /** Timers scheduled but not yet fired (a cancelled timer is gone). */
     pendingTimerCount() { return pendingTimeouts.length; },
 
+    /**
+     * Flip a still-parsing document to 'complete' and fire DOMContentLoaded,
+     * exactly as the browser does after the last of the shared header's boot
+     * scripts. Only meaningful with `readyState: 'loading'`, which models the
+     * real ordering: the component is a synchronous head script, so it runs
+     * long before the document has finished parsing.
+     */
+    fireDomContentLoaded() {
+      document.readyState = 'complete';
+      for (const handler of documentListeners.get('DOMContentLoaded') || []) handler({ type: 'DOMContentLoaded' });
+      notifyCommit();
+    },
+
     /** Dispatch 'artsoul:db-ready' without touching window.ArtSoulDB. */
     dispatchDbReady() {
       context.window.dispatchEvent(new context.CustomEvent('artsoul:db-ready'));
@@ -481,8 +528,20 @@ function createAvatarHarness(options = {}) {
       for (const observer of mutationObservers) observer.callback([], observer);
     },
 
+    /**
+     * Install an observer invoked at every point the component could have
+     * committed a visible change (each image resolution, each timer, each
+     * microtask round). Tests use it to record the full visible-state history
+     * so a forbidden INTERMEDIATE state cannot hide behind a correct final one.
+     */
+    observeCommits(fn) {
+      commitObserver = typeof fn === 'function' ? fn : null;
+      notifyCommit();
+    },
+
     /** Resolve pending image requests and drain microtasks. */
     async flush() {
+      notifyCommit();
       for (let round = 0; round < 8; round += 1) {
         while (pendingImages.length > 0) {
           const { image, source } = pendingImages.shift();
@@ -492,15 +551,19 @@ function createAvatarHarness(options = {}) {
             if (typeof onerror === 'function') onerror.call(image, { type: 'error' });
           } else {
             image.complete = true;
+            if (typeof image.onload === 'function') image.onload.call(image, { type: 'load' });
             image.dispatchEvent({ type: 'load' });
           }
+          notifyCommit();
         }
         while (pendingTimeouts.length > 0) {
           const entry = pendingTimeouts.shift();
           scheduledDelays.push(entry.delay);
           entry.fn();
+          notifyCommit();
         }
         await new Promise(resolve => setImmediate(resolve));
+        notifyCommit();
       }
     }
   });
