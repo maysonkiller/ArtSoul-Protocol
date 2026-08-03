@@ -108,6 +108,10 @@ class FakeElement {
     this.onload = null;
     this.onerror = null;
     this._src = '';
+    // A decoded image has intrinsic dimensions; the preview capture reads them.
+    this.naturalWidth = 0;
+    this.naturalHeight = 0;
+    this.crossOrigin = null;
     // HTMLImageElement.decode(). It is a SEPARATE lifecycle stage from 'load':
     // the resource can have arrived while the bitmap is still decoding, which is
     // exactly the window a commit-on-load would paint into. A harness whose
@@ -251,6 +255,8 @@ function createAvatarHarness(options = {}) {
   );
   const failingImages = new Set(options.failingImages || []);
   const failingDecodes = new Set(options.failingDecodes || []);
+  // Sources whose host sends no CORS headers: an anonymous request fails.
+  const corsBlockedImages = new Set(options.corsBlockedImages || []);
   // Pending image resolutions, drained by flush(). Mirrors a browser deferring
   // load/error until after the synchronous render completed.
   const pendingImages = [];
@@ -324,7 +330,34 @@ function createAvatarHarness(options = {}) {
       documentListeners.get(type).push(handler);
     },
     removeEventListener() {},
-    createElement: tag => new FakeElement(tag, harness),
+    createElement: tag => {
+      const element = new FakeElement(tag, harness);
+      // Minimal <canvas> so the paint-ready avatar preview capture can be
+      // driven deterministically: options.canvasExport decides whether the
+      // export succeeds, throws a SecurityError (tainted canvas, the real
+      // no-CORS behaviour) or is unavailable altogether.
+      if (tag === 'canvas') {
+        element.getContext = () => (options.canvasExport === 'no-context' ? null : { drawImage() {} });
+        element.toDataURL = (type) => {
+          if (options.canvasExport === 'tainted') {
+            const error = new Error('Tainted canvases may not be exported.');
+            error.name = 'SecurityError';
+            throw error;
+          }
+          if (options.canvasExport === 'oversized') {
+            return `data:image/png;base64,${'A'.repeat(40 * 1024)}`;
+          }
+          if (options.canvasExport === 'svg') return 'data:image/svg+xml;base64,PHN2Zy8+';
+          if (type === 'image/webp' && options.canvasExport === 'no-webp') {
+            return 'data:image/png;base64,QUJD';
+          }
+          return type === 'image/webp'
+            ? 'data:image/webp;base64,V0VCUFBSRVZJRVc='
+            : 'data:image/png;base64,UE5HUFJFVklFVw==';
+        };
+      }
+      return element;
+    },
     getElementById(id) {
       return matches(body, `#${id}`) ? body : body.querySelector(`#${id}`);
     },
@@ -573,6 +606,15 @@ function createAvatarHarness(options = {}) {
     /** Currently displayed avatar source. */
     avatarSrc() { return harness.avatarImage()?.getAttribute('src') || ''; },
 
+    /**
+     * What the displayed pixels REPRESENT, which is not always what is in src:
+     * a restored paint-ready preview paints in place of its own source URL.
+     */
+    avatarSource() { return harness.avatarImage()?.dataset.avatarSource || ''; },
+
+    /** True when the button displays a locally cached preview data URI. */
+    avatarIsPreview() { return /^data:image\//.test(harness.avatarSrc()); },
+
     /** Currently displayed account name. */
     avatarName() {
       return navButtons.querySelector('[data-avatar-name]')?.textContent || '';
@@ -621,8 +663,15 @@ function createAvatarHarness(options = {}) {
           if (failingImages.has(source)) {
             const onerror = image.onerror;
             if (typeof onerror === 'function') onerror.call(image, { type: 'error' });
+          } else if (corsBlockedImages.has(source) && image.crossOrigin === 'anonymous') {
+            // A host without CORS headers rejects the anonymous request. The
+            // component must retry once without it so the avatar still renders.
+            const onerror = image.onerror;
+            if (typeof onerror === 'function') onerror.call(image, { type: 'error' });
           } else {
             image.complete = true;
+            image.naturalWidth = 200;
+            image.naturalHeight = 200;
             if (typeof image.onload === 'function') image.onload.call(image, { type: 'load' });
             image.dispatchEvent({ type: 'load' });
           }

@@ -307,8 +307,10 @@ test('a cached connected identity with no live session resolves to guest exactly
   assertNeverFlickers(history, 'cached identity without a session');
   // One authoritative change, never back and forth.
   assertMonotonic(history, 'uiState', 'cached identity without a session');
-  // 'resolving' is the coherent state held while the cached avatar decodes.
-  assert.deepEqual(transitions(history, 'uiState'), [null, 'resolving', 'connected', 'disconnected']);
+  // 'resolving' is the coherent state held while the cached avatar decodes;
+  // 'restoring' is the restored cached presentation, which authorizes nothing
+  // and is never persisted. Only the settled provider produces 'connected'.
+  assert.deepEqual(transitions(history, 'uiState'), [null, 'resolving', 'restoring', 'disconnected']);
   assert.equal(harness.avatarName(), 'ArtSoul Guest');
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assert.equal(harness.avatarAddress(), '');
@@ -912,8 +914,8 @@ test('the component awaits decode before touching the visible image', () => {
   // Source contract behind the behavioural cases above: the commit is reached
   // only through decode(), and a rejection routes to the canonical fallback.
   const component = fs.readFileSync(path.join(ROOT, 'avatar-dropdown.js'), 'utf8');
-  assert.match(component, /preloader\.decode\(\)\.then\(\(\) => settle\(false\), \(\) => settle\(true\)\);/);
-  assert.match(component, /if \(typeof preloader\.decode !== 'function'\) \{\s*settle\(false\);/);
+  assert.match(component, /preloader\.decode\(\)\.then\(/);
+  assert.match(component, /if \(typeof preloader\.decode !== 'function'\) \{\s*commitAndCapture\(\);/);
   // The commit itself is one guarded transaction, never a per-field write.
   assert.match(component, /commitIdentitySnapshot\(\{ button \}, snapshot, token, failed\)/);
   assert.match(component, /this\.holdIdentityWhilePending\(structure, snapshot\);\s*this\.decodeThenCommitIdentity\(structure, snapshot, token\);/);
@@ -1066,7 +1068,7 @@ test('a transient bootstrap disconnect cannot repaint a committed cached identit
   record();
   harness.dropdown.renderInitializingState();
   await harness.flush();
-  assert.equal(harness.uiState(), 'connected');
+  assert.equal(harness.uiState(), 'restoring');
   assert.equal(harness.avatarName(), 'Founder');
 
   // The SDK writes a transient 'disconnected' partway through restoring the
@@ -1078,7 +1080,7 @@ test('a transient bootstrap disconnect cannot repaint a committed cached identit
     await harness.flush();
   }
 
-  assert.equal(harness.uiState(), 'connected', 'a transient SDK value must not repaint guest');
+  assert.equal(harness.uiState(), 'restoring', 'a transient SDK value must not repaint guest');
   assert.equal(harness.avatarName(), 'Founder');
   assert.equal(harness.avatarSrc(), AVATAR_A);
   assertMonotonic(history, 'uiState', 'transient bootstrap disconnect');
@@ -1136,7 +1138,7 @@ test('unrelated document mutations never reset a committed header identity', asy
   assert.equal(history.length, framesAfterHydration, 'unrelated mutations must commit nothing');
   assert.equal(harness.profileCalls.length, profileReads, 'unrelated mutations must not re-read the profile');
   assert.equal(harness.imageLoads.length, imageRequests, 'unrelated mutations must not re-request the avatar');
-  assert.equal(harness.uiState(), 'connected');
+  assert.equal(harness.uiState(), 'restoring');
   assert.equal(harness.avatarName(), 'Founder');
   assert.equal(harness.documentElement.classList.contains('wallet-state-resolving'), false);
 });
@@ -1153,7 +1155,7 @@ test('a genuinely removed header is still rebuilt by the observer', async () => 
   harness.triggerMutationObservers();
   await harness.flush();
 
-  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assert.equal(harness.avatarSource(), AVATAR_A);
   assert.equal(harness.avatarName(), 'Founder');
   assert.equal(harness.uiState(), 'connected');
 });
@@ -1185,7 +1187,7 @@ test('rapid navigation across every shared-header page stays coherent', async ()
 
     assertNeverFlickers(history, `rapid navigation ${page}`);
     assertMonotonic(history, 'uiState', `rapid navigation ${page}`);
-    assert.equal(harness.avatarSrc(), AVATAR_A, `${page}: settled avatar`);
+    assert.equal(harness.avatarSource(), AVATAR_A, `${page}: settled avatar`);
     assert.equal(harness.avatarName(), 'Founder', `${page}: settled name`);
     assert.equal(harness.uiState(), 'connected', `${page}: settled state`);
     // The neutral avatar is requested at most once per document, and never as a
@@ -1338,7 +1340,7 @@ test('a cached connected identity re-initialises without a half-identity frame',
   await harness.flush();
   assert.equal(harness.avatarSrc(), AVATAR_A);
   assert.equal(harness.avatarName(), 'Founder');
-  assert.equal(harness.uiState(), 'connected');
+  assert.equal(harness.uiState(), 'restoring');
   assertNoHalfIdentity(history, 'Founder', 'cached re-initialisation settled');
 });
 
@@ -1484,5 +1486,398 @@ test('every shared-header page ships exactly one of each header node', () => {
     assert.equal(count(/data-avatar-address/g), 1, `${page}: [data-avatar-address]`);
     assert.equal(count(/data-avatar-resolving/g), 1, `${page}: [data-avatar-resolving]`);
     assert.equal(count(/class="site-header"/g), 1, `${page}: .site-header`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 14 — paint-ready cached header avatar
+//
+// ArtSoul is an MPA: every navigation is a fresh document whose static shell
+// carries the canonical avatar, which users read as "wallet disconnected".
+// Caching only the remote URL still costs a network validation and a decode per
+// document, so the previously confirmed identity could not be restored before
+// the first frame and the header showed guest, then "Connecting…", then the
+// profile — on every navigation. A tiny validated local raster fixes that.
+// ---------------------------------------------------------------------------
+
+const PREVIEW_WEBP = 'data:image/webp;base64,V0VCUFBSRVZJRVc=';
+const PREVIEW_MAX_LENGTH = 32 * 1024;
+
+/** Storage for a wallet whose avatar has already been rendered once. */
+function restorableStorage(wallet, name, avatarUrl, previewOverrides = {}) {
+  return {
+    artsoul_wallet: wallet,
+    artsoul_header_ui_state: 'connected',
+    '@appkit/connection_status': 'connected',
+    artsoul_header_identity: JSON.stringify({
+      wallet,
+      name,
+      avatarUrl,
+      preview: { wallet, name, source: avatarUrl, dataUri: PREVIEW_WEBP, ...previewOverrides }
+    })
+  };
+}
+
+test('a successful avatar render stores a bounded paint-ready preview', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  const stored = JSON.parse(harness.storage.get('artsoul_header_identity'));
+  assert.equal(stored.preview.wallet, WALLET_A);
+  assert.equal(stored.preview.name, 'Founder');
+  assert.equal(stored.preview.source, AVATAR_A, 'the preview is bound to the avatar URL it came from');
+  assert.match(stored.preview.dataUri, /^data:image\/(?:png|jpeg|webp);base64,/);
+  assert.ok(stored.preview.dataUri.length <= PREVIEW_MAX_LENGTH, 'the preview must respect the size ceiling');
+  // Captured from the image the header had already decoded: no second request.
+  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 2);
+});
+
+test('a restorable cached identity is already on screen at the earliest bootstrap point', async () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: restorableStorage(WALLET_A, 'Founder', AVATAR_A),
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const { history, record } = track(harness);
+  // Nothing may resolve during this test: no image load, no decode, no timers.
+  harness.deferDecodes();
+
+  record();
+  harness.dropdown.renderInitializingState();
+  record();
+
+  // Synchronous, before any flush: the previously confirmed identity is back.
+  assert.equal(harness.avatarSrc(), PREVIEW_WEBP);
+  assert.equal(harness.avatarSource(), AVATAR_A);
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.avatarAddress(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
+  assert.equal(harness.uiState(), 'restoring');
+  // No guest and no "Connecting…" in any recorded frame.
+  for (const state of history) {
+    assert.notEqual(state.name, RESOLVING_LABEL, 'a restorable identity must not show the resolving label');
+    if (state.uiState === 'restoring') assert.notEqual(state.name, 'ArtSoul Guest');
+  }
+  assert.deepEqual(transitions(history, 'name'), ['ArtSoul Guest', 'Founder']);
+  assertNeverFlickers(history, 'restorable bootstrap');
+});
+
+test('a two-second remote avatar cannot pull a restored identity back to neutral', async () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: restorableStorage(WALLET_A, 'Founder', AVATAR_A),
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const { history, record } = track(harness);
+  // The original remote avatar never resolves for the whole test.
+  harness.deferDecodes();
+  const holdRemote = harness.holdProfileReads();
+
+  record();
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), PREVIEW_WEBP, 'the restored profile visual must survive a slow remote avatar');
+  assert.equal(harness.avatarName(), 'Founder');
+  for (const state of history) {
+    // Never falls back to the neutral avatar, and never shows the resolving
+    // label, while a restorable identity for this wallet exists.
+    if (state.name === 'Founder') assert.notEqual(state.imgSrc, NEUTRAL_AVATAR);
+    assert.notEqual(state.name, RESOLVING_LABEL);
+  }
+  holdRemote();
+  await harness.flush();
+  assert.equal(harness.avatarName(), 'Founder');
+  assertNeverFlickers(history, 'slow remote avatar');
+});
+
+test('the provider settling with the same wallet repaints nothing', async () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: restorableStorage(WALLET_A, 'Founder', AVATAR_A),
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+
+  const before = {
+    button: harness.button(),
+    image: harness.avatarImage(),
+    src: harness.avatarSrc(),
+    source: harness.avatarSource(),
+    name: harness.avatarName(),
+    address: harness.avatarAddress(),
+    children: harness.button().children.length
+  };
+  const imageRequests = harness.imageLoads.length;
+  const { history, record } = track(harness);
+  record();
+
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  assert.equal(harness.button(), before.button, 'the button node must not be replaced');
+  assert.equal(harness.avatarImage(), before.image, 'the image node must not be replaced');
+  assert.equal(harness.avatarSrc(), before.src, 'no image-src transition');
+  assert.equal(harness.avatarSource(), before.source);
+  assert.equal(harness.avatarName(), before.name, 'no name transition');
+  assert.equal(harness.avatarAddress(), before.address, 'no address transition');
+  assert.equal(harness.button().children.length, before.children, 'no geometry-affecting child change');
+  assert.equal(harness.imageLoads.length, imageRequests, 'a confirmed same wallet must not re-request the avatar');
+  // Only the UI state advances, from the cached presentation to the confirmed one.
+  assert.deepEqual(transitions(history, 'uiState'), ['restoring', 'connected']);
+  assert.deepEqual(transitions(history, 'imgSrc'), [before.src]);
+  assert.deepEqual(transitions(history, 'name'), [before.name]);
+});
+
+test('the provider settling disconnected commits guest in one transition', async () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: restorableStorage(WALLET_A, 'Founder', AVATAR_A)
+  });
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+  assert.equal(harness.avatarSrc(), PREVIEW_WEBP);
+
+  const { history, record } = track(harness);
+  record();
+  disconnect(harness);
+
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(harness.avatarName(), 'ArtSoul Guest');
+  assert.equal(harness.avatarAddress(), '');
+  assert.equal(harness.uiState(), 'disconnected');
+  await harness.flush();
+  assert.deepEqual(transitions(history, 'uiState'), ['restoring', 'disconnected']);
+  assertNeverFlickers(history, 'settled disconnect from a restored identity');
+});
+
+test('the provider settling with wallet B never shows wallet A beside B address', async () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: restorableStorage(WALLET_A, 'Alpha', AVATAR_A),
+    profiles: { [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B } }
+  });
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+  assert.equal(harness.avatarSrc(), PREVIEW_WEBP);
+
+  const { history, record } = track(harness);
+  record();
+  connect(harness, WALLET_B);
+  await harness.flush();
+
+  const shortB = `${WALLET_B.slice(0, 6)}...${WALLET_B.slice(-4)}`;
+  assert.equal(harness.avatarSource(), AVATAR_B);
+  assert.equal(harness.avatarName(), 'Bravo');
+  for (const [index, state] of history.entries()) {
+    if (state.address === shortB) {
+      assert.notEqual(state.imgSrc, PREVIEW_WEBP, `frame ${index}: wallet A visual beside wallet B address`);
+      assert.notEqual(state.name, 'Alpha', `frame ${index}: wallet A name beside wallet B address`);
+    }
+  }
+  assertNeverFlickers(history, 'wallet B supersedes a restored wallet A');
+});
+
+test('an invalid stored preview is rejected and the safe resolving path is used', async () => {
+  const shortA = `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`;
+  const rejected = {
+    'missing preview': { preview: undefined },
+    'wrong wallet': { wallet: WALLET_B },
+    'stale name': { name: 'Someone Else' },
+    'stale source': { source: 'https://cdn.artsoul.test/old.png' },
+    'oversized': { dataUri: `data:image/png;base64,${'A'.repeat(PREVIEW_MAX_LENGTH)}` },
+    'svg': { dataUri: 'data:image/svg+xml;base64,PHN2Zy8+' },
+    'javascript url': { dataUri: 'javascript:alert(1)' },
+    'html data url': { dataUri: 'data:text/html;base64,PHNjcmlwdD4=' },
+    'not a string': { dataUri: 12345 },
+    'corrupt base64 charset': { dataUri: 'data:image/png;base64,<<<>>>' }
+  };
+
+  for (const [label, override] of Object.entries(rejected)) {
+    const storage = restorableStorage(WALLET_A, 'Founder', AVATAR_A);
+    if ('preview' in override && override.preview === undefined) {
+      const identity = JSON.parse(storage.artsoul_header_identity);
+      delete identity.preview;
+      storage.artsoul_header_identity = JSON.stringify(identity);
+    } else {
+      const identity = JSON.parse(storage.artsoul_header_identity);
+      identity.preview = { ...identity.preview, ...override };
+      storage.artsoul_header_identity = JSON.stringify(identity);
+    }
+
+    const harness = bootHarness({ settled: false, storage });
+    harness.deferDecodes();
+    harness.dropdown.renderInitializingState();
+
+    assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR, `${label}: must not paint a rejected preview`);
+    assert.equal(harness.avatarName(), RESOLVING_LABEL, `${label}: must fall back to the resolving state`);
+    assert.equal(harness.avatarAddress(), shortA, `${label}: the resolving state stays coherent`);
+    assert.equal(harness.uiState(), 'resolving', `${label}: resolving, not restoring`);
+  }
+});
+
+test('corrupt identity JSON never restores anything', () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: {
+      artsoul_wallet: WALLET_A,
+      artsoul_header_ui_state: 'connected',
+      '@appkit/connection_status': 'connected',
+      artsoul_header_identity: '{"wallet":'
+    }
+  });
+  harness.dropdown.renderInitializingState();
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(harness.avatarName(), RESOLVING_LABEL);
+  assert.equal(harness.document.head.children.length, 0, 'no preload for a corrupt record');
+});
+
+test('a broken avatar never persists a preview', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } },
+    failingImages: [AVATAR_A]
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  const stored = JSON.parse(harness.storage.get('artsoul_header_identity') || 'null');
+  assert.equal(stored?.preview, undefined, 'a failed avatar must not leave a preview behind');
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(harness.avatarName(), 'Founder');
+});
+
+test('a tainted canvas fails safely and keeps the coherent resolving path', async () => {
+  const harness = bootHarness({
+    canvasExport: 'tainted',
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  // The profile is intact — only the optimisation is skipped.
+  assert.equal(harness.avatarSource(), AVATAR_A);
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.uiState(), 'connected');
+  const stored = JSON.parse(harness.storage.get('artsoul_header_identity'));
+  assert.equal(stored.preview, undefined);
+});
+
+test('an avatar host without CORS headers still renders, without a preview', async () => {
+  const harness = bootHarness({
+    corsBlockedImages: [AVATAR_A],
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+
+  assert.equal(harness.avatarSource(), AVATAR_A, 'the avatar must still render');
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assert.equal(harness.avatarName(), 'Founder');
+  const stored = JSON.parse(harness.storage.get('artsoul_header_identity'));
+  assert.equal(stored.preview, undefined, 'no preview is possible without CORS');
+  // Exactly one bounded retry, never a loop.
+  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 3);
+});
+
+test('an oversized or non-raster canvas export is never persisted', async () => {
+  for (const mode of ['oversized', 'svg', 'no-context']) {
+    const harness = bootHarness({
+      canvasExport: mode,
+      profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+    });
+    connect(harness, WALLET_A);
+    await harness.flush();
+    const stored = JSON.parse(harness.storage.get('artsoul_header_identity'));
+    assert.equal(stored.preview, undefined, `${mode}: must not be persisted`);
+    assert.equal(harness.avatarSource(), AVATAR_A, `${mode}: the avatar still renders`);
+  }
+});
+
+test('changing or removing the avatar invalidates the stored preview', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+  assert.ok(JSON.parse(harness.storage.get('artsoul_header_identity')).preview);
+
+  // A changed avatar replaces the preview with one for the new source.
+  harness.setProfile(WALLET_A, { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_B });
+  await harness.dropdown.refresh(WALLET_A);
+  await harness.flush();
+  const afterChange = JSON.parse(harness.storage.get('artsoul_header_identity'));
+  assert.equal(afterChange.avatarUrl, AVATAR_B);
+  assert.equal(afterChange.preview.source, AVATAR_B, 'the preview must follow the new avatar');
+
+  // A removed avatar leaves no preview at all.
+  harness.setProfile(WALLET_A, { wallet_address: WALLET_A, username: 'Founder', avatar_url: null });
+  await harness.dropdown.refresh(WALLET_A);
+  await harness.flush();
+  const afterRemoval = JSON.parse(harness.storage.get('artsoul_header_identity'));
+  assert.equal(afterRemoval.avatarUrl, NEUTRAL_AVATAR);
+  assert.equal(afterRemoval.preview, undefined, 'a removed avatar must not keep a preview');
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(harness.avatarName(), 'Founder');
+});
+
+test('an explicit disconnect followed by a reload never resurrects the connected visual', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+  assert.ok(JSON.parse(harness.storage.get('artsoul_header_identity')).preview);
+
+  disconnect(harness);
+  await harness.flush();
+  assert.equal(harness.storage.get('artsoul_header_identity'), undefined, 'disconnect clears the cached identity');
+  assert.equal(harness.storage.get('artsoul_header_ui_state'), 'disconnected');
+
+  // The next document boots from exactly what the disconnect left behind.
+  const reloaded = bootHarness({ settled: false, storage: Object.fromEntries(harness.storage) });
+  const { history, record } = track(reloaded);
+  record();
+  reloaded.dropdown.renderInitializingState();
+  await reloaded.flush();
+
+  assert.equal(reloaded.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(reloaded.avatarName(), 'ArtSoul Guest');
+  assert.equal(reloaded.uiState(), 'disconnected');
+  for (const state of history) {
+    assert.notEqual(state.name, 'Founder', 'the connected visual must never come back');
+    assert.equal(state.imgSrc, NEUTRAL_AVATAR);
+  }
+});
+
+test('the preview contract is pinned in the component source', () => {
+  const component = fs.readFileSync(path.join(ROOT, 'avatar-dropdown.js'), 'utf8');
+  assert.match(component, /const AVATAR_PREVIEW_MAX_LENGTH = 32 \* 1024;/);
+  assert.match(component, /const AVATAR_PREVIEW_PATTERN = \/\^data:image\\\/\(\?:png\|jpeg\|webp\);base64,\[A-Za-z0-9\+\/\]\+=\{0,2\}\$\/;/);
+  assert.match(component, /const AVATAR_PREVIEW_EDGE_PX = 64;/);
+  // Bound to wallet, display name and the original avatar URL on every read.
+  assert.match(component, /if \(String\(preview\.wallet \|\| ''\)\.toLowerCase\(\) !== normalizedWallet\) return null;/);
+  assert.match(component, /if \(preview\.name !== name\) return null;/);
+  assert.match(component, /if \(preview\.source !== avatarUrl\) return null;/);
+  assert.match(component, /if \(dataUri\.length > AVATAR_PREVIEW_MAX_LENGTH\) return null;/);
+  // No second request: the capture reads the image the header already decoded.
+  assert.match(component, /const dataUri = this\.captureAvatarPreview\(preloader\);/);
+  // Never a dependency, a fetch, a timer or a worker for any of this.
+  assert.doesNotMatch(component, /new Worker|serviceWorker|setInterval/);
+});
+
+test('every shared-header page and both themes keep one stable button geometry', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'unified-styles.css'), 'utf8');
+  assert.match(css, /\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 180px !important;[\s\S]*?height: 42px !important;/);
+  assert.match(css, /\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 48px !important;[\s\S]*?height: 42px !important;/);
+  // Classic stays animation-free: nothing was hidden behind a fade.
+  assert.match(css, /\.classic[\s\S]{0,400}?\.avatar-button,[\s\S]{0,200}?animation: none !important;/);
+  assert.doesNotMatch(css, /\[data-wallet-ui-state="restoring"\][^{]*\{[^}]*(?:opacity|transition|animation)/);
+  for (const page of SHARED_HEADER_PAGES) {
+    const html = readPage(page);
+    assert.equal((html.match(/class="avatar-button"/g) || []).length, 1, `${page}: one account button`);
+    assert.equal((html.match(/data-avatar-image/g) || []).length, 1, `${page}: one avatar image`);
   }
 });

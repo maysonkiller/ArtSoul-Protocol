@@ -24,9 +24,13 @@ test('guest avatar uses the local ArtSoul image with the generated fallback', ()
   // A failed avatar load OR decode commits the canonical ArtSoul image TOGETHER
   // with the connected name and address as one final state, so the identity is
   // never left pending and the visible <img> is never blanked.
-  assert.match(avatarDropdown, /const avatarUrl = failed \? NEUTRAL_AVATAR_URL : snapshot\.avatarUrl;/);
-  assert.match(avatarDropdown, /preloader\.onerror = \(\) => settle\(true\);/);
-  assert.match(avatarDropdown, /preloader\.decode\(\)\.then\(\(\) => settle\(false\), \(\) => settle\(true\)\);/);
+  assert.match(avatarDropdown, /const source = failed \? NEUTRAL_AVATAR_URL : snapshot\.avatarUrl;/);
+  assert.match(avatarDropdown, /const paintSrc = failed \? NEUTRAL_AVATAR_URL : \(snapshot\.paintSrc \|\| snapshot\.avatarUrl\);/);
+  // One bounded retry without CORS so an avatar host that sends no CORS headers
+  // still renders; only then does the load count as failed.
+  assert.match(avatarDropdown, /preloader\.onerror = \(\) => \{\s*if \(corsAttempt\) \{[\s\S]*?withoutCors: true[\s\S]*?\}\s*settle\(true\);/);
+  // A decode rejection routes to the same coherent fallback commit.
+  assert.match(avatarDropdown, /preloader\.decode\(\)\.then\(\s*\(\) => \{[\s\S]*?commitAndCapture\(\);\s*\},\s*\(\) => settle\(true\)\s*\);/);
   assert.match(avatarDropdown, /getProfileAvatarUrl\(profile\)/);
 });
 
@@ -131,7 +135,10 @@ test('the account button commits identity as one atomic snapshot', () => {
   assert.doesNotMatch(avatarDropdown, /commitAvatarImage/);
   assert.match(avatarDropdown, /commitIdentitySnapshot\(\{ button \}, snapshot, token, failed\) \{/);
   assert.match(avatarDropdown, /holdIdentityWhilePending\(\{ button \}, snapshot\) \{/);
-  assert.match(avatarDropdown, /decodeThenCommitIdentity\(structure, snapshot, token\) \{/);
+  assert.match(avatarDropdown, /decodeThenCommitIdentity\(structure, snapshot, token, options = \{\}\) \{/);
+  // A restored local preview is what paints; the snapshot still records the
+  // original avatar URL as its source, so a later render recognises it.
+  assert.match(avatarDropdown, /image\.dataset\.avatarSource = source;/);
   assert.match(avatarDropdown, /preloader\.src = snapshot\.avatarUrl;/);
   // The previous identity is only kept during the decode while it belongs to
   // the account being rendered, so one wallet never wears another's avatar.
