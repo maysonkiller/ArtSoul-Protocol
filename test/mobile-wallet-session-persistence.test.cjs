@@ -422,8 +422,20 @@ test('mobile header keeps the stable shell until a complete cached identity exis
     const initializing = avatar.match(/renderInitializingState\(\) \{[\s\S]*?\n        \}/)?.[0] || '';
     assert.match(initializing, /artsoul_wallet/);
     assert.match(initializing, /isMobileUA/);
-    assert.match(initializing, /wallet-state-resolving/);
     assert.doesNotMatch(initializing, /cachedIdentity = \{[\s\S]*?getDefaultAvatar/);
+    // A stored wallet with no cached identity now renders a COHERENT resolving
+    // state instead of withholding the identity text. Withholding it left the
+    // avatar visible next to an empty region, and on mobile — where
+    // .avatar-info is display:none — the whole button was blank.
+    assert.match(initializing, /return this\.renderResolvingState\(storedWallet\);/);
+    assert.doesNotMatch(initializing, /classList\.add\('wallet-state-resolving'\)/);
+    const resolving = avatar.match(/renderResolvingState\(storedWallet\) \{[\s\S]*?\n        \}/)?.[0] || '';
+    assert.match(resolving, /avatarUrl: NEUTRAL_AVATAR_URL/);
+    assert.match(resolving, /name: RESOLVING_IDENTITY_LABEL/);
+    assert.match(resolving, /storedWallet\.slice\(0, 6\)/);
+    // Strictly visual: the guest menu stays until the provider confirms.
+    assert.match(resolving, /commitVisibleState\('resolving', \{ persist: false \}\)/);
+    assert.doesNotMatch(resolving, /connected: true/);
 });
 
 test('a live core session outranks AppKit/injected empty-account events', () => {

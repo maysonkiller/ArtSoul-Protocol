@@ -263,6 +263,9 @@ function createAvatarHarness(options = {}) {
   // Profile reads can be held open to model a slow mobile response.
   let profileGate = null;
   let profileBehaviour = null;
+  // Balance/network reads can be held open or made to fail independently.
+  let balanceGate = null;
+  let balanceFails = options.balanceFails === true;
 
   harness.queueImageLoad = (image, source) => {
     pendingImages.push({ image, source });
@@ -376,10 +379,15 @@ function createAvatarHarness(options = {}) {
       }
       if (target === BASE_SEPOLIA_RPC_URL) {
         balanceCalls.push({ url: target, options: requestOptions });
-        return Promise.resolve({
+        const response = {
           ok: true,
           json: async () => ({ jsonrpc: '2.0', id: 1, result: '0x16345785d8a0000' })
-        });
+        };
+        // A slow, hanging or failing balance RPC must never hold the visible
+        // identity. balanceGate models exactly that.
+        if (balanceGate) return balanceGate.then(() => (balanceFails ? Promise.reject(new Error('balance RPC failed')) : response));
+        if (balanceFails) return Promise.reject(new Error('balance RPC failed'));
+        return Promise.resolve(response);
       }
       return Promise.resolve({ ok: false, json: async () => ({}), text: async () => '' });
     }
@@ -506,6 +514,22 @@ function createAvatarHarness(options = {}) {
     setProfileBehaviour(fn) { profileBehaviour = fn; },
 
     setProfile(wallet, profile) { profiles.set(String(wallet).toLowerCase(), profile); },
+
+    /**
+     * Hold every balance/network read open until release() is called, so a test
+     * can prove the visible identity commits without waiting for the RPC.
+     */
+    holdBalanceReads() {
+      let release;
+      balanceGate = new Promise(resolve => { release = resolve; });
+      return () => {
+        balanceGate = null;
+        release();
+      };
+    },
+
+    /** Make every balance/network read reject. */
+    failBalanceReads() { balanceFails = true; },
 
     /** Hold every profile read open until release() is called. */
     holdProfileReads() {

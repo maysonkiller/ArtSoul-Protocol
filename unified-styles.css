@@ -4687,13 +4687,25 @@ html.future .site-header .logo-link > .site-logo {
     transition: none !important;
 }
 
-/* Keep the fixed account-button shell AND the canonical ArtSoul avatar visible
-   while AppKit restores a saved session; only the identity TEXT is withheld, so
-   no guest or address-only identity is painted underneath it. Hiding the whole
-   button content instead produced an empty pill on every document navigation —
-   on mobile, where .avatar-info is display:none, nothing was left at all. */
-html.wallet-state-resolving .site-header #navButtons .avatar-info > * {
-    visibility: hidden !important;
+/* Pre-paint placeholder for a saved session that has not hydrated yet.
+   The static shell ships a guest label, which would be the wrong identity for a
+   returning connected user, so it is SWAPPED — never hidden — for a coherent
+   "Connecting…" label of the same size. Every earlier variant withheld the
+   identity text and left the avatar visible, which is precisely the reported
+   "avatar plus empty black area"; on mobile, where .avatar-info is display:none,
+   hiding the whole content left nothing at all. Geometry is unchanged in every
+   state because .avatar-info keeps its fixed box. */
+.site-header #navButtons [data-avatar-resolving] {
+    display: none;
+}
+
+html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
+    display: block;
+}
+
+html.wallet-state-resolving .site-header #navButtons [data-avatar-name],
+html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
+    display: none;
 }
 
 .site-header #navButtons .avatar-button > img {
@@ -4731,6 +4743,15 @@ html.wallet-state-resolving .site-header #navButtons .avatar-info > * {
 .site-header #navButtons [data-avatar-address] {
     min-height: 0.78rem;
     font-size: 0.66rem !important;
+    line-height: 1.15;
+}
+
+/* The pre-paint resolving label occupies the same box and typography as the
+   name it stands in for, so swapping between them shifts nothing. */
+.site-header #navButtons [data-avatar-resolving] {
+    font-family: Inter, Arial, sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 650 !important;
     line-height: 1.15;
 }
 
