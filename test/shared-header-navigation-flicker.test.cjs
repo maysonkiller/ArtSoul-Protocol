@@ -302,6 +302,30 @@ test('a cached connected identity with no live session resolves to guest exactly
   assert.equal(nextDocument.document.head.children.length, 0, 'no stale avatar preload');
 });
 
+test('an explicit desktop AppKit disconnect rejects a stale connected identity before first paint', async () => {
+  const harness = bootHarness({
+    userAgent: DESKTOP_UA,
+    settled: false,
+    storage: {
+      ...cachedIdentityStorage(WALLET_A, 'Founder', AVATAR_A),
+      '@appkit/connection_status': 'disconnected'
+    }
+  });
+  const { history, record } = track(harness);
+
+  record();
+  harness.dropdown.renderInitializingState();
+  record();
+  await harness.flush();
+
+  assertNeverFlickers(history, 'explicit desktop disconnect with stale identity');
+  assert.deepEqual(transitions(history, 'uiState'), [null, 'disconnected']);
+  assert.deepEqual(transitions(history, 'name'), ['ArtSoul Guest']);
+  assert.deepEqual(transitions(history, 'imgSrc'), [NEUTRAL_AVATAR]);
+  assert.equal(harness.document.head.children.length, 0, 'a stale identity must not be preloaded');
+  assert.match(harness.menuHtml(), /Connect Wallet/);
+});
+
 test('a cached identity for another wallet never renders as the connected one', async () => {
   const harness = bootHarness({
     settled: false,
@@ -476,10 +500,10 @@ test('every shared-header page boots the header in the same order with the same 
   for (const page of SHARED_HEADER_PAGES) {
     const html = readPage(page);
     assert.match(html, /<link rel="stylesheet" href="unified-styles\.css\?v=43">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="avatar-dropdown\.js\?v=43"><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="avatar-dropdown\.js\?v=44"><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=43');
-    const component = html.indexOf('avatar-dropdown.js?v=43');
+    const component = html.indexOf('avatar-dropdown.js?v=44');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
     const hydration = html.indexOf('window.AvatarDropdown?.renderInitializingState();');
@@ -729,6 +753,61 @@ test('a decode that settles after a wallet switch cannot modify the current wall
       assert.notEqual(state.imgSrc, AVATAR_A, 'wallet B must never wear wallet A avatar');
     }
   }
+});
+
+test('a late unresolved render cannot overwrite a profile resolved for the same wallet', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const { history, record } = track(harness);
+  let releaseFirstNetworkRead;
+  let networkRead = 0;
+  const networkInfo = {
+    name: 'Base Sepolia',
+    icon: '',
+    color: '#888888',
+    currency: 'ETH',
+    balance: '1.0000',
+    chainId: 84532,
+    baseSepoliaConfirmed: true
+  };
+
+  harness.dropdown.pendingRenderKey = 'connected:84532';
+  harness.dropdown.identityWallet = WALLET_A;
+  harness.dropdown.getCurrentNetworkInfo = async () => {
+    networkRead += 1;
+    if (networkRead === 1) {
+      await new Promise(resolve => { releaseFirstNetworkRead = resolve; });
+    }
+    return networkInfo;
+  };
+
+  record();
+  const unresolved = harness.dropdown.renderWalletInfo(WALLET_A, {
+    renderKey: 'connected:84532',
+    resolved: false
+  });
+  await new Promise(resolve => setImmediate(resolve));
+
+  harness.dropdown.profile = {
+    wallet_address: WALLET_A,
+    username: 'Founder',
+    avatar_url: AVATAR_A
+  };
+  harness.dropdown.resolvedIdentityWallet = WALLET_A;
+  await harness.dropdown.render({ renderKey: 'connected:84532', walletAddress: WALLET_A });
+  await harness.flush();
+  assert.equal(harness.avatarName(), 'Founder');
+
+  releaseFirstNetworkRead();
+  await unresolved;
+  await harness.flush();
+
+  assert.equal(harness.avatarName(), 'Founder', 'the stale unresolved identity must be discarded');
+  assert.equal(harness.avatarSrc(), AVATAR_A, 'the stale unresolved render must not restore the neutral avatar');
+  assertNeverFlickers(history, 'late unresolved render for the resolved wallet');
+  assertMonotonic(history, 'name', 'late unresolved render for the resolved wallet');
+  assertMonotonic(history, 'imgSrc', 'late unresolved render for the resolved wallet');
 });
 
 test('a browser without Image.decode() falls back to the load event and still never blanks', async () => {
