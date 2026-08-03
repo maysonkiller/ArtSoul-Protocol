@@ -89,10 +89,12 @@ test('header keeps a top-right avatar button during wallet initialization', () =
     assert.match(html, /class="avatar-button"/);
     assert.match(html, /src="\/default-avatar\.png"/);
     assert.match(html, /data-avatar-name>ArtSoul Guest<\/div>/);
-    assert.match(styles, /\.site-header-row \{[\s\S]*?grid-template-columns: 172px minmax\(0, 1fr\) 172px;/);
+    // Side columns stay equal so the centre column remains centred; they track
+    // the account button (180px) plus its 8px gutter.
+    assert.match(styles, /\.site-header-row \{[\s\S]*?grid-template-columns: 188px minmax\(0, 1fr\) 188px;/);
     assert.match(styles, /\.site-header-actions \{[\s\S]*?justify-content: flex-end;/);
     assert.match(styles, /\.site-header \.site-logo,[\s\S]*?width: 56px !important;[\s\S]*?height: 56px !important;/);
-    assert.match(styles, /\.site-header #navButtons,[\s\S]*?width: 164px !important;[\s\S]*?height: 42px !important;/);
+    assert.match(styles, /\.site-header #navButtons,[\s\S]*?width: 180px !important;[\s\S]*?height: 42px !important;/);
     assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons,[\s\S]*?width: 48px !important;[\s\S]*?height: 44px !important;/);
 });
 
