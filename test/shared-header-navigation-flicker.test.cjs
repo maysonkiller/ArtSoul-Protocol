@@ -567,7 +567,7 @@ test('hydration swaps the identity label and never hides the identity region', (
   assert.match(css, /\.site-header #navButtons \[data-avatar-resolving\] \{\s*display: none;/);
   assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-resolving\] \{\s*display: block;/);
   assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-name\],\s*html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-address\] \{\s*display: none;/);
-  assert.match(css, /\.site-header #navButtons \[data-avatar-resolving\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 650 !important;/);
+  assert.match(css, /\.site-header #navButtons \[data-avatar-resolving\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 600 !important;/);
   // Nothing may hide the account-button image any more.
   assert.doesNotMatch(css, /avatar-image-loading/);
   // The reserved geometry that makes a stable shell possible must stay.
@@ -1413,7 +1413,8 @@ test('the desktop identity column fits the full ArtSoul Guest label', () => {
   const menuWidth = Number(css.match(/\.site-header \.avatar-dropdown-menu \{\s*width: min\((\d+)px,/)?.[1]);
   const sideColumn = Number(css.match(/grid-template-columns: (\d+)px minmax\(0, 1fr\) \1px;/)?.[1]);
 
-  // Measured in Chromium at Inter 0.82rem/650: "ArtSoul Guest" needs 90px,
+  // Measured in Chromium at the header's system font, 0.82rem/600:
+  // "ArtSoul Guest" needs 90px,
   // a shortened address used as a display name needs 91px, "Connecting…" 88px.
   const WIDEST_HEADER_LABEL_PX = 91;
   assert.ok(infoWidth >= WIDEST_HEADER_LABEL_PX + 8, `identity column ${infoWidth}px cannot fit ${WIDEST_HEADER_LABEL_PX}px labels`);

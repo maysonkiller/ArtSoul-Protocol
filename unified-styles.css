@@ -4566,7 +4566,9 @@ body {
     border-bottom: 1px solid var(--c-border-soft) !important;
     background: color-mix(in srgb, var(--c-bg) 94%, transparent) !important;
     backdrop-filter: blur(12px);
-    font-family: Inter, Arial, sans-serif !important;
+    /* The account control must not reflow when the remote Inter font finishes
+       loading after first paint (especially after a background-tab restore). */
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
 }
 
 html.classic .site-header,
@@ -4734,6 +4736,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
     height: 30px !important;
     flex: 0 0 104px !important;
     justify-content: center;
+    text-align: center;
 }
 
 /* Fixed in every state, so the button geometry cannot depend on the label.
@@ -4744,9 +4747,9 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
 }
 
 .site-header #navButtons [data-avatar-name] {
-    font-family: Inter, Arial, sans-serif !important;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
     font-size: 0.82rem !important;
-    font-weight: 650 !important;
+    font-weight: 600 !important;
     line-height: 1.15;
 }
 
@@ -4759,9 +4762,9 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
 /* The pre-paint resolving label occupies the same box and typography as the
    name it stands in for, so swapping between them shifts nothing. */
 .site-header #navButtons [data-avatar-resolving] {
-    font-family: Inter, Arial, sans-serif !important;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
     font-size: 0.82rem !important;
-    font-weight: 650 !important;
+    font-weight: 600 !important;
     line-height: 1.15;
 }
 
@@ -4778,7 +4781,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
 .site-header .avatar-dropdown-menu {
     width: min(180px, calc(100vw - 24px)) !important;
     padding: 0.32rem !important;
-    font-family: Inter, Arial, sans-serif !important;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
 }
 
 .site-header .avatar-dropdown-menu .avatar-theme-section {

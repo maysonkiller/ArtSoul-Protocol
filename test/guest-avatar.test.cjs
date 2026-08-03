@@ -148,8 +148,10 @@ test('the account button commits identity as one atomic snapshot', () => {
 });
 
 test('header typography and menu interaction geometry are shared across pages', () => {
-  assert.match(unifiedStyles, /\.site-header \{[\s\S]*?font-family: Inter, Arial, sans-serif !important;/);
-  assert.match(unifiedStyles, /\[data-avatar-name\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 650 !important;/);
+  assert.match(unifiedStyles, /\.site-header \{[\s\S]*?font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;/);
+  assert.match(unifiedStyles, /\.site-header #navButtons \.avatar-info \{[\s\S]*?text-align: center;/);
+  assert.match(unifiedStyles, /\[data-avatar-name\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 600 !important;/);
+  assert.doesNotMatch(unifiedStyles, /\.site-header[\s\S]{0,500}?font-family: Inter/);
   assert.match(unifiedStyles, /avatar-theme-switch \.theme-btn \{[\s\S]*?min-height: 27px !important;[\s\S]*?font-size: 0\.75rem !important;/);
   assert.match(unifiedStyles, /avatar-disconnect-item \{[\s\S]*?min-height: 34px !important;/);
   assert.match(unifiedStyles, /\.future \.site-header \.avatar-dropdown-menu \.dropdown-item:not\(\.is-disabled\):hover[\s\S]*?var\(--c-glow-strong\)/);
