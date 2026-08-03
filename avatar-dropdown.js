@@ -35,6 +35,8 @@
     // leading '//' is protocol-relative (a foreign origin), and every other
     // scheme — http:, data:, javascript:, blob: — is rejected outright.
     const PRELOADABLE_AVATAR_URL = /^(?:https:\/\/[^/\s]|\/(?!\/))/;
+    const MOBILE_USER_AGENT_PATTERN = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+    const APPKIT_CONNECTION_STATUS_STORAGE_KEY = '@appkit/connection_status';
 
     // This script is loaded synchronously in the document head. Reserve the
     // connected shell before the header HTML can paint so a saved wallet never
@@ -47,7 +49,15 @@
         const walletHint = String(localStorage.getItem('artsoul_wallet') || '').toLowerCase();
         const cachedUiState = localStorage.getItem('artsoul_header_ui_state');
         const hasWalletHint = WALLET_ADDRESS_PATTERN.test(walletHint);
-        if (hasWalletHint || cachedUiState === 'connected') {
+        // AppKit's explicit desktop disconnect is stronger evidence than our
+        // optimistic visual cache. Without this negative gate, a stale cached
+        // profile is painted for several seconds on every navigation before
+        // AppKit settles and replaces it with the guest state. External mobile
+        // sessions are restored by ArtSoul's separate WalletConnect core, so an
+        // AppKit disconnect is not authoritative for those browsers.
+        const appKitExplicitlyDisconnected = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
+            && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
+        if (!appKitExplicitlyDisconnected && (hasWalletHint || cachedUiState === 'connected')) {
             document.documentElement.classList.add('wallet-state-resolving');
         }
 
@@ -62,7 +72,7 @@
         // not become a document-level fetch. It is a platform hint only — it
         // changes no identity, authorizes nothing, and a rejected value simply
         // means the avatar is fetched later by the component itself.
-        if (hasWalletHint && cachedUiState === 'connected') {
+        if (!appKitExplicitlyDisconnected && hasWalletHint && cachedUiState === 'connected') {
             let cachedIdentity = null;
             try {
                 cachedIdentity = JSON.parse(localStorage.getItem('artsoul_header_identity') || 'null');
@@ -1177,7 +1187,6 @@
             const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
-
             this.updateStableButton({
                 avatarUrl,
                 avatarAlt: username,
@@ -1411,6 +1420,12 @@
             const container = this.getNavContainer();
             if (!container) return false;
 
+            const appKitExplicitlyDisconnected = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
+                && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
+            if (appKitExplicitlyDisconnected) {
+                return this.renderConnectButton({ renderKey: 'initializing-disconnected' });
+            }
+
             const storedWalletHint = (localStorage.getItem('artsoul_wallet') || '').toLowerCase();
             const cachedUiState = localStorage.getItem(this.headerStateStorageKey);
             const cachedIdentityWithoutHint = cachedUiState === 'connected'
@@ -1424,7 +1439,7 @@
             let cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
             // Reuse only a complete cached identity. When none exists, keep the
             // fixed-size shell hidden until the final profile identity arrives.
-            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isMobileUA = MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent);
             if (!cachedIdentity) {
                 document.documentElement.classList.add('wallet-state-resolving');
                 container.setAttribute('aria-busy', 'true');
@@ -1548,6 +1563,12 @@
             const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
+            // A profile recovery can complete while this unresolved fallback is
+            // waiting on the network/balance read. Both renders intentionally
+            // share the same render key, so the key alone cannot distinguish
+            // them. Once this wallet has a resolved profile result, the older
+            // fallback must not repaint its name or avatar.
+            if (options.resolved === false && this.resolvedIdentityWallet === currentWallet) return;
 
             this.updateStableButton({
                 avatarUrl,
