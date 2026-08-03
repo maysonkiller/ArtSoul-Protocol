@@ -132,10 +132,12 @@ test('a cached header identity is replaced by the live profile once the wallet s
 
   harness.dropdown.renderInitializingState();
   await harness.flush();
-  // Restoring from cache still reads as connected, not as a guest.
+  // Restoring from cache still reads as a connected identity, not as a guest.
+  // 'restoring' is a cached presentation of this exact wallet; it authorizes
+  // nothing until the provider settles.
   assert.equal(harness.avatarSrc(), AVATAR_A);
   assert.equal(harness.avatarName(), 'Founder');
-  assert.equal(harness.uiState(), 'connected');
+  assert.equal(harness.uiState(), 'restoring');
 
   harness.context.window.artsoulWalletStateSettled = true;
   connect(harness, WALLET_A);
@@ -159,7 +161,10 @@ test('an avatar image error falls back but never suppresses a later retry', asyn
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assertNoStylizedA(harness);
   assertConnectedIdentity(harness, WALLET_A);
-  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 1);
+  // Two attempts for a broken avatar: the CORS-aware request that would also
+  // feed the paint-ready preview, then the single bounded retry without CORS so
+  // a host that sends no CORS headers still renders. Both fail here.
+  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 2);
   // The stamped key records the failure instead of claiming a successful render.
   assert.match(harness.button().dataset.avatarContentKey, /\|image-error$/);
 
@@ -168,7 +173,11 @@ test('an avatar image error falls back but never suppresses a later retry', asyn
   await harness.flush();
 
   assert.equal(harness.avatarSrc(), AVATAR_A);
-  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 2);
+  // Two requests per successful render: the off-screen decode, then the visible
+  // <img> assignment that the browser serves from the same cache entry. The
+  // failed first attempt contributed one. What matters is that the retry
+  // actually re-requested the avatar instead of being suppressed.
+  assert.equal(harness.imageLoads.filter(src => src === AVATAR_A).length, 4);
 });
 
 // 5 — profile/avatar update while wallet and chain are unchanged
@@ -247,7 +256,9 @@ test('a replaced shared header is rebuilt as the connected identity, not as a gu
   harness.triggerMutationObservers();
   await harness.flush();
 
-  assert.equal(harness.avatarSrc(), AVATAR_A);
+  // The rebuild restores wallet A's avatar. It may paint the paint-ready local
+  // preview of it instead of re-fetching, so assert the logical source.
+  assert.equal(harness.avatarSource(), AVATAR_A);
   assert.equal(harness.avatarName(), 'Founder');
   assertConnectedIdentity(harness, WALLET_A);
 });

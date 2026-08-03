@@ -15,10 +15,22 @@ const sharedHeaderPages = [
 ];
 
 test('guest avatar uses the local ArtSoul image with the generated fallback', () => {
-  assert.equal(fs.existsSync('default-avatar.png'), true);
+  // The one neutral avatar lives in publicDir so Vite serves it at exactly
+  // '/default-avatar.png' instead of emitting a second hashed copy that the
+  // legacy component would treat as a different image.
+  assert.equal(fs.existsSync('public/default-avatar.png'), true);
+  assert.equal(fs.existsSync('default-avatar.png'), false);
   assert.match(avatarDropdown, /src="\/default-avatar\.png"/);
-  assert.match(avatarDropdown, /image\.onerror = \(\) => \{/);
-  assert.match(avatarDropdown, /image\.src = fallback;/);
+  // A failed avatar load OR decode commits the canonical ArtSoul image TOGETHER
+  // with the connected name and address as one final state, so the identity is
+  // never left pending and the visible <img> is never blanked.
+  assert.match(avatarDropdown, /const source = failed \? NEUTRAL_AVATAR_URL : snapshot\.avatarUrl;/);
+  assert.match(avatarDropdown, /const paintSrc = failed \? NEUTRAL_AVATAR_URL : \(snapshot\.paintSrc \|\| snapshot\.avatarUrl\);/);
+  // One bounded retry without CORS so an avatar host that sends no CORS headers
+  // still renders; only then does the load count as failed.
+  assert.match(avatarDropdown, /preloader\.onerror = \(\) => \{\s*if \(corsAttempt\) \{[\s\S]*?withoutCors: true[\s\S]*?\}\s*settle\(true\);/);
+  // A decode rejection routes to the same coherent fallback commit.
+  assert.match(avatarDropdown, /preloader\.decode\(\)\.then\(\s*\(\) => \{[\s\S]*?commitAndCapture\(\);\s*\},\s*\(\) => settle\(true\)\s*\);/);
   assert.match(avatarDropdown, /getProfileAvatarUrl\(profile\)/);
 });
 
@@ -74,7 +86,10 @@ test('the render key encodes the network so a post-connect Base Sepolia confirma
 });
 
 test('connected account menus render the current network and balance row', () => {
-  assert.match(avatarDropdown, /const networkInfo = await this\.getCurrentNetworkInfo\(\{ walletAddress \}\);/);
+  // The live network/balance read now runs AFTER the identity is committed, so
+  // a slow or hanging RPC cannot hold the avatar, name and address off screen.
+  assert.match(avatarDropdown, /networkInfo = await this\.getCurrentNetworkInfo\(\{ walletAddress \}\);/);
+  assert.match(avatarDropdown, /async applyLiveNetworkSection\(\{ walletAddress, currentPath, isOwnProfile, renderKey \}\)/);
   assert.match(avatarDropdown, /renderMenuContent\(\{ currentPath, isOwnProfile, networkInfo, connected: true \}\)/);
   assert.match(avatarDropdown, /data-network-balance/);
   assert.match(avatarDropdown, /BASE_SEPOLIA_RPC_URL = 'https:\/\/sepolia\.base\.org'/);
@@ -87,7 +102,7 @@ test('connected account menus render the current network and balance row', () =>
 });
 
 test('account menu uses the compact desktop and mobile width contracts', () => {
-  assert.match(unifiedStyles, /width: min\(164px, calc\(100vw - 24px\)\) !important;/);
+  assert.match(unifiedStyles, /width: min\(180px, calc\(100vw - 24px\)\) !important;/);
   assert.match(unifiedStyles, /width: min\(148px, calc\(100vw - 28px\)\) !important;/);
   assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
@@ -105,22 +120,38 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=42/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=42/, `${page} must use the shared menu cache version`);
+    assert.match(html, /unified-styles\.css\?v=43/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=44/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
 
-test('stable button hydration does not reassign identical avatar content', () => {
-  assert.match(avatarDropdown, /const contentAlreadyMatches =/);
-  assert.match(avatarDropdown, /if \(contentAlreadyMatches\) \{[\s\S]*?button\.dataset\.avatarContentKey = contentKey;[\s\S]*?return structure;/);
-  assert.match(avatarDropdown, /image\.classList\.add\('avatar-image-loading'\)/);
-  assert.match(unifiedStyles, /avatar-button > img\.avatar-image-loading \{[\s\S]*?visibility: hidden !important;/);
+test('the account button commits identity as one atomic snapshot', () => {
+  // Avatar, alt, name, address, content key and visible UI state are ONE
+  // transaction. Committing them separately produced the reported invalid
+  // frame: neutral avatar beside a connected profile name and address.
+  assert.doesNotMatch(avatarDropdown, /avatar-image-loading/);
+  assert.doesNotMatch(unifiedStyles, /avatar-image-loading/);
+  assert.doesNotMatch(avatarDropdown, /commitAvatarImage/);
+  assert.match(avatarDropdown, /commitIdentitySnapshot\(\{ button \}, snapshot, token, failed\) \{/);
+  assert.match(avatarDropdown, /holdIdentityWhilePending\(\{ button \}, snapshot\) \{/);
+  assert.match(avatarDropdown, /decodeThenCommitIdentity\(structure, snapshot, token, options = \{\}\) \{/);
+  // A restored local preview is what paints; the snapshot still records the
+  // original avatar URL as its source, so a later render recognises it.
+  assert.match(avatarDropdown, /image\.dataset\.avatarSource = source;/);
+  assert.match(avatarDropdown, /preloader\.src = snapshot\.avatarUrl;/);
+  // The previous identity is only kept during the decode while it belongs to
+  // the account being rendered, so one wallet never wears another's avatar.
+  assert.match(avatarDropdown, /image\?\.dataset\.avatarIdentity === snapshot\.identity/);
+  // The visible UI state is part of the snapshot, not a separate later call.
+  assert.match(avatarDropdown, /this\.commitVisibleState\(snapshot\.uiState, \{ persist: snapshot\.persistUiState \}\);/);
 });
 
 test('header typography and menu interaction geometry are shared across pages', () => {
-  assert.match(unifiedStyles, /\.site-header \{[\s\S]*?font-family: Inter, Arial, sans-serif !important;/);
-  assert.match(unifiedStyles, /\[data-avatar-name\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 650 !important;/);
+  assert.match(unifiedStyles, /\.site-header \{[\s\S]*?font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;/);
+  assert.match(unifiedStyles, /\.site-header #navButtons \.avatar-info \{[\s\S]*?text-align: center;/);
+  assert.match(unifiedStyles, /\[data-avatar-name\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 600 !important;/);
+  assert.doesNotMatch(unifiedStyles, /\.site-header[\s\S]{0,500}?font-family: Inter/);
   assert.match(unifiedStyles, /avatar-theme-switch \.theme-btn \{[\s\S]*?min-height: 27px !important;[\s\S]*?font-size: 0\.75rem !important;/);
   assert.match(unifiedStyles, /avatar-disconnect-item \{[\s\S]*?min-height: 34px !important;/);
   assert.match(unifiedStyles, /\.future \.site-header \.avatar-dropdown-menu \.dropdown-item:not\(\.is-disabled\):hover[\s\S]*?var\(--c-glow-strong\)/);
@@ -191,8 +222,14 @@ test('the stylized "A" identity is gone from the shared header', () => {
   assert.doesNotMatch(avatarDropdown, /data:image\/svg\+xml,\$\{encodeURIComponent/);
   assert.doesNotMatch(avatarDropdown, /logoGradient/);
   assert.match(avatarDropdown, /const NEUTRAL_AVATAR_URL = '\/default-avatar\.png';/);
-  // A stale image error from a superseded render must not touch the current one.
-  assert.match(avatarDropdown, /if \(button\.dataset\.avatarContentKey !== contentKey\) return;/);
+  // A stale image result from a superseded render must not touch the current
+  // one, at any asynchronous boundary — load, decode settlement or error.
+  // Any newer snapshot takes a newer token, so a late load, decode or error
+  // belonging to an older wallet or a superseded render can never commit.
+  assert.match(avatarDropdown, /const token = \+\+this\.identityCommitToken;/);
+  assert.match(avatarDropdown, /commitIdentitySnapshot\([^)]*\) \{\s*if \(token !== this\.identityCommitToken\) return false;/);
+  assert.match(avatarDropdown, /const settle = \(failed\) => \{\s*if \(token !== this\.identityCommitToken\) return;/);
+  assert.match(avatarDropdown, /preloader\.onload = \(\) => \{\s*if \(token !== this\.identityCommitToken\) return;/);
 });
 
 test('wallet transitions invalidate identity so a late response cannot leak an avatar', () => {
@@ -213,7 +250,10 @@ test('wallet transitions invalidate identity so a late response cannot leak an a
 });
 
 test('an avatar image failure records the failure instead of claiming a successful render', () => {
-  assert.match(avatarDropdown, /button\.dataset\.avatarContentKey = `\$\{contentKey\}\|image-error`;/);
+  // The failed key is stamped as part of the same atomic snapshot commit, so a
+  // later render for the same (or a newer) URL re-requests the image once
+  // instead of treating the fallback as a successful render.
+  assert.match(avatarDropdown, /button\.dataset\.avatarContentKey = failed\s*\? `\$\{snapshot\.contentKey\}\|image-error`\s*: snapshot\.contentKey;/);
 });
 
 test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {

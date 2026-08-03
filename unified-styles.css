@@ -4566,7 +4566,9 @@ body {
     border-bottom: 1px solid var(--c-border-soft) !important;
     background: color-mix(in srgb, var(--c-bg) 94%, transparent) !important;
     backdrop-filter: blur(12px);
-    font-family: Inter, Arial, sans-serif !important;
+    /* The account control must not reflow when the remote Inter font finishes
+       loading after first paint (especially after a background-tab restore). */
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
 }
 
 html.classic .site-header,
@@ -4585,9 +4587,11 @@ body.future .site-header {
     overflow: visible !important;
 }
 
+/* Side columns stay equal so the centre column remains centred. They track the
+   account button (180px) plus its 8px gutter — see the account-button block. */
 .site-header-row {
     display: grid !important;
-    grid-template-columns: 172px minmax(0, 1fr) 172px;
+    grid-template-columns: 188px minmax(0, 1fr) 188px;
     min-width: 0;
     min-height: 56px;
     align-items: center;
@@ -4650,9 +4654,9 @@ html.future .site-header .logo-link > .site-logo {
 
 .site-header #navButtons,
 .site-header #navButtons .avatar-dropdown-container {
-    width: 164px !important;
-    min-width: 164px !important;
-    max-width: 164px !important;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
@@ -4673,10 +4677,16 @@ html.future .site-header .logo-link > .site-logo {
     justify-content: flex-end;
 }
 
+/* 180 = 2*1.6 border + 2*6 padding + 30 avatar + 4 gap + 104 identity + 4 gap
+   + 10 chevron, with ~7px of slack. The identity column is 104px because the
+   widest label the header can show — "ArtSoul Guest" (90px), a shortened
+   address used as a display name (91px) and "Connecting…" (88px) at Inter
+   0.82rem/650 — must render in full. At the previous 88px "ArtSoul Guest"
+   measured 90px against an 88px box and was ellipsized to "ArtSoul Gu…". */
 .site-header #navButtons .avatar-button {
-    width: 164px !important;
-    min-width: 164px !important;
-    max-width: 164px !important;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
@@ -4687,10 +4697,25 @@ html.future .site-header .logo-link > .site-logo {
     transition: none !important;
 }
 
-/* Keep the fixed account-button shell visible while AppKit restores a saved
-   session, but never paint a guest or address-only identity underneath it. */
-html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
-    visibility: hidden !important;
+/* Pre-paint placeholder for a saved session that has not hydrated yet.
+   The static shell ships a guest label, which would be the wrong identity for a
+   returning connected user, so it is SWAPPED — never hidden — for a coherent
+   "Connecting…" label of the same size. Every earlier variant withheld the
+   identity text and left the avatar visible, which is precisely the reported
+   "avatar plus empty black area"; on mobile, where .avatar-info is display:none,
+   hiding the whole content left nothing at all. Geometry is unchanged in every
+   state because .avatar-info keeps its fixed box. */
+.site-header #navButtons [data-avatar-resolving] {
+    display: none;
+}
+
+html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
+    display: block;
+}
+
+html.wallet-state-resolving .site-header #navButtons [data-avatar-name],
+html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
+    display: none;
 }
 
 .site-header #navButtons .avatar-button > img {
@@ -4703,35 +4728,43 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
     flex: 0 0 30px !important;
 }
 
-.site-header #navButtons .avatar-button > img.avatar-image-loading {
-    visibility: hidden !important;
-}
-
 .site-header #navButtons .avatar-info {
     display: flex !important;
-    width: 88px !important;
-    min-width: 88px !important;
-    max-width: 88px !important;
+    width: 104px !important;
+    min-width: 104px !important;
+    max-width: 104px !important;
     height: 30px !important;
-    flex: 0 0 88px !important;
+    flex: 0 0 104px !important;
     justify-content: center;
+    text-align: center;
 }
 
+/* Fixed in every state, so the button geometry cannot depend on the label.
+   A genuinely long user profile name still ellipsizes here on purpose. */
 .site-header #navButtons .avatar-info > div {
-    width: 88px !important;
-    max-width: 88px !important;
+    width: 104px !important;
+    max-width: 104px !important;
 }
 
 .site-header #navButtons [data-avatar-name] {
-    font-family: Inter, Arial, sans-serif !important;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
     font-size: 0.82rem !important;
-    font-weight: 650 !important;
+    font-weight: 600 !important;
     line-height: 1.15;
 }
 
 .site-header #navButtons [data-avatar-address] {
     min-height: 0.78rem;
     font-size: 0.66rem !important;
+    line-height: 1.15;
+}
+
+/* The pre-paint resolving label occupies the same box and typography as the
+   name it stands in for, so swapping between them shifts nothing. */
+.site-header #navButtons [data-avatar-resolving] {
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
     line-height: 1.15;
 }
 
@@ -4746,9 +4779,9 @@ html.wallet-state-resolving .site-header #navButtons .avatar-button > * {
 }
 
 .site-header .avatar-dropdown-menu {
-    width: min(164px, calc(100vw - 24px)) !important;
+    width: min(180px, calc(100vw - 24px)) !important;
     padding: 0.32rem !important;
-    font-family: Inter, Arial, sans-serif !important;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
 }
 
 .site-header .avatar-dropdown-menu .avatar-theme-section {
