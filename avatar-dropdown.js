@@ -37,26 +37,44 @@
     const PRELOADABLE_AVATAR_URL = /^(?:https:\/\/[^/\s]|\/(?!\/))/;
     const MOBILE_USER_AGENT_PATTERN = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
     const APPKIT_CONNECTION_STATUS_STORAGE_KEY = '@appkit/connection_status';
+    // The label of the coherent resolving state. It must stay in sync with the
+    // pre-paint placeholder in the static header shells and unified-styles.css.
+    const RESOLVING_IDENTITY_LABEL = 'Connecting…';
+
+    // AppKit's last persisted connection status, snapshotted ONCE while this
+    // synchronous head script runs — before the SDK boots and can rewrite it.
+    //
+    // At boot the stored value is the previous document's settled outcome, which
+    // is legitimate evidence: 'disconnected' there means the user really did end
+    // the last page disconnected. Re-reading it later is not: the SDK writes a
+    // transient 'disconnected' partway through restoring a live session, and a
+    // later read would tear down an already committed connected identity and
+    // repaint it as guest. Freezing the value at boot keeps the useful evidence
+    // and removes the transient teardown. Authoritative state still comes only
+    // from the settled wallet provider, which corrects this snapshot either way.
+    //
+    // External mobile sessions are restored by ArtSoul's separate WalletConnect
+    // core, so an AppKit disconnect is never authoritative for those browsers.
+    let appKitDisconnectedAtBoot = false;
+    try {
+        appKitDisconnectedAtBoot = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
+            && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
+    } catch {
+        // Storage can be unavailable in privacy-restricted browsers.
+    }
 
     // This script is loaded synchronously in the document head. Reserve the
     // connected shell before the header HTML can paint so a saved wallet never
     // flashes the static guest identity while its final profile is restored.
     //
-    // 'wallet-state-resolving' withholds the identity TEXT only. The canonical
-    // ArtSoul avatar in the static markup stays visible, so the account button
-    // is never an empty pill — see the matching rule in unified-styles.css.
+    // 'wallet-state-resolving' swaps the static guest LABEL for a coherent
+    // "Connecting…" label of the same size. It never hides the identity region
+    // and never leaves the account button empty — see unified-styles.css.
     try {
         const walletHint = String(localStorage.getItem('artsoul_wallet') || '').toLowerCase();
         const cachedUiState = localStorage.getItem('artsoul_header_ui_state');
         const hasWalletHint = WALLET_ADDRESS_PATTERN.test(walletHint);
-        // AppKit's explicit desktop disconnect is stronger evidence than our
-        // optimistic visual cache. Without this negative gate, a stale cached
-        // profile is painted for several seconds on every navigation before
-        // AppKit settles and replaces it with the guest state. External mobile
-        // sessions are restored by ArtSoul's separate WalletConnect core, so an
-        // AppKit disconnect is not authoritative for those browsers.
-        const appKitExplicitlyDisconnected = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
-            && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
+        const appKitExplicitlyDisconnected = appKitDisconnectedAtBoot;
         if (!appKitExplicitlyDisconnected && (hasWalletHint || cachedUiState === 'connected')) {
             document.documentElement.classList.add('wallet-state-resolving');
         }
@@ -165,6 +183,7 @@
                     <div class="avatar-info">
                         <div data-avatar-name>ArtSoul Guest</div>
                         <div data-avatar-address hidden aria-hidden="true"></div>
+                        <div data-avatar-resolving aria-hidden="true">${RESOLVING_IDENTITY_LABEL}</div>
                     </div>
                     <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true">
                         <path d="M4 6l4 4 4-4"></path>
@@ -597,10 +616,19 @@
             return `wallet:${normalizedAddress}:${chainId || 'none'}:${baseSepoliaConfirmed ? 'confirmed' : 'pending'}`;
         }
 
-        commitVisibleState(state) {
+        /**
+         * Publish a coherent visible state.
+         *
+         * options.persist === false for the transient 'resolving' state: the
+         * stored key is the NEXT document's boot hint and must only ever hold a
+         * settled outcome ('connected' / 'disconnected'). Persisting 'resolving'
+         * would make the following page boot from a state that is neither.
+         */
+        commitVisibleState(state, options = {}) {
             document.documentElement.classList.remove('wallet-state-resolving');
             document.documentElement.dataset.walletUiState = state;
-            this.getNavContainer()?.setAttribute('aria-busy', 'false');
+            this.getNavContainer()?.setAttribute('aria-busy', state === 'resolving' ? 'true' : 'false');
+            if (options.persist === false) return;
             try {
                 localStorage.setItem(this.headerStateStorageKey, state);
             } catch {
@@ -1184,9 +1212,11 @@
             const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
-            const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
+            // The identity depends on the profile alone. Committing it before the
+            // network read means a slow, failed or hanging Base Sepolia RPC can
+            // no longer hold the avatar, name and address off the screen.
             this.updateStableButton({
                 avatarUrl,
                 avatarAlt: username,
@@ -1196,13 +1226,51 @@
             });
             this.commitVisibleState('connected');
             this.updateStableMenu(
+                this.renderMenuContent({
+                    currentPath,
+                    isOwnProfile,
+                    networkInfo: this.getCachedHeaderNetwork(walletAddress),
+                    connected: true
+                }),
+                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(this.getCachedHeaderNetwork(walletAddress))}`
+            );
+            this.applyThemeStyles();
+            this.syncProtocolAdminWallet(walletAddress);
+            this.bindOutsideCloseOnce();
+            void this.applyLiveNetworkSection({
+                walletAddress,
+                currentPath,
+                isOwnProfile,
+                renderKey: options.renderKey || this.pendingRenderKey
+            });
+        }
+
+        /**
+         * Read the live network/balance once and fold it into the already
+         * committed menu. Never touches the account button, so it can never
+         * delay or repaint the visible identity.
+         *
+         * Guarded by the render key: a late result belonging to a superseded
+         * render or a previous wallet is discarded instead of applied. Exactly
+         * one read per render, as before — the RPC diet is unchanged, and no
+         * polling or retry loop is introduced.
+         */
+        async applyLiveNetworkSection({ walletAddress, currentPath, isOwnProfile, renderKey }) {
+            let networkInfo = null;
+            try {
+                networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
+            } catch (error) {
+                console.warn('Unable to read the live wallet network:', error);
+                return;
+            }
+            if (renderKey && this.pendingRenderKey !== renderKey) return;
+            if (!networkInfo) return;
+            this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
                 `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
-            this.syncProtocolAdminWallet(walletAddress);
-            this.bindOutsideCloseOnce();
         }
 
         /**
@@ -1420,9 +1488,8 @@
             const container = this.getNavContainer();
             if (!container) return false;
 
-            const appKitExplicitlyDisconnected = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
-                && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
-            if (appKitExplicitlyDisconnected) {
+            // The boot snapshot, never a fresh read: see appKitDisconnectedAtBoot.
+            if (appKitDisconnectedAtBoot) {
                 return this.renderConnectButton({ renderKey: 'initializing-disconnected' });
             }
 
@@ -1437,13 +1504,19 @@
             const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
             if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
             let cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
-            // Reuse only a complete cached identity. When none exists, keep the
-            // fixed-size shell hidden until the final profile identity arrives.
             const isMobileUA = MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent);
             if (!cachedIdentity) {
-                document.documentElement.classList.add('wallet-state-resolving');
-                container.setAttribute('aria-busy', 'true');
-                return true;
+                // A stored wallet with no complete cached identity. Render a
+                // COHERENT resolving state instead of withholding the identity
+                // text: the canonical avatar, a real "Connecting…" label and the
+                // shortened stored address, all in the fixed geometry. The old
+                // behaviour hid only the text and left the avatar visible, which
+                // is exactly the "avatar plus empty black area" defect.
+                //
+                // This is visual continuity only. It claims no profile, and it
+                // authorizes nothing: the menu still offers Connect Wallet until
+                // the settled provider confirms the session.
+                return this.renderResolvingState(storedWallet);
             }
             if (container.dataset.avatarRenderKey === 'cached-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
 
@@ -1486,6 +1559,44 @@
                 networkInfo
                     ? `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
                     : `cached-restoring:${currentPath}:${isOwnProfile}`
+            );
+            this.applyThemeStyles();
+            this.bindOutsideCloseOnce();
+            return true;
+        }
+
+        /**
+         * Render the coherent resolving state for a stored wallet whose profile
+         * identity is not cached yet.
+         *
+         * Every visible part is filled: the canonical ArtSoul avatar, a real
+         * "Connecting…" label and the shortened stored address, inside the same
+         * fixed geometry as every other state. There is no hidden text region
+         * and no fabricated profile identity.
+         *
+         * Strictly visual. The menu stays the guest menu — Connect Wallet, no
+         * network row, no balance, no Disconnect — until the settled provider
+         * confirms the session, so nothing here authorizes anything.
+         */
+        renderResolvingState(storedWallet) {
+            const container = this.getNavContainer();
+            if (!container) return false;
+
+            const currentPath = window.location.pathname;
+            const isProfilePage = currentPath.includes('profile.html');
+            container.dataset.avatarRenderKey = 'resolving';
+            this.pendingRenderKey = 'resolving';
+            this.updateStableButton({
+                avatarUrl: NEUTRAL_AVATAR_URL,
+                avatarAlt: 'ArtSoul',
+                name: RESOLVING_IDENTITY_LABEL,
+                address: `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`,
+                stateKey: `resolving:${storedWallet}`
+            });
+            this.commitVisibleState('resolving', { persist: false });
+            this.updateStableMenu(
+                this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
+                `resolving:${currentPath}:${isProfilePage}`
             );
             this.applyThemeStyles();
             this.bindOutsideCloseOnce();
@@ -1560,16 +1671,17 @@
             const avatarUrl = cachedIdentity?.avatarUrl || NEUTRAL_AVATAR_URL;
             const displayedName = cachedIdentity?.name || 'ArtSoul User';
             const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
-            const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
             // A profile recovery can complete while this unresolved fallback is
-            // waiting on the network/balance read. Both renders intentionally
-            // share the same render key, so the key alone cannot distinguish
-            // them. Once this wallet has a resolved profile result, the older
-            // fallback must not repaint its name or avatar.
+            // still pending. Both renders intentionally share the same render
+            // key, so the key alone cannot distinguish them. Once this wallet has
+            // a resolved profile result, the older fallback must not repaint its
+            // name or avatar.
             if (options.resolved === false && this.resolvedIdentityWallet === currentWallet) return;
 
+            // Identity first, network afterwards — see render(). The balance RPC
+            // must never hold the connected avatar, name and address off screen.
             this.updateStableButton({
                 avatarUrl,
                 avatarAlt: displayedName,
@@ -1579,13 +1691,23 @@
             });
             this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
-                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
+                this.renderMenuContent({
+                    currentPath,
+                    isOwnProfile,
+                    networkInfo: this.getCachedHeaderNetwork(currentWallet),
+                    connected: true
+                }),
+                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(this.getCachedHeaderNetwork(currentWallet))}`
             );
             this.applyThemeStyles();
-            void this.updateNetworkDisplay();
             this.syncProtocolAdminWallet(walletAddress);
             this.bindOutsideCloseOnce();
+            void this.applyLiveNetworkSection({
+                walletAddress,
+                currentPath,
+                isOwnProfile,
+                renderKey: options.renderKey || this.pendingRenderKey
+            });
         }
     }
 
@@ -1627,24 +1749,28 @@
 
     window.addEventListener('artsoul:nav-ready', () => syncCurrentMenu());
 
+    // The observer watches the whole document, so gallery renders, filter
+    // changes and artwork loading all reach it. It therefore acts on EXACTLY one
+    // condition: the shared account button is missing, i.e. the header was
+    // genuinely removed or replaced. Any other mutation is ignored outright.
+    //
+    // It previously also re-ran renderInitializingState() while the wallet was
+    // unsettled, which re-applied the resolving presentation on every unrelated
+    // React render and reset the visible identity for seconds at a time.
+    //
+    // Recovery of an unresolved profile stays on deliberate, bounded events:
+    // account-menu open, a genuine wallet-state event, ArtSoulDB readiness and
+    // explicit refresh(). No polling, no arbitrary-mutation retries.
     const navObserver = new MutationObserver(() => {
         const container = window.AvatarDropdown.getNavContainer();
-        if (container && window.artsoulWalletStateSettled !== true && container.dataset.avatarCacheHydrated !== 'true') {
-            window.AvatarDropdown.renderInitializingState();
-        } else if (container && !container.querySelector('.avatar-button')) {
-            // The shared header was actually removed or replaced (page
-            // hydration, React re-render). Rebuild it from the live wallet state
-            // so a connected identity is never restored as a guest.
-            //
-            // This is the ONLY thing the observer acts on. It watches the whole
-            // document, so treating an arbitrary mutation as a retry opportunity
-            // would turn every unrelated React render into another profile
-            // request while the identity is unresolved — an unbounded
-            // event-driven retry loop. Recovery instead runs on deliberate,
-            // bounded events: account-menu open, a genuine wallet-state event,
-            // and explicit refresh().
+        if (!container || container.querySelector('.avatar-button')) return;
+        if (window.artsoulWalletStateSettled === true) {
             syncCurrentMenu();
+            return;
         }
+        // Rebuild the pre-settle shell from the same coherent state the boot
+        // path uses, so a replaced header never comes back as a bare guest.
+        window.AvatarDropdown.renderInitializingState();
     });
 
     const startNavObserver = () => {

@@ -35,6 +35,9 @@ const WALLET_B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const AVATAR_A = 'https://cdn.artsoul.test/avatar-a.png';
 const AVATAR_B = 'https://cdn.artsoul.test/avatar-b.png';
 const NEUTRAL_AVATAR = '/default-avatar.png';
+// Must stay in sync with RESOLVING_IDENTITY_LABEL in avatar-dropdown.js and the
+// [data-avatar-resolving] placeholder in every static header shell.
+const RESOLVING_LABEL = 'Connecting…';
 const STYLIZED_A = /^data:image\/svg\+xml/;
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 CriOS/126.0';
 const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0';
@@ -67,21 +70,32 @@ const STATIC_SHELL = staticShellOf('index.html');
 /**
  * What a viewer can see of the account button right now.
  *
- * `identityTextHidden` mirrors the one CSS rule that withholds content during
- * hydration; the css-contract test below pins that rule to the identity text
- * only, so the avatar and the button shell are always on screen.
+ * `resolvingPlaceholder` models the one CSS rule that applies while the
+ * `wallet-state-resolving` class is present: the name and address nodes are
+ * swapped for the `[data-avatar-resolving]` label. `visibleIdentityText` is
+ * therefore whichever of the two the viewer actually reads — it can never be
+ * empty, which is the invariant the "avatar plus black empty area" defect broke.
  */
 function snapshot(harness) {
   const button = harness.button();
   const image = harness.avatarImage();
+  const resolvingNode = harness.navButtons.querySelector('[data-avatar-resolving]');
+  const resolvingPlaceholder = harness.documentElement.classList.contains('wallet-state-resolving');
+  const name = harness.avatarName();
+  const address = harness.avatarAddress();
   return {
     hasButton: !!button,
     childCount: button ? button.children.length : 0,
     imgSrc: image ? (image.getAttribute('src') || '') : null,
     imgHiddenByClass: image ? image.classList.contains('avatar-image-loading') : false,
-    identityTextHidden: harness.documentElement.classList.contains('wallet-state-resolving'),
-    name: harness.avatarName(),
-    address: harness.avatarAddress(),
+    resolvingPlaceholder,
+    resolvingLabel: resolvingNode ? (resolvingNode.textContent || '') : null,
+    visibleIdentityText: resolvingPlaceholder
+      ? (resolvingNode ? (resolvingNode.textContent || '') : '')
+      : name,
+    identityTextHidden: resolvingPlaceholder,
+    name,
+    address,
     uiState: harness.uiState() || null
   };
 }
@@ -112,6 +126,12 @@ function assertNeverFlickers(history, label) {
     assert.equal(state.imgHiddenByClass, false, `${where}: the avatar image was hidden`);
     // 8 — the retired stylized "A" must not be reachable, not even for a frame.
     assert.doesNotMatch(state.imgSrc, STYLIZED_A, `${where}: the retired "A" fallback rendered`);
+    // The reported defect: an avatar on screen with an empty identity area. The
+    // identity region always reads something — a name, or the resolving label.
+    assert.ok(
+      state.visibleIdentityText && state.visibleIdentityText.trim().length > 0,
+      `${where}: the avatar was visible with an empty identity area`
+    );
     // 5 / 6 — a visible identity is never the guest one while connected.
     if (state.uiState === 'connected' && !state.identityTextHidden) {
       assert.notEqual(state.name, 'ArtSoul Guest', `${where}: guest identity painted while connected`);
@@ -161,6 +181,11 @@ function connect(harness, address) {
   harness.context.window.artsoulWalletStateSettled = true;
   harness.context.window.currentWalletAddress = address;
   harness.context.window.artsoulSettledWalletState = { address, chainId: 84532, isConnected: true };
+  // A desktop injected provider. isWalletConnectionConfirmed() consults it on
+  // every path that does not carry an explicit `confirmed` flag — notably the
+  // observer's rebuild of a genuinely removed header — so a desktop scenario
+  // without it would model a browser that has no wallet at all.
+  harness.context.window.ethereum = { selectedAddress: address, request: async () => [address] };
   harness.dispatchWalletState({ address, chainId: 84532, isConnected: true });
 }
 
@@ -168,6 +193,7 @@ function disconnect(harness) {
   harness.context.window.artsoulWalletStateSettled = true;
   harness.context.window.currentWalletAddress = null;
   harness.context.window.artsoulSettledWalletState = { address: null, chainId: null, isConnected: false };
+  harness.context.window.ethereum = { selectedAddress: '', request: async () => [] };
   // appkit-init.js owns the wallet hint and drops it on a settled disconnect;
   // the assertion below pins that contract so this model cannot drift.
   harness.storage.delete('artsoul_wallet');
@@ -523,17 +549,39 @@ test('every shared-header page boots the header in the same order with the same 
 // 9 — the CSS and head-boot contracts the behaviour above depends on
 // ---------------------------------------------------------------------------
 
-test('hydration withholds the identity text only, never the whole account button', () => {
+test('hydration swaps the identity label and never hides the identity region', () => {
   const css = fs.readFileSync(path.join(ROOT, 'unified-styles.css'), 'utf8');
-  // The retired rule blanked every child, which on mobile (.avatar-info is
-  // display:none) left an empty pill on every document navigation.
+  // Both retired variants: blanking every child (an empty pill, and on mobile
+  // nothing at all) and withholding only the text (avatar plus empty black area).
   assert.doesNotMatch(css, /wallet-state-resolving[^{]*\.avatar-button > \*/);
-  assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \.avatar-info > \* \{\s*visibility: hidden !important;/);
+  assert.doesNotMatch(css, /wallet-state-resolving[^{]*\.avatar-info > \*/);
+  assert.doesNotMatch(css, /wallet-state-resolving[\s\S]{0,200}?visibility: hidden/);
+  // The resolving state swaps a real label of identical size in and out.
+  assert.match(css, /\.site-header #navButtons \[data-avatar-resolving\] \{\s*display: none;/);
+  assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-resolving\] \{\s*display: block;/);
+  assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-name\],\s*html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-address\] \{\s*display: none;/);
+  assert.match(css, /\.site-header #navButtons \[data-avatar-resolving\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 650 !important;/);
   // Nothing may hide the account-button image any more.
   assert.doesNotMatch(css, /avatar-image-loading/);
   // The reserved geometry that makes a stable shell possible must stay.
   assert.match(css, /\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 164px !important;/);
   assert.match(css, /\.site-header #navButtons \.avatar-button > img \{[\s\S]*?width: 30px !important;/);
+});
+
+test('the resolving label sits after the name so theme first-child rules still target the name', () => {
+  // .future/.classic style `.avatar-info > div:first-child` as the display name.
+  // Inserting the placeholder before it would move the gradient onto a hidden
+  // node and strip the name's Future treatment.
+  const css = fs.readFileSync(path.join(ROOT, 'unified-styles.css'), 'utf8');
+  assert.match(css, /\.avatar-info > div:first-child/);
+  for (const page of SHARED_HEADER_PAGES) {
+    const info = readPage(page).match(/<div class="avatar-info">([\s\S]*?)<\/div>\s*<svg/);
+    assert.ok(info, `${page} must ship the identity region`);
+    assert.ok(
+      info[1].indexOf('data-avatar-name') < info[1].indexOf('data-avatar-resolving'),
+      `${page}: the resolving label must follow the name node`
+    );
+  }
 });
 
 test('the head boot script preloads a cached avatar instead of fetching it after the header', () => {
@@ -850,4 +898,284 @@ test('the component awaits decode before touching the visible image', () => {
     /preloader\.decode\(\)\.then\(\s*\(\) => commit\(nextUrl, false\),\s*\(\) => commit\(neutral, true\)\s*\);/
   );
   assert.match(component, /if \(typeof preloader\.decode !== 'function'\) \{\s*commit\(nextUrl, false\);/);
+});
+
+// ---------------------------------------------------------------------------
+// 11 — the production-only defects the source-reading tests could not see
+// ---------------------------------------------------------------------------
+
+test('the built output resolves the neutral avatar to exactly one URL', () => {
+  // The regression that shipped: Vite rewrote the static header avatar to a
+  // hashed /assets/default-avatar-<hash>.png while avatar-dropdown.js kept the
+  // literal '/default-avatar.png'. The component then saw a "different" src on
+  // every boot, rewrote the already-rendered image, and produced a second
+  // request plus a blank bitmap frame. Only built output shows this.
+  const distDir = path.join(ROOT, 'dist');
+  if (!fs.existsSync(distDir)) {
+    // `npm run build` runs before `npm run test:unit` in CI, and the same
+    // invariant is enforced hard by scripts/verify-build.mjs on every build.
+    assert.match(
+      fs.readFileSync(path.join(ROOT, 'scripts', 'verify-build.mjs'), 'utf8'),
+      /does not match[\s\S]*?NEUTRAL_AVATAR_URL/,
+      'verify-build.mjs must enforce the single neutral avatar URL'
+    );
+    return;
+  }
+
+  const component = fs.readFileSync(path.join(distDir, 'avatar-dropdown.js'), 'utf8');
+  const componentUrl = component.match(/const NEUTRAL_AVATAR_URL = '([^']+)';/)?.[1];
+  assert.ok(componentUrl, 'dist/avatar-dropdown.js must declare NEUTRAL_AVATAR_URL');
+  assert.equal(fs.existsSync(path.join(distDir, componentUrl.replace(/^\//, ''))), true);
+
+  for (const page of SHARED_HEADER_PAGES) {
+    const built = fs.readFileSync(path.join(distDir, page), 'utf8');
+    const shellUrl = built.match(/<img data-avatar-image src="([^"]+)"/)?.[1];
+    assert.equal(shellUrl, componentUrl, `${page}: built shell and component must agree on one neutral avatar`);
+    assert.match(built, /data-avatar-resolving/, `${page}: built shell must ship the resolving label`);
+  }
+
+  const hashedDuplicates = fs.readdirSync(path.join(distDir, 'assets'))
+    .filter(file => /^default-avatar-[^.]+\.(png|jpe?g|webp|svg)$/i.test(file));
+  assert.deepEqual(hashedDuplicates, [], 'no hashed duplicate of the neutral avatar may be emitted');
+});
+
+test('a stored wallet without a cached profile renders a coherent resolving state', async () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: { artsoul_wallet: WALLET_A, artsoul_header_ui_state: 'connected' }
+  });
+  const { history, record } = track(harness);
+
+  record();
+  harness.dropdown.renderInitializingState();
+  record();
+  await harness.flush();
+
+  assertNeverFlickers(history, 'resolving without a cached profile');
+  // The canonical image plus a real label and the shortened stored address.
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.equal(harness.avatarName(), RESOLVING_LABEL);
+  assert.equal(harness.avatarAddress(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
+  assert.equal(harness.uiState(), 'resolving');
+  // Not a fabricated profile, and it authorizes nothing.
+  assert.match(harness.menuHtml(), /Connect Wallet/);
+  assert.doesNotMatch(harness.menuHtml(), /Disconnect/);
+  assert.doesNotMatch(harness.menuHtml(), /data-network-balance/);
+  // The transient state must never become the NEXT document's boot hint.
+  assert.equal(harness.storage.get('artsoul_header_ui_state'), 'connected');
+  for (const state of history) {
+    assert.ok(state.visibleIdentityText.trim().length > 0);
+  }
+});
+
+test('a held or failing balance RPC cannot delay the visible identity', async () => {
+  for (const mode of ['held', 'failing']) {
+    const harness = bootHarness({
+      profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+    });
+    const { history, record } = track(harness);
+    const release = mode === 'held' ? harness.holdBalanceReads() : null;
+    if (mode === 'failing') harness.failBalanceReads();
+
+    record();
+    connect(harness, WALLET_A);
+    await harness.flush();
+
+    // Identity is fully committed even though the network read has not answered.
+    assert.equal(harness.avatarSrc(), AVATAR_A, `${mode}: avatar must not wait on the RPC`);
+    assert.equal(harness.avatarName(), 'Founder', `${mode}: name must not wait on the RPC`);
+    assert.equal(harness.avatarAddress(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
+    assert.equal(harness.uiState(), 'connected', `${mode}: connected state must not wait on the RPC`);
+    assert.match(harness.menuHtml(), /Disconnect/);
+    assertNeverFlickers(history, `balance RPC ${mode}`);
+
+    if (release) {
+      release();
+      await harness.flush();
+      // The network row folds in afterwards without touching the identity.
+      assert.match(harness.menuHtml(), /Base Sepolia/);
+      assert.equal(harness.avatarSrc(), AVATAR_A);
+      assert.equal(harness.avatarName(), 'Founder');
+      assertNeverFlickers(history, 'balance RPC released');
+    }
+  }
+});
+
+test('a late network result is rejected once the wallet generation changed', async () => {
+  const harness = bootHarness({
+    profiles: {
+      [WALLET_A]: { wallet_address: WALLET_A, username: 'Alpha', avatar_url: AVATAR_A },
+      [WALLET_B]: { wallet_address: WALLET_B, username: 'Bravo', avatar_url: AVATAR_B }
+    }
+  });
+  const { history, record } = track(harness);
+  const release = harness.holdBalanceReads();
+
+  record();
+  connect(harness, WALLET_A);
+  await harness.flush();
+  connect(harness, WALLET_B);
+  await harness.flush();
+
+  release();
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_B);
+  assert.equal(harness.avatarName(), 'Bravo');
+  assert.equal(harness.avatarAddress(), `${WALLET_B.slice(0, 6)}...${WALLET_B.slice(-4)}`);
+  assertNeverFlickers(history, 'late network result after a wallet switch');
+  for (const state of history) {
+    if (state.address === `${WALLET_B.slice(0, 6)}...${WALLET_B.slice(-4)}`) {
+      assert.notEqual(state.imgSrc, AVATAR_A, 'wallet A must never appear for wallet B');
+      assert.notEqual(state.name, 'Alpha');
+    }
+  }
+});
+
+test('a transient bootstrap disconnect cannot repaint a committed cached identity', async () => {
+  const harness = bootHarness({
+    settled: false,
+    userAgent: DESKTOP_UA,
+    storage: {
+      ...cachedIdentityStorage(WALLET_A, 'Founder', AVATAR_A),
+      '@appkit/connection_status': 'connected'
+    },
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const { history, record } = track(harness);
+
+  record();
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+  assert.equal(harness.uiState(), 'connected');
+  assert.equal(harness.avatarName(), 'Founder');
+
+  // The SDK writes a transient 'disconnected' partway through restoring the
+  // session. Nothing in the header may re-read it and tear the identity down.
+  harness.storage.set('@appkit/connection_status', 'disconnected');
+  for (let i = 0; i < 6; i += 1) {
+    harness.triggerMutationObservers();
+    harness.dropdown.renderInitializingState();
+    await harness.flush();
+  }
+
+  assert.equal(harness.uiState(), 'connected', 'a transient SDK value must not repaint guest');
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assertMonotonic(history, 'uiState', 'transient bootstrap disconnect');
+
+  // The restoration then confirms the session — still no guest frame.
+  connect(harness, WALLET_A);
+  await harness.flush();
+  assert.equal(harness.uiState(), 'connected');
+  assertNeverFlickers(history, 'transient bootstrap disconnect');
+  assert.equal(history.some(state => state.uiState === 'disconnected'), false);
+});
+
+test('a boot that starts explicitly disconnected resolves to guest promptly', () => {
+  const harness = bootHarness({
+    settled: false,
+    userAgent: DESKTOP_UA,
+    storage: {
+      ...cachedIdentityStorage(WALLET_A, 'Founder', AVATAR_A),
+      '@appkit/connection_status': 'disconnected'
+    }
+  });
+  harness.dropdown.renderInitializingState();
+
+  assert.equal(harness.uiState(), 'disconnected');
+  assert.equal(harness.avatarName(), 'ArtSoul Guest');
+  assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
+  assert.match(harness.menuHtml(), /Connect Wallet/);
+  assert.equal(harness.document.head.children.length, 0, 'no preload for an explicitly disconnected boot');
+});
+
+test('unrelated document mutations never reset a committed header identity', async () => {
+  const harness = bootHarness({
+    settled: false,
+    storage: {
+      ...cachedIdentityStorage(WALLET_A, 'Founder', AVATAR_A),
+      '@appkit/connection_status': 'connected'
+    },
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  const { history, record } = track(harness);
+
+  record();
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+  const framesAfterHydration = history.length;
+  const profileReads = harness.profileCalls.length;
+  const imageRequests = harness.imageLoads.length;
+
+  // Gallery renders, filter changes, artwork loading: all reach the observer.
+  for (let i = 0; i < 25; i += 1) {
+    harness.triggerMutationObservers();
+    await harness.flush();
+  }
+
+  assert.equal(history.length, framesAfterHydration, 'unrelated mutations must commit nothing');
+  assert.equal(harness.profileCalls.length, profileReads, 'unrelated mutations must not re-read the profile');
+  assert.equal(harness.imageLoads.length, imageRequests, 'unrelated mutations must not re-request the avatar');
+  assert.equal(harness.uiState(), 'connected');
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.documentElement.classList.contains('wallet-state-resolving'), false);
+});
+
+test('a genuinely removed header is still rebuilt by the observer', async () => {
+  const harness = bootHarness({
+    profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+  });
+  connect(harness, WALLET_A);
+  await harness.flush();
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+
+  harness.navButtons.innerHTML = '';
+  harness.triggerMutationObservers();
+  await harness.flush();
+
+  assert.equal(harness.avatarSrc(), AVATAR_A);
+  assert.equal(harness.avatarName(), 'Founder');
+  assert.equal(harness.uiState(), 'connected');
+});
+
+test('rapid navigation across every shared-header page stays coherent', async () => {
+  // Each page is a fresh document that boots from the storage the previous one
+  // settled into, which is exactly what a fast click-through produces.
+  let storage = {
+    ...cachedIdentityStorage(WALLET_A, 'Founder', AVATAR_A),
+    '@appkit/connection_status': 'connected'
+  };
+
+  for (const page of SHARED_HEADER_PAGES) {
+    const harness = bootHarness({
+      settled: false,
+      pathname: `/${page}`,
+      staticShellHtml: staticShellOf(page),
+      storage,
+      profiles: { [WALLET_A]: { wallet_address: WALLET_A, username: 'Founder', avatar_url: AVATAR_A } }
+    });
+    const { history, record } = track(harness);
+
+    record();
+    harness.dropdown.renderInitializingState();
+    record();
+    await harness.flush();
+    connect(harness, WALLET_A);
+    await harness.flush();
+
+    assertNeverFlickers(history, `rapid navigation ${page}`);
+    assertMonotonic(history, 'uiState', `rapid navigation ${page}`);
+    assert.equal(harness.avatarSrc(), AVATAR_A, `${page}: settled avatar`);
+    assert.equal(harness.avatarName(), 'Founder', `${page}: settled name`);
+    assert.equal(harness.uiState(), 'connected', `${page}: settled state`);
+    // The neutral avatar is requested at most once per document, and never as a
+    // second URL for the same picture.
+    const neutralRequests = harness.imageLoads.filter(src => src === NEUTRAL_AVATAR).length;
+    assert.ok(neutralRequests <= 1, `${page}: duplicate neutral avatar requests (${neutralRequests})`);
+    assert.equal(harness.imageLoads.some(src => /default-avatar-[^.]+\.png/.test(src)), false,
+      `${page}: a hashed neutral avatar URL must never be requested`);
+
+    storage = Object.fromEntries(harness.storage);
+  }
 });

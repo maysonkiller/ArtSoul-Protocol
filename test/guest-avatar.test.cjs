@@ -15,7 +15,11 @@ const sharedHeaderPages = [
 ];
 
 test('guest avatar uses the local ArtSoul image with the generated fallback', () => {
-  assert.equal(fs.existsSync('default-avatar.png'), true);
+  // The one neutral avatar lives in publicDir so Vite serves it at exactly
+  // '/default-avatar.png' instead of emitting a second hashed copy that the
+  // legacy component would treat as a different image.
+  assert.equal(fs.existsSync('public/default-avatar.png'), true);
+  assert.equal(fs.existsSync('default-avatar.png'), false);
   assert.match(avatarDropdown, /src="\/default-avatar\.png"/);
   // A failed avatar load OR decode falls back to the canonical ArtSoul image
   // without changing connection semantics; the visible <img> is never blanked.
@@ -77,7 +81,10 @@ test('the render key encodes the network so a post-connect Base Sepolia confirma
 });
 
 test('connected account menus render the current network and balance row', () => {
-  assert.match(avatarDropdown, /const networkInfo = await this\.getCurrentNetworkInfo\(\{ walletAddress \}\);/);
+  // The live network/balance read now runs AFTER the identity is committed, so
+  // a slow or hanging RPC cannot hold the avatar, name and address off screen.
+  assert.match(avatarDropdown, /networkInfo = await this\.getCurrentNetworkInfo\(\{ walletAddress \}\);/);
+  assert.match(avatarDropdown, /async applyLiveNetworkSection\(\{ walletAddress, currentPath, isOwnProfile, renderKey \}\)/);
   assert.match(avatarDropdown, /renderMenuContent\(\{ currentPath, isOwnProfile, networkInfo, connected: true \}\)/);
   assert.match(avatarDropdown, /data-network-balance/);
   assert.match(avatarDropdown, /BASE_SEPOLIA_RPC_URL = 'https:\/\/sepolia\.base\.org'/);
