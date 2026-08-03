@@ -122,6 +122,13 @@
             this.isOpen = false;
             this.container = null;
             this.currentRenderKey = null;
+            // Identity transaction bookkeeping. Every snapshot takes the next
+            // token; any newer snapshot invalidates the pending one, which is
+            // what rejects a late load/decode from a superseded render or an
+            // older wallet. pendingIdentityKey collapses duplicate requests for
+            // the snapshot already in flight.
+            this.identityCommitToken = 0;
+            this.pendingIdentityKey = null;
             this.pendingRenderKey = null;
             this.profileCache = new Map();
             this.profileRequests = new Map();
@@ -203,127 +210,171 @@
             return { navButtons, dropdown, button, menu };
         }
 
-        updateStableButton({ avatarUrl, avatarAlt, name, address = '', stateKey }) {
+        /**
+         * Apply ONE coherent identity snapshot.
+         *
+         * Avatar, alt text, display name, shortened address, the stamped content
+         * key and the visible UI state are a single transaction. They are never
+         * committed separately, because a split commit produces exactly the
+         * invalid frame the founder reported: the neutral/disconnected avatar
+         * standing next to a connected profile name and address for as long as
+         * the real avatar takes to arrive.
+         *
+         * When the snapshot needs an avatar the document has not decoded yet,
+         * NOTHING of it is applied. The button keeps the previous identity while
+         * that identity belongs to the same account, or falls back to the
+         * complete resolving state, until the image can paint.
+         */
+        updateStableButton({ avatarUrl, avatarAlt, name, address = '', stateKey, uiState, persistUiState }) {
             const structure = this.getStableStructure();
             if (!structure) return null;
             const { button } = structure;
-            const contentKey = `${stateKey || ''}|${avatarUrl || ''}|${name || ''}|${address || ''}`;
-            if (button.dataset.avatarContentKey === contentKey) return structure;
-
             const image = button.querySelector('[data-avatar-image]');
-            const nameNode = button.querySelector('[data-avatar-name]');
-            const addressNode = button.querySelector('[data-avatar-address]');
-            const fallback = NEUTRAL_AVATAR_URL;
             const nextAvatarUrl = avatarUrl || NEUTRAL_AVATAR_URL;
             const nextName = name || 'ArtSoul Guest';
-            const currentAddress = addressNode?.hidden ? '' : (addressNode?.textContent || '');
-            const contentAlreadyMatches = image?.getAttribute('src') === nextAvatarUrl
-                && nameNode?.textContent === nextName
-                && currentAddress === (address || '');
+            const contentKey = `${stateKey || ''}|${nextAvatarUrl}|${nextName}|${address || ''}`;
 
-            if (contentAlreadyMatches) {
-                button.dataset.avatarContentKey = contentKey;
+            // Already on screen, or already in flight for this exact snapshot.
+            if (button.dataset.avatarContentKey === contentKey) return structure;
+            if (this.pendingIdentityKey === contentKey) return structure;
+
+            const snapshot = {
+                avatarUrl: nextAvatarUrl,
+                alt: avatarAlt || nextName,
+                name: nextName,
+                address: address || '',
+                // The account this snapshot belongs to. Derived from the visible
+                // address (empty for guest) because it is identical across every
+                // render path for the same wallet, unlike the render key, which
+                // also encodes the chain and the render source.
+                identity: address || 'guest',
+                contentKey,
+                uiState,
+                persistUiState
+            };
+
+            // Any newer snapshot invalidates this one, which is what rejects a
+            // late result from an older wallet, an older URL or a superseded
+            // render.
+            const token = ++this.identityCommitToken;
+            this.pendingIdentityKey = contentKey;
+
+            // Nothing to wait for: the src is unchanged, or the target is the
+            // canonical avatar, which every page paints in its static shell and
+            // is therefore always available. Commit in this same frame.
+            if (!image
+                || nextAvatarUrl === NEUTRAL_AVATAR_URL
+                || image.getAttribute('src') === nextAvatarUrl) {
+                this.commitIdentitySnapshot(structure, snapshot, token, false);
                 return structure;
             }
 
-            // Stamped before the image work so the asynchronous commit below can
-            // recognise its own render, and so a superseded render is rejected.
-            button.dataset.avatarContentKey = contentKey;
-
-            if (image) {
-                this.commitAvatarImage(button, image, {
-                    nextUrl: nextAvatarUrl,
-                    alt: avatarAlt || nextName,
-                    contentKey,
-                    fallback,
-                    // The account the image belongs to. Derived from the visible
-                    // address (empty for guest) because it is identical across
-                    // every render path for the same wallet, unlike the render
-                    // key, which also encodes the chain and the render source.
-                    identity: address || 'guest'
-                });
-            }
-            if (nameNode) nameNode.textContent = nextName;
-            if (addressNode) {
-                addressNode.hidden = !address;
-                addressNode.textContent = address || '';
-                addressNode.setAttribute('aria-hidden', address ? 'false' : 'true');
-            }
-
+            this.holdIdentityWhilePending(structure, snapshot);
+            this.decodeThenCommitIdentity(structure, snapshot, token);
             return structure;
         }
 
         /**
-         * Swap the account-button avatar without ever blanking it.
-         *
-         * Assigning a new src to a live <img> discards the rendered frame
-         * immediately: the browser paints an empty box until the replacement is
-         * ready. Across full-document navigation that is guaranteed to happen,
-         * because every document starts from the static markup and the user's own
-         * avatar is a separate resource. The header therefore loads AND DECODES
-         * the next avatar in a detached image first and assigns it to the visible
-         * one only once it can paint, so the button goes canonical-avatar ->
-         * final avatar in one step, with no intermediate empty frame and no
-         * hidden image.
-         *
-         * 'load' alone is not that guarantee: it fires when the resource has
-         * arrived, while the bitmap may still be decoding, so a commit on 'load'
-         * can still hand the compositor an image it cannot paint yet.
-         * HTMLImageElement.decode() is the promise that resolves only when the
-         * frame is ready. Where it is unavailable, the 'load' event remains the
-         * safe fallback — it is strictly no worse than the behaviour it replaces.
-         *
-         * A load error or a decode rejection keeps the canonical ArtSoul avatar
-         * and stamps a distinct failed key, so the next render for the same (or a
-         * newer) URL re-requests the image exactly once instead of treating it as
-         * rendered. Connection semantics are untouched either way: the name, the
-         * address, the network row and Disconnect are what carry connectedness.
-         *
-         * Every asynchronous boundary — load, decode settlement — re-checks the
-         * stamped content key, so a late result from a superseded render or a
-         * previous wallet can never reach the visible image.
+         * Write the whole snapshot to the DOM in one synchronous, guarded pass.
+         * Returns false when a newer snapshot has already superseded this one.
          */
-        commitAvatarImage(button, image, { nextUrl, alt, contentKey, fallback, identity }) {
-            image.alt = alt || 'ArtSoul';
+        commitIdentitySnapshot({ button }, snapshot, token, failed) {
+            if (token !== this.identityCommitToken) return false;
 
-            // Keeping the previous avatar during the decode is only correct while
-            // it still belongs to the account being rendered. On a wallet change
-            // it would put one account's avatar next to another's name and
-            // address, so the canonical ArtSoul image takes over in the same
-            // frame as the new identity text. It is a local, already-decoded
-            // asset the document has painted, so this is a swap, not a blank.
-            if (image.dataset.avatarIdentity !== identity
-                && image.getAttribute('src') !== NEUTRAL_AVATAR_URL) {
-                image.src = NEUTRAL_AVATAR_URL;
+            const image = button.querySelector('[data-avatar-image]');
+            const nameNode = button.querySelector('[data-avatar-name]');
+            const addressNode = button.querySelector('[data-avatar-address]');
+            // A permanently broken avatar resolves to the canonical image, but it
+            // is still committed TOGETHER with the connected name and address as
+            // one final state. It never stays pending.
+            const avatarUrl = failed ? NEUTRAL_AVATAR_URL : snapshot.avatarUrl;
+
+            if (image) {
+                if (image.getAttribute('src') !== avatarUrl) image.src = avatarUrl;
+                image.alt = snapshot.alt || 'ArtSoul';
+                image.dataset.avatarIdentity = snapshot.identity;
             }
-            image.dataset.avatarIdentity = identity;
+            if (nameNode) nameNode.textContent = snapshot.name;
+            if (addressNode) {
+                addressNode.hidden = !snapshot.address;
+                addressNode.textContent = snapshot.address;
+                addressNode.setAttribute('aria-hidden', snapshot.address ? 'false' : 'true');
+            }
+            button.dataset.avatarContentKey = failed
+                ? `${snapshot.contentKey}|image-error`
+                : snapshot.contentKey;
+            this.pendingIdentityKey = null;
+            if (snapshot.uiState) {
+                this.commitVisibleState(snapshot.uiState, { persist: snapshot.persistUiState });
+            }
+            return true;
+        }
 
-            if (image.getAttribute('src') === nextUrl) return;
+        /**
+         * Keep a complete, coherent state on screen while the snapshot's avatar
+         * is being fetched and decoded. Never a half identity.
+         */
+        holdIdentityWhilePending({ button }, snapshot) {
+            const image = button.querySelector('[data-avatar-image]');
+            const previousKey = button.dataset.avatarContentKey || '';
+            const previousIsCoherent = previousKey
+                && !previousKey.endsWith('|pending')
+                && image?.dataset.avatarIdentity === snapshot.identity;
+            // The identity on screen belongs to the same account and is complete,
+            // so it stays untouched — this is the profile-avatar-changed case.
+            if (previousIsCoherent) return;
 
-            const neutral = fallback || NEUTRAL_AVATAR_URL;
-            const isCurrentRender = () => button.dataset.avatarContentKey === contentKey;
-            const commit = (url, failed) => {
-                if (!isCurrentRender()) return;
-                if (failed) button.dataset.avatarContentKey = `${contentKey}|image-error`;
-                if (image.getAttribute('src') !== url) image.src = url;
+            // Otherwise there is no safe previous identity: a fresh document, or
+            // a different wallet. Show the complete resolving state rather than
+            // any part of the new one.
+            const nameNode = button.querySelector('[data-avatar-name]');
+            const addressNode = button.querySelector('[data-avatar-address]');
+            if (image) {
+                if (image.getAttribute('src') !== NEUTRAL_AVATAR_URL) image.src = NEUTRAL_AVATAR_URL;
+                image.alt = 'ArtSoul';
+                image.dataset.avatarIdentity = snapshot.identity;
+            }
+            if (nameNode) nameNode.textContent = RESOLVING_IDENTITY_LABEL;
+            if (addressNode) {
+                addressNode.hidden = !snapshot.address;
+                addressNode.textContent = snapshot.address;
+                addressNode.setAttribute('aria-hidden', snapshot.address ? 'false' : 'true');
+            }
+            button.dataset.avatarContentKey = `${snapshot.contentKey}|pending`;
+            this.commitVisibleState('resolving', { persist: false });
+        }
+
+        /**
+         * Fetch and decode the snapshot's avatar off the DOM, then commit the
+         * whole snapshot at once.
+         *
+         * 'load' alone is not the guarantee: it fires when the resource has
+         * arrived, while the bitmap may still be decoding, so a commit on load
+         * can still hand the compositor an image it cannot paint yet.
+         * HTMLImageElement.decode() resolves only when the frame is ready. Where
+         * it is unavailable, the load event remains the safe fallback.
+         *
+         * Every asynchronous boundary re-checks the commit token, so a late
+         * result from a superseded render or a previous wallet can never commit.
+         */
+        decodeThenCommitIdentity(structure, snapshot, token) {
+            const settle = (failed) => {
+                if (token !== this.identityCommitToken) return;
+                this.commitIdentitySnapshot(structure, snapshot, token, failed);
             };
-
             const preloader = typeof Image === 'function'
                 ? new Image()
                 : document.createElement('img');
-            preloader.onerror = () => commit(neutral, true);
+            preloader.onerror = () => settle(true);
             preloader.onload = () => {
-                if (!isCurrentRender()) return;
+                if (token !== this.identityCommitToken) return;
                 if (typeof preloader.decode !== 'function') {
-                    commit(nextUrl, false);
+                    settle(false);
                     return;
                 }
-                preloader.decode().then(
-                    () => commit(nextUrl, false),
-                    () => commit(neutral, true)
-                );
+                preloader.decode().then(() => settle(false), () => settle(true));
             };
-            preloader.src = nextUrl;
+            preloader.src = snapshot.avatarUrl;
         }
 
         updateStableMenu(html, menuKey) {
@@ -1222,9 +1273,11 @@
                 avatarAlt: username,
                 name: username,
                 address: shortAddress,
-                stateKey: `identity:${walletAddress.toLowerCase()}`
+                stateKey: `identity:${walletAddress.toLowerCase()}`,
+                // Part of the same transaction: 'connected' becomes visible only
+                // when this identity's avatar can actually paint.
+                uiState: 'connected'
             });
-            this.commitVisibleState('connected');
             this.updateStableMenu(
                 this.renderMenuContent({
                     currentPath,
@@ -1546,9 +1599,9 @@
                 avatarAlt: cachedIdentity.name,
                 name: cachedIdentity.name,
                 address: shortAddress,
-                stateKey: `identity:${storedWallet}`
+                stateKey: `identity:${storedWallet}`,
+                uiState: 'connected'
             });
-            this.commitVisibleState('connected');
             this.updateStableMenu(
                 this.renderMenuContent({
                     currentPath,
@@ -1591,9 +1644,10 @@
                 avatarAlt: 'ArtSoul',
                 name: RESOLVING_IDENTITY_LABEL,
                 address: `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`,
-                stateKey: `resolving:${storedWallet}`
+                stateKey: `resolving:${storedWallet}`,
+                uiState: 'resolving',
+                persistUiState: false
             });
-            this.commitVisibleState('resolving', { persist: false });
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
                 `resolving:${currentPath}:${isProfilePage}`
@@ -1622,13 +1676,14 @@
             const currentPath = window.location.pathname;
             const isProfilePage = currentPath.includes('profile.html');
             this.updateStableButton({
-                avatarUrl: '/default-avatar.png',
+                avatarUrl: NEUTRAL_AVATAR_URL,
                 avatarAlt: 'ArtSoul',
                 name: 'ArtSoul Guest',
                 address: '',
-                stateKey: options.renderKey || 'guest'
+                stateKey: options.renderKey || 'guest',
+                // A real disconnect commits the complete guest identity at once.
+                uiState: 'disconnected'
             });
-            this.commitVisibleState('disconnected');
             this.clearProtocolAdminAccess();
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
@@ -1687,9 +1742,9 @@
                 avatarAlt: displayedName,
                 name: displayedName,
                 address: shortAddress,
-                stateKey: options.renderKey || `wallet:${currentWallet}`
+                stateKey: options.renderKey || `wallet:${currentWallet}`,
+                uiState: 'connected'
             });
-            this.commitVisibleState('connected');
             this.updateStableMenu(
                 this.renderMenuContent({
                     currentPath,

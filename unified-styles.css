@@ -4585,9 +4585,11 @@ body.future .site-header {
     overflow: visible !important;
 }
 
+/* Side columns stay equal so the centre column remains centred. They track the
+   account button (180px) plus its 8px gutter — see the account-button block. */
 .site-header-row {
     display: grid !important;
-    grid-template-columns: 172px minmax(0, 1fr) 172px;
+    grid-template-columns: 188px minmax(0, 1fr) 188px;
     min-width: 0;
     min-height: 56px;
     align-items: center;
@@ -4650,9 +4652,9 @@ html.future .site-header .logo-link > .site-logo {
 
 .site-header #navButtons,
 .site-header #navButtons .avatar-dropdown-container {
-    width: 164px !important;
-    min-width: 164px !important;
-    max-width: 164px !important;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
@@ -4673,10 +4675,16 @@ html.future .site-header .logo-link > .site-logo {
     justify-content: flex-end;
 }
 
+/* 180 = 2*1.6 border + 2*6 padding + 30 avatar + 4 gap + 104 identity + 4 gap
+   + 10 chevron, with ~7px of slack. The identity column is 104px because the
+   widest label the header can show — "ArtSoul Guest" (90px), a shortened
+   address used as a display name (91px) and "Connecting…" (88px) at Inter
+   0.82rem/650 — must render in full. At the previous 88px "ArtSoul Guest"
+   measured 90px against an 88px box and was ellipsized to "ArtSoul Gu…". */
 .site-header #navButtons .avatar-button {
-    width: 164px !important;
-    min-width: 164px !important;
-    max-width: 164px !important;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
     height: 42px !important;
     min-height: 42px !important;
     max-height: 42px !important;
@@ -4720,17 +4728,19 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
 
 .site-header #navButtons .avatar-info {
     display: flex !important;
-    width: 88px !important;
-    min-width: 88px !important;
-    max-width: 88px !important;
+    width: 104px !important;
+    min-width: 104px !important;
+    max-width: 104px !important;
     height: 30px !important;
-    flex: 0 0 88px !important;
+    flex: 0 0 104px !important;
     justify-content: center;
 }
 
+/* Fixed in every state, so the button geometry cannot depend on the label.
+   A genuinely long user profile name still ellipsizes here on purpose. */
 .site-header #navButtons .avatar-info > div {
-    width: 88px !important;
-    max-width: 88px !important;
+    width: 104px !important;
+    max-width: 104px !important;
 }
 
 .site-header #navButtons [data-avatar-name] {
@@ -4766,7 +4776,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
 }
 
 .site-header .avatar-dropdown-menu {
-    width: min(164px, calc(100vw - 24px)) !important;
+    width: min(180px, calc(100vw - 24px)) !important;
     padding: 0.32rem !important;
     font-family: Inter, Arial, sans-serif !important;
 }
