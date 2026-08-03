@@ -105,9 +105,29 @@ class FakeElement {
     // <img> semantics: `complete` mirrors a decoded image and flips only when
     // the harness resolves the requested source.
     this.complete = false;
+    this.onload = null;
     this.onerror = null;
     this._src = '';
+    // A decoded image has intrinsic dimensions; the preview capture reads them.
+    this.naturalWidth = 0;
+    this.naturalHeight = 0;
+    this.crossOrigin = null;
+    // HTMLImageElement.decode(). It is a SEPARATE lifecycle stage from 'load':
+    // the resource can have arrived while the bitmap is still decoding, which is
+    // exactly the window a commit-on-load would paint into. A harness whose
+    // images support decode() must therefore let a test hold the two apart.
+    // Omitted entirely when the harness models a browser without decode().
+    if (tagName === 'img' && ownerHarness && ownerHarness.supportsDecode !== false) {
+      this.decode = () => ownerHarness.queueImageDecode(this, this._src);
+    }
   }
+
+  get rel() { return this.attributes.rel || ''; }
+  set rel(value) { this.attributes.rel = String(value); }
+  get as() { return this.attributes.as || ''; }
+  set as(value) { this.attributes.as = String(value); }
+  get href() { return this.attributes.href || ''; }
+  set href(value) { this.attributes.href = String(value); }
 
   set innerHTML(value) {
     this._innerHTML = String(value);
@@ -203,9 +223,17 @@ class FakeElement {
  * options.settled         - initial window.artsoulWalletStateSettled
  * options.profiles        - map of lowercased wallet -> profile row
  * options.failingImages   - Set of image sources that must fail to load
+ * options.failingDecodes  - Set of image sources that LOAD but fail to decode
+ * options.supportsDecode  - false models a browser without Image.decode()
+ * options.staticShellHtml - static #navButtons markup a product page ships, so
+ *                           the harness can model what the browser paints
+ *                           before avatar-dropdown.js touches anything
  */
 function createAvatarHarness(options = {}) {
   const harness = {};
+  // Read by FakeElement while building the static shell, so it must be known
+  // before the first image element exists.
+  harness.supportsDecode = options.supportsDecode !== false;
 
   const accessCalls = [];
   const profileCalls = [];
@@ -226,22 +254,61 @@ function createAvatarHarness(options = {}) {
     Object.entries(options.profiles || {}).map(([wallet, profile]) => [wallet.toLowerCase(), profile])
   );
   const failingImages = new Set(options.failingImages || []);
+  const failingDecodes = new Set(options.failingDecodes || []);
+  // Sources whose host sends no CORS headers: an anonymous request fails.
+  const corsBlockedImages = new Set(options.corsBlockedImages || []);
   // Pending image resolutions, drained by flush(). Mirrors a browser deferring
   // load/error until after the synchronous render completed.
   const pendingImages = [];
+  // Pending decode() settlements. Held separately from load so a test can
+  // observe the window where the resource has arrived but the bitmap is not
+  // ready to paint — the exact window a commit-on-load would paint into.
+  const pendingDecodes = [];
+  const decodeCalls = [];
+  let decodesDeferred = false;
   // Profile reads can be held open to model a slow mobile response.
   let profileGate = null;
   let profileBehaviour = null;
+  // Balance/network reads can be held open or made to fail independently.
+  let balanceGate = null;
+  let balanceFails = options.balanceFails === true;
 
   harness.queueImageLoad = (image, source) => {
     pendingImages.push({ image, source });
   };
+
+  harness.queueImageDecode = (image, source) => new Promise((resolve, reject) => {
+    // A source that never loaded, or one flagged as undecodable, rejects with
+    // an EncodingError exactly as the platform does.
+    const fails = failingImages.has(source) || failingDecodes.has(source);
+    pendingDecodes.push({
+      source,
+      settle: () => (fails ? reject(new Error(`decode failed for ${source}`)) : resolve())
+    });
+  });
+
+  // Observer invoked at every point the component could have committed a
+  // visible change, so a test can record the full visible-state history instead
+  // of only the settled state.
+  let commitObserver = null;
+  const notifyCommit = () => { if (commitObserver) commitObserver(); };
 
   const documentElement = new FakeElement('html', harness);
   const body = new FakeElement('body', harness);
   const navButtons = new FakeElement('div', harness);
   navButtons.id = 'navButtons';
   body.appendChild(navButtons);
+  // The static shell every product page ships inside #navButtons. Materialising
+  // it reproduces the real first paint: the browser has already painted the
+  // canonical avatar before a single line of component code runs.
+  if (options.staticShellHtml) {
+    navButtons.innerHTML = options.staticShellHtml;
+    navButtons.dataset.avatarRenderKey = 'initializing';
+    // The static markup is part of the document: it is already decoded when the
+    // first paint happens, exactly like a browser serving it from cache.
+    const shellImage = navButtons.querySelector('[data-avatar-image]');
+    if (shellImage) shellImage.complete = true;
+  }
 
   const storage = new Map(Object.entries(options.storage || {}));
   const localStorage = {
@@ -263,7 +330,34 @@ function createAvatarHarness(options = {}) {
       documentListeners.get(type).push(handler);
     },
     removeEventListener() {},
-    createElement: tag => new FakeElement(tag, harness),
+    createElement: tag => {
+      const element = new FakeElement(tag, harness);
+      // Minimal <canvas> so the paint-ready avatar preview capture can be
+      // driven deterministically: options.canvasExport decides whether the
+      // export succeeds, throws a SecurityError (tainted canvas, the real
+      // no-CORS behaviour) or is unavailable altogether.
+      if (tag === 'canvas') {
+        element.getContext = () => (options.canvasExport === 'no-context' ? null : { drawImage() {} });
+        element.toDataURL = (type) => {
+          if (options.canvasExport === 'tainted') {
+            const error = new Error('Tainted canvases may not be exported.');
+            error.name = 'SecurityError';
+            throw error;
+          }
+          if (options.canvasExport === 'oversized') {
+            return `data:image/png;base64,${'A'.repeat(40 * 1024)}`;
+          }
+          if (options.canvasExport === 'svg') return 'data:image/svg+xml;base64,PHN2Zy8+';
+          if (type === 'image/webp' && options.canvasExport === 'no-webp') {
+            return 'data:image/png;base64,QUJD';
+          }
+          return type === 'image/webp'
+            ? 'data:image/webp;base64,V0VCUFBSRVZJRVc='
+            : 'data:image/png;base64,UE5HUFJFVklFVw==';
+        };
+      }
+      return element;
+    },
     getElementById(id) {
       return matches(body, `#${id}`) ? body : body.querySelector(`#${id}`);
     },
@@ -290,6 +384,12 @@ function createAvatarHarness(options = {}) {
         if (index >= 0) pendingTimeouts.splice(index, 1);
     },
     localStorage,
+    // The shared header decodes the next avatar in a detached image before it
+    // swaps the visible one, so the harness must provide the same constructor
+    // the browser does.
+    Image: class {
+      constructor() { return new FakeElement('img', harness); }
+    },
     navigator: { userAgent: options.userAgent || 'node-test' },
     MutationObserver: class {
       constructor(callback) { this.callback = callback; mutationObservers.push(this); }
@@ -312,10 +412,15 @@ function createAvatarHarness(options = {}) {
       }
       if (target === BASE_SEPOLIA_RPC_URL) {
         balanceCalls.push({ url: target, options: requestOptions });
-        return Promise.resolve({
+        const response = {
           ok: true,
           json: async () => ({ jsonrpc: '2.0', id: 1, result: '0x16345785d8a0000' })
-        });
+        };
+        // A slow, hanging or failing balance RPC must never hold the visible
+        // identity. balanceGate models exactly that.
+        if (balanceGate) return balanceGate.then(() => (balanceFails ? Promise.reject(new Error('balance RPC failed')) : response));
+        if (balanceFails) return Promise.reject(new Error('balance RPC failed'));
+        return Promise.resolve(response);
       }
       return Promise.resolve({ ok: false, json: async () => ({}), text: async () => '' });
     }
@@ -420,6 +525,19 @@ function createAvatarHarness(options = {}) {
     /** Timers scheduled but not yet fired (a cancelled timer is gone). */
     pendingTimerCount() { return pendingTimeouts.length; },
 
+    /**
+     * Flip a still-parsing document to 'complete' and fire DOMContentLoaded,
+     * exactly as the browser does after the last of the shared header's boot
+     * scripts. Only meaningful with `readyState: 'loading'`, which models the
+     * real ordering: the component is a synchronous head script, so it runs
+     * long before the document has finished parsing.
+     */
+    fireDomContentLoaded() {
+      document.readyState = 'complete';
+      for (const handler of documentListeners.get('DOMContentLoaded') || []) handler({ type: 'DOMContentLoaded' });
+      notifyCommit();
+    },
+
     /** Dispatch 'artsoul:db-ready' without touching window.ArtSoulDB. */
     dispatchDbReady() {
       context.window.dispatchEvent(new context.CustomEvent('artsoul:db-ready'));
@@ -429,6 +547,22 @@ function createAvatarHarness(options = {}) {
     setProfileBehaviour(fn) { profileBehaviour = fn; },
 
     setProfile(wallet, profile) { profiles.set(String(wallet).toLowerCase(), profile); },
+
+    /**
+     * Hold every balance/network read open until release() is called, so a test
+     * can prove the visible identity commits without waiting for the RPC.
+     */
+    holdBalanceReads() {
+      let release;
+      balanceGate = new Promise(resolve => { release = resolve; });
+      return () => {
+        balanceGate = null;
+        release();
+      };
+    },
+
+    /** Make every balance/network read reject. */
+    failBalanceReads() { balanceFails = true; },
 
     /** Hold every profile read open until release() is called. */
     holdProfileReads() {
@@ -443,6 +577,24 @@ function createAvatarHarness(options = {}) {
     failImage(source) { failingImages.add(source); },
     allowImage(source) { failingImages.delete(source); },
 
+    failDecode(source) { failingDecodes.add(source); },
+    allowDecode(source) { failingDecodes.delete(source); },
+
+    /** Sources whose decode() was actually awaited, in call order. */
+    decodeCalls,
+
+    /**
+     * Stop flush() from settling decode(), so a test can drive a load to
+     * completion and assert that the visible image has NOT changed yet.
+     */
+    deferDecodes() { decodesDeferred = true; },
+
+    /** Resume decode settlement; the next flush() drains what is pending. */
+    releaseDecodes() { decodesDeferred = false; },
+
+    /** decode() promises that have been requested but not settled. */
+    pendingDecodeCount() { return pendingDecodes.length; },
+
     /** The stable account button element, or null before first render. */
     button() { return navButtons.querySelector('.avatar-button'); },
 
@@ -453,6 +605,15 @@ function createAvatarHarness(options = {}) {
 
     /** Currently displayed avatar source. */
     avatarSrc() { return harness.avatarImage()?.getAttribute('src') || ''; },
+
+    /**
+     * What the displayed pixels REPRESENT, which is not always what is in src:
+     * a restored paint-ready preview paints in place of its own source URL.
+     */
+    avatarSource() { return harness.avatarImage()?.dataset.avatarSource || ''; },
+
+    /** True when the button displays a locally cached preview data URI. */
+    avatarIsPreview() { return /^data:image\//.test(harness.avatarSrc()); },
 
     /** Currently displayed account name. */
     avatarName() {
@@ -481,8 +642,20 @@ function createAvatarHarness(options = {}) {
       for (const observer of mutationObservers) observer.callback([], observer);
     },
 
+    /**
+     * Install an observer invoked at every point the component could have
+     * committed a visible change (each image resolution, each timer, each
+     * microtask round). Tests use it to record the full visible-state history
+     * so a forbidden INTERMEDIATE state cannot hide behind a correct final one.
+     */
+    observeCommits(fn) {
+      commitObserver = typeof fn === 'function' ? fn : null;
+      notifyCommit();
+    },
+
     /** Resolve pending image requests and drain microtasks. */
     async flush() {
+      notifyCommit();
       for (let round = 0; round < 8; round += 1) {
         while (pendingImages.length > 0) {
           const { image, source } = pendingImages.shift();
@@ -490,17 +663,34 @@ function createAvatarHarness(options = {}) {
           if (failingImages.has(source)) {
             const onerror = image.onerror;
             if (typeof onerror === 'function') onerror.call(image, { type: 'error' });
+          } else if (corsBlockedImages.has(source) && image.crossOrigin === 'anonymous') {
+            // A host without CORS headers rejects the anonymous request. The
+            // component must retry once without it so the avatar still renders.
+            const onerror = image.onerror;
+            if (typeof onerror === 'function') onerror.call(image, { type: 'error' });
           } else {
             image.complete = true;
+            image.naturalWidth = 200;
+            image.naturalHeight = 200;
+            if (typeof image.onload === 'function') image.onload.call(image, { type: 'load' });
             image.dispatchEvent({ type: 'load' });
           }
+          notifyCommit();
+        }
+        while (!decodesDeferred && pendingDecodes.length > 0) {
+          const entry = pendingDecodes.shift();
+          decodeCalls.push(entry.source);
+          entry.settle();
+          notifyCommit();
         }
         while (pendingTimeouts.length > 0) {
           const entry = pendingTimeouts.shift();
           scheduledDelays.push(entry.delay);
           entry.fn();
+          notifyCommit();
         }
         await new Promise(resolve => setImmediate(resolve));
+        notifyCommit();
       }
     }
   });
