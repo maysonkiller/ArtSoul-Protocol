@@ -1,8 +1,8 @@
 # ArtSoul Engineering Handoff
 
-Updated: 2026-07-28
+Updated: 2026-08-04
 
-Production code baseline: `main` includes `c159001`
+Production code baseline: `main` includes `f4297ce`
 
 Companion state document: `docs/PROJECT_STATE.md`
 
@@ -46,7 +46,7 @@ Do not start Phase C contract work, Genesis implementation, a token, points, air
 | Project X account | `https://x.com/ArtSoulProtocol` |
 | Community | `https://t.me/ArtSoulCommunity` |
 
-The wallet isolation bench is intentionally excluded from navigation. The external-mobile runtime and wrong-network recovery path passed production acceptance on 2026-07-30 through PR #156. Keep the bench until A1 also captures a fresh production mobile SIWE signature and both authenticated negative upload-policy probes, then perform the post-acceptance cleanup as a separate task.
+The wallet isolation bench is intentionally excluded from navigation. The external-mobile runtime and wrong-network recovery path passed production acceptance on 2026-07-30 through PR #156. A fresh production mobile SIWE signature and both authenticated negative upload-policy probes passed on 2026-08-04; see `testnet/A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md`. Remove the bench only through a separate post-acceptance cleanup task after that evidence merges.
 
 ## 3. Production Topology
 
@@ -89,6 +89,12 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 - Configure the documented Supabase Storage bucket guardrails.
 - Reconcile the production migration ledger without automatic adoption.
 - Decide whether repository history remediation is complete.
+
+The public runtime portion of A1 is accepted: the 2026-08-04 iPhone run captured
+a fresh SIWE signature and exact authenticated rejection of unsupported MIME and
+an artwork-size request greater than 50 MB. Only the private, value-free
+credential and repository-history attestation remains; never copy secret values
+into the repository.
 
 ### 2. Fix indexer status configuration drift
 
