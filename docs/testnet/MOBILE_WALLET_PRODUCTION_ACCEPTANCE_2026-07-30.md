@@ -58,3 +58,8 @@ SIWE prompt in this run, and the two authenticated negative upload-policy probes
 were not executed. A1 still requires a production mobile run that visibly
 reports `A1 auth smoke passed`, including both expected HTTP 400 policy
 rejections, plus the separate private credential attestation.
+
+The missing runtime evidence was subsequently accepted on 2026-08-04 and is
+recorded in
+[`A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md`](A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md).
+Only the separate private credential and repository-history attestation remains.
