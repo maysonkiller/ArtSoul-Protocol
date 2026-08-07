@@ -89,5 +89,5 @@ test('A12 production acceptance is durable and reconciled across handoff and bac
   assert.match(durableBacklog, /\| A-28 \|[^|]+\|[^|]+\| done \| A \|/);
   assert.match(durableBacklog, /\| A-44 \|[^|]+\|[^|]+\| done \| A \|/);
   assert.match(handoff, /Production code baseline: `main` includes `f4297ce`/);
-  assert.match(handoff, /A2-A6, A9, A11, and A12 are accepted/);
+  assert.match(handoff, /A1-A6, A9, A11, and A12 are accepted/);
 });
