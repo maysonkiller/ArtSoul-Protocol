@@ -80,21 +80,17 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 
 ## 5. Immediate Priority Queue
 
-`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. A2-A6, A9, A11, and A12 are accepted. A12 production evidence, including the module-entry correction discovered during acceptance, is in `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
+`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. A1-A6, A9, A11, and A12 are accepted. A1's final redacted credential/history evidence is in `testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`. A12 production evidence, including the module-entry correction discovered during acceptance, is in `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
 
-### 1. Finish security and migration operational acceptance
+### 1. A1 security and migration operational acceptance is complete
 
-- Confirm historical service credentials and any deployer key findings from `SECURITY_PUBLIC_READINESS_REPORT.md` were rotated or retired.
-- Apply the reviewed Phase 18.7b and 18.7c changes only through `docs/security/MIGRATION_RUNBOOK.md`, with backup, pre/post evidence, and smoke tests.
-- Configure the documented Supabase Storage bucket guardrails.
-- Reconcile the production migration ledger without automatic adoption.
-- Decide whether repository history remediation is complete.
-
-The public runtime portion of A1 is accepted: the 2026-08-04 iPhone run captured
-a fresh SIWE signature and exact authenticated rejection of unsupported MIME and
-an artwork-size request greater than 50 MB. Only the private, value-free
-credential and repository-history attestation remains; never copy secret values
-into the repository.
+The 2026-08-04 iPhone run captured a fresh SIWE signature and exact authenticated
+rejection of unsupported MIME and an artwork-size request greater than 50 MB.
+The final 2026-08-07 redacted record confirms server-credential separation,
+retirement of the exposed secondary development key locally and on Hetzner,
+forced production RLS, zero open GitHub secret alerts, and the explicit decision
+to retain repository history under Secret Scanning and push protection. Never
+copy secret values into the repository.
 
 ### 2. Fix indexer status configuration drift
 
