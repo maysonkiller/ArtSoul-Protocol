@@ -60,7 +60,7 @@ function allowedApiOrigins() {
     const configured = readEnv(['API_ALLOWED_ORIGINS', 'OAUTH_ALLOWED_ORIGINS']);
     const origins = configured
         ? configured.split(',').map(origin => origin.trim()).filter(Boolean)
-        : ['https://artsoul.vercel.app'];
+        : ['https://artsoulprotocol.com', 'https://artsoul.vercel.app'];
 
     if (process.env.NODE_ENV !== 'production') {
         origins.push('http://localhost:5173', 'http://127.0.0.1:5173');

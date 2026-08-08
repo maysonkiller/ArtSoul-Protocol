@@ -42,6 +42,9 @@ function requestOrigin(req) {
       .map(value => value.trim().replace(/\/$/, ''))
       .filter(Boolean)
   );
+  allowedOrigins.add('https://artsoulprotocol.com');
+  // Keep the Vercel origin valid during the DNS cutover and as an emergency
+  // rollback origin. Provider callbacks should use the canonical domain.
   allowedOrigins.add('https://artsoul.vercel.app');
   if (process.env.VERCEL_URL) allowedOrigins.add(`https://${process.env.VERCEL_URL}`);
   if (process.env.VERCEL_BRANCH_URL) allowedOrigins.add(`https://${process.env.VERCEL_BRANCH_URL}`);

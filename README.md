@@ -24,9 +24,9 @@ The implementation was validated with the production Vite build, Node syntax che
 
 ### Judge links and testing
 
-- Live application: [artsoul.vercel.app](https://artsoul.vercel.app/)
+- Live application: [artsoulprotocol.com](https://artsoulprotocol.com/)
 - Public repository: [maysonkiller/ArtSoul-Protocol](https://github.com/maysonkiller/ArtSoul-Protocol)
-- Protocol documentation: [Protocol Docs](https://artsoul.vercel.app/docs-protocol.html)
+- Protocol documentation: [Protocol Docs](https://artsoulprotocol.com/docs-protocol.html)
 
 The public site can be explored without credentials. Wallet transactions currently target Base Sepolia testnet. A testnet wallet is required only for protected actions such as publishing or bidding; read-only artwork, discovery, protocol documentation, and profile surfaces remain publicly accessible.
 
