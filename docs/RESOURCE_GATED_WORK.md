@@ -1,6 +1,6 @@
 # ArtSoul Resource-Gated Work Plan
 
-Updated: 2026-07-20
+Updated: 2026-08-08
 
 This document records work that remains required but cannot be activated or completed safely until its external resources are available. It is an operational plan subordinate to the [Canon Bible](canon/ARTSOUL_CANON_BIBLE_FULL.md) and the [durable backlog](BACKLOG.md); it does not amend architecture, economics, roles, or lifecycle rules.
 
@@ -23,7 +23,7 @@ Before any paid commitment, refresh the exact purchase, renewal, gas, audit, leg
 
 | ID | Required outcome | Canonical phase | Current state | Safe interim path | Activation/completion condition |
 | --- | --- | --- | --- | --- | --- |
-| RG-01 | Permanent DNS domain and redirect policy | C0 / C14 | Deferred; the Vercel production origin remains canonical for testnet | Continue on `artsoul.vercel.app`; do not present a temporary origin as the final WebAuthn RP ID | Founder-approved domain is funded, registered, renewable, connected to Vercel, HTTPS-verified, and documented |
+| RG-01 | Permanent DNS domain and redirect policy | C0 / C14 | `artsoulprotocol.com` is founder-approved, registered and delegated to Cloudflare; the Vercel attachment, exact DNS records, HTTPS verification and redirect acceptance are pending | Keep `artsoul.vercel.app` as a temporary allowed rollback origin during the cutover; do not enable the final WebAuthn RP until the apex domain is live | Connect the apex to the ArtSoul Vercel project, redirect `www` to the apex, verify HTTPS and the acceptance checks in `runbooks/PERMANENT_DOMAIN_CUTOVER.md`, then remove temporary compatibility only in a later reviewed change |
 | RG-02 | Project email for general, security, and copyright operations | C14 | Deferred until RG-01 | Use existing private operational contact channels; do not publish a mailbox that is not monitored | Domain exists and a monitored receive/reply path plus retention procedure are verified |
 | RG-03 | Production activation of A8a moderation step-up | A8 | Engineering may proceed behind a disabled feature flag; final activation is deferred | Test only with non-production credentials on the current origin and expect re-enrolment | Final domain/RP ID is live; two founder passkeys are enrolled; the one-time bootstrap grant is audit-recorded; Safe-only founder recovery is configured and rehearsed; the flag is enabled through a reviewed deployment |
 | RG-04 | Moderator onboarding and device step-up | A8 | Planned | Keep wallet addresses and role assignments out of public source; use test-only roles after the A8a data model exists | Each moderator has an active least-privilege role, an individually enrolled passkey, a 15-minute step-up session, revocation coverage, and an audit record |
