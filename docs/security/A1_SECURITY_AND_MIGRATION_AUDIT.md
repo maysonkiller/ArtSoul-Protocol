@@ -2,13 +2,15 @@
 
 Initial audit date: 2026-07-16
 
-Last evidence update: 2026-07-26
+Last evidence update: 2026-08-07
 
 Scope: repository secret hygiene, authentication boundaries, server-only credentials, Supabase RLS, deployment headers, and database migration reproducibility. No contract, wallet-connect, auction, mint, economics, or UI behavior is changed by this audit.
 
 ## Result
 
-Phase A1 is **partially operationally accepted**. The repository corrections are merged, the reviewed Phase 18.7b and 18.7c transactions were applied to production on 2026-07-17 after a verified full and schema-only backup, and Storage bucket guardrails were applied on 2026-07-18. The 2026-07-26 follow-up verified the official repository secret-scanning boundary, preview/production response headers, and a post-hardening desktop SIWE plus signed media/metadata upload and public-read path. The remaining acceptance work is a production mobile SIWE smoke test, authenticated negative upload-policy checks, and the private secret-rotation/deployment-environment attestation.
+Phase A1 is **accepted**. The repository corrections are merged, the reviewed Phase 18.7b and 18.7c transactions were applied to production on 2026-07-17 after a verified full and schema-only backup, and Storage bucket guardrails were applied on 2026-07-18. The production mobile SIWE and authenticated negative upload-policy probes passed on 2026-08-04. The value-free credential-retirement and repository-history decision was accepted on 2026-08-07. The final evidence is recorded in `../testnet/A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md` and `../testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`.
+
+The dated findings and interim acceptance language below are retained as the audit trail of how A1 reached acceptance. They are not the current project status.
 
 ## Findings And Corrections
 
@@ -26,6 +28,11 @@ Phase A1 is **partially operationally accepted**. The repository corrections are
 | Deployment headers | Production had HSTS but lacked consistent nosniff, referrer, and frame policy. Auth/session responses could inherit public revalidation behavior. | Added global nosniff/referrer/frame headers and private no-store defaults for API routes. A CSP was intentionally not guessed because current AppKit/ESM imports require a measured policy first. Preview and production smoke tests passed on 2026-07-26. | None for this correction; retain the checks in release acceptance. |
 
 ## Secret Rotation Attestation
+
+This table is the original 2026-07-16 checklist snapshot. Its `UNVERIFIED`
+cells are retained as historical evidence and are superseded by the accepted,
+value-free record in
+`../testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`.
 
 Do not paste keys, tokens, seed phrases, or private-key material into this document, GitHub, chat, or an issue. Record only status, date, and the responsible person.
 

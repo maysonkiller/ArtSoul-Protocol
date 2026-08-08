@@ -34,13 +34,14 @@ Do not start Phase C contract work, Genesis implementation, a token, points, air
 
 | Resource | Location |
 | --- | --- |
-| Production site | `https://artsoul.vercel.app` |
+| Production site | `https://artsoulprotocol.com` |
+| Legacy Vercel alias | `https://artsoul.vercel.app` (temporary rollback/cutover origin) |
 | Repository | `https://github.com/maysonkiller/ArtSoul-Protocol` |
-| Protocol docs | `https://artsoul.vercel.app/docs-protocol.html` |
-| Gallery | `https://artsoul.vercel.app/gallery.html` |
-| Wallet isolation bench | `https://artsoul.vercel.app/wallet-test.html?walletdebug=1` |
-| Public indexer status | `https://artsoul.vercel.app/api/public/indexer-status` |
-| Public projection API | `https://artsoul.vercel.app/api/public/artworks` |
+| Protocol docs | `https://artsoulprotocol.com/docs-protocol.html` |
+| Gallery | `https://artsoulprotocol.com/gallery.html` |
+| Wallet isolation bench | `https://artsoulprotocol.com/wallet-test.html?walletdebug=1` |
+| Public indexer status | `https://artsoulprotocol.com/api/public/indexer-status` |
+| Public projection API | `https://artsoulprotocol.com/api/public/artworks` |
 | Controlled-beta entry | [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md) |
 | Controlled-beta issue form | `https://github.com/maysonkiller/ArtSoul-Protocol/issues/new?template=controlled-beta-bug.yml` |
 | Project X account | `https://x.com/ArtSoulProtocol` |
