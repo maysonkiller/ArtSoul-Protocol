@@ -523,23 +523,36 @@
             };
         }
 
+        normalizePagePath(pathname = window.location.pathname) {
+            const normalized = String(pathname || '/')
+                .replace(/\.html$/, '')
+                .replace(/\/index$/, '/')
+                .replace(/\/$/, '');
+            return normalized || '/';
+        }
+
+        isPage(pathname, page) {
+            return this.normalizePagePath(pathname) === `/${page}`;
+        }
+
         getNavigationItems() {
             const labels = this.getNavigationLabels();
             // Auctions / Marketplace / Collections live as tabs inside Explore Art
-            // (gallery.html), so they are intentionally NOT separate dropdown
+            // (/gallery), so they are intentionally NOT separate dropdown
             // destinations — one clear path to the gallery.
             return [
-                { href: 'profile.html', label: labels.profile, path: 'profile.html', profile: true },
-                { href: 'index.html', label: labels.home || 'ArtSoul Home', path: 'index.html', home: true },
-                { href: 'gallery.html', label: labels.explore, path: 'gallery.html' },
-                { href: 'upload.html', label: labels.publish, path: 'upload.html' },
-                { href: 'docs-protocol.html', label: labels.docs || 'Protocol Docs', path: 'docs-protocol.html' }
+                { href: '/profile', label: labels.profile, path: '/profile', profile: true },
+                { href: '/', label: labels.home || 'ArtSoul Home', path: '/', home: true },
+                { href: '/gallery', label: labels.explore, path: '/gallery' },
+                { href: '/upload', label: labels.publish, path: '/upload' },
+                { href: '/docs-protocol', label: labels.docs || 'Protocol Docs', path: '/docs-protocol' }
             ];
         }
 
         isCurrentNavigationItem(item, currentPath = window.location.pathname, currentHash = window.location.hash) {
-            const isHome = item.home && (currentPath.endsWith('index.html') || currentPath === '/' || currentPath.endsWith('/'));
-            const isSamePath = currentPath.includes(item.path);
+            const normalizedPath = this.normalizePagePath(currentPath);
+            const isHome = item.home && normalizedPath === '/';
+            const isSamePath = normalizedPath === item.path;
             if (!isHome && !isSamePath) return false;
             if (item.hash) return currentHash === item.hash;
             return !currentHash || isHome || !item.profile;
@@ -561,10 +574,10 @@
         }
 
         renderProtocolAdminSlot(currentPath = window.location.pathname) {
-            const isCurrentPage = currentPath.includes('admin.html');
+            const isCurrentPage = this.isPage(currentPath, 'admin');
             const link = this.protocolAdminEligible && !isCurrentPage
                 ? `
-                    <a href="admin.html" class="dropdown-item dropdown-protocol-admin-item">
+                    <a href="/admin" class="dropdown-item dropdown-protocol-admin-item">
                         <span>Protocol Admin</span>
                     </a>
                 `
@@ -576,8 +589,8 @@
             const slot = this.getNavContainer()?.querySelector('[data-protocol-admin-slot]');
             if (!slot) return;
             const currentPath = window.location.pathname;
-            slot.innerHTML = this.protocolAdminEligible && !currentPath.includes('admin.html')
-                ? '<a href="admin.html" class="dropdown-item dropdown-protocol-admin-item"><span>Protocol Admin</span></a>'
+            slot.innerHTML = this.protocolAdminEligible && !this.isPage(currentPath, 'admin')
+                ? '<a href="/admin" class="dropdown-item dropdown-protocol-admin-item"><span>Protocol Admin</span></a>'
                 : '';
             this.applyThemeStyles();
         }
@@ -1447,7 +1460,7 @@
 
             const currentPath = window.location.pathname;
             // Check if on profile page
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             // Check if viewing own profile (no address parameter or address matches current wallet)
             const urlParams = new URLSearchParams(window.location.search);
             const viewingAddress = urlParams.get('address');
@@ -1770,7 +1783,7 @@
             if (container.dataset.avatarRenderKey === 'cached-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
 
             const currentPath = window.location.pathname;
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             const viewingAddress = new URLSearchParams(window.location.search).get('address');
             const isOwnProfile = isProfilePage
                 && (!viewingAddress || viewingAddress.toLowerCase() === storedWallet);
@@ -1839,7 +1852,7 @@
             if (!container) return false;
 
             const currentPath = window.location.pathname;
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             container.dataset.avatarRenderKey = 'resolving';
             this.pendingRenderKey = 'resolving';
             this.updateStableButton({
@@ -1877,7 +1890,7 @@
             this.beginIdentityTransition(null);
 
             const currentPath = window.location.pathname;
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             this.updateStableButton({
                 avatarUrl: NEUTRAL_AVATAR_URL,
                 avatarAlt: 'ArtSoul',
@@ -1917,7 +1930,7 @@
             if (options.renderKey) navButtons.dataset.avatarRenderKey = options.renderKey;
 
             const currentPath = window.location.pathname;
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             const urlParams = new URLSearchParams(window.location.search);
             const viewingAddress = urlParams.get('address');
             const currentWallet = walletAddress?.toLowerCase();

@@ -533,10 +533,10 @@ test('every shared-header page boots the header in the same order with the same 
   for (const page of SHARED_HEADER_PAGES) {
     const html = readPage(page);
     assert.match(html, /<link rel="stylesheet" href="unified-styles\.css\?v=43">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="avatar-dropdown\.js\?v=44"><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="avatar-dropdown\.js\?v=45"><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=43');
-    const component = html.indexOf('avatar-dropdown.js?v=44');
+    const component = html.indexOf('avatar-dropdown.js?v=45');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
     const hydration = html.indexOf('window.AvatarDropdown?.renderInitializingState();');

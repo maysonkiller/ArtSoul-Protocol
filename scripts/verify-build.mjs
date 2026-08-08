@@ -25,6 +25,24 @@ const forbiddenBrowserCompilers = [
     'react-dom.production.min.js'
 ];
 
+async function verifyLocalReference(page, reference) {
+    const relativePath = reference.replace(/^\//, '');
+    const candidates = relativePath
+        ? [relativePath, `${relativePath}.html`]
+        : ['index.html'];
+
+    for (const candidate of candidates) {
+        try {
+            await access(path.join(dist, candidate));
+            return;
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+    }
+
+    throw new Error(`Missing ${page} dependency in dist: ${reference}`);
+}
+
 await Promise.all(pages.map(page => access(path.join(dist, page))));
 await access(path.join(dist, 'src/config/upload-policy.js')).catch(() => {
     throw new Error('Missing legacy runtime dependency in dist: src/config/upload-policy.js');
@@ -56,10 +74,7 @@ for (const page of pages) {
         .filter(reference => reference && !/^(?:[a-z]+:|\/\/|#)/i.test(reference));
 
     for (const reference of localReferences) {
-        const relativePath = reference.replace(/^\//, '');
-        await access(path.join(dist, relativePath)).catch(() => {
-            throw new Error(`Missing ${page} dependency in dist: ${reference}`);
-        });
+        await verifyLocalReference(page, reference);
     }
 }
 

@@ -20,5 +20,7 @@ test('a successful retry clears the pending projection state', () => {
 
   assert.match(success, /setError\(null\)/);
   assert.match(success, /setProjectionRetryCount\(0\)/);
-  assert.match(artwork, />\s*Check now\s*</);
+  assert.match(artwork, />\s*Refresh now\s*</);
+  assert.match(artwork, /Artwork is being finalized/);
+  assert.doesNotMatch(artwork, /public V4\.1 projection/);
 });

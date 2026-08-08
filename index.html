@@ -49,7 +49,7 @@
     <script src="src/ui/theme-manager.js"></script>
     <script defer src="src/ui/themed-selects.js?v=1"></script>
     <script defer src="src/ui/theme-validator.js"></script>
-    <script src="src/ui/navigation-manager.js?v=4"></script>
+    <script src="src/ui/navigation-manager.js?v=5"></script>
     <script defer src="src/ui/system-logger.js"></script>
     <script defer src="src/ui/log-viewer-ui.js"></script>
     <script src="src/ui/admin-control-panel.js"></script>
@@ -223,10 +223,10 @@
             }
         }
     </style>
-    <script src="avatar-dropdown.js?v=44"></script>
+    <script src="avatar-dropdown.js?v=45"></script>
     <script src="contracts-config.js?v=1"></script>
     <script type="module" src="contracts-integration.js?v=7"></script>
-    <script type="module" src="appkit-init.js?v=51"></script>
+    <script type="module" src="appkit-init.js?v=52"></script>
     <link rel="stylesheet" href="mobile-no-motion.css?v=2">
 </head>
 <body>
@@ -234,7 +234,7 @@
         <div class="site-header-shell">
             <div class="site-header-row">
                 <div class="site-header-logo-zone">
-                    <a href="index.html" class="logo-link" aria-label="ArtSoul home">
+                    <a href="/" class="logo-link" aria-label="ArtSoul home">
                         <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
                     </a>
                 </div>
@@ -271,10 +271,10 @@
                 Collector demand comes before minting. Publish artwork, build conviction through an auction, and mint only after settlement.
             </p>
             <div class="home-hero-actions flex flex-wrap gap-4 justify-center">
-                <a href="gallery.html" class="btn-main text-lg px-7 py-3">
+                <a href="/gallery" class="btn-main text-lg px-7 py-3">
                     Explore Art
                 </a>
-                <a href="upload.html" class="btn-secondary text-lg px-7 py-3">
+                <a href="/upload" class="btn-secondary text-lg px-7 py-3">
                     Publish Artwork
                 </a>
             </div>
@@ -330,7 +330,7 @@
                     <p class="home-section-kicker">Current activity</p>
                     <h2 id="homepageFeaturedTitle">Live and Featured</h2>
                 </div>
-                <a href="gallery.html" class="home-section-link">View all art</a>
+                <a href="/gallery" class="home-section-link">View all art</a>
             </div>
             <p id="homepageFeaturedSummary" class="home-section-summary">Live auctions first, followed by recent Discovery works.</p>
             <div id="homepageFeaturedRow" class="home-featured-row" aria-live="polite"></div>
@@ -364,8 +364,8 @@
                 <p>Publish a work for community discovery, or explore auctions already underway.</p>
             </div>
             <div class="home-protocol-cta-actions">
-                <a href="upload.html" class="btn-main">Publish Artwork</a>
-                <a href="gallery.html" class="btn-secondary">Explore Gallery</a>
+                <a href="/upload" class="btn-main">Publish Artwork</a>
+                <a href="/gallery" class="btn-secondary">Explore Gallery</a>
             </div>
         </section>
 

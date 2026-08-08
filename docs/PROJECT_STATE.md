@@ -125,15 +125,15 @@ Built routes:
 
 | Route | Purpose |
 | --- | --- |
-| `/index.html` | Homepage and Discovery Spotlight |
-| `/gallery.html` | Gallery, search, tabs, filters |
-| `/artwork.html` | Artwork, auction, discovery, provenance, resale |
-| `/profile.html` | Profile and lifecycle tabs |
-| `/upload.html` | Publish flow and AI value guidance |
-| `/docs-protocol.html` | Protocol documentation |
-| `/wallet-test.html` | Isolated wallet diagnostic bench, intentionally not in navigation |
-| `/visual-lab.html` | Internal visual test surface |
-| `/generate-favicon.html` | Internal favicon utility |
+| `/` | Homepage and Discovery Spotlight |
+| `/gallery` | Gallery, search, tabs, filters |
+| `/artwork` | Artwork, auction, discovery, provenance, resale |
+| `/profile` | Profile and lifecycle tabs |
+| `/upload` | Publish flow and AI value guidance |
+| `/docs-protocol` | Protocol documentation |
+| `/wallet-test` | Isolated wallet diagnostic bench, intentionally not in navigation |
+| `/visual-lab` | Internal visual test surface |
+| `/generate-favicon` | Internal favicon utility |
 
 The build migration removed in-browser Babel, but the frontend is still hybrid. Vite bundles the React entries while many classic scripts are copied and loaded as global runtime modules. The successful build emits many warnings that these scripts cannot be bundled without `type="module"`. This is not a deployment failure, but it is performance and dependency-order debt.
 
@@ -198,7 +198,7 @@ Production currently loads:
 
 Base Sepolia is the only operational write chain. Base mainnet and Ethereum mainnet are present only in WalletConnect negotiation to tolerate wallet namespaces. They are not product networks and writes remain guarded to chain ID 84532. Ethereum Sepolia remains legacy read-only.
 
-External mobile uses a dedicated WalletConnect session path. A persisted core session is the source of truth, modal closure is not destructive, and explicit Disconnect is the only intended teardown action. The isolated `/wallet-test.html` page must remain until production mobile acceptance is complete.
+External mobile uses a dedicated WalletConnect session path. A persisted core session is the source of truth, modal closure is not destructive, and explicit Disconnect is the only intended teardown action. The isolated `/wallet-test` page must remain until production mobile acceptance is complete.
 
 The visual wallet debug overlay is still wired into all six production pages and appears only under its debug flag. Canonical cleanup is pending the final real-phone checklist.
 
@@ -217,7 +217,7 @@ Read-only checks on 2026-07-15 returned HTTP 200 for:
 - `/api/public/artworks?limit=1`
 - `/api/public/indexer-status`
 
-Legacy `/docs.html` and `/auction-system.html` returned the intended 308 redirect to `/docs-protocol.html`.
+Legacy documentation paths redirect permanently to `/docs-protocol`. Vercel clean URLs also redirect every historical `.html` page URL to its extensionless route.
 
 The deployed HTML and runtime confirmed `appkit-init.js?v=34`, `wallet-core-connect.js?v=9`, and the pinned AppKit 1.8.21 imports.
 
@@ -350,7 +350,7 @@ The contract suite passes when run through Hardhat with a writable temporary con
 ### P1: close before public beta
 
 1. Complete the external-mobile wallet acceptance checklist, including same-tab return, five-page navigation, reload, background restoration, one guarded write switch, and explicit disconnect.
-2. Remove the production visual wallet debug overlay only after that checklist is green; keep `/wallet-test.html` intact.
+2. Remove the production visual wallet debug overlay only after that checklist is green; keep `/wallet-test` intact.
 3. Reconcile runtime confirmation depth with persisted `indexer_state.confirmation_depth`.
 4. Resolve A-40 and A-41: remove or rehabilitate the dormant alert path, then make the event heartbeat cancellable without changing ownership or retry semantics.
 5. Verify Phase 18 RLS/security migrations in Supabase.

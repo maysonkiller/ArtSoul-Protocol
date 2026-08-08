@@ -91,7 +91,7 @@
 }
 
 /* Profile Link/Button - Future Mode */
-.future a[href="profile.html"]:hover,
+.future a[href="/profile"]:hover,
 .future button[onclick*="profile"]:hover {
     animation: neonPulse 0.3s infinite, glitchButton 0.5s ease-in-out;
 }
