@@ -877,11 +877,21 @@ function getDirectProjectionSnapshot(lookup) {
   const cached = directProjectionCache.get(key);
   if (cached && now - cached.createdAt < PROJECTION_CACHE_MS) return cached.promise;
 
-  const promise = buildDirectProjectionSnapshot(lookup);
-  directProjectionCache.set(key, { createdAt: now, promise });
-  promise.catch(() => {
-    if (directProjectionCache.get(key)?.promise === promise) directProjectionCache.delete(key);
+  const cacheEntry = { createdAt: now, promise: null };
+  const promise = buildDirectProjectionSnapshot(lookup).then(snapshot => {
+    // A just-published artwork can legitimately miss the projection for a few
+    // seconds. Share the in-flight read, but never retain that negative result
+    // for the full projection TTL or the exact-artwork page cannot recover.
+    if (snapshot?.cards?.length === 0 && directProjectionCache.get(key) === cacheEntry) {
+      directProjectionCache.delete(key);
+    }
+    return snapshot;
+  }, error => {
+    if (directProjectionCache.get(key) === cacheEntry) directProjectionCache.delete(key);
+    throw error;
   });
+  cacheEntry.promise = promise;
+  directProjectionCache.set(key, cacheEntry);
   if (directProjectionCache.size > 100) {
     directProjectionCache.delete(directProjectionCache.keys().next().value);
   }

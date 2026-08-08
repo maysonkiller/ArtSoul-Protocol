@@ -296,6 +296,7 @@ const { useState, useEffect, useRef } = React;
             const [currentOwnerProfile, setCurrentOwnerProfile] = useState(null);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
+            const [projectionRetryCount, setProjectionRetryCount] = useState(0);
             const [bidAmount, setBidAmount] = useState('');
             const [bidActivity, setBidActivity] = useState([]);
             const [bidderProfiles, setBidderProfiles] = useState({});
@@ -1656,6 +1657,38 @@ const { useState, useEffect, useRef } = React;
             }, [artworkId]);
 
             useEffect(() => {
+                if (error?.code !== 'V41_ARTWORK_NOT_INDEXED' || !isV41CompositeId || projectionRetryCount >= 8) {
+                    return undefined;
+                }
+
+                let retryTimer = null;
+                let cancelled = false;
+                const retry = () => {
+                    retryTimer = setTimeout(async () => {
+                        if (cancelled) return;
+                        const recovered = await loadArtwork();
+                        if (!cancelled && !recovered) {
+                            setProjectionRetryCount(current => current + 1);
+                        }
+                    }, 3000);
+                };
+                const onVisibilityChange = () => {
+                    if (document.visibilityState !== 'visible') return;
+                    document.removeEventListener('visibilitychange', onVisibilityChange);
+                    retry();
+                };
+
+                if (document.visibilityState === 'visible') retry();
+                else document.addEventListener('visibilitychange', onVisibilityChange);
+
+                return () => {
+                    cancelled = true;
+                    if (retryTimer) clearTimeout(retryTimer);
+                    document.removeEventListener('visibilitychange', onVisibilityChange);
+                };
+            }, [artworkId, error?.code, isV41CompositeId, projectionRetryCount]);
+
+            useEffect(() => {
                 if (auction && !isAuctionClosedForBidding(auction)) {
                     updateTimeLeft();
                     const interval = setInterval(updateTimeLeft, 1000);
@@ -1714,6 +1747,8 @@ const { useState, useEffect, useRef } = React;
                     // Load from Supabase
                     const data = await window.ArtSoulDB.getArtwork(artworkId);
                     console.log('[Artwork] Loaded data:', data);
+                    setError(null);
+                    setProjectionRetryCount(0);
                     setArtwork(data);
                     setNewAuctionPrice(current => current || String(firstDefined(
                         data.start_price,
@@ -1868,6 +1903,7 @@ const { useState, useEffect, useRef } = React;
                     ]);
 
                     setLoading(false);
+                    return true;
                 } catch (error) {
                     console.error('Error loading artwork:', error);
                     if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
@@ -1879,6 +1915,7 @@ const { useState, useEffect, useRef } = React;
                         setError(error.message || 'Failed to load artwork. The artwork may not exist or there was a database error.');
                     }
                     setLoading(false);
+                    return false;
                 }
             }
 
@@ -2606,13 +2643,25 @@ const { useState, useEffect, useRef } = React;
                                 <div className="text-base mb-4 opacity-75">
                                     This artwork was submitted on-chain or is pending locally, but the public V4.1 projection has not indexed it yet.
                                 </div>
+                                <div className="text-sm mb-4 opacity-60">
+                                    Checking automatically{projectionRetryCount > 0 ? ` (${projectionRetryCount}/8)` : ''}…
+                                </div>
                                 <div className={`rounded-lg p-3 mb-6 break-all text-sm ${
                                     isClassic ? 'bg-gray-800 text-gray-300' : 'bg-cyan-900/20 border border-cyan-500/30 text-cyan-200'
                                 }`}>
                                     {error.artworkId || artworkId}
                                 </div>
                                 <div className="flex gap-4 justify-center">
-                                    <a href="profile.html" className="btn-secondary">Back to profile</a>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={() => {
+                                            setProjectionRetryCount(0);
+                                            loadArtwork();
+                                        }}
+                                    >
+                                        Check now
+                                    </button>
                                     <a href="gallery.html" className="btn-main">Explore Art</a>
                                 </div>
                             </div>
