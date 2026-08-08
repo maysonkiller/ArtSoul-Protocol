@@ -121,7 +121,7 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=43/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /avatar-dropdown\.js\?v=44/, `${page} must use the shared menu cache version`);
+    assert.match(html, /avatar-dropdown\.js\?v=45/, `${page} must use the shared menu cache version`);
     assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
   }
 });
@@ -257,7 +257,7 @@ test('an avatar image failure records the failure instead of claiming a successf
 });
 
 test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
-  assert.ok(avatarDropdown.indexOf("href: 'profile.html'") < avatarDropdown.indexOf("href: 'index.html'"));
+  assert.ok(avatarDropdown.indexOf("href: '/profile'") < avatarDropdown.indexOf("href: '/'"));
   assert.doesNotMatch(avatarDropdown, /filter\(item => !\(item\.profile && options\.isOwnProfile\)\)/);
   assert.doesNotMatch(avatarDropdown, /filter\(item => item\.profile \|\| !this\.isCurrentNavigationItem/);
 });

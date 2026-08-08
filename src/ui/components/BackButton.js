@@ -39,7 +39,7 @@ class BackButton {
             window.history.back();
         } else {
             // Fallback to home
-            window.location.href = 'index.html';
+            window.location.href = '/';
         }
     }
 

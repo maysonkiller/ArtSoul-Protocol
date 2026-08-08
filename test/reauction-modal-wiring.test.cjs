@@ -26,7 +26,7 @@ test('Confirm is the single re-auction transaction gate and redirects to auction
     const confirmHandler = between('async function handleConfirmNewAuction()', 'async function handleEndAuction()');
     assert.equal((confirmHandler.match(/ArtSoulContracts\.createAuction/g) || []).length, 1);
     assert.doesNotMatch(confirmHandler, /confirmAuctionAction/);
-    assert.match(confirmHandler, /gallery\.html#auctions/);
+    assert.match(confirmHandler, /\/gallery#auctions/);
 });
 
 test('modal is limited to re-auction lifecycle states and contains required fields', () => {

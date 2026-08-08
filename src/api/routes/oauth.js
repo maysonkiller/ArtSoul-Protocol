@@ -83,7 +83,7 @@ function redirectProfile(res, provider, status, error = '') {
   const query = new URLSearchParams({ oauth_status: status, provider });
   if (error) query.set('oauth_error', error);
   res.statusCode = 302;
-  res.setHeader('Location', `/profile.html?${query}`);
+  res.setHeader('Location', `/profile?${query}`);
   res.end();
 }
 

@@ -151,5 +151,5 @@ test('internal redirects release the native beforeunload guard first', () => {
     'the navigation lock must clear before an internal redirect'
   );
   assert.match(source, /window\.addEventListener\('beforeunload'/);
-  assert.match(source, /navigateAfterPublish\(`artwork\.html\?id=v41:/);
+  assert.match(source, /navigateAfterPublish\(`\/artwork\?id=v41:/);
 });

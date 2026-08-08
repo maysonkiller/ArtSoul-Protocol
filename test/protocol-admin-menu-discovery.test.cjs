@@ -29,7 +29,7 @@ test('connected header render performs no Protocol Admin access request', async 
   // The reserved slot keeps header geometry stable while staying empty.
   const menu = harness.context.document.getElementById('avatarDropdownMenu');
   assert.match(menu.innerHTML, /data-protocol-admin-slot/);
-  assert.doesNotMatch(menu.innerHTML, /admin\.html/);
+  assert.doesNotMatch(menu.innerHTML, /href="\/admin"/);
 });
 
 test('first dropdown opening performs exactly one access request; reopening reuses it', async () => {
@@ -62,7 +62,7 @@ test('the admin link appears only after a successful eligible server response', 
   harness.dropdown.toggle();
   await harness.flush();
   assert.equal(harness.dropdown.protocolAdminEligible, false);
-  assert.doesNotMatch(harness.dropdown.renderProtocolAdminSlot('/index.html'), /admin\.html/);
+  assert.doesNotMatch(harness.dropdown.renderProtocolAdminSlot('/'), /href="\/admin"/);
 
   // A later wallet (fresh discovery) that the server confirms is eligible.
   harness.dropdown.toggle();
@@ -81,9 +81,9 @@ test('the admin link appears only after a successful eligible server response', 
   harness.dropdown.toggle();
   await harness.flush();
   assert.equal(harness.dropdown.protocolAdminEligible, true);
-  assert.match(harness.dropdown.renderProtocolAdminSlot('/index.html'), /href="admin\.html"/);
+  assert.match(harness.dropdown.renderProtocolAdminSlot('/'), /href="\/admin"/);
   // The slot never renders the link on the admin page itself.
-  assert.doesNotMatch(harness.dropdown.renderProtocolAdminSlot('/admin.html'), /href="admin\.html"/);
+  assert.doesNotMatch(harness.dropdown.renderProtocolAdminSlot('/admin'), /href="\/admin"/);
 });
 
 test('a wallet change invalidates the cached discovery result', async () => {

@@ -37,9 +37,9 @@ Do not start Phase C contract work, Genesis implementation, a token, points, air
 | Production site | `https://artsoulprotocol.com` |
 | Legacy Vercel alias | `https://artsoul.vercel.app` (temporary rollback/cutover origin) |
 | Repository | `https://github.com/maysonkiller/ArtSoul-Protocol` |
-| Protocol docs | `https://artsoulprotocol.com/docs-protocol.html` |
-| Gallery | `https://artsoulprotocol.com/gallery.html` |
-| Wallet isolation bench | `https://artsoulprotocol.com/wallet-test.html?walletdebug=1` |
+| Protocol docs | `https://artsoulprotocol.com/docs-protocol` |
+| Gallery | `https://artsoulprotocol.com/gallery` |
+| Wallet isolation bench | `https://artsoulprotocol.com/wallet-test?walletdebug=1` |
 | Public indexer status | `https://artsoulprotocol.com/api/public/indexer-status` |
 | Public projection API | `https://artsoulprotocol.com/api/public/artworks` |
 | Controlled-beta entry | [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md) |
@@ -187,7 +187,7 @@ Vercel configuration:
 - Build command: `npm run build`
 - Output directory: `dist`
 - API rewrites: `vercel.json`
-- Legacy redirects: `/docs.html` and `/auction-system.html` to `/docs-protocol.html`
+- Clean public URLs: Vercel permanently redirects historical `.html` URLs to extensionless routes; `/docs` and `/auction-system` redirect to `/docs-protocol`
 
 Normal workflow:
 

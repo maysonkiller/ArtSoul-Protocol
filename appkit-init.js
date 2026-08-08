@@ -3886,7 +3886,8 @@ async function initializeAppKit() {
                     isConnected: false
                 });
 
-                if (window.location.pathname.includes('profile.html')) {
+                const activePath = String(window.location.pathname || '/').replace(/\.html$/, '').replace(/\/$/, '') || '/';
+                if (activePath === '/profile') {
                     console.log('Profile wallet disconnected; staying in guest profile mode.');
                 }
             }

@@ -14,11 +14,11 @@ function read(relativePath) {
 test('public pages publish canonical ArtSoul domain metadata', () => {
   const pages = new Map([
     ['index.html', `${canonicalOrigin}/`],
-    ['gallery.html', `${canonicalOrigin}/gallery.html`],
-    ['profile.html', `${canonicalOrigin}/profile.html`],
-    ['upload.html', `${canonicalOrigin}/upload.html`],
-    ['artwork.html', `${canonicalOrigin}/artwork.html`],
-    ['docs-protocol.html', `${canonicalOrigin}/docs-protocol.html`]
+    ['gallery.html', `${canonicalOrigin}/gallery`],
+    ['profile.html', `${canonicalOrigin}/profile`],
+    ['upload.html', `${canonicalOrigin}/upload`],
+    ['artwork.html', `${canonicalOrigin}/artwork`],
+    ['docs-protocol.html', `${canonicalOrigin}/docs-protocol`]
   ]);
 
   for (const [page, canonicalUrl] of pages) {
@@ -31,7 +31,7 @@ test('public pages publish canonical ArtSoul domain metadata', () => {
 
 test('runtime defaults use the canonical origin and retain a bounded rollback origin', () => {
   assert.ok(read('appkit-init.js').includes(`: '${canonicalOrigin}';`));
-  assert.ok(read('ipfs-client.js').includes(`external_url: '${canonicalOrigin}/upload.html'`));
+  assert.ok(read('ipfs-client.js').includes(`external_url: '${canonicalOrigin}/upload'`));
 
   for (const file of ['src/api/server.js', 'src/api/routes/oauth.js', '.env.example']) {
     const source = read(file);

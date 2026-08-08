@@ -119,7 +119,7 @@ test('detail page keeps the three roles as individually clickable profile links'
     detail.indexOf('function renderOwnershipRole'),
     detail.indexOf('artwork-ownership-row') + 2000
   );
-  assert.match(role, /href=\{`profile\.html\?address=\$\{encodeURIComponent\(address\)\}`\}/);
+  assert.match(role, /href=\{`\/profile\?address=\$\{encodeURIComponent\(address\)\}`\}/);
   const panel = detail.slice(
     detail.indexOf('{/* Ownership Info - Three Roles */}'),
     detail.indexOf('artwork-ownership-actions')
