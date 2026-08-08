@@ -156,7 +156,7 @@ Confirm:
 Then check the public list response without copying credentials:
 
 ```bash
-curl -fsS 'https://artsoul.vercel.app/api/public/artworks?limit=1'
+curl -fsS 'https://artsoulprotocol.com/api/public/artworks?limit=1'
 ```
 
 The response must contain a non-null `public_metrics` object with chain ID
