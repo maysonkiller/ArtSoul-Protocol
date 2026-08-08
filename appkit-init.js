@@ -64,7 +64,7 @@ const SUPPORTED_NETWORKS = {
 // an eternal loading spinner. Derive it from the live origin instead.
 const appOrigin = (typeof window !== 'undefined' && window.location?.origin)
     ? window.location.origin
-    : 'https://artsoul.vercel.app';
+    : 'https://artsoulprotocol.com';
 const appReturnUrl = (() => {
     try {
         const returnUrl = new URL(window.location.href);

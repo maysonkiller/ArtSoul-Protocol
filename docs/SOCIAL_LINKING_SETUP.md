@@ -9,13 +9,13 @@ Add these exact URLs. Providers compare OAuth 2.0 callback URLs exactly.
 Discord:
 
 ```text
-https://artsoul.vercel.app/api/oauth/callback/discord
+https://artsoulprotocol.com/api/oauth/callback/discord
 ```
 
 X:
 
 ```text
-https://artsoul.vercel.app/api/oauth/callback/twitter
+https://artsoulprotocol.com/api/oauth/callback/twitter
 ```
 
 ## Current pull-request preview callback URLs
@@ -67,7 +67,7 @@ http://localhost:3000/api/oauth/callback/twitter
 3. Select **Web App, Automated App or Bot** so the server can use the confidential client secret.
 4. Set app permissions to **Read**.
 5. Add the exact X callback URLs above.
-6. Set the Website URL to `https://artsoul.vercel.app`.
+6. Set the Website URL to `https://artsoulprotocol.com`.
 7. Save settings. ArtSoul requests `tweet.read users.read` and uses Authorization Code with PKCE.
 
 If the IDs in the portals do not match the IDs above, use the portal's actual Client ID in Vercel and verify that the callback URLs were added to that same application.
@@ -81,7 +81,7 @@ DISCORD_CLIENT_ID=<Discord OAuth2 application client ID>
 DISCORD_CLIENT_SECRET=<Discord OAuth2 application client secret>
 X_CLIENT_ID=<X OAuth 2.0 client ID>
 X_CLIENT_SECRET=<X OAuth 2.0 client secret>
-OAUTH_ALLOWED_ORIGINS=https://artsoul.vercel.app,https://artsoul-git-fix-social-linking-maysonkiller-be9112b5.vercel.app
+OAUTH_ALLOWED_ORIGINS=https://artsoulprotocol.com,https://artsoul.vercel.app,https://artsoul-git-fix-social-linking-maysonkiller-be9112b5.vercel.app
 ```
 
 The existing server variables must also remain configured:
