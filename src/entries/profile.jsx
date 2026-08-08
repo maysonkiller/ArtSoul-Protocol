@@ -927,7 +927,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             function handleQuickUpload() {
-                window.location.href = 'upload.html';
+                window.location.href = '/upload';
             }
 
             async function handleProfileConnect() {

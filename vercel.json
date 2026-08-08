@@ -1,6 +1,8 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "cleanUrls": true,
   "headers": [
     {
       "source": "/(.*)",
@@ -38,7 +40,7 @@
       ]
     },
     {
-      "source": "/(index|gallery|artwork|profile|upload|admin|docs-protocol)\\.html",
+      "source": "/(gallery|artwork|profile|upload|admin|docs-protocol|wallet-test|visual-lab|generate-favicon)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -49,13 +51,18 @@
   ],
   "redirects": [
     {
-      "source": "/docs.html",
-      "destination": "/docs-protocol.html",
+      "source": "/index",
+      "destination": "/",
       "permanent": true
     },
     {
-      "source": "/auction-system.html",
-      "destination": "/docs-protocol.html",
+      "source": "/docs",
+      "destination": "/docs-protocol",
+      "permanent": true
+    },
+    {
+      "source": "/auction-system",
+      "destination": "/docs-protocol",
       "permanent": true
     }
   ],

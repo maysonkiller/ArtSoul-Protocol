@@ -1056,7 +1056,7 @@ let selectedFile = null;
                             auction_error_message: ''
                         });
                         await alert(`${mappedAuctionError.message}\n\nYou will now return to your profile. Do not submit the auction again while it is finalizing.`);
-                        navigateAfterPublish('profile.html');
+                        navigateAfterPublish('/profile');
                         return;
                     }
                     pendingArtwork = savePendingArtwork({
@@ -1071,19 +1071,19 @@ let selectedFile = null;
                     if (auctionCreated && !dbSynced) {
                         // Blockchain succeeded but database failed after retries
                         await alert('Auction created on blockchain but database sync failed.\n\nYour artwork is live on the blockchain!\nPlease go to your profile and the status will sync automatically.');
-                        navigateAfterPublish('profile.html');
+                        navigateAfterPublish('/profile');
                         return;
                     } else if (!auctionCreated) {
                         // Blockchain creation failed - artwork stays as draft
                         await alert(`Artwork registered - auction failed.\n\n${mappedAuctionError.message}\n\nYou can retry auction from your profile.`);
-                        navigateAfterPublish('profile.html');
+                        navigateAfterPublish('/profile');
                         return;
                     }
                 }
 
                 // Success - redirect to the new artwork detail page.
                 const chainId = window.getCurrentChainId?.() || window.ArtSoulContracts?.chainId || 84532;
-                navigateAfterPublish(`artwork.html?id=v41:${chainId}:${result.artworkId}`);
+                navigateAfterPublish(`/artwork?id=v41:${chainId}:${result.artworkId}`);
 
             } catch (error) {
                 console.error('Publish failed:', error);

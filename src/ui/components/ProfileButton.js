@@ -38,7 +38,7 @@ class ProfileButton {
         const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
         if (!walletAddress) return;
 
-        window.location.href = 'profile.html';
+        window.location.href = '/profile';
     }
 
     /**

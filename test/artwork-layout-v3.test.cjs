@@ -22,7 +22,7 @@ test('auction keeps one status and exposes each existing state action', () => {
 });
 
 test('profile identities and live bids are linked, named, timed, and newest first', () => {
-    assert.match(source, /href=\{`profile\.html\?address=\$\{encodeURIComponent\(address\)\}`\}/);
+    assert.match(source, /href=\{`\/profile\?address=\$\{encodeURIComponent\(address\)\}`\}/);
     assert.match(source, /getProfileDisplayName/);
     assert.match(source, /label: 'Highest Bidder'/);
     assert.match(source, /label: 'First Collector'/);

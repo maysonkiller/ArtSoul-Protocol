@@ -883,7 +883,7 @@ const { useState, useEffect, useRef } = React;
                 return (
                     <div className="artwork-ownership-row flex w-full items-center gap-3">
                         <a
-                            href={`profile.html?address=${encodeURIComponent(address)}`}
+                            href={`/profile?address=${encodeURIComponent(address)}`}
                             className={`artwork-ownership-profile flex w-full items-center gap-3 flex-1 min-w-0 p-3 rounded-lg transition-all ${
                                 isClassic ? 'hover:bg-gray-700/50' : 'hover:bg-cyan-900/30'
                             }`}
@@ -1235,7 +1235,7 @@ const { useState, useEffect, useRef } = React;
                 return (
                     <span className="provenance-event-role">
                         {role}:{' '}
-                        <a href={`profile.html?address=${encodeURIComponent(address)}`}>
+                        <a href={`/profile?address=${encodeURIComponent(address)}`}>
                             {window.ArtSoulDB?.shortWalletAddress?.(address) || `${address.slice(0, 6)}...${address.slice(-4)}`}
                         </a>
                     </span>
@@ -2158,7 +2158,7 @@ const { useState, useEffect, useRef } = React;
                     console.log('New auction transaction:', txHash);
 
                     await alert('New auction created successfully. Public auction data will update shortly.');
-                    window.location.assign('gallery.html#auctions');
+                    window.location.assign('/gallery#auctions');
                 } catch (error) {
                     console.error('Create new auction failed:', error);
                     const message = getTransactionErrorMessage(error, 'The new auction could not be created. Please try again.');
@@ -2639,12 +2639,12 @@ const { useState, useEffect, useRef } = React;
                     <div className="min-h-screen">
                         <main className="min-h-[60vh] flex items-center justify-center">
                             <div className="text-center max-w-lg mx-auto px-4">
-                                <div className="text-2xl mb-4">Waiting for indexer projection</div>
+                                <div className="text-2xl mb-4">Artwork is being finalized</div>
                                 <div className="text-base mb-4 opacity-75">
-                                    This artwork was submitted on-chain or is pending locally, but the public V4.1 projection has not indexed it yet.
+                                    Your artwork was submitted and is waiting to appear in ArtSoul. This page updates automatically.
                                 </div>
                                 <div className="text-sm mb-4 opacity-60">
-                                    Checking automatically{projectionRetryCount > 0 ? ` (${projectionRetryCount}/8)` : ''}…
+                                    Checking automatically{projectionRetryCount > 0 ? ` (${projectionRetryCount}/8)` : ''}...
                                 </div>
                                 <div className={`rounded-lg p-3 mb-6 break-all text-sm ${
                                     isClassic ? 'bg-gray-800 text-gray-300' : 'bg-cyan-900/20 border border-cyan-500/30 text-cyan-200'
@@ -2660,9 +2660,9 @@ const { useState, useEffect, useRef } = React;
                                             loadArtwork();
                                         }}
                                     >
-                                        Check now
+                                        Refresh now
                                     </button>
-                                    <a href="gallery.html" className="btn-main">Explore Art</a>
+                                    <a href="/gallery" className="btn-main">Explore Art</a>
                                 </div>
                             </div>
                         </main>
@@ -2678,7 +2678,7 @@ const { useState, useEffect, useRef } = React;
                                 <div className="text-2xl mb-4 text-red-400">Error Loading Artwork</div>
                                 <div className="text-base mb-6 opacity-75">{error}</div>
                                 <div className="flex gap-4 justify-center">
-                                    <a href="gallery.html" className="btn-main">Explore Art</a>
+                                    <a href="/gallery" className="btn-main">Explore Art</a>
                                     <button onClick={() => window.location.reload()} className="btn-secondary">Retry</button>
                                 </div>
                             </div>
@@ -2693,7 +2693,7 @@ const { useState, useEffect, useRef } = React;
                         <main className="min-h-[60vh] flex items-center justify-center">
                             <div className="text-center">
                                 <div className="text-2xl mb-4">Artwork not found</div>
-                                <a href="gallery.html" className="btn-main">Explore Art</a>
+                                <a href="/gallery" className="btn-main">Explore Art</a>
                             </div>
                         </main>
                     </div>
@@ -3666,7 +3666,7 @@ const { useState, useEffect, useRef } = React;
                                                             >
                                                                 <div className="bid-activity-identity">
                                                                     <a
-                                                                        href={`profile.html?address=${encodeURIComponent(bid.bidder)}`}
+                                                                        href={`/profile?address=${encodeURIComponent(bid.bidder)}`}
                                                                         className="bidder-profile-link min-w-0 truncate font-semibold"
                                                                     >
                                                                         {getBidderDisplayName(bid.bidder)}

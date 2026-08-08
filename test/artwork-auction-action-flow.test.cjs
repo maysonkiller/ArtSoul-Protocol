@@ -79,7 +79,7 @@ test('new auction action is explicit, eligible, and redirects only after success
     assert.match(createSource, /\[24, 36, 48\]/);
     assert.ok(
         createSource.indexOf('ArtSoulContracts.createAuction(') <
-        createSource.indexOf("window.location.assign('gallery.html#auctions')"),
+        createSource.indexOf("window.location.assign('/gallery#auctions')"),
         'redirect must happen only after createAuction succeeds'
     );
     assert.match(artworkPage, /Create New Auction/);
