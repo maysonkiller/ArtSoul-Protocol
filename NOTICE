@@ -1,0 +1,23 @@
+ArtSoul Protocol
+Copyright 2026 ArtSoul
+
+This product includes software developed by ArtSoul
+(https://artsoulprotocol.com).
+
+The software in this repository is licensed under the Apache License,
+Version 2.0. See LICENSE.
+
+The following materials are NOT covered by the Apache License, Version 2.0,
+and are licensed separately under LICENSE-DOCS:
+
+  - ARTSOUL_CANON_BIBLE_FULL.md
+  - docs/canon/
+  - ArtSoul brand assets: ARTSOULlogo.png, ARTSOULlogo-clean.png,
+    artsoul-social-preview.png, favicon.jpg, 1080x360.png
+
+"ArtSoul" and the ArtSoul logo are trademarks of ArtSoul. Use of these marks
+is not licensed by the Apache License, Version 2.0 (Section 6).
+
+Third-party dependencies remain subject to their respective licences. The
+smart contracts incorporate OpenZeppelin Contracts, licensed under the MIT
+License.

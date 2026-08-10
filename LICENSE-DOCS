@@ -1,0 +1,60 @@
+ArtSoul Protocol — Documentation and Brand License
+Copyright (c) 2026 ArtSoul. All rights reserved.
+
+This license applies ONLY to the Covered Materials listed below. Every other
+file in this repository is licensed under the Apache License, Version 2.0,
+as set out in LICENSE.
+
+
+COVERED MATERIALS
+
+  1. Protocol canon and design documentation
+       ARTSOUL_CANON_BIBLE_FULL.md
+       docs/canon/  (all files and subdirectories)
+
+  2. ArtSoul brand assets
+       ARTSOULlogo.png
+       ARTSOULlogo-clean.png
+       artsoul-social-preview.png
+       favicon.jpg
+       1080x360.png
+
+
+PERMITTED USE
+
+You may read, view, and privately store the Covered Materials. You may quote
+short excerpts for commentary, review, news reporting, academic study,
+security research, or for building an integration with the ArtSoul Protocol,
+provided that ArtSoul is attributed as the source.
+
+
+RESTRICTIONS
+
+Except as permitted above, no licence is granted to reproduce, republish,
+translate, adapt, modify, create derivative works from, distribute,
+sublicense, or make commercial use of the Covered Materials, in whole or in
+substantial part, without prior written permission from the copyright holder.
+
+
+RELATIONSHIP TO THE APACHE LICENSE
+
+The Covered Materials are not licensed under the Apache License, Version 2.0.
+No copyright, patent, or other licence granted by LICENSE extends to the
+Covered Materials. Nothing in this file limits any right granted by LICENSE
+in respect of the software in this repository.
+
+
+TRADEMARKS
+
+"ArtSoul", the ArtSoul name, the ArtSoul logo, and the associated brand
+assets are trademarks of the copyright holder. No trademark licence is
+granted by LICENSE or by this file. See Section 6 of the Apache License,
+Version 2.0.
+
+
+NO WARRANTY
+
+The Covered Materials are provided "AS IS", without warranty of any kind.
+They describe protocol design intent. They are not an offer, a solicitation,
+financial or investment advice, or a guarantee of the behaviour of any
+deployed contract.
