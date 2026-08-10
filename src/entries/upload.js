@@ -5,6 +5,7 @@ import {
     MAX_ARTWORK_UPLOAD_BYTES,
     MAX_ARTWORK_UPLOAD_MB
 } from '../config/upload-policy.js';
+import { artworkPath } from '../ui/artwork-url.js';
 
 let selectedFile = null;
         let uploading = false;
@@ -1083,7 +1084,7 @@ let selectedFile = null;
 
                 // Success - redirect to the new artwork detail page.
                 const chainId = window.getCurrentChainId?.() || window.ArtSoulContracts?.chainId || 84532;
-                navigateAfterPublish(`/artwork?id=v41:${chainId}:${result.artworkId}`);
+                navigateAfterPublish(artworkPath(`v41:${chainId}:${result.artworkId}`));
 
             } catch (error) {
                 console.error('Publish failed:', error);

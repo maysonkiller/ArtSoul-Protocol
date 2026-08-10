@@ -16,6 +16,52 @@ test('Vercel serves extensionless HTML routes and keeps legacy paths redirectabl
   assert.ok(config.redirects.every(route => !/\.html(?:$|[?#])/.test(route.source + route.destination)));
 });
 
+test('short artwork URLs are routed and trailing slashes are normalised', () => {
+  const config = JSON.parse(read('vercel.json'));
+
+  assert.equal(config.trailingSlash, false);
+  assert.ok(
+    config.rewrites.some(route => route.source === '/artwork/:id' && route.destination === '/artwork?id=:id'),
+    'the short artwork path must rewrite onto the existing artwork route'
+  );
+
+  // The short path must not fall out of the no-store cache group.
+  assert.ok(
+    config.headers.some(entry => /artwork/.test(entry.source) && /\(\/\.\*\)\?/.test(entry.source)),
+    'the page cache rule must also cover /artwork/<id>'
+  );
+});
+
+test('artwork URLs shorten only where the chain is unambiguous', async () => {
+  const { artworkPath, expandArtworkId } = await import('../src/ui/artwork-url.js');
+
+  assert.equal(artworkPath('v41:84532:27'), '/artwork/27');
+  assert.equal(expandArtworkId('27'), 'v41:84532:27');
+
+  // Legacy Ethereum Sepolia keeps the explicit composite: a bare number there
+  // would collide with the Base Sepolia artwork of the same number.
+  assert.equal(artworkPath('v41:11155111:27'), '/artwork?id=v41%3A11155111%3A27');
+  assert.equal(expandArtworkId('v41:11155111:27'), 'v41:11155111:27');
+
+  assert.equal(artworkPath(''), '');
+  assert.equal(artworkPath(null), '');
+});
+
+test('runtime navigation builds artwork URLs through the shared helper', () => {
+  for (const file of [
+    'src/entries/gallery.jsx',
+    'src/entries/index.js',
+    'src/entries/upload.js',
+    'src/entries/admin.jsx'
+  ]) {
+    assert.doesNotMatch(
+      read(file),
+      /`\/artwork\?id=\$\{/,
+      `${file} must not hand-build an artwork URL`
+    );
+  }
+});
+
 test('public metadata and runtime navigation use canonical extensionless URLs', () => {
   const canonicalPages = new Map([
     ['index.html', 'https://artsoulprotocol.com/'],

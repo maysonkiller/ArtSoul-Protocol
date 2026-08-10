@@ -151,5 +151,7 @@ test('internal redirects release the native beforeunload guard first', () => {
     'the navigation lock must clear before an internal redirect'
   );
   assert.match(source, /window\.addEventListener\('beforeunload'/);
-  assert.match(source, /navigateAfterPublish\(`\/artwork\?id=v41:/);
+  // The destination is built by the shared helper now, but it must still go
+  // through navigateAfterPublish so the unload guard is released first.
+  assert.match(source, /navigateAfterPublish\(artworkPath\(`v41:\$\{chainId\}:\$\{result\.artworkId\}`\)\)/);
 });
