@@ -111,3 +111,19 @@ test('public metadata and runtime navigation use canonical extensionless URLs', 
     assert.ok(source.includes(".replace(/\\.html$/, '')"), `${file} must normalize legacy .html paths`);
   }
 });
+
+test('the public artworks route resolves a short artwork id', async () => {
+  const source = read('src/api/routes/public/artworks.js');
+
+  // Both the fetch and the post-fetch filter must understand the short form,
+  // otherwise the row is read and then dropped.
+  assert.ok(source.includes('const CANONICAL_PUBLIC_CHAIN_ID = 84532;'));
+  assert.ok(
+    source.includes('return { chain: CANONICAL_PUBLIC_CHAIN_ID, artworkId: rawId };'),
+    'the direct lookup must resolve a bare id on the product chain'
+  );
+  assert.ok(
+    source.includes('const compositeId =') && source.includes('card.id === compositeId'),
+    'the card filter must compare against the widened composite id'
+  );
+});
