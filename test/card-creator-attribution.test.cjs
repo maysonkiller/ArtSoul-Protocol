@@ -40,6 +40,12 @@ class FakeElement {
 function loadDomCardRuntime() {
   const document = { createElement: tag => new FakeElement(tag), querySelectorAll: () => [] };
   const window = { ArtSoulSecurity: { isValidStorageUrl: () => true }, addEventListener: () => {} };
+  // The page loads the artwork URL owner before the card script; the harness
+  // must do the same or the card falls back to a different URL shape.
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'artwork-url.js'), 'utf8'),
+    { window, document }
+  );
   vm.runInNewContext(source, { window, document });
   return window.ArtSoulArtworkCard;
 }

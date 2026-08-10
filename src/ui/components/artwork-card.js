@@ -363,8 +363,7 @@
                 : '');
         const id = canonical || artwork.id || '';
         if (!id) return '';
-        // Shared with the module build; the query form stays valid if it is not up yet.
-        return window.ArtSoulArtworkUrl?.artworkPath?.(id) || `/artwork?id=${encodeURIComponent(id)}`;
+        return window.ArtSoulArtworkUrl.artworkPath(id);
     }
 
     function prepareVideoPreview(video, artwork = {}, options = {}) {

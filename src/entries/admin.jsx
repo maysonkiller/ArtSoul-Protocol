@@ -1,5 +1,4 @@
 import { React, createRoot } from './react-runtime.js';
-import { artworkPath } from '../ui/artwork-url.js';
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
@@ -361,7 +360,7 @@ function ProtocolAdminPage() {
                                     <h3>Artwork {group.artworkId}</h3>
                                     <p>Chain {group.chainId} · {group.reports.length} independent report{group.reports.length === 1 ? '' : 's'}</p>
                                 </div>
-                                <a href={artworkPath(`v41:${group.chainId}:${group.artworkId}`)}>Open artwork</a>
+                                <a href={window.ArtSoulArtworkUrl.artworkPath(`v41:${group.chainId}:${group.artworkId}`)}>Open artwork</a>
                             </header>
                             <div className="protocol-admin-report-grid">
                                 {group.reports.map(report => (
