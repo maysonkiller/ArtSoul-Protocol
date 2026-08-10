@@ -1,7 +1,6 @@
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import './react-runtime.js';
-import { artworkPath } from '../ui/artwork-url.js';
 
 let morphActive = false;
         let originalPositions = [];
@@ -455,7 +454,7 @@ let morphActive = false;
         }
 
         function viewArtwork(id) {
-            window.location.href = artworkPath(id);
+            window.location.href = window.ArtSoulArtworkUrl.artworkPath(id);
         }
 
         function normalizeProtocolArtworkId(value) {
@@ -779,7 +778,7 @@ let morphActive = false;
                         const canonicalV41Id = art.canonical_v41_id || canonicalV41IdForPendingArtwork(art);
                         const card = document.createElement(art.source === 'pending_indexer' && !canonicalV41Id ? 'div' : 'a');
                         if (art.source !== 'pending_indexer' || canonicalV41Id) {
-                            card.href = artworkPath(canonicalV41Id || art.id);
+                            card.href = window.ArtSoulArtworkUrl.artworkPath(canonicalV41Id || art.id);
                         }
                         card.className = 'card rounded-xl overflow-hidden';
 

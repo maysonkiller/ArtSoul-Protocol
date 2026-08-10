@@ -6,6 +6,16 @@ const test = require('node:test');
 const ROOT = path.resolve(__dirname, '..');
 const read = relativePath => fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
 
+const vm = require('node:vm');
+
+/** Run src/ui/artwork-url.js as the browser does and return its global. */
+function loadArtworkUrlGlobal() {
+  const sandbox = { window: {}, URLSearchParams };
+  vm.runInNewContext(read('src/ui/artwork-url.js'), sandbox);
+  assert.ok(sandbox.window.ArtSoulArtworkUrl, 'the script must publish window.ArtSoulArtworkUrl');
+  return sandbox.window.ArtSoulArtworkUrl;
+}
+
 test('Vercel serves extensionless HTML routes and keeps legacy paths redirectable', () => {
   const config = JSON.parse(read('vercel.json'));
 
@@ -32,8 +42,21 @@ test('short artwork URLs are routed and trailing slashes are normalised', () => 
   );
 });
 
-test('artwork URLs shorten only where the chain is unambiguous', async () => {
-  const { artworkPath, expandArtworkId } = await import('../src/ui/artwork-url.js');
+test('artwork URLs shorten only where the chain is unambiguous', () => {
+  // Evaluated the way a browser runs it: a classic script that publishes a
+  // global. require() cannot be used - package.json declares "type": "module".
+  const { artworkPath, expandArtworkId, currentArtworkId } = loadArtworkUrlGlobal();
+
+  // /artwork/<id> is a server-side rewrite: the browser keeps the path and
+  // carries no query string, so reading only location.search finds nothing on
+  // exactly the URLs the product links to.
+  assert.equal(currentArtworkId({ pathname: '/artwork/27', search: '' }), 'v41:84532:27');
+  assert.equal(currentArtworkId({ pathname: '/artwork/27/', search: '' }), 'v41:84532:27');
+  assert.equal(
+    currentArtworkId({ pathname: '/artwork', search: '?id=v41:11155111:27' }),
+    'v41:11155111:27'
+  );
+  assert.equal(currentArtworkId({ pathname: '/artwork', search: '' }), '');
 
   assert.equal(artworkPath('v41:84532:27'), '/artwork/27');
   assert.equal(expandArtworkId('27'), 'v41:84532:27');
@@ -145,4 +168,38 @@ test('a page served at a subpath must not use relative asset references', () => 
     const offenders = [...source.matchAll(relative)].map(match => match[1]);
     assert.deepEqual(offenders, [], `${file} must not reference assets relatively`);
   }
+});
+
+test('one module owns artwork URLs and every surface loads it', () => {
+  // artwork-card.js builds card markup during classic-script execution, before
+  // deferred modules run. A module owner would be missing at that moment and
+  // the homepage and the cards would emit different URLs for the same artwork.
+  for (const page of ['artwork.html', 'index.html', 'gallery.html', 'profile.html', 'upload.html', 'admin.html']) {
+    const html = read(page);
+    assert.ok(html.includes('/src/ui/artwork-url.js'), `${page} must load the artwork URL owner`);
+
+    const owner = html.indexOf('/src/ui/artwork-url.js');
+    const card = html.indexOf('/src/ui/components/artwork-card.js');
+    if (card !== -1) {
+      assert.ok(owner < card, `${page}: the URL owner must load before artwork-card.js`);
+    }
+  }
+
+  // No surface may keep a private copy of the URL shape.
+  for (const file of [
+    'src/entries/artwork.jsx',
+    'src/entries/gallery.jsx',
+    'src/entries/index.js',
+    'src/entries/upload.js',
+    'src/entries/admin.jsx',
+    'src/ui/components/artwork-card.js'
+  ]) {
+    assert.doesNotMatch(read(file), /`\/artwork\?id=\$\{/, `${file} must not hand-build an artwork URL`);
+  }
+
+  assert.doesNotMatch(
+    read('src/entries/artwork.jsx'),
+    /URLSearchParams\(window\.location\.search\)\.get\('id'\)/,
+    'the artwork page must resolve its id through the owner, not from search alone'
+  );
 });

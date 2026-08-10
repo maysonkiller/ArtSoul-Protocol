@@ -2,7 +2,6 @@ import { React, createRoot } from './react-runtime.js';
 import { CardGridSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
-import { artworkPath } from '../ui/artwork-url.js';
 
 const { useState, useEffect, useMemo, useRef } = React;
 
@@ -533,7 +532,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                 artwork={artwork}
                                                 minimal={true}
                                                 surface="gallery"
-                                                onOpen={() => window.location.href = artworkPath(artwork.id)}
+                                                onOpen={() => window.location.href = window.ArtSoulArtworkUrl.artworkPath(artwork.id)}
                                                 actions={isGlobalSearch ? (
                                                     <span
                                                         className="inline-flex rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide"
@@ -552,7 +551,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     return (
                                     <div
                                         key={artwork.id}
-                                        onClick={() => window.location.href = artworkPath(artwork.id)}
+                                        onClick={() => window.location.href = window.ArtSoulArtworkUrl.artworkPath(artwork.id)}
                                         className="rounded-xl overflow-hidden cursor-pointer transition-all hover:scale-105 flex flex-col h-full"
                                         style={{
                                             background: isClassic ? 'rgba(232, 227, 213, 0.03)' : 'rgba(var(--c-accent-rgb), 0.05)',
