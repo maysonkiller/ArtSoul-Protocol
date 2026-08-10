@@ -203,3 +203,34 @@ test('one module owns artwork URLs and every surface loads it', () => {
     'the artwork page must resolve its id through the owner, not from search alone'
   );
 });
+
+test('Tailwind ships as a compiled stylesheet, never the runtime CDN', () => {
+  // The Play CDN shipped ~400kB of JavaScript and generated the stylesheet in
+  // the browser on every page load. It is documented as development-only.
+  const pages = ['index.html', 'gallery.html', 'artwork.html', 'profile.html',
+                 'upload.html', 'docs-protocol.html', 'visual-lab.html'];
+
+  for (const page of pages) {
+    const html = read(page);
+    assert.doesNotMatch(html, /cdn\.tailwindcss\.com/, `${page} must not load the Tailwind CDN`);
+    assert.ok(html.includes('/tailwind-build.css'), `${page} must load the compiled stylesheet`);
+
+    // Tailwind has to stay last so it keeps the precedence the CDN had when it
+    // injected its <style> after the project stylesheets.
+    const tailwind = html.indexOf('/tailwind-build.css');
+    const projectSheets = [...html.matchAll(/rel="stylesheet" href="\/(?!tailwind-build)[^"]+"/g)]
+      .map(match => match.index)
+      .filter(index => index < html.indexOf('</head>'));
+    for (const index of projectSheets) {
+      assert.ok(index < tailwind, `${page}: Tailwind must load after the project stylesheets`);
+    }
+  }
+
+  const config = read('tailwind.config.cjs');
+  assert.match(config, /'\.\/\*\.html'/);
+  assert.match(config, /'\.\/src\/\*\*\/\*\.\{js,jsx\}'/);
+
+  const pkg = JSON.parse(read('package.json'));
+  assert.match(pkg.scripts.build, /build:css/);
+  assert.match(pkg.scripts.build, /verify:tailwind/);
+});

@@ -6,13 +6,15 @@
   "main": "appkit-init.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && npm run verify:build",
+    "build": "npm run build:css && vite build && npm run verify:build && npm run verify:tailwind",
     "preview": "vite preview --host 0.0.0.0",
     "verify:build": "node scripts/verify-build.mjs",
     "monitor:indexer": "node scripts/check-indexer-health.mjs",
     "test": "npm run test:unit && npm run test:contracts",
     "test:unit": "node scripts/run-unit-tests.mjs",
-    "test:contracts": "hardhat test test/ArtSoulV41.test.cjs"
+    "test:contracts": "hardhat test test/ArtSoulV41.test.cjs",
+    "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/tailwind.css -o tailwind-build.css --minify",
+    "verify:tailwind": "node scripts/verify-tailwind.mjs"
   },
   "repository": {
     "type": "git",
@@ -31,6 +33,7 @@
     "@openzeppelin/contracts": "^5.0.0",
     "@vitejs/plugin-react": "6.0.3",
     "hardhat": "^2.28.6",
+    "tailwindcss": "^3.4.19",
     "vite": "8.1.2"
   },
   "directories": {

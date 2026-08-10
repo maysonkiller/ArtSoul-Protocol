@@ -50,6 +50,9 @@ const legacyRootAssets = [
     'performance-optimizations.css',
     'simplified-ui.css',
     'styles.css',
+    // Compiled by `npm run build:css` before vite runs; replaces the Tailwind
+    // Play CDN the pages used to load at runtime.
+    'tailwind-build.css',
     'supabase-auth.js',
     'supabase-client.js',
     'theme-sync.js',
