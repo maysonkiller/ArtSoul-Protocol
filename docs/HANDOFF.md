@@ -1,8 +1,8 @@
 # ArtSoul Engineering Handoff
 
-Updated: 2026-07-28
+Updated: 2026-08-04
 
-Production code baseline: `main` includes `c159001`
+Production code baseline: `main` includes `f4297ce`
 
 Companion state document: `docs/PROJECT_STATE.md`
 
@@ -34,19 +34,20 @@ Do not start Phase C contract work, Genesis implementation, a token, points, air
 
 | Resource | Location |
 | --- | --- |
-| Production site | `https://artsoul.vercel.app` |
+| Production site | `https://artsoulprotocol.com` |
+| Legacy Vercel alias | `https://artsoul.vercel.app` (temporary rollback/cutover origin) |
 | Repository | `https://github.com/maysonkiller/ArtSoul-Protocol` |
-| Protocol docs | `https://artsoul.vercel.app/docs-protocol.html` |
-| Gallery | `https://artsoul.vercel.app/gallery.html` |
-| Wallet isolation bench | `https://artsoul.vercel.app/wallet-test.html?walletdebug=1` |
-| Public indexer status | `https://artsoul.vercel.app/api/public/indexer-status` |
-| Public projection API | `https://artsoul.vercel.app/api/public/artworks` |
+| Protocol docs | `https://artsoulprotocol.com/docs-protocol` |
+| Gallery | `https://artsoulprotocol.com/gallery` |
+| Wallet isolation bench | `https://artsoulprotocol.com/wallet-test?walletdebug=1` |
+| Public indexer status | `https://artsoulprotocol.com/api/public/indexer-status` |
+| Public projection API | `https://artsoulprotocol.com/api/public/artworks` |
 | Controlled-beta entry | [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md) |
 | Controlled-beta issue form | `https://github.com/maysonkiller/ArtSoul-Protocol/issues/new?template=controlled-beta-bug.yml` |
 | Project X account | `https://x.com/ArtSoulProtocol` |
 | Community | `https://t.me/ArtSoulCommunity` |
 
-The wallet isolation bench is intentionally excluded from navigation. Keep it until production external-mobile acceptance and post-cleanup regression testing are complete.
+The wallet isolation bench is intentionally excluded from navigation. The external-mobile runtime and wrong-network recovery path passed production acceptance on 2026-07-30 through PR #156. A fresh production mobile SIWE signature and both authenticated negative upload-policy probes passed on 2026-08-04; see `testnet/A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md`. Remove the bench only through a separate post-acceptance cleanup task after that evidence merges.
 
 ## 3. Production Topology
 
@@ -63,7 +64,7 @@ The wallet isolation bench is intentionally excluded from navigation. Keep it un
 | Health endpoint | `http://127.0.0.1:3001/health` on the indexer host (loopback-only bind; `/metrics` requires `METRICS_AUTH`) |
 | Operational chain | Base Sepolia, chain ID 84532 |
 | Legacy read chain | Ethereum Sepolia, chain ID 11155111, process stopped |
-| Wallet UI | Reown AppKit 1.8.21 plus a dedicated external-mobile WalletConnect core path |
+| Wallet UI | Reown AppKit 1.8.21 plus a dedicated external-mobile WalletConnect core path; production runtime and Base Sepolia recovery accepted 2026-07-30 |
 | AI guidance | Gemini 2.5 Flash-Lite through a server-side API route |
 
 ## 4. Base Sepolia Contracts
@@ -80,15 +81,17 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 
 ## 5. Immediate Priority Queue
 
-`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. A2-A6, A9, A11, and A12 are accepted. A12 production evidence, including the module-entry correction discovered during acceptance, is in `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
+`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. A1-A6, A9, A11, and A12 are accepted. A1's final redacted credential/history evidence is in `testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`. A12 production evidence, including the module-entry correction discovered during acceptance, is in `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
 
-### 1. Finish security and migration operational acceptance
+### 1. A1 security and migration operational acceptance is complete
 
-- Confirm historical service credentials and any deployer key findings from `SECURITY_PUBLIC_READINESS_REPORT.md` were rotated or retired.
-- Apply the reviewed Phase 18.7b and 18.7c changes only through `docs/security/MIGRATION_RUNBOOK.md`, with backup, pre/post evidence, and smoke tests.
-- Configure the documented Supabase Storage bucket guardrails.
-- Reconcile the production migration ledger without automatic adoption.
-- Decide whether repository history remediation is complete.
+The 2026-08-04 iPhone run captured a fresh SIWE signature and exact authenticated
+rejection of unsupported MIME and an artwork-size request greater than 50 MB.
+The final 2026-08-07 redacted record confirms server-credential separation,
+retirement of the exposed secondary development key locally and on Hetzner,
+forced production RLS, zero open GitHub secret alerts, and the explicit decision
+to retain repository history under Secret Scanning and push protection. Never
+copy secret values into the repository.
 
 ### 2. Fix indexer status configuration drift
 
@@ -184,7 +187,7 @@ Vercel configuration:
 - Build command: `npm run build`
 - Output directory: `dist`
 - API rewrites: `vercel.json`
-- Legacy redirects: `/docs.html` and `/auction-system.html` to `/docs-protocol.html`
+- Clean public URLs: Vercel permanently redirects historical `.html` URLs to extensionless routes; `/docs` and `/auction-system` redirect to `/docs-protocol`
 
 Normal workflow:
 

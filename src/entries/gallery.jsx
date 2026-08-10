@@ -322,7 +322,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                     let data = [];
 
                     if (!db) {
-                        throw new Error('V4.1 artwork data source is not ready');
+                        throw new Error('Artwork data source is not ready');
                     }
 
                     data = await db.getPublicProjectionArtworks({
@@ -507,7 +507,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </div>
                                             {emptyState.cta && (
                                     <button
-                                        onClick={() => window.location.href = 'upload.html'}
+                                        onClick={() => window.location.href = '/upload'}
                                         className="btn-main mt-6"
                                     >
                                         Publish Artwork
@@ -532,7 +532,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                 artwork={artwork}
                                                 minimal={true}
                                                 surface="gallery"
-                                                onOpen={() => window.location.href = `artwork.html?id=${artwork.id}`}
+                                                onOpen={() => window.location.href = window.ArtSoulArtworkUrl.artworkPath(artwork.id)}
                                                 actions={isGlobalSearch ? (
                                                     <span
                                                         className="inline-flex rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide"
@@ -551,7 +551,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     return (
                                     <div
                                         key={artwork.id}
-                                        onClick={() => window.location.href = `artwork.html?id=${artwork.id}`}
+                                        onClick={() => window.location.href = window.ArtSoulArtworkUrl.artworkPath(artwork.id)}
                                         className="rounded-xl overflow-hidden cursor-pointer transition-all hover:scale-105 flex flex-col h-full"
                                         style={{
                                             background: isClassic ? 'rgba(232, 227, 213, 0.03)' : 'rgba(var(--c-accent-rgb), 0.05)',

@@ -7,13 +7,13 @@ This diagnostic intentionally does not change ArtSoul wallet behavior. It separa
 Use the same deployment origin for every step. Before testing a Vercel preview, add that exact preview origin to Reown Project Domains.
 
 1. Bare AppKit only:
-   `https://<deployment-origin>/wallet-test.html?walletdebug=1`
+   `https://<deployment-origin>/wallet-test?walletdebug=1`
 2. ArtSoul `appkit-init.js` wrapper, without Supabase:
-   `https://<deployment-origin>/wallet-test.html?walletdebug=1&layer=wrapper`
+   `https://<deployment-origin>/wallet-test?walletdebug=1&layer=wrapper`
 3. ArtSoul wrapper plus `supabase-client.js` and `supabase-auth.js`:
-   `https://<deployment-origin>/wallet-test.html?walletdebug=1&layer=auth`
+   `https://<deployment-origin>/wallet-test?walletdebug=1&layer=auth`
 4. Real page:
-   `https://<deployment-origin>/index.html?walletdebug=1`
+   `https://<deployment-origin>/?walletdebug=1`
 
 The test page is excluded from site navigation and search indexing.
 
@@ -67,9 +67,10 @@ Open Reown Dashboard, select the project whose public Project ID matches the val
 
 1. Project status: active, not deleted or disabled.
 2. Project Domains -> Configure Domains contains exactly:
-   - `https://artsoul.vercel.app`
+   - `https://artsoulprotocol.com`
+   - `https://artsoul.vercel.app` (temporary legacy cutover origin)
    - the exact Vercel preview origin being tested, copied from the browser address bar, for example `https://<deployment>.vercel.app`
-3. Domain entries contain only scheme plus hostname. Do not include `/index.html`, `/wallet-test.html`, query strings, or a trailing page path.
+3. Domain entries contain only scheme plus hostname. Do not include `/`, `/wallet-test`, query strings, or any page path.
 4. The page log reports `metadataUrl` equal to the browser origin.
 5. The page log reports `projectIdPresent: true` without displaying the Project ID.
    It must also report the verified project fingerprint `9fdc...58f2`.

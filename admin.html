@@ -17,27 +17,28 @@
     <title>Protocol Admin | ArtSoul</title>
     <meta name="description" content="Secure ArtSoul moderation review workspace.">
     <meta name="robots" content="noindex,nofollow">
-    <link rel="icon" type="image/jpeg" href="favicon.jpg?v=3">
-    <link rel="apple-touch-icon" href="ARTSOULlogo.png?v=3">
+    <link rel="icon" type="image/jpeg" href="/favicon.jpg?v=3">
+    <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="design-system.css?v=1">
-    <link rel="stylesheet" href="unified-styles.css?v=42">
-    <link rel="stylesheet" href="button-effects.css?v=5">
-    <link rel="stylesheet" href="mobile-no-motion.css?v=2">
-    <script src="src/ui/theme-manager.js"></script>
-    <script src="modal-system.js"></script>
-    <script type="module" src="supabase-client.js"></script>
-    <script type="module" src="supabase-auth.js?v=2"></script>
-    <script src="avatar-dropdown.js?v=39"></script>
-    <script type="module" src="appkit-init.js?v=46"></script>
+    <link rel="stylesheet" href="/design-system.css?v=1">
+    <link rel="stylesheet" href="/unified-styles.css?v=43">
+    <link rel="stylesheet" href="/button-effects.css?v=5">
+    <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
+    <script src="/src/ui/theme-manager.js"></script>
+    <script src="/src/ui/artwork-url.js?v=1"></script>
+    <script src="/modal-system.js"></script>
+    <script type="module" src="/supabase-client.js"></script>
+    <script type="module" src="/supabase-auth.js?v=2"></script>
+    <script src="/avatar-dropdown.js?v=45"></script>
+    <script type="module" src="/appkit-init.js?v=52"></script>
 </head>
 <body>
     <header class="site-header">
         <div class="site-header-shell">
             <div class="site-header-row">
                 <div class="site-header-logo-zone">
-                    <a href="index.html" class="logo-link" aria-label="ArtSoul home">
-                        <img src="ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                    <a href="/" class="logo-link" aria-label="ArtSoul home">
+                        <img src="/ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
                     </a>
                 </div>
                 <div class="site-header-center page-context" aria-hidden="true"></div>
@@ -47,7 +48,7 @@
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
                                 <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">
-                                <div class="avatar-info"><div data-avatar-name>ArtSoul Guest</div><div data-avatar-address hidden aria-hidden="true"></div></div>
+                                <div class="avatar-info"><div data-avatar-name>ArtSoul Guest</div><div data-avatar-address hidden aria-hidden="true"></div><div data-avatar-resolving aria-hidden="true">Connecting…</div></div>
                                 <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
                             </button>
                         </div>

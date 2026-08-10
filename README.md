@@ -24,9 +24,9 @@ The implementation was validated with the production Vite build, Node syntax che
 
 ### Judge links and testing
 
-- Live application: [artsoul.vercel.app](https://artsoul.vercel.app/)
+- Live application: [artsoulprotocol.com](https://artsoulprotocol.com/)
 - Public repository: [maysonkiller/ArtSoul-Protocol](https://github.com/maysonkiller/ArtSoul-Protocol)
-- Protocol documentation: [Protocol Docs](https://artsoul.vercel.app/docs-protocol.html)
+- Protocol documentation: [Protocol Docs](https://artsoulprotocol.com/docs-protocol)
 
 The public site can be explored without credentials. Wallet transactions currently target Base Sepolia testnet. A testnet wallet is required only for protected actions such as publishing or bidding; read-only artwork, discovery, protocol documentation, and profile surfaces remain publicly accessible.
 
@@ -104,4 +104,10 @@ On Windows PowerShell, set variables through `.env` tooling or the process manag
 
 ## License
 
-No license is granted for reuse at this time. See `LICENSE`.
+ArtSoul uses a split licence.
+
+- **Software** — contracts, indexer, API, frontend, scripts, tests, and operational documentation are licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify, and redistribute them, including commercially, under the terms of that licence.
+- **Protocol canon and brand** — `ARTSOUL_CANON_BIBLE_FULL.md`, `docs/canon/`, and the ArtSoul logo and brand assets are licensed separately under [LICENSE-DOCS](LICENSE-DOCS). They may be read and quoted with attribution, but not republished, adapted, or reused commercially.
+- **Trademarks** — "ArtSoul" and the ArtSoul logo are not licensed by the Apache License (Section 6).
+
+See [NOTICE](NOTICE) for the attribution summary required on redistribution.

@@ -15,12 +15,16 @@ function tableOf(path) {
   return String(path).split('?')[0];
 }
 
-function loadHandler() {
+function loadHandler({ missDirectArtworkOnce = false } = {}) {
   const calls = [];
+  let directArtworkReads = 0;
   const supabaseRest = async (path) => {
     calls.push(path);
     switch (tableOf(path)) {
       case 'v41_artworks':
+        if (missDirectArtworkOnce && directArtworkReads++ === 0) {
+          return [];
+        }
         return [{
           chain_id: 84532, artwork_id: '7', creator: '0xCreator',
           metadata_uri: 'https://example.test/meta.json', minted: false, token_id: '',
@@ -120,7 +124,7 @@ test('cold-cache list response is CDN-cacheable and non-empty', async () => {
 test('direct artwork lookup is private+no-store and carries fresh bids', async () => {
   const { handler, calls } = loadHandler();
   const res = fakeRes();
-  await handler({ query: { artwork_id: '7' } }, res);
+  await handler({ query: { chain_id: '84532', artwork_id: '7' } }, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.count, 1);
@@ -131,4 +135,21 @@ test('direct artwork lookup is private+no-store and carries fresh bids', async (
   assert.equal(card.bids[0].bid_amount, '1.5'); // wei -> eth
   assert.equal(res.body.public_metrics, null, 'private direct lookup does not fetch or expose homepage metrics');
   assert.equal(res.headers['cache-control'], 'private, no-store');
+});
+
+test('a negative direct lookup is not retained for the projection TTL', async () => {
+  const { handler, calls } = loadHandler({ missDirectArtworkOnce: true });
+  const first = fakeRes();
+  const second = fakeRes();
+
+  await handler({ query: { chain_id: '84532', artwork_id: '7' } }, first);
+  await handler({ query: { chain_id: '84532', artwork_id: '7' } }, second);
+
+  assert.equal(first.body.count, 0, 'the first read can precede indexer projection');
+  assert.equal(second.body.count, 1, 'the next read can observe the newly indexed artwork');
+  assert.equal(
+    calls.filter(path => tableOf(path) === 'v41_artworks').length,
+    2,
+    'the empty direct lookup is fetched again instead of staying cached'
+  );
 });

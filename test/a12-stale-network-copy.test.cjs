@@ -67,7 +67,7 @@ test('all consumers receive the updated shared runtime assets', () => {
   ];
 
   for (const path of accountMenuPages) {
-    assert.match(read(path), /avatar-dropdown\.js\?v=39/, path);
+    assert.match(read(path), /avatar-dropdown\.js\?v=45/, path);
   }
   for (const path of contractPages) {
     assert.match(read(path), /contracts-integration\.js\?v=7/, path);
@@ -88,6 +88,6 @@ test('A12 production acceptance is durable and reconciled across handoff and bac
   assert.match(canonBacklog, /- \[x\] \*\*A12 — Remove stale network copy\.\*\* Accepted 2026-07-28/);
   assert.match(durableBacklog, /\| A-28 \|[^|]+\|[^|]+\| done \| A \|/);
   assert.match(durableBacklog, /\| A-44 \|[^|]+\|[^|]+\| done \| A \|/);
-  assert.match(handoff, /Production code baseline: `main` includes `c159001`/);
-  assert.match(handoff, /A2-A6, A9, A11, and A12 are accepted/);
+  assert.match(handoff, /Production code baseline: `main` includes `f4297ce`/);
+  assert.match(handoff, /A1-A6, A9, A11, and A12 are accepted/);
 });

@@ -92,7 +92,7 @@ class IPFSClient {
             media_type: mediaType || 'image',
             creator: artworkData.creator,
             created_at: artworkData.createdAt || now,
-            external_url: 'https://artsoul.vercel.app/upload.html',
+            external_url: 'https://artsoulprotocol.com/upload',
             attributes: [
                 {
                     trait_type: 'Creator',

@@ -26,16 +26,16 @@ class NavigationManager {
     constructor() {
         this.history = [];
         this.currentPage = null;
-        this.homePage = 'index.html';
+        this.homePage = '/';
 
         // Pages configuration
         this.pages = {
-            'index.html': { name: ARTSOUL_NAVIGATION_LABELS.explore, icon: '' },
-            'gallery.html': { name: ARTSOUL_NAVIGATION_LABELS.marketplace, icon: '' },
-            'upload.html': { name: ARTSOUL_NAVIGATION_LABELS.publish, icon: '' },
-            'docs-protocol.html': { name: ARTSOUL_NAVIGATION_LABELS.docs, icon: '' },
-            'profile.html': { name: ARTSOUL_NAVIGATION_LABELS.profile, icon: '' },
-            'artwork.html': { name: ARTSOUL_NAVIGATION_LABELS.explore, icon: '' }
+            '/': { name: ARTSOUL_NAVIGATION_LABELS.explore, icon: '' },
+            '/gallery': { name: ARTSOUL_NAVIGATION_LABELS.marketplace, icon: '' },
+            '/upload': { name: ARTSOUL_NAVIGATION_LABELS.publish, icon: '' },
+            '/docs-protocol': { name: ARTSOUL_NAVIGATION_LABELS.docs, icon: '' },
+            '/profile': { name: ARTSOUL_NAVIGATION_LABELS.profile, icon: '' },
+            '/artwork': { name: ARTSOUL_NAVIGATION_LABELS.explore, icon: '' }
         };
 
         this.init();
@@ -74,9 +74,11 @@ class NavigationManager {
      * Get current page from URL
      */
     getCurrentPage() {
-        const path = window.location.pathname;
-        const page = path.split('/').pop() || 'index.html';
-        return page || 'index.html';
+        const path = String(window.location.pathname || '/')
+            .replace(/\.html$/, '')
+            .replace(/\/index$/, '/')
+            .replace(/\/$/, '') || '/';
+        return path;
     }
 
     /**
@@ -86,7 +88,10 @@ class NavigationManager {
         try {
             const saved = sessionStorage.getItem('artsoul_nav_history');
             if (saved) {
-                this.history = JSON.parse(saved);
+                this.history = JSON.parse(saved).map(page => String(page || '/')
+                    .replace(/\.html$/, '')
+                    .replace(/^\/?index$/, '/')
+                    .replace(/^([^/])/, '/$1'));
             }
         } catch (error) {
             console.warn('🧭 Failed to load navigation history:', error);

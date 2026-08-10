@@ -6,14 +6,127 @@
 
     const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 
+    // The one canonical ArtSoul avatar visual. It is used for the guest state
+    // and for a connected wallet whose profile has no avatar; connectedness is
+    // carried by the name, the address row and the menu, never by the image.
+    // The previously generated stylized "A" data-URI is gone: it read as a
+    // third identity and was mistaken for a stale cached avatar.
+    const NEUTRAL_AVATAR_URL = '/default-avatar.png';
+
+    // supabase-client.js announces 'artsoul:db-ready' once, after the complete
+    // window.ArtSoulDB API is assigned.
+    const DB_READY_EVENT = 'artsoul:db-ready';
+    // Hard ceiling on AUTOMATIC identity recoveries per wallet generation. A
+    // wallet transition resets it. Explicit user actions (opening the menu,
+    // refresh() after a profile save) are separate and stay idempotent through
+    // the in-flight request map.
+    const MAX_AUTOMATIC_IDENTITY_RECOVERIES = 2;
+    // Backoff for the retry after a failed profile read, one entry per allowed
+    // automatic recovery. This is a finite, pre-declared schedule — not a poll:
+    // it fires at most MAX_AUTOMATIC_IDENTITY_RECOVERIES times per wallet
+    // generation and then stops for the rest of the page lifetime.
+    const AUTOMATIC_RECOVERY_BACKOFF_MS = [400, 1600];
+
+    const isProfileBackendReady = () => typeof window.ArtSoulDB?.getProfile === 'function';
+
+    const WALLET_ADDRESS_PATTERN = /^0x[a-f0-9]{40}$/;
+    // What the head boot script is allowed to turn into a document-level image
+    // fetch: HTTPS, or a single-slash root-relative path on this origin. A
+    // leading '//' is protocol-relative (a foreign origin), and every other
+    // scheme — http:, data:, javascript:, blob: — is rejected outright.
+    const PRELOADABLE_AVATAR_URL = /^(?:https:\/\/[^/\s]|\/(?!\/))/;
+    const MOBILE_USER_AGENT_PATTERN = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+    const APPKIT_CONNECTION_STATUS_STORAGE_KEY = '@appkit/connection_status';
+    // The label of the coherent resolving state. It must stay in sync with the
+    // pre-paint placeholder in the static header shells and unified-styles.css.
+    const RESOLVING_IDENTITY_LABEL = 'Connecting…';
+
+    // Paint-ready cached header avatar.
+    //
+    // ArtSoul is an MPA: every navigation is a fresh document whose static shell
+    // carries the canonical avatar, which users read as "wallet disconnected".
+    // Caching only the remote avatar URL is not enough to avoid that, because a
+    // remote URL still needs network validation and a decode in each document.
+    // A tiny local raster of the LAST SUCCESSFULLY RENDERED avatar can instead be
+    // committed synchronously by the header bootstrap, before the first frame.
+    //
+    // It is presentation only. It authorizes nothing: the settled provider stays
+    // the sole authority, and the full profile and artwork surfaces keep using
+    // the original avatar URL.
+    const AVATAR_PREVIEW_EDGE_PX = 64;
+    const AVATAR_PREVIEW_MAX_LENGTH = 32 * 1024;
+    // Raster only. SVG can carry script, so it is not an accepted preview type,
+    // and no other scheme is ever read back out of storage.
+    const AVATAR_PREVIEW_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+    // AppKit's last persisted connection status, snapshotted ONCE while this
+    // synchronous head script runs — before the SDK boots and can rewrite it.
+    //
+    // At boot the stored value is the previous document's settled outcome, which
+    // is legitimate evidence: 'disconnected' there means the user really did end
+    // the last page disconnected. Re-reading it later is not: the SDK writes a
+    // transient 'disconnected' partway through restoring a live session, and a
+    // later read would tear down an already committed connected identity and
+    // repaint it as guest. Freezing the value at boot keeps the useful evidence
+    // and removes the transient teardown. Authoritative state still comes only
+    // from the settled wallet provider, which corrects this snapshot either way.
+    //
+    // External mobile sessions are restored by ArtSoul's separate WalletConnect
+    // core, so an AppKit disconnect is never authoritative for those browsers.
+    let appKitDisconnectedAtBoot = false;
+    try {
+        appKitDisconnectedAtBoot = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
+            && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
+    } catch {
+        // Storage can be unavailable in privacy-restricted browsers.
+    }
+
     // This script is loaded synchronously in the document head. Reserve the
     // connected shell before the header HTML can paint so a saved wallet never
     // flashes the static guest identity while its final profile is restored.
+    //
+    // 'wallet-state-resolving' swaps the static guest LABEL for a coherent
+    // "Connecting…" label of the same size. It never hides the identity region
+    // and never leaves the account button empty — see unified-styles.css.
     try {
         const walletHint = String(localStorage.getItem('artsoul_wallet') || '').toLowerCase();
         const cachedUiState = localStorage.getItem('artsoul_header_ui_state');
-        if (/^0x[a-f0-9]{40}$/.test(walletHint) || cachedUiState === 'connected') {
+        const hasWalletHint = WALLET_ADDRESS_PATTERN.test(walletHint);
+        const appKitExplicitlyDisconnected = appKitDisconnectedAtBoot;
+        if (!appKitExplicitlyDisconnected && (hasWalletHint || cachedUiState === 'connected')) {
             document.documentElement.classList.add('wallet-state-resolving');
+        }
+
+        // Start fetching the cached avatar with the document itself instead of
+        // after the header has been parsed. On a repeat navigation the response
+        // is already in the HTTP cache, so the one swap from the canonical
+        // avatar to the user's own avatar lands within the first paints instead
+        // of hundreds of milliseconds later.
+        //
+        // The hint is bound to the wallet it belongs to: an identity stored for
+        // a DIFFERENT wallet, or one with no validated wallet hint at all, must
+        // not become a document-level fetch. It is a platform hint only — it
+        // changes no identity, authorizes nothing, and a rejected value simply
+        // means the avatar is fetched later by the component itself.
+        if (!appKitExplicitlyDisconnected && hasWalletHint && cachedUiState === 'connected') {
+            let cachedIdentity = null;
+            try {
+                cachedIdentity = JSON.parse(localStorage.getItem('artsoul_header_identity') || 'null');
+            } catch {
+                // A corrupted entry is simply not a preload candidate.
+            }
+            const cachedWallet = String(cachedIdentity?.wallet || '').toLowerCase();
+            const cachedAvatarUrl = cachedIdentity?.avatarUrl;
+            if (WALLET_ADDRESS_PATTERN.test(cachedWallet)
+                && cachedWallet === walletHint
+                && typeof cachedAvatarUrl === 'string'
+                && PRELOADABLE_AVATAR_URL.test(cachedAvatarUrl)) {
+                const preloadLink = document.createElement('link');
+                preloadLink.rel = 'preload';
+                preloadLink.as = 'image';
+                preloadLink.href = cachedAvatarUrl;
+                document.head?.appendChild(preloadLink);
+            }
         }
     } catch {
         // Storage can be unavailable in privacy-restricted browsers.
@@ -27,9 +140,31 @@
             this.isOpen = false;
             this.container = null;
             this.currentRenderKey = null;
+            // Identity transaction bookkeeping. Every snapshot takes the next
+            // token; any newer snapshot invalidates the pending one, which is
+            // what rejects a late load/decode from a superseded render or an
+            // older wallet. pendingIdentityKey collapses duplicate requests for
+            // the snapshot already in flight.
+            this.identityCommitToken = 0;
+            this.pendingIdentityKey = null;
             this.pendingRenderKey = null;
             this.profileCache = new Map();
             this.profileRequests = new Map();
+            // Identity bookkeeping. The render key encodes only wallet + chain,
+            // so it cannot express "this wallet is connected but its profile
+            // identity has not been resolved yet". Without that distinction a
+            // single failed profile read leaves the connected header on the
+            // generated ArtSoul fallback for the whole page lifetime, because
+            // sync() early-returns on the unchanged key and appkit-init
+            // de-duplicates identical wallet-state events at the source.
+            this.identityGeneration = 0;
+            this.identityWallet = null;
+            this.resolvedIdentityWallet = null;
+            // Automatic (ArtSoulDB readiness) recoveries used by the current
+            // wallet generation, and the single readiness listener.
+            this.automaticRecoveries = 0;
+            this.profileBackendListener = null;
+            this.recoveryTimer = null;
             this.headerIdentityStorageKey = 'artsoul_header_identity';
             this.headerNetworkStorageKey = 'artsoul_header_network_v2';
             this.headerStateStorageKey = 'artsoul_header_ui_state';
@@ -73,6 +208,7 @@
                     <div class="avatar-info">
                         <div data-avatar-name>ArtSoul Guest</div>
                         <div data-avatar-address hidden aria-hidden="true"></div>
+                        <div data-avatar-resolving aria-hidden="true">${RESOLVING_IDENTITY_LABEL}</div>
                     </div>
                     <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true">
                         <path d="M4 6l4 4 4-4"></path>
@@ -92,53 +228,263 @@
             return { navButtons, dropdown, button, menu };
         }
 
-        updateStableButton({ avatarUrl, avatarAlt, name, address = '', stateKey }) {
+        /**
+         * Apply ONE coherent identity snapshot.
+         *
+         * Avatar, alt text, display name, shortened address, the stamped content
+         * key and the visible UI state are a single transaction. They are never
+         * committed separately, because a split commit produces exactly the
+         * invalid frame the founder reported: the neutral/disconnected avatar
+         * standing next to a connected profile name and address for as long as
+         * the real avatar takes to arrive.
+         *
+         * When the snapshot needs an avatar the document has not decoded yet,
+         * NOTHING of it is applied. The button keeps the previous identity while
+         * that identity belongs to the same account, or falls back to the
+         * complete resolving state, until the image can paint.
+         */
+        updateStableButton({
+            avatarUrl,
+            avatarAlt,
+            name,
+            address = '',
+            stateKey,
+            uiState,
+            persistUiState,
+            previewWallet
+        }) {
             const structure = this.getStableStructure();
             if (!structure) return null;
             const { button } = structure;
-            const contentKey = `${stateKey || ''}|${avatarUrl || ''}|${name || ''}|${address || ''}`;
-            if (button.dataset.avatarContentKey === contentKey) return structure;
+            const image = button.querySelector('[data-avatar-image]');
+            const nextAvatarUrl = avatarUrl || NEUTRAL_AVATAR_URL;
+            const nextName = name || 'ArtSoul Guest';
+            const contentKey = `${stateKey || ''}|${nextAvatarUrl}|${nextName}|${address || ''}`;
+
+            // Already on screen. The visible identity is byte-for-byte what this
+            // snapshot asks for, so not one node is touched — but the UI state
+            // still advances, which is how a restored cached presentation is
+            // promoted to a provider-confirmed one with zero repaint.
+            if (button.dataset.avatarContentKey === contentKey) {
+                if (uiState) this.commitVisibleState(uiState, { persist: persistUiState });
+                return structure;
+            }
+            if (this.pendingIdentityKey === contentKey) return structure;
+
+            const snapshot = {
+                // The logical source of this identity's avatar. It stays the
+                // original URL even when a local preview is what actually paints,
+                // so a later render for the same avatar recognises it as already
+                // displayed instead of swapping the image again.
+                avatarUrl: nextAvatarUrl,
+                paintSrc: nextAvatarUrl,
+                alt: avatarAlt || nextName,
+                name: nextName,
+                address: address || '',
+                // The account this snapshot belongs to. Derived from the visible
+                // address (empty for guest) because it is identical across every
+                // render path for the same wallet, unlike the render key, which
+                // also encodes the chain and the render source.
+                identity: address || 'guest',
+                previewWallet: previewWallet || '',
+                contentKey,
+                uiState,
+                persistUiState
+            };
+
+            // Any newer snapshot invalidates this one, which is what rejects a
+            // late result from an older wallet, an older URL or a superseded
+            // render.
+            const token = ++this.identityCommitToken;
+            this.pendingIdentityKey = contentKey;
+
+            // This exact avatar is already what the button displays — including
+            // the case where a local preview of it is on screen. Nothing to load.
+            const alreadyDisplayingThisAvatar = image
+                && image.dataset.avatarSource === nextAvatarUrl
+                && image.dataset.avatarIdentity === snapshot.identity;
+            if (alreadyDisplayingThisAvatar) {
+                snapshot.paintSrc = image.getAttribute('src') || nextAvatarUrl;
+                this.commitIdentitySnapshot(structure, snapshot, token, false);
+                return structure;
+            }
+
+            // A validated local preview of this exact identity is paint-ready
+            // with no network at all, so the previously confirmed identity is
+            // restored in this same frame instead of showing guest or the
+            // resolving label on every new document.
+            const preview = previewWallet
+                ? this.readAvatarPreview(
+                    this.getCachedHeaderIdentity(previewWallet),
+                    previewWallet,
+                    nextName,
+                    nextAvatarUrl
+                )
+                : null;
+            if (image && preview) {
+                snapshot.paintSrc = preview;
+                this.commitIdentitySnapshot(structure, snapshot, token, false);
+                return structure;
+            }
+
+            // Nothing to wait for: the src is unchanged, or the target is the
+            // canonical avatar, which every page paints in its static shell and
+            // is therefore always available. Commit in this same frame.
+            if (!image
+                || nextAvatarUrl === NEUTRAL_AVATAR_URL
+                || image.getAttribute('src') === nextAvatarUrl) {
+                this.commitIdentitySnapshot(structure, snapshot, token, false);
+                return structure;
+            }
+
+            this.holdIdentityWhilePending(structure, snapshot);
+            this.decodeThenCommitIdentity(structure, snapshot, token);
+            return structure;
+        }
+
+        /**
+         * Write the whole snapshot to the DOM in one synchronous, guarded pass.
+         * Returns false when a newer snapshot has already superseded this one.
+         */
+        commitIdentitySnapshot({ button }, snapshot, token, failed) {
+            if (token !== this.identityCommitToken) return false;
 
             const image = button.querySelector('[data-avatar-image]');
             const nameNode = button.querySelector('[data-avatar-name]');
             const addressNode = button.querySelector('[data-avatar-address]');
-            const fallback = this.getDefaultAvatar();
-            const nextAvatarUrl = avatarUrl || '/default-avatar.png';
-            const nextName = name || 'ArtSoul Guest';
-            const currentAddress = addressNode?.hidden ? '' : (addressNode?.textContent || '');
-            const contentAlreadyMatches = image?.getAttribute('src') === nextAvatarUrl
-                && nameNode?.textContent === nextName
-                && currentAddress === (address || '');
-
-            if (contentAlreadyMatches) {
-                button.dataset.avatarContentKey = contentKey;
-                return structure;
-            }
+            // A permanently broken avatar resolves to the canonical image, but it
+            // is still committed TOGETHER with the connected name and address as
+            // one final state. It never stays pending.
+            const source = failed ? NEUTRAL_AVATAR_URL : snapshot.avatarUrl;
+            const paintSrc = failed ? NEUTRAL_AVATAR_URL : (snapshot.paintSrc || snapshot.avatarUrl);
 
             if (image) {
-                const revealAvatar = () => image.classList.remove('avatar-image-loading');
-                if (image.getAttribute('src') !== nextAvatarUrl) {
-                    image.classList.add('avatar-image-loading');
-                    image.addEventListener('load', revealAvatar, { once: true });
-                }
-                image.src = nextAvatarUrl;
-                image.alt = avatarAlt || nextName || 'ArtSoul';
-                image.onerror = () => {
-                    image.onerror = null;
-                    image.src = fallback;
-                    if (image.complete) revealAvatar();
-                };
-                if (image.complete) revealAvatar();
+                if (image.getAttribute('src') !== paintSrc) image.src = paintSrc;
+                image.alt = snapshot.alt || 'ArtSoul';
+                image.dataset.avatarIdentity = snapshot.identity;
+                // What the pixels REPRESENT, which is not necessarily what is in
+                // src: a restored local preview paints instead of its own source.
+                image.dataset.avatarSource = source;
             }
-            if (nameNode) nameNode.textContent = nextName;
+            if (nameNode) nameNode.textContent = snapshot.name;
             if (addressNode) {
-                addressNode.hidden = !address;
-                addressNode.textContent = address || '';
-                addressNode.setAttribute('aria-hidden', address ? 'false' : 'true');
+                addressNode.hidden = !snapshot.address;
+                addressNode.textContent = snapshot.address;
+                addressNode.setAttribute('aria-hidden', snapshot.address ? 'false' : 'true');
             }
+            button.dataset.avatarContentKey = failed
+                ? `${snapshot.contentKey}|image-error`
+                : snapshot.contentKey;
+            this.pendingIdentityKey = null;
+            if (snapshot.uiState) {
+                this.commitVisibleState(snapshot.uiState, { persist: snapshot.persistUiState });
+            }
+            return true;
+        }
 
-            button.dataset.avatarContentKey = contentKey;
-            return structure;
+        /**
+         * Keep a complete, coherent state on screen while the snapshot's avatar
+         * is being fetched and decoded. Never a half identity.
+         */
+        holdIdentityWhilePending({ button }, snapshot) {
+            const image = button.querySelector('[data-avatar-image]');
+            const previousKey = button.dataset.avatarContentKey || '';
+            const previousIsCoherent = previousKey
+                && !previousKey.endsWith('|pending')
+                && image?.dataset.avatarIdentity === snapshot.identity;
+            // The identity on screen belongs to the same account and is complete,
+            // so it stays untouched — this is the profile-avatar-changed case.
+            if (previousIsCoherent) return;
+
+            // Otherwise there is no safe previous identity: a fresh document, or
+            // a different wallet. Show the complete resolving state rather than
+            // any part of the new one.
+            const nameNode = button.querySelector('[data-avatar-name]');
+            const addressNode = button.querySelector('[data-avatar-address]');
+            if (image) {
+                if (image.getAttribute('src') !== NEUTRAL_AVATAR_URL) image.src = NEUTRAL_AVATAR_URL;
+                image.alt = 'ArtSoul';
+                image.dataset.avatarIdentity = snapshot.identity;
+            }
+            if (nameNode) nameNode.textContent = RESOLVING_IDENTITY_LABEL;
+            if (addressNode) {
+                addressNode.hidden = !snapshot.address;
+                addressNode.textContent = snapshot.address;
+                addressNode.setAttribute('aria-hidden', snapshot.address ? 'false' : 'true');
+            }
+            button.dataset.avatarContentKey = `${snapshot.contentKey}|pending`;
+            this.commitVisibleState('resolving', { persist: false });
+        }
+
+        /**
+         * Fetch and decode the snapshot's avatar off the DOM, then commit the
+         * whole snapshot at once.
+         *
+         * 'load' alone is not the guarantee: it fires when the resource has
+         * arrived, while the bitmap may still be decoding, so a commit on load
+         * can still hand the compositor an image it cannot paint yet.
+         * HTMLImageElement.decode() resolves only when the frame is ready. Where
+         * it is unavailable, the load event remains the safe fallback.
+         *
+         * Every asynchronous boundary re-checks the commit token, so a late
+         * result from a superseded render or a previous wallet can never commit.
+         */
+        decodeThenCommitIdentity(structure, snapshot, token, options = {}) {
+            // A canvas can only export an image the document is allowed to read,
+            // and an image loaded without CORS always taints it — verified in
+            // Chromium: "SecurityError: Tainted canvases may not be exported".
+            // So the request that will paint is also made CORS-aware, and there
+            // is exactly ONE bounded retry without it, so an avatar host that
+            // sends no CORS headers still renders. The preview is then skipped.
+            const corsAttempt = options.withoutCors !== true
+                && snapshot.avatarUrl !== NEUTRAL_AVATAR_URL
+                && !!snapshot.previewWallet;
+
+            const settle = (failed) => {
+                if (token !== this.identityCommitToken) return;
+                this.commitIdentitySnapshot(structure, snapshot, token, failed);
+            };
+            const preloader = typeof Image === 'function'
+                ? new Image()
+                : document.createElement('img');
+            if (corsAttempt) preloader.crossOrigin = 'anonymous';
+            preloader.onerror = () => {
+                if (corsAttempt) {
+                    this.decodeThenCommitIdentity(structure, snapshot, token, { withoutCors: true });
+                    return;
+                }
+                settle(true);
+            };
+            const commitAndCapture = () => {
+                if (!this.commitIdentitySnapshot(structure, snapshot, token, false)) return;
+                if (!corsAttempt) return;
+                // The avatar just decoded for display; capturing from it costs no
+                // extra request and makes the NEXT document paint-ready.
+                const dataUri = this.captureAvatarPreview(preloader);
+                if (dataUri) {
+                    this.persistAvatarPreview(
+                        snapshot.previewWallet,
+                        snapshot.name,
+                        snapshot.avatarUrl,
+                        dataUri
+                    );
+                }
+            };
+            preloader.onload = () => {
+                if (token !== this.identityCommitToken) return;
+                if (typeof preloader.decode !== 'function') {
+                    commitAndCapture();
+                    return;
+                }
+                preloader.decode().then(
+                    () => {
+                        if (token !== this.identityCommitToken) return;
+                        commitAndCapture();
+                    },
+                    () => settle(true)
+                );
+            };
+            preloader.src = snapshot.avatarUrl;
         }
 
         updateStableMenu(html, menuKey) {
@@ -177,23 +523,36 @@
             };
         }
 
+        normalizePagePath(pathname = window.location.pathname) {
+            const normalized = String(pathname || '/')
+                .replace(/\.html$/, '')
+                .replace(/\/index$/, '/')
+                .replace(/\/$/, '');
+            return normalized || '/';
+        }
+
+        isPage(pathname, page) {
+            return this.normalizePagePath(pathname) === `/${page}`;
+        }
+
         getNavigationItems() {
             const labels = this.getNavigationLabels();
             // Auctions / Marketplace / Collections live as tabs inside Explore Art
-            // (gallery.html), so they are intentionally NOT separate dropdown
+            // (/gallery), so they are intentionally NOT separate dropdown
             // destinations — one clear path to the gallery.
             return [
-                { href: 'profile.html', label: labels.profile, path: 'profile.html', profile: true },
-                { href: 'index.html', label: labels.home || 'ArtSoul Home', path: 'index.html', home: true },
-                { href: 'gallery.html', label: labels.explore, path: 'gallery.html' },
-                { href: 'upload.html', label: labels.publish, path: 'upload.html' },
-                { href: 'docs-protocol.html', label: labels.docs || 'Protocol Docs', path: 'docs-protocol.html' }
+                { href: '/profile', label: labels.profile, path: '/profile', profile: true },
+                { href: '/', label: labels.home || 'ArtSoul Home', path: '/', home: true },
+                { href: '/gallery', label: labels.explore, path: '/gallery' },
+                { href: '/upload', label: labels.publish, path: '/upload' },
+                { href: '/docs-protocol', label: labels.docs || 'Protocol Docs', path: '/docs-protocol' }
             ];
         }
 
         isCurrentNavigationItem(item, currentPath = window.location.pathname, currentHash = window.location.hash) {
-            const isHome = item.home && (currentPath.endsWith('index.html') || currentPath === '/' || currentPath.endsWith('/'));
-            const isSamePath = currentPath.includes(item.path);
+            const normalizedPath = this.normalizePagePath(currentPath);
+            const isHome = item.home && normalizedPath === '/';
+            const isSamePath = normalizedPath === item.path;
             if (!isHome && !isSamePath) return false;
             if (item.hash) return currentHash === item.hash;
             return !currentHash || isHome || !item.profile;
@@ -215,10 +574,10 @@
         }
 
         renderProtocolAdminSlot(currentPath = window.location.pathname) {
-            const isCurrentPage = currentPath.includes('admin.html');
+            const isCurrentPage = this.isPage(currentPath, 'admin');
             const link = this.protocolAdminEligible && !isCurrentPage
                 ? `
-                    <a href="admin.html" class="dropdown-item dropdown-protocol-admin-item">
+                    <a href="/admin" class="dropdown-item dropdown-protocol-admin-item">
                         <span>Protocol Admin</span>
                     </a>
                 `
@@ -230,8 +589,8 @@
             const slot = this.getNavContainer()?.querySelector('[data-protocol-admin-slot]');
             if (!slot) return;
             const currentPath = window.location.pathname;
-            slot.innerHTML = this.protocolAdminEligible && !currentPath.includes('admin.html')
-                ? '<a href="admin.html" class="dropdown-item dropdown-protocol-admin-item"><span>Protocol Admin</span></a>'
+            slot.innerHTML = this.protocolAdminEligible && !this.isPage(currentPath, 'admin')
+                ? '<a href="/admin" class="dropdown-item dropdown-protocol-admin-item"><span>Protocol Admin</span></a>'
                 : '';
             this.applyThemeStyles();
         }
@@ -334,10 +693,95 @@
                 name: this.getProfileDisplayName(profile, wallet),
                 avatarUrl: this.getProfileAvatarUrl(profile)
             };
+            // A preview is only carried forward while it still describes exactly
+            // this wallet, this display name and this avatar URL. A renamed
+            // profile, a changed avatar or a removed avatar therefore drops it.
+            const previous = this.getCachedHeaderIdentity(wallet);
+            const preview = this.readAvatarPreview(previous, wallet, identity.name, identity.avatarUrl);
+            if (preview) identity.preview = previous.preview;
             try {
                 localStorage.setItem(this.headerIdentityStorageKey, JSON.stringify(identity));
             } catch {
                 // The normal async profile render remains available without storage.
+            }
+        }
+
+        /**
+         * Validate a stored avatar preview and return its data URI, or null.
+         *
+         * Everything is checked defensively on every read, because localStorage
+         * is attacker-writable in the threat model that matters here: the preview
+         * must be bound to the normalized wallet, the display name and the
+         * original avatar URL it was captured from, must be a raster data URI of
+         * an allowed type, and must respect the size ceiling.
+         */
+        readAvatarPreview(identity, wallet, name, avatarUrl) {
+            const preview = identity?.preview;
+            if (!preview || typeof preview !== 'object') return null;
+            const normalizedWallet = String(wallet || '').toLowerCase();
+            if (!WALLET_ADDRESS_PATTERN.test(normalizedWallet)) return null;
+            if (String(preview.wallet || '').toLowerCase() !== normalizedWallet) return null;
+            if (preview.name !== name) return null;
+            if (preview.source !== avatarUrl) return null;
+            const dataUri = preview.dataUri;
+            if (typeof dataUri !== 'string') return null;
+            if (dataUri.length > AVATAR_PREVIEW_MAX_LENGTH) return null;
+            if (!AVATAR_PREVIEW_PATTERN.test(dataUri)) return null;
+            return dataUri;
+        }
+
+        /**
+         * Capture a tiny raster of an avatar that has ALREADY loaded and decoded
+         * for display. No second request is made: the detached image the header
+         * just decoded is the source.
+         *
+         * Returns null whenever the platform refuses — no 2D context, or a
+         * tainted canvas because the avatar host sent no CORS headers. The header
+         * then simply keeps the coherent resolving path on the next document.
+         */
+        captureAvatarPreview(image) {
+            try {
+                const width = image.naturalWidth || image.width;
+                const height = image.naturalHeight || image.height;
+                if (!width || !height) return null;
+                const canvas = document.createElement('canvas');
+                canvas.width = AVATAR_PREVIEW_EDGE_PX;
+                canvas.height = AVATAR_PREVIEW_EDGE_PX;
+                const context = canvas.getContext?.('2d');
+                if (!context) return null;
+                // Centre-crop to a square, matching the button's object-fit: cover.
+                const side = Math.min(width, height);
+                context.drawImage(
+                    image,
+                    (width - side) / 2, (height - side) / 2, side, side,
+                    0, 0, AVATAR_PREVIEW_EDGE_PX, AVATAR_PREVIEW_EDGE_PX
+                );
+                let dataUri = canvas.toDataURL('image/webp', 0.8);
+                if (!dataUri.startsWith('data:image/webp')) dataUri = canvas.toDataURL('image/png');
+                if (dataUri.length > AVATAR_PREVIEW_MAX_LENGTH) return null;
+                if (!AVATAR_PREVIEW_PATTERN.test(dataUri)) return null;
+                return dataUri;
+            } catch {
+                // SecurityError on a tainted canvas, or no canvas support at all.
+                return null;
+            }
+        }
+
+        /** Persist a captured preview, but only onto the identity it describes. */
+        persistAvatarPreview(wallet, name, source, dataUri) {
+            const normalizedWallet = String(wallet || '').toLowerCase();
+            if (!dataUri || !WALLET_ADDRESS_PATTERN.test(normalizedWallet)) return false;
+            const stored = this.getCachedHeaderIdentity(normalizedWallet);
+            if (!stored || stored.name !== name || stored.avatarUrl !== source) return false;
+            try {
+                localStorage.setItem(this.headerIdentityStorageKey, JSON.stringify({
+                    ...stored,
+                    preview: { wallet: normalizedWallet, name, source, dataUri }
+                }));
+                return true;
+            } catch {
+                // Quota or unavailable storage: the header simply resolves as before.
+                return false;
             }
         }
 
@@ -431,10 +875,19 @@
             return `wallet:${normalizedAddress}:${chainId || 'none'}:${baseSepoliaConfirmed ? 'confirmed' : 'pending'}`;
         }
 
-        commitVisibleState(state) {
+        /**
+         * Publish a coherent visible state.
+         *
+         * options.persist === false for the transient 'resolving' state: the
+         * stored key is the NEXT document's boot hint and must only ever hold a
+         * settled outcome ('connected' / 'disconnected'). Persisting 'resolving'
+         * would make the following page boot from a state that is neither.
+         */
+        commitVisibleState(state, options = {}) {
             document.documentElement.classList.remove('wallet-state-resolving');
             document.documentElement.dataset.walletUiState = state;
-            this.getNavContainer()?.setAttribute('aria-busy', 'false');
+            this.getNavContainer()?.setAttribute('aria-busy', state === 'resolving' ? 'true' : 'false');
+            if (options.persist === false) return;
             try {
                 localStorage.setItem(this.headerStateStorageKey, state);
             } catch {
@@ -492,7 +945,23 @@
             const renderKey = this.getRenderKey(confirmedAddress, options);
             const hasMenuButton = !!container.querySelector('.avatar-button');
 
-            if (!options.refreshProfile && hasMenuButton && container.dataset.avatarRenderKey === renderKey) {
+            // A wallet transition (connect, switch, disconnect) invalidates every
+            // identity bound to the previous wallet, so a late response or a
+            // cached profile can never leak the previous avatar.
+            if (this.identityWallet !== confirmedAddress) {
+                this.beginIdentityTransition(confirmedAddress);
+            }
+
+            // Connected but the profile identity has not resolved yet (failed or
+            // never attempted read): the header is showing the connected-user
+            // fallback. Keep this render path open so the identity can still be
+            // recovered — the key alone cannot express that difference.
+            const identityUnresolved = !!confirmedAddress && this.resolvedIdentityWallet !== confirmedAddress;
+
+            if (!options.refreshProfile
+                && !identityUnresolved
+                && hasMenuButton
+                && container.dataset.avatarRenderKey === renderKey) {
                 return true;
             }
 
@@ -500,11 +969,44 @@
             this.pendingRenderKey = renderKey;
 
             if (confirmedAddress) {
-                this.init(confirmedAddress, { renderKey, walletAddress: confirmedAddress });
+                this.init(confirmedAddress, {
+                    renderKey,
+                    walletAddress: confirmedAddress,
+                    // Without forwarding this flag refresh() could never bust the
+                    // component cache, so a saved profile or avatar never reached
+                    // the shared header.
+                    refreshProfile: options.refreshProfile === true
+                });
                 return true;
             }
 
             return this.renderConnectButton({ renderKey });
+        }
+
+        // Drop every piece of state bound to the previous wallet and open a new
+        // identity generation. Responses issued for an older generation are
+        // discarded on arrival.
+        beginIdentityTransition(nextWallet) {
+            const previousWallet = this.identityWallet;
+            this.identityGeneration += 1;
+            this.identityWallet = nextWallet || null;
+            this.resolvedIdentityWallet = null;
+            this.profile = null;
+            // A new wallet gets its own recovery budget; work still in flight
+            // for the previous generation is discarded by the isCurrent() guard,
+            // and any pending retry for the wallet we are leaving is dropped.
+            this.automaticRecoveries = 0;
+            this.cancelAutomaticRecovery();
+
+            // Leaving a real wallet — disconnect or an address switch — must
+            // leave no wallet-bound identity behind, in memory or in storage, so
+            // the next wallet cannot inherit the previous avatar. Hydration
+            // renders start from a null wallet and clear nothing, which keeps
+            // the A-05 cached-identity flicker guard intact.
+            if (previousWallet && previousWallet !== this.identityWallet) {
+                this.profileCache.delete(previousWallet);
+                this.clearCachedHeaderIdentity();
+            }
         }
 
         /**
@@ -523,12 +1025,47 @@
             if (container) container.dataset.avatarRenderKey = renderKey;
             this.pendingRenderKey = renderKey;
 
+            const normalizedWallet = walletAddress.toLowerCase();
+            if (this.identityWallet !== normalizedWallet) {
+                this.beginIdentityTransition(normalizedWallet);
+            }
+            const generation = this.identityGeneration;
+            // A response is applied only while it still describes the active
+            // wallet. A slow read for wallet A that lands after a switch to
+            // wallet B is discarded instead of overwriting B's identity.
+            const isCurrent = () => this.identityGeneration === generation
+                && this.identityWallet === normalizedWallet;
+
+            // The header is a synchronous head script; supabase-client.js is a
+            // deferred module, so a wallet can be confirmed before ArtSoulDB
+            // exists. That is an UNRESOLVED identity, not a failed profile:
+            // render the connected shell, arm the one-shot readiness listener
+            // and let 'artsoul:db-ready' finish the job.
+            if (!isProfileBackendReady()) {
+                this.armProfileBackendRecovery();
+                if (this.pendingRenderKey !== renderKey) return;
+                await this.renderWalletInfo(walletAddress, { renderKey, resolved: false });
+                return;
+            }
+
             try {
-                this.profile = await this.loadProfileOnce(walletAddress, {
+                const profile = await this.loadProfileOnce(walletAddress, {
                     refresh: options.refreshProfile === true
                 });
 
-                if (!this.profile) {
+                if (!isCurrent()) return;
+                // A completed read — profile found or confirmed absent — resolves
+                // the identity. Repeat wallet-state events then stay cheap and
+                // issue no further requests.
+                this.profile = profile;
+                this.resolvedIdentityWallet = normalizedWallet;
+                // Persisting the header identity happens here, behind the guard,
+                // never inside the shared request: a superseded read for a
+                // previous wallet must not overwrite the stored identity of the
+                // wallet that is actually connected now.
+                if (profile) this.cacheHeaderIdentity(profile, walletAddress);
+
+                if (!profile) {
                     if (this.pendingRenderKey !== renderKey) return;
                     await this.renderWalletInfo(walletAddress, { renderKey });
                     return;
@@ -539,9 +1076,17 @@
             } catch (error) {
                 console.error(' Failed to load profile:', error);
                 console.log('👤 Falling back to wallet info due to error');
-                // Show wallet info on error instead of connect button
+                if (!isCurrent()) return;
+                // A transient rejection from an already-ready backend cannot be
+                // repaired by 'artsoul:db-ready' — supabase-client.js announces
+                // that exactly once. Without a retry of its own the identity
+                // would stay unresolved until the user opened the account menu,
+                // which is precisely the behaviour A-45 must remove.
+                this.scheduleAutomaticRecovery();
+                // Meanwhile the connected shell is shown — never guest, and the
+                // last avatar confirmed for THIS address is kept if there is one.
                 if (this.pendingRenderKey !== renderKey) return;
-                await this.renderWalletInfo(walletAddress, { renderKey });
+                await this.renderWalletInfo(walletAddress, { renderKey, resolved: false });
             }
         }
 
@@ -559,16 +1104,40 @@
 
             console.log('👤 Initializing avatar dropdown for wallet:', walletAddress);
             const request = Promise.resolve()
-                .then(() => window.ArtSoulDB.getProfile(walletAddress))
+                .then(() => {
+                    // Defensive: init() gates on isProfileBackendReady() before
+                    // reaching here. An unready backend must surface as an
+                    // unresolved identity, never as a TypeError that the caller
+                    // would mistake for a definitive "no profile".
+                    if (!isProfileBackendReady()) {
+                        const error = new Error('ArtSoul profile backend is not ready yet.');
+                        error.code = 'PROFILE_BACKEND_UNAVAILABLE';
+                        throw error;
+                    }
+                    return window.ArtSoulDB.getProfile(walletAddress);
+                })
                 .then(profile => {
-                    this.profileCache.set(cacheKey, profile || null);
+                    // Only cache a result that still describes the active wallet.
+                    // A read that was superseded by a wallet switch must not
+                    // reintroduce the previous wallet after
+                    // beginIdentityTransition() removed it. Persisting the header
+                    // identity is init()'s job, behind its generation guard.
+                    if (this.identityWallet === cacheKey) {
+                        this.profileCache.set(cacheKey, profile || null);
+                    }
                     if (profile) {
-                        this.cacheHeaderIdentity(profile, walletAddress);
                         console.log('👤 Profile loaded:', profile.username || walletAddress);
                     } else {
                         console.log('👤 No profile found for wallet:', walletAddress);
                     }
                     return profile || null;
+                })
+                .catch(error => {
+                    // Never cache a failed read. ArtSoulDB.getProfile keeps only a
+                    // 15s read cache, so a permanent component-level entry here
+                    // would outlive the real cache and block every recovery.
+                    this.profileCache.delete(cacheKey);
+                    throw error;
                 })
                 .finally(() => {
                     this.profileRequests.delete(cacheKey);
@@ -891,7 +1460,7 @@
 
             const currentPath = window.location.pathname;
             // Check if on profile page
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             // Check if viewing own profile (no address parameter or address matches current wallet)
             const urlParams = new URLSearchParams(window.location.search);
             const viewingAddress = urlParams.get('address');
@@ -902,26 +1471,68 @@
             const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
-            const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
-
+            // The identity depends on the profile alone. Committing it before the
+            // network read means a slow, failed or hanging Base Sepolia RPC can
+            // no longer hold the avatar, name and address off the screen.
             this.updateStableButton({
                 avatarUrl,
                 avatarAlt: username,
                 name: username,
                 address: shortAddress,
-                stateKey: `identity:${walletAddress.toLowerCase()}`
+                stateKey: `identity:${walletAddress.toLowerCase()}`,
+                previewWallet: walletAddress.toLowerCase(),
+                // Part of the same transaction: 'connected' becomes visible only
+                // when this identity's avatar can actually paint.
+                uiState: 'connected'
             });
-            this.commitVisibleState('connected');
+            this.updateStableMenu(
+                this.renderMenuContent({
+                    currentPath,
+                    isOwnProfile,
+                    networkInfo: this.getCachedHeaderNetwork(walletAddress),
+                    connected: true
+                }),
+                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(this.getCachedHeaderNetwork(walletAddress))}`
+            );
+            this.applyThemeStyles();
+            this.syncProtocolAdminWallet(walletAddress);
+            this.bindOutsideCloseOnce();
+            void this.applyLiveNetworkSection({
+                walletAddress,
+                currentPath,
+                isOwnProfile,
+                renderKey: options.renderKey || this.pendingRenderKey
+            });
+        }
+
+        /**
+         * Read the live network/balance once and fold it into the already
+         * committed menu. Never touches the account button, so it can never
+         * delay or repaint the visible identity.
+         *
+         * Guarded by the render key: a late result belonging to a superseded
+         * render or a previous wallet is discarded instead of applied. Exactly
+         * one read per render, as before — the RPC diet is unchanged, and no
+         * polling or retry loop is introduced.
+         */
+        async applyLiveNetworkSection({ walletAddress, currentPath, isOwnProfile, renderKey }) {
+            let networkInfo = null;
+            try {
+                networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
+            } catch (error) {
+                console.warn('Unable to read the live wallet network:', error);
+                return;
+            }
+            if (renderKey && this.pendingRenderKey !== renderKey) return;
+            if (!networkInfo) return;
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
                 `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();
-            this.syncProtocolAdminWallet(walletAddress);
-            this.bindOutsideCloseOnce();
         }
 
         /**
@@ -941,7 +1552,10 @@
 
             // Lazy Protocol Admin discovery: ask the server only when the
             // menu is actually opened, once per wallet per page lifetime.
-            if (this.isOpen) void this.requestProtocolAdminAccessOnce();
+            if (this.isOpen) {
+                void this.requestProtocolAdminAccessOnce();
+                this.recoverUnresolvedIdentity();
+            }
 
             if (menu) {
                 menu.style.display = this.isOpen ? 'block' : 'none';
@@ -1029,40 +1643,6 @@
             }
         }
 
-        getThemeColor(variableName, fallback) {
-            try {
-                return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim() || fallback;
-            } catch {
-                return fallback;
-            }
-        }
-
-        /**
-         * Get default avatar (first letter of username or generic icon)
-         */
-        getDefaultAvatar() {
-            // Use ArtSoul logo as default avatar (same as header logo)
-            // Beautiful gradient with transparent background
-            const primary = this.getThemeColor('--c-accent', 'currentColor');
-            const secondary = this.getThemeColor('--c-accent-2', primary);
-            const svg = `data:image/svg+xml,${encodeURIComponent(`
-                <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:${primary};stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:${secondary};stop-opacity:1" />
-                        </linearGradient>
-                    </defs>
-                    <!-- Outer circle with gradient border -->
-                    <circle cx="20" cy="20" r="18" fill="none" stroke="url(#logoGradient)" stroke-width="2"/>
-                    <!-- Inner artistic "A" shape -->
-                    <path d="M20 8 L28 28 L24 28 L22 22 L18 22 L16 28 L12 28 Z M19 18 L21 18 L20 13 Z"
-                          fill="url(#logoGradient)"/>
-                </svg>
-            `)}`;
-            return svg;
-        }
-
         getProfileDisplayName(profile, walletAddress) {
             const resolver = window.ArtSoulProfileDisplay?.displayName || window.ArtSoulDB?.displayName;
             const fallback = walletAddress ? 'ArtSoul User' : 'ArtSoul Guest';
@@ -1071,19 +1651,109 @@
 
         getProfileAvatarUrl(profile) {
             const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-            return resolver?.(profile, this.getDefaultAvatar()) || this.getDefaultAvatar();
+            return resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
         }
 
         /**
          * Update profile (call after profile changes)
          */
         async refresh(walletAddress) {
-            return this.sync(walletAddress, { refreshProfile: true, confirmed: true });
+            const wallet = walletAddress || window.currentWalletAddress || null;
+            return this.sync(wallet, { refreshProfile: true, confirmed: true });
+        }
+
+        /**
+         * Arm the one-shot ArtSoulDB readiness listener.
+         *
+         * Registered at most once per page: the listener itself is idempotent
+         * and every recovery it triggers is capped per wallet generation, so
+         * duplicate 'artsoul:db-ready' dispatches cannot become a request
+         * storm. No timer, no polling, no DOM-mutation retry.
+         */
+        /**
+         * Schedule the single pending retry after a failed profile read.
+         *
+         * Bounded by construction: it shares the per-generation budget with the
+         * readiness-driven recovery (MAX_AUTOMATIC_IDENTITY_RECOVERIES), never
+         * stacks more than one pending retry, and the callback re-checks the
+         * identity generation so a wallet change or disconnect discards it.
+         * Total profile reads per wallet generation stay at 1 + 2 = 3.
+         */
+        scheduleAutomaticRecovery() {
+            if (this.recoveryTimer !== null) return false;
+            if (this.automaticRecoveries >= MAX_AUTOMATIC_IDENTITY_RECOVERIES) return false;
+            const delay = AUTOMATIC_RECOVERY_BACKOFF_MS[this.automaticRecoveries]
+                ?? AUTOMATIC_RECOVERY_BACKOFF_MS[AUTOMATIC_RECOVERY_BACKOFF_MS.length - 1];
+            const generation = this.identityGeneration;
+            this.recoveryTimer = setTimeout(() => {
+                this.recoveryTimer = null;
+                // The authoritative guard: clearTimeout is only hygiene, this
+                // check is what makes a superseded wallet impossible to revive.
+                if (this.identityGeneration !== generation) return;
+                this.recoverUnresolvedIdentity({ automatic: true });
+            }, delay);
+            return true;
+        }
+
+        cancelAutomaticRecovery() {
+            if (this.recoveryTimer === null) return;
+            clearTimeout(this.recoveryTimer);
+            this.recoveryTimer = null;
+        }
+
+        armProfileBackendRecovery() {
+            if (this.profileBackendListener) return false;
+            this.profileBackendListener = () => {
+                this.recoverUnresolvedIdentity({ automatic: true });
+            };
+            window.addEventListener(DB_READY_EVENT, this.profileBackendListener);
+            return true;
+        }
+
+        /**
+         * Re-attempt a connected identity whose profile read never succeeded.
+         *
+         * Automatic callers (ArtSoulDB readiness) pass { automatic: true } and
+         * are capped at MAX_AUTOMATIC_IDENTITY_RECOVERIES per wallet
+         * generation. Deliberate callers — opening the account menu, a genuine
+         * wallet-state event, explicit refresh() — are uncapped but stay
+         * idempotent through the in-flight request map. Arbitrary DOM mutations
+         * are deliberately NOT a trigger: the nav observer watches the whole
+         * document, so that would amplify a failing backend into one request
+         * per unrelated render.
+         *
+         * Bounded by design: it runs only while the active wallet is still
+         * unresolved, loadProfileOnce() collapses concurrent reads per wallet,
+         * and a completed read (profile found or confirmed absent) closes the
+         * path for the rest of the page lifetime. There is no timer and no poll.
+         */
+        recoverUnresolvedIdentity(options = {}) {
+            if (window.artsoulWalletStateSettled !== true) return false;
+            const wallet = String(
+                window.currentWalletAddress
+                || window.artsoulSettledWalletState?.address
+                || ''
+            ).toLowerCase();
+            if (!/^0x[a-f0-9]{40}$/.test(wallet)) return false;
+            if (this.identityWallet !== wallet) return false;
+            if (this.resolvedIdentityWallet === wallet) return false;
+            if (this.profileRequests.has(wallet)) return false;
+            if (options.automatic === true) {
+                if (this.automaticRecoveries >= MAX_AUTOMATIC_IDENTITY_RECOVERIES) return false;
+                this.automaticRecoveries += 1;
+            }
+            this.init(wallet, { walletAddress: wallet, confirmed: true });
+            return true;
         }
 
         renderInitializingState() {
             const container = this.getNavContainer();
             if (!container) return false;
+
+            // The boot snapshot, never a fresh read: see appKitDisconnectedAtBoot.
+            if (appKitDisconnectedAtBoot) {
+                return this.renderConnectButton({ renderKey: 'initializing-disconnected' });
+            }
 
             const storedWalletHint = (localStorage.getItem('artsoul_wallet') || '').toLowerCase();
             const cachedUiState = localStorage.getItem(this.headerStateStorageKey);
@@ -1096,18 +1766,24 @@
             const hasWalletHint = /^0x[a-f0-9]{40}$/.test(storedWallet);
             if (!hasWalletHint) return this.renderConnectButton({ renderKey: 'initializing' });
             let cachedIdentity = this.getCachedHeaderIdentity(storedWallet);
-            // Reuse only a complete cached identity. When none exists, keep the
-            // fixed-size shell hidden until the final profile identity arrives.
-            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isMobileUA = MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent);
             if (!cachedIdentity) {
-                document.documentElement.classList.add('wallet-state-resolving');
-                container.setAttribute('aria-busy', 'true');
-                return true;
+                // A stored wallet with no complete cached identity. Render a
+                // COHERENT resolving state instead of withholding the identity
+                // text: the canonical avatar, a real "Connecting…" label and the
+                // shortened stored address, all in the fixed geometry. The old
+                // behaviour hid only the text and left the avatar visible, which
+                // is exactly the "avatar plus empty black area" defect.
+                //
+                // This is visual continuity only. It claims no profile, and it
+                // authorizes nothing: the menu still offers Connect Wallet until
+                // the settled provider confirms the session.
+                return this.renderResolvingState(storedWallet);
             }
             if (container.dataset.avatarRenderKey === 'cached-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
 
             const currentPath = window.location.pathname;
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             const viewingAddress = new URLSearchParams(window.location.search).get('address');
             const isOwnProfile = isProfilePage
                 && (!viewingAddress || viewingAddress.toLowerCase() === storedWallet);
@@ -1132,9 +1808,16 @@
                 avatarAlt: cachedIdentity.name,
                 name: cachedIdentity.name,
                 address: shortAddress,
-                stateKey: `identity:${storedWallet}`
+                stateKey: `identity:${storedWallet}`,
+                previewWallet: storedWallet,
+                // 'restoring' is honest: this is the previously confirmed
+                // presentation of this exact wallet, restored for visual
+                // continuity. It authorizes nothing and is never persisted —
+                // the settled provider still decides, and promotes this to
+                // 'connected' without touching a single visible node.
+                uiState: 'restoring',
+                persistUiState: false
             });
-            this.commitVisibleState('connected');
             this.updateStableMenu(
                 this.renderMenuContent({
                     currentPath,
@@ -1145,6 +1828,45 @@
                 networkInfo
                     ? `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
                     : `cached-restoring:${currentPath}:${isOwnProfile}`
+            );
+            this.applyThemeStyles();
+            this.bindOutsideCloseOnce();
+            return true;
+        }
+
+        /**
+         * Render the coherent resolving state for a stored wallet whose profile
+         * identity is not cached yet.
+         *
+         * Every visible part is filled: the canonical ArtSoul avatar, a real
+         * "Connecting…" label and the shortened stored address, inside the same
+         * fixed geometry as every other state. There is no hidden text region
+         * and no fabricated profile identity.
+         *
+         * Strictly visual. The menu stays the guest menu — Connect Wallet, no
+         * network row, no balance, no Disconnect — until the settled provider
+         * confirms the session, so nothing here authorizes anything.
+         */
+        renderResolvingState(storedWallet) {
+            const container = this.getNavContainer();
+            if (!container) return false;
+
+            const currentPath = window.location.pathname;
+            const isProfilePage = this.isPage(currentPath, 'profile');
+            container.dataset.avatarRenderKey = 'resolving';
+            this.pendingRenderKey = 'resolving';
+            this.updateStableButton({
+                avatarUrl: NEUTRAL_AVATAR_URL,
+                avatarAlt: 'ArtSoul',
+                name: RESOLVING_IDENTITY_LABEL,
+                address: `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`,
+                stateKey: `resolving:${storedWallet}`,
+                uiState: 'resolving',
+                persistUiState: false
+            });
+            this.updateStableMenu(
+                this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
+                `resolving:${currentPath}:${isProfilePage}`
             );
             this.applyThemeStyles();
             this.bindOutsideCloseOnce();
@@ -1163,16 +1885,21 @@
                 this.pendingRenderKey = options.renderKey;
             }
 
+            // Guest is a wallet transition too: beginIdentityTransition() drops
+            // the identity bound to the wallet we are leaving, if there was one.
+            this.beginIdentityTransition(null);
+
             const currentPath = window.location.pathname;
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             this.updateStableButton({
-                avatarUrl: '/default-avatar.png',
+                avatarUrl: NEUTRAL_AVATAR_URL,
                 avatarAlt: 'ArtSoul',
                 name: 'ArtSoul Guest',
                 address: '',
-                stateKey: options.renderKey || 'guest'
+                stateKey: options.renderKey || 'guest',
+                // A real disconnect commits the complete guest identity at once.
+                uiState: 'disconnected'
             });
-            this.commitVisibleState('disconnected');
             this.clearProtocolAdminAccess();
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
@@ -1184,7 +1911,18 @@
         }
 
         /**
-         * Render wallet info when connected but no profile
+         * Render the connected header without a resolved profile.
+         *
+         * options.resolved === false means the identity is still UNRESOLVED
+         * (ArtSoulDB not ready, or the read failed). Then a header identity
+         * cached for THIS exact normalized address is reused, so a returning
+         * user keeps their real avatar instead of flashing a neutral one.
+         * options.resolved !== false means the backend answered definitively
+         * that this wallet has no profile/avatar: the canonical neutral avatar
+         * is correct and a stale cached avatar must NOT be resurrected.
+         *
+         * Either way the row stays unmistakably connected — address, network,
+         * balance and Disconnect — and never renders the guest identity.
          */
         async renderWalletInfo(walletAddress, options = {}) {
             const navButtons = this.getNavContainer();
@@ -1192,34 +1930,56 @@
             if (options.renderKey) navButtons.dataset.avatarRenderKey = options.renderKey;
 
             const currentPath = window.location.pathname;
-            const isProfilePage = currentPath.includes('profile.html');
+            const isProfilePage = this.isPage(currentPath, 'profile');
             const urlParams = new URLSearchParams(window.location.search);
             const viewingAddress = urlParams.get('address');
             const currentWallet = walletAddress?.toLowerCase();
             const isOwnProfile = isProfilePage && (!viewingAddress || viewingAddress.toLowerCase() === currentWallet);
 
-            const avatarUrl = this.getDefaultAvatar();
+            const cachedIdentity = options.resolved === false
+                ? this.getCachedHeaderIdentity(currentWallet)
+                : null;
+            const avatarUrl = cachedIdentity?.avatarUrl || NEUTRAL_AVATAR_URL;
+            const displayedName = cachedIdentity?.name || 'ArtSoul User';
             const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
-            const networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
+            // A profile recovery can complete while this unresolved fallback is
+            // still pending. Both renders intentionally share the same render
+            // key, so the key alone cannot distinguish them. Once this wallet has
+            // a resolved profile result, the older fallback must not repaint its
+            // name or avatar.
+            if (options.resolved === false && this.resolvedIdentityWallet === currentWallet) return;
 
+            // Identity first, network afterwards — see render(). The balance RPC
+            // must never hold the connected avatar, name and address off screen.
             this.updateStableButton({
                 avatarUrl,
-                avatarAlt: 'ArtSoul User',
-                name: 'ArtSoul User',
+                avatarAlt: displayedName,
+                name: displayedName,
                 address: shortAddress,
-                stateKey: options.renderKey || `wallet:${currentWallet}`
+                stateKey: options.renderKey || `wallet:${currentWallet}`,
+                previewWallet: currentWallet,
+                uiState: 'connected'
             });
-            this.commitVisibleState('connected');
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
-                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
+                this.renderMenuContent({
+                    currentPath,
+                    isOwnProfile,
+                    networkInfo: this.getCachedHeaderNetwork(currentWallet),
+                    connected: true
+                }),
+                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(this.getCachedHeaderNetwork(currentWallet))}`
             );
             this.applyThemeStyles();
-            void this.updateNetworkDisplay();
             this.syncProtocolAdminWallet(walletAddress);
             this.bindOutsideCloseOnce();
+            void this.applyLiveNetworkSection({
+                walletAddress,
+                currentPath,
+                isOwnProfile,
+                renderKey: options.renderKey || this.pendingRenderKey
+            });
         }
     }
 
@@ -1261,13 +2021,28 @@
 
     window.addEventListener('artsoul:nav-ready', () => syncCurrentMenu());
 
+    // The observer watches the whole document, so gallery renders, filter
+    // changes and artwork loading all reach it. It therefore acts on EXACTLY one
+    // condition: the shared account button is missing, i.e. the header was
+    // genuinely removed or replaced. Any other mutation is ignored outright.
+    //
+    // It previously also re-ran renderInitializingState() while the wallet was
+    // unsettled, which re-applied the resolving presentation on every unrelated
+    // React render and reset the visible identity for seconds at a time.
+    //
+    // Recovery of an unresolved profile stays on deliberate, bounded events:
+    // account-menu open, a genuine wallet-state event, ArtSoulDB readiness and
+    // explicit refresh(). No polling, no arbitrary-mutation retries.
     const navObserver = new MutationObserver(() => {
         const container = window.AvatarDropdown.getNavContainer();
-        if (container && window.artsoulWalletStateSettled !== true && container.dataset.avatarCacheHydrated !== 'true') {
-            window.AvatarDropdown.renderInitializingState();
-        } else if (container && !container.querySelector('.avatar-button')) {
+        if (!container || container.querySelector('.avatar-button')) return;
+        if (window.artsoulWalletStateSettled === true) {
             syncCurrentMenu();
+            return;
         }
+        // Rebuild the pre-settle shell from the same coherent state the boot
+        // path uses, so a replaced header never comes back as a bare guest.
+        window.AvatarDropdown.renderInitializingState();
     });
 
     const startNavObserver = () => {

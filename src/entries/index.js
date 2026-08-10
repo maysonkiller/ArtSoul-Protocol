@@ -217,7 +217,7 @@ let morphActive = false;
             if (!walletAddress || !selectedArtworkFile) return;
 
             alert('Homepage quick upload is disabled for public testnet. Please use the Publish Artwork page so on-chain registration stays canonical.');
-            window.location.href = 'upload.html';
+            window.location.href = '/upload';
             return;
 
             const title = document.getElementById('artworkTitle').value;
@@ -454,7 +454,7 @@ let morphActive = false;
         }
 
         function viewArtwork(id) {
-            window.location.href = `artwork.html?id=${id}`;
+            window.location.href = window.ArtSoulArtworkUrl.artworkPath(id);
         }
 
         function normalizeProtocolArtworkId(value) {
@@ -778,7 +778,7 @@ let morphActive = false;
                         const canonicalV41Id = art.canonical_v41_id || canonicalV41IdForPendingArtwork(art);
                         const card = document.createElement(art.source === 'pending_indexer' && !canonicalV41Id ? 'div' : 'a');
                         if (art.source !== 'pending_indexer' || canonicalV41Id) {
-                            card.href = `artwork.html?id=${canonicalV41Id || art.id}`;
+                            card.href = window.ArtSoulArtworkUrl.artworkPath(canonicalV41Id || art.id);
                         }
                         card.className = 'card rounded-xl overflow-hidden';
 

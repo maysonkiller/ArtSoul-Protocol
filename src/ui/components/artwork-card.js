@@ -362,7 +362,8 @@
                 ? `v41:${artwork.chain_id || artwork.chainId}:${artwork.artwork_id || artwork.artworkId || artwork.blockchain_id}`
                 : '');
         const id = canonical || artwork.id || '';
-        return id ? `artwork.html?id=${encodeURIComponent(id)}` : '';
+        if (!id) return '';
+        return window.ArtSoulArtworkUrl.artworkPath(id);
     }
 
     function prepareVideoPreview(video, artwork = {}, options = {}) {

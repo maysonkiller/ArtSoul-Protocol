@@ -913,6 +913,11 @@ const { useState, useEffect, useRef } = React;
                         setProfile(newProfile);
                     }
 
+                    // The shared header caches the profile for the page lifetime,
+                    // so a saved name or avatar only reaches it through the
+                    // component's own refresh entry point.
+                    await window.AvatarDropdown?.refresh?.(walletAddress);
+
                     setEditMode(false);
                     alert('Profile saved!');
                 } catch (error) {
@@ -922,7 +927,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             function handleQuickUpload() {
-                window.location.href = 'upload.html';
+                window.location.href = '/upload';
             }
 
             async function handleProfileConnect() {

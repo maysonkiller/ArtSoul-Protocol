@@ -32,7 +32,14 @@ const legacyRootAssets = [
     'button-effects.css',
     'contracts-config.js',
     'contracts-integration.js',
-    'default-avatar.png',
+    // default-avatar.png deliberately lives in publicDir instead of here. It is
+    // the one neutral account avatar, referenced by the identical literal URL
+    // '/default-avatar.png' from every static header shell AND from the legacy
+    // avatar-dropdown.js. Copying it as a legacy root asset made Vite ALSO emit
+    // a hashed /assets/default-avatar-<hash>.png and rewrite the HTML to it, so
+    // the built pages and the component disagreed about the same picture: the
+    // component saw a "different" src, rewrote the already-rendered image and
+    // forced a second request plus a blank bitmap frame on every page load.
     'design-system.css',
     'favicon.jpg',
     'ipfs-client.js',
@@ -43,6 +50,9 @@ const legacyRootAssets = [
     'performance-optimizations.css',
     'simplified-ui.css',
     'styles.css',
+    // Compiled by `npm run build:css` before vite runs; replaces the Tailwind
+    // Play CDN the pages used to load at runtime.
+    'tailwind-build.css',
     'supabase-auth.js',
     'supabase-client.js',
     'theme-sync.js',

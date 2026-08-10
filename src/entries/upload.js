@@ -82,6 +82,10 @@ let selectedFile = null;
             return /^(screenshot|screen shot|img|image|photo|picture|untitled)\b/i.test(simplified);
         }
 
+        // Long enough for real collector context, short enough that the artwork
+        // page stays readable without the description dominating it.
+        const MAX_ARTWORK_DESCRIPTION_LENGTH = 1000;
+
         function validateArtworkDetails({ title, description, price }) {
             const cleanTitle = normalizeArtworkTitle(title);
             const cleanDescription = (description || '').trim().replace(/\s+/g, ' ');
@@ -96,6 +100,10 @@ let selectedFile = null;
 
             if (!cleanDescription || Array.from(cleanDescription).length < 12) {
                 return 'Add a short meaningful description with the story, medium, or collector context.';
+            }
+
+            if (Array.from(cleanDescription).length > MAX_ARTWORK_DESCRIPTION_LENGTH) {
+                return `Keep the description under ${MAX_ARTWORK_DESCRIPTION_LENGTH} characters.`;
             }
 
             if (!price || parseFloat(price) <= 0) {
@@ -500,7 +508,11 @@ let selectedFile = null;
             const authorizationCurrent = Boolean(walletAddress && authorizedWalletAddress === walletAddress);
             const ready = !uploading && !formError && authorizationCurrent && estimateCurrent && !aiValuationController && !authorizationInProgress;
 
-            button.disabled = !ready;
+            // Only a running upload disables Publish. Disabling it for an
+            // incomplete form swallows the click and leaves the person with no
+            // explanation of what is missing.
+            button.disabled = uploading;
+            button.setAttribute('aria-disabled', String(!ready));
             if (message) hint.textContent = message;
             else if (formError) hint.textContent = formError;
             else if (authorizationInProgress) hint.textContent = 'Waiting for wallet authorization.';
@@ -511,6 +523,59 @@ let selectedFile = null;
 
             updatePrePublishAction();
             return ready;
+        }
+
+        /**
+         * Send the person to the step that is blocking publication.
+         *
+         * Scrolls the blocking control into view, moves focus to it and states
+         * the reason next to it. It never activates the control: requesting AI
+         * guidance costs a wallet signature, so that stays an explicit choice.
+         */
+        function revealBlockingStep(message, preferredTargetId = '') {
+            const note = document.getElementById('publishBlockedNote');
+            if (note) {
+                note.textContent = message;
+                note.style.display = 'block';
+            }
+
+            const candidates = [preferredTargetId, 'prePublishAction', 'aiValuationRetry', 'artTitle'].filter(Boolean);
+            let target = null;
+            for (const id of candidates) {
+                const element = document.getElementById(id);
+                if (element && element.offsetParent !== null && !element.disabled) {
+                    target = element;
+                    break;
+                }
+            }
+
+            const scrollTo = target || document.getElementById('aiValuationPanel');
+            scrollTo?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (target) {
+                target.classList.add('publish-step-wanted');
+                window.setTimeout(() => target.classList.remove('publish-step-wanted'), 2400);
+                target.focus({ preventScroll: true });
+            }
+        }
+
+        function bindDescriptionCounter() {
+            const field = document.getElementById('artDescription');
+            const counter = document.getElementById('artDescriptionCount');
+            if (!field || !counter) return;
+            const render = () => {
+                const used = Array.from(field.value || '').length;
+                counter.textContent = `${used} / ${MAX_ARTWORK_DESCRIPTION_LENGTH}`;
+            };
+            field.addEventListener('input', render);
+            render();
+        }
+
+        function clearBlockingStep() {
+            const note = document.getElementById('publishBlockedNote');
+            if (note) {
+                note.textContent = '';
+                note.style.display = 'none';
+            }
         }
 
         async function ensureUploadAuthorization() {
@@ -820,34 +885,37 @@ let selectedFile = null;
             const fileError = validateArtworkFile(selectedFile);
             if (fileError) {
                 setFileValidationError(fileError.message);
-                alert(fileError.message);
+                revealBlockingStep(fileError.message, 'artFile');
                 return;
             }
 
             if (!selectedAuctionDuration) {
                 document.getElementById('auctionDurationError').style.display = 'block';
-                document.getElementById('auctionDurationLabel').scrollIntoView({ behavior: 'auto', block: 'center' });
-                alert('Choose a 24, 36, or 48 hour auction duration before publishing.');
+                revealBlockingStep('Choose a 24, 36, or 48 hour auction duration before publishing.', 'auctionDurationLabel');
                 return;
             }
 
             if (!document.getElementById('originalWorkConfirm').checked) {
                 document.getElementById('originalWorkError').style.display = 'block';
-                document.getElementById('beforePublishTitle').scrollIntoView({ behavior: 'auto', block: 'center' });
-                alert('Confirm that this is your original work before publishing.');
+                revealBlockingStep('Confirm that this is your original work before publishing.', 'originalWorkConfirm');
                 return;
             }
 
             const validationError = validateArtworkDetails({ title, description, price });
             if (validationError) {
-                alert(validationError);
+                revealBlockingStep(validationError);
                 return;
             }
 
             if (!updatePublishReadiness()) {
-                alert(document.getElementById('publishReadinessHint')?.textContent || 'Complete every required step before publishing.');
+                revealBlockingStep(
+                    document.getElementById('publishReadinessHint')?.textContent
+                    || 'Complete every required step before publishing.'
+                );
                 return;
             }
+
+            clearBlockingStep();
 
             const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
             if (!walletAddress) return;
@@ -1056,7 +1124,7 @@ let selectedFile = null;
                             auction_error_message: ''
                         });
                         await alert(`${mappedAuctionError.message}\n\nYou will now return to your profile. Do not submit the auction again while it is finalizing.`);
-                        navigateAfterPublish('profile.html');
+                        navigateAfterPublish('/profile');
                         return;
                     }
                     pendingArtwork = savePendingArtwork({
@@ -1071,19 +1139,19 @@ let selectedFile = null;
                     if (auctionCreated && !dbSynced) {
                         // Blockchain succeeded but database failed after retries
                         await alert('Auction created on blockchain but database sync failed.\n\nYour artwork is live on the blockchain!\nPlease go to your profile and the status will sync automatically.');
-                        navigateAfterPublish('profile.html');
+                        navigateAfterPublish('/profile');
                         return;
                     } else if (!auctionCreated) {
                         // Blockchain creation failed - artwork stays as draft
                         await alert(`Artwork registered - auction failed.\n\n${mappedAuctionError.message}\n\nYou can retry auction from your profile.`);
-                        navigateAfterPublish('profile.html');
+                        navigateAfterPublish('/profile');
                         return;
                     }
                 }
 
                 // Success - redirect to the new artwork detail page.
                 const chainId = window.getCurrentChainId?.() || window.ArtSoulContracts?.chainId || 84532;
-                navigateAfterPublish(`artwork.html?id=v41:${chainId}:${result.artworkId}`);
+                navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${chainId}:${result.artworkId}`));
 
             } catch (error) {
                 console.error('Publish failed:', error);
@@ -1117,6 +1185,7 @@ let selectedFile = null;
         }
 
         function bindUploadFlow() {
+            bindDescriptionCounter();
             ['artTitle', 'artDescription', 'artPrice'].forEach((id) => {
                 const field = document.getElementById(id);
                 field?.addEventListener('input', updatePublishReadiness);

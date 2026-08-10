@@ -2,6 +2,9 @@ import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../
 import { getModerationAccess } from '../../moderation-access.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
+// The active product chain. Ethereum Sepolia rows stay readable but are never
+// what a short, chainless public URL refers to.
+const CANONICAL_PUBLIC_CHAIN_ID = 84532;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const TABLES = [
@@ -596,7 +599,12 @@ function filterCards(cards, query) {
   let result = cards;
 
   if (id) {
-    result = result.filter(card => card.id === id || `${card.chain_id}:${card.artwork_id}` === id);
+    // A short public URL carries only the artwork number, so widen it to the
+    // composite the cards are keyed by before comparing.
+    const compositeId = /^\d{1,78}$/.test(id) ? `v41:${CANONICAL_PUBLIC_CHAIN_ID}:${id}` : id;
+    result = result.filter(card =>
+      card.id === compositeId || `${card.chain_id}:${card.artwork_id}` === compositeId
+    );
   }
 
   if (query.chain_id) {
@@ -640,6 +648,13 @@ function parseDirectLookup(query = {}) {
   const compositeMatch = rawId.match(/^v41:(84532|11155111):(\d{1,78})$/);
   if (compositeMatch) {
     return { chain: Number(compositeMatch[1]), artworkId: compositeMatch[2] };
+  }
+
+  // Short public URLs (/artwork/27) carry only the artwork number. A bare id
+  // always means the product chain; legacy Ethereum Sepolia rows keep the
+  // explicit composite so nothing here is ambiguous.
+  if (/^\d{1,78}$/.test(rawId)) {
+    return { chain: CANONICAL_PUBLIC_CHAIN_ID, artworkId: rawId };
   }
 
   const chain = chainId(query.chain_id);
@@ -877,11 +892,21 @@ function getDirectProjectionSnapshot(lookup) {
   const cached = directProjectionCache.get(key);
   if (cached && now - cached.createdAt < PROJECTION_CACHE_MS) return cached.promise;
 
-  const promise = buildDirectProjectionSnapshot(lookup);
-  directProjectionCache.set(key, { createdAt: now, promise });
-  promise.catch(() => {
-    if (directProjectionCache.get(key)?.promise === promise) directProjectionCache.delete(key);
+  const cacheEntry = { createdAt: now, promise: null };
+  const promise = buildDirectProjectionSnapshot(lookup).then(snapshot => {
+    // A just-published artwork can legitimately miss the projection for a few
+    // seconds. Share the in-flight read, but never retain that negative result
+    // for the full projection TTL or the exact-artwork page cannot recover.
+    if (snapshot?.cards?.length === 0 && directProjectionCache.get(key) === cacheEntry) {
+      directProjectionCache.delete(key);
+    }
+    return snapshot;
+  }, error => {
+    if (directProjectionCache.get(key) === cacheEntry) directProjectionCache.delete(key);
+    throw error;
   });
+  cacheEntry.promise = promise;
+  directProjectionCache.set(key, cacheEntry);
   if (directProjectionCache.size > 100) {
     directProjectionCache.delete(directProjectionCache.keys().next().value);
   }

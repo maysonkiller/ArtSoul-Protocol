@@ -296,6 +296,10 @@ const { useState, useEffect, useRef } = React;
             const [currentOwnerProfile, setCurrentOwnerProfile] = useState(null);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
+            const [projectionRetryCount, setProjectionRetryCount] = useState(0);
+            // A long description must not push the auction panel off the screen.
+            // Canon 11 keeps the primary content visible without scrolling.
+            const [descriptionExpanded, setDescriptionExpanded] = useState(false);
             const [bidAmount, setBidAmount] = useState('');
             const [bidActivity, setBidActivity] = useState([]);
             const [bidderProfiles, setBidderProfiles] = useState({});
@@ -362,10 +366,12 @@ const { useState, useEffect, useRef } = React;
             const reportTriggerRef = useRef(null);
             const [transactionActions, setTransactionActions] = useState({});
 
+            const DESCRIPTION_CLAMP_CHARS = 320;
             const isClassic = theme === 'classic';
-            const artworkId = new URLSearchParams(window.location.search).get('id');
+            const artworkId = window.ArtSoulArtworkUrl.currentArtworkId();
             const v41CompositeId = parseV41CompositeArtworkId(artworkId);
             const isV41CompositeId = Boolean(v41CompositeId);
+            const descriptionOverflows = String(artwork?.description || '').length > DESCRIPTION_CLAMP_CHARS;
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
 
             function beginTransactionAction(action) {
@@ -882,7 +888,7 @@ const { useState, useEffect, useRef } = React;
                 return (
                     <div className="artwork-ownership-row flex w-full items-center gap-3">
                         <a
-                            href={`profile.html?address=${encodeURIComponent(address)}`}
+                            href={`/profile?address=${encodeURIComponent(address)}`}
                             className={`artwork-ownership-profile flex w-full items-center gap-3 flex-1 min-w-0 p-3 rounded-lg transition-all ${
                                 isClassic ? 'hover:bg-gray-700/50' : 'hover:bg-cyan-900/30'
                             }`}
@@ -1234,7 +1240,7 @@ const { useState, useEffect, useRef } = React;
                 return (
                     <span className="provenance-event-role">
                         {role}:{' '}
-                        <a href={`profile.html?address=${encodeURIComponent(address)}`}>
+                        <a href={`/profile?address=${encodeURIComponent(address)}`}>
                             {window.ArtSoulDB?.shortWalletAddress?.(address) || `${address.slice(0, 6)}...${address.slice(-4)}`}
                         </a>
                     </span>
@@ -1655,6 +1661,43 @@ const { useState, useEffect, useRef } = React;
                 }
             }, [artworkId]);
 
+            // A projection usually lands well inside the first second, so the early
+            // checks are cheap and fast and only then widen out. A flat interval made
+            // every recovery wait the full step even when the row was already there.
+            const PROJECTION_RETRY_DELAYS_MS = [400, 800, 1500, 2500, 3000, 3000, 3000, 3000];
+
+            useEffect(() => {
+                if (error?.code !== 'V41_ARTWORK_NOT_INDEXED' || !isV41CompositeId || projectionRetryCount >= PROJECTION_RETRY_DELAYS_MS.length) {
+                    return undefined;
+                }
+
+                let retryTimer = null;
+                let cancelled = false;
+                const retry = () => {
+                    retryTimer = setTimeout(async () => {
+                        if (cancelled) return;
+                        const recovered = await loadArtwork();
+                        if (!cancelled && !recovered) {
+                            setProjectionRetryCount(current => current + 1);
+                        }
+                    }, PROJECTION_RETRY_DELAYS_MS[projectionRetryCount] ?? 3000);
+                };
+                const onVisibilityChange = () => {
+                    if (document.visibilityState !== 'visible') return;
+                    document.removeEventListener('visibilitychange', onVisibilityChange);
+                    retry();
+                };
+
+                if (document.visibilityState === 'visible') retry();
+                else document.addEventListener('visibilitychange', onVisibilityChange);
+
+                return () => {
+                    cancelled = true;
+                    if (retryTimer) clearTimeout(retryTimer);
+                    document.removeEventListener('visibilitychange', onVisibilityChange);
+                };
+            }, [artworkId, error?.code, isV41CompositeId, projectionRetryCount]);
+
             useEffect(() => {
                 if (auction && !isAuctionClosedForBidding(auction)) {
                     updateTimeLeft();
@@ -1714,6 +1757,8 @@ const { useState, useEffect, useRef } = React;
                     // Load from Supabase
                     const data = await window.ArtSoulDB.getArtwork(artworkId);
                     console.log('[Artwork] Loaded data:', data);
+                    setError(null);
+                    setProjectionRetryCount(0);
                     setArtwork(data);
                     setNewAuctionPrice(current => current || String(firstDefined(
                         data.start_price,
@@ -1868,6 +1913,7 @@ const { useState, useEffect, useRef } = React;
                     ]);
 
                     setLoading(false);
+                    return true;
                 } catch (error) {
                     console.error('Error loading artwork:', error);
                     if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
@@ -1879,6 +1925,7 @@ const { useState, useEffect, useRef } = React;
                         setError(error.message || 'Failed to load artwork. The artwork may not exist or there was a database error.');
                     }
                     setLoading(false);
+                    return false;
                 }
             }
 
@@ -2121,7 +2168,7 @@ const { useState, useEffect, useRef } = React;
                     console.log('New auction transaction:', txHash);
 
                     await alert('New auction created successfully. Public auction data will update shortly.');
-                    window.location.assign('gallery.html#auctions');
+                    window.location.assign('/gallery#auctions');
                 } catch (error) {
                     console.error('Create new auction failed:', error);
                     const message = getTransactionErrorMessage(error, 'The new auction could not be created. Please try again.');
@@ -2599,22 +2646,18 @@ const { useState, useEffect, useRef } = React;
 
             if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
                 return (
-                    <div className="min-h-screen">
-                        <main className="min-h-[60vh] flex items-center justify-center">
-                            <div className="text-center max-w-lg mx-auto px-4">
-                                <div className="text-2xl mb-4">Waiting for indexer projection</div>
-                                <div className="text-base mb-4 opacity-75">
-                                    This artwork was submitted on-chain or is pending locally, but the public V4.1 projection has not indexed it yet.
+                    <div className="artsoul-wait-screen">
+                        <main className="artsoul-wait-stage">
+                            <div className="artsoul-wait" role="status" aria-live="polite" aria-busy="true">
+                                <div className="artsoul-wait-mark">
+                                    <span className="artsoul-wait-word">ArtSoul</span>
+                                    <span className="artsoul-wait-dots" aria-hidden="true">
+                                        <span className="artsoul-wait-dot"></span>
+                                        <span className="artsoul-wait-dot"></span>
+                                        <span className="artsoul-wait-dot"></span>
+                                    </span>
                                 </div>
-                                <div className={`rounded-lg p-3 mb-6 break-all text-sm ${
-                                    isClassic ? 'bg-gray-800 text-gray-300' : 'bg-cyan-900/20 border border-cyan-500/30 text-cyan-200'
-                                }`}>
-                                    {error.artworkId || artworkId}
-                                </div>
-                                <div className="flex gap-4 justify-center">
-                                    <a href="profile.html" className="btn-secondary">Back to profile</a>
-                                    <a href="gallery.html" className="btn-main">Explore Art</a>
-                                </div>
+                                <span className="sr-only">Loading artwork {error.artworkId || artworkId}</span>
                             </div>
                         </main>
                     </div>
@@ -2629,7 +2672,7 @@ const { useState, useEffect, useRef } = React;
                                 <div className="text-2xl mb-4 text-red-400">Error Loading Artwork</div>
                                 <div className="text-base mb-6 opacity-75">{error}</div>
                                 <div className="flex gap-4 justify-center">
-                                    <a href="gallery.html" className="btn-main">Explore Art</a>
+                                    <a href="/gallery" className="btn-main">Explore Art</a>
                                     <button onClick={() => window.location.reload()} className="btn-secondary">Retry</button>
                                 </div>
                             </div>
@@ -2644,7 +2687,7 @@ const { useState, useEffect, useRef } = React;
                         <main className="min-h-[60vh] flex items-center justify-center">
                             <div className="text-center">
                                 <div className="text-2xl mb-4">Artwork not found</div>
-                                <a href="gallery.html" className="btn-main">Explore Art</a>
+                                <a href="/gallery" className="btn-main">Explore Art</a>
                             </div>
                         </main>
                     </div>
@@ -3164,9 +3207,19 @@ const { useState, useEffect, useRef } = React;
                                     <header className="artwork-page-header">
                                         <h1 className="artwork-detail-title">{artwork.title}</h1>
                                     </header>
-                                    <div className="artwork-page-description">
+                                    <div className={`artwork-page-description${descriptionOverflows && !descriptionExpanded ? ' is-clamped' : ''}`}>
                                         <h2>Description</h2>
                                         <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
+                                        {descriptionOverflows && (
+                                            <button
+                                                type="button"
+                                                className="artwork-description-toggle"
+                                                aria-expanded={descriptionExpanded}
+                                                onClick={() => setDescriptionExpanded(current => !current)}
+                                            >
+                                                {descriptionExpanded ? 'Show less' : 'Show more'}
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="artwork-page-extra">
                                         <h2>Artwork details</h2>
@@ -3617,7 +3670,7 @@ const { useState, useEffect, useRef } = React;
                                                             >
                                                                 <div className="bid-activity-identity">
                                                                     <a
-                                                                        href={`profile.html?address=${encodeURIComponent(bid.bidder)}`}
+                                                                        href={`/profile?address=${encodeURIComponent(bid.bidder)}`}
                                                                         className="bidder-profile-link min-w-0 truncate font-semibold"
                                                                     >
                                                                         {getBidderDisplayName(bid.bidder)}

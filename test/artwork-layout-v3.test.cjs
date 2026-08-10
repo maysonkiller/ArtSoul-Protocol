@@ -22,7 +22,7 @@ test('auction keeps one status and exposes each existing state action', () => {
 });
 
 test('profile identities and live bids are linked, named, timed, and newest first', () => {
-    assert.match(source, /href=\{`profile\.html\?address=\$\{encodeURIComponent\(address\)\}`\}/);
+    assert.match(source, /href=\{`\/profile\?address=\$\{encodeURIComponent\(address\)\}`\}/);
     assert.match(source, /getProfileDisplayName/);
     assert.match(source, /label: 'Highest Bidder'/);
     assert.match(source, /label: 'First Collector'/);
@@ -57,7 +57,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=42/);
+    assert.match(html, /unified-styles\.css\?v=43/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -89,10 +89,12 @@ test('header keeps a top-right avatar button during wallet initialization', () =
     assert.match(html, /class="avatar-button"/);
     assert.match(html, /src="\/default-avatar\.png"/);
     assert.match(html, /data-avatar-name>ArtSoul Guest<\/div>/);
-    assert.match(styles, /\.site-header-row \{[\s\S]*?grid-template-columns: 172px minmax\(0, 1fr\) 172px;/);
+    // Side columns stay equal so the centre column remains centred; they track
+    // the account button (180px) plus its 8px gutter.
+    assert.match(styles, /\.site-header-row \{[\s\S]*?grid-template-columns: 188px minmax\(0, 1fr\) 188px;/);
     assert.match(styles, /\.site-header-actions \{[\s\S]*?justify-content: flex-end;/);
     assert.match(styles, /\.site-header \.site-logo,[\s\S]*?width: 56px !important;[\s\S]*?height: 56px !important;/);
-    assert.match(styles, /\.site-header #navButtons,[\s\S]*?width: 164px !important;[\s\S]*?height: 42px !important;/);
+    assert.match(styles, /\.site-header #navButtons,[\s\S]*?width: 180px !important;[\s\S]*?height: 42px !important;/);
     assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons,[\s\S]*?width: 48px !important;[\s\S]*?height: 44px !important;/);
 });
 

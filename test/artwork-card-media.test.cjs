@@ -9,6 +9,12 @@ const window = {
     ArtSoulSecurity: { isValidStorageUrl: () => true },
     addEventListener: () => {}
 };
+// The page loads the artwork URL owner before the card script; the harness
+// must do the same or the card builds a different URL shape than the product.
+vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'artwork-url.js'), 'utf8'),
+    { window, document: {} }
+);
 vm.runInNewContext(source, { window, document: {} });
 const { mediaType, mediaUrl, posterUrl, mediaDescriptor } = window.ArtSoulArtworkCard;
 

@@ -193,7 +193,7 @@ Classic and Future themes are strictly separated.
 - Theme colors live in `unified-styles.css` variables.
 - Future colors never appear in Classic.
 - Classic colors never appear in Future.
-- Classic is static.
+- Classic may use animation, but only in its own colors (Amended 2026-08-10; supersedes "Classic is static"). Animation in Classic stays functional — loading and progress feedback — and never adopts Future's glow or neon treatment.
 - Future can use motion and glow.
 - Mobile and desktop may differ in layout only, not color semantics.
 
