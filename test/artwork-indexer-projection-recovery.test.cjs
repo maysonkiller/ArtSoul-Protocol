@@ -72,3 +72,22 @@ test('the pending screen is the branded wait indicator, not raw theme hex', () =
   assert.doesNotMatch(pending, /bg-(gray|cyan)-\d/);
   assert.doesNotMatch(pending, /text-(gray|cyan)-\d/);
 });
+
+test('the page waits for the db-ready event instead of polling for it', () => {
+  // supabase-client.js announces 'artsoul:db-ready' once, after the complete
+  // window.ArtSoulDB API is assigned. Polling for the same global cost up to
+  // 5s of dead time before the artwork was even requested, and abandoned the
+  // load entirely if the module was merely slow.
+  assert.doesNotMatch(artwork, /while \(!window\.ArtSoulDB/);
+  assert.doesNotMatch(artwork, /ArtSoulDB not loaded after 5 seconds/);
+
+  assert.match(artwork, /addEventListener\('artsoul:db-ready', onReady, \{ once: true \}\)/);
+  assert.match(artwork, /removeEventListener\('artsoul:db-ready', onReady\)/);
+
+  // A listener alone would hang when the event already fired during boot.
+  const effect = artwork.slice(
+    artwork.indexOf('if (!artworkId || artwork) return undefined;'),
+    artwork.indexOf('}, [artworkId]);')
+  );
+  assert.match(effect, /if \(window\.ArtSoulDB\) \{\s*loadArtwork\(\);/);
+});
