@@ -3,6 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "cleanUrls": true,
+  "trailingSlash": false,
   "headers": [
     {
       "source": "/(.*)",
@@ -40,7 +41,7 @@
       ]
     },
     {
-      "source": "/(gallery|artwork|profile|upload|admin|docs-protocol|wallet-test|visual-lab|generate-favicon)",
+      "source": "/(gallery|artwork|profile|upload|admin|docs-protocol|wallet-test|visual-lab|generate-favicon)(/.*)?",
       "headers": [
         {
           "key": "Cache-Control",
@@ -67,6 +68,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/artwork/:id",
+      "destination": "/artwork?id=:id"
+    },
     {
       "source": "/api/auth/:route*",
       "destination": "/api/[...route]?route=auth/:route*"
