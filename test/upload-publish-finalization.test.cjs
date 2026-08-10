@@ -155,3 +155,33 @@ test('internal redirects release the native beforeunload guard first', () => {
   // through navigateAfterPublish so the unload guard is released first.
   assert.match(source, /navigateAfterPublish\(window\.ArtSoulArtworkUrl\.artworkPath\(/);
 });
+
+test('Publish stays clickable and explains what is blocking it', () => {
+  // A disabled submit swallows the click, so the person gets no answer at all.
+  assert.match(source, /button\.disabled = uploading;/);
+  assert.doesNotMatch(source, /button\.disabled = !ready;/);
+  assert.match(source, /setAttribute\('aria-disabled'/);
+
+  const reveal = extractFunction('revealBlockingStep');
+  assert.match(reveal, /scrollIntoView/);
+  assert.match(reveal, /\.focus\(/);
+  // Requesting AI guidance costs a wallet signature: never trigger it for them.
+  assert.doesNotMatch(reveal, /\.click\(\)/);
+
+  const handler = extractFunction('handleUpload');
+  assert.match(handler, /revealBlockingStep\(validationError\)/);
+  // Only the form steps are covered: a wrong network is an environment problem,
+  // not a control on this page, and keeps its own modal warning.
+  const formSteps = handler.slice(0, handler.indexOf('const walletAddress ='));
+  assert.doesNotMatch(formSteps, /alert\(/);
+});
+
+test('the artwork description has a bounded length', () => {
+  assert.match(source, /const MAX_ARTWORK_DESCRIPTION_LENGTH = 1000;/);
+  assert.match(source, /Keep the description under \$\{MAX_ARTWORK_DESCRIPTION_LENGTH\} characters/);
+
+  const html = fs.readFileSync(path.join(__dirname, '..', 'upload.html'), 'utf8');
+  assert.match(html, /id="artDescription"[^>]*maxlength="1000"/);
+  assert.match(html, /id="artDescriptionCount"/);
+  assert.match(html, /id="publishBlockedNote"[^>]*role="alert"/);
+});
