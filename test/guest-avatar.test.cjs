@@ -122,7 +122,10 @@ test('every product page loads the same account menu and stylesheet versions', (
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=43/, `${page} must use the shared stylesheet cache version`);
     assert.match(html, /avatar-dropdown\.js\?v=45/, `${page} must use the shared menu cache version`);
-    assert.match(html, /window\.AvatarDropdown\?\.renderInitializingState\(\);/, `${page} must hydrate the cached header before main content`);
+    // Hydration moved into avatar-dropdown.js so the script can be deferred:
+    // an inline call cannot see a deferred script. The page's obligation is now
+    // to load the module, and the module hydrates itself.
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=45" defer><\/script>/, `${page} must load the deferred account menu`);
   }
 });
 

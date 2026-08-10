@@ -34,11 +34,11 @@
     <link rel="stylesheet" href="/unified-styles.css?v=43">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
-    <script src="/src/ui/theme-manager.js"></script>
-    <script src="/modal-system.js"></script>
+    <script src="/src/ui/theme-manager.js" defer></script>
+    <script src="/modal-system.js" defer></script>
     <script type="module" src="/supabase-client.js"></script>
     <script type="module" src="/supabase-auth.js?v=2"></script>
-    <script src="/avatar-dropdown.js?v=45"></script>
+    <script src="/avatar-dropdown.js?v=45" defer></script>
     <script type="module" src="/appkit-init.js?v=52"></script>
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
 </head>
@@ -67,7 +67,6 @@
             </div>
         </div>
     </header>
-    <script>window.AvatarDropdown?.renderInitializingState();</script>
 
     <div id="app"></div>
     <script type="module" src="/src/entries/docs-protocol.jsx"></script>

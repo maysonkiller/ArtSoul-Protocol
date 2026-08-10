@@ -234,3 +234,22 @@ test('Tailwind ships as a compiled stylesheet, never the runtime CDN', () => {
   assert.match(pkg.scripts.build, /build:css/);
   assert.match(pkg.scripts.build, /verify:tailwind/);
 });
+
+test('no page blocks first paint on a head script', () => {
+  // 18 classic scripts executed serially in <head> before anything painted.
+  // Classic defer preserves relative execution order, so the chain still runs
+  // in document order - it just stops holding up the first paint.
+  const pages = ['index.html', 'gallery.html', 'artwork.html', 'profile.html',
+                 'upload.html', 'admin.html', 'docs-protocol.html'];
+
+  for (const page of pages) {
+    const html = read(page);
+    const head = html.slice(0, html.indexOf('</head>'));
+    const blocking = [...head.matchAll(/<script([^>]*\bsrc="[^"]+"[^>]*)>/g)]
+      .map(match => match[1])
+      .filter(attrs => !/type="module"| defer| async/.test(attrs))
+      .map(attrs => attrs.match(/src="([^"]+)"/)[1]);
+
+    assert.deepEqual(blocking, [], `${page} must not block first paint on a head script`);
+  }
+});
