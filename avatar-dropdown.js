@@ -2054,5 +2054,15 @@
     // unified-styles.css owns the component from first paint so hydration
     // cannot introduce a second set of visual rules.
 
+    // Paint the pre-settle shell as soon as the module is available. Each page
+    // used to do this with an inline call right after the header markup, which
+    // is what kept this script render-blocking: an inline call cannot see a
+    // deferred script. Owning it here lets every page defer the whole chain.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => window.AvatarDropdown.renderInitializingState(), { once: true });
+    } else {
+        window.AvatarDropdown.renderInitializingState();
+    }
+
     console.log('📦 Avatar Dropdown module loaded');
 })();

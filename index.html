@@ -45,13 +45,13 @@
     <link rel="stylesheet" href="/ai-ui-styles.css?v=1">
     <link rel="stylesheet" href="/simplified-ui.css?v=1">
     <link rel="stylesheet" href="/ui-core.css">
-    <script src="/src/ui/theme-manager.js"></script>
+    <script src="/src/ui/theme-manager.js" defer></script>
     <script defer src="/src/ui/themed-selects.js?v=1"></script>
     <script defer src="/src/ui/theme-validator.js"></script>
-    <script src="/src/ui/navigation-manager.js?v=5"></script>
+    <script src="/src/ui/navigation-manager.js?v=5" defer></script>
     <script defer src="/src/ui/system-logger.js"></script>
     <script defer src="/src/ui/log-viewer-ui.js"></script>
-    <script src="/src/ui/admin-control-panel.js"></script>
+    <script src="/src/ui/admin-control-panel.js" defer></script>
     <script defer src="/src/ui/status-banner-system.js"></script>
     <script>
         // Initialize UI systems after page load
@@ -72,10 +72,10 @@
             }
         });
     </script>
-    <script src="/modal-system.js"></script>
-    <script src="/src/features/discovery/discovery-service.js?v=1"></script>
-    <script src="/src/ui/artwork-url.js?v=1"></script>
-    <script src="/src/ui/components/artwork-card.js?v=11"></script>
+    <script src="/modal-system.js" defer></script>
+    <script src="/src/features/discovery/discovery-service.js?v=1" defer></script>
+    <script src="/src/ui/artwork-url.js?v=1" defer></script>
+    <script src="/src/ui/components/artwork-card.js?v=11" defer></script>
     <style>
         @keyframes spin {
             from { transform: rotate(0deg); }
@@ -223,8 +223,8 @@
             }
         }
     </style>
-    <script src="/avatar-dropdown.js?v=45"></script>
-    <script src="/contracts-config.js?v=1"></script>
+    <script src="/avatar-dropdown.js?v=45" defer></script>
+    <script src="/contracts-config.js?v=1" defer></script>
     <script type="module" src="/contracts-integration.js?v=7"></script>
     <script type="module" src="/appkit-init.js?v=52"></script>
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
@@ -255,7 +255,6 @@
             </div>
         </div>
     </header>
-    <script>window.AvatarDropdown?.renderInitializingState();</script>
 
     <!-- Morph Backdrop -->
     <div id="morphBackdrop" class="morph-backdrop"></div>

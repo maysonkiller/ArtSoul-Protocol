@@ -535,22 +535,26 @@ test('every shared-header page boots the header in the same order with the same 
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
     assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=43">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=45"><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=45" defer><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=43');
     const component = html.indexOf('avatar-dropdown.js?v=45');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
-    const hydration = html.indexOf('window.AvatarDropdown?.renderInitializingState();');
 
-    // The stylesheet must be render-blocking before the shell exists, the
-    // component must be a synchronous head script that runs before the shell is
-    // parsed, and hydration must run immediately after the shell — otherwise a
-    // page can paint an identity the others never show.
+    // The stylesheet stays render-blocking so the shell is styled on first
+    // paint, and the boot scripts keep their relative order: deferred classic
+    // scripts execute in document order, so position still decides sequence.
     assert.ok(stylesheet < component, `${page}: the stylesheet must load before the component`);
     assert.ok(component < appkit, `${page}: the component must run before appkit-init`);
     assert.ok(appkit < shell, `${page}: the boot scripts must precede the header shell`);
-    assert.ok(shell < hydration, `${page}: hydration must follow the static shell`);
+
+    // Hydration used to be an inline call placed after the shell. That is what
+    // forced the script to stay render-blocking, because an inline call cannot
+    // see a deferred script. The module now hydrates itself, and defer already
+    // guarantees it runs after the document — including the shell — is parsed.
+    assert.doesNotMatch(html, /window\.AvatarDropdown\?\.renderInitializingState\(\)/,
+      `${page} must not hydrate the header from an inline script`);
   }
 });
 
@@ -1883,4 +1887,14 @@ test('every shared-header page and both themes keep one stable button geometry',
     assert.equal((html.match(/class="avatar-button"/g) || []).length, 1, `${page}: one account button`);
     assert.equal((html.match(/data-avatar-image/g) || []).length, 1, `${page}: one avatar image`);
   }
+});
+
+test('the account menu hydrates itself once the document is parsed', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'avatar-dropdown.js'), 'utf8');
+
+  // Deferred scripts normally run after parsing, but the same file is also
+  // loaded by pages that may already be interactive, so both states are
+  // covered rather than assuming one.
+  assert.match(source, /document\.readyState === 'loading'/);
+  assert.match(source, /addEventListener\('DOMContentLoaded', \(\) => window\.AvatarDropdown\.renderInitializingState\(\), \{ once: true \}\)/);
 });
