@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex,nofollow">
     <title>Wallet Connection Test</title>
-    <link rel="stylesheet" href="unified-styles.css?v=31">
+    <link rel="stylesheet" href="/unified-styles.css?v=31">
     <style>
         .wallet-test-page, .wallet-test-page * { box-sizing: border-box; }
         .wallet-test-page {
@@ -92,17 +92,17 @@
             <div id="walletTestStatus" class="wallet-test-status">Starting...</div>
         </section>
         <nav class="wallet-test-variants" aria-label="WalletConnect proposal variants">
-            <a class="wallet-test-variant" href="?walletdebug=1&amp;variant=single">A: Base Sepolia only</a>
-            <a class="wallet-test-variant" href="?walletdebug=1&amp;variant=multi">B: Sepolia + Base + Mainnet</a>
-            <a class="wallet-test-variant" href="?walletdebug=1&amp;layer=core">C: Core production path</a>
-            <a class="wallet-test-variant" href="?walletdebug=1&amp;layer=appkit-modal">D: Official AppKit modal</a>
-            <a class="wallet-test-variant wallet-test-variant-auth" href="?walletdebug=1&amp;layer=auth">E: SIWE + upload policy</a>
+            <a class="wallet-test-variant" href="/?walletdebug=1&amp;variant=single">A: Base Sepolia only</a>
+            <a class="wallet-test-variant" href="/?walletdebug=1&amp;variant=multi">B: Sepolia + Base + Mainnet</a>
+            <a class="wallet-test-variant" href="/?walletdebug=1&amp;layer=core">C: Core production path</a>
+            <a class="wallet-test-variant" href="/?walletdebug=1&amp;layer=appkit-modal">D: Official AppKit modal</a>
+            <a class="wallet-test-variant wallet-test-variant-auth" href="/?walletdebug=1&amp;layer=auth">E: SIWE + upload policy</a>
         </nav>
         <button id="walletTestConnect" class="wallet-test-action" type="button">Connect with bare AppKit</button>
         <button id="walletTestDisconnect" class="wallet-test-action" type="button" hidden>Disconnect diagnostic session</button>
         <button id="walletTestCopy" class="wallet-test-action" type="button">Copy complete log</button>
         <pre id="walletTestLog" aria-live="polite"></pre>
     </main>
-    <script type="module" src="wallet-test.js?v=18"></script>
+    <script type="module" src="/wallet-test.js?v=18"></script>
 </body>
 </html>
