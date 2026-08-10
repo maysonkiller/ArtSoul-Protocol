@@ -119,37 +119,47 @@ body.future .artsoul-skeleton-card {
 
 /* Branded wait indicator.
    Shown while a freshly published artwork is still reaching the projection.
-   Animated in both themes; each theme keeps its own colors. */
+   Both themes animate; each keeps its own colors. The colour flow across the
+   wordmark is a Future treatment and never appears in Classic. */
+.artsoul-wait-screen {
+    min-height: 100vh;
+}
+
+.artsoul-wait-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Fill what is left under the header so the mark sits mid-screen. */
+    min-height: calc(100vh - var(--artsoul-header-height, 96px));
+    padding: 24px;
+}
+
 .artsoul-wait {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 18px;
-    text-align: center;
+    justify-content: center;
 }
 
 .artsoul-wait-mark {
     display: inline-flex;
-    align-items: baseline;
-    gap: 10px;
-    font-size: clamp(28px, 5vw, 46px);
+    align-items: center;
+    gap: 14px;
+    font-size: clamp(40px, 8vw, 84px);
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
+    line-height: 1;
     color: var(--c-text);
-}
-
-body.future .artsoul-wait-mark {
-    text-shadow: 0 0 18px var(--c-glow);
 }
 
 .artsoul-wait-dots {
     display: inline-flex;
-    gap: 7px;
+    align-items: center;
+    gap: 10px;
 }
 
 .artsoul-wait-dot {
-    width: 9px;
-    height: 9px;
+    width: 0.16em;
+    height: 0.16em;
     border-radius: 50%;
     background: var(--c-accent);
     animation: artsoulWaitDot 1.25s ease-in-out infinite;
@@ -158,35 +168,55 @@ body.future .artsoul-wait-mark {
 .artsoul-wait-dot:nth-child(2) { animation-delay: 0.16s; }
 .artsoul-wait-dot:nth-child(3) { animation-delay: 0.32s; }
 
+/* Future only: the wordmark flows through the neon accents. */
+body.future .artsoul-wait-word {
+    background-image: linear-gradient(
+        100deg,
+        var(--c-accent) 0%,
+        var(--c-accent-2) 30%,
+        var(--c-accent-3) 55%,
+        var(--c-accent) 85%
+    );
+    background-size: 260% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: artsoulWaitFlow 4s linear infinite;
+}
+
 body.future .artsoul-wait-dot {
-    box-shadow: 0 0 10px var(--c-glow-strong);
-}
-
-.artsoul-wait-copy {
-    max-width: 40ch;
-    color: var(--c-text-muted);
-}
-
-.artsoul-wait-id {
-    padding: 10px 14px;
-    border: 1px solid var(--c-border-soft);
-    border-radius: 10px;
-    background: var(--c-surface-muted);
-    color: var(--c-text-muted);
-    font-size: 13px;
-    word-break: break-all;
+    box-shadow: 0 0 12px var(--c-glow-strong);
 }
 
 @keyframes artsoulWaitDot {
     0%, 100% { opacity: 0.25; transform: translateY(0); }
-    50% { opacity: 1; transform: translateY(-5px); }
+    50% { opacity: 1; transform: translateY(-0.12em); }
+}
+
+@keyframes artsoulWaitFlow {
+    to { background-position: -260% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .artsoul-wait-dot {
+    .artsoul-wait-dot,
+    body.future .artsoul-wait-word {
         animation: none !important;
-        opacity: 0.7;
     }
+
+    .artsoul-wait-dot { opacity: 0.7; }
+}
+
+/* Available to assistive technology, never painted. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 @media (max-width: 768px), (prefers-reduced-motion: reduce) {

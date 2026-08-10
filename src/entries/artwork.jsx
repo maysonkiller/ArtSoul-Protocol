@@ -2641,36 +2641,18 @@ const { useState, useEffect, useRef } = React;
 
             if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
                 return (
-                    <div className="min-h-screen">
-                        <main className="min-h-[60vh] flex items-center justify-center">
-                            <div className="artsoul-wait max-w-lg mx-auto px-4" role="status" aria-live="polite" aria-busy="true">
+                    <div className="artsoul-wait-screen">
+                        <main className="artsoul-wait-stage">
+                            <div className="artsoul-wait" role="status" aria-live="polite" aria-busy="true">
                                 <div className="artsoul-wait-mark">
-                                    <span>ArtSoul</span>
+                                    <span className="artsoul-wait-word">ArtSoul</span>
                                     <span className="artsoul-wait-dots" aria-hidden="true">
                                         <span className="artsoul-wait-dot"></span>
                                         <span className="artsoul-wait-dot"></span>
                                         <span className="artsoul-wait-dot"></span>
                                     </span>
                                 </div>
-                                <div className="artsoul-wait-copy">
-                                    Your artwork was submitted and is almost ready. This page updates on its own.
-                                </div>
-                                <div className="artsoul-wait-id">
-                                    {error.artworkId || artworkId}
-                                </div>
-                                <div className="flex gap-4 justify-center">
-                                    <button
-                                        type="button"
-                                        className="btn-secondary"
-                                        onClick={() => {
-                                            setProjectionRetryCount(0);
-                                            loadArtwork();
-                                        }}
-                                    >
-                                        Refresh now
-                                    </button>
-                                    <a href="/gallery" className="btn-main">Explore Art</a>
-                                </div>
+                                <span className="sr-only">Loading artwork {error.artworkId || artworkId}</span>
                             </div>
                         </main>
                     </div>
