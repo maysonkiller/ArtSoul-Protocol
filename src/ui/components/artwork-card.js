@@ -362,7 +362,9 @@
                 ? `v41:${artwork.chain_id || artwork.chainId}:${artwork.artwork_id || artwork.artworkId || artwork.blockchain_id}`
                 : '');
         const id = canonical || artwork.id || '';
-        return id ? `/artwork?id=${encodeURIComponent(id)}` : '';
+        if (!id) return '';
+        // Shared with the module build; the query form stays valid if it is not up yet.
+        return window.ArtSoulArtworkUrl?.artworkPath?.(id) || `/artwork?id=${encodeURIComponent(id)}`;
     }
 
     function prepareVideoPreview(video, artwork = {}, options = {}) {

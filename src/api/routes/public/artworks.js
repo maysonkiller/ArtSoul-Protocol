@@ -2,6 +2,9 @@ import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../
 import { getModerationAccess } from '../../moderation-access.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
+// The active product chain. Ethereum Sepolia rows stay readable but are never
+// what a short, chainless public URL refers to.
+const CANONICAL_PUBLIC_CHAIN_ID = 84532;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const TABLES = [
@@ -640,6 +643,13 @@ function parseDirectLookup(query = {}) {
   const compositeMatch = rawId.match(/^v41:(84532|11155111):(\d{1,78})$/);
   if (compositeMatch) {
     return { chain: Number(compositeMatch[1]), artworkId: compositeMatch[2] };
+  }
+
+  // Short public URLs (/artwork/27) carry only the artwork number. A bare id
+  // always means the product chain; legacy Ethereum Sepolia rows keep the
+  // explicit composite so nothing here is ambiguous.
+  if (/^\d{1,78}$/.test(rawId)) {
+    return { chain: CANONICAL_PUBLIC_CHAIN_ID, artworkId: rawId };
   }
 
   const chain = chainId(query.chain_id);
