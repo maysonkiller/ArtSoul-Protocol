@@ -127,3 +127,22 @@ test('the public artworks route resolves a short artwork id', async () => {
     'the card filter must compare against the widened composite id'
   );
 });
+
+test('a page served at a subpath must not use relative asset references', () => {
+  // /artwork/<id> is served by rewrite, so the browser resolves relative
+  // references against /artwork/ and requests files that do not exist there.
+  // Every same-origin reference on this page has to be root-absolute.
+  const relative = /\s(?:src|href)="(?!\/|https?:\/\/|data:|#|mailto:)([^"]+)"/g;
+
+  for (const file of ['artwork.html', 'dist/artwork.html']) {
+    let source;
+    try {
+      source = read(file);
+    } catch {
+      continue; // dist only exists after a build
+    }
+
+    const offenders = [...source.matchAll(relative)].map(match => match[1]);
+    assert.deepEqual(offenders, [], `${file} must not reference assets relatively`);
+  }
+});

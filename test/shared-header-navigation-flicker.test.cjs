@@ -532,8 +532,10 @@ test('every shared-header page ships one identical static boot shell', () => {
 test('every shared-header page boots the header in the same order with the same asset pins', () => {
   for (const page of SHARED_HEADER_PAGES) {
     const html = readPage(page);
-    assert.match(html, /<link rel="stylesheet" href="unified-styles\.css\?v=43">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="avatar-dropdown\.js\?v=45"><\/script>/, `${page} component pin`);
+    // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
+    // same assets as one served at the root.
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=43">/, `${page} stylesheet pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=45"><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=43');
     const component = html.indexOf('avatar-dropdown.js?v=45');
