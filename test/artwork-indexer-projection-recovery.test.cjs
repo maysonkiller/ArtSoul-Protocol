@@ -38,8 +38,24 @@ test('a successful retry clears the pending projection state', () => {
 
   assert.match(success, /setError\(null\)/);
   assert.match(success, /setProjectionRetryCount\(0\)/);
-  assert.match(artwork, />\s*Refresh now\s*</);
   assert.doesNotMatch(artwork, /public V4\.1 projection/);
+});
+
+test('the pending screen shows the wordmark and nothing else', () => {
+  const pending = artwork.slice(
+    artwork.indexOf("error?.code === 'V41_ARTWORK_NOT_INDEXED'"),
+    artwork.indexOf('if (error) {', artwork.indexOf("error?.code === 'V41_ARTWORK_NOT_INDEXED'"))
+  );
+
+  // The wait state is the ArtSoul mark centred on the screen. Explanatory copy,
+  // the raw id chip and the escape buttons were noise on a screen that resolves
+  // itself in under a second.
+  assert.match(pending, /artsoul-wait-word/);
+  assert.doesNotMatch(pending, /Refresh now|Explore Art/);
+  assert.doesNotMatch(pending, /artsoul-wait-copy|artsoul-wait-id/);
+
+  // The id still has to reach assistive technology.
+  assert.match(pending, /className="sr-only">Loading artwork/);
 });
 
 test('the pending screen is the branded wait indicator, not raw theme hex', () => {
