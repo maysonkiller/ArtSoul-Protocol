@@ -599,7 +599,12 @@ function filterCards(cards, query) {
   let result = cards;
 
   if (id) {
-    result = result.filter(card => card.id === id || `${card.chain_id}:${card.artwork_id}` === id);
+    // A short public URL carries only the artwork number, so widen it to the
+    // composite the cards are keyed by before comparing.
+    const compositeId = /^\d{1,78}$/.test(id) ? `v41:${CANONICAL_PUBLIC_CHAIN_ID}:${id}` : id;
+    result = result.filter(card =>
+      card.id === compositeId || `${card.chain_id}:${card.artwork_id}` === compositeId
+    );
   }
 
   if (query.chain_id) {
