@@ -1,6 +1,6 @@
 # ArtSoul Durable Backlog
 
-Updated: 2026-07-20
+Updated: 2026-08-10
 Canonical phase model: `A-D` from [`docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`](canon/ARTSOUL_CANON_BIBLE_FULL.md) section 17.
 
 This is the repository's durable work register. It consolidates verified completed work, open implementation work, founder-owned inputs, and code-level follow-ups so that ideas do not remain authoritative only in chat sessions or external prompt files.
@@ -123,6 +123,8 @@ This consolidation audited the repository through `main` commit `ab0b1d7`, [`PRO
 | C-23 | Complete legal, privacy, IP and operational readiness | Canon [C14](canon/12_IMPLEMENTATION_BACKLOG.md) | blocked-on-founder | C | Counsel/founder-owned inputs; engineering may implement approved technical requirements only after decisions exist. |
 | C-24 | Perform the final premium visual/accessibility pass | Canon [C15](canon/12_IMPLEMENTATION_BACKLOG.md) | planned | C | Homepage, cards, artwork, aura, responsive and accessibility polish occurs after functionality is stable. |
 | C-25 | Approve a funded mainnet launch and operating envelope | Canon [C14/D3](canon/12_IMPLEMENTATION_BACKLOG.md); [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md) | blocked-on-founder | C | Before launch approval, current quotes and committed funds must cover independent review, domain/email, Safes/signers, rehearsal and mainnet gas, monitoring, backups, incident response, legal readiness, renewals, and a defined operating runway. Applications or expected grants are not committed funds. |
+| A-46 | Unblock first paint: defer the head script chain | Measured 2026-08-10; follows [#184](https://github.com/maysonkiller/ArtSoul-Protocol/pull/184) | planned | A | Every page loads 18 classic `<script src>` tags in `<head>`, executed serially before first paint. `defer` preserves relative order between classic scripts, so the chain itself is safe to defer as a unit - but deferred scripts run *after* inline scripts, and inline code on all seven pages depends on these globals: `AvatarDropdown` (index, gallery, artwork, profile, upload, admin, docs-protocol) and `ThemeManager` (index, which reads the stored theme before paint to avoid a light-theme flash). Deferring those two without moving their inline callers to an event breaks header init and reintroduces the theme flash. Approach: defer the scripts with no inline consumer first, then convert the `AvatarDropdown` and `ThemeManager` inline callers to run on an explicit ready event. Requires browser verification - a broken header does not fail the test suite. |
+| A-47 | Stop shipping the whole projection on first load | Measured 2026-08-10 | planned | A | `/api/public/artworks` returns every artwork in one response: 63 kB and ~1.4 s cold. The homepage `Live Base Sepolia proof` block and the gallery both wait on it. Add a bounded default page size and let the surfaces request more, without changing the projection contract. |
 
 ## Phase D - Staged Mainnet Launch
 
