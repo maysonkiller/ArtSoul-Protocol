@@ -297,9 +297,6 @@ const { useState, useEffect, useRef } = React;
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [projectionRetryCount, setProjectionRetryCount] = useState(0);
-            // A long description must not push the auction panel off the screen.
-            // Canon 11 keeps the primary content visible without scrolling.
-            const [descriptionExpanded, setDescriptionExpanded] = useState(false);
             const [bidAmount, setBidAmount] = useState('');
             const [bidActivity, setBidActivity] = useState([]);
             const [bidderProfiles, setBidderProfiles] = useState({});
@@ -366,12 +363,10 @@ const { useState, useEffect, useRef } = React;
             const reportTriggerRef = useRef(null);
             const [transactionActions, setTransactionActions] = useState({});
 
-            const DESCRIPTION_CLAMP_CHARS = 320;
             const isClassic = theme === 'classic';
             const artworkId = window.ArtSoulArtworkUrl.currentArtworkId();
             const v41CompositeId = parseV41CompositeArtworkId(artworkId);
             const isV41CompositeId = Boolean(v41CompositeId);
-            const descriptionOverflows = String(artwork?.description || '').length > DESCRIPTION_CLAMP_CHARS;
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
 
             function beginTransactionAction(action) {
@@ -1642,23 +1637,21 @@ const { useState, useEffect, useRef } = React;
             }
 
             useEffect(() => {
-                if (artworkId && !artwork) {
-                    // Wait for ArtSoulDB to be ready
-                    const checkAndLoad = async () => {
-                        let attempts = 0;
-                        while (!window.ArtSoulDB && attempts < 50) {
-                            await new Promise(resolve => setTimeout(resolve, 100));
-                            attempts++;
-                        }
-                        if (window.ArtSoulDB) {
-                            loadArtwork();
-                        } else {
-                            console.error('ArtSoulDB not loaded after 5 seconds');
-                            setLoading(false);
-                        }
-                    };
-                    checkAndLoad();
+                if (!artworkId || artwork) return undefined;
+
+                // supabase-client.js announces 'artsoul:db-ready' exactly once,
+                // after the complete window.ArtSoulDB API is assigned. This used
+                // to poll for it every 100ms for up to 5 seconds, so the page sat
+                // idle for most of a tick that had already passed, and gave up
+                // entirely if the module was merely slow.
+                if (window.ArtSoulDB) {
+                    loadArtwork();
+                    return undefined;
                 }
+
+                const onReady = () => loadArtwork();
+                window.addEventListener('artsoul:db-ready', onReady, { once: true });
+                return () => window.removeEventListener('artsoul:db-ready', onReady);
             }, [artworkId]);
 
             // A projection usually lands well inside the first second, so the early
@@ -3207,19 +3200,9 @@ const { useState, useEffect, useRef } = React;
                                     <header className="artwork-page-header">
                                         <h1 className="artwork-detail-title">{artwork.title}</h1>
                                     </header>
-                                    <div className={`artwork-page-description${descriptionOverflows && !descriptionExpanded ? ' is-clamped' : ''}`}>
+                                    <div className="artwork-page-description">
                                         <h2>Description</h2>
                                         <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
-                                        {descriptionOverflows && (
-                                            <button
-                                                type="button"
-                                                className="artwork-description-toggle"
-                                                aria-expanded={descriptionExpanded}
-                                                onClick={() => setDescriptionExpanded(current => !current)}
-                                            >
-                                                {descriptionExpanded ? 'Show less' : 'Show more'}
-                                            </button>
-                                        )}
                                     </div>
                                     <div className="artwork-page-extra">
                                         <h2>Artwork details</h2>

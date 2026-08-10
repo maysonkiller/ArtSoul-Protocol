@@ -5788,30 +5788,18 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
     }
 }
 
-/* Long descriptions collapse so the auction panel stays on screen (canon 11). */
-.artwork-page-description.is-clamped .artwork-page-copy {
-    display: -webkit-box;
-    -webkit-line-clamp: 6;
-    line-clamp: 6;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.artwork-description-toggle {
-    margin-top: 8px;
-    padding: 0;
-    background: none;
-    border: 0;
-    color: var(--c-accent);
-    font: inherit;
-    font-size: 0.9em;
-    cursor: pointer;
-    text-decoration: underline;
-}
-
-.artwork-description-toggle:hover,
-.artwork-description-toggle:focus-visible {
-    color: var(--c-text);
+/* A long description scrolls inside its own panel, the same way the AI
+   guidance panel does, so it can never push the auction panel off screen
+   (canon 11) and the reader keeps the whole text without a second click. */
+.artwork-page-description .artwork-page-copy {
+    max-height: 9.5em;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 6px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--c-border) transparent;
 }
 
 /* Why Publish did not proceed, stated next to the step that is blocking it. */
