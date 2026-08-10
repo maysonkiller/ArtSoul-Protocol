@@ -117,6 +117,78 @@ body.future .artsoul-skeleton-card {
     to { background-position: -220% 0; }
 }
 
+/* Branded wait indicator.
+   Shown while a freshly published artwork is still reaching the projection.
+   Animated in both themes; each theme keeps its own colors. */
+.artsoul-wait {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    text-align: center;
+}
+
+.artsoul-wait-mark {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: clamp(28px, 5vw, 46px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--c-text);
+}
+
+body.future .artsoul-wait-mark {
+    text-shadow: 0 0 18px var(--c-glow);
+}
+
+.artsoul-wait-dots {
+    display: inline-flex;
+    gap: 7px;
+}
+
+.artsoul-wait-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--c-accent);
+    animation: artsoulWaitDot 1.25s ease-in-out infinite;
+}
+
+.artsoul-wait-dot:nth-child(2) { animation-delay: 0.16s; }
+.artsoul-wait-dot:nth-child(3) { animation-delay: 0.32s; }
+
+body.future .artsoul-wait-dot {
+    box-shadow: 0 0 10px var(--c-glow-strong);
+}
+
+.artsoul-wait-copy {
+    max-width: 40ch;
+    color: var(--c-text-muted);
+}
+
+.artsoul-wait-id {
+    padding: 10px 14px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 10px;
+    background: var(--c-surface-muted);
+    color: var(--c-text-muted);
+    font-size: 13px;
+    word-break: break-all;
+}
+
+@keyframes artsoulWaitDot {
+    0%, 100% { opacity: 0.25; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .artsoul-wait-dot {
+        animation: none !important;
+        opacity: 0.7;
+    }
+}
+
 @media (max-width: 768px), (prefers-reduced-motion: reduce) {
     .artsoul-skeleton,
     .artsoul-skeleton-card {

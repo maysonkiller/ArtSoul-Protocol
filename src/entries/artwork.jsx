@@ -1656,8 +1656,13 @@ const { useState, useEffect, useRef } = React;
                 }
             }, [artworkId]);
 
+            // A projection usually lands well inside the first second, so the early
+            // checks are cheap and fast and only then widen out. A flat interval made
+            // every recovery wait the full step even when the row was already there.
+            const PROJECTION_RETRY_DELAYS_MS = [400, 800, 1500, 2500, 3000, 3000, 3000, 3000];
+
             useEffect(() => {
-                if (error?.code !== 'V41_ARTWORK_NOT_INDEXED' || !isV41CompositeId || projectionRetryCount >= 8) {
+                if (error?.code !== 'V41_ARTWORK_NOT_INDEXED' || !isV41CompositeId || projectionRetryCount >= PROJECTION_RETRY_DELAYS_MS.length) {
                     return undefined;
                 }
 
@@ -1670,7 +1675,7 @@ const { useState, useEffect, useRef } = React;
                         if (!cancelled && !recovered) {
                             setProjectionRetryCount(current => current + 1);
                         }
-                    }, 3000);
+                    }, PROJECTION_RETRY_DELAYS_MS[projectionRetryCount] ?? 3000);
                 };
                 const onVisibilityChange = () => {
                     if (document.visibilityState !== 'visible') return;
@@ -2638,17 +2643,19 @@ const { useState, useEffect, useRef } = React;
                 return (
                     <div className="min-h-screen">
                         <main className="min-h-[60vh] flex items-center justify-center">
-                            <div className="text-center max-w-lg mx-auto px-4">
-                                <div className="text-2xl mb-4">Artwork is being finalized</div>
-                                <div className="text-base mb-4 opacity-75">
-                                    Your artwork was submitted and is waiting to appear in ArtSoul. This page updates automatically.
+                            <div className="artsoul-wait max-w-lg mx-auto px-4" role="status" aria-live="polite" aria-busy="true">
+                                <div className="artsoul-wait-mark">
+                                    <span>ArtSoul</span>
+                                    <span className="artsoul-wait-dots" aria-hidden="true">
+                                        <span className="artsoul-wait-dot"></span>
+                                        <span className="artsoul-wait-dot"></span>
+                                        <span className="artsoul-wait-dot"></span>
+                                    </span>
                                 </div>
-                                <div className="text-sm mb-4 opacity-60">
-                                    Checking automatically{projectionRetryCount > 0 ? ` (${projectionRetryCount}/8)` : ''}...
+                                <div className="artsoul-wait-copy">
+                                    Your artwork was submitted and is almost ready. This page updates on its own.
                                 </div>
-                                <div className={`rounded-lg p-3 mb-6 break-all text-sm ${
-                                    isClassic ? 'bg-gray-800 text-gray-300' : 'bg-cyan-900/20 border border-cyan-500/30 text-cyan-200'
-                                }`}>
+                                <div className="artsoul-wait-id">
                                     {error.artworkId || artworkId}
                                 </div>
                                 <div className="flex gap-4 justify-center">
