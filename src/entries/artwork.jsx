@@ -297,6 +297,9 @@ const { useState, useEffect, useRef } = React;
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [projectionRetryCount, setProjectionRetryCount] = useState(0);
+            // A long description must not push the auction panel off the screen.
+            // Canon 11 keeps the primary content visible without scrolling.
+            const [descriptionExpanded, setDescriptionExpanded] = useState(false);
             const [bidAmount, setBidAmount] = useState('');
             const [bidActivity, setBidActivity] = useState([]);
             const [bidderProfiles, setBidderProfiles] = useState({});
@@ -363,10 +366,12 @@ const { useState, useEffect, useRef } = React;
             const reportTriggerRef = useRef(null);
             const [transactionActions, setTransactionActions] = useState({});
 
+            const DESCRIPTION_CLAMP_CHARS = 320;
             const isClassic = theme === 'classic';
             const artworkId = window.ArtSoulArtworkUrl.currentArtworkId();
             const v41CompositeId = parseV41CompositeArtworkId(artworkId);
             const isV41CompositeId = Boolean(v41CompositeId);
+            const descriptionOverflows = String(artwork?.description || '').length > DESCRIPTION_CLAMP_CHARS;
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
 
             function beginTransactionAction(action) {
@@ -3202,9 +3207,19 @@ const { useState, useEffect, useRef } = React;
                                     <header className="artwork-page-header">
                                         <h1 className="artwork-detail-title">{artwork.title}</h1>
                                     </header>
-                                    <div className="artwork-page-description">
+                                    <div className={`artwork-page-description${descriptionOverflows && !descriptionExpanded ? ' is-clamped' : ''}`}>
                                         <h2>Description</h2>
                                         <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
+                                        {descriptionOverflows && (
+                                            <button
+                                                type="button"
+                                                className="artwork-description-toggle"
+                                                aria-expanded={descriptionExpanded}
+                                                onClick={() => setDescriptionExpanded(current => !current)}
+                                            >
+                                                {descriptionExpanded ? 'Show less' : 'Show more'}
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="artwork-page-extra">
                                         <h2>Artwork details</h2>
