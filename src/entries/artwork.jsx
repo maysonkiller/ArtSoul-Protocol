@@ -11,7 +11,6 @@ import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligib
 import { classifyBidFailure } from '../features/auction/bid-error.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
-import { expandArtworkId } from '../ui/artwork-url.js';
 
 const { useState, useEffect, useRef } = React;
         const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -365,7 +364,7 @@ const { useState, useEffect, useRef } = React;
             const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
-            const artworkId = expandArtworkId(new URLSearchParams(window.location.search).get('id'));
+            const artworkId = window.ArtSoulArtworkUrl.currentArtworkId();
             const v41CompositeId = parseV41CompositeArtworkId(artworkId);
             const isV41CompositeId = Boolean(v41CompositeId);
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
