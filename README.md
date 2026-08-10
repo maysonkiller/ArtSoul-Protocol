@@ -104,4 +104,10 @@ On Windows PowerShell, set variables through `.env` tooling or the process manag
 
 ## License
 
-No license is granted for reuse at this time. See `LICENSE`.
+ArtSoul uses a split licence.
+
+- **Software** — contracts, indexer, API, frontend, scripts, tests, and operational documentation are licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify, and redistribute them, including commercially, under the terms of that licence.
+- **Protocol canon and brand** — `ARTSOUL_CANON_BIBLE_FULL.md`, `docs/canon/`, and the ArtSoul logo and brand assets are licensed separately under [LICENSE-DOCS](LICENSE-DOCS). They may be read and quoted with attribution, but not republished, adapted, or reused commercially.
+- **Trademarks** — "ArtSoul" and the ArtSoul logo are not licensed by the Apache License (Section 6).
+
+See [NOTICE](NOTICE) for the attribution summary required on redistribution.
