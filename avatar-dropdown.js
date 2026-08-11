@@ -73,22 +73,24 @@
     //
     // External mobile sessions are restored by ArtSoul's separate WalletConnect
     // core, so an AppKit disconnect is never authoritative for those browsers.
-    let appKitDisconnectedAtBoot = false;
-    try {
-        appKitDisconnectedAtBoot = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
-            && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
-    } catch {
-        // Storage can be unavailable in privacy-restricted browsers.
+    let appKitDisconnectedAtBoot = window.ArtSoulHeaderPrepaint?.boot?.appKitDisconnectedAtBoot === true;
+    if (!window.ArtSoulHeaderPrepaint?.boot) {
+        try {
+            appKitDisconnectedAtBoot = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
+                && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
+        } catch {
+            // Storage can be unavailable in privacy-restricted browsers.
+        }
     }
 
-    // This script is loaded synchronously in the document head. Reserve the
-    // connected shell before the header HTML can paint so a saved wallet never
-    // flashes the static guest identity while its final profile is restored.
+    // Compatibility fallback for documents that have not adopted the tiny
+    // synchronous header-prepaint bridge yet. Product pages use the bridge, so
+    // this deferred component must not re-apply a second boot presentation.
     //
     // 'wallet-state-resolving' swaps the static guest LABEL for a coherent
     // "Connecting…" label of the same size. It never hides the identity region
     // and never leaves the account button empty — see unified-styles.css.
-    try {
+    if (!window.ArtSoulHeaderPrepaint) try {
         const walletHint = String(localStorage.getItem('artsoul_wallet') || '').toLowerCase();
         const cachedUiState = localStorage.getItem('artsoul_header_ui_state');
         const hasWalletHint = WALLET_ADDRESS_PATTERN.test(walletHint);
@@ -2054,10 +2056,10 @@
     // unified-styles.css owns the component from first paint so hydration
     // cannot introduce a second set of visual rules.
 
-    // Paint the pre-settle shell as soon as the module is available. Each page
-    // used to do this with an inline call right after the header markup, which
-    // is what kept this script render-blocking: an inline call cannot see a
-    // deferred script. Owning it here lets every page defer the whole chain.
+    // Reconcile the pre-settle shell after the deferred component is available.
+    // header-prepaint.js already committed the first visible frame immediately
+    // after the static shell. Matching content keys let this component adopt
+    // that frame without rewriting the avatar, name or address.
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => window.AvatarDropdown.renderInitializingState(), { once: true });
     } else {

@@ -38,7 +38,8 @@
     <script src="/modal-system.js" defer></script>
     <script type="module" src="/supabase-client.js"></script>
     <script type="module" src="/supabase-auth.js?v=2"></script>
-    <script src="/avatar-dropdown.js?v=45" defer></script>
+    <script src="/header-prepaint.js?v=1"></script>
+    <script src="/avatar-dropdown.js?v=46" defer></script>
     <script type="module" src="/appkit-init.js?v=52"></script>
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
 </head>
@@ -67,6 +68,7 @@
             </div>
         </div>
     </header>
+    <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
 
     <div id="app"></div>
     <script type="module" src="/src/entries/docs-protocol.jsx"></script>

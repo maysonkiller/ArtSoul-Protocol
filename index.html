@@ -223,7 +223,8 @@
             }
         }
     </style>
-    <script src="/avatar-dropdown.js?v=45" defer></script>
+    <script src="/header-prepaint.js?v=1"></script>
+    <script src="/avatar-dropdown.js?v=46" defer></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <script type="module" src="/contracts-integration.js?v=7"></script>
     <script type="module" src="/appkit-init.js?v=52"></script>
@@ -255,6 +256,7 @@
             </div>
         </div>
     </header>
+    <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
 
     <!-- Morph Backdrop -->
     <div id="morphBackdrop" class="morph-backdrop"></div>

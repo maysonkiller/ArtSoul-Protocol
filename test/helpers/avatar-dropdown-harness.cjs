@@ -11,6 +11,8 @@ const vm = require('node:vm');
 
 const SOURCE_PATH = path.join(__dirname, '..', '..', 'avatar-dropdown.js');
 const SOURCE = fs.readFileSync(SOURCE_PATH, 'utf8');
+const PREPAINT_SOURCE_PATH = path.join(__dirname, '..', '..', 'header-prepaint.js');
+const PREPAINT_SOURCE = fs.readFileSync(PREPAINT_SOURCE_PATH, 'utf8');
 
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
 
@@ -83,6 +85,12 @@ class FakeClassList {
   add(...names) { for (const name of names) this.names.add(name); }
   remove(...names) { for (const name of names) this.names.delete(name); }
   contains(name) { return this.names.has(name); }
+  toggle(name, force) {
+    const shouldAdd = force === undefined ? !this.names.has(name) : Boolean(force);
+    if (shouldAdd) this.names.add(name);
+    else this.names.delete(name);
+    return shouldAdd;
+  }
 }
 
 class FakeElement {
@@ -485,10 +493,18 @@ function createAvatarHarness(options = {}) {
     }
   };
 
-  // The real browser ordering: avatar-dropdown.js is a synchronous head script
-  // while supabase-client.js is a deferred module, so ArtSoulDB can be missing
-  // when a wallet is confirmed. Passing dbReady:false reproduces that race;
-  // every earlier suite keeps the ready-from-the-start default.
+  // Product pages snapshot first-frame state in a tiny synchronous head bridge,
+  // then hydrate the parsed shell before the deferred account component runs.
+  // The option is explicit so component-only tests can still isolate the larger
+  // component while first-paint tests use the real ordering.
+  if (options.prepaint === true) {
+    vm.runInNewContext(PREPAINT_SOURCE, context, { filename: 'header-prepaint.js' });
+    context.window.ArtSoulHeaderPrepaint.hydrate(navButtons);
+  }
+
+  // supabase-client.js is deferred, so ArtSoulDB can be missing when a wallet
+  // is confirmed. Passing dbReady:false reproduces that race; earlier suites
+  // keep the ready-from-the-start default.
   if (options.dbReady !== false) context.window.ArtSoulDB = artSoulDb;
 
   vm.runInNewContext(SOURCE, context, { filename: 'avatar-dropdown.js' });

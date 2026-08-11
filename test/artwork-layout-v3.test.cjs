@@ -142,3 +142,18 @@ test('ISO auction timestamps bypass the legacy helper Unknown result', () => {
     assert.match(source, /return 'Syncing end time'/);
     assert.match(source, /projection\.auction_end_time,[\s\S]*?projection\.end_time,[\s\S]*?projection\.endTime/);
 });
+
+test('artwork has a visible pre-module skeleton and a bounded module failure state', () => {
+    const app = html.indexOf('<div id="app">');
+    const staticSkeleton = html.indexOf('data-artwork-static-skeleton');
+    const failureTemplate = html.indexOf('id="artworkEntryFailure"');
+    const entryScript = html.indexOf('src="/src/entries/artwork.jsx"');
+
+    assert.ok(app >= 0 && app < staticSkeleton, 'the static skeleton must be inside the application root');
+    assert.ok(staticSkeleton < entryScript, 'the loading frame must exist before the module request');
+    assert.ok(failureTemplate < entryScript, 'the module failure UI must exist before the module request');
+    assert.match(html, /setTimeout\(showFailure, 15000\)/);
+    assert.match(html, /onerror="window\.ArtSoulArtworkEntryFailed\?\.\(\)"/);
+    assert.match(source, /artworkAppRoot\.dataset\.artworkEntryMounted = 'true';/);
+    assert.match(source, /new CustomEvent\('artsoul:artwork-entry-mounted'\)/);
+});
