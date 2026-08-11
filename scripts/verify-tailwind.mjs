@@ -6,6 +6,7 @@
 // fails the build instead.
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 const CSS = 'tailwind-build.css';
 const CLASS_ATTR = /class(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})/g;
@@ -14,19 +15,44 @@ const CLASS_ATTR = /class(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})/g
 const UTILITY = new RegExp('^-?(?:sm:|md:|lg:|xl:|hover:|focus:|active:|disabled:)*(?:'
   + 'flex|grid|block|inline|inline-flex|inline-block|hidden|'
   + 'items-|justify-|self-|gap-|space-[xy]-|'
-  + 'p[xytblrse]?-\d|m[xytblrse]?-\d|w-|h-|min-w-|min-h-|max-w-|max-h-|'
+  + 'p[xytblrse]?-\\d|m[xytblrse]?-\\d|w-|h-|min-w-|min-h-|max-w-|max-h-|'
   + 'text-|font-|leading-|tracking-|truncate|uppercase|whitespace-|break-|'
-  + 'bg-|border|rounded|shadow|opacity-\d|ring|'
-  + 'relative|absolute|fixed|sticky|top-|right-|bottom-|left-|inset-|z-\d|'
+  + 'bg-|border|rounded|shadow|opacity-\\d|ring|'
+  + 'relative|absolute|fixed|sticky|top-|right-|bottom-|left-|inset-|z-\\d|'
   + 'overflow-|object-|cursor-|pointer-events-|select-|resize|'
-  + 'transition|duration-\d|ease-|delay-\d|animate-|'
-  + 'order-\d|col-|row-|basis-|grow|shrink|flex-|aspect-|list-|float-|'
+  + 'transition|duration-\\d|ease-|delay-\\d|animate-|'
+  + 'order-\\d|col-|row-|basis-|grow|shrink|flex-|aspect-|list-|float-|'
   + 'visible|invisible|sr-only|mx-auto|my-auto'
   + ')');
 
-const files = execSync('git ls-files', { encoding: 'utf8' })
-  .split('\n')
-  .filter(f => /\.(html|jsx?|mjs)$/.test(f) && !f.startsWith('test/') && !f.startsWith('scripts/'));
+const SOURCE_FILE = /\.(html|jsx?|mjs)$/;
+const SKIPPED_DIRECTORIES = new Set(['.git', '.vercel', 'dist', 'node_modules', 'scripts', 'test']);
+
+function collectSourceFiles(directory = '.') {
+  const files = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!SKIPPED_DIRECTORIES.has(entry.name)) {
+        files.push(...collectSourceFiles(path.join(directory, entry.name)));
+      }
+    } else if (entry.isFile() && SOURCE_FILE.test(entry.name)) {
+      files.push(path.join(directory, entry.name));
+    }
+  }
+  return files;
+}
+
+let files;
+try {
+  files = execSync('git ls-files', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    .split('\n')
+    .filter(file => SOURCE_FILE.test(file) && !file.startsWith('test/') && !file.startsWith('scripts/'));
+} catch {
+  // Direct Vercel CLI uploads intentionally omit .git. Scanning the uploaded
+  // source tree keeps this build guard available instead of making Git
+  // metadata an accidental production-build dependency.
+  files = collectSourceFiles();
+}
 
 const used = new Set();
 for (const file of files) {
