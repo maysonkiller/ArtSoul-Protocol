@@ -27,7 +27,15 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
 
   try {
-    const access = await getModerationAccess(req, { strict: true });
+    // A read is also the artwork page's server-authoritative access probe.
+    // Guests and non-staff wallets receive no moderation data, but they do not
+    // turn an otherwise healthy public artwork page into a noisy 401 request.
+    // Writes remain strict and fail closed before any state is changed.
+    const access = await getModerationAccess(req, { strict: req.method === 'POST' });
+
+    if (req.method === 'GET' && !access.canModerate) {
+      return res.status(200).json({ success: true, access, data: null });
+    }
 
     if (req.method === 'GET' && String(req.query?.view || '').toLowerCase() === 'hidden') {
       const rows = await supabaseRest(

@@ -704,29 +704,32 @@ test('a revoked credential invalidates an otherwise valid session immediately', 
 });
 
 // ---------------------------------------------------------------------------
-// STEP_UP_REQUIRED exposes the client UI (server↔client contract)
+// The quiet read probe exposes staff step-up state without protected data
 // ---------------------------------------------------------------------------
 
-test('the moderation-visibility route returns { error: STEP_UP_REQUIRED } for a stepped-down staff wallet', async () => {
+test('the moderation-visibility read exposes step-up state but no visibility data for stepped-down staff', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
   const res = fakeRes();
   await envir.loadRoute('artworkVisibility')(fakeReq({
     method: 'GET', cookie: envir.siweCookie(STAFF), query: { chain_id: '84532', artwork_id: '7' }
   }), res);
-  assert.equal(res.statusCode, 403);
-  // sendError serializes the machine code under `error` (not `code`).
-  assert.equal(res.body.error, 'STEP_UP_REQUIRED');
-  assert.equal('code' in res.body, false);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.access.role, 'moderator');
+  assert.equal(res.body.access.canModerate, false);
+  assert.equal(res.body.access.passkeyRequired, true);
+  assert.equal(res.body.access.stepUpActive, false);
+  assert.equal(res.body.data, null);
 });
 
-test('the client keys moderation errors on result.error and exposes passkey controls', () => {
+test('the client consumes server-confirmed staff passkey state and exposes passkey controls', () => {
   const client = read(path.join('src', 'entries', 'artwork.jsx'));
-  // The visibility handler branches on result.error for the three step-up codes.
+  // Error codes remain a defensive fallback for rejected protected requests.
   assert.match(client, /\[['"]STEP_UP_REQUIRED['"], ['"]STEP_UP_WALLET_MISMATCH['"], ['"]CREDENTIAL_REVOKED['"]\]\.includes\(result\.error\)/);
   assert.doesNotMatch(client, /includes\(result\.code\)/);
+  assert.match(client, /result\.access\?\.passkeyRequired === true && Boolean\(result\.access\?\.role\)/);
   // Entering passkey-required state renders the Verify and Enroll controls.
-  assert.match(client, /setPasskeyAccess\(\{ required: true, active: false \}\)/);
+  assert.match(client, /\{ required: true, active: result\.access\.stepUpActive === true \}/);
   assert.match(client, /onClick=\{startPasskeyStepUp\}/);
   assert.match(client, /onClick=\{enrollModerationPasskey\}/);
 });

@@ -528,8 +528,11 @@ test('a role-registry outage fails closed instead of granting access', async () 
 });
 
 test('the moderation route and UI never trust client-side staff state', () => {
-  // Server route: strict authorization before any read or write.
-  assert.match(moderationRouteSource, /getModerationAccess\(req, \{ strict: true \}\)/);
+  // Server route: writes are strict, while non-staff reads return no protected
+  // visibility data and never use client-side state as authorization.
+  assert.match(moderationRouteSource, /strict: req\.method === 'POST'/);
+  assert.match(moderationRouteSource, /req\.method === 'GET' && !access\.canModerate/);
+  assert.match(moderationRouteSource, /data: null/);
   // UI: the staff panel renders only from the server-returned access object.
   assert.match(artworkSource, /\{moderationAccess\?\.canModerate && \(/);
   // The access object is populated exclusively from the server response.

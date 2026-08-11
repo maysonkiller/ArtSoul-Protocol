@@ -20,6 +20,7 @@ const metadata = encodeURIComponent(JSON.stringify({
 }));
 let activeRole = 'admin';
 let rpcCalls = [];
+let visibilityReadCalls = 0;
 
 const artworks = [1, 2, 3, 4, 5, 6, 7].map(id => ({
   chain_id: 84532,
@@ -120,6 +121,7 @@ global.fetch = async (url, options = {}) => {
       hidden_by: payload.p_actor_wallet
     }];
   } else {
+    if (pathname === 'artwork_moderation_visibility') visibilityReadCalls += 1;
     body = restRows(pathname);
   }
 
@@ -219,6 +221,37 @@ test('regular authenticated owners cannot change moderation visibility', async (
 
   assert.equal(response.statusCode, 403);
   assert.equal(response.body.error, 'ADMIN_REQUIRED');
+});
+
+test('guest moderation reads are a quiet access probe and expose no visibility data', async () => {
+  visibilityReadCalls = 0;
+  const response = responseMock();
+  await moderationHandler({
+    method: 'GET',
+    query: { chain_id: 84532, artwork_id: '4' },
+    headers: {}
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.access.canModerate, false);
+  assert.equal(response.body.data, null);
+  assert.equal(visibilityReadCalls, 0);
+});
+
+test('authorized staff reads retain access to moderation visibility data', async () => {
+  activeRole = 'admin';
+  visibilityReadCalls = 0;
+  const response = responseMock();
+  await moderationHandler({
+    method: 'GET',
+    query: { chain_id: 84532, artwork_id: '4' },
+    headers: { cookie: sessionCookie() }
+  }, response);
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.access.canModerate, true);
+  assert.equal(response.body.data.hidden, true);
+  assert.equal(visibilityReadCalls, 1);
 });
 
 test('authorized staff hide action uses the atomic server-side RPC', async () => {

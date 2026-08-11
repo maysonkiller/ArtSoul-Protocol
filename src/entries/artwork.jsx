@@ -1299,9 +1299,10 @@ const { useState, useEffect, useRef } = React;
                         ...result.access,
                         ...(result.data || {})
                     });
-                    if (result.access?.passkeyRequired) {
-                        setPasskeyAccess({ required: true, active: result.access.stepUpActive === true });
-                    }
+                    const staffPasskeyRequired = result.access?.passkeyRequired === true && Boolean(result.access?.role);
+                    setPasskeyAccess(staffPasskeyRequired
+                        ? { required: true, active: result.access.stepUpActive === true }
+                        : null);
                     setModerationReason(result.data?.hidden_reason || '');
                     setModerationMessage('');
                     return true;
