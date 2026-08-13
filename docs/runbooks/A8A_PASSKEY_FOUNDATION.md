@@ -6,8 +6,10 @@ RG-03/RG-04 for the activation gates.
 
 Founder decisions preserved (2026-07-20): 15-minute step-up sessions, two
 independent founder passkeys before activation, one one-time auditable
-bootstrap grant, Safe-only founder recovery (fails closed until built),
-X/Discord are eligibility/profile data and never authentication factors.
+bootstrap grant, Safe-only founder recovery, and X/Discord as eligibility/
+profile data rather than authentication factors. A8d now implements the
+disabled Safe-only recovery foundation, but migration, configuration and the
+founder ceremony remain unapplied/unrehearsed.
 
 ## 1. What ships in this phase
 
@@ -60,10 +62,11 @@ their audit rows always move together:
 
 ## 1c. Last-passkey protection
 
-Because Safe recovery is not implemented yet, self-revocation refuses to
-revoke a wallet's LAST active credential (`LAST_ACTIVE_CREDENTIAL`, audited
+Self-revocation refuses to revoke a wallet's LAST active credential
+(`LAST_ACTIVE_CREDENTIAL`, audited
 as `passkey_revoke_denied`, no state change). A wallet with two or more
-active credentials may revoke one after a valid step-up.
+active credentials may revoke one after a valid step-up. A8d recovery does
+not weaken this normal-operation safeguard.
 
 ## 2. Environment variables (do NOT set in this PR)
 
@@ -75,6 +78,10 @@ active credentials may revoke one after a valid step-up.
 | `ARTSOUL_WEBAUTHN_RP_NAME` | Human-readable RP display name. |
 | `ARTSOUL_MODERATION_SESSION_SECRET` | Dedicated HMAC secret for the 15-minute moderation cookie. Separate from `SESSION_SECRET`. |
 
+Safe recovery adds three more variables and a separate reviewed ceremony.
+See `docs/runbooks/A8D_SAFE_RECOVERY.md`; leave them unset until A8d has been
+migrated and rehearsed.
+
 With the flag `true` and ANY of the other four missing, every moderation
 request fails closed (503 `MODERATION_PASSKEY_MISCONFIGURED`) — there is no
 silent fallback to the legacy path.
@@ -83,7 +90,8 @@ silent fallback to the legacy path.
 
 1. Take and verify a Supabase backup (same procedure as phase 18.7b/014).
 2. Run `sql/migrations/a8a_moderation_passkey_foundation.sql` with the
-   service role.
+   service role. A8d recovery, if included in the same reviewed rollout, is
+   applied only afterward using its separate additive migration.
 3. Run `sql/verification/a8a_passkey_foundation_verification.sql` and check:
    4 tables, RLS enabled AND forced on all 4, zero anon/authenticated
    grants, the active-bootstrap partial unique index present, the four RPCs
@@ -133,15 +141,16 @@ self-skips when Docker is unavailable.
 - [ ] Migration applied and verification output archived.
 - [ ] Two founder passkeys enrolled and both verified.
 - [ ] One-time bootstrap grant consumed and audit-recorded.
-- [ ] Safe-only founder recovery implemented AND rehearsed (future PR;
-      until then `/api/moderation/passkey-recovery` always denies).
+- [ ] A8d migration applied, read-only verification archived, and Safe-only
+      founder recovery rehearsed against the configured Safe and two RPCs.
 - [ ] `ARTSOUL_MODERATION_SESSION_SECRET` generated and stored server-side only.
 - [ ] Flag enabled through a reviewed deployment; legacy social-factor path
       removed in the same review.
 
 ## 6. Recovery position
 
-There is NO recovery path in this phase. Lost-passkey recovery requires the
-future Safe-authorized ceremony; the recovery endpoint fails closed and
-audit-logs every attempt (`recovery_denied`). Do not create ad-hoc grants
-to bypass a lost passkey outside a rehearsed, documented ceremony.
+A8d provides the disabled Safe-only foundation described in
+`docs/runbooks/A8D_SAFE_RECOVERY.md`. It remains unavailable until the A8a and
+A8d migrations, complete server configuration, production-equivalent Safe
+rehearsal, and reviewed feature activation are complete. Do not create ad-hoc
+grants to bypass a lost passkey outside that documented ceremony.

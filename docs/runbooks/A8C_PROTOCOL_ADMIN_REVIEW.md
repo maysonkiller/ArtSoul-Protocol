@@ -81,16 +81,18 @@ ARTSOUL_REPORT_DAILY_LIMIT=
 
 When activation is authorized, also configure the exact final WebAuthn RP ID,
 allowed origin, RP name and a dedicated moderation-session secret according to
-`A8A_PASSKEY_FOUNDATION.md`. Never infer them from request headers.
+`A8A_PASSKEY_FOUNDATION.md`. Configure Safe recovery only according to
+`A8D_SAFE_RECOVERY.md`. Never infer either identity from request headers.
 
 ## Migration and verification order
 
 Follow `A8_MODERATION_ROLLOUT.md`; do not run A8c alone on production. After a
-verified current Supabase backup, apply A8a, A8b and then A8c. Run:
+verified current Supabase backup, apply A8a, A8b, A8c and then A8d. Run:
 
 1. `sql/verification/a8a_passkey_foundation_verification.sql`;
 2. `sql/verification/a8b_artwork_report_intake_verification.sql`;
-3. `sql/verification/a8c_protocol_admin_review_verification.sql`.
+3. `sql/verification/a8c_protocol_admin_review_verification.sql`;
+4. `sql/verification/a8d_moderation_safe_recovery_verification.sql`.
 
 Retain exported results as operational evidence. Never paste service-role
 keys, passkey tokens, session secrets or private staff assignments into the

@@ -161,6 +161,7 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     'a8a_moderation_passkey_foundation.sql',
     'a8b_artwork_report_intake.sql',
     'a8c_protocol_admin_review.sql',
+    'a8d_moderation_safe_recovery.sql',
     '015_public_metrics_projection.sql'
   ]);
 
