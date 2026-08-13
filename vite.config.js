@@ -29,6 +29,7 @@ const legacyRootAssets = [
     'ARTSOULlogo.png',
     'artwork-card-fixes.css',
     'avatar-dropdown.js',
+    'header-prepaint.js',
     'button-effects.css',
     'contracts-config.js',
     'contracts-integration.js',

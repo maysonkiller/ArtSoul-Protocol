@@ -235,10 +235,11 @@ test('Tailwind ships as a compiled stylesheet, never the runtime CDN', () => {
   assert.match(pkg.scripts.build, /verify:tailwind/);
 });
 
-test('no page blocks first paint on a head script', () => {
-  // 18 classic scripts executed serially in <head> before anything painted.
-  // Classic defer preserves relative execution order, so the chain still runs
-  // in document order - it just stops holding up the first paint.
+test('only the bounded header prepaint may block parsing before first paint', () => {
+  // The wallet SDK and the account component stay deferred. One tiny,
+  // dependency-free bridge is deliberately synchronous because its whole job
+  // is to restore the last confirmed visual identity before the guest shell can
+  // become a visible frame.
   const pages = ['index.html', 'gallery.html', 'artwork.html', 'profile.html',
                  'upload.html', 'admin.html', 'docs-protocol.html'];
 
@@ -250,6 +251,11 @@ test('no page blocks first paint on a head script', () => {
       .filter(attrs => !/type="module"| defer| async/.test(attrs))
       .map(attrs => attrs.match(/src="([^"]+)"/)[1]);
 
-    assert.deepEqual(blocking, [], `${page} must not block first paint on a head script`);
+    assert.deepEqual(blocking, ['/header-prepaint.js?v=1'], `${page} may block only on the shared prepaint bridge`);
   }
+
+  assert.ok(
+    fs.statSync(path.join(ROOT, 'header-prepaint.js')).size <= 7 * 1024,
+    'the synchronous prepaint bridge must remain at or below 7 KiB'
+  );
 });

@@ -66,7 +66,8 @@
     <script src="/src/features/discovery/discovery-service.js?v=1" defer></script>
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
     <script src="/src/ui/components/artwork-card.js?v=11" defer></script>
-    <script src="/avatar-dropdown.js?v=45" defer></script>
+    <script src="/header-prepaint.js?v=1"></script>
+    <script src="/avatar-dropdown.js?v=46" defer></script>
     <script type="module" src="/appkit-init.js?v=52"></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <script type="module" src="/contracts-integration.js?v=7"></script>
@@ -271,8 +272,81 @@ body.classic,
             </div>
         </div>
     </header>
-    <div id="app"></div>
-    <script type="module" src="/src/entries/artwork.jsx"></script>
+    <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
+    <div id="app">
+        <div class="artwork-page-root" data-artwork-static-skeleton>
+            <main class="artwork-page-shell site-page-container" role="status" aria-label="Loading artwork" aria-busy="true">
+                <div class="artwork-page-layout">
+                    <div class="artwork-page-left">
+                        <section class="artwork-detail-stage artwork-mobile-media">
+                            <div class="artsoul-skeleton artsoul-skeleton-media artwork-page-skeleton-media" aria-hidden="true"></div>
+                        </section>
+                        <section class="artwork-page-panel artwork-page-context artwork-mobile-context">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-heading" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                        </section>
+                        <section class="artwork-page-panel artwork-page-trust artwork-mobile-trust">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
+                        </section>
+                        <section class="artwork-page-panel artwork-page-ai artwork-mobile-ai">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
+                        </section>
+                    </div>
+                    <aside class="artwork-page-right">
+                        <section class="artwork-page-panel artwork-mobile-auction">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
+                        </section>
+                        <section class="artwork-page-panel artwork-mobile-people">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
+                            <div class="artwork-ownership-actions">
+                                <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
+                                <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
+                            </div>
+                        </section>
+                    </aside>
+                </div>
+            </main>
+        </div>
+    </div>
+    <template id="artworkEntryFailure">
+        <div class="min-h-screen">
+            <main class="min-h-[60vh] flex items-center justify-center">
+                <div class="text-center max-w-md mx-auto px-4">
+                    <div class="text-2xl mb-4">Artwork could not start</div>
+                    <div class="text-base mb-6 opacity-75">The page module did not load. Check your connection and try again.</div>
+                    <div class="flex gap-4 justify-center">
+                        <a href="/gallery" class="btn-main">Explore Art</a>
+                        <button type="button" class="btn-secondary" onclick="window.location.reload()">Retry</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </template>
+    <script>
+        (() => {
+            const app = document.getElementById('app');
+            const failure = document.getElementById('artworkEntryFailure');
+            let timeoutId;
+            const showFailure = () => {
+                if (!app || app.dataset.artworkEntryMounted === 'true' || !failure) return;
+                app.replaceChildren(failure.content.cloneNode(true));
+            };
+            window.ArtSoulArtworkEntryFailed = showFailure;
+            window.addEventListener('artsoul:artwork-entry-mounted', () => clearTimeout(timeoutId), { once: true });
+            timeoutId = window.setTimeout(showFailure, 15000);
+        })();
+    </script>
+    <script type="module" src="/src/entries/artwork.jsx" onerror="window.ArtSoulArtworkEntryFailed?.()"></script>
     <script>
         window.addEventListener('load', () => {
             if (window.StatusBannerSystem) {

@@ -3933,4 +3933,9 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
-        createRoot(document.getElementById('app')).render(<ArtworkPage />);
+        const artworkAppRoot = document.getElementById('app');
+        if (artworkAppRoot) {
+            artworkAppRoot.dataset.artworkEntryMounted = 'true';
+            window.dispatchEvent(new CustomEvent('artsoul:artwork-entry-mounted'));
+            createRoot(artworkAppRoot).render(<ArtworkPage />);
+        }

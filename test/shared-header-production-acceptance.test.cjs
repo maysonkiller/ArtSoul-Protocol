@@ -9,7 +9,7 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8').replace(/\r\n/g, '\n');
 }
 
-test('shared-header production acceptance closes only A-05 and A-45', () => {
+test('shared-header production acceptance remains durable while its later visual regression is reopened', () => {
   const acceptance = read('docs/testnet/SHARED_HEADER_PRODUCTION_ACCEPTANCE_2026-08-04.md');
   const backlog = read('docs/BACKLOG.md');
   const canonicalBacklog = read('docs/canon/12_IMPLEMENTATION_BACKLOG.md');
@@ -21,7 +21,9 @@ test('shared-header production acceptance closes only A-05 and A-45', () => {
   assert.match(acceptance, /one account button, one avatar image, fixed geometry/);
   assert.match(acceptance, /does not\nchange or re-accept SIWE/);
 
-  assert.match(backlog, /^\| A-05 \|[^\n]*\| done \| A \|/m);
+  assert.match(backlog, /^\| A-05 \|[^\n]*\| in progress \| A \|/m);
+  assert.match(backlog, /The 2026-08-04 production acceptance remains valid for PR #168/);
+  assert.match(backlog, /subsequently reopened the first-frame defect/);
   assert.match(backlog, /^\| A-45 \|[^\n]*\| done \| A \|/m);
   assert.match(backlog, /SHARED_HEADER_PRODUCTION_ACCEPTANCE_2026-08-04\.md/);
 

@@ -64,7 +64,8 @@
     </script>
     <script src="/modal-system.js" defer></script>
     <script src="/src/features/artwork/ai-valuation-client.js?v=2" defer></script>
-    <script src="/avatar-dropdown.js?v=45" defer></script>
+    <script src="/header-prepaint.js?v=1"></script>
+    <script src="/avatar-dropdown.js?v=46" defer></script>
     <script type="module" src="/appkit-init.js?v=52"></script>
     <script type="module" src="/ipfs-client.js?v=2"></script>
     <script src="/contracts-config.js?v=1" defer></script>
@@ -562,6 +563,7 @@
             </div>
         </div>
     </header>
+    <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
 
     <main class="upload-page-main site-page-container py-12 max-w-3xl">
         <div class="upload-page-heading text-center">

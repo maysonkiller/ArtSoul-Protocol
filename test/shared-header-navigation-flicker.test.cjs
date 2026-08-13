@@ -159,10 +159,9 @@ function assertMonotonic(history, field, label) {
 }
 
 /**
- * A harness that boots the way a real document does: the component is a
- * synchronous head script, so it runs while the document is still parsing and
- * the static shell is already in the DOM. Nothing has rendered yet when the
- * caller starts recording, so the very first frame is the true first paint.
+ * A harness that boots the way a real document does: the tiny prepaint bridge
+ * snapshots storage in the head, hydrates the parsed static shell, and only
+ * then allows the deferred account component to reconcile it.
  */
 function bootHarness(options = {}) {
   const harness = createAvatarHarness({
@@ -170,6 +169,7 @@ function bootHarness(options = {}) {
     pathname: options.pathname || '/gallery.html',
     staticShellHtml: STATIC_SHELL,
     readyState: 'loading',
+    prepaint: true,
     ...options
   });
   harness.context.window.currentChainId = 84532;
@@ -274,7 +274,7 @@ for (const userAgent of [DESKTOP_UA, IPHONE_UA]) {
     // The cached avatar is not decoded yet on a fresh document, so the button
     // shows the COMPLETE resolving state and only then the connected identity.
     // It must never read "Founder" beside the neutral avatar.
-    assert.deepEqual(transitions(history, 'name'), ['ArtSoul Guest', RESOLVING_LABEL, 'Founder']);
+    assert.deepEqual(transitions(history, 'name'), [RESOLVING_LABEL, 'Founder']);
     // The guest name is only ever on screen while nothing claims a connection.
     for (const state of history) {
       if (state.name === 'ArtSoul Guest') assert.notEqual(state.uiState, 'connected');
@@ -310,7 +310,7 @@ test('a cached connected identity with no live session resolves to guest exactly
   // 'resolving' is the coherent state held while the cached avatar decodes;
   // 'restoring' is the restored cached presentation, which authorizes nothing
   // and is never persisted. Only the settled provider produces 'connected'.
-  assert.deepEqual(transitions(history, 'uiState'), [null, 'resolving', 'restoring', 'disconnected']);
+  assert.deepEqual(transitions(history, 'uiState'), ['resolving', 'restoring', 'disconnected']);
   assert.equal(harness.avatarName(), 'ArtSoul Guest');
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assert.equal(harness.avatarAddress(), '');
@@ -352,7 +352,7 @@ test('an explicit desktop AppKit disconnect rejects a stale connected identity b
   await harness.flush();
 
   assertNeverFlickers(history, 'explicit desktop disconnect with stale identity');
-  assert.deepEqual(transitions(history, 'uiState'), [null, 'disconnected']);
+  assert.deepEqual(transitions(history, 'uiState'), ['disconnected']);
   assert.deepEqual(transitions(history, 'name'), ['ArtSoul Guest']);
   assert.deepEqual(transitions(history, 'imgSrc'), [NEUTRAL_AVATAR]);
   assert.equal(harness.document.head.children.length, 0, 'a stale identity must not be preloaded');
@@ -535,26 +535,31 @@ test('every shared-header page boots the header in the same order with the same 
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
     assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=43">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=45" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=1"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=46" defer><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=43');
-    const component = html.indexOf('avatar-dropdown.js?v=45');
+    const prepaint = html.indexOf('header-prepaint.js?v=1');
+    const component = html.indexOf('avatar-dropdown.js?v=46');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
+    const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");
 
     // The stylesheet stays render-blocking so the shell is styled on first
     // paint, and the boot scripts keep their relative order: deferred classic
     // scripts execute in document order, so position still decides sequence.
-    assert.ok(stylesheet < component, `${page}: the stylesheet must load before the component`);
+    assert.ok(stylesheet < prepaint, `${page}: the stylesheet must load before prepaint`);
+    assert.ok(prepaint < component, `${page}: prepaint must snapshot storage before the deferred component`);
     assert.ok(component < appkit, `${page}: the component must run before appkit-init`);
     assert.ok(appkit < shell, `${page}: the boot scripts must precede the header shell`);
+    assert.ok(shell < hydrate, `${page}: first-frame hydration must follow the parsed shell`);
 
     // Hydration used to be an inline call placed after the shell. That is what
     // forced the script to stay render-blocking, because an inline call cannot
     // see a deferred script. The module now hydrates itself, and defer already
     // guarantees it runs after the document — including the shell — is parsed.
     assert.doesNotMatch(html, /window\.AvatarDropdown\?\.renderInitializingState\(\)/,
-      `${page} must not hydrate the header from an inline script`);
+      `${page} must not call the deferred component from an inline script`);
   }
 });
 
@@ -1567,7 +1572,7 @@ test('a restorable cached identity is already on screen at the earliest bootstra
     assert.notEqual(state.name, RESOLVING_LABEL, 'a restorable identity must not show the resolving label');
     if (state.uiState === 'restoring') assert.notEqual(state.name, 'ArtSoul Guest');
   }
-  assert.deepEqual(transitions(history, 'name'), ['ArtSoul Guest', 'Founder']);
+  assert.deepEqual(transitions(history, 'name'), ['Founder']);
   assertNeverFlickers(history, 'restorable bootstrap');
 });
 
