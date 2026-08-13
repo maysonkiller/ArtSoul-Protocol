@@ -1,5 +1,6 @@
 import { allowMethods, sendError } from '../../backend.js';
 import {
+  ENROLLMENT_GRANT_TTL_MS,
   generateGrantToken,
   hashGrantToken,
   issueEnrollmentGrantRpc,
@@ -14,8 +15,6 @@ import {
 // target another wallet, so it is not a wallet-only or delegation bypass.
 // The raw one-time token is returned exactly once here; only its SHA-256
 // hash is persisted (inside the atomic issue RPC).
-const ADDITIONAL_GRANT_TTL_MS = 15 * 60 * 1000; // bounded by the step-up TTL
-
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
 
@@ -31,7 +30,7 @@ export default async function handler(req, res) {
     }
 
     const rawToken = generateGrantToken();
-    const expiresAt = new Date(Date.now() + ADDITIONAL_GRANT_TTL_MS).toISOString();
+    const expiresAt = new Date(Date.now() + ENROLLMENT_GRANT_TTL_MS).toISOString();
 
     await issueEnrollmentGrantRpc({
       targetWallet: wallet,

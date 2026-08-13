@@ -1,7 +1,7 @@
 # A8 Moderation Rollout Order
 
 Status: implementation and activation plan. This runbook coordinates the
-already-merged A8a and A8b foundations with the remaining A-22 staff workflow.
+A8a/A8b/A8c foundations and the disabled A8d Safe recovery foundation.
 It does not amend protocol architecture or economics.
 
 ## 1. Build now, behind disabled flags
@@ -31,14 +31,16 @@ this stage.
 Before production activation:
 
 1. Connect and verify the final project domain and WebAuthn RP ID.
-2. Configure and rehearse the Safe-only founder recovery path.
-3. Prepare the reviewed A8a, A8b and A8c migrations. Passkey enrollment and
+2. Configure and rehearse the Safe-only founder recovery path according to
+   `A8D_SAFE_RECOVERY.md`.
+3. Prepare the reviewed A8a, A8b, A8c and A8d migrations. Passkey enrollment and
    feature activation happen only in the ordered deployment stage below.
 4. Assign each moderator an active least-privilege role and an individually
    enrolled passkey. Do not store private staff wallet assignments in source.
 
-These steps follow `RESOURCE_GATED_WORK.md` and
-`runbooks/A8A_PASSKEY_FOUNDATION.md`.
+These steps follow `RESOURCE_GATED_WORK.md`,
+`runbooks/A8A_PASSKEY_FOUNDATION.md`, and
+`runbooks/A8D_SAFE_RECOVERY.md`.
 
 ## 3. Activate the database and deployment
 
@@ -46,13 +48,15 @@ Only after the Protocol Admin workflow is operational:
 
 1. Take and verify a current Supabase backup.
 2. Apply, in order, `sql/migrations/a8a_moderation_passkey_foundation.sql`,
-   `sql/migrations/a8b_artwork_report_intake.sql`, and
-   `sql/migrations/a8c_protocol_admin_review.sql`.
-3. Run the matching read-only A8a, A8b and A8c verification files and retain
+   `sql/migrations/a8b_artwork_report_intake.sql`,
+   `sql/migrations/a8c_protocol_admin_review.sql`, and
+   `sql/migrations/a8d_moderation_safe_recovery.sql`.
+3. Run the matching read-only A8a, A8b, A8c and A8d verification files and retain
    the evidence.
-4. Configure the final RP ID/origin/name and dedicated moderation-session
-   secret. Enable only the passkey flag, create the one-time auditable
-   bootstrap grant, and enrol the two independent founder passkeys.
+4. Configure the final RP ID/origin/name, dedicated moderation-session secret,
+   exact Safe/chain and two independent recovery RPCs. Enable only the passkey
+   flag, create the one-time auditable bootstrap grant, enrol the two
+   independent founder passkeys, and complete the Safe recovery rehearsal.
 5. Enable `ARTSOUL_PROTOCOL_ADMIN_ENABLED=true`, redeploy, and complete the
    protected admin acceptance checklist while public reporting remains off.
 6. Set `ARTSOUL_REPORT_DAILY_LIMIT=5` and only then enable

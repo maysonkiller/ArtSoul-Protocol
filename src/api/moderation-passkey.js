@@ -20,6 +20,8 @@ export const MODERATION_SESSION_COOKIE = 'artsoul_mod_session';
 export const MODERATION_SESSION_TTL_SECONDS = 15 * 60;
 // Challenge lifetime mirrors the existing SIWE nonce TTL (tunable).
 export const WEBAUTHN_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+// Additional-device and Safe-recovery grants expire with the step-up window.
+export const ENROLLMENT_GRANT_TTL_MS = MODERATION_SESSION_TTL_SECONDS * 1000;
 
 const STAFF_MODERATION_ROLES = new Set(['admin', 'moderator', 'team']);
 

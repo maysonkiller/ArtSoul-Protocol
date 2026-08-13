@@ -16,12 +16,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { Interface, hashMessage, isAddress, isHexString } = require('ethers');
 
 const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 const backendSource = read(path.join('src', 'api', 'backend.js'));
 const passkeySource = read(path.join('src', 'api', 'moderation-passkey.js'));
+const safeRecoverySource = read(path.join('src', 'api', 'moderation-safe-recovery.js'));
 const accessSource = read(path.join('src', 'api', 'moderation-access.js'));
 const artworkVisibilitySource = read(path.join('src', 'api', 'routes', 'moderation', 'artwork-visibility.js'));
 
@@ -38,6 +40,7 @@ const ROUTE_SOURCES = {
 
 const STAFF = '0x1111111111111111111111111111111111111111';
 const OTHER = '0x2222222222222222222222222222222222222222';
+const SAFE = '0x3333333333333333333333333333333333333333';
 
 const CONFIGURED_ENV = {
   SESSION_SECRET: 'test-siwe-secret',
@@ -46,6 +49,13 @@ const CONFIGURED_ENV = {
   ARTSOUL_WEBAUTHN_ALLOWED_ORIGIN: 'https://artsoul.test',
   ARTSOUL_WEBAUTHN_RP_NAME: 'ArtSoul Staff',
   ARTSOUL_MODERATION_SESSION_SECRET: 'test-moderation-secret'
+};
+
+const RECOVERY_ENV = {
+  ...CONFIGURED_ENV,
+  ARTSOUL_MODERATION_SAFE_RECOVERY_ADDRESS: SAFE,
+  ARTSOUL_MODERATION_SAFE_RECOVERY_CHAIN_ID: '84532',
+  ARTSOUL_MODERATION_SAFE_RECOVERY_RPC_URLS: 'https://rpc-a.test,https://rpc-b.test'
 };
 
 function hashToken(raw) {
@@ -69,7 +79,8 @@ function createDb(seed = {}) {
     artsoul_staff_passkeys: seed.passkeys || [],
     artsoul_webauthn_challenges: seed.challenges || [],
     artsoul_staff_enrollment_grants: seed.grants || [],
-    artsoul_staff_auth_events: seed.events || []
+    artsoul_staff_auth_events: seed.events || [],
+    artsoul_staff_recovery_requests: seed.recoveryRequests || []
   };
   const log = [];
   let nextId = 1000;
@@ -178,6 +189,33 @@ function createDb(seed = {}) {
       cred.last_used_at = new Date().toISOString();
       audit(wallet, 'passkey_auth_success', b.p_credential_id, null);
       return 'OK';
+    },
+    a8d_complete_safe_recovery(b) {
+      const wallet = String(b.p_target_wallet).toLowerCase();
+      const safe = String(b.p_safe_address).toLowerCase();
+      const request = tables.artsoul_staff_recovery_requests.find(row => row.request_id === b.p_request_id);
+      if (!request || request.target_wallet !== wallet || request.safe_address !== safe ||
+          Number(request.chain_id) !== Number(b.p_chain_id) || request.message_hash !== String(b.p_message_hash).toLowerCase() ||
+          request.consumed_at || new Date(request.expires_at) <= new Date()) return 'RECOVERY_REQUEST_INVALID';
+      if (!/^[0-9a-f]{64}$/.test(String(b.p_signature_hash)) ||
+          !/^[0-9a-f]{64}$/.test(String(b.p_token_hash)) ||
+          new Date(b.p_grant_expires_at) <= new Date() ||
+          new Date(b.p_grant_expires_at) > new Date(Date.now() + (15 * 60 * 1000))) return 'RECOVERY_COMMIT_INVALID';
+      request.consumed_at = new Date().toISOString();
+      const grant = insert('artsoul_staff_enrollment_grants', {
+        target_wallet: wallet, purpose: 'additional', token_hash: String(b.p_token_hash).toLowerCase(),
+        issued_by: safe, issued_at: new Date().toISOString(), expires_at: b.p_grant_expires_at,
+        consumed_at: null, revoked_at: null
+      })[0];
+      audit(wallet, 'recovery_authorized', null, {
+        request_id: request.request_id, safe_address: safe, chain_id: Number(b.p_chain_id),
+        message_hash: String(b.p_message_hash).toLowerCase(), signature_hash: String(b.p_signature_hash).toLowerCase(),
+        grant_id: grant.id
+      });
+      audit(wallet, 'grant_issued', null, {
+        grant_id: grant.id, purpose: 'additional', issued_by: safe, source: 'safe_recovery'
+      });
+      return 'OK';
     }
   };
 
@@ -242,14 +280,43 @@ function cookieValueFromHeader(header) {
   return String(header || '').split(';')[0];
 }
 
-function loadEnvironment({ env = {}, db = createDb(), webauthn = {} } = {}) {
+function loadEnvironment({ env = {}, db = createDb(), webauthn = {}, recoveryRpc = {} } = {}) {
   const calls = { registrationOptions: [], registrationVerify: [], authenticationOptions: [], authenticationVerify: [] };
   const control = { registrationVerified: true, authenticationVerified: true, newCounter: 7, ...webauthn };
+
+  const recoveryControl = {
+    'https://rpc-a.test': { valid: true },
+    'https://rpc-b.test': { valid: true },
+    ...recoveryRpc
+  };
+  class MockJsonRpcProvider {
+    constructor(url, chainId) { this.url = url.url || url; this.chainId = chainId; }
+    async getNetwork() {
+      const item = recoveryControl[this.url] || {};
+      if (item.networkError) throw new Error('network unavailable');
+      return { chainId: BigInt(item.chainId ?? this.chainId) };
+    }
+    async getCode() {
+      const item = recoveryControl[this.url] || {};
+      if (item.codeError) throw new Error('code unavailable');
+      return item.code ?? '0x6000';
+    }
+    async call() {
+      const item = recoveryControl[this.url] || {};
+      if (item.callError) throw new Error('EIP-1271 call failed');
+      const magic = item.valid === false ? 'ffffffff' : '1626ba7e';
+      return `0x${magic}${'0'.repeat(56)}`;
+    }
+  }
+  class MockFetchRequest {
+    constructor(url) { this.url = url; this.timeout = 0; }
+  }
 
   const context = vm.createContext({
     process: { env: { NODE_ENV: 'test', ...env } },
     console: { log() {}, warn() {}, error() {} },
-    crypto, Buffer, URLSearchParams, exported: {},
+    crypto, Buffer, URL, URLSearchParams, FetchRequest: MockFetchRequest, Interface, JsonRpcProvider: MockJsonRpcProvider,
+    hashMessage, isAddress, isHexString, exported: {},
     generateRegistrationOptions: async (options) => {
       calls.registrationOptions.push(options);
       return { challenge: 'reg-challenge-1', rp: { id: options.rpID } };
@@ -284,13 +351,15 @@ function loadEnvironment({ env = {}, db = createDb(), webauthn = {} } = {}) {
   context.exported.__mockSupabase = db.supabaseRest;
   vm.runInContext('supabaseRest = exported.__mockSupabase;', context);
   vm.runInContext(stripModule(passkeySource), context, { filename: 'moderation-passkey.js (stripped)' });
+  vm.runInContext(stripModule(safeRecoverySource), context, { filename: 'moderation-safe-recovery.js (stripped)' });
   vm.runInContext(stripModule(accessSource), context, { filename: 'moderation-access.js (stripped)' });
   vm.runInContext([
     'exported.getModerationAccess = getModerationAccess;',
     'exported.setWalletSession = setWalletSession;',
     'exported.setModerationSession = setModerationSession;',
     'exported.MODERATION_SESSION_TTL_SECONDS = MODERATION_SESSION_TTL_SECONDS;',
-    'exported.hashGrantToken = hashGrantToken;'
+    'exported.hashGrantToken = hashGrantToken;',
+    'exported.hashSafeRecoverySignature = hashSafeRecoverySignature;'
   ].join('\n'), context);
 
   const routeCache = new Map();
@@ -315,7 +384,7 @@ function loadEnvironment({ env = {}, db = createDb(), webauthn = {} } = {}) {
     return cookieValueFromHeader(res.headers['set-cookie']);
   }
 
-  return { context, db, calls, control, loadRoute, siweCookie, moderationCookie, exported: context.exported };
+  return { context, db, calls, control, recoveryControl, loadRoute, siweCookie, moderationCookie, exported: context.exported };
 }
 
 function staffSeed(extra = {}) {
@@ -803,14 +872,95 @@ test('no HTTP route can mint a bootstrap grant', async () => {
   }
 });
 
-test('recovery always fails closed and is audit-recorded', async () => {
+test('recovery fails closed when the Safe configuration is absent', async () => {
   const db = createDb(staffSeed());
   const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
   const res = fakeRes();
   await envir.loadRoute('recovery')(fakeReq({ cookie: envir.siweCookie(STAFF) }), res);
-  assert.equal(res.statusCode, 403);
-  assert.equal(res.body.error, 'RECOVERY_UNAVAILABLE');
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.error, 'MODERATION_SAFE_RECOVERY_MISCONFIGURED');
   assert.equal(db.tables.artsoul_staff_auth_events.at(-1).event_type, 'recovery_denied');
+});
+
+test('Safe recovery request binds the authenticated staff wallet and exact production identity', async () => {
+  const db = createDb(staffSeed());
+  const envir = loadEnvironment({ env: RECOVERY_ENV, db });
+  const res = fakeRes();
+  await envir.loadRoute('recovery')(fakeReq({
+    cookie: envir.siweCookie(STAFF),
+    host: 'evil.example',
+    body: { action: 'request', target_wallet: OTHER, safe_address: OTHER }
+  }), res);
+  assert.equal(res.statusCode, 200);
+  const row = db.tables.artsoul_staff_recovery_requests[0];
+  assert.equal(row.target_wallet, STAFF, 'request body cannot select the recovered wallet');
+  assert.equal(row.safe_address, SAFE, 'request body cannot select the authorizing Safe');
+  assert.equal(row.rp_id, CONFIGURED_ENV.ARTSOUL_WEBAUTHN_RP_ID);
+  assert.equal(row.origin, CONFIGURED_ENV.ARTSOUL_WEBAUTHN_ALLOWED_ORIGIN);
+  assert.match(row.message, new RegExp(`Target wallet: ${STAFF}`));
+  assert.match(row.message, new RegExp(`Authorizing Safe: ${SAFE}`));
+  assert.doesNotMatch(row.message, /evil\.example/);
+  assert.equal(row.message_hash, hashMessage(row.message));
+});
+
+test('Safe recovery audit hashes canonical signature bytes rather than hex spelling', () => {
+  const envir = loadEnvironment({ env: RECOVERY_ENV });
+  assert.equal(
+    envir.exported.hashSafeRecoverySignature('0xAABBcc'),
+    envir.exported.hashSafeRecoverySignature('0xaabbCC')
+  );
+});
+
+test('one invalid or unavailable RPC makes Safe recovery fail closed without issuing a grant', async () => {
+  const db = createDb(staffSeed());
+  const envir = loadEnvironment({
+    env: RECOVERY_ENV,
+    db,
+    recoveryRpc: { 'https://rpc-b.test': { valid: false } }
+  });
+  const cookie = envir.siweCookie(STAFF);
+  const requested = fakeRes();
+  await envir.loadRoute('recovery')(fakeReq({ cookie, body: { action: 'request' } }), requested);
+  const completed = fakeRes();
+  await envir.loadRoute('recovery')(fakeReq({
+    cookie,
+    body: { action: 'complete', request_id: requested.body.request.request_id, signature: '0x1234' }
+  }), completed);
+  assert.equal(completed.statusCode, 403);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants.length, 0);
+  assert.equal(db.tables.artsoul_staff_recovery_requests[0].consumed_at, undefined);
+  assert.equal(db.tables.artsoul_staff_auth_events.at(-1).event_type, 'recovery_denied');
+});
+
+test('threshold-valid Safe recovery issues one additional-device grant and rejects replay', async () => {
+  const db = createDb(staffSeed());
+  const envir = loadEnvironment({ env: RECOVERY_ENV, db });
+  const cookie = envir.siweCookie(STAFF);
+  const requested = fakeRes();
+  await envir.loadRoute('recovery')(fakeReq({ cookie, body: { action: 'request' } }), requested);
+  const payload = {
+    action: 'complete', request_id: requested.body.request.request_id, signature: '0x1234',
+    target_wallet: OTHER, safe_address: OTHER
+  };
+  const completed = fakeRes();
+  await envir.loadRoute('recovery')(fakeReq({ cookie, body: payload }), completed);
+  assert.equal(completed.statusCode, 200);
+  assert.match(completed.body.token, /^[A-Za-z0-9_-]{43}$/);
+  assert.ok(db.tables.artsoul_staff_recovery_requests[0].consumed_at);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants.length, 1);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants[0].target_wallet, STAFF);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants[0].issued_by, SAFE);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants[0].purpose, 'additional');
+  assert.equal(db.tables.artsoul_staff_enrollment_grants[0].token_hash, hashToken(completed.body.token));
+  assert.deepEqual(
+    db.tables.artsoul_staff_auth_events.slice(-2).map(event => event.event_type),
+    ['recovery_authorized', 'grant_issued']
+  );
+
+  const replay = fakeRes();
+  await envir.loadRoute('recovery')(fakeReq({ cookie, body: payload }), replay);
+  assert.equal(replay.statusCode, 403);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants.length, 1, 'replay must not issue a second grant');
 });
 
 // ---------------------------------------------------------------------------
