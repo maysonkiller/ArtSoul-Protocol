@@ -18,23 +18,41 @@ X:
 https://artsoulprotocol.com/api/oauth/callback/twitter
 ```
 
-## Current pull-request preview callback URLs
+## Registered state, verified 2026-08-17
 
-Add these for real provider verification on the `fix/social-linking` preview. Confirm that the deployed Vercel alias matches before saving the provider settings.
+The X application `artsoul-marketplace` (OAuth 2.0 Client ID
+`YVNmTUVHcE5Sb1hVbnp3NUFFNUs6MTpjaQ`) had **no apex callback registered** after
+the 2026-08-08 domain cutover, which is why linking failed on the apex with
+`Something went wrong` on X's own authorize screen while Discord kept working.
+Backlog A-49 records the diagnosis.
 
-Discord:
-
-```text
-https://artsoul-git-fix-social-linking-maysonkiller-be9112b5.vercel.app/api/oauth/callback/discord
-```
-
-X:
+Its Callback URI list now contains exactly:
 
 ```text
-https://artsoul-git-fix-social-linking-maysonkiller-be9112b5.vercel.app/api/oauth/callback/twitter
+https://artsoulprotocol.com/api/oauth/callback/twitter
+https://artsoul.vercel.app/api/oauth/callback/twitter
+http://localhost:3000/api/oauth/callback/twitter
 ```
 
-Vercel preview aliases are deployment-specific. Each preview host used for OAuth testing must be added as an exact callback URL in the provider portal.
+The stale `artsoul-git-fix-social-linking-maysonkiller-be9112b5.vercel.app`
+callback was removed. That branch is merged and a redirect URI pointing at a
+domain nobody controls any more is unnecessary attack surface. App permissions
+stayed `Read`, type of app stayed `Web App, Automated App or Bot`, and no key was
+regenerated, so no Vercel variable changed.
+
+Website URL, Organization URL, Terms of Service and Privacy Policy were also
+moved from `https://artsoul.vercel.app` to `https://artsoulprotocol.com`.
+
+**Discord has not been re-checked** against this list. Linking works on the apex,
+so its Redirects already contain the apex, but it may still carry the same stale
+preview entry. Audit it during the next social-linking task.
+
+## Preview callback URLs
+
+A Vercel preview alias is deployment-specific. If a future preview needs real
+provider verification, add that exact host as a callback URL in the provider
+portal for the duration of the test, then remove it again. Do not leave dead
+preview callbacks registered.
 
 ## Local callback URLs
 
