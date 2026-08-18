@@ -1,10 +1,12 @@
 # ArtSoul Engineering Handoff
 
-Updated: 2026-08-04
+Updated: 2026-08-17
 
-Production code baseline: `main` includes `f4297ce`
+Production code baseline: `main` at `f904d90` (merged PR #196)
 
-Companion state document: `docs/PROJECT_STATE.md`
+Companion state document: `docs/PROJECT_STATE.md`. That file is a dated audit
+snapshot, not a live status source. Where it disagrees with
+[`BACKLOG.md`](BACKLOG.md), the backlog is correct.
 
 This handoff is for the next engineering task or a new Codex thread. It contains operational facts, not product marketing. Never expose the internal release codename in UI, investor material, or public campaign copy.
 
@@ -81,62 +83,82 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 
 ## 5. Immediate Priority Queue
 
-`docs/BACKLOG.md` is the status source. Follow its Phase A order; one item equals one task and one PR. A1-A6, A9, A11, and A12 are accepted. A1's final redacted credential/history evidence is in `testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`. A12 production evidence, including the module-entry correction discovered during acceptance, is in `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
+[`BACKLOG.md`](BACKLOG.md) is the status source and this section is a view of it,
+never a second opinion. If the two disagree, the backlog wins and this section is
+stale. One backlog item equals one task and one pull request.
 
-### 1. A1 security and migration operational acceptance is complete
+Phase A stands at **38 done, 4 in progress, 6 planned** across A-01 to A-48, with
+no open pull request and no open issue. Do not re-open a `done` row without new
+contradicting evidence; every one of them carries dated production acceptance.
 
-The 2026-08-04 iPhone run captured a fresh SIWE signature and exact authenticated
-rejection of unsupported MIME and an artwork-size request greater than 50 MB.
-The final 2026-08-07 redacted record confirms server-credential separation,
-retirement of the exposed secondary development key locally and on Hetzner,
-forced production RLS, zero open GitHub secret alerts, and the explicit decision
-to retain repository history under Secret Scanning and push protection. Never
-copy secret values into the repository.
+Accepted and closed - do not redo:
 
-### 2. Fix indexer status configuration drift
+| Area | Backlog rows | Evidence |
+| --- | --- | --- |
+| Secrets, RLS, migration ledger | A-01, A-02 | `testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`, `testnet/A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md` |
+| External-mobile wallet and diagnostics removal | A-03, A-04 | `testnet/MOBILE_WALLET_PRODUCTION_ACCEPTANCE_2026-07-30.md` |
+| Shared header identity and first paint | A-05, A-45, A-46 | `testnet/SHARED_HEADER_PRODUCTION_REACCEPTANCE_2026-08-13.md` |
+| Indexer depth, failure integrity, heartbeat, metrics auth | A-14, A-15, A-40 to A-43 | PRs #112, #114, #136, #138, #140, #142, #144, #145 |
+| CI and the canonical test runner | A-16, A-17 | `.github/workflows/ci.yml`, `scripts/run-unit-tests.mjs`, `npm test` |
+| Projections, provenance, profile gating | A-18, A-19 | PRs #120, #122, #124, #126, #127 |
+| Base commitments, homepage, network copy | A-24 to A-28, A-44 | `runbooks/A11_PUBLIC_METRICS_ROLLOUT.md`, `testnet/A12_NETWORK_COPY_ACCEPTANCE.md` |
+| Infrastructure cost observation | A-13 | `runbooks/A9_INFRA_COST_MONITORING.md` |
 
-`INDEXER_CONFIRMATION_DEPTH=3` is active in runtime, but an existing `indexer_state` row still reports 12. Update the persisted field when configuration changes, add a focused test, and verify `/api/public/indexer-status` matches `/health`.
+### 1. The moderation chain is the only thing gating Phase B
 
-Do not alter auction confirmation semantics while fixing observability.
+A-21, A-22 and A-39 are one dependency chain and they are the reason
+[`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md) is still
+**NO-GO** under A-23.
 
-### 3. Verify projections and provenance
+- **A-39** (PR #129, PR #196): A8a step-up and the A8d Safe-only recovery
+  foundation are merged with the flag disabled and the migrations unapplied.
+- **A-22** (PR #133): the Protocol Admin review queue, notifications and audit
+  log are implemented and reviewed; they cannot be activated before A-39.
+- **A-21** (PR #130): complaint intake exists behind a disabled flag and must
+  stay disabled until A-22 has an operational review path.
 
-- Exercise registered, live, no-bid, awaiting-payment, defaulted, sold/minted, listed, and resold states.
-- Verify Creator, First Collector, and Owner are derived from indexed on-chain data.
-- Verify full timeline order and profile links.
-- Verify cards remain creator-focused and do not duplicate ownership rows.
+The remaining work here is **not code**. It is a single ordered activation
+sequence owned by the founder, defined in
+[`runbooks/A8_MODERATION_ROLLOUT.md`](runbooks/A8_MODERATION_ROLLOUT.md) section 3:
+a verified Supabase backup; the four migrations `a8a`, `a8b`, `a8c`, `a8d`
+applied **in that order** with their read-only verification output archived;
+final RP ID, origin, moderation-session secret, Safe, chain and two independent
+recovery RPCs configured; two enrolled founder passkeys; the one-time audited
+bootstrap grant; and the full A8d recovery ceremony including every mandatory
+denial in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md)
+section 6. See RG-03 in [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md).
 
-### 4. Complete profile lifecycle and action gating
+RG-01 gates that sequence and is the cheapest open item in the project. Its
+fill-in evidence form is
+[`testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md`](testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md).
 
-- Re-test created, auction, sold, and collected tabs.
-- Ensure owner-only resale, creator-only re-auction, winner-only settlement, and legacy-chain read-only behavior.
-- Confirm disconnected profile renders immediately without background churn.
+The 2026-08-16 Base Sepolia multisig rehearsal
+([`testnet/RG05_SAFE_MULTISIG_REHEARSAL_2026-08-16.md`](testnet/RG05_SAFE_MULTISIG_REHEARSAL_2026-08-16.md))
+proved threshold enforcement and signer-loss replacement. It does **not** satisfy
+A-39: A8d verifies a server-issued recovery message through EIP-1271 and two RPC
+endpoints, which that rehearsal never exercised.
 
-### 5. Build moderation/reporting MVP
+### 2. Unblocked engineering available now
 
-- Add a Report action on each artwork.
-- Implement complaint submission and notice-and-takedown review state.
-- Add a review queue and audit trail.
-- Use server-confirmed staff roles plus the approved 15-minute passkey step-up; X and Discord handles are not authentication factors. Preserve the multisig requirement for irreversible actions.
-- Do not build Content-ID or audio fingerprinting; v1.2 canon explicitly removed that requirement.
+These six rows need no founder decision and no new spend:
 
-### 6. Confirm infrastructure cost and health
+| Row | Work | First step |
+| --- | --- | --- |
+| A-47 | Reduce head asset weight | Split `avatar-dropdown.js` and attack the exact-artwork cold path. Lazy-loading `appkit-init.js` was investigated on 2026-08-11 and **rejected**: it is the sole writer of `window.artsoulWalletStateSettled`. |
+| A-48 | Full-document repaint on browser Back | Determine why the page is bfcache-ineligible before adding any mask, SPA rewrite or wallet lifecycle change. |
+| A-33 | Artwork-page acceptance sweep | Open concrete defects only; do not redesign or touch auction mechanics. |
+| A-34 | Reusable aura frame shell | Presentation-only API. Real status binding stays C-14. |
+| A-35 | Migration trees and legacy runtime | Reconcile what is applied before deleting anything. |
+| A-38 | Dependency and warning triage | Classify runtime versus dev-only. Never `npm audit fix --force`. |
 
-- Monitor Alchemy for at least seven days after PR #90.
-- Confirm usage trends toward less than 30% of the monthly free tier.
-- Add indexer lag, fallback-RPC, API error, Supabase egress, and PM2 restart alerts.
-- A-15 is production-verified at merge commit `32b2d49`: `failed_events` is retired, `event_processing_registry` is the fail-closed source of truth, health is healthy, and both failed/dead counts are zero in `/health` and authenticated Prometheus output.
-- A-40 and A-41 are production-verified at merge commits `711027b` and `c1decb2`: the dormant alert path is removed, health metrics use real rolling RPC observations, and the event heartbeat is cancellable.
-- A-42 is production-verified at merge commit `1c37061`: `METRICS_AUTH` is explicit and undisclosed, `/metrics` returns 401 without it and 200 with it, port 3001 is loopback-only, the monitor is green, and PM2 was saved only after acceptance passed.
-- A9 was accepted on 2026-07-28 after the 2026-07-22 through 2026-07-28 Alchemy/Supabase observation window. Alchemy forecast 22.9M of the 30M hard limit; ArtSoul-only Supabase uncached egress stayed at 41.0–59.4 MB/day, current-cycle uncached/cached totals were 0.246/0.764 GB, and Spend Cap remained enabled. Continue the Tuesday/Friday checks in `runbooks/A9_INFRA_COST_MONITORING.md`; A-43 is already separately accepted.
+### 3. Standing operational duties
 
-### 7. Complete the Base commitments and beta-entry evidence
-
-- A11, A12, and backlog A-24 through A-28 were accepted on production on 2026-07-28 through PRs #160, #162, and #163. Migration 015, the cached aggregate, public API, responsive homepage, active-network copy, canonical Genesis trust copy, React entry scheduling, Hetzner health, advancing cursor, and saved PM2 state passed. See `runbooks/A11_PUBLIC_METRICS_ROLLOUT.md` and `testnet/A12_NETWORK_COPY_ACCEPTANCE.md`.
-- Complete the evidence gates in
-  [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md); the
-  entry pack is prepared but remains NO-GO while Phase A blockers are open.
-- Invite trusted testers only after the remaining Phase A acceptance criteria pass. Track feedback in GitHub Issues rather than chat-only queues.
+- Continue the Tuesday/Friday Alchemy and Supabase review in
+  [`runbooks/A9_INFRA_COST_MONITORING.md`](runbooks/A9_INFRA_COST_MONITORING.md).
+- Keep `npm run monitor:indexer` green and PM2 saved only after acceptance.
+- Track tester feedback in GitHub Issues, never in chat-only queues.
+- Do not start Phase C contract work, Genesis, Collections, promoted banners or
+  premium aura work while any Phase A row above is open.
 
 ## 6. Local Development Commands
 
@@ -152,7 +174,15 @@ npm run build
 git diff --check
 ```
 
-Run focused Node tests explicitly until the aggregate script is repaired:
+The aggregate command is repaired and is the default. `npm test` runs
+`test:unit` through `scripts/run-unit-tests.mjs` and then `test:contracts`
+through Hardhat, which is the same thing CI runs on Ubuntu and Windows:
+
+```powershell
+npm test
+```
+
+Run individual suites only when narrowing a specific failure:
 
 ```powershell
 node --test test/mobile-wallet-session-persistence.test.cjs

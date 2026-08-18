@@ -41,3 +41,16 @@ FOUNDER_ACTION_PLAN_RU.md
 *LEGAL*.md
 *OUTREACH*.md
 *FOUNDER_ACTION*.md
+
+# Founder-owned operational material that must never reach the public repository.
+# RESOURCE_GATED_WORK.md RG-04 requires wallet addresses and role assignments to
+# stay out of public source. Redacted acceptance records belong in docs/testnet/.
+docs/private/
+docs/BASE_ECOSYSTEM_FUND_READINESS.md
+docs/progress/PUBLIC_PROGRESS_2026-07-29_TO_2026-08-13.md
+
+# Playwright CLI debug artifacts (console logs, page dumps, traces, screenshots)
+.playwright-cli/
+
+# Generated brand/marketing renders. Decide per-asset whether to track them.
+brand/
