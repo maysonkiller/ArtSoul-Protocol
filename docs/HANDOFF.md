@@ -2,7 +2,7 @@
 
 Updated: 2026-08-19
 
-Production code baseline: `main` at `f904d90` (merged PR #196)
+Production code baseline: `main` includes `f4297ce` and currently heads at `f904d90` (merged PR #196)
 
 Companion state document: `docs/PROJECT_STATE.md`. That file is a dated audit
 snapshot, not a live status source. Where it disagrees with
@@ -103,6 +103,26 @@ Accepted and closed - do not redo:
 | Projections, provenance, profile gating | A-18, A-19 | PRs #120, #122, #124, #126, #127 |
 | Base commitments, homepage, network copy | A-24 to A-28, A-44 | `runbooks/A11_PUBLIC_METRICS_ROLLOUT.md`, `testnet/A12_NETWORK_COPY_ACCEPTANCE.md` |
 | Infrastructure cost observation | A-13 | `runbooks/A9_INFRA_COST_MONITORING.md` |
+
+Dated acceptance statements, kept verbatim because they are the evidence that
+these rows are closed:
+
+- A1-A6, A9, A11, and A12 are accepted. A1 security and migration operational acceptance is complete.
+  The 2026-08-04 iPhone run captured a fresh SIWE
+  signature and exact authenticated rejection of unsupported MIME and an
+  artwork-size request greater than 50 MB, and the 2026-08-07 redacted record
+  confirmed server-credential separation, retirement of the exposed secondary
+  development key, forced production RLS, and zero open GitHub secret alerts.
+- A9 was accepted on 2026-07-28 after the 2026-07-22 through 2026-07-28
+  Alchemy and Supabase observation window. Alchemy forecast 22.9M of the 30M
+  hard limit; ArtSoul-only Supabase uncached egress stayed at 41.0-59.4 MB/day
+  and Spend Cap remained enabled. Continue the Tuesday/Friday checks in
+  [`runbooks/A9_INFRA_COST_MONITORING.md`](runbooks/A9_INFRA_COST_MONITORING.md).
+- A11, A12, and backlog A-24 through A-28 were accepted on production on 2026-07-28 through PRs #160, #162 and #163.
+  Migration 015, the cached
+  aggregate, the public API, the responsive homepage, active-network copy, the
+  canonical Genesis trust copy, React entry scheduling, Hetzner health, an
+  advancing cursor and saved PM2 state all passed.
 
 ### 1. The moderation chain is the only thing gating Phase B
 
