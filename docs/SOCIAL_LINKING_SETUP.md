@@ -18,7 +18,7 @@ X:
 https://artsoulprotocol.com/api/oauth/callback/twitter
 ```
 
-## Registered state, verified 2026-08-17
+## Registered state, verified 2026-08-19
 
 The X application `artsoul-marketplace` (OAuth 2.0 Client ID
 `YVNmTUVHcE5Sb1hVbnp3NUFFNUs6MTpjaQ`) had **no apex callback registered** after

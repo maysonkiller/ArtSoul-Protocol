@@ -81,7 +81,7 @@ These exist because OAuth redirects back to a fixed origin. If a provider
 callback still points anywhere other than the apex, linking silently breaks in
 production.
 
-X linking failed on the apex until 2026-08-17 because the X application had no
+X linking failed on the apex until 2026-08-19 because the X application had no
 apex callback registered. Backlog A-49 records the diagnosis and the correction,
 and a founder link/unlink on the apex succeeded afterwards. All rows below are
 runnable; C4 to C6 are no longer blocked.

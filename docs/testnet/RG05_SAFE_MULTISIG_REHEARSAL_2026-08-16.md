@@ -1,7 +1,7 @@
 # RG-05 Base Sepolia Multisig Rehearsal - 2026-08-16
 
-Recorded: 2026-08-17
-Verified: 2026-08-17 against Base Sepolia chain state, not against a founder report
+Recorded: 2026-08-19
+Verified: 2026-08-19 against Base Sepolia chain state, not against a founder report
 Scope: `RESOURCE_GATED_WORK.md` RG-05, backlog [`C-01`](../BACKLOG.md)
 Chain: Base Sepolia, chain ID `84532`
 Status: **partial pass.** The threshold and signer-loss gates of RG-05 are
@@ -80,7 +80,7 @@ block its own replacement, and does not need to be available.
 Nonce 4 restored Signer 2 and removed the temporary address, again without any
 signature from the address being removed.
 
-Post-restore state, read from chain on 2026-08-17:
+Post-restore state, read from chain on 2026-08-19:
 
 - owner count 3, matching the original composition exactly;
 - threshold 2;
@@ -118,7 +118,7 @@ Not proven, and still open:
 
 ## 6. How this was verified, and how to re-verify
 
-Verification on 2026-08-17 used two independent read paths:
+Verification on 2026-08-19 used two independent read paths:
 
 1. the public Base Sepolia JSON-RPC endpoint `https://sepolia.base.org`, for
    `eth_getTransactionByHash`, `eth_getTransactionReceipt`, decoded
