@@ -1,4 +1,5 @@
 import { React, createRoot } from './react-runtime.js';
+import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { CardGridSkeleton, ProfilePageSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
@@ -35,7 +36,7 @@ const { useState, useEffect, useRef } = React;
             const [myArtworks, setMyArtworks] = useState([]);
             const [loading, setLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
             const [artworksLoading, setArtworksLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
-            const [isOwnProfile, setIsOwnProfile] = useState(true);
+            const [isOwnProfile, setIsOwnProfile] = useState(false);
             const [walletStateSettled, setWalletStateSettled] = useState(initiallySettled);
             const [discoveryProfile, setDiscoveryProfile] = useState(null);
             const [oauthNotice, setOAuthNotice] = useState(null);
@@ -81,8 +82,16 @@ const { useState, useEffect, useRef } = React;
                     if (disposed) return;
 
                     const viewAddress = getViewAddress();
-                    const stateIsSettled = Boolean(viewAddress) || window.artsoulWalletStateSettled === true;
-                    if (!stateIsSettled) return;
+                    // Two separate questions. An address in the URL tells us which
+                    // profile to render; it proves nothing about the wallet. Deciding
+                    // ownership from an unsettled wallet is what hid Edit Profile when
+                    // an artwork linked to /profile?address=<own wallet>.
+                    const walletSettled = isWalletStateSettled({
+                        settledFlag: window.artsoulWalletStateSettled === true,
+                        walletEvent: event?.detail
+                    });
+                    const canResolveTarget = Boolean(viewAddress) || walletSettled;
+                    if (!canResolveTarget) return;
                     setWalletStateSettled(true);
 
                     const signal = getProfileSignal(event?.detail);
@@ -90,15 +99,21 @@ const { useState, useEffect, useRef } = React;
                     const confirmedAddress = event?.detail?.isConnected
                         ? event.detail.address
                         : getActiveWalletAddress();
-                    const viewedAddress = getViewAddress() || signal.address;
-                    if (viewedAddress && confirmedAddress) {
-                        setIsOwnProfile(viewedAddress.toLowerCase() === confirmedAddress.toLowerCase());
+                    const ownership = resolveProfileOwnership({
+                        walletSettled,
+                        viewedAddress: viewAddress || signal.address,
+                        confirmedAddress
+                    });
+                    // null means undecided; leave the previous value rather than
+                    // committing a false that a later event might never correct.
+                    if (ownership !== null) {
+                        setIsOwnProfile(ownership);
                     }
 
                     const addressChanged = signal.address !== previous.address;
                     if (!previous.initialized || options.force || addressChanged) {
                         profileSignalRef.current = { ...signal, initialized: true };
-                        loadProfile(signal.address);
+                        loadProfile(signal.address, { walletSettled });
                     }
                 };
 
@@ -748,9 +763,17 @@ const { useState, useEffect, useRef } = React;
 
                 loadingProfileAddressRef.current = normalizedAddress;
 
-                // Determine if this is the current user's profile
-                const currentAddress = getActiveWalletAddress();
-                const isOwn = currentAddress && currentAddress.toLowerCase() === walletAddress.toLowerCase();
+                // Determine if this is the current user's profile. Undecided stays
+                // undecided: committing false here is what survived until a later
+                // wallet event that may never fire.
+                const walletSettled = isWalletStateSettled({
+                    settledFlag: options.walletSettled === true || window.artsoulWalletStateSettled === true
+                });
+                const isOwn = resolveProfileOwnership({
+                    walletSettled,
+                    viewedAddress: walletAddress,
+                    confirmedAddress: getActiveWalletAddress()
+                });
 
                 try {
                     const db = await waitForArtSoulDB();
@@ -788,8 +811,10 @@ const { useState, useEffect, useRef } = React;
                     setMyArtworks(artworkData.items);
                     setDiscoveryProfile(nextDiscoveryProfile);
                     setArtworksLoading(false);
-                    setIsOwnProfile(Boolean(isOwn));
-                    setEditMode(Boolean(isOwn && profileResult.status === 'fulfilled' && !profileResult.value));
+                    if (isOwn !== null) {
+                        setIsOwnProfile(isOwn);
+                    }
+                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
                     loadedProfileAddressRef.current = normalizedAddress;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
