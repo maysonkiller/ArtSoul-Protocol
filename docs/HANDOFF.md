@@ -1,6 +1,6 @@
 # ArtSoul Engineering Handoff
 
-Updated: 2026-08-17
+Updated: 2026-08-19
 
 Production code baseline: `main` at `f904d90` (merged PR #196)
 
@@ -87,7 +87,7 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 never a second opinion. If the two disagree, the backlog wins and this section is
 stale. One backlog item equals one task and one pull request.
 
-Phase A stands at **38 done, 4 in progress, 6 planned** across A-01 to A-48, with
+Phase A stands at **39 done, 4 in progress, 7 planned** across A-01 to A-50, with
 no open pull request and no open issue. Do not re-open a `done` row without new
 contradicting evidence; every one of them carries dated production acceptance.
 
