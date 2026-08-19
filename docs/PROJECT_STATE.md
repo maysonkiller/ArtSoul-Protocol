@@ -1,15 +1,15 @@
 # ArtSoul Project State
 
 Audit date: 2026-07-15
-Reconciled: 2026-08-17 against `main` at `f904d90` (merged PR #196)
+Reconciled: 2026-08-19 against `main` at `f904d90` (merged PR #196)
 
 > **Read this first.** This file is a dated audit snapshot. It is preserved
 > because its architecture, canon-comparison and contract sections remain
 > accurate and useful. It is **not** the status source.
 > [`BACKLOG.md`](BACKLOG.md) is. Where the two disagree, the backlog wins.
 >
-> Corrections applied on 2026-08-17 are marked inline as
-> **`[Superseded 2026-08-17]`**. The largest ones, so no agent re-opens closed
+> Corrections applied on 2026-08-19 are marked inline as
+> **`[Superseded 2026-08-19]`**. The largest ones, so no agent re-opens closed
 > work:
 >
 > - The 20-failure test baseline and the missing aggregate test command are
@@ -20,7 +20,7 @@ Reconciled: 2026-08-17 against `main` at `f904d90` (merged PR #196)
 >   indexer confirmation-depth defect, projection/provenance verification and
 >   profile action gating are all **accepted with dated production evidence**
 >   (A-03, A-04, A-14, A-18, A-19).
-> - Phase A now stands at 38 `done`, 4 `in progress`, 6 `planned`. The only
+> - Phase A now stands at 39 `done`, 4 `in progress`, 7 `planned`. The only
 >   chain gating Phase B is moderation: A-39, then A-22, then A-21, then the
 >   A-23 go/no-go.
 >
@@ -43,20 +43,20 @@ Current strengths:
 
 - The production site and public API are online on Vercel.
 - The Base Sepolia indexer is online on Hetzner and the public projection was current at audit time.
-- The Vite multi-page production build succeeds and every built HTML route passes the build verifier without in-browser Babel. **[Superseded 2026-08-17]** The count is now ten routes; `/admin` was added by A-22.
+- The Vite multi-page production build succeeds and every built HTML route passes the build verifier without in-browser Babel. **[Superseded 2026-08-19]** The count is now ten routes; `/admin` was added by A-22.
 - The deployed testnet contract covers registration, auctions, deposit-backed bids, settlement, lazy minting, default handling, withdrawals, and resale.
-- Focused contract tests pass: 19 of 19. **[Still true 2026-08-17]** They now run in CI on Ubuntu and Windows.
+- Focused contract tests pass: 19 of 19. **[Still true 2026-08-19]** They now run in CI on Ubuntu and Windows.
 - Public reads use Supabase projections and caching instead of per-visitor RPC reads.
 - The RPC diet from PR #90 is deployed to the Base Sepolia indexer.
 
 Phase A blockers **as recorded on 2026-07-15**:
 
-- ~~The external-mobile wallet flow is materially improved but still needs the final real-phone acceptance checklist and cleanup of the production debug overlay.~~ **[Superseded 2026-08-17]** Closed by A-03 and A-04; real-iPhone production acceptance is recorded in `testnet/MOBILE_WALLET_PRODUCTION_ACCEPTANCE_2026-07-30.md` and no production overlay wiring remains.
-- ~~The general Node regression suite has 20 failing tests out of 132.~~ **[Superseded 2026-08-17]** Closed by A-16 and A-17. The canonical runner collects `.test.cjs`, `.test.mjs` and `.test.js` deterministically and passes the Windows and Ubuntu CI matrix.
+- ~~The external-mobile wallet flow is materially improved but still needs the final real-phone acceptance checklist and cleanup of the production debug overlay.~~ **[Superseded 2026-08-19]** Closed by A-03 and A-04; real-iPhone production acceptance is recorded in `testnet/MOBILE_WALLET_PRODUCTION_ACCEPTANCE_2026-07-30.md` and no production overlay wiring remains.
+- ~~The general Node regression suite has 20 failing tests out of 132.~~ **[Superseded 2026-08-19]** Closed by A-16 and A-17. The canonical runner collects `.test.cjs`, `.test.mjs` and `.test.js` deterministically and passes the Windows and Ubuntu CI matrix.
 - The public testnet contracts are not mainnet candidates. Resale economics, Genesis behavior, marketplace enforcement, and automatic no-bid finalization do not match the frozen mainnet canon. **Still true.** This is Phase C work, tracked as C-06 to C-08 and C-19 to C-22.
-- ~~Database migration state, historical secret rotation, and public-repository history cleanup require explicit human verification.~~ **[Superseded 2026-08-17]** Closed by A-01 and A-02 on 2026-08-07 with forced RLS, a reconciled migration ledger, zero open secret alerts, and an explicit recorded decision to retain repository history under Secret Scanning and push protection.
+- ~~Database migration state, historical secret rotation, and public-repository history cleanup require explicit human verification.~~ **[Superseded 2026-08-19]** Closed by A-01 and A-02 on 2026-08-07 with forced RLS, a reconciled migration ledger, zero open secret alerts, and an explicit recorded decision to retain repository history under Secret Scanning and push protection.
 - User-facing complaint submission and a review queue are not implemented. **Partly superseded.** Both are now built (A-21 via PR #130, A-22 via PR #133) but remain behind disabled feature flags with unapplied migrations. Activation is founder-gated through A-39 and RG-03, and this is the only chain gating Phase B.
-- ~~There is no repository CI workflow and no working aggregate `npm test` command.~~ **[Superseded 2026-08-17]** `.github/workflows/ci.yml` and `npm test` both exist and are green.
+- ~~There is no repository CI workflow and no working aggregate `npm test` command.~~ **[Superseded 2026-08-19]** `.github/workflows/ci.yml` and `npm test` both exist and are green.
 
 ## 2. Canon Authority
 
@@ -109,8 +109,8 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 
 ### Phase A: Stabilize Public Testnet - active
 
-**[Superseded 2026-08-17]** The table below records the 2026-07-15 position. The
-current position is 38 `done`, 4 `in progress`, 6 `planned` across A-01 to A-48
+**[Superseded 2026-08-19]** The table below records the 2026-07-15 position. The
+current position is 39 `done`, 4 `in progress`, 7 `planned` across A-01 to A-50
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that
@@ -163,7 +163,7 @@ Built routes:
 | `/artwork` | Artwork, auction, discovery, provenance, resale |
 | `/profile` | Profile and lifecycle tabs |
 | `/upload` | Publish flow and AI value guidance |
-| `/admin` | **[Added 2026-08-17]** Protocol Admin moderation review queue (A-22, PR #133), feature-flagged and disabled |
+| `/admin` | **[Added 2026-08-19]** Protocol Admin moderation review queue (A-22, PR #133), feature-flagged and disabled |
 | `/docs-protocol` | Protocol documentation |
 | `/wallet-test` | Isolated wallet diagnostic bench, intentionally not in navigation |
 | `/visual-lab` | Internal visual test surface |
@@ -266,7 +266,7 @@ At audit time the public status endpoint reported:
 
 The public endpoint reported `confirmation_depth=12`, while the founder's direct Hetzner health check after the RPC-diet rollout reported runtime depth 3. This is a real state-reporting defect: `src/indexer/production-runner.js` writes confirmation depth only when inserting a fresh `indexer_state` row and does not update it for an existing row. Runtime polling uses the configured depth, but the persisted status field remains stale. Fix this in a separate code PR and add a regression test.
 
-**[Superseded 2026-08-17]** Fixed and accepted as A-14. PR #112 reconciled the deployed depth from 12 to 3 without resetting the persisted cursor, and PR #114 added schema-aware migration 014, regression coverage and a PostgreSQL 17 integration check. Do not re-open this defect.
+**[Superseded 2026-08-19]** Fixed and accepted as A-14. PR #112 reconciled the deployed depth from 12 to 3 without resetting the persisted cursor, and PR #114 added schema-aware migration 014, regression coverage and a PostgreSQL 17 integration check. Do not re-open this defect.
 
 ### 6.3 Hetzner rollout evidence
 
@@ -350,7 +350,7 @@ No pull requests or GitHub issues were open at audit time. This is a process ris
 
 ### Red or incomplete checks
 
-**[Superseded 2026-08-17] This entire subsection is historical.** A-16 (PR #109)
+**[Superseded 2026-08-19] This entire subsection is historical.** A-16 (PR #109)
 and A-17 (PR #132) closed it. `npm test` runs `test:unit` and `test:contracts`;
 `scripts/run-unit-tests.mjs` collects `.test.cjs`, `.test.mjs` and `.test.js` in
 deterministic order while Hardhat runs `test/ArtSoulV41.test.cjs` separately; and
@@ -394,7 +394,7 @@ The contract suite passes when run through Hardhat with a writable temporary con
 
 ### P1: close before public beta
 
-**[Superseded 2026-08-17]** Ten of these eleven are closed. Only item 8 remains,
+**[Superseded 2026-08-19]** Ten of these eleven are closed. Only item 8 remains,
 and it is founder-gated rather than engineering-gated.
 
 1. ~~Complete the external-mobile wallet acceptance checklist~~ - closed, A-03.
@@ -436,7 +436,7 @@ No token, points, airdrop, zero-fee Genesis mechanic, or alternative economics p
 
 ### Close Phase A
 
-**[Superseded 2026-08-17]** Steps 1, 2, 3, 4 and 6 are complete with dated
+**[Superseded 2026-08-19]** Steps 1, 2, 3, 4 and 6 are complete with dated
 production acceptance, and step 5 is complete except for the moderation MVP.
 What actually remains to close Phase A:
 
