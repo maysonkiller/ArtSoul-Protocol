@@ -278,13 +278,17 @@ async function getProfile(walletAddress) {
 
     const request = (async () => {
         const supabase = await initSupabase();
+        // maybeSingle, not single: a wallet with no profile row yet is the normal
+        // first-visit state, and single() answers it with HTTP 406, which the
+        // browser reports as a failed request in the console even though the
+        // caller handles it. maybeSingle returns null for zero rows instead.
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('wallet_address', normalizedAddress)
-            .single();
+            .maybeSingle();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+        if (error) {
             console.error('Error fetching profile:', error);
             throw error;
         }
