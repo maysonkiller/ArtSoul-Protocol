@@ -433,11 +433,13 @@ test('mobile header keeps the stable shell until a complete cached identity exis
     assert.match(resolving, /avatarUrl: NEUTRAL_AVATAR_URL/);
     assert.match(resolving, /name: RESOLVING_IDENTITY_LABEL/);
     assert.match(resolving, /storedWallet\.slice\(0, 6\)/);
-    // Strictly visual: the guest menu stays until the provider confirms.
+    // Strictly visual: a non-interactive restore status replaces both account
+    // actions until the provider confirms connected or disconnected.
     // The visible state travels inside the identity snapshot, and 'resolving' is
     // never persisted: the stored key is the next document's boot hint and must
     // only ever hold a settled outcome.
     assert.match(resolving, /uiState: 'resolving',\s*persistUiState: false/);
+    assert.match(resolving, /restoring: true/);
     assert.doesNotMatch(resolving, /connected: true/);
 });
 

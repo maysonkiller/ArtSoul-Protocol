@@ -119,6 +119,17 @@ const { useState, useEffect, useRef } = React;
 
                 if (getViewAddress() || window.artsoulWalletStateSettled === true) {
                     refreshProfileState({ detail: window.artsoulSettledWalletState });
+                } else if (hasInitialWalletHint) {
+                    // Public profile data is safe to read while the provider
+                    // restores the previous wallet. Ownership remains unknown
+                    // and every protected action stays hidden until settlement.
+                    const restoringAddress = initialWalletHint.toLowerCase();
+                    profileSignalRef.current = {
+                        address: restoringAddress,
+                        chainId: null,
+                        initialized: true
+                    };
+                    loadProfile(restoringAddress, { walletSettled: false });
                 }
 
                 window.addEventListener('artsoul:wallet-state-settled', refreshProfileState);
@@ -1218,7 +1229,7 @@ const { useState, useEffect, useRef } = React;
                 );
             }
 
-            if (!viewAddress && !connectedWalletAddress) {
+            if (!viewAddress && !connectedWalletAddress && !profile?.wallet_address) {
                 return (
                     <div className={`min-h-screen ${bgClass}`}>
                         <main className="site-page-container py-12">

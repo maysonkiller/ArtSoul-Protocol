@@ -534,13 +534,13 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=44">/, `${page} stylesheet pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=45">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=2"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=47" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=48" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=44');
+    const stylesheet = html.indexOf('unified-styles.css?v=45');
     const prepaint = html.indexOf('header-prepaint.js?v=2');
-    const component = html.indexOf('avatar-dropdown.js?v=47');
+    const component = html.indexOf('avatar-dropdown.js?v=48');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
     const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");
@@ -989,8 +989,10 @@ test('a stored wallet without a cached profile renders a coherent resolving stat
   assert.equal(harness.avatarName(), RESOLVING_LABEL);
   assert.equal(harness.avatarAddress(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
   assert.equal(harness.uiState(), 'resolving');
-  // Not a fabricated profile, and it authorizes nothing.
-  assert.match(harness.menuHtml(), /Connect Wallet/);
+  // Not a fabricated profile, and it authorizes nothing. Neither account
+  // action is truthful until the provider settles.
+  assert.match(harness.menuHtml(), /Restoring wallet…/);
+  assert.doesNotMatch(harness.menuHtml(), /Connect Wallet/);
   assert.doesNotMatch(harness.menuHtml(), /Disconnect/);
   assert.doesNotMatch(harness.menuHtml(), /data-network-balance/);
   // The transient state must never become the NEXT document's boot hint.

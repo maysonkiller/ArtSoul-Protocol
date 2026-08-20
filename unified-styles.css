@@ -4986,6 +4986,16 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
     padding: 0.34rem 0.48rem !important;
 }
 
+.site-header .avatar-dropdown-navigation .avatar-restore-status {
+    justify-content: center !important;
+    cursor: progress !important;
+    pointer-events: none !important;
+    opacity: 0.72;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
 .future .site-header .avatar-dropdown-menu .dropdown-item:not(.is-disabled):hover,
 .future .site-header .avatar-dropdown-menu .dropdown-item:not(.is-disabled):focus-visible {
     border-color: var(--c-accent) !important;

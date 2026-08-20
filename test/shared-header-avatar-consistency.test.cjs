@@ -162,6 +162,25 @@ test('a cached header identity is replaced by the live profile once the wallet s
   assertConnectedIdentity(harness, WALLET_A);
 });
 
+test('an uncached stored wallet exposes no false account action while restoration is pending', async () => {
+  const harness = createAvatarHarness({
+    userAgent: IPHONE_UA,
+    pathname: '/profile',
+    settled: false,
+    storage: { artsoul_wallet: WALLET_A }
+  });
+
+  harness.dropdown.renderInitializingState();
+  await harness.flush();
+
+  assert.equal(harness.uiState(), 'resolving');
+  assert.equal(harness.avatarName(), 'Connecting…');
+  assert.equal(harness.avatarAddress(), shortName(WALLET_A));
+  assert.match(harness.menuHtml(), /Restoring wallet…/);
+  assert.doesNotMatch(harness.menuHtml(), /Connect Wallet/);
+  assert.doesNotMatch(harness.menuHtml(), /Disconnect/);
+});
+
 // 4 — requested avatar load error followed by a successful retry
 test('an avatar image error falls back but never suppresses a later retry', async () => {
   const harness = connectedHarness({
