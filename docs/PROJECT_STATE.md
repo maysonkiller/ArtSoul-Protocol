@@ -1,15 +1,15 @@
 # ArtSoul Project State
 
 Audit date: 2026-07-15
-Reconciled: 2026-08-19 against `main` at `f904d90` (merged PR #196)
+Reconciled: 2026-08-20 against `main` at `0bbeec5` (merged PR #201)
 
 > **Read this first.** This file is a dated audit snapshot. It is preserved
 > because its architecture, canon-comparison and contract sections remain
 > accurate and useful. It is **not** the status source.
 > [`BACKLOG.md`](BACKLOG.md) is. Where the two disagree, the backlog wins.
 >
-> Corrections applied on 2026-08-19 are marked inline as
-> **`[Superseded 2026-08-19]`**. The largest ones, so no agent re-opens closed
+> Corrections applied on 2026-08-19 and 2026-08-20 are marked inline. The
+> largest ones, so no agent re-opens closed
 > work:
 >
 > - The 20-failure test baseline and the missing aggregate test command are
@@ -20,9 +20,9 @@ Reconciled: 2026-08-19 against `main` at `f904d90` (merged PR #196)
 >   indexer confirmation-depth defect, projection/provenance verification and
 >   profile action gating are all **accepted with dated production evidence**
 >   (A-03, A-04, A-14, A-18, A-19).
-> - Phase A now stands at 39 `done`, 4 `in progress`, 7 `planned`. The only
->   chain gating Phase B is moderation: A-39, then A-22, then A-21, then the
->   A-23 go/no-go.
+> - Phase A now stands at 39 `done`, 7 `in progress`, 8 `planned`. Moderation
+>   remains the founder-gated dependency chain; A-50 through A-52 await
+>   production acceptance, and eight planned engineering rows remain open.
 >
 > The mainnet contract blockers in sections 7 and 10 are **unchanged and still
 > true**. Nothing in this reconciliation moves any Phase C or Phase D gate.
@@ -51,7 +51,7 @@ Current strengths:
 
 Phase A blockers **as recorded on 2026-07-15**:
 
-- ~~The external-mobile wallet flow is materially improved but still needs the final real-phone acceptance checklist and cleanup of the production debug overlay.~~ **[Superseded 2026-08-19]** Closed by A-03 and A-04; real-iPhone production acceptance is recorded in `testnet/MOBILE_WALLET_PRODUCTION_ACCEPTANCE_2026-07-30.md` and no production overlay wiring remains.
+- ~~The external-mobile wallet flow is materially improved but still needs the final real-phone acceptance checklist and cleanup of the production debug overlay.~~ **[Superseded 2026-08-19]** Closed by A-03 and A-04; real-iOS production acceptance is recorded in `testnet/MOBILE_WALLET_PRODUCTION_ACCEPTANCE_2026-07-30.md` and no production overlay wiring remains.
 - ~~The general Node regression suite has 20 failing tests out of 132.~~ **[Superseded 2026-08-19]** Closed by A-16 and A-17. The canonical runner collects `.test.cjs`, `.test.mjs` and `.test.js` deterministically and passes the Windows and Ubuntu CI matrix.
 - The public testnet contracts are not mainnet candidates. Resale economics, Genesis behavior, marketplace enforcement, and automatic no-bid finalization do not match the frozen mainnet canon. **Still true.** This is Phase C work, tracked as C-06 to C-08 and C-19 to C-22.
 - ~~Database migration state, historical secret rotation, and public-repository history cleanup require explicit human verification.~~ **[Superseded 2026-08-19]** Closed by A-01 and A-02 on 2026-08-07 with forced RLS, a reconciled migration ledger, zero open secret alerts, and an explicit recorded decision to retain repository history under Secret Scanning and push protection.
@@ -109,13 +109,14 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 
 ### Phase A: Stabilize Public Testnet - active
 
-**[Superseded 2026-08-19]** The table below records the 2026-07-15 position. The
-current position is 39 `done`, 4 `in progress`, 7 `planned` across A-01 to A-50
+**[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
+current position is 39 `done`, 7 `in progress`, 8 `planned` across A-01 to A-54
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that
 remain open are moderation (A-21, A-22, A-39) and the A-23 go/no-go, plus the
-six unblocked rows A-33, A-34, A-35, A-38, A-47 and A-48.
+eight unblocked rows A-33, A-34, A-35, A-38, A-47, A-48, A-53 and A-54. A-50
+through A-52 have merged fixes and remain open only for production acceptance.
 
 | Exit area | Current evidence | Remaining work |
 | --- | --- | --- |
@@ -436,7 +437,7 @@ No token, points, airdrop, zero-fee Genesis mechanic, or alternative economics p
 
 ### Close Phase A
 
-**[Superseded 2026-08-19]** Steps 1, 2, 3, 4 and 6 are complete with dated
+**[Reconciled 2026-08-20]** Steps 1, 2, 3, 4 and 6 are complete with dated
 production acceptance, and step 5 is complete except for the moderation MVP.
 What actually remains to close Phase A:
 
@@ -444,7 +445,8 @@ What actually remains to close Phase A:
    founder passkeys, issue the one-time audited bootstrap grant, and rehearse the
    A8d recovery ceremony with every mandatory denial. Then enable A-22, then
    A-21. This is founder-gated.
-2. Land the six unblocked engineering rows A-33, A-34, A-35, A-38, A-47 and A-48.
+2. Complete production acceptance for A-50 through A-52, then land the eight
+   unblocked engineering rows A-33, A-34, A-35, A-38, A-47, A-48, A-53 and A-54.
 3. Record the A-23 go/no-go once no Phase A row and no P1 issue is open.
 
 ### Execute Phase B

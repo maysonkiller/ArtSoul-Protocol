@@ -87,7 +87,7 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 never a second opinion. If the two disagree, the backlog wins and this section is
 stale. One backlog item equals one task and one pull request.
 
-Phase A stands at **39 done, 4 in progress, 7 planned** across A-01 to A-50, with
+Phase A stands at **39 done, 7 in progress, 8 planned** across A-01 to A-54, with
 no open pull request and no open issue. Do not re-open a `done` row without new
 contradicting evidence; every one of them carries dated production acceptance.
 
@@ -108,7 +108,7 @@ Dated acceptance statements, kept verbatim because they are the evidence that
 these rows are closed:
 
 - A1-A6, A9, A11, and A12 are accepted. A1 security and migration operational acceptance is complete.
-  The 2026-08-04 iPhone run captured a fresh SIWE
+  The 2026-08-04 iOS run captured a fresh SIWE
   signature and exact authenticated rejection of unsupported MIME and an
   artwork-size request greater than 50 MB, and the 2026-08-07 redacted record
   confirmed server-credential separation, retirement of the exposed secondary
@@ -124,11 +124,15 @@ these rows are closed:
   canonical Genesis trust copy, React entry scheduling, Hetzner health, an
   advancing cursor and saved PM2 state all passed.
 
-### 1. The moderation chain is the only thing gating Phase B
+### 1. The moderation chain is the founder-gated Phase A dependency
 
 A-21, A-22 and A-39 are one dependency chain and they are the reason
 [`testnet/CONTROLLED_BETA_ENTRY.md`](testnet/CONTROLLED_BETA_ENTRY.md) is still
 **NO-GO** under A-23.
+
+It is not the only open Phase A work. A-50 through A-52 have merged fixes and
+still require production acceptance; A-53 and A-54 are measured-defect work;
+and the planned engineering rows in the next section also remain open.
 
 - **A-39** (PR #129, PR #196): A8a step-up and the A8d Safe-only recovery
   foundation are merged with the flag disabled and the migrations unapplied.
@@ -160,12 +164,14 @@ endpoints, which that rehearsal never exercised.
 
 ### 2. Unblocked engineering available now
 
-These six rows need no founder decision and no new spend:
+These eight rows need no founder decision and no new spend:
 
 | Row | Work | First step |
 | --- | --- | --- |
 | A-47 | Reduce head asset weight | Split `avatar-dropdown.js` and attack the exact-artwork cold path. Lazy-loading `appkit-init.js` was investigated on 2026-08-11 and **rejected**: it is the sole writer of `window.artsoulWalletStateSettled`. |
 | A-48 | Full-document repaint on browser Back | Determine why the page is bfcache-ineligible before adding any mask, SPA rewrite or wallet lifecycle change. |
+| A-53 | Header/profile settle gap | Measure which wallet event gates each surface before changing either lifecycle. Preserve A-03, A-05 and A-45 acceptance. |
+| A-54 | Cross-page perceived load | Reproduce on a cold profile and identify the resource that gates interactivity. Do not assume the API is responsible. |
 | A-33 | Artwork-page acceptance sweep | Open concrete defects only; do not redesign or touch auction mechanics. |
 | A-34 | Reusable aura frame shell | Presentation-only API. Real status binding stays C-14. |
 | A-35 | Migration trees and legacy runtime | Reconcile what is applied before deleting anything. |
