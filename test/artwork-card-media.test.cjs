@@ -5,6 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'components', 'artwork-card.js'), 'utf8');
+const gallerySource = fs.readFileSync(path.join(__dirname, '..', 'src', 'entries', 'gallery.jsx'), 'utf8');
 const window = {
     ArtSoulSecurity: { isValidStorageUrl: () => true },
     addEventListener: () => {}
@@ -63,4 +64,18 @@ test('unresolved media remains unknown instead of defaulting to image or audio',
     const artwork = { file_url: 'https://storage.example.test/object?id=unknown' };
     assert.equal(mediaType(artwork), 'unknown');
     assert.equal(mediaDescriptor(artwork).known, false);
+});
+
+test('shared card images defer offscreen transfer and decode work', () => {
+    assert.match(source, /guard\.loading = 'lazy'/);
+    assert.match(source, /guard\.decoding = 'async'/);
+    assert.match(source, /avatar\.loading = 'lazy'/);
+    assert.match(source, /avatar\.decoding = 'async'/);
+    assert.match(source, /img\.loading = 'lazy'/);
+    assert.match(source, /img\.decoding = 'async'/);
+    assert.match(source, /className: 'artsoul-card-media-object',[\s\S]*loading: 'lazy',[\s\S]*decoding: 'async'/);
+    assert.match(source, /className: 'artsoul-video-poster', loading: 'lazy', decoding: 'async'/);
+    assert.match(source, /className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async'/);
+    assert.equal((gallerySource.match(/loading="lazy"/g) || []).length, 2);
+    assert.equal((gallerySource.match(/decoding="async"/g) || []).length, 2);
 });
