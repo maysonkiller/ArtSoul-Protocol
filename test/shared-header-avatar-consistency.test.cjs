@@ -22,6 +22,12 @@ const path = require('node:path');
 const { createAvatarHarness } = require('./helpers/avatar-dropdown-harness.cjs');
 
 const WALLET_A = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+// A-52. An account with no username is named by its shortened address, which is
+// the canonical rule in supabase-client.js displayName(). These tests used to
+// assert the literal 'ArtSoul User', a pre-load placeholder that contradicted
+// that rule and was what made the header appear to change its mind.
+const shortName = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+
 const WALLET_B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const AVATAR_A = 'https://cdn.artsoul.test/avatar-a.png';
 const AVATAR_B = 'https://cdn.artsoul.test/avatar-b.png';
@@ -404,7 +410,7 @@ test('a failed profile read keeps a connected fallback and recovers on a later r
   // The exact production symptom: connected menu, neutral avatar, no identity.
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assertNoStylizedA(harness);
-  assert.equal(harness.avatarName(), 'ArtSoul User');
+  assert.equal(harness.avatarName(), shortName(WALLET_A));
   assertConnectedIdentity(harness, WALLET_A);
   assert.match(harness.menuHtml(), /Base Sepolia/);
   // The failure must not be cached, or every later attempt would be a no-op.
@@ -536,7 +542,7 @@ test('a wallet with no profile row resolves and stays cheap', async () => {
   await harness.flush();
 
   assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET_A);
-  assert.equal(harness.avatarName(), 'ArtSoul User');
+  assert.equal(harness.avatarName(), shortName(WALLET_A));
   assertConnectedIdentity(harness, WALLET_A);
 
   const reads = harness.profileCalls.length;
@@ -762,7 +768,7 @@ test('a definitively absent profile uses the neutral avatar and never a stale ca
 
   assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET_A);
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR, 'a definitive answer must not reuse the cache');
-  assert.equal(harness.avatarName(), 'ArtSoul User');
+  assert.equal(harness.avatarName(), shortName(WALLET_A));
   assertNoStylizedA(harness);
   assertConnectedIdentity(harness, WALLET_A);
 });

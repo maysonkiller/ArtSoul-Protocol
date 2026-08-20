@@ -20,10 +20,10 @@ you saw, and report it. A partial run is not evidence.
 
 | Operator | Devices | Blocks to run |
 | --- | --- | --- |
-| Operator A | iPhone | B, and C7 |
+| Operator A | iOS device | B, and C7 |
 | Operator B | Desktop PC, and an Android phone | A, D, and C1 to C6 |
 
-Operator A's iPhone run is mandatory. RG-01 names desktop and iPhone explicitly,
+Operator A's iOS run is mandatory. RG-01 names desktop and iOS explicitly,
 and the external-mobile WalletConnect path behaves differently on iOS because the
 browser leaves and re-enters the page.
 
@@ -58,7 +58,7 @@ than leaking between sessions.
 | A7 | Disconnect explicitly from the account menu | Returns to guest cleanly. No stale avatar or name remains | |
 | A8 | Reload after disconnect | Still guest. The session did not resurrect itself | |
 
-## Block B - iPhone (Operator A)
+## Block B - iOS (Operator A)
 
 Use the real phone and the real mobile wallet app, not a desktop emulator. This
 run is the one that matters, because the external-mobile path leaves the browser
@@ -94,7 +94,7 @@ runnable; C4 to C6 are no longer blocked.
 | C4 | Profile, link X | B, desktop | X authorization opens and returns to `artsoulprotocol.com` | |
 | C5 | Confirm the linked X handle appears | B, desktop | Handle is shown on the profile | |
 | C6 | Unlink X | B, desktop | Link is removed and the profile updates | |
-| C7 | Repeat C1 and C2 for Discord | A, iPhone | Returns to the apex on mobile as well | |
+| C7 | Repeat C1 and C2 for Discord | A, iOS | Returns to the apex on mobile as well | |
 
 Linked social handles are eligibility and profile data. They are never
 authentication factors and they grant no moderation authority.
