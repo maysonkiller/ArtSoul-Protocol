@@ -226,6 +226,10 @@ class ArtSoulContracts {
         }
     }
 
+    isReady() {
+        return Boolean(this.coreContract);
+    }
+
     ensureCore() {
         if (!this.coreContract) {
             throw new Error('Contracts not initialized');

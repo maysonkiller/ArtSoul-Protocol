@@ -635,6 +635,13 @@ const { useState, useEffect, useRef } = React;
                     if (provider && !window.ArtSoulContracts.provider) {
                         await window.ArtSoulContracts.init(provider);
                     }
+                    // The wallet provider is not always available by the time the
+                    // profile mounts. Genesis state is presentational, so an
+                    // uninitialised contract layer is an expected state that
+                    // resolves on a later render, not an error worth reporting.
+                    if (window.ArtSoulContracts.isReady?.() === false) {
+                        return fallback;
+                    }
                     const state = await window.ArtSoulContracts.getProjectNFTState(walletAddress);
                     return {
                         owned: Boolean(state?.minted || state?.hasProjectNFT || state?.owned || state?.balance > 0),
