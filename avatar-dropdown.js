@@ -1384,17 +1384,29 @@
             ` : '';
 
             const isConnected = connected || !!networkInfo;
-            const accountAction = (restoring || isConnected) ? `
+            let accountAction = '';
+            if (restoring && !isConnected) {
+                accountAction = `
+                <div class="avatar-dropdown-divider"></div>
+                <div class="dropdown-item avatar-restore-status is-disabled" role="status" aria-live="polite" aria-disabled="true">
+                    <span>Restoring wallet…</span>
+                </div>
+            `;
+            } else if (isConnected) {
+                accountAction = `
                 <div class="avatar-dropdown-divider"></div>
                 <button onclick="window.resetWalletConnection()" data-allow-rapid class="dropdown-item avatar-disconnect-item">
                     <span>Disconnect</span>
                 </button>
-            ` : `
+            `;
+            } else {
+                accountAction = `
                 <div class="avatar-dropdown-divider"></div>
                 <button onclick="safeConnectWallet()" id="connectBtn" data-allow-rapid class="dropdown-item btn-main">
                     <span>Connect Wallet</span>
                 </button>
             `;
+            }
 
             return `
                 <div class="avatar-theme-section">
@@ -1791,9 +1803,9 @@
                 // behaviour hid only the text and left the avatar visible, which
                 // is exactly the "avatar plus empty black area" defect.
                 //
-                // This is visual continuity only. It claims no profile, and it
-                // authorizes nothing: the menu still offers Connect Wallet until
-                // the settled provider confirms the session.
+                // This is visual continuity only. It claims no profile and
+                // authorizes nothing: the menu reports restoration until the
+                // settled provider confirms either outcome.
                 return this.renderResolvingState(storedWallet);
             }
             if (container.dataset.avatarRenderKey === 'cached-wallet' && container.querySelector('#avatarDropdownMenu')) return true;
@@ -1859,9 +1871,9 @@
          * fixed geometry as every other state. There is no hidden text region
          * and no fabricated profile identity.
          *
-         * Strictly visual. The menu stays the guest menu — Connect Wallet, no
-         * network row, no balance, no Disconnect — until the settled provider
-         * confirms the session, so nothing here authorizes anything.
+         * Strictly visual. The menu exposes no network, balance, Connect or
+         * Disconnect action until the settled provider confirms the outcome;
+         * it reports the restoration in progress instead.
          */
         renderResolvingState(storedWallet) {
             const container = this.getNavContainer();
@@ -1881,7 +1893,7 @@
                 persistUiState: false
             });
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
+                this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage, restoring: true }),
                 `resolving:${currentPath}:${isProfilePage}`
             );
             this.applyThemeStyles();

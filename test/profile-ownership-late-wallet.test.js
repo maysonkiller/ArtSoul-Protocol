@@ -80,3 +80,13 @@ test('the profile entry fails closed and no longer conflates the two signals', (
     assert.match(source, /if \(ownership !== null\) \{/);
     assert.match(source, /if \(isOwn !== null\) \{/);
 });
+
+test('profile restoration may prefetch public data but cannot grant ownership', () => {
+    const source = fs.readFileSync('src/entries/profile.jsx', 'utf8');
+    const restoreBranch = source.match(/else if \(hasInitialWalletHint\) \{[\s\S]*?loadProfile\(restoringAddress, \{ walletSettled: false \}\);[\s\S]*?\n\s*\}/)?.[0] || '';
+
+    assert.match(restoreBranch, /initialWalletHint\.toLowerCase\(\)/);
+    assert.match(restoreBranch, /loadProfile\(restoringAddress, \{ walletSettled: false \}\)/);
+    assert.doesNotMatch(restoreBranch, /setIsOwnProfile\(true\)/);
+    assert.match(source, /!connectedWalletAddress && !profile\?\.wallet_address/);
+});
