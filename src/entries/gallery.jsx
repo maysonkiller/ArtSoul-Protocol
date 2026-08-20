@@ -627,6 +627,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                                 id={`music-logo-${artwork.id}`}
                                                                 src="ARTSOULlogo.png"
                                                                 alt="Music"
+                                                                loading="lazy"
+                                                                decoding="async"
                                                                 style={{
                                                                     width: '50%',
                                                                     height: '50%',
@@ -662,6 +664,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                             src={artwork.file_url}
                                                             alt={window.ArtSoulSecurity?.sanitizeText(artwork.title) || 'Artwork'}
                                                             className="w-full h-full object-contain"
+                                                            loading="lazy"
+                                                            decoding="async"
                                                         />
                                                     )}
                                                 </>
