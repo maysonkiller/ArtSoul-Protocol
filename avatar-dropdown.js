@@ -261,7 +261,10 @@
             const image = button.querySelector('[data-avatar-image]');
             const nextAvatarUrl = avatarUrl || NEUTRAL_AVATAR_URL;
             const nextName = name || this.shortWalletAddress(address) || 'ArtSoul Guest';
-            const contentKey = `${stateKey || ''}|${nextAvatarUrl}|${nextName}|${address || ''}`;
+            const nextAddress = address && nextName.toLowerCase() !== String(address).toLowerCase()
+                ? address
+                : '';
+            const contentKey = `${stateKey || ''}|${nextAvatarUrl}|${nextName}|${nextAddress}`;
 
             // Already on screen. The visible identity is byte-for-byte what this
             // snapshot asks for, so not one node is touched — but the UI state
@@ -282,7 +285,10 @@
                 paintSrc: nextAvatarUrl,
                 alt: avatarAlt || nextName,
                 name: nextName,
-                address: address || '',
+                // A wallet with no profile name already uses its shortened
+                // address as the primary label. Do not print the same value a
+                // second time underneath it; named profiles still show both.
+                address: nextAddress,
                 // The account this snapshot belongs to. Derived from the visible
                 // address (empty for guest) because it is identical across every
                 // render path for the same wallet, unlike the render key, which

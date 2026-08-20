@@ -77,9 +77,17 @@ function connect(harness, address) {
 
 /** The header must never present a connected wallet as a disconnected guest. */
 function assertConnectedIdentity(harness, address) {
+  const abbreviatedAddress = shortName(address);
+  const renderedName = harness.avatarName();
+  const renderedAddress = harness.avatarAddress();
+
   assert.equal(harness.uiState(), 'connected');
-  assert.notEqual(harness.avatarName(), 'ArtSoul Guest');
-  assert.equal(harness.avatarAddress(), `${address.slice(0, 6)}...${address.slice(-4)}`);
+  assert.notEqual(renderedName, 'ArtSoul Guest');
+  if (renderedName === abbreviatedAddress) {
+    assert.equal(renderedAddress, '', 'an unnamed wallet must render its address exactly once');
+  } else {
+    assert.equal(renderedAddress, abbreviatedAddress, 'a named wallet must retain its address line');
+  }
   assert.match(harness.menuHtml(), /Disconnect/);
   assert.doesNotMatch(harness.menuHtml(), /Connect Wallet/);
 }

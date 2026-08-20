@@ -5097,7 +5097,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
     }
 
     .site-header-row {
-        grid-template-columns: 40px minmax(0, 1fr) 48px;
+        grid-template-columns: 40px minmax(0, 1fr) 168px;
         min-height: 44px;
         gap: 0.5rem;
     }
@@ -5124,18 +5124,18 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
 
     .site-header #navButtons,
     .site-header #navButtons .avatar-dropdown-container {
-        width: 48px !important;
-        min-width: 48px !important;
-        max-width: 48px !important;
+        width: 168px !important;
+        min-width: 168px !important;
+        max-width: 168px !important;
         height: 44px !important;
         min-height: 44px !important;
         max-height: 44px !important;
     }
 
     .site-header #navButtons .avatar-button {
-        width: 48px !important;
-        min-width: 48px !important;
-        max-width: 48px !important;
+        width: 168px !important;
+        min-width: 168px !important;
+        max-width: 168px !important;
         height: 42px !important;
         min-height: 42px !important;
         max-height: 42px !important;
@@ -5145,7 +5145,12 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
     }
 
     .site-header #navButtons .avatar-info {
-        display: none !important;
+        display: flex !important;
+        width: 103px !important;
+        min-width: 103px !important;
+        max-width: 103px !important;
+        height: 29px !important;
+        flex: 0 0 103px !important;
     }
 
     .site-header #navButtons .avatar-button > img {
@@ -5172,7 +5177,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
        the component's late-injected desktop defaults without changing JS. */
     .site-header .avatar-dropdown-menu {
         top: calc(100% + 0.35rem) !important;
-        width: min(148px, calc(100vw - 28px)) !important;
+        width: min(168px, calc(100vw - 28px)) !important;
         max-width: calc(100vw - 28px) !important;
         max-height: calc(100dvh - var(--site-header-height) - 14px) !important;
         padding: 0.3rem !important;

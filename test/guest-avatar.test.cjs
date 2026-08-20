@@ -103,8 +103,18 @@ test('connected account menus render the current network and balance row', () =>
 
 test('account menu uses the compact desktop and mobile width contracts', () => {
   assert.match(unifiedStyles, /width: min\(180px, calc\(100vw - 24px\)\) !important;/);
-  assert.match(unifiedStyles, /width: min\(148px, calc\(100vw - 28px\)\) !important;/);
+  assert.match(unifiedStyles, /width: min\(168px, calc\(100vw - 28px\)\) !important;/);
   assert.match(unifiedStyles, /\.profile-social-links \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+});
+
+test('mobile account button keeps the connected name and address visible', () => {
+  const mobileInfoStart = unifiedStyles.lastIndexOf('.site-header #navButtons .avatar-info {');
+  const mobileInfo = unifiedStyles.slice(mobileInfoStart, unifiedStyles.indexOf('}', mobileInfoStart) + 1);
+  assert.ok(mobileInfoStart >= 0, 'the final shared mobile identity rule must exist');
+  assert.match(unifiedStyles, /@media \(max-width: 768px\)[\s\S]*?grid-template-columns: 40px minmax\(0, 1fr\) 168px;/);
+  assert.match(mobileInfo, /display: flex !important;/);
+  assert.match(mobileInfo, /width: 103px !important;/);
+  assert.doesNotMatch(mobileInfo, /display: none !important;/);
 });
 
 test('account menu has one stylesheet source and a full-width compact network row', () => {
@@ -120,9 +130,9 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=43/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=1"><\/script>/, `${page} must load the first-frame bridge`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=46" defer><\/script>/, `${page} must load the deferred account menu`);
+    assert.match(html, /unified-styles\.css\?v=44/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=2"><\/script>/, `${page} must load the first-frame bridge`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=47" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(
       html,
       /<\/header>\s*<script>window\.ArtSoulHeaderPrepaint\?\.hydrate\(document\.getElementById\('navButtons'\)\);<\/script>/,
