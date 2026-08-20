@@ -534,13 +534,13 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=43">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=1"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=46" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=44">/, `${page} stylesheet pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=2"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=47" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=43');
-    const prepaint = html.indexOf('header-prepaint.js?v=1');
-    const component = html.indexOf('avatar-dropdown.js?v=46');
+    const stylesheet = html.indexOf('unified-styles.css?v=44');
+    const prepaint = html.indexOf('header-prepaint.js?v=2');
+    const component = html.indexOf('avatar-dropdown.js?v=47');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
     const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");
@@ -1883,7 +1883,7 @@ test('the preview contract is pinned in the component source', () => {
 test('every shared-header page and both themes keep one stable button geometry', () => {
   const css = fs.readFileSync(path.join(ROOT, 'unified-styles.css'), 'utf8');
   assert.match(css, /\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 180px !important;[\s\S]*?height: 42px !important;/);
-  assert.match(css, /\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 48px !important;[\s\S]*?height: 42px !important;/);
+  assert.match(css, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 168px !important;[\s\S]*?height: 42px !important;/);
   // Classic stays animation-free: nothing was hidden behind a fade.
   assert.match(css, /\.classic[\s\S]{0,400}?\.avatar-button,[\s\S]{0,200}?animation: none !important;/);
   assert.doesNotMatch(css, /\[data-wallet-ui-state="restoring"\][^{]*\{[^}]*(?:opacity|transition|animation)/);

@@ -86,13 +86,16 @@
         if (!button || !image || !name || !address) return false;
 
         const commit = ({ renderKey, source, paintSource, label, shortAddress, imageIdentity, uiState }) => {
+            const displayAddress = shortAddress && label.toLowerCase() !== shortAddress.toLowerCase()
+                ? shortAddress
+                : '';
             image.src = paintSource;
             image.alt = label;
             image.dataset.avatarSource = source;
             image.dataset.avatarIdentity = imageIdentity;
             name.textContent = label;
-            writeAddress(address, shortAddress);
-            button.dataset.avatarContentKey = `${renderKey}|${source}|${label}|${shortAddress}`;
+            writeAddress(address, displayAddress);
+            button.dataset.avatarContentKey = `${renderKey}|${source}|${label}|${displayAddress}`;
             container.dataset.avatarRenderKey = renderKey === `identity:${wallet}` ? 'cached-wallet' : renderKey;
             container.setAttribute('aria-busy', uiState === 'resolving' ? 'true' : 'false');
             document.documentElement.dataset.walletUiState = uiState;

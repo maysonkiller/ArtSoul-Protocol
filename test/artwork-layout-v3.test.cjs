@@ -57,7 +57,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=43/);
+    assert.match(html, /unified-styles\.css\?v=44/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -95,7 +95,7 @@ test('header keeps a top-right avatar button during wallet initialization', () =
     assert.match(styles, /\.site-header-actions \{[\s\S]*?justify-content: flex-end;/);
     assert.match(styles, /\.site-header \.site-logo,[\s\S]*?width: 56px !important;[\s\S]*?height: 56px !important;/);
     assert.match(styles, /\.site-header #navButtons,[\s\S]*?width: 180px !important;[\s\S]*?height: 42px !important;/);
-    assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons,[\s\S]*?width: 48px !important;[\s\S]*?height: 44px !important;/);
+    assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons,[\s\S]*?width: 168px !important;[\s\S]*?height: 44px !important;/);
 });
 
 test('images keep their aspect ratio and use an in-page lightbox while video and audio controls remain intact', () => {

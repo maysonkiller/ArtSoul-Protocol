@@ -41,3 +41,10 @@ test('ArtSoul Guest survives only where no wallet exists at all', () => {
   assert.match(headerPrepaint, /label: 'ArtSoul Guest'/);
   assert.match(headerPrepaint, /label: RESOLVING_LABEL/);
 });
+
+test('an unnamed connected wallet shows its shortened address only once', () => {
+  assert.match(avatarDropdown, /const nextAddress = address && nextName\.toLowerCase\(\) !== String\(address\)\.toLowerCase\(\)/);
+  assert.match(avatarDropdown, /address: nextAddress,/);
+  assert.match(headerPrepaint, /const displayAddress = shortAddress && label\.toLowerCase\(\) !== shortAddress\.toLowerCase\(\)/);
+  assert.match(headerPrepaint, /writeAddress\(address, displayAddress\)/);
+});
