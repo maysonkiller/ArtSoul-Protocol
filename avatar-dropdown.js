@@ -260,7 +260,7 @@
             const { button } = structure;
             const image = button.querySelector('[data-avatar-image]');
             const nextAvatarUrl = avatarUrl || NEUTRAL_AVATAR_URL;
-            const nextName = name || 'ArtSoul Guest';
+            const nextName = name || this.shortWalletAddress(address) || 'ArtSoul Guest';
             const contentKey = `${stateKey || ''}|${nextAvatarUrl}|${nextName}|${address || ''}`;
 
             // Already on screen. The visible identity is byte-for-byte what this
@@ -1645,9 +1645,17 @@
             }
         }
 
+        // Mirrors shortWalletAddress in supabase-client.js. A connected wallet
+        // always has a name we can compute, so no path needs to invent one.
+        shortWalletAddress(address) {
+            const value = (address || '').toString().trim();
+            if (!value) return '';
+            return value.length <= 12 ? value : `${value.slice(0, 6)}...${value.slice(-4)}`;
+        }
+
         getProfileDisplayName(profile, walletAddress) {
             const resolver = window.ArtSoulProfileDisplay?.displayName || window.ArtSoulDB?.displayName;
-            const fallback = walletAddress ? 'ArtSoul User' : 'ArtSoul Guest';
+            const fallback = this.shortWalletAddress(walletAddress) || 'ArtSoul Guest';
             return resolver?.(profile, walletAddress) || fallback;
         }
 
@@ -1942,8 +1950,8 @@
                 ? this.getCachedHeaderIdentity(currentWallet)
                 : null;
             const avatarUrl = cachedIdentity?.avatarUrl || NEUTRAL_AVATAR_URL;
-            const displayedName = cachedIdentity?.name || 'ArtSoul User';
-            const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+            const shortAddress = this.shortWalletAddress(walletAddress);
+            const displayedName = cachedIdentity?.name || shortAddress;
 
             if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
             // A profile recovery can complete while this unresolved fallback is
