@@ -34,7 +34,7 @@
 // Pinned OFFICIAL modal (wcm-* custom elements — no collision with the
 // page's @reown/appkit w3m-* elements). The bundle is fully self-contained:
 // no runtime dynamic imports left to fail silently.
-import { WalletConnectModal } from 'https://esm.sh/@walletconnect/modal@2.7.0?bundle';
+import { WalletConnectModal } from '@walletconnect/modal';
 
 const WC_ETHEREUM_PROVIDER_VERSION = '2.23.10';
 const WC_ETHEREUM_PROVIDER_URL = `https://esm.sh/@walletconnect/ethereum-provider@${WC_ETHEREUM_PROVIDER_VERSION}?bundle`;

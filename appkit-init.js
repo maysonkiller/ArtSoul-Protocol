@@ -3,9 +3,9 @@
 // Centralized Web3 wallet connection for ArtSoul
 // ============================================
 
-import { createAppKit } from 'https://esm.sh/@reown/appkit@1.8.21?bundle'
-import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.8.21?bundle'
-import { baseSepolia, base, mainnet } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle'
+import { createAppKit } from '@reown/appkit'
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+import { baseSepolia, base, mainnet } from '@reown/appkit/networks'
 // Mobile external browsers connect through the standard WalletConnect flow:
 // the proven bare @walletconnect/ethereum-provider driving the official
 // WalletConnect modal. AppKit stays for desktop and injected browsers.

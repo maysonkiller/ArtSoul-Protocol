@@ -14,13 +14,16 @@ const walletTest = read('wallet-test.js');
 const coreWallet = read('wallet-core-connect.js');
 const profile = read(path.join('src', 'entries', 'profile.jsx'));
 const upload = read(path.join('src', 'entries', 'upload.js'));
+const packageJson = JSON.parse(read('package.json'));
 
 test('production and isolated diagnostics pin every Reown import to 1.8.21', () => {
     for (const source of [appKit, walletTest]) {
-        assert.match(source, /@reown\/appkit@1\.8\.21\?bundle/);
-        assert.match(source, /@reown\/appkit-adapter-wagmi@1\.8\.21\?bundle/);
-        assert.match(source, /@reown\/appkit@1\.8\.21\/networks\?bundle/);
+        assert.match(source, /from '@reown\/appkit'/);
+        assert.match(source, /from '@reown\/appkit-adapter-wagmi'/);
+        assert.match(source, /from '@reown\/appkit\/networks'/);
     }
+    assert.equal(packageJson.dependencies['@reown/appkit'], '1.8.21');
+    assert.equal(packageJson.dependencies['@reown/appkit-adapter-wagmi'], '1.8.21');
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
         assert.match(read(page), /appkit-init\.js\?v=52/, `${page} must load the standard wallet flow`);
     }
@@ -60,7 +63,8 @@ test('mobile external browsers use the standard flow: pinned provider + official
     // connect() pended forever with no modal and no error.
     assert.match(coreWallet, /showQrModal: false/);
     assert.doesNotMatch(coreWallet, /showQrModal: true/);
-    assert.match(coreWallet, /import \{ WalletConnectModal \} from 'https:\/\/esm\.sh\/@walletconnect\/modal@2\.7\.0\?bundle'/);
+    assert.match(coreWallet, /import \{ WalletConnectModal \} from '@walletconnect\/modal'/);
+    assert.equal(packageJson.dependencies['@walletconnect/modal'], '2.7.0');
     assert.match(coreWallet, /WC_MODAL_VERSION = '2\.7\.0'/);
     // The modal instance is a singleton with the z-index ceiling so no
     // ArtSoul overlay can cover it.

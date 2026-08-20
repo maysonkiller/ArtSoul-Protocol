@@ -23,7 +23,6 @@ const pageInputs = {
 const legacyRootAssets = [
     '1080x360.png',
     'ai-ui-styles.css',
-    'appkit-init.js',
     'artsoul-social-preview.png',
     'ARTSOULlogo-clean.png',
     'ARTSOULlogo.png',
@@ -58,9 +57,7 @@ const legacyRootAssets = [
     'supabase-client.js',
     'theme-sync.js',
     'ui-core.css',
-    'unified-styles.css',
-    'wallet-core-connect.js',
-    'wallet-test.js'
+    'unified-styles.css'
 ];
 
 const legacyClientTrees = [
@@ -92,8 +89,15 @@ function keepLegacyRuntimeModulesSeparate() {
             order: 'pre',
             handler(html) {
                 return html.replace(
-                    /<script type="module"(?![^>]*\/src\/entries\/)([^>]*)><\/script>/g,
-                    '<script type="application/x-artsoul-module" data-artsoul-legacy-module$1></script>'
+                    /<script type="module"([^>]*)><\/script>/g,
+                    (scriptTag, attributes) => {
+                        // Wallet entry points must be processed by Vite so the
+                        // pinned SDK graph ships as same-origin chunks instead
+                        // of hundreds of runtime CDN module requests.
+                        const isBundledEntry = /src="\/(?:src\/entries\/|appkit-init\.js|wallet-test\.js)/.test(attributes);
+                        if (isBundledEntry) return scriptTag;
+                        return `<script type="application/x-artsoul-module" data-artsoul-legacy-module${attributes}></script>`;
+                    }
                 );
             }
         },

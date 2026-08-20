@@ -41,8 +41,12 @@
     "test": "test"
   },
   "dependencies": {
+    "@reown/appkit": "1.8.21",
+    "@reown/appkit-adapter-wagmi": "1.8.21",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
+    "@wagmi/core": "3.6.4",
+    "@walletconnect/modal": "2.7.0",
     "abbrev": "^1.0.9",
     "acorn": "^8.16.0",
     "acorn-walk": "^8.3.5",
@@ -398,6 +402,8 @@
     "util-deprecate": "^1.0.2",
     "uuid": "^8.3.2",
     "v8-compile-cache-lib": "^3.0.1",
+    "viem": "2.55.19",
+    "wagmi": "3.6.4",
     "web3-utils": "^1.10.4",
     "which": "^1.3.1",
     "which-typed-array": "^1.1.20",

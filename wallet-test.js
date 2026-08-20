@@ -1,6 +1,6 @@
-import { createAppKit } from 'https://esm.sh/@reown/appkit@1.8.21?bundle';
-import { WagmiAdapter } from 'https://esm.sh/@reown/appkit-adapter-wagmi@1.8.21?bundle';
-import { baseSepolia, base, mainnet } from 'https://esm.sh/@reown/appkit@1.8.21/networks?bundle';
+import { createAppKit } from '@reown/appkit';
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
+import { baseSepolia, base, mainnet } from '@reown/appkit/networks';
 
 // Public Reown project identifier for the verified ArtSoul web project.
 const PROJECT_ID = '9fdc97f91c02d46a28ca9d185a9e58f2';
