@@ -87,8 +87,8 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 never a second opinion. If the two disagree, the backlog wins and this section is
 stale. One backlog item equals one task and one pull request.
 
-Phase A stands at **39 done, 7 in progress, 8 planned** across A-01 to A-54, with
-no open pull request and no open issue. Do not re-open a `done` row without new
+Phase A stands at **39 done, 8 in progress, 7 planned** across A-01 to A-54, with
+one open pull request (PR #203) and no open issue. Do not re-open a `done` row without new
 contradicting evidence; every one of them carries dated production acceptance.
 
 Accepted and closed - do not redo:
@@ -169,7 +169,7 @@ These eight rows need no founder decision and no new spend:
 | Row | Work | First step |
 | --- | --- | --- |
 | A-47 | Reduce head asset weight | Split `avatar-dropdown.js` and attack the exact-artwork cold path. Lazy-loading `appkit-init.js` was investigated on 2026-08-11 and **rejected**: it is the sole writer of `window.artsoulWalletStateSettled`. |
-| A-48 | Full-document repaint on browser Back | Determine why the page is bfcache-ineligible before adding any mask, SPA rewrite or wallet lifecycle change. |
+| A-48 | Full-document repaint on browser Back | PR #203 fixes the measured `NetworkExceedsBufferLimit` cause by deferring offscreen card images; close only after production desktop and iOS/Android Back acceptance. |
 | A-53 | Header/profile settle gap | Measure which wallet event gates each surface before changing either lifecycle. Preserve A-03, A-05 and A-45 acceptance. |
 | A-54 | Cross-page perceived load | Reproduce on a cold profile and identify the resource that gates interactivity. Do not assume the API is responsible. |
 | A-33 | Artwork-page acceptance sweep | Open concrete defects only; do not redesign or touch auction mechanics. |
