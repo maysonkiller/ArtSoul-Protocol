@@ -39,7 +39,7 @@ ordinary-navigation header defect.
 ## Founder production evidence
 
 After the production deployment, the founder exercised the site on a real
-iPhone in both connected and disconnected states. The run covered initial
+iOS device in both connected and disconnected states. The run covered initial
 session restoration, repeated page navigation, artwork pages, explicit
 disconnect and reconnect, SIWE signing, reloads, and network recovery from Base
 Mainnet to Base Sepolia through the existing network control and MetaMask.
@@ -59,7 +59,7 @@ The accepted run confirmed:
   delayed or failed module path.
 
 The founder observed one brief whole-document repaint when using an explicit
-Back control or the native iPhone history-swipe. It was not observed during
+Back control or the native iOS history-swipe. It was not observed during
 ordinary forward page navigation and did not present the wrong wallet identity.
 This is therefore recorded separately as A-48 rather than being hidden inside
 A-05 or treated as a WalletConnect failure.

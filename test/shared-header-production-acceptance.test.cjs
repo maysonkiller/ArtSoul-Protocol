@@ -24,14 +24,14 @@ test('shared-header production acceptance remains durable and the deferred-heade
 
   assert.match(reacceptance, /^Accepted: 2026-08-13$/m);
   assert.match(reacceptance, /PR #194/);
-  assert.match(reacceptance, /real\niPhone/);
+  assert.match(reacceptance, /real\niOS device/);
   assert.match(reacceptance, /explicit reconnect and SIWE completed/);
   assert.match(reacceptance, /tracked as A-48/);
 
   assert.match(backlog, /^\| A-05 \|[^\n]*\| done \| A \|/m);
   assert.match(backlog, /^\| A-45 \|[^\n]*\| done \| A \|/m);
   assert.match(backlog, /^\| A-46 \|[^\n]*\| done \| A \|/m);
-  assert.match(backlog, /^\| A-48 \|[^\n]*\| planned \| A \|/m);
+  assert.match(backlog, /^\| A-48 \|[^\n]*\| in progress \| A \|/m);
   assert.match(backlog, /SHARED_HEADER_PRODUCTION_ACCEPTANCE_2026-08-04\.md/);
   assert.match(backlog, /SHARED_HEADER_PRODUCTION_REACCEPTANCE_2026-08-13\.md/);
 
