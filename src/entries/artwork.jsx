@@ -3174,7 +3174,7 @@ const { useState, useEffect, useRef } = React;
                                                 <p className="text-sm opacity-70 mb-5">
                                                     {artwork.description || 'This artwork is indexed on-chain, but its metadata media URL is unavailable.'}
                                                 </p>
-                                                <div className="grid gap-3 text-left text-xs">
+                                                <div className="artwork-fallback-facts grid gap-3 text-left text-xs">
                                                     <div className="rounded-lg border border-current/20 p-3">
                                                         <div className="uppercase tracking-wide opacity-60 mb-1">Artwork ID</div>
                                                         <div className="break-all">{artwork.artwork_id || artwork.blockchain_id || 'Unavailable'}</div>
