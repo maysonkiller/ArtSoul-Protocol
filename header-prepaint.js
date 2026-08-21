@@ -133,12 +133,20 @@
             return true;
         }
 
+        // A name beside the neutral avatar is a half identity, so a cached label
+        // may only paint here when the cached avatar IS the neutral one: an
+        // account with no picture has nothing better arriving, so its name and
+        // its image are both already final. An account whose custom avatar has
+        // not decoded yet keeps the resolving label until the image is ready.
+        const settledWithoutPicture = identity
+            && identity.wallet === wallet
+            && identity.avatarUrl === NEUTRAL_AVATAR_URL;
         delete container.dataset.avatarCacheHydrated;
         commit({
             renderKey: `resolving:${wallet}`,
             source: NEUTRAL_AVATAR_URL,
             paintSource: NEUTRAL_AVATAR_URL,
-            label: RESOLVING_LABEL,
+            label: settledWithoutPicture ? identity.name : RESOLVING_LABEL,
             shortAddress,
             imageIdentity: shortAddress,
             uiState: 'resolving'
