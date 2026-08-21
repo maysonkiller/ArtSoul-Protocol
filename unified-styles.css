@@ -140,6 +140,26 @@
    It now sits flat in the surface colours both themes already own. Canon 16
    governs which colours each theme uses, not whether a placeholder animates. */
 
+/* A placeholder that appears instantly and disappears 200ms later is a flash,
+   not information: the eye registers something went wrong, never what was
+   loading. Held invisible for a moment first, a load that finishes inside that
+   moment shows nothing at all, and only a wait long enough to notice gets a
+   placeholder.
+
+   Opacity alone, and a step rather than a fade: the element keeps its box the
+   whole time, so the layout it reserves and the aria-busy it announces are
+   unchanged, and nothing moves on screen. Reduced motion is not gated here -
+   there is no motion, and gating it would leave the placeholder invisible for
+   the people who most need to be told something is happening. */
+.artsoul-placeholder {
+    opacity: 0;
+    animation: artsoulPlaceholderReveal 1ms linear 320ms forwards;
+}
+
+@keyframes artsoulPlaceholderReveal {
+    to { opacity: 1; }
+}
+
 /* Branded wait indicator.
    Shown while a freshly published artwork is still reaching the projection.
    Both themes animate; each keeps its own colors. The colour flow across the

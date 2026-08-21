@@ -1,12 +1,20 @@
 import { React } from './react-runtime.js';
 
+// Every placeholder root carries `artsoul-placeholder`, which holds it
+// invisible for a moment before it appears. A load that finishes inside that
+// moment shows nothing at all, instead of a shape that flashes up and vanishes
+// - which is what made these read as a glitch rather than as loading. The
+// element is still in the DOM the whole time, so the layout it reserves and the
+// aria-busy it announces are unchanged. The delay is in unified-styles.css.
+const PLACEHOLDER = 'artsoul-placeholder';
+
 function SkeletonBlock({ className = '' }) {
     return <div className={`artsoul-skeleton ${className}`.trim()} aria-hidden="true"></div>;
 }
 
 export function CardGridSkeleton({ count = 12, className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3' }) {
     return (
-        <div className={className} role="status" aria-label="Loading artworks" aria-busy="true">
+        <div className={`${className} ${PLACEHOLDER}`} role="status" aria-label="Loading artworks" aria-busy="true">
             {Array.from({ length: count }, (_, index) => (
                 <div className="artsoul-skeleton-card" key={index} aria-hidden="true">
                     <SkeletonBlock className="artsoul-skeleton-media" />
@@ -22,7 +30,7 @@ export function CardGridSkeleton({ count = 12, className = 'grid grid-cols-2 sm:
 
 export function ArtworkPageSkeleton() {
     return (
-        <main className="artwork-page-shell site-page-container" role="status" aria-label="Loading artwork" aria-busy="true">
+        <main className={`artwork-page-shell site-page-container ${PLACEHOLDER}`} role="status" aria-label="Loading artwork" aria-busy="true">
             <div className="artwork-page-layout">
                 <div className="artwork-page-left">
                     <section className="artwork-detail-stage artwork-mobile-media">
@@ -68,7 +76,7 @@ export function ArtworkPageSkeleton() {
 
 export function ProfilePageSkeleton({ className = '' }) {
     return (
-        <main className={`site-page-container profile-page-main py-8 ${className}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
+        <main className={`site-page-container profile-page-main py-8 ${className} ${PLACEHOLDER}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
             <section className="profile-skeleton-header rounded-xl p-6 mb-6">
                 <div className="profile-skeleton-identity">
                     <SkeletonBlock className="profile-skeleton-avatar" />
