@@ -42,6 +42,20 @@
     border-radius: 0;
 }
 
+/* The artwork fallback facts panel was the only element relying on the removed
+   bare `.grid` rule in performance-optimizations.css for its columns. Its
+   previous rendering is preserved explicitly so that cleanup is behaviour
+   neutral here. */
+.artwork-fallback-facts {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+@media (max-width: 640px) {
+    .artwork-fallback-facts {
+        grid-template-columns: 1fr;
+    }
+}
+
 .artsoul-skeleton-card-copy {
     display: grid;
     gap: 10px;
