@@ -109,48 +109,23 @@
     }
 
     // Cards were requesting the original upload, which is what made them sit
-    // dark for seconds. Supabase serves a transformed copy from its own render
-    // endpoint. Measured against the live storage bucket on 2026-08-21, with a
-    // browser Accept header so format negotiation applies:
-    //
-    //   1668 KB PNG  -> 68 KB WebP at width 600 quality 70  (24x)
-    //     46 KB WebP -> 31 KB WebP at the same settings     (1.5x)
-    //
-    // Both directions win, but the second shows the transform is not free for
-    // an already small file, so this stays a card-only concern.
+    // dark for seconds. The sizing itself lives in supabase-client.js as
+    // ArtSoulSecurity.storageRenderUrl, shared with the avatar surfaces because
+    // it is the same defect. 600 px covers a card at two mobile columns on a
+    // 3x screen; measured, a 1668 KB PNG comes back as 68 KB WebP.
     //
     // Presentation only. mediaUrl still returns the original, so the artwork
-    // page and fullscreen keep full quality, and nothing stored or projected
-    // changes.
-    const STORAGE_OBJECT_PATH = '/storage/v1/object/public/';
-    const STORAGE_RENDER_PATH = '/storage/v1/render/image/public/';
+    // page and fullscreen keep full quality and nothing projected changes.
     const CARD_THUMBNAIL_WIDTH = 600;
-    const CARD_THUMBNAIL_QUALITY = 70;
-
-    // Raster stills the render endpoint can safely resample. GIF is absent on
-    // purpose: a still transform would drop its animation. SVG is absent
-    // because it is already small and rasterising it loses the point.
-    const CARD_THUMBNAIL_EXTENSIONS = /\.(jpg|jpeg|png|webp|avif)(\?|$)/;
 
     function cardThumbnailUrl(url, type) {
-        // Still images only, and only ones the URL itself confirms. Production
-        // rows carry a bare 'image' in file_type rather than a MIME type, so
-        // the extension is the honest signal; anything unrecognised, including
-        // an extensionless upload that could be a GIF, is left alone.
+        // Still images only. A GIF put through a still transform loses its
+        // animation, and video and audio are not images at all. The shared
+        // helper re-checks the extension, so an animated file mislabelled as an
+        // image is refused there too.
         if (type !== 'image') return url;
-        if (!url || typeof url !== 'string') return url;
-        if (!CARD_THUMBNAIL_EXTENSIONS.test(normalize(url))) return url;
-        if (!url.includes(STORAGE_OBJECT_PATH)) return url;
-        if (typeof window.ArtSoulSecurity?.isValidStorageUrl === 'function' &&
-            !window.ArtSoulSecurity.isValidStorageUrl(url)) return url;
-        try {
-            const rendered = new URL(url.replace(STORAGE_OBJECT_PATH, STORAGE_RENDER_PATH));
-            rendered.searchParams.set('width', String(CARD_THUMBNAIL_WIDTH));
-            rendered.searchParams.set('quality', String(CARD_THUMBNAIL_QUALITY));
-            return rendered.toString();
-        } catch {
-            return url;
-        }
+        const resize = window.ArtSoulSecurity?.storageRenderUrl;
+        return typeof resize === 'function' ? resize(url, CARD_THUMBNAIL_WIDTH) : url;
     }
 
     function mediaDescriptor(artwork = {}) {

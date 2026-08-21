@@ -41,7 +41,25 @@ test('the identity cache accepts an account that has no profile yet', () => {
   // is cacheable and reaches the branch above.
   assert.match(avatarDropdown, /name: this\.getProfileDisplayName\(profile, wallet\),/);
   assert.match(avatarDropdown, /avatarUrl: this\.getProfileAvatarUrl\(profile\)/);
-  assert.match(avatarDropdown, /return resolver\?\.\(profile, NEUTRAL_AVATAR_URL\) \|\| NEUTRAL_AVATAR_URL;/);
+  assert.match(avatarDropdown, /resolver\?\.\(profile, NEUTRAL_AVATAR_URL\) \|\| NEUTRAL_AVATAR_URL/);
+});
+
+test('the neutral avatar survives resizing untouched', () => {
+  // The branch above recognises a nameless account by avatarUrl === the neutral
+  // image. Header avatars are now requested at a display size, so if that
+  // resizing rewrote the neutral URL the comparison would fail and the status
+  // word would come back for exactly the accounts this fix was written for.
+  const client = fs.readFileSync('supabase-client.js', 'utf8');
+  const start = client.indexOf('const STORAGE_OBJECT_PATH');
+  const end = client.indexOf('function sanitizeText');
+  assert.ok(start > -1 && end > start, 'the sizing helper must be discoverable');
+  const helper = new Function(
+    'isValidStorageUrl', 'URL',
+    `${client.slice(start, end)}
+return storageRenderUrl;`
+  )(() => true, URL);
+  assert.equal(helper('/default-avatar.png', 128), '/default-avatar.png');
+  assert.match(avatarDropdown, /const NEUTRAL_AVATAR_URL = '\/default-avatar\.png';/);
 });
 
 test('one wallet line, not two, when the name is the address', () => {
