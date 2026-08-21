@@ -45,7 +45,13 @@
     const APPKIT_CONNECTION_STATUS_STORAGE_KEY = '@appkit/connection_status';
     // The label of the coherent resolving state. It must stay in sync with the
     // pre-paint placeholder in the static header shells and unified-styles.css.
-    const RESOLVING_IDENTITY_LABEL = 'Connecting…';
+    // A known account is named by its own shortened address until its
+    // picture arrives. Naming it by its connection status instead put
+    // "Connecting" on screen on every navigation. See its test.
+    const resolvingIdentityLabel = (walletAddress) => {
+        const value = String(walletAddress || '').trim();
+        return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+    };
 
     // Paint-ready cached header avatar.
     //
@@ -216,7 +222,7 @@
                     <div class="avatar-info">
                         <div data-avatar-name>ArtSoul Guest</div>
                         <div data-avatar-address hidden aria-hidden="true"></div>
-                        <div data-avatar-resolving aria-hidden="true">${RESOLVING_IDENTITY_LABEL}</div>
+                        <div data-avatar-resolving aria-hidden="true"></div>
                     </div>
                     <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true">
                         <path d="M4 6l4 4 4-4"></path>
@@ -420,7 +426,7 @@
                 image.alt = 'ArtSoul';
                 image.dataset.avatarIdentity = snapshot.identity;
             }
-            if (nameNode) nameNode.textContent = RESOLVING_IDENTITY_LABEL;
+            if (nameNode) nameNode.textContent = snapshot.address || snapshot.identity || snapshot.name;
             if (addressNode) {
                 addressNode.hidden = !snapshot.address;
                 addressNode.textContent = snapshot.address;
@@ -1979,8 +1985,8 @@
             this.updateStableButton({
                 avatarUrl: NEUTRAL_AVATAR_URL,
                 avatarAlt: 'ArtSoul',
-                name: RESOLVING_IDENTITY_LABEL,
-                address: `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`,
+                name: resolvingIdentityLabel(storedWallet),
+                address: resolvingIdentityLabel(storedWallet),
                 stateKey: `resolving:${storedWallet}`,
                 uiState: 'resolving',
                 persistUiState: false

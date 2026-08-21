@@ -18,8 +18,8 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
-  'avatar-dropdown.js': { version: 49, sha256: 'eb88afcc02fcd0d0' },
-  'header-prepaint.js': { version: 3, sha256: '06fb888f3b3a9bb1' },
+  'avatar-dropdown.js': { version: 50, sha256: '506acc73759ecdcb' },
+  'header-prepaint.js': { version: 4, sha256: '8b23a80e58fb9ad2' },
   'data-prefetch.js': { version: 1, sha256: 'f4d04f2111f93a87' }
 };
 

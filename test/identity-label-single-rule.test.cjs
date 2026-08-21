@@ -42,7 +42,7 @@ test('ArtSoul Guest survives only where no wallet exists at all', () => {
   // A-56 made this conditional: an account whose avatar is the neutral image
   // has nothing left to resolve, so it is named rather than given a status
   // word. The resolving label survives for an undecoded custom avatar.
-  assert.match(headerPrepaint, /label: settledWithoutPicture \? identity\.name : RESOLVING_LABEL,/);
+  assert.match(headerPrepaint, /label: settledWithoutPicture \? identity\.name : shortAddress,/);
 });
 
 test('an unnamed connected wallet shows its shortened address only once', () => {

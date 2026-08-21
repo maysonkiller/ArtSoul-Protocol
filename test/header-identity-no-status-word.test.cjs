@@ -11,7 +11,7 @@ test('an account with no picture is named, never given a status word', () => {
   // cached avatar is the neutral image and its cached name is its own shortened
   // address, so both are already final and there is nothing left to resolve.
   assert.match(prepaint, /const settledWithoutPicture = identity\s*\n\s*&& identity\.wallet === wallet\s*\n\s*&& identity\.avatarUrl === NEUTRAL_AVATAR_URL;/);
-  assert.match(prepaint, /label: settledWithoutPicture \? identity\.name : RESOLVING_LABEL,/);
+  assert.match(prepaint, /label: settledWithoutPicture \? identity\.name : shortAddress,/);
 });
 
 test('a name still never appears beside an undecoded custom avatar', () => {
