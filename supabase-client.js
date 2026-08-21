@@ -44,49 +44,27 @@ window.ArtSoulPublicConfig.load = loadSupabasePublicConfig;
 const ALLOWED_STORAGE_DOMAIN = 'bexigvqrunomwtjsxlej.supabase.co';
 
 function isValidStorageUrl(url) {
+    const check = window.ArtSoulStorageImage?.isValidStorageUrl;
+    if (typeof check === 'function') return check(url);
     if (!url || typeof url !== 'string') return false;
     try {
-        const urlObj = new URL(url);
-        return urlObj.hostname === ALLOWED_STORAGE_DOMAIN;
+        return new URL(url).hostname === ALLOWED_STORAGE_DOMAIN;
     } catch {
         return false;
     }
 }
 
-// Stored images are served at their upload size. Measured against the live
-// bucket on 2026-08-21 with a browser Accept header, so format negotiation
-// applies: profile avatars of 2045, 2313 and 2841 KB come back as 8.3, 10.1
-// and 28.4 KB WebP at width 96, and a 1668 KB artwork PNG as 68 KB at width
-// 600. The header waits for the avatar to decode before it can replace its
-// resolving label, so an avatar measured in megabytes is what keeps that label
-// on screen.
+// The sizing itself lives in storage-image.js, a plain script loaded before
+// every consumer. It used to live here, and avatar-dropdown.js - a classic
+// deferred script that paints the account button roughly three seconds before
+// this module executes - called it when it did not exist yet and silently fell
+// back to the upload itself.
 //
 // Presentation only: the original URL is what stays stored, projected and
 // linked. This returns a display copy and never replaces the source of truth.
-//
-// Only a raster still the URL itself vouches for is resampled. Production rows
-// carry a bare 'image' in file_type rather than a MIME type, so the extension
-// is the honest signal. GIF is excluded because a still transform drops its
-// animation, SVG because rasterising it loses the point, and an unrecognised
-// or extensionless file is left alone rather than guessed at.
-const STORAGE_OBJECT_PATH = '/storage/v1/object/public/';
-const STORAGE_RENDER_PATH = '/storage/v1/render/image/public/';
-const RESAMPLEABLE_STILL = /\.(jpg|jpeg|png|webp|avif)(\?|$)/i;
-
 function storageRenderUrl(url, width, quality = 70) {
-    if (!url || typeof url !== 'string') return url;
-    if (!Number.isInteger(width) || width < 16 || width > 2048) return url;
-    if (!RESAMPLEABLE_STILL.test(url)) return url;
-    if (!url.includes(STORAGE_OBJECT_PATH)) return url;
-    if (!isValidStorageUrl(url)) return url;
-    try {
-        const rendered = new URL(url.replace(STORAGE_OBJECT_PATH, STORAGE_RENDER_PATH));
-        rendered.searchParams.set('width', String(width));
-        rendered.searchParams.set('quality', String(quality));
-        return rendered.toString();
-    } catch {
-        return url;
-    }
+    const sizer = window.ArtSoulStorageImage?.sized;
+    return typeof sizer === 'function' ? sizer(url, width, quality) : url;
 }
 
 function sanitizeText(text) {

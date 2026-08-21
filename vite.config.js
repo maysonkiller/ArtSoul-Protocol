@@ -30,6 +30,7 @@ const legacyRootAssets = [
     'avatar-dropdown.js',
     'header-prepaint.js',
     'data-prefetch.js',
+    'storage-image.js',
     'button-effects.css',
     'contracts-config.js',
     'contracts-integration.js',

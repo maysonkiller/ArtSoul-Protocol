@@ -124,7 +124,7 @@
         // helper re-checks the extension, so an animated file mislabelled as an
         // image is refused there too.
         if (type !== 'image') return url;
-        const resize = window.ArtSoulSecurity?.storageRenderUrl;
+        const resize = window.ArtSoulStorageImage?.sized;
         return typeof resize === 'function' ? resize(url, CARD_THUMBNAIL_WIDTH) : url;
     }
 

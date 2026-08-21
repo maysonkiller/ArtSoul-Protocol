@@ -836,7 +836,7 @@
                 );
             };
 
-            const resize = window.ArtSoulSecurity?.storageRenderUrl;
+            const resize = window.ArtSoulStorageImage?.sized;
             const small = typeof resize === 'function'
                 ? resize(snapshot.avatarUrl, AVATAR_PREVIEW_SOURCE_WIDTH)
                 : snapshot.avatarUrl;
@@ -1775,7 +1775,7 @@
             // non-square avatar, which is what made them wrong before.
             const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
             const source = resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
-            const resize = window.ArtSoulSecurity?.storageRenderUrl;
+            const resize = window.ArtSoulStorageImage?.sized;
             return typeof resize === 'function' ? resize(source, HEADER_BUTTON_AVATAR_WIDTH) : source;
         }
 

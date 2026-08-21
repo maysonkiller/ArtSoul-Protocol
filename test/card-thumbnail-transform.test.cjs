@@ -4,27 +4,19 @@ const fs = require('node:fs');
 
 const source = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
 
-// The sizing itself lives in supabase-client.js and is shared with the avatar
-// surfaces. Loading the real function keeps this test honest: a stub would let
+// The sizing lives in storage-image.js, a plain script loaded before every
+// consumer. Loading the real function keeps this test honest: a stub would let
 // the card and the header drift apart without anything failing.
 function loadStorageRenderUrl() {
-  const client = fs.readFileSync('supabase-client.js', 'utf8');
-  const start = client.indexOf('const STORAGE_OBJECT_PATH');
-  const end = client.indexOf('function sanitizeText');
-  assert.ok(start > -1 && end > start, 'the sizing helper must be discoverable');
-  return new Function(
-    'isValidStorageUrl', 'URL',
-    `${client.slice(start, end)}
-return storageRenderUrl;`
-  )(
-    (u) => { try { return new URL(u).hostname === 'store.test'; } catch { return false; } },
-    URL
-  );
+  const source = fs.readFileSync('storage-image.js', 'utf8');
+  const win = {};
+  new Function('window', 'URL', source)(win, URL);
+  return (url, width, quality) => win.ArtSoulStorageImage.sized(url, width, quality);
 }
 
 function loadCard() {
   const win = {
-    ArtSoulSecurity: { storageRenderUrl: loadStorageRenderUrl() },
+    ArtSoulStorageImage: { sized: loadStorageRenderUrl() },
     addEventListener() {},
     document: { addEventListener() {}, querySelectorAll: () => [] }
   };
@@ -32,7 +24,8 @@ function loadCard() {
   return win.ArtSoulArtworkCard;
 }
 
-const OBJECT = 'https://store.test/storage/v1/object/public/artworks/uploads/a/b.png';
+// The real allowed host, because the sizing validates it.
+const OBJECT = 'https://bexigvqrunomwtjsxlej.supabase.co/storage/v1/object/public/artworks/uploads/a/b.png';
 
 test('a still image from our own storage is requested as a sized copy', () => {
   // A-60. Measured on production: the first six profile cards pulled 7.9 MB of
@@ -79,7 +72,7 @@ test('both card renderers paint the thumbnail, not the original', () => {
 test('a page without the shared helper still renders cards', () => {
   // artwork-card.js is a classic script and supabase-client.js is a module, so
   // the helper is read at call time and its absence must cost the sizing only.
-  const win = { ArtSoulSecurity: {}, addEventListener() {}, document: { addEventListener() {}, querySelectorAll: () => [] } };
+  const win = { addEventListener() {}, document: { addEventListener() {}, querySelectorAll: () => [] } };
   new Function('window', 'document', 'URL', 'console', source)(win, win.document, URL, console);
   const d = win.ArtSoulArtworkCard.mediaDescriptor({ file_type: 'image/png', file_url: OBJECT });
   assert.equal(d.thumbnailUrl, OBJECT);
@@ -97,8 +90,8 @@ test('an image the URL cannot vouch for is left alone', () => {
   // upload could be a GIF. Transforming it would silently kill its animation.
   const card = loadCard();
   for (const url of [
-    'https://store.test/storage/v1/object/public/artworks/1777588989698_Image',
-    'https://store.test/storage/v1/object/public/artworks/logo.svg'
+    'https://bexigvqrunomwtjsxlej.supabase.co/storage/v1/object/public/artworks/1777588989698_Image',
+    'https://bexigvqrunomwtjsxlej.supabase.co/storage/v1/object/public/artworks/logo.svg'
   ]) {
     const d = card.mediaDescriptor({ file_type: 'image', file_url: url });
     assert.equal(d.thumbnailUrl, url);
@@ -107,7 +100,7 @@ test('an image the URL cannot vouch for is left alone', () => {
 
 test('a bare "image" file_type on a .gif URL still classifies as gif', () => {
   const card = loadCard();
-  const url = 'https://store.test/storage/v1/object/public/artworks/loop.gif';
+  const url = 'https://bexigvqrunomwtjsxlej.supabase.co/storage/v1/object/public/artworks/loop.gif';
   const d = card.mediaDescriptor({ file_type: 'image', file_url: url });
   assert.equal(d.type, 'gif');
   assert.equal(d.thumbnailUrl, url);
@@ -170,4 +163,39 @@ test('artwork cards still ask for a sized copy', () => {
   const card = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
   assert.match(card, /const CARD_THUMBNAIL_WIDTH = 600;/);
   assert.match(card, /resize\(url, CARD_THUMBNAIL_WIDTH\)/);
+});
+
+test('the sizing exists before anything that paints an image', () => {
+  // This is the whole bug. The helper lived in supabase-client.js, a module
+  // reached only through the page bundle. avatar-dropdown.js is a classic
+  // deferred script and paints the account button roughly three seconds before
+  // that bundle executes on a phone, so it called a function that did not exist
+  // yet and silently fell back to the upload itself - a 2.37 MB picture for a
+  // 40px circle, with the guest avatar on screen until it finished.
+  const PAGES = ['index.html', 'gallery.html', 'artwork.html', 'profile.html',
+                 'upload.html', 'docs-protocol.html', 'admin.html'];
+  for (const page of PAGES) {
+    const html = fs.readFileSync(page, 'utf8');
+    const sizing = html.indexOf('storage-image.js');
+    assert.ok(sizing > -1, `${page} must load the sizing helper`);
+    for (const consumer of ['avatar-dropdown.js', 'artwork-card.js']) {
+      const at = html.indexOf(consumer);
+      if (at === -1) continue;
+      assert.ok(sizing < at, `${page}: the sizing must load before ${consumer}`);
+    }
+  }
+});
+
+test('nothing reaches for the sizing through the page bundle any more', () => {
+  for (const file of ['avatar-dropdown.js', 'src/ui/components/artwork-card.js']) {
+    const text = fs.readFileSync(file, 'utf8');
+    assert.doesNotMatch(text, /ArtSoulSecurity\?\.storageRenderUrl/,
+      `${file} must not depend on a module that executes after it paints`);
+    assert.match(text, /window\.ArtSoulStorageImage\?\.sized/);
+  }
+  // One implementation. The module name survives for module consumers and
+  // delegates to it.
+  const client = fs.readFileSync('supabase-client.js', 'utf8');
+  assert.match(client, /const sizer = window\.ArtSoulStorageImage\?\.sized;/);
+  assert.doesNotMatch(client, /RESAMPLEABLE_STILL/);
 });
