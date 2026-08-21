@@ -4834,12 +4834,15 @@ html.future .site-header .logo-link > .site-logo {
     display: none;
 }
 
+/* The identity region is never covered. `wallet-state-resolving` used to reveal
+   a "Connecting..." overlay and hide the name and address underneath it, so the
+   word sat on screen for as long as the wallet took to settle - on every
+   navigation, on every page. There is nothing to resolve about an address the
+   browser already holds: a known account is named by its own shortened address
+   until its picture arrives, which is exactly what a profile with no nickname
+   shows permanently. The overlay element stays in the markup and stays hidden;
+   the class survives only as a state marker for aria-busy. */
 html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
-    display: block;
-}
-
-html.wallet-state-resolving .site-header #navButtons [data-avatar-name],
-html.wallet-state-resolving .site-header #navButtons [data-avatar-address] {
     display: none;
 }
 

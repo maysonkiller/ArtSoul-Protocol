@@ -35,9 +35,13 @@ const WALLET_B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const AVATAR_A = 'https://cdn.artsoul.test/avatar-a.png';
 const AVATAR_B = 'https://cdn.artsoul.test/avatar-b.png';
 const NEUTRAL_AVATAR = '/default-avatar.png';
-// Must stay in sync with RESOLVING_IDENTITY_LABEL in avatar-dropdown.js and the
-// [data-avatar-resolving] placeholder in every static header shell.
-const RESOLVING_LABEL = 'Connecting…';
+// A known account is named by its own shortened address until its picture
+// arrives. It used to be named by its connection status, so the word
+// "Connecting" sat on screen for as long as the wallet took to settle, on every
+// navigation and every page. The tests below still describe the same frame -
+// wallet known, picture not yet - they just no longer expect a status word.
+const shortAddress = (wallet) => `${wallet.slice(0, 6)}...${wallet.slice(-4)}`;
+const RESOLVING_LABEL = shortAddress(WALLET_A);
 const STYLIZED_A = /^data:image\/svg\+xml/;
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 CriOS/126.0';
 const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0';
@@ -535,12 +539,12 @@ test('every shared-header page boots the header in the same order with the same 
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
     assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=45">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=3"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=49" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=4"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=50" defer><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=45');
-    const prepaint = html.indexOf('header-prepaint.js?v=3');
-    const component = html.indexOf('avatar-dropdown.js?v=49');
+    const prepaint = html.indexOf('header-prepaint.js?v=4');
+    const component = html.indexOf('avatar-dropdown.js?v=50');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
     const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");
@@ -574,10 +578,16 @@ test('hydration swaps the identity label and never hides the identity region', (
   assert.doesNotMatch(css, /wallet-state-resolving[^{]*\.avatar-button > \*/);
   assert.doesNotMatch(css, /wallet-state-resolving[^{]*\.avatar-info > \*/);
   assert.doesNotMatch(css, /wallet-state-resolving[\s\S]{0,200}?visibility: hidden/);
-  // The resolving state swaps a real label of identical size in and out.
+  // The identity region is never covered. The resolving state used to swap in a
+  // "Connecting..." overlay of identical size and hide the name and address
+  // underneath it, which kept that word on screen for as long as the wallet took
+  // to settle. Nothing is swapped now: a known account is named by its own
+  // shortened address until its picture arrives, so the same element carries the
+  // label the whole way through and the overlay is never revealed.
   assert.match(css, /\.site-header #navButtons \[data-avatar-resolving\] \{\s*display: none;/);
-  assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-resolving\] \{\s*display: block;/);
-  assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-name\],\s*html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-address\] \{\s*display: none;/);
+  assert.match(css, /html\.wallet-state-resolving \.site-header #navButtons \[data-avatar-resolving\] \{\s*display: none;/);
+  assert.doesNotMatch(css, /html\.wallet-state-resolving[^{]*\[data-avatar-name\][^{]*\{[^}]*display: none/);
+  assert.doesNotMatch(css, /html\.wallet-state-resolving[^{]*\[data-avatar-address\][^{]*\{[^}]*display: none/);
   assert.match(css, /\.site-header #navButtons \[data-avatar-resolving\] \{[\s\S]*?font-size: 0\.82rem !important;[\s\S]*?font-weight: 600 !important;/);
   // Nothing may hide the account-button image any more.
   assert.doesNotMatch(css, /avatar-image-loading/);
@@ -713,7 +723,9 @@ test('a refused preload hint still leaves the cached identity purely visual', ()
   // The cached avatar still has to be decoded, so the button holds the complete
   // resolving state rather than committing half of the connected identity.
   assert.equal(harness.avatarName(), RESOLVING_LABEL);
-  assert.equal(harness.avatarAddress(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
+  // The label IS the address in a resolving frame, so the second wallet line
+  // is withheld: one wallet line, never two. A-56.
+  assert.equal(harness.avatarAddress(), '');
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assert.equal(harness.context.window.currentWalletAddress, undefined);
   assert.equal(harness.context.window.artsoulWalletStateSettled, false);
@@ -987,7 +999,9 @@ test('a stored wallet without a cached profile renders a coherent resolving stat
   // The canonical image plus a real label and the shortened stored address.
   assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR);
   assert.equal(harness.avatarName(), RESOLVING_LABEL);
-  assert.equal(harness.avatarAddress(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
+  // The label IS the address in a resolving frame, so the second wallet line
+  // is withheld: one wallet line, never two. A-56.
+  assert.equal(harness.avatarAddress(), '');
   assert.equal(harness.uiState(), 'resolving');
   // Not a fabricated profile, and it authorizes nothing. Neither account
   // action is truthful until the provider settles.
@@ -1728,7 +1742,7 @@ test('an invalid stored preview is rejected and the safe resolving path is used'
 
     assert.equal(harness.avatarSrc(), NEUTRAL_AVATAR, `${label}: must not paint a rejected preview`);
     assert.equal(harness.avatarName(), RESOLVING_LABEL, `${label}: must fall back to the resolving state`);
-    assert.equal(harness.avatarAddress(), shortA, `${label}: the resolving state stays coherent`);
+    assert.equal(harness.avatarAddress(), '', `${label}: one wallet line, never two`);
     assert.equal(harness.uiState(), 'resolving', `${label}: resolving, not restoring`);
   }
 });

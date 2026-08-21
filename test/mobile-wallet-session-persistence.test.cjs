@@ -431,8 +431,12 @@ test('mobile header keeps the stable shell until a complete cached identity exis
     assert.doesNotMatch(initializing, /classList\.add\('wallet-state-resolving'\)/);
     const resolving = avatar.match(/renderResolvingState\(storedWallet\) \{[\s\S]*?\n        \}/)?.[0] || '';
     assert.match(resolving, /avatarUrl: NEUTRAL_AVATAR_URL/);
-    assert.match(resolving, /name: RESOLVING_IDENTITY_LABEL/);
-    assert.match(resolving, /storedWallet\.slice\(0, 6\)/);
+    // Named by its own shortened address, never by its connection status.
+    assert.match(resolving, /name: resolvingIdentityLabel\(storedWallet\)/);
+    // The shortening lives in one helper now rather than inline here.
+    assert.match(resolving, /address: resolvingIdentityLabel\(storedWallet\)/);
+    assert.match(avatar, /const resolvingIdentityLabel = \(walletAddress\) => \{/);
+    assert.match(avatar, /value\.slice\(0, 6\)\}\.\.\.\$\{value\.slice\(-4\)/);
     // Strictly visual: a non-interactive restore status replaces both account
     // actions until the provider confirms connected or disconnected.
     // The visible state travels inside the identity snapshot, and 'resolving' is

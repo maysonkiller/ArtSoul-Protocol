@@ -174,8 +174,12 @@ test('an uncached stored wallet exposes no false account action while restoratio
   await harness.flush();
 
   assert.equal(harness.uiState(), 'resolving');
-  assert.equal(harness.avatarName(), 'Connecting…');
-  assert.equal(harness.avatarAddress(), shortName(WALLET_A));
+  // A known account is named by its own shortened address until its picture
+  // arrives, never by its connection status.
+  assert.equal(harness.avatarName(), `${WALLET_A.slice(0, 6)}...${WALLET_A.slice(-4)}`);
+  // The label IS the address here, so the second wallet line is withheld:
+  // one wallet line, never two. A-56.
+  assert.equal(harness.avatarAddress(), '');
   assert.match(harness.menuHtml(), /Restoring wallet…/);
   assert.doesNotMatch(harness.menuHtml(), /Connect Wallet/);
   assert.doesNotMatch(harness.menuHtml(), /Disconnect/);

@@ -34,27 +34,36 @@ test('the visible result and its heading are committed together', () => {
   assert.match(commit, /fetchProfileArtworks\(activeProfile, requestedGallery\)/);
 });
 
-test('a tab switch never falls back to the six-card skeleton', () => {
-  // The skeleton reserves a height unrelated to the incoming tab. It is correct
-  // for a first load, where there is nothing to keep, and wrong for a switch.
-  assert.match(profileEntry, /\{artworksLoading && !hasSettledArtworks \? \(\s*\n\s*<CardGridSkeleton count=\{6\} className="contents" \/>/);
+test('a placeholder stands in until the list belongs to the tab on screen', () => {
+  // A-58 kept the previous tab's result on screen while the next one loaded, so
+  // the heading followed the committed tab and lagged behind the highlight. On a
+  // phone that read as the header naming one gallery while the page showed
+  // another - reported from production with a screenshot of Auctions highlighted
+  // above a Created Artworks heading.
+  //
+  // The tab, the heading and the list now always name the same gallery. A
+  // placeholder covers the gap, and with the per-visit cache that gap only
+  // exists the first time a tab is opened.
+  assert.match(profileEntry, /\{displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? \(/);
+  assert.match(profileEntry, /<CardGridSkeleton count=\{6\} className="contents" \/>/);
   assert.match(profileEntry, /const \[hasSettledArtworks, setHasSettledArtworks\] = useState\(false\);/);
 });
 
-test('everything describing the list follows the committed tab', () => {
-  // A stale heading, empty message or Add New tile would trade one wrongness
-  // for another.
+test('everything describing the list follows the tab that is highlighted', () => {
+  // A stale heading, empty message or Add New tile would trade one wrongness for
+  // another. displayedGallery survives only as the commit guard inside the
+  // loader; nothing visible reads it.
   for (const site of [
-    /\{GALLERY_TYPES\.find\(g => g\.id === displayedGallery\)\?\.label\}/,
-    /\{isOwnProfile && displayedGallery === 'created' && \(/,
-    /\{displayedGallery === 'sold' && 'No completed sales yet\.'\}/,
-    /\{displayedGallery === 'collected' && 'No collected NFTs yet\.'\}/
+    /\{GALLERY_TYPES\.find\(g => g\.id === selectedGallery\)\?\.label\}/,
+    /\{isOwnProfile && selectedGallery === 'created' && \(/,
+    /\{selectedGallery === 'sold' && 'No completed sales yet\.'\}/,
+    /\{selectedGallery === 'collected' && 'No collected NFTs yet\.'\}/
   ]) {
     assert.match(profileEntry, site);
   }
-  // The tapped tab still highlights immediately: that feedback must not lag.
-  assert.match(profileEntry, /selectedGallery === gallery\.id/);
-  assert.match(profileEntry, /if \(gallery\.id !== selectedGallery\) \{/);
+  const rendered = profileEntry.slice(profileEntry.indexOf('profile-artwork-grid'));
+  assert.doesNotMatch(rendered, /displayedGallery ===/,
+    'nothing rendered may be keyed to the committed tab any more');
 });
 
 test('the outgoing list is never dimmed while the next one loads', () => {

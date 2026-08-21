@@ -1639,7 +1639,7 @@ const { useState, useEffect, useRef } = React;
                                 <h3 className={`text-xl font-bold ${
                                     isClassic ? 'text-gray-100' : 'text-cyan-300'
                                 }`}>
-                                    {GALLERY_TYPES.find(g => g.id === displayedGallery)?.label}
+                                    {GALLERY_TYPES.find(g => g.id === selectedGallery)?.label}
                                 </h3>
                                 {artworksLoading && hasSettledArtworks ? (
                                     <span
@@ -1660,12 +1660,16 @@ const { useState, useEffect, useRef } = React;
                             </div>
 
                             <div className="profile-artwork-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" aria-busy={artworksLoading}>
-                                {artworksLoading && !hasSettledArtworks ? (
+                                {displayedGallery !== selectedGallery || (artworksLoading && !hasSettledArtworks) ? (
+                                    /* The tab, the heading and the list always name the same
+                                       gallery. Showing the previous tab's cards under the new
+                                       tab's heading was reported as the header saying one thing
+                                       while the page showed another. */
                                     <CardGridSkeleton count={6} className="contents" />
                                 ) : (
                                     <>
                                         {/* Add New is a Created Artworks action only. */}
-                                        {isOwnProfile && displayedGallery === 'created' && (
+                                        {isOwnProfile && selectedGallery === 'created' && (
                                             <button
                                                 type="button"
                                                 onClick={handleQuickUpload}
@@ -1691,10 +1695,10 @@ const { useState, useEffect, useRef } = React;
 
                                         {myArtworks.length === 0 && (
                                             <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
-                                                {displayedGallery === 'created' && 'No created artworks yet.'}
-                                                {displayedGallery === 'auction' && 'No live auctions right now.'}
-                                                {displayedGallery === 'sold' && 'No completed sales yet.'}
-                                                {displayedGallery === 'collected' && 'No collected NFTs yet.'}
+                                                {selectedGallery === 'created' && 'No created artworks yet.'}
+                                                {selectedGallery === 'auction' && 'No live auctions right now.'}
+                                                {selectedGallery === 'sold' && 'No completed sales yet.'}
+                                                {selectedGallery === 'collected' && 'No collected NFTs yet.'}
                                             </div>
                                         )}
                                     </>

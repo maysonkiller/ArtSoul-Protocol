@@ -13,7 +13,6 @@
     const PRELOADABLE_AVATAR_URL = /^(?:https:\/\/[^/\s]|\/(?!\/))/;
     const PREVIEW_MAX_LENGTH = 32 * 1024;
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
-    const RESOLVING_LABEL = 'Connecting…';
 
     const read = (key) => {
         try {
@@ -147,7 +146,7 @@
             renderKey: `resolving:${wallet}`,
             source: NEUTRAL_AVATAR_URL,
             paintSource: NEUTRAL_AVATAR_URL,
-            label: settledWithoutPicture ? identity.name : RESOLVING_LABEL,
+            label: settledWithoutPicture ? identity.name : shortAddress,
             shortAddress,
             imageIdentity: shortAddress,
             uiState: 'resolving'

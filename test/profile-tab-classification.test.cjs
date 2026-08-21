@@ -24,14 +24,14 @@ test('Add New is Created-only and loading uses one neutral skeleton state', () =
   // appears for Created only. Asserting the committed value is stronger than
   // asserting the pending one, because the pending one can describe a list that
   // is not on screen.
-  assert.match(profile, /isOwnProfile && displayedGallery === 'created'/);
+  assert.match(profile, /isOwnProfile && selectedGallery === 'created'/);
   assert.doesNotMatch(profile, /ProfileArtworkSkeleton/);
   assert.doesNotMatch(profile, /profile-card-skeleton/);
   // Exactly one skeleton state, and it may only appear when there is no previous
   // result to keep. Replacing a settled list with it is what produced the
   // oversized transient block.
   assert.equal(profile.match(/CardGridSkeleton/g).length, 2);
-  assert.match(profile, /artworksLoading && !hasSettledArtworks \? \([\s\S]*CardGridSkeleton count=\{6\}[\s\S]*\) : \(/);
+  assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? \([\s\S]*CardGridSkeleton count=\{6\}[\s\S]*\) : \(/);
   assert.match(profile, /!artworksLoading && \([\s\S]*myArtworks\.length\} items/);
   assert.doesNotMatch(profile, /Creator action|Prepare a new auction|Open publisher/);
 });
@@ -54,9 +54,9 @@ test('empty states render only after loading for all four tabs', () => {
   // tab so the message can never describe a result that is not on screen. A
   // first load still cannot reach them: hasSettledArtworks is false until a
   // fetch commits, so the skeleton branch owns that render.
-  assert.match(profile, /displayedGallery === 'created' && 'No created artworks yet\.'/);
-  assert.match(profile, /displayedGallery === 'auction' && 'No live auctions right now\.'/);
-  assert.match(profile, /displayedGallery === 'sold' && 'No completed sales yet\.'/);
-  assert.match(profile, /displayedGallery === 'collected' && 'No collected NFTs yet\.'/);
+  assert.match(profile, /selectedGallery === 'created' && 'No created artworks yet\.'/);
+  assert.match(profile, /selectedGallery === 'auction' && 'No live auctions right now\.'/);
+  assert.match(profile, /selectedGallery === 'sold' && 'No completed sales yet\.'/);
+  assert.match(profile, /selectedGallery === 'collected' && 'No collected NFTs yet\.'/);
   assert.match(profile, /const \[hasSettledArtworks, setHasSettledArtworks\] = useState\(false\);/);
 });

@@ -251,7 +251,7 @@ test('only the bounded header prepaint may block parsing before first paint', ()
       .filter(attrs => !/type="module"| defer| async/.test(attrs))
       .map(attrs => attrs.match(/src="([^"]+)"/)[1]);
 
-    assert.deepEqual(blocking, ['/header-prepaint.js?v=3'], `${page} may block only on the shared prepaint bridge`);
+    assert.deepEqual(blocking, ['/header-prepaint.js?v=4'], `${page} may block only on the shared prepaint bridge`);
   }
 
   assert.ok(
