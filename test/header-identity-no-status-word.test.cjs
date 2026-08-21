@@ -49,15 +49,11 @@ test('the neutral avatar survives resizing untouched', () => {
   // image. Header avatars are now requested at a display size, so if that
   // resizing rewrote the neutral URL the comparison would fail and the status
   // word would come back for exactly the accounts this fix was written for.
-  const client = fs.readFileSync('supabase-client.js', 'utf8');
-  const start = client.indexOf('const STORAGE_OBJECT_PATH');
-  const end = client.indexOf('function sanitizeText');
-  assert.ok(start > -1 && end > start, 'the sizing helper must be discoverable');
-  const helper = new Function(
-    'isValidStorageUrl', 'URL',
-    `${client.slice(start, end)}
-return storageRenderUrl;`
-  )(() => true, URL);
+  // The sizing lives in storage-image.js, loaded before every consumer.
+  const source = fs.readFileSync('storage-image.js', 'utf8');
+  const win = {};
+  new Function('window', 'URL', source)(win, URL);
+  const helper = win.ArtSoulStorageImage.sized;
   assert.equal(helper('/default-avatar.png', 128), '/default-avatar.png');
   assert.match(avatarDropdown, /const NEUTRAL_AVATAR_URL = '\/default-avatar\.png';/);
 });
