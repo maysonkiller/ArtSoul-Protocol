@@ -31,6 +31,7 @@ const legacyRootAssets = [
     'header-prepaint.js',
     'data-prefetch.js',
     'storage-image.js',
+    'base-network.js',
     'button-effects.css',
     'contracts-config.js',
     'contracts-integration.js',
