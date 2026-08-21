@@ -550,11 +550,40 @@
             ];
         }
 
-        isCurrentNavigationItem(item, currentPath = window.location.pathname, currentHash = window.location.hash) {
+        /**
+         * Is this menu entry the page the person is already looking at?
+         *
+         * The Profile entry is special. `/profile` renders whoever the address
+         * parameter names, so being on that path does not mean being on YOUR
+         * profile. Matching on the path alone hid the way back to your own
+         * profile for as long as you were reading somebody else's, which is
+         * precisely when you need it. `isOwnProfile` is what the callers
+         * already compute; it is now what decides.
+         */
+        /**
+         * Does the profile currently on screen belong to this wallet?
+         *
+         * `/profile` with no address is always your own; with one, only when it
+         * matches. Every caller needs the same answer, so it lives in one place.
+         */
+        isOwnProfileAddress(walletAddress) {
+            const wallet = String(walletAddress || '').toLowerCase();
+            if (!wallet) return false;
+            let viewing = '';
+            try {
+                viewing = new URLSearchParams(window.location.search).get('address') || '';
+            } catch {
+                viewing = '';
+            }
+            return !viewing || viewing.toLowerCase() === wallet;
+        }
+
+        isCurrentNavigationItem(item, currentPath = window.location.pathname, currentHash = window.location.hash, isOwnProfile = true) {
             const normalizedPath = this.normalizePagePath(currentPath);
             const isHome = item.home && normalizedPath === '/';
             const isSamePath = normalizedPath === item.path;
             if (!isHome && !isSamePath) return false;
+            if (item.profile && !isOwnProfile) return false;
             if (item.hash) return currentHash === item.hash;
             return !currentHash || isHome || !item.profile;
         }
@@ -562,8 +591,9 @@
         renderDropdownNavItems(options = {}) {
             const currentPath = options.currentPath || window.location.pathname;
             const currentHash = window.location.hash || '';
+            const isOwnProfile = options.isOwnProfile !== false;
             return this.getNavigationItems()
-                .filter(item => !this.isCurrentNavigationItem(item, currentPath, currentHash))
+                .filter(item => !this.isCurrentNavigationItem(item, currentPath, currentHash, isOwnProfile))
                 .map(item => {
                     return `
                     <a href="${item.href}" class="dropdown-item${item.profile ? ' dropdown-profile-item' : ''}">
@@ -1524,11 +1554,8 @@
             const currentPath = window.location.pathname;
             // Check if on profile page
             const isProfilePage = this.isPage(currentPath, 'profile');
-            // Check if viewing own profile (no address parameter or address matches current wallet)
-            const urlParams = new URLSearchParams(window.location.search);
-            const viewingAddress = urlParams.get('address');
-            const currentWallet = this.profile?.wallet_address?.toLowerCase();
-            const isOwnProfile = isProfilePage && (!viewingAddress || viewingAddress.toLowerCase() === currentWallet);
+            const isOwnProfile = isProfilePage
+                && this.isOwnProfileAddress(this.profile?.wallet_address);
 
             const walletAddress = this.profile?.wallet_address || options.walletAddress || window.currentWalletAddress || '';
             const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
@@ -1861,9 +1888,7 @@
 
             const currentPath = window.location.pathname;
             const isProfilePage = this.isPage(currentPath, 'profile');
-            const viewingAddress = new URLSearchParams(window.location.search).get('address');
-            const isOwnProfile = isProfilePage
-                && (!viewingAddress || viewingAddress.toLowerCase() === storedWallet);
+            const isOwnProfile = isProfilePage && this.isOwnProfileAddress(storedWallet);
             const shortAddress = `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`;
             let networkInfo = this.getCachedHeaderNetwork(storedWallet);
             if (isMobileUA && networkInfo?.chainId === 84532 && networkInfo.baseSepoliaConfirmed !== true) {
@@ -1930,6 +1955,10 @@
 
             const currentPath = window.location.pathname;
             const isProfilePage = this.isPage(currentPath, 'profile');
+            // A restoring frame must not guess that any profile page is yours;
+            // the address in the URL already says whose it is.
+            const restoringOwnProfile = isProfilePage
+                && this.isOwnProfileAddress(storedWallet);
             container.dataset.avatarRenderKey = 'resolving';
             this.pendingRenderKey = 'resolving';
             this.updateStableButton({
@@ -1942,8 +1971,8 @@
                 persistUiState: false
             });
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage, restoring: true }),
-                `resolving:${currentPath}:${isProfilePage}`
+                this.renderMenuContent({ currentPath, isOwnProfile: restoringOwnProfile, restoring: true }),
+                `resolving:${currentPath}:${restoringOwnProfile}`
             );
             this.applyThemeStyles();
             this.bindOutsideCloseOnce();
@@ -2008,10 +2037,8 @@
 
             const currentPath = window.location.pathname;
             const isProfilePage = this.isPage(currentPath, 'profile');
-            const urlParams = new URLSearchParams(window.location.search);
-            const viewingAddress = urlParams.get('address');
             const currentWallet = walletAddress?.toLowerCase();
-            const isOwnProfile = isProfilePage && (!viewingAddress || viewingAddress.toLowerCase() === currentWallet);
+            const isOwnProfile = isProfilePage && this.isOwnProfileAddress(currentWallet);
 
             const cachedIdentity = options.resolved === false
                 ? this.getCachedHeaderIdentity(currentWallet)
