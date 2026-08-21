@@ -12,7 +12,10 @@
     // The previously generated stylized "A" data-URI is gone: it read as a
     // third identity and was mistaken for a stale cached avatar.
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
-    const HEADER_AVATAR_WIDTH = 128;
+    // Width of the throwaway copy the cached preview is captured from. It is
+    // never displayed; only its pixels are stored, downscaled again by
+    // AVATAR_PREVIEW_EDGE_PX.
+    const AVATAR_PREVIEW_SOURCE_WIDTH = 128;
 
     // supabase-client.js announces 'artsoul:db-ready' once, after the complete
     // window.ArtSoulDB API is assigned.
@@ -466,18 +469,7 @@
             };
             const commitAndCapture = () => {
                 if (!this.commitIdentitySnapshot(structure, snapshot, token, false)) return;
-                if (!corsAttempt) return;
-                // The avatar just decoded for display; capturing from it costs no
-                // extra request and makes the NEXT document paint-ready.
-                const dataUri = this.captureAvatarPreview(preloader);
-                if (dataUri) {
-                    this.persistAvatarPreview(
-                        snapshot.previewWallet,
-                        snapshot.name,
-                        snapshot.avatarUrl,
-                        dataUri
-                    );
-                }
+                this.captureAvatarPreviewFor(snapshot, corsAttempt, preloader);
             };
             preloader.onload = () => {
                 if (token !== this.identityCommitToken) return;
@@ -774,6 +766,56 @@
                 // SecurityError on a tainted canvas, or no canvas support at all.
                 return null;
             }
+        }
+
+        /**
+         * Store a tiny base64 copy of this avatar so the NEXT document can paint
+         * a complete identity in its first frame instead of a status word.
+         *
+         * The capture used to read the already-decoded display image. That is
+         * free, but it only happens once a multi-megabyte upload has finished
+         * decoding, and a person who taps through to the next page before then
+         * leaves without a preview - so the header resolves from scratch again,
+         * on every navigation, forever. Uploads measured on the live bucket run
+         * to 2.8 MB.
+         *
+         * So the capture reads its own request for a small copy from the render
+         * endpoint. It is a few kilobytes, it decodes in one frame, and it is
+         * never displayed: only its pixels are stored. When the endpoint is not
+         * available - anything off our own storage host, a GIF, an SVG - the
+         * display image is used exactly as before.
+         */
+        captureAvatarPreviewFor(snapshot, corsAttempt, decodedDisplayImage) {
+            if (!corsAttempt) return;
+            const store = (image) => {
+                const dataUri = this.captureAvatarPreview(image);
+                if (!dataUri) return false;
+                return this.persistAvatarPreview(
+                    snapshot.previewWallet,
+                    snapshot.name,
+                    snapshot.avatarUrl,
+                    dataUri
+                );
+            };
+
+            const resize = window.ArtSoulSecurity?.storageRenderUrl;
+            const small = typeof resize === 'function'
+                ? resize(snapshot.avatarUrl, AVATAR_PREVIEW_SOURCE_WIDTH)
+                : snapshot.avatarUrl;
+            if (small === snapshot.avatarUrl) {
+                if (decodedDisplayImage?.complete) store(decodedDisplayImage);
+                return;
+            }
+
+            const source = typeof Image === 'function' ? new Image() : document.createElement('img');
+            source.crossOrigin = 'anonymous';
+            // A failed preview is never an error the person should notice: the
+            // header simply keeps resolving as it did before.
+            source.onerror = () => {
+                if (decodedDisplayImage?.complete) store(decodedDisplayImage);
+            };
+            source.onload = () => { store(source); };
+            source.src = small;
         }
 
         /** Persist a captured preview, but only onto the identity it describes. */
@@ -1679,13 +1721,14 @@
         }
 
         getProfileAvatarUrl(profile) {
+            // The avatar a person uploaded is what is displayed, at its own
+            // proportions. A fixed render width forced every avatar through one
+            // dimension, which reframed the ones that are not square - uploads
+            // range from 400x400 to 832x1248 to 4032x3024 - and upscaled the
+            // small ones. Sizing now happens only where it is invisible: the
+            // cached preview in captureAvatarPreview.
             const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-            const source = resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
-            // The button paints at 40px, so 128 covers a 3x screen. This matters
-            // more here than anywhere else: the header holds its resolving label
-            // until the avatar decodes, and stored avatars run to megabytes.
-            const resize = window.ArtSoulSecurity?.storageRenderUrl;
-            return typeof resize === 'function' ? resize(source, HEADER_AVATAR_WIDTH) : source;
+            return resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
         }
 
         /**

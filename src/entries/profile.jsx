@@ -205,10 +205,9 @@ const { useState, useEffect, useRef } = React;
 
             function getProfileAvatarUrl(profileData) {
                 const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-                const source = resolver?.(profileData, '') || '';
-                // The hero avatar paints at 112px, so 384 covers a 3x screen.
-                const resize = window.ArtSoulSecurity?.storageRenderUrl;
-                return typeof resize === 'function' ? resize(source, 384) : source;
+                // Displayed at the uploader's own proportions; see the note in
+                // avatar-dropdown.js getProfileAvatarUrl.
+                return resolver?.(profileData, '') || '';
             }
 
             // Base mainnet explorer: the protocol targets Base mainnet, so the

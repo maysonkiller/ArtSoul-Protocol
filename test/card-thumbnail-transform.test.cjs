@@ -113,29 +113,53 @@ test('a bare "image" file_type on a .gif URL still classifies as gif', () => {
   assert.equal(d.thumbnailUrl, url);
 });
 
-test('the header avatar is requested at a display size', () => {
-  // The header holds its resolving label until the avatar decodes, and stored
-  // avatars run to megabytes: measured on the live bucket, 2045, 2313 and 2841
-  // KB come back as 8.3, 10.1 and 28.4 KB WebP at a display width. That wait is
-  // what the founder saw as "Connecting" on every page.
-  const dropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
-  assert.match(dropdown, /const HEADER_AVATAR_WIDTH = 128;/);
-  assert.match(dropdown, /resize\(source, HEADER_AVATAR_WIDTH\)/);
+// The lines of a function definition, from its opening line to the first line
+// whose indentation returns to the definition's own level.
+function functionBody(source, definitionLine) {
+  const lines = source.split('\n');
+  const start = lines.findIndex((l) => l.includes(definitionLine));
+  assert.ok(start > -1, `definition not found: ${definitionLine}`);
+  const indent = lines[start].match(/^\s*/)[0].length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const l = lines[i];
+    if (l.trim() && l.match(/^\s*/)[0].length <= indent) return lines.slice(start, i + 1).join('\n');
+  }
+  return lines.slice(start).join('\n');
+}
+
+test('no avatar surface resizes the picture it displays', () => {
+  // An avatar is displayed at the proportions its owner uploaded. A fixed
+  // render width forced every one through a single dimension, which reframed
+  // the ones that are not square - live uploads range from 400x400 to 832x1248
+  // to 4032x3024 - and upscaled the small ones. Sizing survives only where it
+  // is invisible: the cached preview, whose pixels are stored and never shown.
+  const definitions = {
+    'avatar-dropdown.js': 'getProfileAvatarUrl(profile) {',
+    'src/entries/profile.jsx': 'function getProfileAvatarUrl(profileData) {',
+    'src/entries/artwork.jsx': 'function getProfileAvatarUrl(profileData, address'
+  };
+  for (const [file, definition] of Object.entries(definitions)) {
+    const body = functionBody(fs.readFileSync(file, 'utf8'), definition);
+    assert.doesNotMatch(body, /storageRenderUrl/, `${file}: getProfileAvatarUrl must return the upload itself`);
+  }
 });
 
-test('every avatar surface uses the one shared helper', () => {
-  // Canon: a change to a type of UI element applies to every surface it appears
-  // on. Avatars appear in the header button and menu, the profile hero and the
-  // artwork provenance rows.
-  for (const file of ['avatar-dropdown.js', 'src/entries/profile.jsx', 'src/entries/artwork.jsx']) {
-    const text = fs.readFileSync(file, 'utf8');
-    assert.match(text, /window\.ArtSoulSecurity\?\.storageRenderUrl/, `${file} must use the shared helper`);
-  }
-  // And nobody re-implements it.
-  const client = fs.readFileSync('supabase-client.js', 'utf8');
-  assert.equal((client.match(/function storageRenderUrl/g) || []).length, 1);
-  for (const file of ['src/ui/components/artwork-card.js', 'avatar-dropdown.js', 'src/entries/profile.jsx', 'src/entries/artwork.jsx']) {
-    const text = fs.readFileSync(file, 'utf8');
-    assert.doesNotMatch(text, /storage\/v1\/render\/image\/public/, `${file} must not build the URL itself`);
-  }
+test('the cached preview is captured from a copy nobody sees', () => {
+  const dropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
+  assert.match(dropdown, /const AVATAR_PREVIEW_SOURCE_WIDTH = 128;/);
+  assert.match(dropdown, /captureAvatarPreviewFor\(snapshot, corsAttempt, preloader\)/);
+  // The small copy is only ever a capture source: it is never written to an
+  // element that paints.
+  const body = functionBody(dropdown, 'captureAvatarPreviewFor(snapshot, corsAttempt, decodedDisplayImage)');
+  assert.match(body, /source\.src = small;/);
+  assert.doesNotMatch(body, /paintSrc/);
+  assert.doesNotMatch(body, /image\.src/);
+});
+
+test('artwork cards still ask for a sized copy', () => {
+  // Cards are unaffected by the avatar revert: a card thumbnail is a crop of a
+  // work, not a portrait, and the dark cards were reported separately.
+  const card = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
+  assert.match(card, /const CARD_THUMBNAIL_WIDTH = 600;/);
+  assert.match(card, /resize\(url, CARD_THUMBNAIL_WIDTH\)/);
 });

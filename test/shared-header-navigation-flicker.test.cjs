@@ -1876,8 +1876,22 @@ test('the preview contract is pinned in the component source', () => {
   assert.match(component, /if \(preview\.name !== name\) return null;/);
   assert.match(component, /if \(preview\.source !== avatarUrl\) return null;/);
   assert.match(component, /if \(dataUri\.length > AVATAR_PREVIEW_MAX_LENGTH\) return null;/);
-  // No second request: the capture reads the image the header already decoded.
-  assert.match(component, /const dataUri = this\.captureAvatarPreview\(preloader\);/);
+  // Exactly one extra request, for a copy that is never displayed.
+  //
+  // This used to read the image the header had already decoded, so that the
+  // preview cost no request at all. That looked frugal and was wrong: the
+  // capture could only run after a multi-megabyte upload finished decoding, and
+  // anyone who moved to the next page before then left without a preview - so
+  // the header resolved from scratch on every navigation. Measured uploads run
+  // to 2.8 MB. A few kilobytes fetched once buys a complete first frame on
+  // every later page.
+  assert.match(component, /captureAvatarPreviewFor\(snapshot, corsAttempt, preloader\);/);
+  assert.match(component, /const AVATAR_PREVIEW_SOURCE_WIDTH = 128;/);
+  assert.match(component, /resize\(snapshot\.avatarUrl, AVATAR_PREVIEW_SOURCE_WIDTH\)/);
+  // When no smaller copy exists - off-host media, a GIF, an SVG - it falls back
+  // to the decoded display image, which is the old behaviour exactly.
+  assert.match(component, /if \(small === snapshot\.avatarUrl\) \{/);
+  assert.match(component, /if \(decodedDisplayImage\?\.complete\) store\(decodedDisplayImage\);/);
   // Never a dependency, a fetch, a timer or a worker for any of this.
   assert.doesNotMatch(component, /new Worker|serviceWorker|setInterval/);
 });
