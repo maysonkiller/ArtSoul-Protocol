@@ -46,13 +46,13 @@
    bare `.grid` rule in performance-optimizations.css for its columns. Its
    previous rendering is preserved explicitly so that cleanup is behaviour
    neutral here. */
-/* A-58. While the next tab result loads, the previous one stays on screen and
-   is marked stale instead of being replaced by a skeleton. Opacity only: no
-   colour is introduced here, so Classic and Future keep their own palettes. */
-.profile-artwork-grid[aria-busy="true"] {
-    opacity: 0.55;
-    transition: opacity 160ms ease;
-}
+/* A-58. While the next tab result loads, the previous one stays on screen
+   instead of being replaced by a skeleton, and the inline note beside the
+   heading carries the signal. The first attempt also dimmed the outgoing list
+   to 0.55; with card media still arriving that read as two layers stacked on
+   each other, which is worse than the flash it replaced, so the list now stays
+   fully opaque and simply swaps. Opacity only, no colour, so Classic and Future
+   keep their own palettes. */
 
 .profile-gallery-loading-note {
     opacity: 0.75;
@@ -65,10 +65,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .profile-artwork-grid[aria-busy="true"] {
-        transition: none;
-    }
-
     .profile-gallery-loading-note {
         animation: none;
         opacity: 0.75;
