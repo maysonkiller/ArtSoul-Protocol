@@ -535,12 +535,12 @@ test('every shared-header page boots the header in the same order with the same 
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
     assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=45">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=2"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=48" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=3"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=49" defer><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=45');
-    const prepaint = html.indexOf('header-prepaint.js?v=2');
-    const component = html.indexOf('avatar-dropdown.js?v=48');
+    const prepaint = html.indexOf('header-prepaint.js?v=3');
+    const component = html.indexOf('avatar-dropdown.js?v=49');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
     const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");

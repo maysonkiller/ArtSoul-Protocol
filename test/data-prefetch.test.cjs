@@ -103,3 +103,27 @@ test('every shared-header page loads it, and the build ships it', () => {
   }
   assert.match(fs.readFileSync('vite.config.js', 'utf8'), /'data-prefetch\.js',/);
 });
+
+test('a tab already seen this visit is shown without another round trip', () => {
+  // Switching tabs went to the network every time, so the previous tab's cards
+  // stayed on screen for the round trip and read as a flash of the wrong
+  // content. Each tab's result is kept for this visit only.
+  const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
+  assert.match(profile, /const galleryCacheRef = useRef\(new Map\(\)\);/);
+  assert.match(profile, /const cached = galleryCacheRef\.current\.get\(cacheKey\);/);
+  // Keyed by wallet too, so one profile can never read another's list.
+  assert.match(profile, /const cacheKey = `\$\{String\(activeProfile\?\.wallet_address \|\| ''\)\.toLowerCase\(\)\}:\$\{requestedGallery\}`/);
+  // A transaction just changed the chain: those callers ask for a fresh read.
+  assert.equal((profile.match(/loadMyArtworks\(null, \{ fresh: true \}\)/g) || []).length, 3);
+  assert.match(profile, /if \(fresh\) galleryCacheRef\.current\.clear\(\);/);
+  // It never becomes a source of truth: the network result always replaces it.
+  assert.match(profile, /galleryCacheRef\.current\.set\(cacheKey, result\.items\);/);
+});
+
+test('a placeholder does not announce itself', () => {
+  // The skeleton carried the Future glow and a sweeping highlight, so a page
+  // that waited a second read as a fault rather than as loading.
+  const css = fs.readFileSync('unified-styles.css', 'utf8');
+  assert.doesNotMatch(css, /artsoulSkeletonSweep/);
+  assert.doesNotMatch(css, /body\.future \.artsoul-skeleton/);
+});

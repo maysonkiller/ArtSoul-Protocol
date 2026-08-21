@@ -50,6 +50,8 @@ const { useState, useEffect, useRef } = React;
             const loadedProfileAddressRef = useRef(null);
             const loadingProfileAddressRef = useRef(null);
             const artworksRequestRef = useRef(0);
+            // Per-visit tab results. Presentation only; see loadMyArtworks.
+            const galleryCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
             const [transactionActions, setTransactionActions] = useState({});
             const [addressCopied, setAddressCopied] = useState(false);
@@ -881,15 +883,39 @@ const { useState, useEffect, useRef } = React;
                 };
             }
 
-            async function loadMyArtworks(profileOverride = null) {
+            async function loadMyArtworks(profileOverride = null, { fresh = false } = {}) {
                 const requestId = ++artworksRequestRef.current;
-                setArtworksLoading(true);
                 const activeProfile = profileOverride || profile;
-
                 const requestedGallery = selectedGallery;
+                // Keyed by wallet as well as tab, so one profile can never read
+                // another's cached list. A transaction just changed the chain,
+                // so those callers ask for a fresh read.
+                const cacheKey = `${String(activeProfile?.wallet_address || '').toLowerCase()}:${requestedGallery}`;
+                if (fresh) galleryCacheRef.current.clear();
+
+                // Switching tabs used to go to the network every time, so the
+                // previous tab's cards stayed on screen for the round trip and
+                // read as a flash of the wrong content. Each tab's result is
+                // kept for this visit only, in memory, so coming back to one
+                // already seen is instant and shows nothing but itself.
+                //
+                // It is a presentation cache and never a source of truth: it
+                // lives in a ref, dies with the page, is dropped whenever the
+                // profile changes, and the network result always replaces it.
+                const cached = galleryCacheRef.current.get(cacheKey);
+                if (cached) {
+                    setMyArtworks(cached);
+                    setDisplayedGallery(requestedGallery);
+                    setHasSettledArtworks(true);
+                    setArtworksLoading(false);
+                } else {
+                    setArtworksLoading(true);
+                }
+
                 try {
                     const result = await fetchProfileArtworks(activeProfile, requestedGallery);
                     if (requestId === artworksRequestRef.current) {
+                        galleryCacheRef.current.set(cacheKey, result.items);
                         // One commit: the list and the tab it belongs to.
                         setMyArtworks(result.items);
                         setDisplayedGallery(requestedGallery);
@@ -897,7 +923,7 @@ const { useState, useEffect, useRef } = React;
                     }
                 } catch (error) {
                     console.error('Error loading artworks:', error);
-                    if (requestId === artworksRequestRef.current) {
+                    if (requestId === artworksRequestRef.current && !cached) {
                         setMyArtworks([]);
                         setDisplayedGallery(requestedGallery);
                         setHasSettledArtworks(true);
@@ -1079,7 +1105,7 @@ const { useState, useEffect, useRef } = React;
                             console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
                         }
                         alert('Auction was already active on the blockchain. Public state will update shortly.');
-                        loadMyArtworks();
+                        loadMyArtworks(null, { fresh: true });
                         return;
                     }
 
@@ -1120,7 +1146,7 @@ const { useState, useEffect, useRef } = React;
                         }
 
                         alert('Auction created successfully! Public state will update shortly.');
-                        loadMyArtworks(); // Reload artworks
+                        loadMyArtworks(null, { fresh: true }); // Reload artworks
                     } catch (txError) {
                         if (txError.message.includes('network changed') || txError.code === 'NETWORK_ERROR') {
                             throw new Error('Network was changed during transaction. Please stay on the same network and try again.');
@@ -1214,7 +1240,7 @@ const { useState, useEffect, useRef } = React;
                     await window.ArtSoulContracts.listResale(tokenId, price.toString());
 
                     alert('NFT listed for resale. Public state will update shortly.');
-                    loadMyArtworks(); // Reload artworks
+                    loadMyArtworks(null, { fresh: true }); // Reload artworks
                 } catch (error) {
                     console.error('Resale listing failed:', error);
                     const message = getTransactionErrorMessage(error, 'The resale listing could not be created. Please try again.');
