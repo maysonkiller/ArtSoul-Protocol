@@ -292,6 +292,26 @@ let selectedFile = null;
             if (lower.includes('insufficient funds') || lower.includes('insufficient gas') || lower.includes('not enough funds')) {
                 return { code: 'INSUFFICIENT_FUNDS', message: 'Insufficient ETH on Base Sepolia to publish this artwork. Top up your wallet and try again.' };
             }
+            // A revert carries a reason. This one carries none, and it comes
+            // from estimateGas, which means the node never executed anything:
+            // ethers reports an RPC that will not answer as `missing revert
+            // data` with a null reason and null data. Reported on 2026-08-21,
+            // when the public Base Sepolia endpoint returned `no backend is
+            // currently healthy to serve traffic` - the same call estimated
+            // successfully against another endpoint at the same moment. Calling
+            // that a failed transaction told the person their artwork had been
+            // rejected on-chain, which had not happened and was not true.
+            if (lower.includes('missing revert data')
+                || lower.includes('could not coalesce error')
+                || lower.includes('no backend is currently healthy')
+                || code === 'NETWORK_ERROR'
+                || code === 'SERVER_ERROR'
+                || code === 'TIMEOUT') {
+                return {
+                    code: 'NETWORK_UNAVAILABLE',
+                    message: 'Base Sepolia did not answer, so nothing was sent and nothing was published. This is the network, not your artwork or your wallet. Wait a moment and try again.'
+                };
+            }
             if (code === 'CALL_EXCEPTION' || lower.includes('reverted') || lower.includes('execution reverted')) {
                 return {
                     code: 'TRANSACTION_REVERTED',

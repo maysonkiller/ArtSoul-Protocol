@@ -36,13 +36,28 @@ const projectId = '9fdc97f91c02d46a28ca9d185a9e58f2';
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_SEPOLIA_CAIP_ID = 'eip155:84532';
+// The public endpoint stays first, and is no longer the only one. On
+// 2026-08-21 it answered `no backend is currently healthy to serve traffic`
+// for a sustained period; ethers reports that as `missing revert data` on
+// estimateGas, so publishing appeared to fail on-chain when nothing had been
+// attempted. The same call estimated at 0x37318 against a second endpoint at
+// the same moment, from the same address, with the contract unpaused.
+//
+// These are additional routes to the SAME chain, not another network: one
+// chain, Base, exactly as before. A wallet offered several RPC URLs for a
+// chain moves to the next when one stops answering.
 const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
+const BASE_SEPOLIA_RPC_URLS = [
+    BASE_SEPOLIA_RPC_URL,
+    'https://base-sepolia-rpc.publicnode.com',
+    'https://base-sepolia.drpc.org'
+];
 const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
 // Mainnet entries are negotiation-only compatibility routes for mobile
 // WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
 const networks = [baseSepolia, base, mainnet];
 const customRpcUrls = {
-    [BASE_SEPOLIA_CAIP_ID]: [{ url: BASE_SEPOLIA_RPC_URL }]
+    [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URLS.map(url => ({ url }))
 };
 
 const SUPPORTED_NETWORKS = {
@@ -52,7 +67,7 @@ const SUPPORTED_NETWORKS = {
         hexChainId: '0x14a34',
         chainName: 'Base Sepolia',
         nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-        rpcUrls: [BASE_SEPOLIA_RPC_URL],
+        rpcUrls: BASE_SEPOLIA_RPC_URLS,
         blockExplorerUrls: ['https://sepolia.basescan.org']
     }
 };
