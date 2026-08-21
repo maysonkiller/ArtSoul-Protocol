@@ -1996,7 +1996,6 @@
             this.beginIdentityTransition(null);
 
             const currentPath = window.location.pathname;
-            const isProfilePage = this.isPage(currentPath, 'profile');
             this.updateStableButton({
                 avatarUrl: NEUTRAL_AVATAR_URL,
                 avatarAlt: 'ArtSoul',
@@ -2007,9 +2006,14 @@
                 uiState: 'disconnected'
             });
             this.clearProtocolAdminAccess();
+            // A guest has no profile of their own, so no page can be it. Reading
+            // somebody's profile while disconnected used to hide the Profile
+            // entry, because "am I on a profile page" was standing in for "am I
+            // on MY profile page" - the same substitution as A-62, on the guest
+            // branch. The entry stays, and leads to the connect prompt.
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile: isProfilePage }),
-                `guest:${currentPath}:${isProfilePage}`
+                this.renderMenuContent({ currentPath, isOwnProfile: false }),
+                `guest:${currentPath}:false`
             );
             this.applyThemeStyles();
             this.bindOutsideCloseOnce();

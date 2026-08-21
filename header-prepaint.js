@@ -45,10 +45,6 @@
         : (cachedUiState === 'connected' ? identity?.wallet || '' : '');
     const hasWallet = WALLET_PATTERN.test(wallet);
 
-    if (!appKitDisconnectedAtBoot && (hasWallet || cachedUiState === 'connected')) {
-        document.documentElement.classList.add('wallet-state-resolving');
-    }
-
     if (!appKitDisconnectedAtBoot
         && WALLET_PATTERN.test(walletHint)
         && cachedUiState === 'connected'
@@ -69,6 +65,13 @@
         if (typeof preview.dataUri !== 'string' || preview.dataUri.length > PREVIEW_MAX_LENGTH) return null;
         return PREVIEW_PATTERN.test(preview.dataUri) ? preview.dataUri : null;
     };
+
+    // Claim to be resolving only with nothing to paint: this label showed for
+    // every line of markup between <head> and hydrate(). See its test.
+    if (!appKitDisconnectedAtBoot && !readPreview()
+        && (hasWallet || cachedUiState === 'connected')) {
+        document.documentElement.classList.add('wallet-state-resolving');
+    }
 
     const writeAddress = (node, value) => {
         if (!node) return;
@@ -133,11 +136,9 @@
             return true;
         }
 
-        // A name beside the neutral avatar is a half identity, so a cached label
-        // may only paint here when the cached avatar IS the neutral one: an
-        // account with no picture has nothing better arriving, so its name and
-        // its image are both already final. An account whose custom avatar has
-        // not decoded yet keeps the resolving label until the image is ready.
+        // A name beside the neutral avatar is half an identity, so a cached
+        // label paints here only when the cached avatar IS the neutral one:
+        // that account has nothing better arriving. See its test.
         const settledWithoutPicture = identity
             && identity.wallet === wallet
             && identity.avatarUrl === NEUTRAL_AVATAR_URL;
