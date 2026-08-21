@@ -7,16 +7,61 @@ const path = require('node:path');
 const STYLESHEETS = fs.readdirSync('.')
   .filter((name) => name.endsWith('.css') && name !== 'tailwind-build.css');
 
-function bareGridRules(css) {
-  // A rule whose selector list contains the standalone `.grid` class.
-  const rules = [];
-  const re = /(^|\})([^{}]*?)\{([^{}]*)\}/g;
-  let m;
-  while ((m = re.exec(css)) !== null) {
-    const selectors = m[2].split(',').map((s) => s.trim());
-    if (selectors.some((s) => /(^|\s)\.grid$/.test(s))) rules.push(m[3]);
+// Yields every { selector, body } in a stylesheet at ANY nesting depth.
+//
+// The first version of this used one regex over the whole file, which could
+// only ever see top-level rules. mobile-responsive.css declared the same
+// override inside @media blocks, so the test passed while production stayed
+// broken for weeks. A depth-aware scan is the only honest way to check this.
+function eachRule(css) {
+  const out = [];
+  let depth = 0;
+  let selectorStart = 0;
+  const stack = [];
+  for (let i = 0; i < css.length; i += 1) {
+    const c = css[i];
+    if (c === '{') {
+      const head = css.slice(selectorStart, i).trim();
+      stack.push({ head, bodyStart: i + 1 });
+      depth += 1;
+      selectorStart = i + 1;
+    } else if (c === '}') {
+      const frame = stack.pop();
+      depth -= 1;
+      if (frame && !frame.head.startsWith('@')) {
+        out.push({ selector: frame.head, body: css.slice(frame.bodyStart, i) });
+      }
+      selectorStart = i + 1;
+    } else if (c === ';') {
+      selectorStart = i + 1;
+    }
   }
-  return rules;
+  return out;
+}
+
+// Rules whose selector IS a bare Tailwind display utility, and therefore apply
+// to every element on the page carrying it.
+//
+// Only the unqualified form is a defect. `header > .container > .flex` targets
+// one known element through a path and wins on specificity deliberately; that
+// is styling, not shadowing. A selector that is nothing but `.grid` or `.flex`
+// silently reaches everything, which is what broke production.
+//
+// Token comparison rather than a built regex: the first attempt constructed one
+// with `new RegExp`, the escapes collapsed inside the template literal, and the
+// resulting pattern matched `.profile-artwork-grid` too.
+function utilityRules(css, utility) {
+  const target = `.${utility}`;
+  return eachRule(css)
+    .filter((rule) => rule.selector
+      .split(',')
+      .map((s) => s.trim())
+      .some((s) => s === target))
+    .map((rule) => rule.body);
+}
+
+function bareGridRules(css) {
+  return utilityRules(css, 'grid');
 }
 
 test('no product stylesheet declares layout on the bare Tailwind grid utility', () => {
@@ -33,6 +78,31 @@ test('no product stylesheet declares layout on the bare Tailwind grid utility', 
         `${file}: .grid must not declare gap`);
     }
   }
+});
+
+test('no product stylesheet declares spacing on the bare Tailwind flex utility', () => {
+  // Same defect class as above, in the same file. `.flex { gap: 8px }` under
+  // 380px reached every flex container. Measured live at 375px it changed
+  // nothing visible, because the only unqualified gap-* on those pages was
+  // gap-2, which already wants 8px - so this guards a latent trap, not a
+  // reported symptom.
+  for (const file of STYLESHEETS) {
+    const css = fs.readFileSync(file, 'utf8');
+    for (const body of utilityRules(css, 'flex')) {
+      assert.doesNotMatch(body, /(^|;|\s)gap\s*:/,
+        `${file}: .flex must not declare gap`);
+      assert.doesNotMatch(body, /flex-direction/,
+        `${file}: .flex must not declare flex-direction`);
+    }
+  }
+});
+
+test('the depth-aware scan actually reaches inside a media query', () => {
+  // Pins the fix for the blind spot above: without this, the two tests before
+  // it would pass on any stylesheet that nests its overrides.
+  const nested = '@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }';
+  assert.deepEqual(bareGridRules(nested).length, 1);
+  assert.match(bareGridRules(nested)[0], /grid-template-columns/);
 });
 
 test('the one element that relied on the removed rule keeps its own columns', () => {

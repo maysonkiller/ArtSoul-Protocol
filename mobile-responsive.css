@@ -103,10 +103,13 @@ audio {
         padding-right: 12px;
     }
 
-    /* Reduce gap in flex containers */
-    .flex {
-        gap: 8px;
-    }
+    /* `.flex` is Tailwind's display utility, so a gap here reached every flex
+       container on a screen under 380px - an iPhone SE is 375px. Measured live
+       at that width, nothing on the pages checked changed shape, because the
+       only unqualified gap-* in use was gap-2, which already wants 8px. It is
+       removed as the same latent defect as the grid rules above rather than for
+       a visible symptom: the first gap-1 or gap-4 on a flex row would have
+       silently lost its spacing. */
 }
 
 /* ===================================
@@ -195,22 +198,19 @@ header .container {
    8. CARD LAYOUTS
    =================================== */
 
-/* Responsive card grids */
+/* A-55 removed the same override from performance-optimizations.css but left
+   this copy, so the defect stayed in production: `.grid` is Tailwind's display
+   utility, and declaring columns on it silently overrode every grid-cols-* and
+   gap-* on the page. Both selectors weigh one class and neither used
+   !important, so source order decided, and the build emits this file after
+   tailwind-build.css. Measured in a real browser at 375px: the profile gallery
+   resolved to one 318.4px column instead of the two its own grid-cols-2 asks
+   for. Every .grid element on the live pages declares its own columns, so
+   nothing depended on this. Layout belongs to the element, never to a display
+   utility. */
 @media (max-width: 640px) {
-    .grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-
     .card {
         margin-bottom: 16px;
-    }
-}
-
-@media (min-width: 641px) and (max-width: 1024px) {
-    .grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
     }
 }
 
