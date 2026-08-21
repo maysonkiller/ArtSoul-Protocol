@@ -1296,29 +1296,25 @@
             }
 
             // Get balance
-            let balance = chainId === 84532
-                ? '…'
-                : cachedNetwork?.chainId === chainId
-                    ? cachedNetwork.balance
-                    : '0.0000';
+            // The last balance read for this same chain is a better answer than
+            // an ellipsis while a fresh read is in flight, and the only answer
+            // left if every route is unreachable.
+            let balance = cachedNetwork?.chainId === chainId && cachedNetwork.balance
+                ? cachedNetwork.balance
+                : (chainId === 84532 ? '…' : '0.0000');
             if (options.includeBalance !== false && chainId && window.currentWalletAddress) {
                 try {
                     let balanceHex = null;
                     if (chainId === 84532) {
-                        const response = await fetch(BASE_SEPOLIA_RPC_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                jsonrpc: '2.0',
-                                id: 1,
-                                method: 'eth_getBalance',
-                                params: [walletAddress, 'latest']
-                            })
-                        });
-                        if (!response.ok) throw new Error(`Base Sepolia RPC returned ${response.status}`);
-                        const payload = await response.json();
-                        if (payload.error) throw new Error(payload.error.message || 'Base Sepolia balance read failed');
-                        balanceHex = payload.result;
+                        // Every route, not one. This read had its own single
+                        // address while the wallet configuration had three, so
+                        // one endpoint going quiet left the balance showing an
+                        // ellipsis with nothing to explain it.
+                        // Guarded, because a helper that is merely absent must
+                        // never be mistaken for a helper that answered. A-68.
+                        const route = window.ArtSoulBaseSepolia?.rpc;
+                        if (typeof route !== 'function') throw new Error('Base Sepolia routes unavailable');
+                        balanceHex = await route('eth_getBalance', [walletAddress, 'latest']);
                     } else if (provider && provider.request) {
                         balanceHex = await provider.request({
                             method: 'eth_getBalance',

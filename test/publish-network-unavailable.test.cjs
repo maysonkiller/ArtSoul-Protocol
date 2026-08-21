@@ -33,19 +33,60 @@ test('a real revert still says the transaction failed', () => {
   assert.match(upload, /The artwork registration transaction failed on Base Sepolia/);
 });
 
-test('one chain, more than one way to reach it', () => {
-  // A single public endpoint meant one outage stopped every write. These are
-  // additional routes to the same chain, not another network: Base only.
-  assert.match(appkit, /const BASE_SEPOLIA_RPC_URLS = \[/);
-  const list = appkit.slice(appkit.indexOf('const BASE_SEPOLIA_RPC_URLS = ['));
-  const block = list.slice(0, list.indexOf('];'));
-  const entries = block.split(String.fromCharCode(10)).slice(1)
-    .map((l) => l.trim().replace(/,$/, "")).filter(Boolean);
-  assert.ok(entries.length >= 3, `at least three routes, saw ${entries.length}`);
-  assert.equal(entries[0], 'BASE_SEPOLIA_RPC_URL', 'the public endpoint stays first');
-  assert.match(appkit, /rpcUrls: BASE_SEPOLIA_RPC_URLS,/);
-  assert.match(appkit, /BASE_SEPOLIA_RPC_URLS\.map\(url => \(\{ url \}\)\)/);
-  // Still one chain id, and mainnet stays negotiation-only.
+test('one chain, one list, more than one way to reach it', () => {
+  // There were two lists. appkit-init.js configures the wallet's chain; the
+  // account menu reads the balance with its own fetch, from a classic script
+  // that cannot import a module, and still had a single address - so one
+  // endpoint going quiet left the balance showing a bare ellipsis while
+  // everything else had somewhere else to go.
+  const network = fs.readFileSync('base-network.js', 'utf8');
+  const dropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
+
+  const listed = [...network.matchAll(/'(https:\/\/[^']+)'/g)].map((m) => m[1]);
+  assert.ok(listed.length >= 3, `at least three routes, saw ${listed.length}`);
+  assert.equal(listed[0], 'https://sepolia.base.org', 'the public endpoint stays first');
+
+  // Both consumers take that list rather than keeping their own.
+  assert.match(appkit, /window\.ArtSoulBaseSepolia\?\.rpcUrls\?\.length/);
+  assert.match(dropdown, /window\.ArtSoulBaseSepolia\?\.rpc;/);
+  // Guarded: a helper that is merely absent must not read as one that answered.
+  assert.match(dropdown, /if \(typeof route !== 'function'\) throw new Error/);
+
+  // The floor in appkit-init is the same list, not a second opinion.
+  const floor = appkit.slice(appkit.indexOf('const BASE_SEPOLIA_RPC_URLS'));
+  const fallback = [...floor.slice(0, floor.indexOf('];')).matchAll(/'(https:\/\/[^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(fallback, listed, 'the fallback must match base-network.js exactly');
+
+  // Still one chain, and mainnet stays negotiation-only.
   assert.match(appkit, /const BASE_SEPOLIA_CHAIN_ID = 84532;/);
-  assert.doesNotMatch(block, /solana|polygon|arbitrum|optimism\.io/i);
+  assert.match(network, /chainId: 84532,/);
+  assert.doesNotMatch(network, /solana|polygon|arbitrum/i);
+});
+
+test('every route is tried before the caller is told nothing came back', () => {
+  const network = fs.readFileSync('base-network.js', 'utf8');
+  assert.match(network, /for \(const url of RPC_URLS\)/);
+  assert.match(network, /return payload\.result;/);
+  assert.match(network, /throw lastError \|\| new Error/);
+});
+
+test('an outage never erases a balance already known', () => {
+  // The initial value used to be an ellipsis regardless, so a failed read
+  // replaced a number the menu had shown a moment earlier.
+  const dropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
+  assert.match(dropdown, /let balance = cachedNetwork\?\.chainId === chainId && cachedNetwork\.balance/);
+});
+
+test('the list loads before both consumers', () => {
+  for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html',
+                      'upload.html', 'docs-protocol.html', 'admin.html']) {
+    const html = fs.readFileSync(page, 'utf8');
+    const list = html.indexOf('base-network.js');
+    assert.ok(list > -1, `${page} must load the route list`);
+    for (const consumer of ['avatar-dropdown.js', 'appkit-init.js']) {
+      const at = html.indexOf(consumer);
+      if (at === -1) continue;
+      assert.ok(list < at, `${page}: the route list must load before ${consumer}`);
+    }
+  }
 });

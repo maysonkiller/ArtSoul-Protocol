@@ -46,12 +46,18 @@ const BASE_SEPOLIA_CAIP_ID = 'eip155:84532';
 // These are additional routes to the SAME chain, not another network: one
 // chain, Base, exactly as before. A wallet offered several RPC URLs for a
 // chain moves to the next when one stops answering.
-const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
-const BASE_SEPOLIA_RPC_URLS = [
-    BASE_SEPOLIA_RPC_URL,
-    'https://base-sepolia-rpc.publicnode.com',
-    'https://base-sepolia.drpc.org'
-];
+// base-network.js owns the list, so the wallet configuration and the balance
+// read in the account menu can never disagree about how to reach the chain.
+// The literal here is a floor for the case where that script has not run, not
+// a second opinion; a test pins the two to the same values.
+const BASE_SEPOLIA_RPC_URLS = window.ArtSoulBaseSepolia?.rpcUrls?.length
+    ? [...window.ArtSoulBaseSepolia.rpcUrls]
+    : [
+        'https://sepolia.base.org',
+        'https://base-sepolia-rpc.publicnode.com',
+        'https://base-sepolia.drpc.org'
+    ];
+const BASE_SEPOLIA_RPC_URL = BASE_SEPOLIA_RPC_URLS[0];
 const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
 // Mainnet entries are negotiation-only compatibility routes for mobile
 // WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
