@@ -127,14 +127,12 @@ function functionBody(source, definitionLine) {
   return lines.slice(start).join('\n');
 }
 
-test('no avatar surface resizes the picture it displays', () => {
-  // An avatar is displayed at the proportions its owner uploaded. A fixed
-  // render width forced every one through a single dimension, which reframed
-  // the ones that are not square - live uploads range from 400x400 to 832x1248
-  // to 4032x3024 - and upscaled the small ones. Sizing survives only where it
-  // is invisible: the cached preview, whose pixels are stored and never shown.
+test('the surfaces large enough to reframe an avatar show the upload itself', () => {
+  // Live uploads are 400x400, 832x1248, 1254x1254 and 4032x3024. At 112px and
+  // above, forcing them all through one render width visibly reframes the
+  // non-square ones and upscales the small ones, which is what made the profile
+  // wrong. These two keep the upload.
   const definitions = {
-    'avatar-dropdown.js': 'getProfileAvatarUrl(profile) {',
     'src/entries/profile.jsx': 'function getProfileAvatarUrl(profileData) {',
     'src/entries/artwork.jsx': 'function getProfileAvatarUrl(profileData, address'
   };
@@ -142,6 +140,16 @@ test('no avatar surface resizes the picture it displays', () => {
     const body = functionBody(fs.readFileSync(file, 'utf8'), definition);
     assert.doesNotMatch(body, /storageRenderUrl/, `${file}: getProfileAvatarUrl must return the upload itself`);
   }
+});
+
+test('the 40px account button does not wait on megabytes', () => {
+  // Loading the upload into a 40px circle means the identity cannot commit
+  // until it decodes - measured 2.37 MB - so the button shows a half-drawn
+  // picture and the resolving label stays on screen. At this size 128px cannot
+  // be told apart from the original.
+  const body = functionBody(fs.readFileSync('avatar-dropdown.js', 'utf8'), 'getProfileAvatarUrl(profile) {');
+  assert.match(body, /resize\(source, HEADER_BUTTON_AVATAR_WIDTH\)/);
+  assert.match(fs.readFileSync('avatar-dropdown.js', 'utf8'), /const HEADER_BUTTON_AVATAR_WIDTH = 128;/);
 });
 
 test('the cached preview is captured from a copy nobody sees', () => {
