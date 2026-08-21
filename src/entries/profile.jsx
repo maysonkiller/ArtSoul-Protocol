@@ -430,6 +430,17 @@ const { useState, useEffect, useRef } = React;
                 const creatorLabel = sharedCards?.creatorLabel;
                 const SharedCountdown = sharedCards?.ReactCountdown;
                 const CardElement = href ? 'a' : 'div';
+                // An artwork registered on-chain whose auction never went through
+                // has nowhere else to go: publishing is two transactions, and if
+                // the second one fails the first is already permanent. Until now
+                // the failure message sent people to their profile for a retry
+                // that did not exist, and the card was only a link. This is that
+                // retry. It appears for your own work, on Base Sepolia, that is
+                // registered with no auction of any kind.
+                const canStartAuction = isOwnProfile
+                    && isBaseSepoliaArtwork(artwork)
+                    && String(artwork.status || '').toLowerCase() === 'registered'
+                    && !String(artwork.active_auction_id ?? artwork.auction_id ?? '').trim();
 
                 return (
                     <CardElement
@@ -447,6 +458,20 @@ const { useState, useEffect, useRef } = React;
                                 <span className={`artsoul-card-status artsoul-card-status-${status.key}`}>{status.label}</span>
                                 {price && <span className="artsoul-card-price">{price}</span>}
                             </div>
+                            {canStartAuction && (
+                                <button
+                                    type="button"
+                                    className="btn-main profile-start-auction"
+                                    onClick={(event) => {
+                                        // The card itself is a link to the artwork.
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        handleStartAuction(artwork);
+                                    }}
+                                >
+                                    Start auction
+                                </button>
+                            )}
                         </div>
                         {SharedCountdown && <SharedCountdown artwork={artwork} />}
                     </CardElement>
@@ -1063,12 +1088,62 @@ const { useState, useEffect, useRef } = React;
             // AUCTION MANAGEMENT FUNCTIONS
             // ============================================
 
-            async function handleCreateAuction(artwork) {
+            /**
+             * Finish an artwork whose registration succeeded and whose auction
+             * did not.
+             *
+             * Publishing is two transactions. The first is permanent the moment
+             * it confirms, so a second one that fails - a wallet rejection, an
+             * endpoint that stopped answering - leaves a real artwork on chain
+             * with no auction and, until now, no way to give it one.
+             *
+             * The starting price is asked for rather than taken from the record:
+             * the record has none, because the price only ever reaches the chain
+             * through the auction call that failed.
+             */
+            async function handleStartAuction(artwork) {
+                const durations = { 24: '24', 36: '36', 48: '48' };
+                const rawHours = window.prompt(
+                    'Auction duration in hours - 24, 36 or 48.',
+                    '24'
+                );
+                if (rawHours === null) return;
+                const hours = String(rawHours).trim();
+                if (!durations[hours]) {
+                    alert('Choose 24, 36 or 48 hours.');
+                    return;
+                }
+
+                const rawPrice = window.prompt(
+                    `Starting price in ETH for "${artwork.title || 'this artwork'}".`,
+                    ''
+                );
+                if (rawPrice === null) return;
+                const price = String(rawPrice).trim().replace(',', '.');
+                if (!price || !(parseFloat(price) > 0)) {
+                    alert('The starting price must be greater than 0.');
+                    return;
+                }
+
+                await handleCreateAuction(artwork, {
+                    startingPrice: price,
+                    durationHours: Number(hours)
+                });
+            }
+
+            async function handleCreateAuction(artwork, { startingPrice, durationHours } = {}) {
                 const actionKey = beginTransactionAction('create-auction', artwork);
                 if (!actionKey) return;
 
-                // Primary auctions support 24h / 36h / 48h only.
-                const durationHours = 24;
+                // Primary auctions support 24h / 36h / 48h only. Canon rule 3.
+                if (![24, 36, 48].includes(Number(durationHours))) {
+                    alert('Auction duration must be 24, 36 or 48 hours.');
+                    return;
+                }
+                if (!(parseFloat(startingPrice) > 0)) {
+                    alert('The starting price must be greater than 0.');
+                    return;
+                }
 
                 try {
                     // Check wallet connection
@@ -1127,8 +1202,8 @@ const { useState, useEffect, useRef } = React;
                     try {
                         await window.ArtSoulContracts.createAuction(
                             artwork.blockchain_id,
-                            artwork.creator_value.toString(),
-                            durationHours
+                            String(startingPrice),
+                            Number(durationHours)
                         );
 
                         // Verify network didn't change during transaction

@@ -281,7 +281,7 @@ let selectedFile = null;
                 metadata_upload: 'The artwork details could not be stored. Please try again.',
                 wallet_init: 'The connected wallet could not be prepared for publishing. Reconnect it and try again.',
                 register: 'The artwork could not be registered on Base Sepolia. Please try again.',
-                auction: 'The artwork was registered, but its auction could not be created. Retry the auction from your profile.'
+                auction: 'The artwork was registered, but its auction could not be created. Open your profile and use Start auction on this artwork to finish it.'
             };
             return stageMessages[currentPublishStage] || 'The publish flow could not be completed. Please try again.';
         }
@@ -324,7 +324,7 @@ let selectedFile = null;
                 return {
                     code: 'TRANSACTION_REVERTED',
                     message: currentPublishStage === 'auction'
-                        ? 'The artwork was registered, but the auction transaction failed on Base Sepolia. Retry the auction from your profile.'
+                        ? 'The artwork was registered, but the auction transaction failed on Base Sepolia. Open your profile and use Start auction on this artwork to finish it.'
                         : 'The artwork registration transaction failed on Base Sepolia. No artwork was published.'
                 };
             }
@@ -561,6 +561,17 @@ let selectedFile = null;
          * guidance costs a wallet signature, so that stays an explicit choice.
          */
         function revealBlockingStep(message, preferredTargetId = '') {
+            // The reason goes where the click happened. It used to be written
+            // only into publishBlockedNote, which sits beside the AI panel near
+            // the top of the form, while the page scrolled to the field that was
+            // wrong - so someone standing at the Publish button saw a field
+            // highlight itself and no explanation anywhere near them.
+            const hint = document.getElementById('publishReadinessHint');
+            if (hint) {
+                hint.textContent = message;
+                hint.dataset.blocked = 'true';
+            }
+
             const note = document.getElementById('publishBlockedNote');
             if (note) {
                 note.textContent = message;
@@ -604,6 +615,10 @@ let selectedFile = null;
                 note.textContent = '';
                 note.style.display = 'none';
             }
+            // The hint returns to being a hint; updatePublishReadiness owns its
+            // text from here.
+            const hint = document.getElementById('publishReadinessHint');
+            if (hint) delete hint.dataset.blocked;
         }
 
         async function ensureUploadAuthorization() {

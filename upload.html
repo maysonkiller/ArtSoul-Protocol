@@ -309,6 +309,22 @@
             text-align: center;
         }
 
+        /* When it carries the reason a publish was refused it stops being a
+           hint. It sits directly under the button, which is where the person
+           is standing when they are told, and reads at the same size as the
+           rest of the form rather than as fine print. No colour of its own:
+           each theme already owns its text and surface. */
+        .publish-readiness-hint[data-blocked="true"] {
+            margin-top: 0.75rem;
+            padding: 10px 12px;
+            border: 1px solid var(--c-border);
+            border-radius: 8px;
+            background: var(--c-surface-strong);
+            color: var(--c-text);
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
         #publishBtn:disabled {
             cursor: not-allowed;
             opacity: 0.55;
