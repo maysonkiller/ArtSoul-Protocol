@@ -96,6 +96,16 @@ const { useState, useEffect, useRef } = React;
             }
 
             const chainId = Number(parts[1]);
+            // Set by the publish flow when it navigates here. The only thing
+            // being waited for then is the indexer, which the branded mark names.
+            const justPublished = (() => {
+                try {
+                    return new URLSearchParams(window.location.search).get('published') === '1';
+                } catch {
+                    return false;
+                }
+            })();
+
             const artworkId = parts[2];
             if (!Number.isSafeInteger(chainId) || !/^\d+$/.test(artworkId)) {
                 return null;
@@ -2632,15 +2642,11 @@ const { useState, useEffect, useRef } = React;
                 }
             }
 
-            if (loading) {
-                return (
-                    <div className="artwork-page-root">
-                        <ArtworkPageSkeleton />
-                    </div>
-                );
-            }
-
-            if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
+            // Opened straight out of a publish, or waiting for the indexer to
+            // catch up: both are the same wait, and the branded mark already
+            // exists to name it. The generic page skeleton was a placeholder
+            // standing in for a wait we can describe.
+            if ((loading && justPublished) || error?.code === 'V41_ARTWORK_NOT_INDEXED') {
                 return (
                     <div className="artsoul-wait-screen">
                         <main className="artsoul-wait-stage">
@@ -2653,9 +2659,17 @@ const { useState, useEffect, useRef } = React;
                                         <span className="artsoul-wait-dot"></span>
                                     </span>
                                 </div>
-                                <span className="sr-only">Loading artwork {error.artworkId || artworkId}</span>
+                                <span className="sr-only">Loading artwork {error?.artworkId || artworkId}</span>
                             </div>
                         </main>
+                    </div>
+                );
+            }
+
+            if (loading) {
+                return (
+                    <div className="artwork-page-root">
+                        <ArtworkPageSkeleton />
                     </div>
                 );
             }

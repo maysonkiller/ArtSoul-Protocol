@@ -147,13 +147,16 @@ test('publish submits one auction transaction and never prompts a duplicate on t
 test('internal redirects release the native beforeunload guard first', () => {
   const navigate = extractFunction('navigateAfterPublish');
   assert.ok(
-    navigate.indexOf('publishNavigationLocked = false') < navigate.indexOf('window.location.assign(path)'),
+    navigate.indexOf('publishNavigationLocked = false') < navigate.indexOf('window.location.assign('),
     'the navigation lock must clear before an internal redirect'
   );
   assert.match(source, /window\.addEventListener\('beforeunload'/);
   // The destination is built by the shared helper now, but it must still go
   // through navigateAfterPublish so the unload guard is released first.
   assert.match(source, /navigateAfterPublish\(window\.ArtSoulArtworkUrl\.artworkPath\(/);
+  // It also marks the destination, which is the only way the artwork page can
+  // tell a publish from an ordinary visit and name the wait it is showing.
+  assert.match(navigate, /published=1/);
 });
 
 test('Publish stays clickable and explains what is blocking it', () => {
