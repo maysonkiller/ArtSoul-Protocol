@@ -225,7 +225,11 @@ function buildQuery(params = {}) {
 }
 
 async function backendRead(path) {
-    const response = await fetch(path, {
+    // data-prefetch.js may already have this request in flight from <head>,
+    // issued before these modules finished executing. It is handed over once
+    // and then forgotten, so this is a head start and never a cache.
+    const started = window.ArtSoulPrefetch?.take?.(path);
+    const response = started ? await started : await fetch(path, {
         method: 'GET',
         credentials: 'include'
     });

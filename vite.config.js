@@ -29,6 +29,7 @@ const legacyRootAssets = [
     'artwork-card-fixes.css',
     'avatar-dropdown.js',
     'header-prepaint.js',
+    'data-prefetch.js',
     'button-effects.css',
     'contracts-config.js',
     'contracts-integration.js',
