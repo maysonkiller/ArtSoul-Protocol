@@ -12,12 +12,13 @@
     // The previously generated stylized "A" data-URI is gone: it read as a
     // third identity and was mistaken for a stale cached avatar.
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
-    // The account button paints a 40px circle; 128 covers a 3x screen.
-    const HEADER_BUTTON_AVATAR_WIDTH = 128;
-    // Width of the throwaway copy the cached preview is captured from. It is
+    // The account button paints a 40px circle; 128 covers a 3x screen. It is
+    // one number because the box is square and the sizing asks for a square.
+    const HEADER_BUTTON_AVATAR_SIZE = 128;
+    // Size of the throwaway copy the cached preview is captured from. It is
     // never displayed; only its pixels are stored, downscaled again by
     // AVATAR_PREVIEW_EDGE_PX.
-    const AVATAR_PREVIEW_SOURCE_WIDTH = 128;
+    const AVATAR_PREVIEW_SOURCE_SIZE = 128;
 
     // supabase-client.js announces 'artsoul:db-ready' once, after the complete
     // window.ArtSoulDB API is assigned.
@@ -838,7 +839,7 @@
 
             const resize = window.ArtSoulStorageImage?.sized;
             const small = typeof resize === 'function'
-                ? resize(snapshot.avatarUrl, AVATAR_PREVIEW_SOURCE_WIDTH)
+                ? resize(snapshot.avatarUrl, AVATAR_PREVIEW_SOURCE_SIZE)
                 : snapshot.avatarUrl;
             if (small === snapshot.avatarUrl) {
                 if (decodedDisplayImage?.complete) store(decodedDisplayImage);
@@ -1776,7 +1777,7 @@
             const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
             const source = resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
             const resize = window.ArtSoulStorageImage?.sized;
-            return typeof resize === 'function' ? resize(source, HEADER_BUTTON_AVATAR_WIDTH) : source;
+            return typeof resize === 'function' ? resize(source, HEADER_BUTTON_AVATAR_SIZE) : source;
         }
 
         /**

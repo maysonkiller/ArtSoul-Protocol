@@ -36,6 +36,12 @@ test('a still image from our own storage is requested as a sized copy', () => {
   assert.equal(d.url, OBJECT, 'the original must stay reachable for detail views');
   assert.match(d.thumbnailUrl, /\/storage\/v1\/render\/image\/public\//);
   assert.match(d.thumbnailUrl, /width=600/);
+  // Both dimensions, always: with a width alone the endpoint returns that
+  // width against the ORIGINAL height - verified in a browser, a 1254x1254
+  // avatar came back 128x1254 - and object-fit: cover then blew the sliver
+  // up about tenfold.
+  assert.match(d.thumbnailUrl, /height=600/);
+  assert.match(d.thumbnailUrl, /resize=cover/);
   assert.match(d.thumbnailUrl, /quality=70/);
 });
 
@@ -141,13 +147,13 @@ test('the 40px account button does not wait on megabytes', () => {
   // picture and the resolving label stays on screen. At this size 128px cannot
   // be told apart from the original.
   const body = functionBody(fs.readFileSync('avatar-dropdown.js', 'utf8'), 'getProfileAvatarUrl(profile) {');
-  assert.match(body, /resize\(source, HEADER_BUTTON_AVATAR_WIDTH\)/);
-  assert.match(fs.readFileSync('avatar-dropdown.js', 'utf8'), /const HEADER_BUTTON_AVATAR_WIDTH = 128;/);
+  assert.match(body, /resize\(source, HEADER_BUTTON_AVATAR_SIZE\)/);
+  assert.match(fs.readFileSync('avatar-dropdown.js', 'utf8'), /const HEADER_BUTTON_AVATAR_SIZE = 128;/);
 });
 
 test('the cached preview is captured from a copy nobody sees', () => {
   const dropdown = fs.readFileSync('avatar-dropdown.js', 'utf8');
-  assert.match(dropdown, /const AVATAR_PREVIEW_SOURCE_WIDTH = 128;/);
+  assert.match(dropdown, /const AVATAR_PREVIEW_SOURCE_SIZE = 128;/);
   assert.match(dropdown, /captureAvatarPreviewFor\(snapshot, corsAttempt, preloader\)/);
   // The small copy is only ever a capture source: it is never written to an
   // element that paints.
@@ -161,8 +167,8 @@ test('artwork cards still ask for a sized copy', () => {
   // Cards are unaffected by the avatar revert: a card thumbnail is a crop of a
   // work, not a portrait, and the dark cards were reported separately.
   const card = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
-  assert.match(card, /const CARD_THUMBNAIL_WIDTH = 600;/);
-  assert.match(card, /resize\(url, CARD_THUMBNAIL_WIDTH\)/);
+  assert.match(card, /const CARD_THUMBNAIL_SIZE = 600;/);
+  assert.match(card, /resize\(url, CARD_THUMBNAIL_SIZE\)/);
 });
 
 test('the sizing exists before anything that paints an image', () => {
@@ -198,4 +204,26 @@ test('nothing reaches for the sizing through the page bundle any more', () => {
   const client = fs.readFileSync('supabase-client.js', 'utf8');
   assert.match(client, /const sizer = window\.ArtSoulStorageImage\?\.sized;/);
   assert.doesNotMatch(client, /RESAMPLEABLE_STILL/);
+});
+
+test('a width is never sent without a height', () => {
+  // The endpoint does not scale proportionally on a width alone: it returns
+  // that width against the ORIGINAL height. Verified in a browser against a
+  // 1254x1254 avatar - ?width=128 came back 128x1254 and ?width=600 came back
+  // 600x1254 - so every sized image was a sliver that object-fit: cover then
+  // blew up about tenfold. That was the avatar reported as stretched and hugely
+  // zoomed, on desktop and on a phone.
+  const sizing = fs.readFileSync('storage-image.js', 'utf8');
+  assert.match(sizing, /searchParams\.set\('width', String\(size\)\);/);
+  assert.match(sizing, /searchParams\.set\('height', String\(size\)\);/);
+  assert.match(sizing, /searchParams\.set\('resize', 'cover'\);/);
+  // One number in, a square out: every box that is sized is square.
+  assert.match(sizing, /function sized\(url, size, quality = 70\)/);
+
+  const helper = loadStorageRenderUrl();
+  const url = helper('https://bexigvqrunomwtjsxlej.supabase.co/storage/v1/object/public/a/b.png', 128);
+  const params = new URL(url).searchParams;
+  assert.equal(params.get('width'), '128');
+  assert.equal(params.get('height'), '128');
+  assert.equal(params.get('resize'), 'cover');
 });

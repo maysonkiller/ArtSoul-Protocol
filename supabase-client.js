@@ -62,9 +62,9 @@ function isValidStorageUrl(url) {
 //
 // Presentation only: the original URL is what stays stored, projected and
 // linked. This returns a display copy and never replaces the source of truth.
-function storageRenderUrl(url, width, quality = 70) {
+function storageRenderUrl(url, size, quality = 70) {
     const sizer = window.ArtSoulStorageImage?.sized;
-    return typeof sizer === 'function' ? sizer(url, width, quality) : url;
+    return typeof sizer === 'function' ? sizer(url, size, quality) : url;
 }
 
 function sanitizeText(text) {

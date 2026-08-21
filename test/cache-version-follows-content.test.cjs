@@ -18,10 +18,10 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
-  'avatar-dropdown.js': { version: 51, sha256: '4561a55203ddeeac' },
+  'avatar-dropdown.js': { version: 52, sha256: '43185623bf7ab8f1' },
   'header-prepaint.js': { version: 4, sha256: '8b23a80e58fb9ad2' },
   'data-prefetch.js': { version: 1, sha256: 'f4d04f2111f93a87' },
-  'storage-image.js': { version: 1, sha256: '6ad080f2feb1c79f' }
+  'storage-image.js': { version: 2, sha256: '07216bbe6946e7e5' }
 };
 
 const PAGES = fs.readdirSync('.').filter((n) => n.endsWith('.html'));
