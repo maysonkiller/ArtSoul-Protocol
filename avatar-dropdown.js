@@ -12,6 +12,8 @@
     // The previously generated stylized "A" data-URI is gone: it read as a
     // third identity and was mistaken for a stale cached avatar.
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
+    // The account button paints a 40px circle; 128 covers a 3x screen.
+    const HEADER_BUTTON_AVATAR_WIDTH = 128;
     // Width of the throwaway copy the cached preview is captured from. It is
     // never displayed; only its pixels are stored, downscaled again by
     // AVATAR_PREVIEW_EDGE_PX.
@@ -1554,10 +1556,18 @@
             const currentPath = window.location.pathname;
             // Check if on profile page
             const isProfilePage = this.isPage(currentPath, 'profile');
-            const isOwnProfile = isProfilePage
-                && this.isOwnProfileAddress(this.profile?.wallet_address);
 
             const walletAddress = this.profile?.wallet_address || options.walletAddress || window.currentWalletAddress || '';
+            // Answered from the connected wallet, not from the loaded profile.
+            // Reading `this.profile` here made this false until the profile
+            // arrived and true afterwards, so a second render followed, its key
+            // changed, and applyLiveNetworkSection - which issues exactly one
+            // read per render and discards a result whose key has moved -
+            // dropped the network and balance it was already fetching. The row
+            // then sat unfilled until the page was reloaded. The connected
+            // address is known from the first render, so the answer no longer
+            // changes underneath it.
+            const isOwnProfile = isProfilePage && this.isOwnProfileAddress(walletAddress);
             const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
@@ -1748,14 +1758,19 @@
         }
 
         getProfileAvatarUrl(profile) {
-            // The avatar a person uploaded is what is displayed, at its own
-            // proportions. A fixed render width forced every avatar through one
-            // dimension, which reframed the ones that are not square - uploads
-            // range from 400x400 to 832x1248 to 4032x3024 - and upscaled the
-            // small ones. Sizing now happens only where it is invisible: the
-            // cached preview in captureAvatarPreview.
+            // The account button is a 40px circle. Loading the upload itself
+            // into it means waiting on megabytes - measured 2.37 MB - before
+            // the identity can commit, which is both a half-drawn picture and
+            // the resolving label staying on screen. 128px covers a 3x screen
+            // and cannot be told apart at this size.
+            //
+            // The profile hero and the provenance rows deliberately keep the
+            // upload: they are large enough for a fixed width to reframe a
+            // non-square avatar, which is what made them wrong before.
             const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-            return resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
+            const source = resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
+            const resize = window.ArtSoulSecurity?.storageRenderUrl;
+            return typeof resize === 'function' ? resize(source, HEADER_BUTTON_AVATAR_WIDTH) : source;
         }
 
         /**
