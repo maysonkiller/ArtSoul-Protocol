@@ -56,7 +56,9 @@ test('video metadata wins over stale audio metadata before first paint', () => {
     assert.equal(mediaType(artwork), 'video');
     assert.deepEqual(
         { ...mediaDescriptor(artwork) },
-        { type: 'video', url: artwork.file_url, poster: '', known: true }
+        // thumbnailUrl mirrors url for anything that is not a still image, so a
+        // video is never routed through a still transform.
+        { type: 'video', url: artwork.file_url, thumbnailUrl: artwork.file_url, poster: '', known: true }
     );
 });
 
