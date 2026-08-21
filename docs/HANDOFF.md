@@ -87,8 +87,8 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 never a second opinion. If the two disagree, the backlog wins and this section is
 stale. One backlog item equals one task and one pull request.
 
-Phase A stands at **39 done, 16 in progress, 6 planned** across A-01 to A-61, with
-A-52 through A-61 awaiting production acceptance and no open issue. Do not re-open a `done` row without new
+Phase A stands at **45 done, 10 in progress, 6 planned** across A-01 to A-61, with
+A-50, A-53, A-56 and A-61 await a run on a device with a connected wallet; A-51, A-52, A-54, A-55, A-58 and A-60 were closed on 2026-08-21 by measurement in a browser. Do not re-open a `done` row without new
 contradicting evidence; every one of them carries dated production acceptance.
 
 Accepted and closed - do not redo:
