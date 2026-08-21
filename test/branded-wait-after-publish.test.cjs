@@ -38,3 +38,30 @@ test('the branded wait keeps its own styling and its accessible text', () => {
   assert.match(artwork, /role="status" aria-live="polite" aria-busy="true"/);
   assert.match(artwork, /<span className="sr-only">Loading artwork/);
 });
+
+test('justPublished is declared inside the component that uses it', () => {
+  // It was first declared in a module-level helper, so every artwork page threw
+  // "justPublished is not defined" and rendered nothing at all. The suite stayed
+  // green because these assertions read source text, which cannot see scope.
+  const componentStart = artwork.indexOf('function ArtworkPage() {');
+  const declaration = artwork.indexOf('const justPublished =');
+  const usage = artwork.indexOf('loading && justPublished');
+  assert.ok(componentStart > -1, 'the component must be discoverable');
+  assert.ok(declaration > componentStart, 'declared inside the component, not above it');
+  assert.ok(usage > declaration, 'declared before it is read');
+});
+
+test('the render branches read only values the component declares', () => {
+  // The same shape of mistake, checked across the values those branches depend
+  // on. Cheap, and it is the check that was missing.
+  const component = artwork.slice(artwork.indexOf('function ArtworkPage() {'));
+  const declarations = {
+    justPublished: /const justPublished =/,
+    artworkId: /const artworkId = window\.ArtSoulArtworkUrl\.currentArtworkId\(\)/,
+    loading: /const \[loading, setLoading\] = useState/,
+    error: /const \[error, setError\] = useState/
+  };
+  for (const [name, pattern] of Object.entries(declarations)) {
+    assert.match(component, pattern, `${name} must be declared inside the component`);
+  }
+});

@@ -96,16 +96,6 @@ const { useState, useEffect, useRef } = React;
             }
 
             const chainId = Number(parts[1]);
-            // Set by the publish flow when it navigates here. The only thing
-            // being waited for then is the indexer, which the branded mark names.
-            const justPublished = (() => {
-                try {
-                    return new URLSearchParams(window.location.search).get('published') === '1';
-                } catch {
-                    return false;
-                }
-            })();
-
             const artworkId = parts[2];
             if (!Number.isSafeInteger(chainId) || !/^\d+$/.test(artworkId)) {
                 return null;
@@ -375,6 +365,16 @@ const { useState, useEffect, useRef } = React;
 
             const isClassic = theme === 'classic';
             const artworkId = window.ArtSoulArtworkUrl.currentArtworkId();
+            // Set by the publish flow when it navigates here. The only thing
+            // being waited for then is the indexer, which the branded mark names.
+            const justPublished = (() => {
+                try {
+                    return new URLSearchParams(window.location.search).get('published') === '1';
+                } catch {
+                    return false;
+                }
+            })();
+
             const v41CompositeId = parseV41CompositeArtworkId(artworkId);
             const isV41CompositeId = Boolean(v41CompositeId);
             const connectedWalletAddress = walletRenderState.address || window.currentWalletAddress || window.getCurrentWalletAddress?.();
