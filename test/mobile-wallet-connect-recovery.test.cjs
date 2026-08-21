@@ -25,11 +25,11 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
     assert.equal(packageJson.dependencies['@reown/appkit'], '1.8.21');
     assert.equal(packageJson.dependencies['@reown/appkit-adapter-wagmi'], '1.8.21');
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=52/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /appkit-init\.js\?v=53/, `${page} must load the standard wallet flow`);
     }
     assert.match(appKit, /wallet-core-connect\.js\?v=18/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=18/);
-    assert.match(walletTest, /appkit-init\.js\?v=52/);
+    assert.match(walletTest, /appkit-init\.js\?v=53/);
 });
 
 test('the on-screen wallet debug overlay is fully removed', () => {

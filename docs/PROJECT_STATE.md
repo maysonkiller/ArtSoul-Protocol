@@ -110,7 +110,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 45 `done`, 17 `in progress`, 7 `planned` across A-01 to A-69
+current position is 45 `done`, 18 `in progress`, 7 `planned` across A-01 to A-70
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that
