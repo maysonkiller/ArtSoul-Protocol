@@ -18,15 +18,21 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
-  'avatar-dropdown.js': { version: 49, sha256: 'b1340a041fe85904' },
-  'header-prepaint.js': { version: 3, sha256: '716135d2f3299f64' },
-  'data-prefetch.js': { version: 1, sha256: '05d10f2bff576223' }
+  'avatar-dropdown.js': { version: 49, sha256: 'eb88afcc02fcd0d0' },
+  'header-prepaint.js': { version: 3, sha256: '06fb888f3b3a9bb1' },
+  'data-prefetch.js': { version: 1, sha256: 'f4d04f2111f93a87' }
 };
 
 const PAGES = fs.readdirSync('.').filter((n) => n.endsWith('.html'));
 
+// Line endings are normalised before hashing. The repository stores these files
+// with CRLF and a Linux checkout can present them as LF, so hashing the raw
+// bytes passed on Windows and failed in CI for a file nobody had touched.
+const CR = String.fromCharCode(13);
+
 function shortHash(file) {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 16);
+  const normalised = fs.readFileSync(file, 'utf8').split(CR).join('');
+  return crypto.createHash('sha256').update(normalised, 'utf8').digest('hex').slice(0, 16);
 }
 
 test('a changed runtime file forces its cache version to change with it', () => {
