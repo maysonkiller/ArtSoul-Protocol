@@ -133,28 +133,12 @@
     gap: 12px;
 }
 
-body.future .artsoul-skeleton,
-body.future .artsoul-skeleton-card {
-    box-shadow: 0 0 14px var(--c-glow);
-}
-
-@media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
-    body.future .artsoul-skeleton,
-    body.future .artsoul-skeleton-card {
-        background-image: linear-gradient(
-            100deg,
-            var(--c-surface-muted) 20%,
-            var(--c-glow) 42%,
-            var(--c-surface-muted) 64%
-        );
-        background-size: 220% 100%;
-        animation: artsoulSkeletonSweep 1.8s linear infinite;
-    }
-}
-
-@keyframes artsoulSkeletonSweep {
-    to { background-position: -220% 0; }
-}
+/* A skeleton is a placeholder for something about to arrive, not an event. It
+   used to carry the Future glow and a sweeping highlight, so a page that waited
+   a second announced itself on every navigation and read as a fault rather than
+   as loading - reported from both desktop and phones, worst on the artwork page.
+   It now sits flat in the surface colours both themes already own. Canon 16
+   governs which colours each theme uses, not whether a placeholder animates. */
 
 /* Branded wait indicator.
    Shown while a freshly published artwork is still reaching the projection.

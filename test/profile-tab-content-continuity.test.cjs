@@ -16,9 +16,20 @@ test('the visible result and its heading are committed together', () => {
     profileEntry.indexOf('async function handleAvatarUpload')
   );
   assert.ok(commit, 'the loader commit block must be discoverable');
-  // Both success and failure commit the list and its tab in the same guarded step.
-  assert.equal(commit.match(/setDisplayedGallery\(requestedGallery\);/g).length, 2);
-  assert.equal(commit.match(/if \(requestId === artworksRequestRef\.current\) \{/g).length, 2);
+  // The property, not a count of places: wherever the list is set, the tab it
+  // belongs to is set on the very next line. There are three such places now -
+  // a cache hit, a successful read, a failed one - and a fourth would be fine
+  // as long as it keeps the pair together.
+  const setsList = [...commit.matchAll(/setMyArtworks\([^)]*\);\s*\n\s*(\S[^\n]*)/g)].map((m) => m[1]);
+  assert.ok(setsList.length >= 3, `expected at least three commit sites, saw ${setsList.length}`);
+  for (const next of setsList) {
+    assert.match(next, /setDisplayedGallery\(requestedGallery\);/,
+      'a list must never be shown without committing the tab it belongs to');
+  }
+  // Anything that commits after an await stays guarded against a newer request.
+  // The failure branch carries an extra condition, so the guard is matched by
+  // its opening rather than by an exact line.
+  assert.equal(commit.match(/if \(requestId === artworksRequestRef\.current[^)]*\) \{/g).length, 2);
   // The fetch uses the tab captured at call time, not a later value.
   assert.match(commit, /fetchProfileArtworks\(activeProfile, requestedGallery\)/);
 });
