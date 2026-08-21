@@ -36,9 +36,24 @@
         }
     }
 
-    function sized(url, width, quality = 70) {
+    // Both dimensions, always.
+    //
+    // The render endpoint does not scale proportionally when it is given only a
+    // width: it returns that width against the ORIGINAL height. Verified in a
+    // browser against a 1254x1254 avatar - `?width=128` came back 128x1254 and
+    // `?width=600` came back 600x1254. Every sized image was therefore a narrow
+    // sliver, which `object-fit: cover` then blew up about tenfold. That is the
+    // avatar that looked stretched and enormously zoomed, and the card media
+    // that looked wrong beside it.
+    //
+    // Every place we size is a square box - the account button circle, the card
+    // media with `aspect-ratio: 1` - so one number is asked for and sent as both
+    // dimensions. `cover` is the endpoint's own default for a width and height
+    // pair and matches the `object-fit: cover` the box already uses, so the
+    // crop the browser would have made is simply made earlier.
+    function sized(url, size, quality = 70) {
         if (!url || typeof url !== 'string') return url;
-        if (!Number.isInteger(width) || width < 16 || width > 2048) return url;
+        if (!Number.isInteger(size) || size < 16 || size > 2048) return url;
         // Production rows carry a bare 'image' in file_type rather than a MIME
         // type, so the extension is the honest signal; anything unrecognised,
         // including an extensionless upload that could be a GIF, is left alone.
@@ -47,7 +62,9 @@
         if (!isValidStorageUrl(url)) return url;
         try {
             const rendered = new URL(url.replace(OBJECT_PATH, RENDER_PATH));
-            rendered.searchParams.set('width', String(width));
+            rendered.searchParams.set('width', String(size));
+            rendered.searchParams.set('height', String(size));
+            rendered.searchParams.set('resize', 'cover');
             rendered.searchParams.set('quality', String(quality));
             return rendered.toString();
         } catch {

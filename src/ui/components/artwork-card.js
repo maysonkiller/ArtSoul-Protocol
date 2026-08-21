@@ -116,7 +116,10 @@
     //
     // Presentation only. mediaUrl still returns the original, so the artwork
     // page and fullscreen keep full quality and nothing projected changes.
-    const CARD_THUMBNAIL_WIDTH = 600;
+    // The card media box is square (aspect-ratio: 1) and crops with
+    // object-fit: cover, so one number is asked for and the same crop is
+    // simply made before the bytes are sent rather than after.
+    const CARD_THUMBNAIL_SIZE = 600;
 
     function cardThumbnailUrl(url, type) {
         // Still images only. A GIF put through a still transform loses its
@@ -125,7 +128,7 @@
         // image is refused there too.
         if (type !== 'image') return url;
         const resize = window.ArtSoulStorageImage?.sized;
-        return typeof resize === 'function' ? resize(url, CARD_THUMBNAIL_WIDTH) : url;
+        return typeof resize === 'function' ? resize(url, CARD_THUMBNAIL_SIZE) : url;
     }
 
     function mediaDescriptor(artwork = {}) {

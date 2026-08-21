@@ -540,11 +540,11 @@ test('every shared-header page boots the header in the same order with the same 
     // same assets as one served at the root.
     assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=45">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=4"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=51" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=52" defer><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=45');
     const prepaint = html.indexOf('header-prepaint.js?v=4');
-    const component = html.indexOf('avatar-dropdown.js?v=51');
+    const component = html.indexOf('avatar-dropdown.js?v=52');
     const appkit = html.indexOf('appkit-init.js?v=');
     const shell = html.indexOf('<div id="navButtons"');
     const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");
@@ -1900,8 +1900,8 @@ test('the preview contract is pinned in the component source', () => {
   // to 2.8 MB. A few kilobytes fetched once buys a complete first frame on
   // every later page.
   assert.match(component, /captureAvatarPreviewFor\(snapshot, corsAttempt, preloader\);/);
-  assert.match(component, /const AVATAR_PREVIEW_SOURCE_WIDTH = 128;/);
-  assert.match(component, /resize\(snapshot\.avatarUrl, AVATAR_PREVIEW_SOURCE_WIDTH\)/);
+  assert.match(component, /const AVATAR_PREVIEW_SOURCE_SIZE = 128;/);
+  assert.match(component, /resize\(snapshot\.avatarUrl, AVATAR_PREVIEW_SOURCE_SIZE\)/);
   // When no smaller copy exists - off-host media, a GIF, an SVG - it falls back
   // to the decoded display image, which is the old behaviour exactly.
   assert.match(component, /if \(small === snapshot\.avatarUrl\) \{/);
