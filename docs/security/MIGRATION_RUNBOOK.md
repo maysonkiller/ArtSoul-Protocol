@@ -11,6 +11,53 @@ This runbook is the authoritative operational path for the current ArtSoul repos
 | Other files in `sql/migrations/` | Feature, auth, AI, moderation, observability, and security changes | Manually reviewed migrations. Their production status must be recorded explicitly; filename order is not an execution plan. |
 | `migrations/001_ai_integration.sql` | Early AI integration migration | Historical/manual. Verify schema before use; do not assume it belongs to the indexer 001-014 sequence. |
 
+### Per-file disposition
+
+Every `.sql` file in the three trees appears here. A file that is absent from
+this table is unledgered, and `test/migration-ledger-coverage.test.cjs` fails
+until it is added. Twelve files, including all four A8 migrations, were absent
+before 2026-08-21.
+
+`not recorded` means exactly that: this repository holds no evidence of the
+file's production status. It is not a claim that the file was never applied.
+Verify against the database before applying or re-applying it.
+
+| File | Disposition |
+| --- | --- |
+| `sql/migrations/001_core_indexer_schema.sql` | Indexer sequence 1. Runner-managed. |
+| `sql/migrations/002_auction_state_schema.sql` | Indexer sequence 2. Runner-managed. |
+| `sql/migrations/003_resilience_schema.sql` | Indexer sequence 3. Runner-managed. |
+| `src/indexer/migrations/004_distributed_locks.sql` | Indexer sequence 4. Runner-managed. |
+| `src/indexer/migrations/005_event_idempotency.sql` | Indexer sequence 5. Runner-managed. |
+| `src/indexer/migrations/006_ownership_observability.sql` | Indexer sequence 6. Runner-managed. |
+| `src/indexer/migrations/007_outbox_pattern.sql` | Indexer sequence 7. Runner-managed. |
+| `src/indexer/migrations/008_reorg_handling.sql` | Indexer sequence 8. Runner-managed. |
+| `src/indexer/migrations/009_event_queue_spillover.sql` | Indexer sequence 9. Runner-managed. |
+| `src/indexer/migrations/010_v4_1_event_lifecycle.sql` | Indexer sequence 10. Runner-managed. |
+| `src/indexer/migrations/011_discovery_social_signals.sql` | Indexer sequence 11. Runner-managed. |
+| `src/indexer/migrations/012_indexer_base_runtime_tables.sql` | Indexer sequence 12. Runner-managed. |
+| `src/indexer/migrations/013_chain_scoped_v41_projections.sql` | Indexer sequence 13. Runner-managed. |
+| `src/indexer/migrations/014_schema_aware_reorg_rollback.sql` | Indexer sequence 14. **Applied to production** after backup; accepted as backlog A-14. |
+| `src/indexer/migrations/015_public_metrics_projection.sql` | Indexer sequence 15. **Applied to production** 2026-07-28; accepted as backlog A-26. |
+| `sql/migrations/a8a_moderation_passkey_foundation.sql` | A8 activation step 1. **Unapplied**, per `RESOURCE_GATED_WORK.md` RG-03. Founder-gated. |
+| `sql/migrations/a8b_artwork_report_intake.sql` | A8 activation step 2. **Unapplied.** Founder-gated. |
+| `sql/migrations/a8c_protocol_admin_review.sql` | A8 activation step 3. **Unapplied.** Founder-gated. |
+| `sql/migrations/a8d_moderation_safe_recovery.sql` | A8 activation step 4. **Unapplied**, per `runbooks/A8D_SAFE_RECOVERY.md`. Founder-gated. |
+| `sql/migrations/phase18_7a_supabase_security_hardening.sql` | Prior partial classification. Superseded by 18.7b. |
+| `sql/migrations/phase18_7b_supabase_security_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
+| `sql/migrations/phase18_7c_supabase_storage_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
+| `sql/migrations/security_hardening.sql` | **SUPERSEDED, DO NOT APPLY.** |
+| `sql/migrations/rls_wallet_fix.sql` | **SUPERSEDED, DO NOT APPLY.** |
+| `sql/migrations/phase18_artwork_moderation_visibility.sql` | Staff hide/unhide is live in production (backlog A-20), so its effect is present. The ledger row is `not recorded`; verify before re-applying. |
+| `sql/migrations/phase10_auth_final.sql` | `not recorded`. Historical auth migration. |
+| `sql/migrations/phase11_ai_core.sql` | `not recorded`. Historical AI migration. |
+| `sql/migrations/phase12_correctness.sql` | `not recorded`. Historical correctness migration. |
+| `sql/migrations/observability_layer.sql` | `not recorded`. Manual observability migration. |
+| `sql/migrations/observability_dashboard.sql` | `not recorded`. Manual observability migration. |
+| `sql/migrations/stabilization_layer.sql` | `not recorded`. Manual stabilization migration. |
+| `sql/migrations/indexer_dedup_setup.sql` | `not recorded`. Manual deduplication setup. |
+| `migrations/001_ai_integration.sql` | Historical/manual, third tree. Its `001` prefix does **not** belong to the indexer sequence; the numbering collision with `sql/migrations/001_core_indexer_schema.sql` is real. Verify schema before any use. |
+
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.
 
 ## Security Migration Status
@@ -145,6 +192,40 @@ After this migration is merged and the operator has explicit approval to modify 
 6. Monitor the indexer logs through the next real reorg check. The prior `relation "indexed_auctions" does not exist` and `relation "indexed_bids" does not exist` errors must not recur.
 
 Rollback, if required, is a database restore or a new reviewed forward migration. Do not restore the pre-014 function because it is incompatible with the observed production schema.
+
+## A8 Moderation Activation
+
+The four A8 migrations are the first step of the only dependency chain still
+gating Phase B. They were absent from this runbook until 2026-08-21, so the
+sequence lived only in `runbooks/A8_MODERATION_ROLLOUT.md` while the backup and
+verification discipline lived only here. One path, not two:
+
+1. Satisfy the preconditions in `RESOURCE_GATED_WORK.md` RG-03 first. Apex-origin
+   acceptance is one of them, recorded through
+   `testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md`.
+2. Create and validate a full backup and a schema-only export, exactly as the
+   existing production procedure above requires.
+3. Apply, **in this order and one transaction each**:
+   `a8a_moderation_passkey_foundation.sql`,
+   `a8b_artwork_report_intake.sql`,
+   `a8c_protocol_admin_review.sql`,
+   `a8d_moderation_safe_recovery.sql`.
+   These are feature migrations. `scripts/apply-migrations.js` manages the
+   indexer sequence only and must not be pointed at them.
+4. Run each matching read-only file in `sql/verification/` and archive its
+   output with timestamp and environment label. Those files end in `ROLLBACK`;
+   never replace it with `COMMIT`.
+5. Confirm forced RLS, no anon or authenticated table or RPC grant, no raw
+   signature, token or private-key column, and the SECURITY DEFINER RPC with a
+   fixed `search_path`.
+6. Only then configure RP ID, origin, the moderation-session secret, the Safe,
+   the chain and two independent recovery RPCs, enrol two founder passkeys, and
+   issue the one-time audited bootstrap grant.
+7. Rehearse the full A8d recovery ceremony including every mandatory denial in
+   `runbooks/A8D_SAFE_RECOVERY.md` section 6 before enabling any flag.
+
+Stop at the first unexpected verification result. Applying a later A8 migration
+over an unverified earlier one is the failure this ordering exists to prevent.
 
 ## Clean Mainnet Database Cutover
 

@@ -20,7 +20,7 @@ Reconciled: 2026-08-20 against `main` at `0bbeec5` (merged PR #201)
 >   indexer confirmation-depth defect, projection/provenance verification and
 >   profile action gating are all **accepted with dated production evidence**
 >   (A-03, A-04, A-14, A-18, A-19).
-> - Phase A now stands at 39 `done`, 13 `in progress`, 7 `planned`. Moderation
+> - Phase A now stands at 39 `done`, 14 `in progress`, 6 `planned`. Moderation
 >   remains the founder-gated dependency chain; A-50 through A-52 await
 >   production acceptance, and five planned engineering rows remain open.
 >
@@ -110,7 +110,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 39 `done`, 13 `in progress`, 7 `planned` across A-01 to A-59
+current position is 39 `done`, 14 `in progress`, 6 `planned` across A-01 to A-59
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that
