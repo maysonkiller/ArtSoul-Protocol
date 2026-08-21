@@ -34,6 +34,10 @@ const { useState, useEffect, useRef } = React;
             const [editMode, setEditMode] = useState(false);
             const [selectedGallery, setSelectedGallery] = useState('created');
             const [myArtworks, setMyArtworks] = useState([]);
+            // The tab the visible result belongs to. It lags selectedGallery until a
+            // fetch commits, so the heading and the list are never out of step.
+            const [displayedGallery, setDisplayedGallery] = useState('created');
+            const [hasSettledArtworks, setHasSettledArtworks] = useState(false);
             const [loading, setLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
             const [artworksLoading, setArtworksLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
             const [isOwnProfile, setIsOwnProfile] = useState(false);
@@ -880,12 +884,22 @@ const { useState, useEffect, useRef } = React;
                 setArtworksLoading(true);
                 const activeProfile = profileOverride || profile;
 
+                const requestedGallery = selectedGallery;
                 try {
-                    const result = await fetchProfileArtworks(activeProfile, selectedGallery);
-                    if (requestId === artworksRequestRef.current) setMyArtworks(result.items);
+                    const result = await fetchProfileArtworks(activeProfile, requestedGallery);
+                    if (requestId === artworksRequestRef.current) {
+                        // One commit: the list and the tab it belongs to.
+                        setMyArtworks(result.items);
+                        setDisplayedGallery(requestedGallery);
+                        setHasSettledArtworks(true);
+                    }
                 } catch (error) {
                     console.error('Error loading artworks:', error);
-                    if (requestId === artworksRequestRef.current) setMyArtworks([]);
+                    if (requestId === artworksRequestRef.current) {
+                        setMyArtworks([]);
+                        setDisplayedGallery(requestedGallery);
+                        setHasSettledArtworks(true);
+                    }
                 } finally {
                     if (requestId === artworksRequestRef.current) setArtworksLoading(false);
                 }
@@ -1597,9 +1611,18 @@ const { useState, useEffect, useRef } = React;
                                 <h3 className={`text-xl font-bold ${
                                     isClassic ? 'text-gray-100' : 'text-cyan-300'
                                 }`}>
-                                    {GALLERY_TYPES.find(g => g.id === selectedGallery)?.label}
+                                    {GALLERY_TYPES.find(g => g.id === displayedGallery)?.label}
                                 </h3>
-                                {!artworksLoading && (
+                                {artworksLoading && hasSettledArtworks ? (
+                                    <span
+                                        className={`profile-gallery-loading-note text-sm ${
+                                            isClassic ? 'text-gray-400' : 'text-purple-300'
+                                        }`}
+                                        role="status"
+                                    >
+                                        Loading{'…'}
+                                    </span>
+                                ) : !artworksLoading && (
                                     <span className={`text-sm ${
                                         isClassic ? 'text-gray-400' : 'text-purple-300'
                                     }`}>
@@ -1609,12 +1632,12 @@ const { useState, useEffect, useRef } = React;
                             </div>
 
                             <div className="profile-artwork-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" aria-busy={artworksLoading}>
-                                {artworksLoading ? (
+                                {artworksLoading && !hasSettledArtworks ? (
                                     <CardGridSkeleton count={6} className="contents" />
                                 ) : (
                                     <>
                                         {/* Add New is a Created Artworks action only. */}
-                                        {isOwnProfile && selectedGallery === 'created' && (
+                                        {isOwnProfile && displayedGallery === 'created' && (
                                             <button
                                                 type="button"
                                                 onClick={handleQuickUpload}
@@ -1640,10 +1663,10 @@ const { useState, useEffect, useRef } = React;
 
                                         {myArtworks.length === 0 && (
                                             <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
-                                                {selectedGallery === 'created' && 'No created artworks yet.'}
-                                                {selectedGallery === 'auction' && 'No live auctions right now.'}
-                                                {selectedGallery === 'sold' && 'No completed sales yet.'}
-                                                {selectedGallery === 'collected' && 'No collected NFTs yet.'}
+                                                {displayedGallery === 'created' && 'No created artworks yet.'}
+                                                {displayedGallery === 'auction' && 'No live auctions right now.'}
+                                                {displayedGallery === 'sold' && 'No completed sales yet.'}
+                                                {displayedGallery === 'collected' && 'No collected NFTs yet.'}
                                             </div>
                                         )}
                                     </>
