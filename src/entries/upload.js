@@ -179,12 +179,20 @@ let selectedFile = null;
             throw pendingError;
         }
 
+        // The artwork page cannot otherwise know it is being opened straight
+        // out of a publish, so its first frame was the generic page skeleton
+        // even though the only thing being waited for is the indexer catching
+        // up. This says so, and the page shows the ArtSoul mark instead. It
+        // survives a reload, because that wait can outlast one.
         function navigateAfterPublish(path) {
             publishNavigationLocked = false;
+            const target = path.includes('?')
+                ? `${path}&published=1`
+                : `${path}?published=1`;
             if (typeof window.location?.assign === 'function') {
-                window.location.assign(path);
+                window.location.assign(target);
             } else {
-                window.location.href = path;
+                window.location.href = target;
             }
         }
 
