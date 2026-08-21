@@ -205,7 +205,10 @@ const { useState, useEffect, useRef } = React;
 
             function getProfileAvatarUrl(profileData) {
                 const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-                return resolver?.(profileData, '') || '';
+                const source = resolver?.(profileData, '') || '';
+                // The hero avatar paints at 112px, so 384 covers a 3x screen.
+                const resize = window.ArtSoulSecurity?.storageRenderUrl;
+                return typeof resize === 'function' ? resize(source, 384) : source;
             }
 
             // Base mainnet explorer: the protocol targets Base mainnet, so the

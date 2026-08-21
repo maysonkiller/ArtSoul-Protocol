@@ -12,6 +12,7 @@
     // The previously generated stylized "A" data-URI is gone: it read as a
     // third identity and was mistaken for a stale cached avatar.
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
+    const HEADER_AVATAR_WIDTH = 128;
 
     // supabase-client.js announces 'artsoul:db-ready' once, after the complete
     // window.ArtSoulDB API is assigned.
@@ -1679,7 +1680,12 @@
 
         getProfileAvatarUrl(profile) {
             const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-            return resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
+            const source = resolver?.(profile, NEUTRAL_AVATAR_URL) || NEUTRAL_AVATAR_URL;
+            // The button paints at 40px, so 128 covers a 3x screen. This matters
+            // more here than anywhere else: the header holds its resolving label
+            // until the avatar decodes, and stored avatars run to megabytes.
+            const resize = window.ArtSoulSecurity?.storageRenderUrl;
+            return typeof resize === 'function' ? resize(source, HEADER_AVATAR_WIDTH) : source;
         }
 
         /**

@@ -855,7 +855,10 @@ const { useState, useEffect, useRef } = React;
             function getProfileAvatarUrl(profileData, address = '') {
                 const fallbackAvatar = getDefaultProfileAvatar(address || profileData?.wallet_address || 'artsoul');
                 const resolver = window.ArtSoulProfileDisplay?.avatarUrl || window.ArtSoulDB?.avatarUrl;
-                return resolver?.(profileData, fallbackAvatar) || fallbackAvatar;
+                const source = resolver?.(profileData, fallbackAvatar) || fallbackAvatar;
+                // Provenance rows paint a small inline avatar; 128 covers 3x.
+                const resize = window.ArtSoulSecurity?.storageRenderUrl;
+                return typeof resize === 'function' ? resize(source, 128) : source;
             }
 
             function renderOwnershipRole({ label, address, profile }) {

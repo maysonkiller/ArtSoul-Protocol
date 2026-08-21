@@ -46,23 +46,30 @@ test('everything describing the list follows the committed tab', () => {
   assert.match(profileEntry, /if \(gallery\.id !== selectedGallery\) \{/);
 });
 
+test('the outgoing list is never dimmed while the next one loads', () => {
+  // The first attempt dimmed the grid to 0.55. With card media still arriving
+  // that read as the old tab showing through the new one, which is worse than
+  // the flash it replaced. The inline note carries the signal on its own.
+  assert.doesNotMatch(styles, /\.profile-artwork-grid\[aria-busy/);
+});
+
 test('the stale state is signalled without motion or theme colour', () => {
   // Canon 16: no theme hex outside the variables, and reduced motion honoured.
   const block = styles.slice(
-    styles.indexOf('.profile-artwork-grid[aria-busy="true"]'),
+    styles.indexOf('.profile-gallery-loading-note'),
     styles.indexOf('.artwork-fallback-facts {')
   );
   assert.doesNotMatch(block, /#[0-9a-fA-F]{3,8}\b/);
   assert.match(block, /opacity:/);
   assert.match(block, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(block, /animation: none;/);
-  // aria-busy is what drives it, so assistive tech and CSS agree.
+  // aria-busy still drives assistive tech even with nothing visual hung off it.
   assert.match(profileEntry, /aria-busy=\{artworksLoading\}/);
 });
 
 test('no arbitrary min-height, timeout or overflow masking was introduced', () => {
   const block = styles.slice(
-    styles.indexOf('.profile-artwork-grid[aria-busy="true"]'),
+    styles.indexOf('.profile-gallery-loading-note'),
     styles.indexOf('.artwork-fallback-facts {')
   );
   assert.doesNotMatch(block, /min-height/);

@@ -108,11 +108,34 @@
         return candidate && normalize(candidate) !== media ? candidate : '';
     }
 
+    // Cards were requesting the original upload, which is what made them sit
+    // dark for seconds. The sizing itself lives in supabase-client.js as
+    // ArtSoulSecurity.storageRenderUrl, shared with the avatar surfaces because
+    // it is the same defect. 600 px covers a card at two mobile columns on a
+    // 3x screen; measured, a 1668 KB PNG comes back as 68 KB WebP.
+    //
+    // Presentation only. mediaUrl still returns the original, so the artwork
+    // page and fullscreen keep full quality and nothing projected changes.
+    const CARD_THUMBNAIL_WIDTH = 600;
+
+    function cardThumbnailUrl(url, type) {
+        // Still images only. A GIF put through a still transform loses its
+        // animation, and video and audio are not images at all. The shared
+        // helper re-checks the extension, so an animated file mislabelled as an
+        // image is refused there too.
+        if (type !== 'image') return url;
+        const resize = window.ArtSoulSecurity?.storageRenderUrl;
+        return typeof resize === 'function' ? resize(url, CARD_THUMBNAIL_WIDTH) : url;
+    }
+
     function mediaDescriptor(artwork = {}) {
         const type = mediaType(artwork);
+        const url = mediaUrl(artwork);
         return Object.freeze({
             type,
-            url: mediaUrl(artwork),
+            url,
+            // Card surfaces paint this; url stays the original for detail views.
+            thumbnailUrl: cardThumbnailUrl(url, type),
             poster: type === 'video' ? posterUrl(artwork) : '',
             known: type !== 'unknown'
         });
@@ -547,7 +570,8 @@
         }
 
         const img = document.createElement('img');
-        img.src = url;
+        // Card surfaces paint the transformed copy; url stays the original.
+        img.src = descriptor.thumbnailUrl || url;
         img.alt = artwork.title || 'Artwork';
         img.className = 'artsoul-card-media-object';
         img.loading = 'lazy';
@@ -624,7 +648,8 @@
         if (type === 'audio') return h(ReactAudioPreview, { artwork, url, onUnavailable });
         return h('div', { className: 'artsoul-card-media' },
             h('img', {
-                src: url,
+                // Card surfaces paint the transformed copy; url stays the original.
+                src: descriptor.thumbnailUrl || url,
                 alt: artwork.title || 'Artwork',
                 className: 'artsoul-card-media-object',
                 loading: 'lazy',
