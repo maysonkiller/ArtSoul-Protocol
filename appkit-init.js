@@ -22,6 +22,7 @@ import {
     isCoreConnectInFlight,
     isCoreSessionActive,
     requestCoreWalletMethod,
+    resolveCoreRpcUrl,
     resolveCoreSessionChainId,
     restoreCoreSessionOutcome,
     setCoreAuthLifecycleState
@@ -57,7 +58,6 @@ const BASE_SEPOLIA_RPC_URLS = window.ArtSoulBaseSepolia?.rpcUrls?.length
         'https://base-sepolia-rpc.publicnode.com',
         'https://base-sepolia.drpc.org'
     ];
-const BASE_SEPOLIA_RPC_URL = BASE_SEPOLIA_RPC_URLS[0];
 const CORE_NETWORK_CONFIRMATION_KEY = 'artsoul_core_network_confirmation_v2';
 // Mainnet entries are negotiation-only compatibility routes for mobile
 // WalletConnect. ArtSoul operations and every write remain Base Sepolia-only.
@@ -3570,7 +3570,11 @@ async function initializeAppKit() {
                 enableNetworkSwitch: false,
                 universalProviderConfigOverride: {
                     events: { eip155: ['chainChanged', 'accountsChanged'] },
-                    rpcMap: { [BASE_SEPOLIA_CAIP_ID]: BASE_SEPOLIA_RPC_URL }
+                    // One url only: WalletConnect's rpcMap type is
+                    // `{ [chainId: string]: string }`, so this leg cannot carry the
+                    // fallback list customRpcUrls above gives the adapter. Pick a
+                    // route that is answering rather than one that may already be down.
+                    rpcMap: { [BASE_SEPOLIA_CAIP_ID]: await resolveCoreRpcUrl() }
                 },
                 themeMode: 'dark',
                 themeVariables: {
