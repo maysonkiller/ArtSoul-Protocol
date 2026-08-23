@@ -48,7 +48,20 @@ const WC_MODAL_VERSION = '2.7.0';
 export const CORE_STORAGE_PREFIX = 'artsoul-mobile-core-v4';
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
-const BASE_SEPOLIA_RPC_URL = 'https://sepolia.base.org';
+// A-73 said there was one list of ways to reach Base Sepolia. There were
+// still two: this file kept a single hardcoded address of its own, and it is
+// the one the external-mobile WalletConnect provider actually dials.
+// base-network.js owns the list; the literal below is a floor for the case
+// where that classic script has not run, not a second opinion, and a test pins
+// the two together.
+const BASE_SEPOLIA_RPC_URLS = (typeof window !== 'undefined' && window.ArtSoulBaseSepolia?.rpcUrls?.length)
+    ? [...window.ArtSoulBaseSepolia.rpcUrls]
+    : [
+        'https://sepolia.base.org',
+        'https://base-sepolia-rpc.publicnode.com',
+        'https://base-sepolia.drpc.org'
+    ];
+const BASE_SEPOLIA_RPC_URL = BASE_SEPOLIA_RPC_URLS[0];
 const CORE_RESTORE_TIMEOUT_MS = 4500;
 const CORE_RESTORE_POLL_INTERVAL_MS = 120;
 // WalletConnect optional permissions are not guaranteed to be approved by a
@@ -950,6 +963,43 @@ function summarizeEventPayload(eventName, payload) {
     return { value: payload ?? null };
 }
 
+// WalletConnect's rpcMap holds exactly ONE url per chain — its published type
+// is `{ [chainId: string]: string }` (@walletconnect/ethereum-provider 2.23.10,
+// verified against the package's own EthereumProvider.d.ts). A list cannot be
+// handed to it, so the external-mobile path cannot fail over the way the rest
+// of the app now does. That matters: this is the url the provider dials for the
+// reads it serves itself, including the `eth_estimateGas` whose unanswered
+// reply started A-70.
+//
+// What can be done is to not hand it an address that is already down. One
+// bounded probe picks the first route answering right now. If none answers the
+// documented public endpoint is used anyway — a wallet that fails to
+// initialise helps nobody, and the publish classifier is what tells the person
+// the chain is unreachable.
+//
+// This runs before the provider exists, so nobody is reading an error message;
+// they are waiting for a modal. A-63 and A-64 spent real work on that wait, and
+// this must not quietly buy it back: the probe gets the short init budget,
+// which bounds the WHOLE lookup, not each route.
+export async function resolveCoreRpcUrl() {
+    const network = typeof window !== 'undefined' ? window.ArtSoulBaseSepolia : null;
+    const probe = network?.probe;
+    if (typeof probe !== 'function') return BASE_SEPOLIA_RPC_URL;
+    try {
+        const probed = await probe({ budgetMs: network.probeInitBudgetMs });
+        if (probed?.reachable && typeof probed.url === 'string' && BASE_SEPOLIA_RPC_URLS.includes(probed.url)) {
+            coreLog('core provider rpc route selected', { url: probed.url, attempts: probed.attempts?.length ?? 0 });
+            return probed.url;
+        }
+        coreLog('core provider rpc route unresolved; using the documented endpoint', {
+            attempts: probed?.attempts?.length ?? 0
+        });
+    } catch (error) {
+        coreLog('core provider rpc probe failed; using the documented endpoint', describeCoreError(error));
+    }
+    return BASE_SEPOLIA_RPC_URL;
+}
+
 // ONE provider instance per page. showQrModal: false — the provider must
 // NOT build its own runtime modal; our statically imported official modal
 // (wallet list, deep links, QR) drives the whole connect UX instead. Still
@@ -968,7 +1018,7 @@ export async function getCoreEthereumProvider() {
                 events: REQUIRED_EVENTS,
                 showQrModal: false,
                 metadata: settings.metadata,
-                rpcMap: { [BASE_SEPOLIA_CHAIN_ID]: BASE_SEPOLIA_RPC_URL }
+                rpcMap: { [BASE_SEPOLIA_CHAIN_ID]: await resolveCoreRpcUrl() }
             };
             let instance;
             if (typeof settings.createProvider === 'function') {

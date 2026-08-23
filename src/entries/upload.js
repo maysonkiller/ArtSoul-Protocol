@@ -5,6 +5,7 @@ import {
     MAX_ARTWORK_UPLOAD_BYTES,
     MAX_ARTWORK_UPLOAD_MB
 } from '../config/upload-policy.js';
+import { classifyPublishFailure, keepsPendingTransaction, provesFinalFailure } from '../features/publish/publish-error.js';
 
 let selectedFile = null;
         let uploading = false;
@@ -142,7 +143,11 @@ let selectedFile = null;
                 `v41:${chainId}:${artworkId}`
             ),
             now = () => Date.now(),
-            sleep = waitForDelay
+            sleep = waitForDelay,
+            // Injected so the extracted-function tests can drive this without
+            // the module graph. Defaults to never-final, which is the only safe
+            // assumption when the caller supplies no way to tell.
+            isFinalFailure = () => false
         }) {
             let transactionOutcome = null;
             Promise.resolve(transactionPromise).then(
@@ -170,12 +175,30 @@ let selectedFile = null;
                 await sleep(Math.min(pollIntervalMs, remaining));
             }
 
+            // The provider's rejection was kept through the whole indexer race,
+            // because a projection can prove the auction even after the wallet
+            // gave up on it. Past the deadline that race is over, and an error
+            // that positively settles the transaction - a mined receipt with
+            // status 0, revert data, a wallet rejection - is the answer. It was
+            // being thrown away here, so a real, final failure was reported as
+            // "still finalizing": a card telling somebody to wait for something
+            // that had already ended.
+            const providerError = transactionOutcome && transactionOutcome.ok === false
+                ? transactionOutcome.error
+                : null;
+            if (providerError && isFinalFailure(providerError)) {
+                throw providerError;
+            }
+
+            // Still ambiguous. The transaction was broadcast and nothing has
+            // settled it, so the pending state stays and nothing invites a
+            // second auction.
             const pendingError = createUploadError(
                 'AUCTION_CONFIRMATION_PENDING',
                 'The auction transaction was submitted and is still finalizing. Check its status from your profile before trying anything again.'
             );
             pendingError.txHash = txHash;
-            pendingError.cause = transactionOutcome?.error || null;
+            pendingError.cause = providerError;
             throw pendingError;
         }
 
@@ -275,6 +298,9 @@ let selectedFile = null;
                 if (reason.includes('TYPE')) return 'This file type is not supported. Choose a supported image, video, or audio file.';
                 return 'The selected file is not valid. Check its type and size, then try again.';
             }
+            if (code === 'FILE_TOO_LARGE') {
+                return `This file is too large. The maximum size is ${MAX_ARTWORK_UPLOAD_MB} MB.`;
+            }
             const stageMessages = {
                 fingerprint: 'The selected file could not be read. Choose the file again and retry.',
                 media_upload: 'The artwork file could not be stored. Check your connection and try again.',
@@ -286,83 +312,29 @@ let selectedFile = null;
             return stageMessages[currentPublishStage] || 'The publish flow could not be completed. Please try again.';
         }
 
-        function mapPublishError(error) {
-            const code = String(error?.code || '').toUpperCase();
-            const message = String(error?.shortMessage || error?.reason || error?.message || '');
-            const lower = message.toLowerCase();
+        // A bounded reachability check, used only for the one error shape that
+        // cannot be classified from the error itself: a CALL_EXCEPTION with no
+        // revert data and no reason. A-70 called every one of those an outage;
+        // a contract that refuses without a reason produces the identical
+        // error, so the chain is asked rather than assumed. Absent helper means
+        // unresolved, never "reachable" - A-68.
+        async function probeBaseSepolia() {
+            const probe = window.ArtSoulBaseSepolia?.probe;
+            if (typeof probe !== 'function') return null;
+            return probe();
+        }
 
-            if (code === 'ACTION_REJECTED' || code === '4001' || lower.includes('user rejected') || lower.includes('user denied')) {
-                return { code: 'USER_REJECTED', message: 'The transaction was rejected in your wallet. No artwork was published.' };
-            }
-            if (lower.includes('nonce too low')) {
-                return { code: 'NONCE_TOO_LOW', message: 'Your wallet has a pending transaction. Wait for it to finish, then try again.' };
-            }
-            if (lower.includes('insufficient funds') || lower.includes('insufficient gas') || lower.includes('not enough funds')) {
-                return { code: 'INSUFFICIENT_FUNDS', message: 'Insufficient ETH on Base Sepolia to publish this artwork. Top up your wallet and try again.' };
-            }
-            // A revert carries a reason. This one carries none, and it comes
-            // from estimateGas, which means the node never executed anything:
-            // ethers reports an RPC that will not answer as `missing revert
-            // data` with a null reason and null data. Reported on 2026-08-21,
-            // when the public Base Sepolia endpoint returned `no backend is
-            // currently healthy to serve traffic` - the same call estimated
-            // successfully against another endpoint at the same moment. Calling
-            // that a failed transaction told the person their artwork had been
-            // rejected on-chain, which had not happened and was not true.
-            if (lower.includes('missing revert data')
-                || lower.includes('could not coalesce error')
-                || lower.includes('no backend is currently healthy')
-                || code === 'NETWORK_ERROR'
-                || code === 'SERVER_ERROR'
-                || code === 'TIMEOUT') {
-                return {
-                    code: 'NETWORK_UNAVAILABLE',
-                    message: 'Base Sepolia did not answer, so nothing was sent and nothing was published. This is the network, not your artwork or your wallet. Wait a moment and try again.'
-                };
-            }
-            if (code === 'CALL_EXCEPTION' || lower.includes('reverted') || lower.includes('execution reverted')) {
-                return {
-                    code: 'TRANSACTION_REVERTED',
-                    message: currentPublishStage === 'auction'
-                        ? 'The artwork was registered, but the auction transaction failed on Base Sepolia. Open your profile and use Start auction on this artwork to finish it.'
-                        : 'The artwork registration transaction failed on Base Sepolia. No artwork was published.'
-                };
-            }
-            if (lower.includes('no wallet provider') || (lower.includes('wallet provider') && lower.includes('not available'))) {
-                return { code: 'WALLET_NOT_CONNECTED', message: 'Connect your wallet before publishing this artwork.' };
-            }
-            if (lower.includes('network was changed') || code === 'NETWORK_ERROR') {
-                return { code: 'NETWORK_CHANGED', message: 'The wallet network changed during publishing. Switch back to Base Sepolia and try again.' };
-            }
-            if (lower.includes('metadata upload')) {
-                return { code: 'METADATA_UPLOAD_FAILED', message: 'The artwork details could not be stored. Please try again.' };
-            }
-            if (lower.includes('storage upload') || lower.includes('upload authorization')) {
-                return { code: 'MEDIA_UPLOAD_FAILED', message: 'The artwork file could not be stored. Check your connection and try again.' };
-            }
-            if (lower.includes('confirmed artwork id') || lower.includes('register transaction did not return')) {
-                return { code: 'REGISTRATION_INCOMPLETE', message: 'The wallet did not return a complete artwork registration confirmation. Check your profile before retrying.' };
-            }
-            if (lower.includes('unsupported network') || lower.includes('wrong network')) {
-                return { code: 'UNSUPPORTED_NETWORK', message: 'This artwork must be published on Base Sepolia. Switch networks and try again.' };
-            }
-            if (lower.includes('duplicate artwork')) {
-                return { code: 'DUPLICATE_ARTWORK', message: 'This file has already been published.' };
-            }
-
-            const directMessages = {
-                FILE_REQUIRED: 'Select an artwork file before continuing.',
-                INVALID_FILENAME: 'This file name looks auto-generated. Please rename the file to a meaningful title (for example: my-artwork.png) and try again.',
-                FILE_TOO_LARGE: `This file is too large. The maximum size is ${MAX_ARTWORK_UPLOAD_MB} MB.`,
-                UNSUPPORTED_FILE_TYPE: 'This file type is not supported. Choose a supported image, video, or audio file.',
-                WALLET_NOT_CONNECTED: 'Connect your wallet before publishing this artwork.',
-                AUTHORIZATION_REQUIRED: 'Authorize this upload with your wallet signature before publishing.',
-                AI_UNAVAILABLE: 'AI value guidance is not ready. Request an estimate before publishing.',
-                AUCTION_CONFIRMATION_PENDING: 'The auction transaction was submitted and is still finalizing. Check its status from your profile before trying anything again.'
-            };
-            if (directMessages[code]) return { code, message: directMessages[code] };
-
-            return { code: code || 'PUBLISH_FAILED', message: describePublishError(error) };
+        // submittedTxHash is the difference between "we never sent it" and "we
+        // sent it and lost the answer". Without it a transport failure during
+        // receipt polling reads as "nothing was sent", and the person is told
+        // to publish an artwork that may already be on the chain.
+        async function mapPublishError(error, submittedTxHash = '') {
+            return classifyPublishFailure(error, {
+                stage: currentPublishStage,
+                submittedTxHash,
+                probeNetwork: probeBaseSepolia,
+                describeFallback: describePublishError
+            });
         }
 
         const PENDING_ARTWORKS_KEY = 'artsoul_pending_indexer_artworks';
@@ -671,7 +643,7 @@ let selectedFile = null;
                 await ensureUploadAuthorization();
                 await requestAIValuation(selectedFile);
             } catch (error) {
-                const mapped = mapPublishError(error);
+                const mapped = await mapPublishError(error);
                 setAIValuationState('unavailable', { message: mapped.message });
                 updatePublishReadiness(mapped.message);
             } finally {
@@ -1137,7 +1109,8 @@ let selectedFile = null;
                             transactionPromise: auctionConfirmation,
                             chainId: BASE_SEPOLIA_CHAIN_ID,
                             artworkId: result.artworkId,
-                            txHash: firstAuctionOutcome.hash
+                            txHash: firstAuctionOutcome.hash,
+                            isFinalFailure: provesFinalFailure
                         });
                     }
                     auctionCreated = true;
@@ -1155,9 +1128,13 @@ let selectedFile = null;
                     console.log('Legacy auction DB sync skipped; v41 indexer will project auction state.');
                 } catch (auctionError) {
                     console.error(' Auction creation error:', auctionError);
-                    const mappedAuctionError = mapPublishError(auctionError);
+                    const mappedAuctionError = await mapPublishError(auctionError, pendingArtwork?.auction_tx_hash || '');
                     console.log('Auction creation error shown to user:', mappedAuctionError.message);
-                    if (mappedAuctionError.code === 'AUCTION_CONFIRMATION_PENDING' && pendingArtwork?.auction_tx_hash) {
+                    // A submitted auction whose confirmation was lost is not a
+                    // failed auction. Resubmitting it is how one artwork ends up
+                    // with two auctions, so this keeps the submitted state and
+                    // says not to send it again.
+                    if (keepsPendingTransaction(mappedAuctionError.code) && pendingArtwork?.auction_tx_hash) {
                         pendingArtwork = savePendingArtwork({
                             ...pendingArtwork,
                             stage: 'auction_submitted',
@@ -1198,11 +1175,26 @@ let selectedFile = null;
 
             } catch (error) {
                 console.error('Publish failed:', error);
-                const mapped = mapPublishError(error);
+                const mapped = await mapPublishError(
+                    error,
+                    currentPublishStage === 'register' ? (pendingArtwork?.register_tx_hash || '') : ''
+                );
                 const errorMessage = `Publish failed: ${mapped.message}`;
 
                 if (pendingArtwork?.register_tx_hash && !pendingArtwork?.artwork_id) {
-                    removePendingArtwork(pendingArtwork.temp_id);
+                    if (keepsPendingTransaction(mapped.code)) {
+                        // The wallet broadcast this. Deleting the card is what
+                        // leaves somebody with no trace of a transaction that
+                        // may be mining right now.
+                        pendingArtwork = savePendingArtwork({
+                            ...pendingArtwork,
+                            stage: 'register_submitted',
+                            lifecycle_label: 'Finalizing...',
+                            lifecycle_message: mapped.message
+                        });
+                    } else {
+                        removePendingArtwork(pendingArtwork.temp_id);
+                    }
                 }
 
                 console.log('Publish error shown to user:', errorMessage);

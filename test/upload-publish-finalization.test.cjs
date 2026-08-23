@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { pathToFileURL } = require('node:url');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'entries', 'upload.js'), 'utf8');
 
@@ -128,18 +129,129 @@ test('bounded settlement ends with a non-destructive pending result', async () =
   assert.equal(clock, 30);
 });
 
+// The classifier owns what counts as positive final failure evidence. The
+// waiter takes it as an injected dependency so this suite drives the same rule
+// the publish flow does, rather than a second copy of it.
+async function loadFinality() {
+  const moduleUrl = pathToFileURL(
+    path.join(__dirname, '..', 'src', 'features', 'publish', 'publish-error.js')
+  ).href;
+  const { provesFinalFailure } = await import(moduleUrl);
+  return provesFinalFailure;
+}
+
+// A wallet rejection carrying the chain's own verdict: mined, and it failed.
+function minedFailure() {
+  return Object.assign(new Error('transaction execution reverted'), {
+    code: 'CALL_EXCEPTION',
+    action: 'sendTransaction',
+    data: null,
+    reason: null,
+    receipt: { status: 0, hash: '0xsubmitted' }
+  });
+}
+
+test('indexer proof still wins over a provider rejection that looks final', async () => {
+  // The race is the point: the wallet can give up on a transaction the chain
+  // accepted, and the projection is the authority. Surfacing provider failures
+  // must not cost that.
+  const { waitForAuctionConfirmation } = loadWaiter();
+  const isFinalFailure = await loadFinality();
+
+  const hash = await waitForAuctionConfirmation({
+    transactionPromise: Promise.reject(minedFailure()),
+    chainId: 84532,
+    artworkId: '7',
+    txHash: '0xsubmitted',
+    timeoutMs: 50,
+    pollIntervalMs: 10,
+    readProjection: async () => ({ artwork_id: '7', auction_id: '4' }),
+    now: () => 0,
+    sleep: async () => {},
+    isFinalFailure
+  });
+
+  assert.equal(hash, '0xsubmitted');
+});
+
+test('a proven receipt failure survives the deadline instead of becoming pending', async () => {
+  // Reproduced before this was fixed: the provider error was kept on
+  // pendingError.cause and never read, so a mined status-0 receipt was reported
+  // as AUCTION_CONFIRMATION_PENDING - a card telling somebody to wait for
+  // something that had already ended.
+  const { waitForAuctionConfirmation } = loadWaiter();
+  const isFinalFailure = await loadFinality();
+  let clock = 0;
+
+  await assert.rejects(
+    waitForAuctionConfirmation({
+      transactionPromise: Promise.reject(minedFailure()),
+      chainId: 84532,
+      artworkId: '7',
+      txHash: '0xsubmitted',
+      timeoutMs: 30,
+      pollIntervalMs: 10,
+      readProjection: async () => null,
+      now: () => clock,
+      sleep: async ms => { clock += ms; },
+      isFinalFailure
+    }),
+    error => error.code === 'CALL_EXCEPTION'
+      && error.receipt?.status === 0
+      && error.code !== 'AUCTION_CONFIRMATION_PENDING'
+  );
+  assert.equal(clock, 30, 'the indexer still got its full window first');
+});
+
+test('an ambiguous provider rejection stays pending after the deadline', async () => {
+  const { waitForAuctionConfirmation } = loadWaiter();
+  const isFinalFailure = await loadFinality();
+  let clock = 0;
+
+  await assert.rejects(
+    waitForAuctionConfirmation({
+      transactionPromise: Promise.reject(new Error('provider transport closed')),
+      chainId: 84532,
+      artworkId: '7',
+      txHash: '0xsubmitted',
+      timeoutMs: 30,
+      pollIntervalMs: 10,
+      readProjection: async () => null,
+      now: () => clock,
+      sleep: async ms => { clock += ms; },
+      isFinalFailure
+    }),
+    error => error.code === 'AUCTION_CONFIRMATION_PENDING'
+      && error.txHash === '0xsubmitted'
+      && error.cause?.message === 'provider transport closed'
+  );
+});
+
+test('the publish flow hands the waiter the shared finality rule', () => {
+  assert.match(source, /import \{ classifyPublishFailure, keepsPendingTransaction, provesFinalFailure \}/);
+  assert.match(source, /isFinalFailure: provesFinalFailure/);
+  // Absent, it must assume nothing is final: that is the only safe default for
+  // a transaction the wallet already broadcast.
+  assert.match(source, /isFinalFailure = \(\) => false/);
+});
+
 test('publish submits one auction transaction and never prompts a duplicate on timeout', () => {
   const uploadHandler = extractFunction('handleUpload');
   assert.equal((uploadHandler.match(/ArtSoulContracts\.createAuction\(/g) || []).length, 1);
   assert.match(uploadHandler, /Promise\.race\(\[/);
   assert.match(uploadHandler, /waitForAuctionConfirmation\(\{/);
-  assert.match(uploadHandler, /mappedAuctionError\.code === 'AUCTION_CONFIRMATION_PENDING'/);
+  // A-70, reopened: the branch that used to name AUCTION_CONFIRMATION_PENDING
+  // by hand now asks the shared policy, so a confirmation lost to an unhealthy
+  // endpoint is protected by the same guard rather than falling through to
+  // "auction failed - you can retry".
+  const guard = 'keepsPendingTransaction(mappedAuctionError.code)';
+  assert.ok(uploadHandler.includes(guard), 'the duplicate guard must consult the shared policy');
   assert.match(uploadHandler, /stage: 'auction_submitted'/);
   assert.match(uploadHandler, /Do not submit the auction again while it is finalizing/);
 
   const pendingBranch = uploadHandler.slice(
-    uploadHandler.indexOf("mappedAuctionError.code === 'AUCTION_CONFIRMATION_PENDING'"),
-    uploadHandler.indexOf('pendingArtwork = savePendingArtwork({', uploadHandler.indexOf("mappedAuctionError.code === 'AUCTION_CONFIRMATION_PENDING'") + 100)
+    uploadHandler.indexOf(guard),
+    uploadHandler.indexOf('pendingArtwork = savePendingArtwork({', uploadHandler.indexOf(guard) + 100)
   );
   assert.doesNotMatch(pendingBranch, /auction_failed|createAuction\(/);
 });

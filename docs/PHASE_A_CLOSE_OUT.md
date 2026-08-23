@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **57 done, 10 in progress, 7 planned** across A-01 to A-74.
+Phase A stands at **56 done, 11 in progress, 7 planned** across A-01 to A-74.
 
 ## The shape of what is left
 
@@ -69,6 +69,12 @@ Merged and measured, needing one confirmation each:
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
 - **A-72** quick loads showing no placeholder at all
 - **A-73** the balance in the account menu showing a number
+- **A-70** reopened 2026-08-23: the row was closed on a publish that succeeded
+  after the endpoint recovered, which is evidence the outage ended and not that
+  the classification is right. Its own criterion - a publish confirmed while one
+  endpoint is unhealthy - was never met, and the fix had begun calling reasonless
+  contract reverts a network outage. Corrected and awaiting that evidence, plus
+  one external-mobile publish on a real phone.
 
 ## What Phase A does not need
 
