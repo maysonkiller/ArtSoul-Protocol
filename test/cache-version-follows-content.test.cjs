@@ -20,7 +20,7 @@ const fs = require('node:fs');
 const RUNTIME = {
   'avatar-dropdown.js': { version: 53, sha256: 'ee3fb1b622c14938' },
   'header-prepaint.js': { version: 4, sha256: '8b23a80e58fb9ad2' },
-  'data-prefetch.js': { version: 1, sha256: 'f4d04f2111f93a87' },
+  'data-prefetch.js': { version: 2, sha256: '677f46fc141db5a9' },
   'base-network.js': { version: 1, sha256: '16a29bcce9c59c07' },
   'storage-image.js': { version: 2, sha256: '07216bbe6946e7e5' }
 };

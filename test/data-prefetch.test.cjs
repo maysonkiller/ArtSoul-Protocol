@@ -74,6 +74,22 @@ test('the homepage asks for the feed it actually renders', () => {
   assert.deepEqual(calls.map((c) => c.url), ['/api/public/config', '/api/public/artworks?limit=100']);
 });
 
+test('a clean artwork route starts the exact projection request from the head', () => {
+  const { calls } = run('/artwork/v41%3A84532%3A31', '');
+  assert.deepEqual(calls.map((call) => call.url), [
+    '/api/public/config',
+    '/api/public/artworks?id=v41%3A84532%3A31&limit=1'
+  ]);
+});
+
+test('the legacy artwork query starts the same exact projection request', () => {
+  const { calls } = run('/artwork.html', '?id=v41%3A84532%3A31');
+  assert.deepEqual(calls.map((call) => call.url), [
+    '/api/public/config',
+    '/api/public/artworks?id=v41%3A84532%3A31&limit=1'
+  ]);
+});
+
 test('backendRead consumes the head start when there is one', () => {
   assert.match(client, /const started = window\.ArtSoulPrefetch\?\.take\?\.\(path\);/);
   assert.match(client, /const response = started \? await started : await fetch\(path, \{/);
@@ -95,7 +111,7 @@ test('every shared-header page loads it, and the build ships it', () => {
     // this is not a first-paint concern. It still executes within a few hundred
     // milliseconds, long before the modules that would otherwise issue this
     // request at 3.3 seconds.
-    assert.match(html, /<script src="\/data-prefetch\.js\?v=1" async><\/script>/, `${page} must load the prefetch asynchronously`);
+    assert.match(html, /<script src="\/data-prefetch\.js\?v=2" async><\/script>/, `${page} must load the prefetch asynchronously`);
     assert.ok(
       html.indexOf('data-prefetch.js') > html.indexOf('header-prepaint.js'),
       `${page}: the first paint comes before the data`

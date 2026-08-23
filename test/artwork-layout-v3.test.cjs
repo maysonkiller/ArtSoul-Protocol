@@ -157,3 +157,27 @@ test('artwork has a visible pre-module skeleton and a bounded module failure sta
     assert.match(source, /artworkAppRoot\.dataset\.artworkEntryMounted = 'true';/);
     assert.match(source, /new CustomEvent\('artsoul:artwork-entry-mounted'\)/);
 });
+
+test('React keeps the already-visible artwork skeleton visible when it mounts', () => {
+    assert.match(source, /function ArtworkPage\(\{ initialSkeletonVisible = false \}\)/);
+    assert.match(source, /<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
+    assert.match(source, /artworkAppRoot\.querySelector\('\[data-artwork-static-skeleton\]'\)/);
+    assert.match(source, /<ArtworkPage initialSkeletonVisible=\{initialSkeletonVisible\} \/>/);
+
+    const skeletons = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
+    assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false \}\)/);
+    assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/);
+});
+
+test('supplementary artwork reads do not hold the primary projection behind loading', () => {
+    const primaryReady = source.indexOf('setLoading(false);', source.indexOf('async function loadArtwork()'));
+    const profilesStart = source.indexOf('const profilesPromise =', source.indexOf('async function loadArtwork()'));
+    const supplementaryWait = source.indexOf('await Promise.allSettled([', profilesStart);
+
+    assert.ok(primaryReady > -1 && primaryReady < profilesStart,
+        'the page must paint after its canonical projection, before profile hydration starts');
+    assert.ok(profilesStart < supplementaryWait,
+        'supplementary reads must continue after the primary render is released');
+    assert.match(source, /bidderProfilesPromise = applyLiveAuctionProjection\(data\);/);
+    assert.match(source, /await Promise\.allSettled\(\[\s*bidderProfilesPromise,/);
+});

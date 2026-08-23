@@ -28,9 +28,9 @@ export function CardGridSkeleton({ count = 12, className = 'grid grid-cols-2 sm:
     );
 }
 
-export function ArtworkPageSkeleton() {
+export function ArtworkPageSkeleton({ immediate = false }) {
     return (
-        <main className={`artwork-page-shell site-page-container ${PLACEHOLDER}`} role="status" aria-label="Loading artwork" aria-busy="true">
+        <main className={`artwork-page-shell site-page-container ${immediate ? '' : PLACEHOLDER}`.trim()} role="status" aria-label="Loading artwork" aria-busy="true">
             <div className="artwork-page-layout">
                 <div className="artwork-page-left">
                     <section className="artwork-detail-stage artwork-mobile-media">
