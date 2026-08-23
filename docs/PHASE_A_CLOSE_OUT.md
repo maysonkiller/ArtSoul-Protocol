@@ -1,13 +1,13 @@
 # Phase A Close-Out
 
-Recorded: 2026-08-22
+Recorded: 2026-08-23
 
 One page answering one question: what is left before Phase A can close, and who
 can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **57 done, 10 in progress, 7 planned** across A-01 to A-74.
+Phase A stands at **56 done, 11 in progress, 7 planned** across A-01 to A-74.
 
 ## The shape of what is left
 
@@ -54,6 +54,7 @@ Ordered by what the founder can feel, not by row number.
 | --- | --- | --- |
 | **A-64** | Take the wallet SDK off the first-load critical path | 504 KB across 129 files, downloaded by every visitor whether or not they ever connect. It is the only remaining change that shortens the wait itself, and it is the cause behind both the placeholder people still see and the font arriving late. Needs one connected run - connect, sign in, switch network, publish - before it can be merged on anything but test evidence |
 | **A-47** | Reduce head asset weight | Largely subsumed by A-64; reassess after it |
+| **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-48** | The single full-document repaint on browser Back | Diagnosis not started |
 | **A-53** | The identity settle gap between header and profile | Never reproduced on a device |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |

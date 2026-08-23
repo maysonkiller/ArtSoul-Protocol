@@ -34,18 +34,20 @@ test('the visible result and its heading are committed together', () => {
   assert.match(commit, /fetchProfileArtworks\(activeProfile, requestedGallery\)/);
 });
 
-test('a placeholder stands in until the list belongs to the tab on screen', () => {
+test('an uncached tab waits without drawing a grid of transient cards', () => {
   // A-58 kept the previous tab's result on screen while the next one loaded, so
   // the heading followed the committed tab and lagged behind the highlight. On a
   // phone that read as the header naming one gallery while the page showed
   // another - reported from production with a screenshot of Auctions highlighted
   // above a Created Artworks heading.
   //
-  // The tab, the heading and the list now always name the same gallery. A
-  // placeholder covers the gap, and with the per-visit cache that gap only
-  // exists the first time a tab is opened.
-  assert.match(profileEntry, /\{displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? \(/);
-  assert.match(profileEntry, /<CardGridSkeleton count=\{6\} className="contents" \/>/);
+  // The tab and heading still switch together, but the first visit to a tab no
+  // longer draws six cards that disappear a moment later. The compact status
+  // beside the heading is enough feedback and remains visible under the global
+  // mobile no-motion policy.
+  assert.match(profileEntry, /\{displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
+  assert.doesNotMatch(profileEntry, /CardGridSkeleton/);
+  assert.match(profileEntry, /profile-gallery-loading-note text-sm/);
   assert.match(profileEntry, /const \[hasSettledArtworks, setHasSettledArtworks\] = useState\(false\);/);
 });
 
