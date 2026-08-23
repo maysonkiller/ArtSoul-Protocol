@@ -21,6 +21,9 @@ const metadata = encodeURIComponent(JSON.stringify({
 let activeRole = 'admin';
 let rpcCalls = [];
 let visibilityReadCalls = 0;
+let holdExactArtworkSeven = false;
+let releaseExactArtworkSeven = null;
+let exactLookupCalls = [];
 
 const artworks = [1, 2, 3, 4, 5, 6, 7].map(id => ({
   chain_id: 84532,
@@ -110,6 +113,15 @@ global.fetch = async (url, options = {}) => {
   const pathname = restPath.split('/')[0];
   let body;
 
+  if (holdExactArtworkSeven) {
+    exactLookupCalls.push(pathname);
+    if (pathname === 'v41_artworks' && parsed.searchParams.get('artwork_id') === 'eq.7') {
+      await new Promise(resolve => {
+        releaseExactArtworkSeven = resolve;
+      });
+    }
+  }
+
   if (restPath === 'rpc/set_artwork_moderation_visibility') {
     const payload = JSON.parse(options.body || '{}');
     rpcCalls.push(payload);
@@ -197,6 +209,28 @@ test('creator profile includes inactive lifecycle rows but excludes moderator-hi
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.body.data.map(row => row.artwork_id), ['1', '2', '3', '5', '6', '7']);
   assert.deepEqual(response.body.suppressed_artwork_ids, ['v41:84532:4']);
+});
+
+test('an exact artwork starts independent projection reads before its artwork row returns', async () => {
+  holdExactArtworkSeven = true;
+  releaseExactArtworkSeven = null;
+  exactLookupCalls = [];
+
+  const pending = callPublic({ id: 'v41:84532:7' });
+  for (let index = 0; index < 5; index += 1) await Promise.resolve();
+
+  const callsBeforeArtwork = [...exactLookupCalls];
+  const release = releaseExactArtworkSeven;
+  holdExactArtworkSeven = false;
+  release?.();
+  const response = await pending;
+
+  assert.equal(typeof release, 'function', 'the artwork read must have reached the held request');
+  assert.ok(callsBeforeArtwork.includes('v41_auctions'), 'auction projection must start in parallel');
+  assert.ok(callsBeforeArtwork.includes('v41_bids'), 'bid projection must start in parallel');
+  assert.ok(callsBeforeArtwork.includes('v41_settlements'), 'settlement projection must start in parallel');
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body.data.map(row => row.artwork_id), ['7']);
 });
 
 test('hidden direct artwork is unavailable publicly but visible to authorized staff', async () => {

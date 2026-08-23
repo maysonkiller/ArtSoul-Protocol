@@ -19,7 +19,7 @@ test('that wait is named, not filled with a placeholder', () => {
   assert.match(artwork, /if \(\(loading && justPublished\) \|\| error\?\.code === 'V41_ARTWORK_NOT_INDEXED'\) \{/);
   // It is decided before the skeleton branch, which would otherwise own it.
   assert.ok(
-    artwork.indexOf('loading && justPublished') < artwork.indexOf('<ArtworkPageSkeleton />'),
+    artwork.indexOf('loading && justPublished') < artwork.indexOf('<ArtworkPageSkeleton immediate={initialSkeletonVisible} />'),
     'the branded wait must be chosen before the skeleton'
   );
   // One renderer for both waits, not two that can drift apart.
@@ -29,7 +29,11 @@ test('that wait is named, not filled with a placeholder', () => {
 
 test('an ordinary visit still gets the skeleton', () => {
   // Nothing is being waited for that we can name, so nothing is claimed.
-  assert.match(artwork, /if \(loading\) \{[\s\S]{0,120}<ArtworkPageSkeleton \/>/);
+  const loadingBranch = artwork.slice(
+    artwork.indexOf('if (loading) {'),
+    artwork.indexOf('if (error) {')
+  );
+  assert.match(loadingBranch, /<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
 });
 
 test('the branded wait keeps its own styling and its accessible text', () => {
@@ -43,7 +47,7 @@ test('justPublished is declared inside the component that uses it', () => {
   // It was first declared in a module-level helper, so every artwork page threw
   // "justPublished is not defined" and rendered nothing at all. The suite stayed
   // green because these assertions read source text, which cannot see scope.
-  const componentStart = artwork.indexOf('function ArtworkPage() {');
+  const componentStart = artwork.indexOf('function ArtworkPage({ initialSkeletonVisible = false }) {');
   const declaration = artwork.indexOf('const justPublished =');
   const usage = artwork.indexOf('loading && justPublished');
   assert.ok(componentStart > -1, 'the component must be discoverable');
@@ -54,7 +58,7 @@ test('justPublished is declared inside the component that uses it', () => {
 test('the render branches read only values the component declares', () => {
   // The same shape of mistake, checked across the values those branches depend
   // on. Cheap, and it is the check that was missing.
-  const component = artwork.slice(artwork.indexOf('function ArtworkPage() {'));
+  const component = artwork.slice(artwork.indexOf('function ArtworkPage({ initialSkeletonVisible = false }) {'));
   const declarations = {
     justPublished: /const justPublished =/,
     artworkId: /const artworkId = window\.ArtSoulArtworkUrl\.currentArtworkId\(\)/,

@@ -15,10 +15,14 @@ test('a load that finishes quickly shows no placeholder at all', () => {
   assert.match(styles, /@keyframes artsoulPlaceholderReveal \{\s*\n\s*to \{ opacity: 1; \}/);
 });
 
-test('every placeholder root is held, not just one of them', () => {
+test('new placeholder roots are held while an already-visible artwork skeleton stays visible', () => {
   const roots = [...skeletons.matchAll(/role="status" aria-label="Loading/g)];
   assert.equal(roots.length, 3, 'card grid, artwork page, profile page');
-  assert.equal((skeletons.match(/\$\{PLACEHOLDER\}/g) || []).length, 3);
+  assert.equal((skeletons.match(/\$\{PLACEHOLDER\}/g) || []).length, 2,
+    'card-grid and profile placeholders always wait before appearing');
+  assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false \}\)/);
+  assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/,
+    'React must not hide its replacement when the static artwork skeleton is already visible');
   assert.match(skeletons, /const PLACEHOLDER = 'artsoul-placeholder';/);
 });
 

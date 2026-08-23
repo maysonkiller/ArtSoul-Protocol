@@ -1,4 +1,4 @@
-import { React, createRoot } from './react-runtime.js';
+import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
 
 // A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
@@ -287,7 +287,7 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
-        function ArtworkPage() {
+        function ArtworkPage({ initialSkeletonVisible = false }) {
             const [theme, setTheme] = useState('classic');
             const [artwork, setArtwork] = useState(null);
             const [auction, setAuction] = useState(null);
@@ -1772,8 +1772,13 @@ const { useState, useEffect, useRef } = React;
                         ''
                     )));
                     loadModerationVisibility(data);
+                    let bidderProfilesPromise = Promise.resolve();
                     if (isV41CompositeId) {
-                        await applyLiveAuctionProjection(data);
+                        // The projection itself is applied synchronously before
+                        // bidder profile hydration begins. Profile names are
+                        // supplementary and must not hold the artwork behind the
+                        // loading screen.
+                        bidderProfilesPromise = applyLiveAuctionProjection(data);
                     } else {
                         setBidActivity([]);
                     }
@@ -1791,6 +1796,12 @@ const { useState, useEffect, useRef } = React;
                     const pageUrl = window.location.href;
                     document.getElementById('og-url').setAttribute('content', pageUrl);
                     document.title = data.title + ' - ArtSoul';
+
+                    // The canonical artwork projection is enough to paint the
+                    // page. Profiles, votes, provenance and wallet-backed
+                    // contract details continue below and fill their own
+                    // sections when ready instead of extending a black screen.
+                    setLoading(false);
 
                     const profileAddresses = [...new Set([
                         data.creator_id,
@@ -1911,6 +1922,7 @@ const { useState, useEffect, useRef } = React;
                     })();
 
                     await Promise.allSettled([
+                        bidderProfilesPromise,
                         profilesPromise,
                         votesPromise,
                         interactionPromise,
@@ -1918,7 +1930,6 @@ const { useState, useEffect, useRef } = React;
                         contractPromise
                     ]);
 
-                    setLoading(false);
                     return true;
                 } catch (error) {
                     console.error('Error loading artwork:', error);
@@ -2668,8 +2679,11 @@ const { useState, useEffect, useRef } = React;
 
             if (loading) {
                 return (
-                    <div className="artwork-page-root">
-                        <ArtworkPageSkeleton />
+                    <div
+                        className="artwork-page-root"
+                        data-artwork-static-skeleton={initialSkeletonVisible ? '' : undefined}
+                    >
+                        <ArtworkPageSkeleton immediate={initialSkeletonVisible} />
                     </div>
                 );
             }
@@ -3951,7 +3965,27 @@ const { useState, useEffect, useRef } = React;
 
         const artworkAppRoot = document.getElementById('app');
         if (artworkAppRoot) {
+            const initialSkeletonVisible = Boolean(
+                artworkAppRoot.querySelector('[data-artwork-static-skeleton]')
+            );
             artworkAppRoot.dataset.artworkEntryMounted = 'true';
             window.dispatchEvent(new CustomEvent('artsoul:artwork-entry-mounted'));
-            createRoot(artworkAppRoot).render(<ArtworkPage />);
+            const artworkPage = <ArtworkPage initialSkeletonVisible={initialSkeletonVisible} />;
+            if (initialSkeletonVisible) {
+                // The document already contains the exact loading tree. Hydrate
+                // it in place so iOS never has to repaint an empty application
+                // root between the static frame and React ownership. The static
+                // HTML is indented for maintenance, while JSX has no whitespace
+                // text nodes between elements; remove only those inert nodes so
+                // React can adopt the element tree instead of rejecting it.
+                const walker = document.createTreeWalker(artworkAppRoot, NodeFilter.SHOW_TEXT);
+                const whitespaceNodes = [];
+                while (walker.nextNode()) {
+                    if (!walker.currentNode.nodeValue?.trim()) whitespaceNodes.push(walker.currentNode);
+                }
+                whitespaceNodes.forEach(node => node.remove());
+                hydrateRoot(artworkAppRoot, artworkPage);
+            } else {
+                createRoot(artworkAppRoot).render(artworkPage);
+            }
         }

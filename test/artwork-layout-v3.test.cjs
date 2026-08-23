@@ -157,3 +157,35 @@ test('artwork has a visible pre-module skeleton and a bounded module failure sta
     assert.match(source, /artworkAppRoot\.dataset\.artworkEntryMounted = 'true';/);
     assert.match(source, /new CustomEvent\('artsoul:artwork-entry-mounted'\)/);
 });
+
+test('React keeps the already-visible artwork skeleton visible when it mounts', () => {
+    assert.match(source, /function ArtworkPage\(\{ initialSkeletonVisible = false \}\)/);
+    assert.match(source, /<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
+    assert.match(source, /artworkAppRoot\.querySelector\('\[data-artwork-static-skeleton\]'\)/);
+    assert.match(source, /data-artwork-static-skeleton=\{initialSkeletonVisible \? '' : undefined\}/);
+    assert.match(source, /document\.createTreeWalker\(artworkAppRoot, NodeFilter\.SHOW_TEXT\)/);
+    assert.match(source, /if \(!walker\.currentNode\.nodeValue\?\.trim\(\)\) whitespaceNodes\.push/);
+    assert.match(source, /hydrateRoot\(artworkAppRoot, artworkPage\)/);
+    assert.match(source, /createRoot\(artworkAppRoot\)\.render\(artworkPage\)/);
+
+    const runtime = fs.readFileSync('src/entries/react-runtime.js', 'utf8');
+    assert.match(runtime, /import \{ createRoot, hydrateRoot \} from 'react-dom\/client';/);
+    assert.match(runtime, /export \{ React, createRoot, hydrateRoot \};/);
+
+    const skeletons = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
+    assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false \}\)/);
+    assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/);
+});
+
+test('supplementary artwork reads do not hold the primary projection behind loading', () => {
+    const primaryReady = source.indexOf('setLoading(false);', source.indexOf('async function loadArtwork()'));
+    const profilesStart = source.indexOf('const profilesPromise =', source.indexOf('async function loadArtwork()'));
+    const supplementaryWait = source.indexOf('await Promise.allSettled([', profilesStart);
+
+    assert.ok(primaryReady > -1 && primaryReady < profilesStart,
+        'the page must paint after its canonical projection, before profile hydration starts');
+    assert.ok(profilesStart < supplementaryWait,
+        'supplementary reads must continue after the primary render is released');
+    assert.match(source, /bidderProfilesPromise = applyLiveAuctionProjection\(data\);/);
+    assert.match(source, /await Promise\.allSettled\(\[\s*bidderProfilesPromise,/);
+});

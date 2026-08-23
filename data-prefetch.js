@@ -78,6 +78,24 @@
         return WALLET.test(own) ? own : '';
     }
 
+    function artworkId(path) {
+        var cleanPrefix = '/artwork/';
+        if (path.indexOf(cleanPrefix) === 0) {
+            try {
+                return decodeURIComponent(path.slice(cleanPrefix.length));
+            } catch (error) {
+                return '';
+            }
+        }
+
+        if (path !== '/artwork') return '';
+        try {
+            return new URLSearchParams(window.location.search).get('id') || '';
+        } catch (error) {
+            return '';
+        }
+    }
+
     var path = window.location.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
 
     // Every page needs the public config before it can talk to storage.
@@ -88,6 +106,12 @@
         // Mirrors the default gallery in profile.jsx: created works, limit 200,
         // in that parameter order, because the key is the request string.
         if (wallet) start('/api/public/artworks?creator=' + wallet + '&limit=200');
+    } else if (path === '/artwork' || path.indexOf('/artwork/') === 0) {
+        var id = artworkId(path);
+        // Mirrors getPublicProjectionArtwork(): id first, then limit. Starting
+        // this from the head overlaps the exact-artwork server cold path with
+        // the page bundle instead of waiting for the bundle before dialing it.
+        if (id) start('/api/public/artworks?id=' + encodeURIComponent(id) + '&limit=1');
     } else if (path === '/') {
         start('/api/public/artworks?limit=100');
     }

@@ -505,7 +505,7 @@ function bidsByAuction(bids = []) {
   return map;
 }
 
-async function toPublicCard(artwork, maps) {
+async function toPublicCard(artwork, maps, preloadedMetadata) {
   const chain = chainId(artwork.chain_id);
   const artworkId = protocolId(artwork.artwork_id);
   const auction = maps.auctions.get(keyFor(chain, artworkId));
@@ -524,7 +524,9 @@ async function toPublicCard(artwork, maps) {
     watching: 0
   };
   const moderation = maps.moderation.get(keyFor(chain, artworkId));
-  const metadata = await loadMetadataCached(artwork.metadata_uri);
+  const metadata = preloadedMetadata === undefined
+    ? await loadMetadataCached(artwork.metadata_uri)
+    : preloadedMetadata;
   const mediaType = getMediaType(metadata);
   const rawMediaUrl = getMediaUrl(metadata, mediaType);
   const mediaUrl = toHttpUri(rawMediaUrl) || rawMediaUrl;
@@ -666,9 +668,17 @@ function parseDirectLookup(query = {}) {
   return null;
 }
 
-async function projectTableData(tableData, warnings, publicMetrics = null) {
+async function projectTableData(tableData, warnings, publicMetrics = null, preload = {}) {
+  // Creator names and immutable metadata are independent reads. Starting them
+  // together removes one serial network round trip from a cold projection.
+  const [creatorNames, metadataRows] = await Promise.all([
+    preload.creatorNames ?? creatorNamesByAddress(tableData.v41_artworks, warnings),
+    preload.metadataRows ?? Promise.all(
+      tableData.v41_artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
+    )
+  ]);
   const maps = {
-    creatorNames: await creatorNamesByAddress(tableData.v41_artworks, warnings),
+    creatorNames,
     auctions: latestAuctionByArtwork(tableData.v41_auctions),
     settlements: latestCompletedSettlementByArtwork(tableData.v41_settlements),
     resales: resaleByToken(tableData.v41_resale_listings),
@@ -679,7 +689,9 @@ async function projectTableData(tableData, warnings, publicMetrics = null) {
     bids: bidsByAuction(tableData.v41_bids)
   };
 
-  const cards = await Promise.all(tableData.v41_artworks.map(artwork => toPublicCard(artwork, maps)));
+  const cards = await Promise.all(
+    tableData.v41_artworks.map((artwork, index) => toPublicCard(artwork, maps, metadataRows[index]))
+  );
   const diagnostics = TABLES.reduce((acc, table) => {
     acc[table] = {
       rowsByChain: countByChain(tableData[table] || []),
@@ -695,14 +707,76 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
   const warnings = [];
   const chainFilter = `eq.${chain}`;
   const artworkFilter = `eq.${artworkId}`;
-  const v41Artworks = await queryTable(
+  const v41ArtworksPromise = queryTable(
     'v41_artworks',
     'select=chain_id,artwork_id,creator,metadata_uri,minted,token_id,canonical_floor,active_auction_id,block_number,transaction_hash,indexed_at,last_updated_at' +
       `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
     warnings
   );
+  const v41AuctionsPromise = queryTable(
+      'v41_auctions',
+      'select=chain_id,auction_id,artwork_id,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id' +
+        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=last_updated_block.desc&limit=100`,
+      warnings
+    );
+  const v41BidsPromise = queryTable(
+      'v41_bids',
+      'select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at' +
+        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
+      warnings
+    );
+  const v41SettlementsPromise = queryTable(
+      'v41_settlements',
+      'select=chain_id,artwork_id,settlement_status,winner,token_id,block_number,log_index,indexed_at' +
+        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
+      warnings
+    );
+  const v41FloorHistoryPromise = queryTable(
+      'v41_floor_history',
+      'select=chain_id,artwork_id,floor_price,block_number' +
+        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc&limit=1`,
+      warnings
+    );
+  const artworkSocialSignalsPromise = queryTable(
+      'artwork_social_signals',
+      'select=chain_id,artwork_id,wallet_address,signal_type' +
+        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=5000`,
+      warnings
+    );
+  const artworkModerationVisibilityPromise = queryTable(
+      'artwork_moderation_visibility',
+      `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
+      warnings
+    );
 
+  // Only resale tables depend on token_id. Everything else above begins with
+  // the request instead of waiting for the artwork row to return first.
+  const v41Artworks = await v41ArtworksPromise;
   const tokenId = protocolId(v41Artworks[0]?.token_id);
+  const preload = {
+    creatorNames: creatorNamesByAddress(v41Artworks, warnings),
+    metadataRows: Promise.all(
+      v41Artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
+    )
+  };
+  const v41ResaleListingsPromise =
+    tokenId
+      ? queryTable(
+          'v41_resale_listings',
+          `select=chain_id,token_id,active,price,seller&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
+          warnings
+        )
+      : Promise.resolve([]);
+  const v41ResaleHistoryPromise =
+    tokenId
+      ? queryTable(
+          'v41_resale_history',
+          'select=chain_id,token_id,buyer,seller,block_number,log_index,indexed_at' +
+            `&chain_id=${chainFilter}&token_id=eq.${tokenId}&order=block_number.desc,log_index.desc&limit=1`,
+          warnings
+        )
+      : Promise.resolve([]);
+
   const [
     v41Auctions,
     v41Bids,
@@ -713,56 +787,14 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
     artworkSocialSignals,
     artworkModerationVisibility
   ] = await Promise.all([
-    queryTable(
-      'v41_auctions',
-      'select=chain_id,auction_id,artwork_id,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=last_updated_block.desc&limit=100`,
-      warnings
-    ),
-    queryTable(
-      'v41_bids',
-      'select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
-      warnings
-    ),
-    queryTable(
-      'v41_settlements',
-      'select=chain_id,artwork_id,settlement_status,winner,token_id,block_number,log_index,indexed_at' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
-      warnings
-    ),
-    tokenId
-      ? queryTable(
-          'v41_resale_listings',
-          `select=chain_id,token_id,active,price,seller&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
-          warnings
-        )
-      : [],
-    tokenId
-      ? queryTable(
-          'v41_resale_history',
-          'select=chain_id,token_id,buyer,seller,block_number,log_index,indexed_at' +
-            `&chain_id=${chainFilter}&token_id=eq.${tokenId}&order=block_number.desc,log_index.desc&limit=1`,
-          warnings
-        )
-      : [],
-    queryTable(
-      'v41_floor_history',
-      'select=chain_id,artwork_id,floor_price,block_number' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc&limit=1`,
-      warnings
-    ),
-    queryTable(
-      'artwork_social_signals',
-      'select=chain_id,artwork_id,wallet_address,signal_type' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=5000`,
-      warnings
-    ),
-    queryTable(
-      'artwork_moderation_visibility',
-      `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
-      warnings
-    )
+    v41AuctionsPromise,
+    v41BidsPromise,
+    v41SettlementsPromise,
+    v41ResaleListingsPromise,
+    v41ResaleHistoryPromise,
+    v41FloorHistoryPromise,
+    artworkSocialSignalsPromise,
+    artworkModerationVisibilityPromise
   ]);
 
   return projectTableData({
@@ -776,7 +808,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
     v41_trust_signals: [],
     artwork_social_signals: artworkSocialSignals,
     artwork_moderation_visibility: artworkModerationVisibility
-  }, warnings, null);
+  }, warnings, null, preload);
 }
 
 async function buildProjectionSnapshot() {
