@@ -162,7 +162,15 @@ test('React keeps the already-visible artwork skeleton visible when it mounts', 
     assert.match(source, /function ArtworkPage\(\{ initialSkeletonVisible = false \}\)/);
     assert.match(source, /<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
     assert.match(source, /artworkAppRoot\.querySelector\('\[data-artwork-static-skeleton\]'\)/);
-    assert.match(source, /<ArtworkPage initialSkeletonVisible=\{initialSkeletonVisible\} \/>/);
+    assert.match(source, /data-artwork-static-skeleton=\{initialSkeletonVisible \? '' : undefined\}/);
+    assert.match(source, /document\.createTreeWalker\(artworkAppRoot, NodeFilter\.SHOW_TEXT\)/);
+    assert.match(source, /if \(!walker\.currentNode\.nodeValue\?\.trim\(\)\) whitespaceNodes\.push/);
+    assert.match(source, /hydrateRoot\(artworkAppRoot, artworkPage\)/);
+    assert.match(source, /createRoot\(artworkAppRoot\)\.render\(artworkPage\)/);
+
+    const runtime = fs.readFileSync('src/entries/react-runtime.js', 'utf8');
+    assert.match(runtime, /import \{ createRoot, hydrateRoot \} from 'react-dom\/client';/);
+    assert.match(runtime, /export \{ React, createRoot, hydrateRoot \};/);
 
     const skeletons = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
     assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false \}\)/);

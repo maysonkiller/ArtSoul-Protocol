@@ -1,4 +1,4 @@
-import { React, createRoot } from './react-runtime.js';
+import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
 
 // A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
@@ -2679,7 +2679,10 @@ const { useState, useEffect, useRef } = React;
 
             if (loading) {
                 return (
-                    <div className="artwork-page-root">
+                    <div
+                        className="artwork-page-root"
+                        data-artwork-static-skeleton={initialSkeletonVisible ? '' : undefined}
+                    >
                         <ArtworkPageSkeleton immediate={initialSkeletonVisible} />
                     </div>
                 );
@@ -3967,7 +3970,22 @@ const { useState, useEffect, useRef } = React;
             );
             artworkAppRoot.dataset.artworkEntryMounted = 'true';
             window.dispatchEvent(new CustomEvent('artsoul:artwork-entry-mounted'));
-            createRoot(artworkAppRoot).render(
-                <ArtworkPage initialSkeletonVisible={initialSkeletonVisible} />
-            );
+            const artworkPage = <ArtworkPage initialSkeletonVisible={initialSkeletonVisible} />;
+            if (initialSkeletonVisible) {
+                // The document already contains the exact loading tree. Hydrate
+                // it in place so iOS never has to repaint an empty application
+                // root between the static frame and React ownership. The static
+                // HTML is indented for maintenance, while JSX has no whitespace
+                // text nodes between elements; remove only those inert nodes so
+                // React can adopt the element tree instead of rejecting it.
+                const walker = document.createTreeWalker(artworkAppRoot, NodeFilter.SHOW_TEXT);
+                const whitespaceNodes = [];
+                while (walker.nextNode()) {
+                    if (!walker.currentNode.nodeValue?.trim()) whitespaceNodes.push(walker.currentNode);
+                }
+                whitespaceNodes.forEach(node => node.remove());
+                hydrateRoot(artworkAppRoot, artworkPage);
+            } else {
+                createRoot(artworkAppRoot).render(artworkPage);
+            }
         }

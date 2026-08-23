@@ -29,7 +29,11 @@ test('that wait is named, not filled with a placeholder', () => {
 
 test('an ordinary visit still gets the skeleton', () => {
   // Nothing is being waited for that we can name, so nothing is claimed.
-  assert.match(artwork, /if \(loading\) \{[\s\S]{0,180}<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
+  const loadingBranch = artwork.slice(
+    artwork.indexOf('if (loading) {'),
+    artwork.indexOf('if (error) {')
+  );
+  assert.match(loadingBranch, /<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
 });
 
 test('the branded wait keeps its own styling and its accessible text', () => {
