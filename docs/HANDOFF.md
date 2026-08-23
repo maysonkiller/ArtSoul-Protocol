@@ -168,7 +168,7 @@ These eight rows need no founder decision and no new spend:
 | Row | Work | First step |
 | --- | --- | --- |
 | A-47 | Reduce head asset weight | Split `avatar-dropdown.js` and attack the exact-artwork cold path. Lazy-loading `appkit-init.js` was investigated on 2026-08-11 and **rejected**: it is the sole writer of `window.artsoulWalletStateSettled`. |
-| A-58 | Remove first-visit profile-tab card flashes | Draw no synthetic card grid for an uncached tab; keep the selected tab and heading aligned and delay the compact loading status. |
+| A-58 | Remove first-visit profile-tab card flashes | Draw no synthetic card grid for an uncached tab; keep the selected tab and heading aligned and retain only the compact loading status. |
 | A-48 | Full-document repaint on browser Back | PR #203 fixes the measured `NetworkExceedsBufferLimit` cause by deferring offscreen card images; close only after production desktop and iOS/Android Back acceptance. |
 | A-53 | Header/profile settle gap | Measure which wallet event gates each surface before changing either lifecycle. Preserve A-03, A-05 and A-45 acceptance. |
 | A-54 | Cross-page perceived load | Reproduce on a cold profile and identify the resource that gates interactivity. Do not assume the API is responsible. |

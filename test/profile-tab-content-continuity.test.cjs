@@ -43,11 +43,11 @@ test('an uncached tab waits without drawing a grid of transient cards', () => {
   //
   // The tab and heading still switch together, but the first visit to a tab no
   // longer draws six cards that disappear a moment later. The compact status
-  // beside the heading is enough feedback and is delayed by the shared
-  // placeholder rule so a quick response produces no visual flash.
+  // beside the heading is enough feedback and remains visible under the global
+  // mobile no-motion policy.
   assert.match(profileEntry, /\{displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
   assert.doesNotMatch(profileEntry, /CardGridSkeleton/);
-  assert.match(profileEntry, /profile-gallery-loading-note artsoul-placeholder/);
+  assert.match(profileEntry, /profile-gallery-loading-note text-sm/);
   assert.match(profileEntry, /const \[hasSettledArtworks, setHasSettledArtworks\] = useState\(false\);/);
 });
 

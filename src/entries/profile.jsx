@@ -1718,7 +1718,7 @@ const { useState, useEffect, useRef } = React;
                                 </h3>
                                 {artworksLoading && hasSettledArtworks ? (
                                     <span
-                                        className={`profile-gallery-loading-note artsoul-placeholder text-sm ${
+                                        className={`profile-gallery-loading-note text-sm ${
                                             isClassic ? 'text-gray-400' : 'text-purple-300'
                                         }`}
                                         role="status"

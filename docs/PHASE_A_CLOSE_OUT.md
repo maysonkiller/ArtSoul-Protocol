@@ -54,7 +54,7 @@ Ordered by what the founder can feel, not by row number.
 | --- | --- | --- |
 | **A-64** | Take the wallet SDK off the first-load critical path | 504 KB across 129 files, downloaded by every visitor whether or not they ever connect. It is the only remaining change that shortens the wait itself, and it is the cause behind both the placeholder people still see and the font arriving late. Needs one connected run - connect, sign in, switch network, publish - before it can be merged on anything but test evidence |
 | **A-47** | Reduce head asset weight | Largely subsumed by A-64; reassess after it |
-| **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's delayed opacity. The repair keeps the panel mounted and uses only a compact delayed status |
+| **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-48** | The single full-document repaint on browser Back | Diagnosis not started |
 | **A-53** | The identity settle gap between header and profile | Never reproduced on a device |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
