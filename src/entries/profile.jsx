@@ -1,6 +1,6 @@
 import { React, createRoot } from './react-runtime.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
-import { CardGridSkeleton, ProfilePageSkeleton } from './loading-skeletons.jsx';
+import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 
@@ -1718,7 +1718,7 @@ const { useState, useEffect, useRef } = React;
                                 </h3>
                                 {artworksLoading && hasSettledArtworks ? (
                                     <span
-                                        className={`profile-gallery-loading-note text-sm ${
+                                        className={`profile-gallery-loading-note artsoul-placeholder text-sm ${
                                             isClassic ? 'text-gray-400' : 'text-purple-300'
                                         }`}
                                         role="status"
@@ -1735,13 +1735,7 @@ const { useState, useEffect, useRef } = React;
                             </div>
 
                             <div className="profile-artwork-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" aria-busy={artworksLoading}>
-                                {displayedGallery !== selectedGallery || (artworksLoading && !hasSettledArtworks) ? (
-                                    /* The tab, the heading and the list always name the same
-                                       gallery. Showing the previous tab's cards under the new
-                                       tab's heading was reported as the header saying one thing
-                                       while the page showed another. */
-                                    <CardGridSkeleton count={6} className="contents" />
-                                ) : (
+                                {displayedGallery !== selectedGallery || (artworksLoading && !hasSettledArtworks) ? null : (
                                     <>
                                         {/* Add New is a Created Artworks action only. */}
                                         {isOwnProfile && selectedGallery === 'created' && (

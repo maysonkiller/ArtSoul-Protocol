@@ -18,7 +18,7 @@ test('local pending artworks appear only in Created Artworks', () => {
   assert.doesNotMatch(profile, /galleryType !== 'auction' \|\| Boolean\(artwork\.auction_tx_hash\)/);
 });
 
-test('Add New is Created-only and loading uses one neutral skeleton state', () => {
+test('Add New is Created-only and tab loading draws no transient card grid', () => {
   // A-58 keyed every description of the list to displayedGallery, the tab the
   // visible result actually belongs to, so the requirement is unchanged: Add New
   // appears for Created only. Asserting the committed value is stronger than
@@ -27,11 +27,9 @@ test('Add New is Created-only and loading uses one neutral skeleton state', () =
   assert.match(profile, /isOwnProfile && selectedGallery === 'created'/);
   assert.doesNotMatch(profile, /ProfileArtworkSkeleton/);
   assert.doesNotMatch(profile, /profile-card-skeleton/);
-  // Exactly one skeleton state, and it may only appear when there is no previous
-  // result to keep. Replacing a settled list with it is what produced the
-  // oversized transient block.
-  assert.equal(profile.match(/CardGridSkeleton/g).length, 2);
-  assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? \([\s\S]*CardGridSkeleton count=\{6\}[\s\S]*\) : \(/);
+  assert.doesNotMatch(profile, /CardGridSkeleton/);
+  assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
+  assert.match(profile, /profile-gallery-loading-note artsoul-placeholder/);
   assert.match(profile, /!artworksLoading && \([\s\S]*myArtworks\.length\} items/);
   assert.doesNotMatch(profile, /Creator action|Prepare a new auction|Open publisher/);
 });
@@ -53,7 +51,7 @@ test('empty states render only after loading for all four tabs', () => {
   // All four tabs keep an explicit empty message, now keyed to the committed
   // tab so the message can never describe a result that is not on screen. A
   // first load still cannot reach them: hasSettledArtworks is false until a
-  // fetch commits, so the skeleton branch owns that render.
+  // fetch commits, so the compact loading branch owns that render.
   assert.match(profile, /selectedGallery === 'created' && 'No created artworks yet\.'/);
   assert.match(profile, /selectedGallery === 'auction' && 'No live auctions right now\.'/);
   assert.match(profile, /selectedGallery === 'sold' && 'No completed sales yet\.'/);
