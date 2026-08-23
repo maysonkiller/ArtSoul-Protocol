@@ -87,7 +87,7 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 never a second opinion. If the two disagree, the backlog wins and this section is
 stale. One backlog item equals one task and one pull request.
 
-Phase A stands at **57 done, 11 in progress, 6 planned** across A-01 to A-74. A-47 was reopened on 2026-08-23 by new founder iOS evidence that contradicted browser-only acceptance: the artwork skeleton handed off to a black body. A-50, A-53, A-56 and A-61 await a run on a device with a connected wallet; A-51, A-52, A-54, A-55, A-58 and A-60 were closed on 2026-08-21 by measurement in a browser. Do not re-open a `done` row without new
+Phase A stands at **56 done, 12 in progress, 6 planned** across A-01 to A-74. A-47 was reopened on 2026-08-23 by new founder iOS evidence that contradicted browser-only acceptance: artwork loading handed off through a dark body. A-58 was reopened the same day because first visits to profile tabs flashed synthetic cards. A-50, A-53, A-56 and A-61 await a run on a device with a connected wallet; A-51, A-52, A-54, A-55 and A-60 were closed on 2026-08-21 by measurement in a browser. Do not re-open a `done` row without new
 contradicting evidence; every one of them carries dated production acceptance.
 
 Accepted and closed - do not redo:
@@ -168,6 +168,7 @@ These eight rows need no founder decision and no new spend:
 | Row | Work | First step |
 | --- | --- | --- |
 | A-47 | Keep artwork loading continuous and shorten the exact-artwork path | Preserve one visible loading surface across the static-to-React handoff, prefetch the exact projection and render primary content before supplementary reads. Re-measure the server cold path separately; do not cache live auction state unconditionally. |
+| A-58 | Remove first-visit profile-tab card flashes | Draw no synthetic card grid for an uncached tab; keep the selected tab and heading aligned and retain only the compact loading status. |
 | A-48 | Full-document repaint on browser Back | PR #203 fixes the measured `NetworkExceedsBufferLimit` cause by deferring offscreen card images; close only after production desktop and iOS/Android Back acceptance. |
 | A-53 | Header/profile settle gap | Measure which wallet event gates each surface before changing either lifecycle. Preserve A-03, A-05 and A-45 acceptance. |
 | A-54 | Cross-page perceived load | Reproduce on a cold profile and identify the resource that gates interactivity. Do not assume the API is responsible. |
