@@ -56,6 +56,8 @@ const { useState, useEffect, useRef } = React;
             const [transactionActions, setTransactionActions] = useState({});
             const [addressCopied, setAddressCopied] = useState(false);
             const addressCopiedTimerRef = useRef(null);
+            const [decodedProfileAvatarUrl, setDecodedProfileAvatarUrl] = useState('');
+            const profileAvatarDecodeTokenRef = useRef(0);
 
             const isClassic = theme === 'classic';
             // Keep React-rendered theme classes aligned with ThemeManager.
@@ -211,6 +213,43 @@ const { useState, useEffect, useRef } = React;
                 // avatar-dropdown.js getProfileAvatarUrl.
                 return resolver?.(profileData, '') || '';
             }
+
+            const resolvedAvatarUrl = getProfileAvatarUrl(profile);
+            useEffect(() => {
+                const token = ++profileAvatarDecodeTokenRef.current;
+                setDecodedProfileAvatarUrl('');
+                if (!resolvedAvatarUrl || resolvedAvatarUrl === 'uploading...') return undefined;
+
+                const preloader = typeof Image === 'function'
+                    ? new Image()
+                    : document.createElement('img');
+                const commit = () => {
+                    if (token !== profileAvatarDecodeTokenRef.current) return;
+                    setDecodedProfileAvatarUrl(resolvedAvatarUrl);
+                };
+                preloader.onerror = () => {
+                    // Keep the stable shell instead of exposing a broken or
+                    // partially painted image. A later profile refresh retries.
+                };
+                preloader.onload = () => {
+                    if (token !== profileAvatarDecodeTokenRef.current) return;
+                    if (typeof preloader.decode !== 'function') {
+                        commit();
+                        return;
+                    }
+                    preloader.decode().then(commit, () => {});
+                };
+                preloader.decoding = 'async';
+                preloader.src = resolvedAvatarUrl;
+
+                return () => {
+                    if (token === profileAvatarDecodeTokenRef.current) {
+                        profileAvatarDecodeTokenRef.current += 1;
+                    }
+                    preloader.onload = null;
+                    preloader.onerror = null;
+                };
+            }, [resolvedAvatarUrl]);
 
             // Base mainnet explorer: the protocol targets Base mainnet, so the
             // profile address always links to basescan.org.
@@ -1362,7 +1401,6 @@ const { useState, useEffect, useRef } = React;
 
             const profileAddress = profile?.wallet_address || viewAddress || connectedWalletAddress;
             const resolvedProfileName = getProfileDisplayName(profile, profileAddress);
-            const resolvedAvatarUrl = getProfileAvatarUrl(profile);
 
             return (
                 <div className={`min-h-screen ${bgClass} transition-all duration-500`}>
@@ -1388,9 +1426,12 @@ const { useState, useEffect, useRef } = React;
                                             animation: 'colorShift 8s ease-in-out infinite'
                                         } : {}}
                                         onClick={() => editMode && fileInputRef.current?.click()}
+                                        aria-busy={Boolean(resolvedAvatarUrl && !decodedProfileAvatarUrl)}
                                     >
-                                        {resolvedAvatarUrl ? (
-                                            <img src={resolvedAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                        {decodedProfileAvatarUrl ? (
+                                            <img src={decodedProfileAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : resolvedAvatarUrl ? (
+                                            <div className="w-full h-full" aria-hidden="true"></div>
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-sm opacity-50">
                                                 No Avatar
