@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import publicProfileHandler from '../src/api/routes/public/profile.js';
+
+const WALLET = '0x6ec8c121043357ac231e36d403edabf90ae6989b';
+
+function createResponse() {
+  return {
+    headers: {},
+    statusCode: 200,
+    body: null,
+    setHeader(name, value) { this.headers[name] = value; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+    end() { return this; }
+  };
+}
+
+// The field list is asserted literally here so that widening it is a deliberate
+// edit rather than a side effect. Which fields the page actually needs, and what
+// breaks when one goes missing, is proved in
+// public-profile-read-keeps-page-behavior.test.mjs.
+test('public profile exposes exactly the fields used by the public page', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    process.env.SUPABASE_URL = originalUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+  });
+
+  process.env.SUPABASE_URL = 'https://database.example';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role';
+  let requestedUrl = '';
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url);
+    return new Response(JSON.stringify([{
+      id: 'a4b1f0c2-1111-4444-8888-0d9e6c5f3a21',
+      created_at: '2025-05-01T10:00:00.000Z',
+      wallet_address: WALLET,
+      username: 'Mayson',
+      bio: 'Founder',
+      avatar_url: 'https://cdn.example/avatar.png'
+    }]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+
+  const res = createResponse();
+  await publicProfileHandler({
+    method: 'GET',
+    query: { address: '0x6EC8C121043357aC231E36D403EdAbf90AE6989B' }
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.profile.wallet_address, WALLET);
+  assert.equal(res.headers['Cache-Control'], 'private, no-store');
+  assert.match(requestedUrl, /profiles\?wallet_address=eq\./);
+  assert.match(requestedUrl, /select=id,created_at,wallet_address,username,bio,avatar_url,twitter_handle,twitter_username,discord_username/);
+  assert.doesNotMatch(requestedUrl, /select=\*/);
+  assert.doesNotMatch(requestedUrl, /twitter_id|discord_id|discord_avatar/);
+});
+
+test('public profile rejects an invalid address before querying the database', async () => {
+  let fetched = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { fetched = true; throw new Error('must not fetch'); };
+  try {
+    const res = createResponse();
+    await publicProfileHandler({ method: 'GET', query: { address: 'not-a-wallet' } }, res);
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.error, 'INVALID_WALLET_ADDRESS');
+    assert.equal(fetched, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('public profile returns null for a wallet without a profile row', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    process.env.SUPABASE_URL = originalUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+  });
+  process.env.SUPABASE_URL = 'https://database.example';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role';
+  globalThis.fetch = async () => new Response('[]', { status: 200 });
+
+  const res = createResponse();
+  await publicProfileHandler({ method: 'GET', query: { address: WALLET } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.profile, null);
+});

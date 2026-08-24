@@ -296,24 +296,12 @@ async function getProfile(walletAddress) {
     }
 
     const request = (async () => {
-        const supabase = await initSupabase();
-        // maybeSingle, not single: a wallet with no profile row yet is the normal
-        // first-visit state, and single() answers it with HTTP 406, which the
-        // browser reports as a failed request in the console even though the
-        // caller handles it. maybeSingle returns null for zero rows instead.
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('wallet_address', normalizedAddress)
-            .maybeSingle();
-
-        if (error) {
-            console.error('Error fetching profile:', error);
-            throw error;
-        }
-
-        profileReadCache.set(normalizedAddress, { data: data || null, timestamp: Date.now() });
-        return data;
+        const result = await backendRead(
+            `/api/public/profile?address=${encodeURIComponent(normalizedAddress)}`
+        );
+        const profile = result.profile || null;
+        profileReadCache.set(normalizedAddress, { data: profile, timestamp: Date.now() });
+        return profile;
     })().finally(() => profileReadRequests.delete(normalizedAddress));
 
     profileReadRequests.set(normalizedAddress, request);
@@ -444,6 +432,13 @@ async function getArtwork(artworkId) {
 }
 
 async function getArtworksByCreator(creatorId) {
+    // buildQuery drops empty values, so a missing creator does not narrow this
+    // read - it widens it to every artwork on the platform, which the caller
+    // then shows as that creator's own work. Refuse instead of guessing.
+    if (!creatorId) {
+        throw new Error('A creator id is required to read a creator\'s artworks');
+    }
+
     const projectionArtworks = await getPublicProjectionArtworks({
         creator: creatorId,
         limit: 200

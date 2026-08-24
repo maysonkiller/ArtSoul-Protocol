@@ -1,4 +1,4 @@
-import { React, createRoot } from './react-runtime.js';
+import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
@@ -22,7 +22,7 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
-        function ProfilePage() {
+        function ProfilePage({ initialSkeletonVisible = false }) {
             const initialViewAddress = getViewAddress();
             const initialWalletHint = getStoredWalletHint();
             const hasInitialWalletHint = /^0x[a-f0-9]{40}$/i.test(initialWalletHint);
@@ -871,11 +871,17 @@ const { useState, useEffect, useRef } = React;
                         throw new Error('ArtSoulDB is not ready');
                     }
 
-                    const [profileResult, artworksResult, genesisResult] = await Promise.allSettled([
-                        db.getProfile(walletAddress),
-                        fetchProfileArtworks({ wallet_address: walletAddress }, selectedGallery, db),
-                        getGenesisState(walletAddress)
-                    ]);
+                    const profilePromise = db.getProfile(walletAddress);
+                    const artworksPromise = fetchProfileArtworks(
+                        { wallet_address: walletAddress },
+                        selectedGallery,
+                        db
+                    );
+                    const genesisPromise = getGenesisState(walletAddress);
+                    const profileResult = await Promise.resolve(profilePromise).then(
+                        value => ({ status: 'fulfilled', value }),
+                        reason => ({ status: 'rejected', reason })
+                    );
                     let profileData = profileResult.status === 'fulfilled' ? profileResult.value : null;
                     if (!profileData) {
                         profileData = {
@@ -889,6 +895,21 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     if (requestId !== profileRequestRef.current) return;
+                    // The identity request is deliberately narrow and starts in
+                    // the document head. Commit it as soon as it resolves instead
+                    // of holding the whole profile behind the slower artwork feed.
+                    setProfile(profileData);
+                    if (isOwn !== null) {
+                        setIsOwnProfile(isOwn);
+                    }
+                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
+                    setLoading(false);
+
+                    const [artworksResult, genesisResult] = await Promise.allSettled([
+                        artworksPromise,
+                        genesisPromise
+                    ]);
+                    if (requestId !== profileRequestRef.current) return;
                     const artworkData = artworksResult.status === 'fulfilled'
                         ? artworksResult.value
                         : { items: [], corpus: [] };
@@ -897,14 +918,9 @@ const { useState, useEffect, useRef } = React;
                         : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
                     const nextDiscoveryProfile = buildDiscoveryProfile(profileData, artworkData.corpus, genesisState);
 
-                    setProfile(profileData);
                     setMyArtworks(artworkData.items);
                     setDiscoveryProfile(nextDiscoveryProfile);
                     setArtworksLoading(false);
-                    if (isOwn !== null) {
-                        setIsOwnProfile(isOwn);
-                    }
-                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
                     loadedProfileAddressRef.current = normalizedAddress;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
@@ -1371,16 +1387,22 @@ const { useState, useEffect, useRef } = React;
 
             if (!viewAddress && !walletStateSettled) {
                 return (
-                    <div className={`min-h-screen ${bgClass}`}>
-                        <ProfilePageSkeleton />
+                    <div
+                        className="min-h-screen"
+                        data-profile-static-skeleton={initialSkeletonVisible ? '' : undefined}
+                    >
+                        <ProfilePageSkeleton immediate={initialSkeletonVisible} />
                     </div>
                 );
             }
 
             if (loading) {
                 return (
-                    <div className={`min-h-screen ${bgClass}`}>
-                        <ProfilePageSkeleton />
+                    <div
+                        className="min-h-screen"
+                        data-profile-static-skeleton={initialSkeletonVisible ? '' : undefined}
+                    >
+                        <ProfilePageSkeleton immediate={initialSkeletonVisible} />
                     </div>
                 );
             }
@@ -1820,6 +1842,26 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
-        createRoot(document.getElementById('app')).render(<ProfilePage />);
+        const profileAppRoot = document.getElementById('app');
+        if (profileAppRoot) {
+            const initialSkeletonVisible = Boolean(
+                profileAppRoot.querySelector('[data-profile-static-skeleton]')
+            );
+            const profilePage = <ProfilePage initialSkeletonVisible={initialSkeletonVisible} />;
+            if (initialSkeletonVisible) {
+                // The HTML already painted the exact loading tree. Adopt it in
+                // place so no empty application root appears while the module
+                // graph and public profile request settle.
+                const walker = document.createTreeWalker(profileAppRoot, NodeFilter.SHOW_TEXT);
+                const whitespaceNodes = [];
+                while (walker.nextNode()) {
+                    if (!walker.currentNode.nodeValue?.trim()) whitespaceNodes.push(walker.currentNode);
+                }
+                whitespaceNodes.forEach(node => node.remove());
+                hydrateRoot(profileAppRoot, profilePage);
+            } else {
+                createRoot(profileAppRoot).render(profilePage);
+            }
+        }
 
         // Theme is managed by ThemeManager

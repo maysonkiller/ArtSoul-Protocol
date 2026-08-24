@@ -28,7 +28,7 @@ function run(pathname, search, storage = {}) {
 
 const MIXED = '0x6EC8C121043357aC231E36D403EdAbf90AE6989B';
 
-test('a profile starts its own gallery request from the head', () => {
+test('a profile starts its identity and gallery requests from the head', () => {
   // Measured on the apex, iPhone viewport, 6x CPU slowdown: the document is
   // interactive at 674 ms but the modules finish at 3276 ms, and the content
   // request was not issued until 3410 ms because it waited for them. The
@@ -36,6 +36,7 @@ test('a profile starts its own gallery request from the head', () => {
   const { calls } = run('/profile', `?address=${MIXED}`);
   assert.deepEqual(calls.map((c) => c.url), [
     '/api/public/config',
+    `/api/public/profile?address=${MIXED}`,
     `/api/public/artworks?creator=${MIXED}&limit=200`
   ]);
   assert.equal(calls[0].init.credentials, 'include');
@@ -43,7 +44,10 @@ test('a profile starts its own gallery request from the head', () => {
 
 test('your own profile carries no address, so the cached wallet is used', () => {
   const { calls } = run('/profile', '', { artsoul_wallet: MIXED.toLowerCase() });
-  assert.equal(calls[1].url, `/api/public/artworks?creator=${MIXED.toLowerCase()}&limit=200`);
+  assert.deepEqual(calls.slice(1).map((call) => call.url), [
+    `/api/public/profile?address=${MIXED.toLowerCase()}`,
+    `/api/public/artworks?creator=${MIXED.toLowerCase()}&limit=200`
+  ]);
 });
 
 test('no wallet anywhere means no gallery guess', () => {
@@ -100,6 +104,7 @@ test('the request string matches what the page will ask for', () => {
   // builds { creator, limit } and index.js builds { limit }.
   const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
   assert.match(profile, /\{ creator: walletAddress, limit: 200/);
+  assert.match(client, /`\/api\/public\/profile\?address=\$\{encodeURIComponent\(normalizedAddress\)\}`/);
   const index = fs.readFileSync('src/entries/index.js', 'utf8');
   assert.match(index, /getPublicProjectionArtworks\(\{ limit: 100 \}\)/);
 });
@@ -111,7 +116,7 @@ test('every shared-header page loads it, and the build ships it', () => {
     // this is not a first-paint concern. It still executes within a few hundred
     // milliseconds, long before the modules that would otherwise issue this
     // request at 3.3 seconds.
-    assert.match(html, /<script src="\/data-prefetch\.js\?v=2" async><\/script>/, `${page} must load the prefetch asynchronously`);
+    assert.match(html, /<script src="\/data-prefetch\.js\?v=3" async><\/script>/, `${page} must load the prefetch asynchronously`);
     assert.ok(
       html.indexOf('data-prefetch.js') > html.indexOf('header-prepaint.js'),
       `${page}: the first paint comes before the data`

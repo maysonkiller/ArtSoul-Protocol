@@ -12,9 +12,13 @@ function SkeletonBlock({ className = '' }) {
     return <div className={`artsoul-skeleton ${className}`.trim()} aria-hidden="true"></div>;
 }
 
-export function CardGridSkeleton({ count = 12, className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3' }) {
+export function CardGridSkeleton({
+    count = 12,
+    className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3',
+    immediate = false
+}) {
     return (
-        <div className={`${className} ${PLACEHOLDER}`} role="status" aria-label="Loading artworks" aria-busy="true">
+        <div className={`${className} ${immediate ? '' : PLACEHOLDER}`.trim()} role="status" aria-label="Loading artworks" aria-busy="true">
             {Array.from({ length: count }, (_, index) => (
                 <div className="artsoul-skeleton-card" key={index} aria-hidden="true">
                     <SkeletonBlock className="artsoul-skeleton-media" />
@@ -74,9 +78,9 @@ export function ArtworkPageSkeleton({ immediate = false }) {
     );
 }
 
-export function ProfilePageSkeleton({ className = '' }) {
+export function ProfilePageSkeleton({ className = '', immediate = false }) {
     return (
-        <main className={`site-page-container profile-page-main py-8 ${className} ${PLACEHOLDER}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
+        <main className={`site-page-container profile-page-main py-8 ${className} ${immediate ? '' : PLACEHOLDER}`.trim()} role="status" aria-label="Loading profile" aria-busy="true">
             <section className="profile-skeleton-header rounded-xl p-6 mb-6">
                 <div className="profile-skeleton-identity">
                     <SkeletonBlock className="profile-skeleton-avatar" />
@@ -93,7 +97,7 @@ export function ProfilePageSkeleton({ className = '' }) {
                     {Array.from({ length: 4 }, (_, index) => <SkeletonBlock className="artsoul-skeleton-button" key={index} />)}
                 </div>
             </section>
-            <CardGridSkeleton count={6} />
+            <CardGridSkeleton count={6} immediate={immediate} />
         </main>
     );
 }

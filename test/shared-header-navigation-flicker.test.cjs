@@ -549,10 +549,11 @@ test('every shared-header page boots the header in the same order with the same 
     const shell = html.indexOf('<div id="navButtons"');
     const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");
 
-    // The stylesheet stays render-blocking so the shell is styled on first
-    // paint, and the boot scripts keep their relative order: deferred classic
-    // scripts execute in document order, so position still decides sequence.
-    assert.ok(stylesheet < prepaint, `${page}: the stylesheet must load before prepaint`);
+    // The tiny dependency-free prepaint bridge must not wait for remote fonts
+    // or stylesheets before the body and its loading shell can be parsed. The
+    // stylesheet is still render-blocking, so the first painted shell is styled.
+    assert.ok(prepaint < stylesheet, `${page}: prepaint must not wait for stylesheets`);
+    assert.ok(stylesheet < shell, `${page}: the stylesheet must precede the visible shell`);
     assert.ok(prepaint < component, `${page}: prepaint must snapshot storage before the deferred component`);
     assert.ok(component < appkit, `${page}: the component must run before appkit-init`);
     assert.ok(appkit < shell, `${page}: the boot scripts must precede the header shell`);
