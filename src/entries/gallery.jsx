@@ -605,7 +605,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                                 src={artwork.file_url}
                                                                 className="w-full h-full object-contain"
                                                                 preload="metadata"
-                                                                poster="ARTSOULlogo-clean.png"
+                                                                poster="/ARTSOULlogo-clean.png"
                                                                 muted
                                                                 playsInline
                                                                 controls
@@ -625,7 +625,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                         <div className={`w-full h-full flex flex-col items-center justify-center ${isClassic ? 'bg-gray-800' : 'bg-gradient-to-br from-purple-900/30 to-cyan-900/30'}`} style={{position: 'relative'}}>
                                                             <img
                                                                 id={`music-logo-${artwork.id}`}
-                                                                src="ARTSOULlogo.png"
+                                                                src="/ARTSOULlogo.png"
                                                                 alt="Music"
                                                                 loading="lazy"
                                                                 decoding="async"

@@ -366,7 +366,7 @@ let morphActive = false;
                     audioPreview.style.cssText = 'width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(6, 182, 212, 0.3)); position: relative;';
 
                     const logoImg = document.createElement('img');
-                    logoImg.src = 'ARTSOULlogo.png';
+                    logoImg.src = '/ARTSOULlogo.png';
                     logoImg.alt = 'Music';
                     logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 3s linear infinite; animation-play-state: paused; margin-bottom: 1rem;';
 
@@ -809,7 +809,7 @@ let morphActive = false;
                                 audioContainer.className = 'w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black';
 
                                 const logoImg = document.createElement('img');
-                                logoImg.src = 'ARTSOULlogo.png';
+                                logoImg.src = '/ARTSOULlogo.png';
                                 logoImg.alt = 'Music';
                                 logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 8s linear infinite; margin-bottom: 1rem; transition: animation-duration 0.3s;';
                                 logoImg.onerror = function() {
