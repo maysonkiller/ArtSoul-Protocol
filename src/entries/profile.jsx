@@ -1,4 +1,4 @@
-import { React, createRoot } from './react-runtime.js';
+import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
@@ -22,7 +22,7 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
-        function ProfilePage() {
+        function ProfilePage({ initialSkeletonVisible = false }) {
             const initialViewAddress = getViewAddress();
             const initialWalletHint = getStoredWalletHint();
             const hasInitialWalletHint = /^0x[a-f0-9]{40}$/i.test(initialWalletHint);
@@ -1371,16 +1371,22 @@ const { useState, useEffect, useRef } = React;
 
             if (!viewAddress && !walletStateSettled) {
                 return (
-                    <div className={`min-h-screen ${bgClass}`}>
-                        <ProfilePageSkeleton />
+                    <div
+                        className="min-h-screen"
+                        data-profile-static-skeleton={initialSkeletonVisible ? '' : undefined}
+                    >
+                        <ProfilePageSkeleton immediate={initialSkeletonVisible} />
                     </div>
                 );
             }
 
             if (loading) {
                 return (
-                    <div className={`min-h-screen ${bgClass}`}>
-                        <ProfilePageSkeleton />
+                    <div
+                        className="min-h-screen"
+                        data-profile-static-skeleton={initialSkeletonVisible ? '' : undefined}
+                    >
+                        <ProfilePageSkeleton immediate={initialSkeletonVisible} />
                     </div>
                 );
             }
@@ -1820,6 +1826,26 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
-        createRoot(document.getElementById('app')).render(<ProfilePage />);
+        const profileAppRoot = document.getElementById('app');
+        if (profileAppRoot) {
+            const initialSkeletonVisible = Boolean(
+                profileAppRoot.querySelector('[data-profile-static-skeleton]')
+            );
+            const profilePage = <ProfilePage initialSkeletonVisible={initialSkeletonVisible} />;
+            if (initialSkeletonVisible) {
+                // The HTML already painted the exact loading tree. Adopt it in
+                // place so no empty application root appears while the module
+                // graph and public profile request settle.
+                const walker = document.createTreeWalker(profileAppRoot, NodeFilter.SHOW_TEXT);
+                const whitespaceNodes = [];
+                while (walker.nextNode()) {
+                    if (!walker.currentNode.nodeValue?.trim()) whitespaceNodes.push(walker.currentNode);
+                }
+                whitespaceNodes.forEach(node => node.remove());
+                hydrateRoot(profileAppRoot, profilePage);
+            } else {
+                createRoot(profileAppRoot).render(profilePage);
+            }
+        }
 
         // Theme is managed by ThemeManager

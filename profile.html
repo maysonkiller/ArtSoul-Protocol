@@ -244,6 +244,91 @@
     </header>
     <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
     <div id="app"></div>
+    <template id="profileInitialSkeleton">
+        <div class="min-h-screen" data-profile-static-skeleton>
+            <main class="site-page-container profile-page-main py-8" role="status" aria-label="Loading profile" aria-busy="true">
+                <section class="profile-skeleton-header rounded-xl p-6 mb-6">
+                    <div class="profile-skeleton-identity">
+                        <div class="artsoul-skeleton profile-skeleton-avatar" aria-hidden="true"></div>
+                        <div class="profile-skeleton-copy">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-heading" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                </section>
+                <section class="profile-skeleton-tabs rounded-xl p-6 mb-6">
+                    <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                    <div class="profile-skeleton-tab-row">
+                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
+                    </div>
+                </section>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" role="status" aria-label="Loading artworks" aria-busy="true">
+                    <div class="artsoul-skeleton-card" aria-hidden="true">
+                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton-card-copy">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                    <div class="artsoul-skeleton-card" aria-hidden="true">
+                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton-card-copy">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                    <div class="artsoul-skeleton-card" aria-hidden="true">
+                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton-card-copy">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                    <div class="artsoul-skeleton-card" aria-hidden="true">
+                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton-card-copy">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                    <div class="artsoul-skeleton-card" aria-hidden="true">
+                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton-card-copy">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                    <div class="artsoul-skeleton-card" aria-hidden="true">
+                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
+                        <div class="artsoul-skeleton-card-copy">
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
+                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </template>
+    <script>
+        (() => {
+            const app = document.getElementById('app');
+            const template = document.getElementById('profileInitialSkeleton');
+            const viewAddress = new URLSearchParams(window.location.search).get('address') || '';
+            let walletHint = '';
+            try {
+                walletHint = localStorage.getItem('artsoul_wallet') || '';
+            } catch {
+                walletHint = '';
+            }
+            if (app && template && /^0x[a-f0-9]{40}$/i.test(viewAddress || walletHint)) {
+                app.appendChild(template.content.cloneNode(true));
+            }
+        })();
+    </script>
     <script type="module" src="/src/entries/profile.jsx"></script>
     <script>
         window.addEventListener('load', () => {
