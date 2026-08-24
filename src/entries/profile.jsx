@@ -871,11 +871,17 @@ const { useState, useEffect, useRef } = React;
                         throw new Error('ArtSoulDB is not ready');
                     }
 
-                    const [profileResult, artworksResult, genesisResult] = await Promise.allSettled([
-                        db.getProfile(walletAddress),
-                        fetchProfileArtworks({ wallet_address: walletAddress }, selectedGallery, db),
-                        getGenesisState(walletAddress)
-                    ]);
+                    const profilePromise = db.getProfile(walletAddress);
+                    const artworksPromise = fetchProfileArtworks(
+                        { wallet_address: walletAddress },
+                        selectedGallery,
+                        db
+                    );
+                    const genesisPromise = getGenesisState(walletAddress);
+                    const profileResult = await Promise.resolve(profilePromise).then(
+                        value => ({ status: 'fulfilled', value }),
+                        reason => ({ status: 'rejected', reason })
+                    );
                     let profileData = profileResult.status === 'fulfilled' ? profileResult.value : null;
                     if (!profileData) {
                         profileData = {
@@ -889,6 +895,21 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     if (requestId !== profileRequestRef.current) return;
+                    // The identity request is deliberately narrow and starts in
+                    // the document head. Commit it as soon as it resolves instead
+                    // of holding the whole profile behind the slower artwork feed.
+                    setProfile(profileData);
+                    if (isOwn !== null) {
+                        setIsOwnProfile(isOwn);
+                    }
+                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
+                    setLoading(false);
+
+                    const [artworksResult, genesisResult] = await Promise.allSettled([
+                        artworksPromise,
+                        genesisPromise
+                    ]);
+                    if (requestId !== profileRequestRef.current) return;
                     const artworkData = artworksResult.status === 'fulfilled'
                         ? artworksResult.value
                         : { items: [], corpus: [] };
@@ -897,14 +918,9 @@ const { useState, useEffect, useRef } = React;
                         : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
                     const nextDiscoveryProfile = buildDiscoveryProfile(profileData, artworkData.corpus, genesisState);
 
-                    setProfile(profileData);
                     setMyArtworks(artworkData.items);
                     setDiscoveryProfile(nextDiscoveryProfile);
                     setArtworksLoading(false);
-                    if (isOwn !== null) {
-                        setIsOwnProfile(isOwn);
-                    }
-                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
                     loadedProfileAddressRef.current = normalizedAddress;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;

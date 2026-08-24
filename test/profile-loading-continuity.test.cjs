@@ -39,3 +39,19 @@ test('immediate profile skeletons bypass both placeholder delays', () => {
   assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/);
   assert.match(skeletons, /<CardGridSkeleton count=\{6\} immediate=\{immediate\} \/>/);
 });
+
+test('profile identity commits before the slower gallery settles', () => {
+  const loadStart = profile.indexOf('async function loadProfile');
+  const loadEnd = profile.indexOf('async function fetchProfileArtworks', loadStart);
+  const block = profile.slice(loadStart, loadEnd);
+  const profileAwait = block.indexOf('const profileResult = await');
+  const identityCommit = block.indexOf('setProfile(profileData);');
+  const galleryAwait = block.indexOf('await Promise.allSettled([', identityCommit);
+  const loadingRelease = block.indexOf('setLoading(false);', identityCommit);
+
+  assert.ok(profileAwait >= 0 && profileAwait < identityCommit);
+  assert.ok(identityCommit < loadingRelease && loadingRelease < galleryAwait);
+  assert.match(block, /const artworksPromise = fetchProfileArtworks\(/);
+  assert.match(block, /setMyArtworks\(artworkData\.items\);/);
+  assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
+});

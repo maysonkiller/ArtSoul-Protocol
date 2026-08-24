@@ -105,7 +105,10 @@
         var wallet = profileWallet();
         // Mirrors the default gallery in profile.jsx: created works, limit 200,
         // in that parameter order, because the key is the request string.
-        if (wallet) start('/api/public/artworks?creator=' + wallet + '&limit=200');
+        if (wallet) {
+            start('/api/public/profile?address=' + encodeURIComponent(wallet));
+            start('/api/public/artworks?creator=' + wallet + '&limit=200');
+        }
     } else if (path === '/artwork' || path.indexOf('/artwork/') === 0) {
         var id = artworkId(path);
         // Mirrors getPublicProjectionArtwork(): id first, then limit. Starting

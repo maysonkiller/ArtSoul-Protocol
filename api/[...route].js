@@ -30,6 +30,7 @@ import publicArtworkProvenanceHandler from '../src/api/routes/public/artwork-pro
 import publicAuctionLiveHandler from '../src/api/routes/public/auction-live.js';
 import publicConfigHandler from '../src/api/routes/public/config.js';
 import publicIndexerStatusHandler from '../src/api/routes/public/indexer-status.js';
+import publicProfileHandler from '../src/api/routes/public/profile.js';
 import uploadFileHandler from '../src/api/routes/upload/file.js';
 
 const ROUTES = new Map([
@@ -45,6 +46,7 @@ const ROUTES = new Map([
   ['public/auction-live', publicAuctionLiveHandler],
   ['public/config', publicConfigHandler],
   ['public/indexer-status', publicIndexerStatusHandler],
+  ['public/profile', publicProfileHandler],
   ['upload/file', uploadFileHandler],
   ['functions/ai/analyze', functionsAiAnalyzeHandler],
   ['functions/artworks', functionsArtworksHandler],

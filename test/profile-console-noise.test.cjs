@@ -7,14 +7,14 @@ const contracts = fs.readFileSync('contracts-integration.js', 'utf8');
 const profileEntry = fs.readFileSync('src/entries/profile.jsx', 'utf8');
 
 test('a wallet with no profile row does not provoke an HTTP 406', () => {
-  // A first visit legitimately has no profiles row. single() answers that with
-  // 406 Not Acceptable, which the browser logs as a failed request even though
-  // the caller treats it as normal. maybeSingle returns null instead.
+  // A first visit legitimately has no profiles row. The public profile route
+  // returns profile:null, rather than asking PostgREST for singular JSON and
+  // provoking a 406 response for that normal state.
   const readBlock = supabaseClient.slice(
     supabaseClient.indexOf("const request = (async () => {"),
     supabaseClient.indexOf('profileReadCache.set(normalizedAddress')
   );
-  assert.match(readBlock, /\.maybeSingle\(\);/);
+  assert.match(readBlock, /backendRead\(\s*`\/api\/public\/profile\?address=/);
   assert.doesNotMatch(readBlock, /\.single\(\);/);
   // With zero rows no longer an error, the PGRST116 special case is dead code
   // and must not be reintroduced as a way to swallow real failures.
