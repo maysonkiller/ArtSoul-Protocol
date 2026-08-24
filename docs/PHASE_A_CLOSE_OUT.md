@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **55 done, 14 in progress, 6 planned** across A-01 to A-75.
+Phase A stands at **55 done, 15 in progress, 5 planned** across A-01 to A-75.
 
 ## The shape of what is left
 
@@ -52,7 +52,7 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-64** | Take the wallet SDK off the first-load critical path | 504 KB across 129 files, downloaded by every visitor whether or not they ever connect. It is the only remaining change that shortens the wait itself, and it is the cause behind both the placeholder people still see and the font arriving late. Needs one connected run - connect, sign in, switch network, publish - before it can be merged on anything but test evidence |
+| **A-64** | Take the wallet SDK off the first-load critical path | Implemented behind a preview gate: all seven shared-header pages now mount and paint before dynamically importing the unchanged wallet runtime. The build manifest no longer makes AppKit a static dependency of the profile or homepage. Needs connected desktop, Android and iOS runs covering cached reload, reconnect, SIWE, Base Sepolia switching and publish before merge |
 | **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. Production measurements put primary content at 0.7-2.4 seconds and video readiness at 1.6-3.2 seconds; production Android and the legacy-video tail remain open evidence |
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |

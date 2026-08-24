@@ -20,9 +20,9 @@ Reconciled: 2026-08-20 against `main` at `0bbeec5` (merged PR #201)
 >   indexer confirmation-depth defect, projection/provenance verification and
 >   profile action gating are all **accepted with dated production evidence**
 >   (A-03, A-04, A-14, A-18, A-19).
-> - Phase A now stands at 55 `done`, 13 `in progress`, 6 `planned`. Moderation
->   remains the founder-gated dependency chain; ten unblocked engineering rows
->   and six planned rows remain open.
+> - Phase A now stands at 55 `done`, 15 `in progress`, 5 `planned`. Moderation
+>   remains the founder-gated dependency chain; eleven unblocked engineering rows
+>   and five planned rows remain open.
 >
 > The mainnet contract blockers in sections 7 and 10 are **unchanged and still
 > true**. Nothing in this reconciliation moves any Phase C or Phase D gate.
@@ -110,12 +110,12 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 55 `done`, 14 `in progress`, 6 `planned` across A-01 to A-75
+current position is 55 `done`, 15 `in progress`, 5 `planned` across A-01 to A-75
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that
 remain open are moderation (A-21, A-22, A-39) and the A-23 go/no-go, plus the
-ten unblocked rows A-33, A-34, A-35, A-38, A-47, A-48, A-53, A-54, A-58 and A-61. A-50
+eleven unblocked rows A-33, A-34, A-35, A-38, A-47, A-48, A-53, A-54, A-58, A-61 and A-64. A-50
 and A-56 have merged fixes and remain open only for production acceptance.
 
 | Exit area | Current evidence | Remaining work |

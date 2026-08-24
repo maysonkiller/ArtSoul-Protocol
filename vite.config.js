@@ -97,7 +97,7 @@ function keepLegacyRuntimeModulesSeparate() {
                         // Wallet entry points must be processed by Vite so the
                         // pinned SDK graph ships as same-origin chunks instead
                         // of hundreds of runtime CDN module requests.
-                        const isBundledEntry = /src="\/(?:src\/entries\/|appkit-init\.js|wallet-test\.js)/.test(attributes);
+                        const isBundledEntry = /src="\/(?:src\/entries\/|appkit-init\.js|wallet-runtime-loader\.js|wallet-test\.js)/.test(attributes);
                         if (isBundledEntry) return scriptTag;
                         return `<script type="application/x-artsoul-module" data-artsoul-legacy-module${attributes}></script>`;
                     }

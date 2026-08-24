@@ -11,6 +11,7 @@ const contracts = read('contracts-integration.js');
 const artwork = read(path.join('src', 'entries', 'artwork.jsx'));
 const auctionServiceV3 = read(path.join('src', 'features', 'auction', 'auction-service-v3.js'));
 const walletTest = read('wallet-test.js');
+const walletRuntimeLoader = read('wallet-runtime-loader.js');
 const coreWallet = read('wallet-core-connect.js');
 const profile = read(path.join('src', 'entries', 'profile.jsx'));
 const upload = read(path.join('src', 'entries', 'upload.js'));
@@ -25,8 +26,10 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
     assert.equal(packageJson.dependencies['@reown/appkit'], '1.8.21');
     assert.equal(packageJson.dependencies['@reown/appkit-adapter-wagmi'], '1.8.21');
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=54/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /wallet-runtime-loader\.js/, `${page} must load the standard wallet boundary`);
+        assert.doesNotMatch(read(page), /src="\/appkit-init\.js\?v=54"/, `${page} must not preload the wallet runtime`);
     }
+    assert.match(walletRuntimeLoader, /import\('\.\/appkit-init\.js\?v=54'\)/);
     assert.match(appKit, /wallet-core-connect\.js\?v=18/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=18/);
     assert.match(walletTest, /appkit-init\.js\?v=54/);
