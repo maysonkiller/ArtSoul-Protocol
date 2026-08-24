@@ -539,7 +539,7 @@
             label.textContent = 'AUDIO';
             const avatar = document.createElement('img');
             avatar.className = 'artsoul-card-audio-avatar';
-            avatar.src = 'ARTSOULlogo.png';
+            avatar.src = '/ARTSOULlogo.png';
             avatar.alt = '';
             avatar.loading = 'lazy';
             avatar.decoding = 'async';
@@ -761,7 +761,7 @@
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
                 h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
-                h('img', { src: 'ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
+                h('img', { src: '/ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },

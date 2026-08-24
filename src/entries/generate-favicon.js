@@ -19,7 +19,7 @@ const canvas = document.getElementById('canvas');
 
             ctx.drawImage(img, x, y, width, height);
         };
-        img.src = 'ARTSOULlogo.png';
+        img.src = '/ARTSOULlogo.png';
 
         function download() {
             canvas.toBlob(function(blob) {
