@@ -432,6 +432,13 @@ async function getArtwork(artworkId) {
 }
 
 async function getArtworksByCreator(creatorId) {
+    // buildQuery drops empty values, so a missing creator does not narrow this
+    // read - it widens it to every artwork on the platform, which the caller
+    // then shows as that creator's own work. Refuse instead of guessing.
+    if (!creatorId) {
+        throw new Error('A creator id is required to read a creator\'s artworks');
+    }
+
     const projectionArtworks = await getPublicProjectionArtworks({
         creator: creatorId,
         limit: 200

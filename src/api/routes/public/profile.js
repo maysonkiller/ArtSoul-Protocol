@@ -5,7 +5,19 @@ import {
   supabaseRest
 } from '../../backend.js';
 
+// The exact set the public profile page consumes, and nothing else. This list
+// is a behavioural contract rather than a detail of this route: it is the whole
+// answer ArtSoulDB.getProfile() gives every caller.
+//
+// `id` and `created_at` are not decorative. handleSaveProfile branches on `id`
+// to take the update path instead of the create/upsert fallback, and the
+// discovery service scores account age from `created_at`, so dropping either
+// silently changes what the product does. Private provider identifiers -
+// twitter_id, discord_id, discord_avatar - stay out, with every other column no
+// public surface reads.
 const PUBLIC_PROFILE_FIELDS = [
+  'id',
+  'created_at',
   'wallet_address',
   'username',
   'bio',

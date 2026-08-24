@@ -17,7 +17,11 @@ function createResponse() {
   };
 }
 
-test('public profile exposes only the fields used by the public page', async (t) => {
+// The field list is asserted literally here so that widening it is a deliberate
+// edit rather than a side effect. Which fields the page actually needs, and what
+// breaks when one goes missing, is proved in
+// public-profile-read-keeps-page-behavior.test.mjs.
+test('public profile exposes exactly the fields used by the public page', async (t) => {
   const originalFetch = globalThis.fetch;
   const originalUrl = process.env.SUPABASE_URL;
   const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -33,6 +37,8 @@ test('public profile exposes only the fields used by the public page', async (t)
   globalThis.fetch = async (url) => {
     requestedUrl = String(url);
     return new Response(JSON.stringify([{
+      id: 'a4b1f0c2-1111-4444-8888-0d9e6c5f3a21',
+      created_at: '2025-05-01T10:00:00.000Z',
       wallet_address: WALLET,
       username: 'Mayson',
       bio: 'Founder',
@@ -50,9 +56,9 @@ test('public profile exposes only the fields used by the public page', async (t)
   assert.equal(res.body.profile.wallet_address, WALLET);
   assert.equal(res.headers['Cache-Control'], 'private, no-store');
   assert.match(requestedUrl, /profiles\?wallet_address=eq\./);
-  assert.match(requestedUrl, /select=wallet_address,username,bio,avatar_url,twitter_handle,twitter_username,discord_username/);
+  assert.match(requestedUrl, /select=id,created_at,wallet_address,username,bio,avatar_url,twitter_handle,twitter_username,discord_username/);
   assert.doesNotMatch(requestedUrl, /select=\*/);
-  assert.doesNotMatch(requestedUrl, /twitter_id|discord_id/);
+  assert.doesNotMatch(requestedUrl, /twitter_id|discord_id|discord_avatar/);
 });
 
 test('public profile rejects an invalid address before querying the database', async () => {
