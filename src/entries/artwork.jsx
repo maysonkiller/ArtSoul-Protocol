@@ -1966,6 +1966,10 @@ const { useState, useEffect, useRef } = React;
 
             async function placeBidOnce() {
                 if (!ensureArtworkWriteEnabled()) return;
+                if (isAuctionClosedForBidding(auction)) {
+                    alert('This auction has ended.');
+                    return;
+                }
                 const minimumBidDetails = calculateMinimumBidDetails(auction);
                 // Open the wallet modal on tap when not connected, then continue
                 // the bid on this same page instead of showing a "connect" toast.
