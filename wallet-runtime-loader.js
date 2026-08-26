@@ -7,16 +7,34 @@
 // the small async proxies below; AppKit replaces each proxy when it evaluates.
 
 let runtimePromise = null;
+let runtimeReady = false;
+
+async function waitForWalletRuntimeBoot() {
+    if (document.readyState === 'loading') {
+        await new Promise(resolve => {
+            document.addEventListener('DOMContentLoaded', resolve, { once: true });
+        });
+    }
+
+    const bootPromise = window.__artsoulAppKitBootPromise;
+    if (!bootPromise || typeof bootPromise.then !== 'function') {
+        throw new Error('Wallet runtime boot did not start.');
+    }
+    await bootPromise;
+}
 
 function loadWalletRuntime() {
     if (!runtimePromise) {
         runtimePromise = import('./appkit-init.js?v=54')
-            .then(module => {
+            .then(async module => {
+                await waitForWalletRuntimeBoot();
+                runtimeReady = true;
                 window.dispatchEvent(new CustomEvent('artsoul:wallet-runtime-ready'));
                 return module;
             })
             .catch(error => {
                 runtimePromise = null;
+                runtimeReady = false;
                 throw error;
             });
     }
@@ -48,7 +66,8 @@ const installAsyncProxy = name => {
 
 window.ArtSoulWalletRuntime = Object.freeze({
     load: loadWalletRuntime,
-    isLoading: () => Boolean(runtimePromise)
+    isLoading: () => Boolean(runtimePromise && !runtimeReady),
+    isReady: () => runtimeReady
 });
 
 function startAfterFirstPaint() {
