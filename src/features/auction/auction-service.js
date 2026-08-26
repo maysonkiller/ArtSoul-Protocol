@@ -568,7 +568,7 @@ class AuctionService {
         try {
             const result = await this.getAuctionState(artworkId);
 
-            if (result.state !== 'AUCTION') {
+            if (result.state !== 'AUCTION' || this.shouldEndAuction(result)) {
                 return { canBid: false, reason: 'Auction is not active' };
             }
 
@@ -585,12 +585,18 @@ class AuctionService {
     }
 
     _normalizeTimestamp(value) {
-        const timestamp = Number(value || 0);
-        if (!Number.isFinite(timestamp) || timestamp <= 0) {
+        if (value === undefined || value === null || value === '') {
             return 0;
         }
 
-        return timestamp > 1000000000000 ? timestamp : timestamp * 1000;
+        const text = String(value).trim();
+        const numeric = /^\d+(?:\.\d+)?$/.test(text) ? Number(text) : NaN;
+        if (Number.isFinite(numeric) && numeric > 0) {
+            return numeric > 1000000000000 ? numeric : numeric * 1000;
+        }
+
+        const parsed = Date.parse(text);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
     }
 
     shouldEndAuction(auction) {
