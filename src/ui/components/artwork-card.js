@@ -3,6 +3,7 @@
 
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     const RECENT_PENDING_MS = 30 * 60 * 1000;
+    const BRAND_MEDIA_POSTER = '/ARTSOULlogo-clean.png';
     const countdownListeners = new Set();
     let countdownTimerId = null;
 
@@ -139,7 +140,7 @@
             url,
             // Card surfaces paint this; url stays the original for detail views.
             thumbnailUrl: cardThumbnailUrl(url, type),
-            poster: type === 'video' ? posterUrl(artwork) : '',
+            poster: type === 'video' ? (posterUrl(artwork) || BRAND_MEDIA_POSTER) : '',
             known: type !== 'unknown'
         });
     }
@@ -398,25 +399,6 @@
 
         const poster = posterUrl(artwork);
         if (poster) video.poster = poster;
-
-        const renderFirstFrame = () => {
-            const duration = Number(video.duration);
-            if (!Number.isFinite(duration) || duration <= 0) return;
-            const target = Math.min(0.1, Math.max(0, duration - 0.05));
-            if (Math.abs(video.currentTime - target) < 0.01) return;
-            try {
-                video.currentTime = target;
-            } catch {
-                // The poster remains visible when a browser cannot seek before playback.
-            }
-        };
-
-        if (video.readyState >= 1) renderFirstFrame();
-        video.addEventListener('loadedmetadata', renderFirstFrame, { once: true });
-        video.addEventListener('loadeddata', renderFirstFrame, { once: true });
-        video.addEventListener('seeked', () => {
-            video.closest('.artsoul-card-media')?.querySelector('.artsoul-media-loading')?.remove();
-        }, { once: true });
     }
 
     function createMediaLoadingElement() {
@@ -503,7 +485,7 @@
             const video = document.createElement('video');
             video.src = url;
             video.className = 'artsoul-card-media-object';
-            video.preload = 'metadata';
+            video.preload = 'none';
             video.poster = descriptor.poster;
             video.playsInline = true;
             video.muted = true;
@@ -539,14 +521,14 @@
             label.textContent = 'AUDIO';
             const avatar = document.createElement('img');
             avatar.className = 'artsoul-card-audio-avatar';
-            avatar.src = '/ARTSOULlogo.png';
+            avatar.src = BRAND_MEDIA_POSTER;
             avatar.alt = '';
             avatar.loading = 'lazy';
             avatar.decoding = 'async';
             avatar.dataset.playing = 'false';
             const audio = document.createElement('audio');
             audio.src = url;
-            audio.preload = 'metadata';
+            audio.preload = 'none';
             audio.className = 'artsoul-card-audio-element';
             const controls = document.createElement('div');
             controls.className = 'artsoul-card-media-controls';
@@ -704,7 +686,7 @@
             setMuted(video.muted);
         };
         return h('div', { className: 'artsoul-card-media artsoul-card-media-video', 'data-playing': String(playing) },
-            h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'metadata', playsInline: true,
+            h('video', { ref, src: url, className: 'artsoul-card-media-object', preload: 'none', playsInline: true,
                 poster: posterFailed ? '' : poster, muted, style: { pointerEvents: 'none' },
                 onLoadedMetadata: event => { prepareVideoPreview(event.currentTarget, artwork); setLoaded(true); },
                 onLoadedData: () => setLoaded(true),
@@ -761,7 +743,7 @@
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
                 h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
-                h('img', { src: '/ARTSOULlogo.png', alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
+                h('img', { src: BRAND_MEDIA_POSTER, alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
@@ -774,7 +756,7 @@
                         onClick: toggleMute, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                         onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
                 ),
-                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'metadata', muted,
+                h('audio', { ref, src: url, className: 'artsoul-card-audio-element', preload: 'none', muted,
                     onPlay: event => { pauseOtherMedia(event.currentTarget); setPlaying(true); },
                     onPause: () => setPlaying(false), onEnded: () => setPlaying(false),
                     onError: onUnavailable || undefined,

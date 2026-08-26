@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **56 done, 15 in progress, 5 planned** across A-01 to A-76.
+Phase A stands at **56 done, 16 in progress, 5 planned** across A-01 to A-77.
 
 ## The shape of what is left
 
@@ -23,7 +23,7 @@ So the remaining work divides cleanly:
 | --- | --- | ---: |
 | Engineering, in this repository | anyone working here | 9 |
 | Operator ceremony and outside resources | the founder | 4 gates |
-| Acceptance on a real device | the founder | 3 |
+| Acceptance on a real device | the founder | 4 |
 
 ## 1. Founder gates - nothing ships past these
 
@@ -67,11 +67,12 @@ Ordered by what the founder can feel, not by row number.
 
 ## 3. Waiting only on a look
 
-Merged and measured, needing one confirmation each:
+Implemented and measured, needing one confirmation each:
 
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
 - **A-72** quick loads showing no placeholder at all
 - **A-73** the balance in the account menu showing a number
+- **A-77** card posters and Play controls on desktop, Android and iOS, with no media request before interaction
 
 ## What Phase A does not need
 

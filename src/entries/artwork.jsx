@@ -210,7 +210,7 @@ const { useState, useEffect, useRef } = React;
                         <div className="artwork-detail-audio-visual">
                             <div className="artwork-detail-audio-logo-wrap">
                                 <img
-                                    src="/ARTSOULlogo.png"
+                                    src="/ARTSOULlogo-clean.png"
                                     alt="Music"
                                     className={`artwork-detail-audio-logo ${isPlaying ? 'is-playing' : ''}`}
                                 />

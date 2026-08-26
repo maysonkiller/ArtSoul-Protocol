@@ -6,6 +6,8 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'components', 'artwork-card.js'), 'utf8');
 const gallerySource = fs.readFileSync(path.join(__dirname, '..', 'src', 'entries', 'gallery.jsx'), 'utf8');
+const homeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'entries', 'index.js'), 'utf8');
+const detailSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'entries', 'artwork.jsx'), 'utf8');
 const window = {
     ArtSoulSecurity: { isValidStorageUrl: () => true },
     addEventListener: () => {}
@@ -58,7 +60,13 @@ test('video metadata wins over stale audio metadata before first paint', () => {
         { ...mediaDescriptor(artwork) },
         // thumbnailUrl mirrors url for anything that is not a still image, so a
         // video is never routed through a still transform.
-        { type: 'video', url: artwork.file_url, thumbnailUrl: artwork.file_url, poster: '', known: true }
+        {
+            type: 'video',
+            url: artwork.file_url,
+            thumbnailUrl: artwork.file_url,
+            poster: '/ARTSOULlogo-clean.png',
+            known: true
+        }
     );
 });
 
@@ -80,4 +88,32 @@ test('shared card images defer offscreen transfer and decode work', () => {
     assert.match(source, /className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async'/);
     assert.equal((gallerySource.match(/loading="lazy"/g) || []).length, 2);
     assert.equal((gallerySource.match(/decoding="async"/g) || []).length, 2);
+});
+
+test('card audio and video stay off the page-load network path', () => {
+    assert.doesNotMatch(source, /preload[:=] ['"]metadata['"]/);
+    assert.match(source, /video\.preload = 'none'/);
+    assert.match(source, /audio\.preload = 'none'/);
+    assert.match(source, /preload: 'none'/);
+    assert.doesNotMatch(source, /video\.currentTime = target/);
+
+    assert.doesNotMatch(gallerySource, /preload="metadata"/);
+    assert.match(gallerySource, /preload="none"/);
+    assert.doesNotMatch(homeSource, /preload(?: = |', ')metadata/);
+    assert.match(homeSource, /preload(?: = |', ')none/);
+    assert.ok(
+        (homeSource.match(/video\.poster = '\/ARTSOULlogo-clean\.png'/g) || []).length >= 2,
+        'both homepage fallback video renderers must paint a poster without fetching video bytes'
+    );
+
+    // The selected artwork is not a card: its player still needs metadata so
+    // the user gets a usable detail surface before pressing Play.
+    assert.match(detailSource, /preload="metadata"/);
+});
+
+test('runtime media uses the lighter existing ArtSoul visual', () => {
+    for (const runtimeSource of [source, gallerySource, homeSource, detailSource]) {
+        assert.doesNotMatch(runtimeSource, /['"]\/ARTSOULlogo\.png['"]/);
+        assert.match(runtimeSource, /['"]\/ARTSOULlogo-clean\.png['"]/);
+    }
 });

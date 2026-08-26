@@ -110,12 +110,12 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 56 `done`, 15 `in progress`, 5 `planned` across A-01 to A-76
+current position is 56 `done`, 16 `in progress`, 5 `planned` across A-01 to A-77
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that
-remain open are moderation (A-21, A-22, A-39) and the A-23 go/no-go, plus the
-eleven unblocked rows A-33, A-34, A-35, A-38, A-47, A-48, A-53, A-54, A-58, A-61 and A-64. A-50
+remain open are moderation (A-21, A-22, A-39) and the A-23 go/no-go, plus
+the unblocked rows A-33, A-34, A-35, A-38, A-47, A-48, A-53, A-54, A-58, A-61, A-64 and A-77. A-50
 and A-56 have merged fixes and remain open only for production acceptance.
 
 | Exit area | Current evidence | Remaining work |

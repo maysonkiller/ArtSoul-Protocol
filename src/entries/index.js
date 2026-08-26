@@ -350,7 +350,8 @@ let morphActive = false;
                     const video = document.createElement('video');
                     video.src = art.file_url;
                     video.className = 'artwork-image';
-                    video.setAttribute('preload', 'metadata');
+                    video.setAttribute('preload', 'none');
+                    video.poster = '/ARTSOULlogo-clean.png';
                     video.setAttribute('playsinline', '');
                     video.muted = true;
                     video.style.cssText = 'pointer-events: none;';
@@ -366,7 +367,7 @@ let morphActive = false;
                     audioPreview.style.cssText = 'width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(6, 182, 212, 0.3)); position: relative;';
 
                     const logoImg = document.createElement('img');
-                    logoImg.src = '/ARTSOULlogo.png';
+                    logoImg.src = '/ARTSOULlogo-clean.png';
                     logoImg.alt = 'Music';
                     logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 3s linear infinite; animation-play-state: paused; margin-bottom: 1rem;';
 
@@ -381,6 +382,7 @@ let morphActive = false;
                     const audioPlayer = document.createElement('audio');
                     audioPlayer.src = art.file_url;
                     audioPlayer.controls = true;
+                    audioPlayer.preload = 'none';
                     audioPlayer.crossOrigin = 'anonymous';
                     audioPlayer.style.cssText = 'width: 90%; max-width: 300px; position: relative; z-index: 10;';
 
@@ -794,7 +796,8 @@ let morphActive = false;
                                 video.src = art.file_url;
                                 video.className = 'w-full h-full object-contain';
                                 video.controls = true;
-                                video.preload = 'metadata';
+                                video.preload = 'none';
+                                video.poster = '/ARTSOULlogo-clean.png';
                                 video.onclick = (e) => e.stopPropagation();
                                 video.onerror = () => {
                                     console.warn('Video failed to load:', art.file_url);
@@ -809,7 +812,7 @@ let morphActive = false;
                                 audioContainer.className = 'w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black';
 
                                 const logoImg = document.createElement('img');
-                                logoImg.src = '/ARTSOULlogo.png';
+                                logoImg.src = '/ARTSOULlogo-clean.png';
                                 logoImg.alt = 'Music';
                                 logoImg.style.cssText = 'width: 50%; height: 50%; object-fit: contain; animation: spin 8s linear infinite; margin-bottom: 1rem; transition: animation-duration 0.3s;';
                                 logoImg.onerror = function() {
@@ -822,7 +825,7 @@ let morphActive = false;
                                 audio.className = 'w-full px-4';
                                 audio.controls = true;
                                 audio.crossOrigin = 'anonymous';
-                                audio.preload = 'metadata';
+                                audio.preload = 'none';
                                 audio.onclick = (e) => e.stopPropagation();
 
                                 // Make logo spin faster when playing
