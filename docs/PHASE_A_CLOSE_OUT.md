@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **55 done, 15 in progress, 6 planned** across A-01 to A-76.
+Phase A stands at **56 done, 14 in progress, 6 planned** across A-01 to A-76.
 
 ## The shape of what is left
 
@@ -21,7 +21,7 @@ So the remaining work divides cleanly:
 
 | | who | count |
 | --- | --- | ---: |
-| Engineering, in this repository | anyone working here | 10 |
+| Engineering, in this repository | anyone working here | 9 |
 | Operator ceremony and outside resources | the founder | 4 gates |
 | Acceptance on a real device | the founder | 3 |
 
