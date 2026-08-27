@@ -26,7 +26,7 @@ test('branded runtime media resolves from the site root on clean subpath routes'
 
   assert.match(
     read('src/entries/artwork.jsx'),
-    /src="\/ARTSOULlogo-clean\.png"/,
-    'the audio detail must render its branded visual from the site root'
+    /brandMediaPoster\?\.\(\) \|\| '\/ARTSOULlogo-clean\.png'/,
+    'the audio detail must reuse the loaded brand visual with a root-absolute fallback'
   );
 });

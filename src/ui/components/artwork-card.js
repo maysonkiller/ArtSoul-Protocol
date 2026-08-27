@@ -11,6 +11,11 @@
         return (value || '').toString().trim().toLowerCase();
     }
 
+    function brandMediaPoster() {
+        const siteLogo = globalThis.document?.querySelector?.('.site-logo');
+        return siteLogo?.currentSrc || siteLogo?.src || BRAND_MEDIA_POSTER;
+    }
+
     function toNumber(value, fallback = 0) {
         const parsed = parseFloat(value);
         return Number.isFinite(parsed) ? parsed : fallback;
@@ -140,7 +145,7 @@
             url,
             // Card surfaces paint this; url stays the original for detail views.
             thumbnailUrl: cardThumbnailUrl(url, type),
-            poster: type === 'video' ? (posterUrl(artwork) || BRAND_MEDIA_POSTER) : '',
+            poster: type === 'video' ? (posterUrl(artwork) || brandMediaPoster()) : '',
             known: type !== 'unknown'
         });
     }
@@ -521,7 +526,7 @@
             label.textContent = 'AUDIO';
             const avatar = document.createElement('img');
             avatar.className = 'artsoul-card-audio-avatar';
-            avatar.src = BRAND_MEDIA_POSTER;
+            avatar.src = brandMediaPoster();
             avatar.alt = '';
             avatar.loading = 'lazy';
             avatar.decoding = 'async';
@@ -743,7 +748,7 @@
         return h('div', { className: 'artsoul-card-media' },
             h('div', { className: 'artsoul-card-audio' },
                 h('div', { className: 'artsoul-card-audio-label' }, 'AUDIO'),
-                h('img', { src: BRAND_MEDIA_POSTER, alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
+                h('img', { src: brandMediaPoster(), alt: '', className: 'artsoul-card-audio-avatar', loading: 'lazy', decoding: 'async', 'data-playing': String(playing) }),
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
@@ -856,6 +861,7 @@
         identityKeys,
         mediaUrl,
         posterUrl,
+        brandMediaPoster,
         mediaType,
         mediaDescriptor,
         hasSafeMedia,

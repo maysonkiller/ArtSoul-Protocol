@@ -19,7 +19,7 @@ vm.runInNewContext(
     { window, document: {} }
 );
 vm.runInNewContext(source, { window, document: {} });
-const { mediaType, mediaUrl, posterUrl, mediaDescriptor } = window.ArtSoulArtworkCard;
+const { mediaType, mediaUrl, posterUrl, mediaDescriptor, brandMediaPoster } = window.ArtSoulArtworkCard;
 
 test('video evidence wins over stale audio metadata without selecting the audio URL', () => {
     const artwork = {
@@ -90,6 +90,23 @@ test('shared card images defer offscreen transfer and decode work', () => {
     assert.equal((gallerySource.match(/decoding="async"/g) || []).length, 2);
 });
 
+test('card media reuses the already-loaded site-logo URL', () => {
+    const siteLogoUrl = 'https://cdn.example.test/site-logo.png';
+    const isolatedWindow = {
+        ArtSoulSecurity: { isValidStorageUrl: () => true },
+        addEventListener: () => {}
+    };
+    const isolatedDocument = {
+        querySelector: selector => selector === '.site-logo'
+            ? { currentSrc: siteLogoUrl, src: '/ARTSOULlogo-clean.png' }
+            : null
+    };
+    vm.runInNewContext(source, { window: isolatedWindow, document: isolatedDocument });
+
+    assert.equal(isolatedWindow.ArtSoulArtworkCard.brandMediaPoster(), siteLogoUrl);
+    assert.equal(brandMediaPoster(), '/ARTSOULlogo-clean.png');
+});
+
 test('card audio and video stay off the page-load network path', () => {
     assert.doesNotMatch(source, /preload[:=] ['"]metadata['"]/);
     assert.match(source, /video\.preload = 'none'/);
@@ -102,7 +119,7 @@ test('card audio and video stay off the page-load network path', () => {
     assert.doesNotMatch(homeSource, /preload(?: = |', ')metadata/);
     assert.match(homeSource, /preload(?: = |', ')none/);
     assert.ok(
-        (homeSource.match(/video\.poster = '\/ARTSOULlogo-clean\.png'/g) || []).length >= 2,
+        (homeSource.match(/video\.poster = window\.ArtSoulArtworkCard\?\.brandMediaPoster\?\.\(\) \|\| '\/ARTSOULlogo-clean\.png'/g) || []).length >= 2,
         'both homepage fallback video renderers must paint a poster without fetching video bytes'
     );
 
