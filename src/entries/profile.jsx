@@ -56,8 +56,6 @@ const { useState, useEffect, useRef } = React;
             const [transactionActions, setTransactionActions] = useState({});
             const [addressCopied, setAddressCopied] = useState(false);
             const addressCopiedTimerRef = useRef(null);
-            const [decodedProfileAvatarUrl, setDecodedProfileAvatarUrl] = useState('');
-            const profileAvatarDecodeTokenRef = useRef(0);
 
             const isClassic = theme === 'classic';
             // Keep React-rendered theme classes aligned with ThemeManager.
@@ -215,41 +213,6 @@ const { useState, useEffect, useRef } = React;
             }
 
             const resolvedAvatarUrl = getProfileAvatarUrl(profile);
-            useEffect(() => {
-                const token = ++profileAvatarDecodeTokenRef.current;
-                setDecodedProfileAvatarUrl('');
-                if (!resolvedAvatarUrl || resolvedAvatarUrl === 'uploading...') return undefined;
-
-                const preloader = typeof Image === 'function'
-                    ? new Image()
-                    : document.createElement('img');
-                const commit = () => {
-                    if (token !== profileAvatarDecodeTokenRef.current) return;
-                    setDecodedProfileAvatarUrl(resolvedAvatarUrl);
-                };
-                preloader.onerror = () => {
-                    // Keep the stable shell instead of exposing a broken or
-                    // partially painted image. A later profile refresh retries.
-                };
-                preloader.onload = () => {
-                    if (token !== profileAvatarDecodeTokenRef.current) return;
-                    if (typeof preloader.decode !== 'function') {
-                        commit();
-                        return;
-                    }
-                    preloader.decode().then(commit, () => {});
-                };
-                preloader.decoding = 'async';
-                preloader.src = resolvedAvatarUrl;
-
-                return () => {
-                    if (token === profileAvatarDecodeTokenRef.current) {
-                        profileAvatarDecodeTokenRef.current += 1;
-                    }
-                    preloader.onload = null;
-                    preloader.onerror = null;
-                };
-            }, [resolvedAvatarUrl]);
 
             // Base mainnet explorer: the protocol targets Base mainnet, so the
             // profile address always links to basescan.org.
@@ -871,17 +834,11 @@ const { useState, useEffect, useRef } = React;
                         throw new Error('ArtSoulDB is not ready');
                     }
 
-                    const profilePromise = db.getProfile(walletAddress);
-                    const artworksPromise = fetchProfileArtworks(
-                        { wallet_address: walletAddress },
-                        selectedGallery,
-                        db
-                    );
-                    const genesisPromise = getGenesisState(walletAddress);
-                    const profileResult = await Promise.resolve(profilePromise).then(
-                        value => ({ status: 'fulfilled', value }),
-                        reason => ({ status: 'rejected', reason })
-                    );
+                    const [profileResult, artworksResult, genesisResult] = await Promise.allSettled([
+                        db.getProfile(walletAddress),
+                        fetchProfileArtworks({ wallet_address: walletAddress }, selectedGallery, db),
+                        getGenesisState(walletAddress)
+                    ]);
                     let profileData = profileResult.status === 'fulfilled' ? profileResult.value : null;
                     if (!profileData) {
                         profileData = {
@@ -895,21 +852,6 @@ const { useState, useEffect, useRef } = React;
                     }
 
                     if (requestId !== profileRequestRef.current) return;
-                    // The identity request is deliberately narrow and starts in
-                    // the document head. Commit it as soon as it resolves instead
-                    // of holding the whole profile behind the slower artwork feed.
-                    setProfile(profileData);
-                    if (isOwn !== null) {
-                        setIsOwnProfile(isOwn);
-                    }
-                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
-                    setLoading(false);
-
-                    const [artworksResult, genesisResult] = await Promise.allSettled([
-                        artworksPromise,
-                        genesisPromise
-                    ]);
-                    if (requestId !== profileRequestRef.current) return;
                     const artworkData = artworksResult.status === 'fulfilled'
                         ? artworksResult.value
                         : { items: [], corpus: [] };
@@ -918,9 +860,18 @@ const { useState, useEffect, useRef } = React;
                         : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
                     const nextDiscoveryProfile = buildDiscoveryProfile(profileData, artworkData.corpus, genesisState);
 
+                    // Publish one coherent profile frame. Releasing the identity,
+                    // gallery, and avatar source in separate commits made the
+                    // page visibly assemble itself even though all reads had
+                    // already started in parallel.
+                    setProfile(profileData);
                     setMyArtworks(artworkData.items);
                     setDiscoveryProfile(nextDiscoveryProfile);
                     setArtworksLoading(false);
+                    if (isOwn !== null) {
+                        setIsOwnProfile(isOwn);
+                    }
+                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
                     loadedProfileAddressRef.current = normalizedAddress;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
@@ -1448,12 +1399,9 @@ const { useState, useEffect, useRef } = React;
                                             animation: 'colorShift 8s ease-in-out infinite'
                                         } : {}}
                                         onClick={() => editMode && fileInputRef.current?.click()}
-                                        aria-busy={Boolean(resolvedAvatarUrl && !decodedProfileAvatarUrl)}
                                     >
-                                        {decodedProfileAvatarUrl ? (
-                                            <img src={decodedProfileAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                        ) : resolvedAvatarUrl ? (
-                                            <div className="w-full h-full" aria-hidden="true"></div>
+                                        {resolvedAvatarUrl ? (
+                                            <img src={resolvedAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-sm opacity-50">
                                                 No Avatar

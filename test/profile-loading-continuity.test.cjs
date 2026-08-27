@@ -40,18 +40,21 @@ test('immediate profile skeletons bypass both placeholder delays', () => {
   assert.match(skeletons, /<CardGridSkeleton count=\{6\} immediate=\{immediate\} \/>/);
 });
 
-test('profile identity commits before the slower gallery settles', () => {
+test('profile identity and initial gallery commit as one coherent frame', () => {
   const loadStart = profile.indexOf('async function loadProfile');
   const loadEnd = profile.indexOf('async function fetchProfileArtworks', loadStart);
   const block = profile.slice(loadStart, loadEnd);
-  const profileAwait = block.indexOf('const profileResult = await');
+  const combinedAwait = block.indexOf('await Promise.allSettled([');
   const identityCommit = block.indexOf('setProfile(profileData);');
-  const galleryAwait = block.indexOf('await Promise.allSettled([', identityCommit);
-  const loadingRelease = block.indexOf('setLoading(false);', identityCommit);
+  const galleryCommit = block.indexOf('setMyArtworks(artworkData.items);');
+  const loadingRelease = block.lastIndexOf('setLoading(false);');
 
-  assert.ok(profileAwait >= 0 && profileAwait < identityCommit);
-  assert.ok(identityCommit < loadingRelease && loadingRelease < galleryAwait);
-  assert.match(block, /const artworksPromise = fetchProfileArtworks\(/);
-  assert.match(block, /setMyArtworks\(artworkData\.items\);/);
+  assert.ok(combinedAwait >= 0 && combinedAwait < identityCommit);
+  assert.ok(identityCommit < galleryCommit && galleryCommit < loadingRelease);
+  assert.doesNotMatch(
+    block.slice(identityCommit, galleryCommit),
+    /setLoading\(false\)/,
+    'the loading surface must not disappear between the identity and gallery commits'
+  );
   assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
 });
