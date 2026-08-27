@@ -23,12 +23,21 @@ test('an artwork whose auction failed can still be given one', () => {
 });
 
 test('the retry is offered only where it can work', () => {
+  // A-77 widened this. The original condition covered only the failed second
+  // transaction - status `registered`, no auction id. An auction that ran and
+  // ended with no bids leaves the artwork in the same position the contract
+  // cares about (unminted, `activeAuctionId == 0`), but its status is
+  // `defaulted`, so the retry was refused in the one state it was most needed.
+  // The lifecycle now decides; the auction id no longer does, because that is
+  // the field the projection had wrong.
   const start = profile.indexOf('const canStartAuction');
-  const block = profile.slice(start, profile.indexOf(';', profile.indexOf('auction_id', start)) + 1);
+  const block = profile.slice(start, profile.indexOf(';', start) + 1);
   assert.match(block, /isOwnProfile/, 'only on your own profile');
   assert.match(block, /isBaseSepoliaArtwork\(artwork\)/, 'only on the active testnet');
-  assert.match(block, /=== 'registered'/, 'only before an auction exists');
-  assert.match(block, /active_auction_id \?\? artwork\.auction_id/, 'and only with no auction id');
+  assert.match(block, /!isMintedArtwork\(artwork\)/, 'never for a minted work');
+  assert.match(block, /lifecycle === 'registered' \|\| lifecycle === 'defaulted'/, 'only where a new auction is possible');
+  // Which lifecycle states qualify, per wallet role, is proven behaviorally in
+  // profile-lifecycle-action-gating.test.cjs rather than by matching source.
 });
 
 test('the auction takes its price and duration from the person, not from a record that has none', () => {

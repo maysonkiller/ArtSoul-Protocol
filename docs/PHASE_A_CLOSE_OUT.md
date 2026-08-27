@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **56 done, 14 in progress, 6 planned** across A-01 to A-76.
+Phase A stands at **56 done, 15 in progress, 6 planned** across A-01 to A-77.
 
 ## The shape of what is left
 
@@ -72,6 +72,10 @@ Merged and measured, needing one confirmation each:
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
 - **A-72** quick loads showing no placeholder at all
 - **A-73** the balance in the account menu showing a number
+- **A-77** an artwork whose auction ended with no bids offered for auction again.
+  The code half is merged; this one also needs a founder-run backfill, because
+  twelve artworks are already stored pointing at a finished auction and the fix
+  only stops new ones being created that way
 
 ## What Phase A does not need
 
