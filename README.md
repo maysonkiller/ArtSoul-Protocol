@@ -42,10 +42,12 @@ indexer, the public projection API, and the whole product interface — gallery,
 artwork and auction pages, publishing, profiles and provenance.
 
 **Added during the challenge window:** the agent interface. ArtSoul now declares
-seven tools with JSON Schema inputs to a WebMCP-capable browser, so an agent
+eight tools with JSON Schema inputs to a WebMCP-capable browser, so an agent
 reads auction state, provenance and lifecycle directly instead of inferring them
-from the page, and any action that moves value stops at a prepared step the
-person signs themselves. New files: [`webmcp-tools.js`](webmcp-tools.js),
+from the page. Any action that moves value ends at the person's own wallet: the
+agent can open it with a prepared bid, and only after the person has granted that
+permission in the page, but the wallet always asks them to approve, and no
+website can delegate that click. New files: [`webmcp-tools.js`](webmcp-tools.js),
 [`test/webmcp-tools.test.cjs`](test/webmcp-tools.test.cjs) and
 [`docs/WEBMCP.md`](docs/WEBMCP.md). Changes to existing files are limited to one
 build-manifest line and one deferred script tag on three pages. Every commit in

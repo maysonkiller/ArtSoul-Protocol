@@ -9,10 +9,13 @@
  *
  * Two rules this file does not break:
  *
- * 1. The agent never signs. Reading is fully automatic; anything that moves
- *    money stops at a prepared, explained action that the person confirms and
- *    signs in their own wallet. `prepare_bid` opens the auction and reports
- *    state - it cannot place a bid.
+ * 1. The agent never signs. Reading is fully automatic. `place_bid` goes as far
+ *    as a website can: it opens the person's wallet with the transaction, and
+ *    the wallet asks them to approve it. That last click is theirs and cannot be
+ *    delegated from here - a website cannot make a wallet approve anything, and
+ *    an agent that could would be an agent that can lose someone's money on a
+ *    misread instruction. Opening the wallet at all needs a permission the
+ *    person grants with their own click in the page; no tool can raise it.
  * 2. No economics live here. The minimum increment, the deposit and the
  *    settlement window are contract constants. When the wallet layer is ready
  *    they are read from the chain; when it is not, this file reports what the
@@ -37,6 +40,24 @@
     // fewer, and a smaller payload keeps the agent's context useful.
     const MAX_RESULTS = 20;
     const DEFAULT_RESULTS = 8;
+
+    // Two levels, and only two. `read` is every visitor by default; `wallet`
+    // lets the agent open the wallet with a transaction the person then
+    // approves themselves. There is deliberately no level above this: a level
+    // that signs without the person would need a scoped session key on a smart
+    // account, which is contract architecture and belongs to a canon amendment,
+    // not to a switch in a JavaScript file.
+    const PERMISSION_KEY = 'artsoul.agent.permission';
+    const PERMISSION_READ = 'read';
+    const PERMISSION_WALLET = 'wallet';
+
+    function safeLocalStorage() {
+        try {
+            return window.localStorage || null;
+        } catch {
+            return null;
+        }
+    }
 
     function normalizeId(value) {
         const id = String(value == null ? '' : value).trim();
@@ -99,6 +120,30 @@
         // The wallet layer is optional. It is present once the page has an
         // initialized provider, and absent for a visitor who never connected.
         const readContracts = deps.readContracts || (() => null);
+        // Granting the agent access to the wallet is a human act, so it goes
+        // through the browser's own dialog and is remembered per browser.
+        const confirmAction = deps.confirmAction ||
+            ((message) => (typeof window === 'undefined' ? false : window.confirm(message)));
+        const storage = deps.storage || (typeof window === 'undefined' ? null : safeLocalStorage());
+
+        function readPermission() {
+            try {
+                return (storage && storage.getItem(PERMISSION_KEY)) || PERMISSION_READ;
+            } catch {
+                // Private windows and blocked site data throw on access. A
+                // permission that cannot be read is a permission not granted.
+                return PERMISSION_READ;
+            }
+        }
+
+        function writePermission(level) {
+            try {
+                if (storage) storage.setItem(PERMISSION_KEY, level);
+            } catch {
+                // Losing the memory of the grant costs one extra confirmation,
+                // which is the safe direction to fail in.
+            }
+        }
 
         async function listCards(view) {
             const params = new URLSearchParams({ chain_id: String(CHAIN_ID), limit: '200' });
@@ -377,6 +422,104 @@
             }
         };
 
+        /**
+         * The one tool that reaches the chain. It does not sign: it asks the
+         * wallet to ask the person. `ArtSoulContracts.placeBid` already ensures
+         * Base Sepolia, computes the required deposit from the contract and
+         * opens the wallet, so this tool adds exactly one thing on top - a
+         * permission the person grants with their own click, in the page, never
+         * through the agent.
+         */
+        const placeBid = {
+            name: 'place_bid',
+            description:
+                'Open the connected wallet with a bid on an ArtSoul auction, so the person can review and approve ' +
+                'it. Requires a connected wallet and a permission the person grants in the page. The agent does ' +
+                'not sign: the wallet asks the person to confirm, and the transaction only exists once they do.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    artwork_id: { type: 'string', description: 'The artwork number shown in its page URL.' },
+                    bid_eth: { type: 'string', description: 'The bid amount in ETH the person wants to offer.' }
+                },
+                required: ['artwork_id', 'bid_eth']
+            },
+            execute: async (input) => {
+                const args = input || {};
+                const artworkId = normalizeId(args.artwork_id);
+                if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
+
+                const amount = text(args.bid_eth);
+                if (!(Number(amount) > 0)) {
+                    return JSON.stringify({ submitted: false, reason: 'bid_eth must be a positive amount in ETH.' });
+                }
+
+                const contracts = readContracts();
+                const walletReady = contracts && typeof contracts.placeBid === 'function' &&
+                    (typeof contracts.isReady !== 'function' || contracts.isReady());
+                if (!walletReady) {
+                    return JSON.stringify({
+                        submitted: false,
+                        reason: 'No wallet is connected on this page. The person needs to connect a wallet on Base Sepolia first.',
+                        url: `/artwork/${artworkId}`
+                    });
+                }
+
+                const card = await lookupCard(artworkId);
+                if (!card) return JSON.stringify({ error: `No published artwork ${artworkId} on Base Sepolia.` });
+                const status = text(card.status);
+                if (status !== 'auction') {
+                    return JSON.stringify({
+                        submitted: false,
+                        reason: `Artwork ${artworkId} is "${status}", so it is not open for bidding.`,
+                        url: `/artwork/${artworkId}`
+                    });
+                }
+
+                // The permission is granted by a human click in the page. An
+                // agent cannot grant it to itself: there is deliberately no tool
+                // that raises this level.
+                if (readPermission() !== PERMISSION_WALLET) {
+                    const granted = confirmAction(
+                        `Allow this page's AI agent to open your wallet with bids on ArtSoul?\n\n` +
+                        `Next: a bid of ${amount} ETH on artwork ${artworkId}.\n\n` +
+                        `Your wallet will still ask you to approve every transaction. ArtSoul never signs for you.`
+                    );
+                    if (!granted) {
+                        return JSON.stringify({
+                            submitted: false,
+                            reason: 'The person did not grant the agent permission to open the wallet.',
+                            url: `/artwork/${artworkId}`
+                        });
+                    }
+                    writePermission(PERMISSION_WALLET);
+                }
+
+                try {
+                    const transactionHash = await contracts.placeBid(artworkId, amount);
+                    return JSON.stringify({
+                        submitted: true,
+                        approved_by: 'the person, in their own wallet',
+                        artwork_id: artworkId,
+                        bid_eth: amount,
+                        transaction_hash: transactionHash || null,
+                        note: 'The wallet asked the person to approve this transaction and they did. ' +
+                            'The required deposit was computed by the contract, not by this page.',
+                        url: `/artwork/${artworkId}`
+                    });
+                } catch (error) {
+                    // A rejected signature is the ordinary case, not a fault.
+                    return JSON.stringify({
+                        submitted: false,
+                        artwork_id: artworkId,
+                        bid_eth: amount,
+                        reason: (error && error.message) || 'The wallet did not complete the transaction.',
+                        url: `/artwork/${artworkId}`
+                    });
+                }
+            }
+        };
+
         const prepareArtworkRegistration = {
             name: 'prepare_artwork_registration',
             description:
@@ -420,6 +563,7 @@
             getArtworkProvenance,
             explainSettlement,
             prepareBid,
+            placeBid,
             prepareArtworkRegistration
         ];
     }
@@ -451,7 +595,36 @@
         return (doc && doc.modelContext) || (nav && nav.modelContext) || null;
     }
 
-    window.ArtSoulWebMCP = Object.freeze({ createTools, register, modelContextOf, CHAIN_ID });
+    // Permission accessors for a future in-page toggle. Reading and revoking
+    // are exposed; granting stays where it belongs, behind the person's click
+    // in the confirmation dialog.
+    function permissionLevel() {
+        try {
+            return (safeLocalStorage() || { getItem: () => null }).getItem(PERMISSION_KEY) || PERMISSION_READ;
+        } catch {
+            return PERMISSION_READ;
+        }
+    }
+
+    function revokePermission() {
+        try {
+            const store = safeLocalStorage();
+            if (store) store.removeItem(PERMISSION_KEY);
+        } catch {
+            // Nothing to do: an unreadable store already denies the permission.
+        }
+    }
+
+    window.ArtSoulWebMCP = Object.freeze({
+        createTools,
+        register,
+        modelContextOf,
+        permissionLevel,
+        revokePermission,
+        PERMISSION_READ,
+        PERMISSION_WALLET,
+        CHAIN_ID
+    });
 
     const context = modelContextOf(
         typeof document === 'undefined' ? null : document,

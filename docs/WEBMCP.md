@@ -15,11 +15,27 @@ tools hand over those answers, and nothing else.
 
 ## The two rules the layer does not break
 
-**The agent never signs.** Reading is fully automatic. Anything that moves value
-stops at a prepared, explained action: `prepare_bid` reports the live auction and
-opens its page, `prepare_artwork_registration` opens the publish page. The person
-reviews the amount and approves the transaction in their own wallet. Neither tool
-can return a transaction, and a regression test asserts it.
+**The agent never signs.** Reading is fully automatic. `place_bid` goes as far as
+a website can: it opens the person's wallet with the transaction, and the wallet
+asks them to approve it. That last click cannot be delegated from a page — no
+website can make a wallet approve anything — and it is where the boundary
+belongs, because an agent reads instructions from the open web and an agent that
+could sign is an agent that can lose someone's money on a misread instruction.
+
+Opening the wallet at all requires a permission the person grants themselves,
+through the browser's own confirmation dialog, in the page. The default level is
+`read`; the `wallet` level is remembered per browser and can be revoked with
+`window.ArtSoulWebMCP.revokePermission()`. A storage that cannot be read denies
+rather than grants, a refusal is never remembered as a grant, and **no tool can
+raise the level** — there is deliberately no tool that grants permissions, and a
+test asserts that none appears. Anything beyond this — an agent signing inside
+bounds the person set once — needs scoped session keys on a smart account, which
+is contract architecture; it is filed as backlog C-27 and gated behind the
+independent audit.
+
+`prepare_bid` and `prepare_artwork_registration` remain the no-wallet path: they
+report state, open the relevant page and stop, and neither can return a
+transaction.
 
 **No economics live in the layer.** Deposit size, minimum bid increment, auction
 durations and the settlement window are contract constants on Base. When the
@@ -39,6 +55,7 @@ economics.
 | `get_artwork_provenance` | Creator, First Collector, Owner and the event timeline | `/api/public/artwork-provenance` |
 | `explain_settlement` | The publish → auction → settlement → mint lifecycle, and where one work sits in it | `/api/public/artworks` |
 | `prepare_bid` | Live auction state, then opens the auction for the person to sign | `/api/public/artworks` (+ contract constants when available) |
+| `place_bid` | Opens the connected wallet with the bid, for the person to approve | `ArtSoulContracts.placeBid` (contract computes the deposit) |
 | `prepare_artwork_registration` | Validates details, then opens the publish page for the person to sign | — |
 
 No new API route was added. Every tool reads an endpoint the product already

@@ -80,6 +80,7 @@ test('the seven ArtSoul tools are registered when the browser supports WebMCP', 
     'get_artwork_provenance',
     'explain_settlement',
     'prepare_bid',
+    'place_bid',
     'prepare_artwork_registration'
   ]);
   assert.equal(typeof win.ArtSoulWebMCP.register, 'function');
@@ -97,7 +98,7 @@ test('one rejected descriptor does not cost the other tools', async () => {
   const tools = win.ArtSoulWebMCP.createTools({ fetchJson: async () => ({}) });
   const names = await win.ArtSoulWebMCP.register(modelContext, tools);
   assert.equal(names.includes('search_artworks'), false);
-  assert.equal(accepted.length, 6);
+  assert.equal(accepted.length, 7);
 });
 
 test('every tool declares a JSON Schema so the agent never guesses an input', () => {
@@ -272,6 +273,158 @@ test('prepare_bid reports contract constants only when the chain can be read', a
   });
   const failed = JSON.parse(await broken.get('prepare_bid').execute({ artwork_id: '31' }));
   assert.equal(failed.contract_constants, null);
+});
+
+function memoryStorage(initial) {
+  const map = new Map(Object.entries(initial || {}));
+  return {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => map.set(k, v),
+    removeItem: (k) => map.delete(k),
+    map
+  };
+}
+
+function walletStub(onBid) {
+  const calls = [];
+  return {
+    calls,
+    contracts: {
+      isReady: () => true,
+      placeBid: async (artworkId, amount) => {
+        calls.push([artworkId, amount]);
+        return onBid ? onBid(artworkId, amount) : '0xhash';
+      }
+    }
+  };
+}
+
+test('place_bid opens the wallet only after the person grants permission themselves', async () => {
+  const wallet = walletStub();
+  const storage = memoryStorage();
+  const prompts = [];
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    readContracts: () => wallet.contracts,
+    storage,
+    confirmAction: (message) => { prompts.push(message); return true; }
+  });
+
+  const first = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(first.submitted, true);
+  assert.equal(first.approved_by, 'the person, in their own wallet');
+  assert.equal(first.transaction_hash, '0xhash');
+  assert.deepEqual(wallet.calls, [['31', '0.5']]);
+  // The dialog must name the amount and the artwork, and must not promise that
+  // the page will sign anything.
+  assert.equal(prompts.length, 1);
+  assert.match(prompts[0], /0\.5 ETH/);
+  assert.match(prompts[0], /artwork 31/);
+  assert.match(prompts[0], /never signs for you/);
+
+  // Granted once, remembered for this browser: no second dialog.
+  await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.6' });
+  assert.equal(prompts.length, 1);
+  assert.equal(wallet.calls.length, 2);
+});
+
+test('a refused permission means no wallet call at all', async () => {
+  const wallet = walletStub();
+  const storage = memoryStorage();
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    readContracts: () => wallet.contracts,
+    storage,
+    confirmAction: () => false
+  });
+
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(answer.submitted, false);
+  assert.match(answer.reason, /did not grant/);
+  assert.deepEqual(wallet.calls, []);
+  assert.equal(storage.map.size, 0, 'a refusal must not be remembered as a grant');
+});
+
+test('no tool can raise the agent permission by itself', () => {
+  const win = load();
+  const names = win.ArtSoulWebMCP.createTools({ fetchJson: async () => ({}) }).map((t) => t.name);
+  // The grant exists only behind a human click in the confirmation dialog. If a
+  // tool ever appears that sets it, this test is the thing that should stop it.
+  assert.equal(names.some((name) => /permission|grant|allow|approve/i.test(name)), false);
+  assert.equal(typeof win.ArtSoulWebMCP.revokePermission, 'function');
+  assert.equal(win.ArtSoulWebMCP.permissionLevel(), 'read');
+});
+
+test('place_bid refuses without a connected wallet, on a closed auction, and on a bad amount', async () => {
+  const win = load();
+  const storage = memoryStorage({ 'artsoul.agent.permission': 'wallet' });
+  const noWallet = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    storage
+  });
+  const guest = JSON.parse(await noWallet.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(guest.submitted, false);
+  assert.match(guest.reason, /No wallet is connected/);
+
+  const wallet = walletStub();
+  const closed = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [SETTLED_CARD] } }),
+    readContracts: () => wallet.contracts,
+    storage
+  });
+  const sold = JSON.parse(await closed.get('place_bid').execute({ artwork_id: '12', bid_eth: '0.5' }));
+  assert.equal(sold.submitted, false);
+  assert.match(sold.reason, /not open for bidding/);
+  assert.deepEqual(wallet.calls, []);
+
+  const live = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    readContracts: () => wallet.contracts,
+    storage
+  });
+  for (const bad of ['0', '-1', 'a lot', '']) {
+    const answer = JSON.parse(await live.get('place_bid').execute({ artwork_id: '31', bid_eth: bad }));
+    assert.equal(answer.submitted, false, `${bad} must be refused`);
+  }
+  assert.deepEqual(wallet.calls, [], 'an invalid amount must never reach the wallet');
+});
+
+test('a rejected signature is reported as an ordinary outcome, not a crash', async () => {
+  const wallet = walletStub(() => { throw new Error('User rejected the request.'); });
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    readContracts: () => wallet.contracts,
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+  });
+
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(answer.submitted, false);
+  assert.match(answer.reason, /User rejected/);
+});
+
+test('a storage that throws denies the permission instead of granting it', async () => {
+  const wallet = walletStub();
+  const hostile = {
+    getItem() { throw new Error('site data blocked'); },
+    setItem() { throw new Error('site data blocked'); }
+  };
+  let asked = 0;
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    readContracts: () => wallet.contracts,
+    storage: hostile,
+    confirmAction: () => { asked += 1; return true; }
+  });
+
+  await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' });
+  await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' });
+  // Unreadable storage costs an extra confirmation, which is the safe direction.
+  assert.equal(asked, 2);
+  assert.equal(wallet.calls.length, 2);
 });
 
 test('prepare_artwork_registration says registration is not a mint', async () => {
