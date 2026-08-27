@@ -370,8 +370,21 @@ const { useState, useEffect, useRef } = React;
             function hasActiveAuction(artwork = {}) {
                 const status = String(artwork.status || '').toLowerCase();
                 if (isMintedArtwork(artwork) || status === 'sold' || status === 'for_sale') return false;
-                if (!isZeroProtocolId(artwork.active_auction_id || artwork.activeAuctionId)) return true;
-                return status === 'auction' || status === 'awaiting_end' || status === 'settlement_pending';
+                // A-77. The lifecycle decides, not the id. An auction that ended
+                // with no bids is finished: on chain `endAuction` sets
+                // Artwork.activeAuctionId back to 0, and so do settlement and a
+                // winner default, so `registered` and `defaulted` are both states
+                // in which the contract will accept a new auction. Reading the id
+                // first said the opposite - the projection kept the finished
+                // auction's id (fixed in the same change), so a released artwork
+                // looked occupied and its creator was refused a new auction with
+                // a message about an active auction that did not exist.
+                if (status === 'registered' || status === 'defaulted') return false;
+                if (status === 'auction' || status === 'awaiting_end' || status === 'settlement_pending') return true;
+                // No usable lifecycle - a pending or unrecognised row. Here the
+                // id is the only evidence there is, and an unknown state must
+                // fail closed.
+                return !isZeroProtocolId(artwork.active_auction_id || artwork.activeAuctionId);
             }
 
             function isMintedArtwork(artwork = {}) {
@@ -476,10 +489,33 @@ const { useState, useEffect, useRef } = React;
                 // that did not exist, and the card was only a link. This is that
                 // retry. It appears for your own work, on Base Sepolia, that is
                 // registered with no auction of any kind.
+                //
+                // A-77 widened this. The first version asked for status
+                // `registered` and no auction id, which covered only the failed
+                // second transaction. An auction that runs and ends with no bids
+                // leaves the artwork in exactly the same position - unminted,
+                // with no auction, free to be auctioned again - but its status is
+                // `defaulted` and, until the indexer fix in this change, the
+                // projection still carried the finished auction's id. Both
+                // conditions were false, so the one state the contract was most
+                // ready to auction again was the state the interface refused to
+                // offer. Verified against `ArtSoulCore.createAuction`, which asks
+                // only that the work is unminted with `activeAuctionId == 0`, and
+                // all three on-chain paths that finish an auction - no bids,
+                // settlement, winner default - set it back to 0.
+                //
+                // Deliberately gated on lifecycle rather than on the auction id:
+                // that id is the field that was wrong, and rows already stored
+                // with it stay wrong until the backfill runs. `auction` and
+                // `awaiting_end` are excluded because a live auction must not be
+                // replaced and an expired one has to be finalized first;
+                // `settlement_pending` is excluded because the winner may still
+                // settle.
+                const lifecycle = String(artwork.status || '').toLowerCase();
                 const canStartAuction = isOwnProfile
                     && isBaseSepoliaArtwork(artwork)
-                    && String(artwork.status || '').toLowerCase() === 'registered'
-                    && !String(artwork.active_auction_id ?? artwork.auction_id ?? '').trim();
+                    && !isMintedArtwork(artwork)
+                    && (lifecycle === 'registered' || lifecycle === 'defaulted');
 
                 return (
                     <CardElement
