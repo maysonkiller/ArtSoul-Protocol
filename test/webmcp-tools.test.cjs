@@ -179,26 +179,79 @@ test('an artwork id that is not a protocol number is refused before any request'
 });
 
 test('provenance names the three canon roles and explains First Collector', async () => {
+  // The payload below is the real shape of /api/public/artwork-provenance,
+  // captured from production: roles are `*_address` fields under `roles`, and
+  // the timeline arrives as `events`. An earlier version of this tool guessed a
+  // `provenance.timeline` shape and returned three nulls against live data, so
+  // this fixture is deliberately verbatim rather than convenient.
   const win = load();
   const tools = toolsFrom(win, {
     fetchJson: jsonFetch({
       '/api/public/artwork-provenance': {
-        provenance: {
-          creator: '0xcreator',
-          first_collector: '0xcollector',
-          current_owner: '0xowner',
-          timeline: [{ event: 'Settled' }]
-        }
+        success: true,
+        source: 'v41_provenance_projection',
+        chain_id: 84532,
+        artwork_id: '19',
+        roles: {
+          creator_address: '0xA61C114E38cEAc5BDE6325956F4e808582690329',
+          first_collector_address: '0x6EC8C121043357aC231E36D403EdAbf90AE6989B',
+          current_owner_address: '0x6EC8C121043357aC231E36D403EdAbf90AE6989B'
+        },
+        events: [
+          {
+            type: 'artwork_registered',
+            block_number: 43660058,
+            log_index: 138,
+            transaction_hash: '0x3ad3e5',
+            recorded_at: '2026-07-03T14:20:12.598+00:00',
+            creator_address: '0xA61C114E38cEAc5BDE6325956F4e808582690329'
+          },
+          {
+            type: 'auction_started',
+            transaction_hash: '0x2b96a6',
+            recorded_at: '2026-07-03T14:20:47.805+00:00',
+            start_price: '0.001',
+            duration_seconds: 129600
+          },
+          {
+            type: 'settlement_completed',
+            transaction_hash: '0x079ced',
+            recorded_at: '2026-07-05T07:46:19.314+00:00',
+            first_collector_address: '0x6EC8C121043357aC231E36D403EdAbf90AE6989B',
+            final_price: '0.001'
+          }
+        ]
       }
     })
   });
 
-  const answer = JSON.parse(await tools.get('get_artwork_provenance').execute({ artwork_id: '12' }));
-  assert.equal(answer.creator, '0xcreator');
-  assert.equal(answer.first_collector, '0xcollector');
-  assert.equal(answer.owner, '0xowner');
-  assert.equal(answer.timeline.length, 1);
+  const answer = JSON.parse(await tools.get('get_artwork_provenance').execute({ artwork_id: '19' }));
+  assert.equal(answer.creator, '0xA61C114E38cEAc5BDE6325956F4e808582690329');
+  assert.equal(answer.first_collector, '0x6EC8C121043357aC231E36D403EdAbf90AE6989B');
+  assert.equal(answer.owner, '0x6EC8C121043357aC231E36D403EdAbf90AE6989B');
   assert.match(answer.note, /First Collector/);
+
+  assert.equal(answer.timeline.length, 3);
+  assert.deepEqual(answer.timeline.map((entry) => entry.event), [
+    'artwork_registered',
+    'auction_started',
+    'settlement_completed'
+  ]);
+  assert.equal(answer.timeline[2].amount_eth, '0.001');
+  assert.equal(answer.timeline[2].at, '2026-07-05T07:46:19.314+00:00');
+  // Block numbers and log indexes mean nothing in a conversation.
+  assert.equal('block_number' in answer.timeline[0], false);
+});
+
+test('a long provenance timeline is capped instead of flooding the agent', async () => {
+  const events = Array.from({ length: 40 }, (_, i) => ({ type: `resale_${i}`, recorded_at: '2026-07-05T07:46:19Z' }));
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artwork-provenance': { roles: {}, events } })
+  });
+  const answer = JSON.parse(await tools.get('get_artwork_provenance').execute({ artwork_id: '19' }));
+  assert.equal(answer.timeline.length, 25);
+  assert.equal(answer.creator, null, 'missing roles must be null, never undefined');
 });
 
 test('explain_settlement keeps the canon floor rule and refuses to quote figures it cannot read', async () => {

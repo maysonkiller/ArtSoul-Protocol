@@ -40,6 +40,9 @@
     // fewer, and a smaller payload keeps the agent's context useful.
     const MAX_RESULTS = 20;
     const DEFAULT_RESULTS = 8;
+    // A provenance timeline is short by nature, but a work that was resold many
+    // times should not flood the agent's context either.
+    const MAX_TIMELINE = 25;
 
     // Two levels, and only two. `read` is every visitor by default; `wallet`
     // lets the agent open the wallet with a transaction the person then
@@ -306,13 +309,22 @@
                 const payload = await fetchJson(
                     `/api/public/artwork-provenance?chain_id=${CHAIN_ID}&artwork_id=${encodeURIComponent(artworkId)}`
                 );
-                const provenance = (payload && (payload.provenance || payload.data)) || payload || {};
+                // The endpoint answers with `roles` and `events`; the raw events
+                // carry block numbers and log indexes that mean nothing in a
+                // conversation, so only the narratable fields are passed on.
+                const roles = (payload && payload.roles) || {};
+                const events = Array.isArray(payload && payload.events) ? payload.events : [];
                 return JSON.stringify({
                     artwork_id: artworkId,
-                    creator: provenance.creator || null,
-                    first_collector: provenance.first_collector || null,
-                    owner: provenance.current_owner || provenance.owner || null,
-                    timeline: Array.isArray(provenance.timeline) ? provenance.timeline : [],
+                    creator: roles.creator_address || null,
+                    first_collector: roles.first_collector_address || null,
+                    owner: roles.current_owner_address || null,
+                    timeline: events.slice(0, MAX_TIMELINE).map(event => ({
+                        event: text(event.type),
+                        at: event.recorded_at || null,
+                        amount_eth: text(event.final_price || event.winning_bid || event.price || event.start_price) || null,
+                        transaction_hash: event.transaction_hash || null
+                    })),
                     note: 'First Collector is the address that won and settled the primary auction. ' +
                         'It is a permanent public role, not a transferable badge.',
                     url: `/artwork/${artworkId}`
