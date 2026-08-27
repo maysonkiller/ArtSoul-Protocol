@@ -57,6 +57,9 @@ const legacyRootAssets = [
     // Play CDN the pages used to load at runtime.
     'tailwind-build.css',
     'supabase-auth.js',
+    // Agent tools. A classic deferred script like the other root assets, so it
+    // is copied verbatim rather than bundled into a page entry.
+    'webmcp-tools.js',
     'supabase-client.js',
     'theme-sync.js',
     'ui-core.css',
