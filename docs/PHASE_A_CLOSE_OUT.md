@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **56 done, 14 in progress, 6 planned** across A-01 to A-76.
+Phase A stands at **56 done, 15 in progress, 6 planned** across A-01 to A-77.
 
 ## The shape of what is left
 
@@ -56,7 +56,8 @@ Ordered by what the founder can feel, not by row number.
 | **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. Production measurements put primary content at 0.7-2.4 seconds and video readiness at 1.6-3.2 seconds; production Android and the legacy-video tail remain open evidence |
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
-| **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
+| **A-54** | Shorten the profile critical path without piecemeal paint | The static shell removed empty frames, but the later identity-first split exposed a visibly assembled page. Keep the useful parallel reads and prefetch; A-77 restores one coherent initial commit while the remaining latency work stays measured separately |
+| **A-77** | Restore one coherent profile paint | The early identity and delayed-avatar repairs combined into a visibly assembled page. Keep the parallel reads and prefetch, but publish the initial profile, gallery and real avatar source in one frame |
 | **A-48** | The single full-document repaint on browser Back | Diagnosis not started |
 | **A-53** | The identity settle gap between header and profile | Never reproduced on a device |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
