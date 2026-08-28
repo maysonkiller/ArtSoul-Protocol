@@ -42,7 +42,7 @@ indexer, the public projection API, and the whole product interface — gallery,
 artwork and auction pages, publishing, profiles and provenance.
 
 **Added during the challenge window:** the agent interface. ArtSoul now declares
-eight tools with JSON Schema inputs to a WebMCP-capable browser, so an agent
+eleven tools with JSON Schema inputs to a WebMCP-capable browser, so an agent
 reads auction state, provenance and lifecycle directly instead of inferring them
 from the page. Any action that moves value ends at the person's own wallet: the
 agent can open it with a prepared bid, and only after the person has granted that

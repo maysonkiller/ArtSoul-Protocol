@@ -69,18 +69,21 @@ test('an ordinary browser gets no tools, no requests and no handlers', () => {
   assert.equal(typeof win.ArtSoulWebMCP.createTools, 'function');
 });
 
-test('the seven ArtSoul tools are registered when the browser supports WebMCP', async () => {
+test('the eleven ArtSoul tools are registered when the browser supports WebMCP', async () => {
   const registered = [];
   const win = load({ modelContext: { registerTool: async (tool) => registered.push(tool.name) } });
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(registered, [
     'search_artworks',
     'find_active_auctions',
+    'get_artwork',
     'get_auction_state',
     'get_artwork_provenance',
     'explain_settlement',
+    'open_artwork',
     'prepare_bid',
     'place_bid',
+    'end_expired_auction',
     'prepare_artwork_registration'
   ]);
   assert.equal(typeof win.ArtSoulWebMCP.register, 'function');
@@ -98,7 +101,7 @@ test('one rejected descriptor does not cost the other tools', async () => {
   const tools = win.ArtSoulWebMCP.createTools({ fetchJson: async () => ({}) });
   const names = await win.ArtSoulWebMCP.register(modelContext, tools);
   assert.equal(names.includes('search_artworks'), false);
-  assert.equal(accepted.length, 7);
+  assert.equal(accepted.length, 10);
 });
 
 test('every tool declares a JSON Schema so the agent never guesses an input', () => {
@@ -478,6 +481,154 @@ test('a storage that throws denies the permission instead of granting it', async
   // Unreadable storage costs an extra confirmation, which is the safe direction.
   assert.equal(asked, 2);
   assert.equal(wallet.calls.length, 2);
+});
+
+test('search finds a work by its number, the way people actually refer to it', async () => {
+  // The number is the identifier printed in the URL, so "31", "#31" and
+  // "artwork 31" are all ordinary ways to name a work in a conversation.
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD, SETTLED_CARD] } })
+  });
+
+  for (const query of ['31', '#31', 'artwork 31', 'Artwork  #31']) {
+    const answer = JSON.parse(await tools.get('search_artworks').execute({ query }));
+    assert.equal(answer.count, 1, `${query} must find exactly one work`);
+    assert.equal(answer.results[0].artwork_id, '31');
+  }
+
+  // A number that is part of a title still matches by text, and a number that
+  // matches nothing returns nothing rather than everything.
+  const none = JSON.parse(await tools.get('search_artworks').execute({ query: '999' }));
+  assert.equal(none.count, 0);
+});
+
+test('get_artwork answers the whole public record of one work', async () => {
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({
+      '/api/public/artworks': {
+        data: [{
+          ...AUCTION_CARD,
+          current_owner_address: '0xowner',
+          token_id: '0',
+          like_count: 4,
+          would_buy_count: 2,
+          watching_count: 7,
+          bids: [{}, {}]
+        }]
+      }
+    })
+  });
+
+  const answer = JSON.parse(await tools.get('get_artwork').execute({ artwork_id: '31' }));
+  assert.equal(answer.artwork_id, '31');
+  assert.equal(answer.title, 'Northern Static');
+  assert.equal(answer.description, 'A study in interference');
+  assert.equal(answer.creator_address, '0xabc');
+  assert.equal(answer.owner, '0xowner');
+  assert.equal(answer.bid_count, 2);
+  // ArtSoulNFT assigns the first token id 1, so a zero is the projection saying
+  // "no token" and must never be reported to an agent as token zero.
+  assert.equal(answer.token_id, null);
+  assert.deepEqual(answer.community_signals, { likes: 4, would_buy: 2, watching: 7 });
+  // Discovery signals must never arrive dressed as money.
+  assert.equal('value' in answer.community_signals, false);
+});
+
+test('open_artwork navigates, and refuses a work that does not exist', async () => {
+  const opened = [];
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    openPath: (path) => opened.push(path)
+  });
+
+  const answer = JSON.parse(await tools.get('open_artwork').execute({ artwork_id: '31' }));
+  assert.equal(answer.opened, true);
+  assert.equal(answer.title, 'Northern Static');
+  assert.deepEqual(opened, ['/artwork/31']);
+
+  const missing = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [] } }),
+    openPath: (path) => opened.push(path)
+  });
+  const refused = JSON.parse(await missing.get('open_artwork').execute({ artwork_id: '77' }));
+  assert.equal(refused.opened, false);
+  assert.equal(opened.length, 1, 'a missing artwork must not navigate anywhere');
+});
+
+test('end_expired_auction only finalizes an auction whose time has actually passed', async () => {
+  const calls = [];
+  const contracts = {
+    isReady: () => true,
+    endAuction: async (id) => { calls.push(id); return '0xended'; }
+  };
+  const win = load();
+  const storage = memoryStorage({ 'artsoul.agent.permission': 'wallet' });
+
+  const live = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
+    readContracts: () => contracts,
+    storage
+  });
+  const stillRunning = JSON.parse(await live.get('end_expired_auction').execute({ artwork_id: '31' }));
+  assert.equal(stillRunning.submitted, false);
+  assert.match(stillRunning.reason, /end time has passed/);
+  assert.deepEqual(calls, [], 'a running auction must never reach the wallet');
+
+  const expired = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, status: 'awaiting_end' }] } }),
+    readContracts: () => contracts,
+    storage
+  });
+  const finalized = JSON.parse(await expired.get('end_expired_auction').execute({ artwork_id: '31' }));
+  assert.equal(finalized.submitted, true);
+  assert.equal(finalized.transaction_hash, '0xended');
+  assert.equal(finalized.approved_by, 'the person, in their own wallet');
+  assert.deepEqual(calls, ['31']);
+});
+
+test('end_expired_auction needs a wallet and the same granted permission as a bid', async () => {
+  const calls = [];
+  const contracts = {
+    isReady: () => true,
+    endAuction: async (id) => { calls.push(id); return '0xended'; }
+  };
+  const expiredCard = { '/api/public/artworks': { data: [{ ...AUCTION_CARD, status: 'awaiting_end' }] } };
+  const win = load();
+
+  const guest = toolsFrom(win, {
+    fetchJson: jsonFetch(expiredCard),
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+  });
+  const noWallet = JSON.parse(await guest.get('end_expired_auction').execute({ artwork_id: '31' }));
+  assert.equal(noWallet.submitted, false);
+  assert.match(noWallet.reason, /No wallet is connected/);
+
+  const refused = toolsFrom(win, {
+    fetchJson: jsonFetch(expiredCard),
+    readContracts: () => contracts,
+    storage: memoryStorage(),
+    confirmAction: () => false
+  });
+  const denied = JSON.parse(await refused.get('end_expired_auction').execute({ artwork_id: '31' }));
+  assert.equal(denied.submitted, false);
+  assert.match(denied.reason, /did not grant/);
+  assert.deepEqual(calls, []);
+});
+
+test('the tools that reach the chain are exactly the three that need a signature', () => {
+  // A guard against the layer growing a write nobody reviewed. Every other tool
+  // must stay readable by an anonymous visitor with no wallet at all.
+  const win = load();
+  const source = fs.readFileSync('webmcp-tools.js', 'utf8');
+  const writes = win.ArtSoulWebMCP.createTools({ fetchJson: async () => ({}) })
+    .map((tool) => tool.name)
+    .filter((name) => /^(place_|end_|prepare_)/.test(name));
+  assert.deepEqual(writes, ['prepare_bid', 'place_bid', 'end_expired_auction', 'prepare_artwork_registration']);
+  // Only two of those actually call the wallet, and both go through the grant.
+  assert.equal((source.match(/readPermission\(\) !== PERMISSION_WALLET/g) || []).length, 2);
 });
 
 test('prepare_artwork_registration says registration is not a mint', async () => {
