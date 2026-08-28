@@ -73,10 +73,9 @@ Merged and measured, needing one confirmation each:
 - **A-72** quick loads showing no placeholder at all
 - **A-73** the balance in the account menu showing a number
 - **A-77** an artwork whose auction ended with no bids offered for auction again.
-  Merged and deployed, and the backfill released all ten affected artworks on
-  2026-08-28. What remains is the indexer deployment on the Hetzner host, which
-  stops future no-bid endings leaving the same stale pointer, and one profile
-  run that starts a new auction on artwork 31
+  Merged, deployed to production and to the Hetzner indexer, and the backfill
+  released all ten affected artworks, all on 2026-08-28. What remains is one
+  profile run that starts a new auction on artwork 31
 
 ## What Phase A does not need
 
