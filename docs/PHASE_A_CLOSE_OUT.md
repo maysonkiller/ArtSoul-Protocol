@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **56 done, 15 in progress, 6 planned** across A-01 to A-77.
+Phase A stands at **57 done, 14 in progress, 6 planned** across A-01 to A-77.
 
 ## The shape of what is left
 
@@ -72,10 +72,10 @@ Merged and measured, needing one confirmation each:
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
 - **A-72** quick loads showing no placeholder at all
 - **A-73** the balance in the account menu showing a number
-- **A-77** an artwork whose auction ended with no bids offered for auction again.
-  Merged, deployed to production and to the Hetzner indexer, and the backfill
-  released all ten affected artworks, all on 2026-08-28. What remains is one
-  profile run that starts a new auction on artwork 31
+
+**A-77 closed on 2026-08-28.** The fix shipped to production and to the Hetzner
+indexer, the backfill released all ten affected artworks, and artwork 31 was
+auctioned again from the profile with the new auction confirmed on chain.
 
 ## What Phase A does not need
 
