@@ -86,6 +86,9 @@
         const artworkId = normalizeId(card.artwork_id);
         return {
             artwork_id: artworkId,
+            // The auction number is how the protocol names an auction, and
+            // leaving it out sent agents to the chain to look it up.
+            auction_id: normalizeId(card.active_auction_id || card.auction_id) || null,
             title: text(card.title) || 'Untitled',
             creator: text(card.creator_name) || text(card.creator),
             status: text(card.status),
@@ -160,6 +163,33 @@
             return Array.isArray(payload && payload.data) ? payload.data : [];
         }
 
+        // How current the projection is, asked once per page and reused. An agent
+        // that cannot see this has to prove freshness itself, which means an RPC
+        // round trip it should never have needed.
+        let projectionStatus;
+        async function indexerStatus() {
+            if (projectionStatus !== undefined) return projectionStatus;
+            try {
+                const payload = await fetchJson('/api/public/indexer-status');
+                const chain = (Array.isArray(payload && payload.chains) ? payload.chains : [])
+                    .find(entry => Number(entry.chain_id) === CHAIN_ID) || null;
+                projectionStatus = chain
+                    ? {
+                        indexed_block: chain.last_indexed_block ?? null,
+                        confirmed_block: chain.last_confirmed_block ?? null,
+                        indexed_at: chain.last_indexed_at || null,
+                        blocks_behind_chain: chain.lag_to_observed_block ?? null,
+                        stale: chain.stale_projection === true
+                    }
+                    : null;
+            } catch {
+                // Freshness is context, never the answer. If it cannot be read
+                // the tools still answer, they simply do not claim a block.
+                projectionStatus = null;
+            }
+            return projectionStatus;
+        }
+
         async function lookupCard(artworkId) {
             const payload = await fetchJson(`/api/public/artworks?id=${encodeURIComponent(artworkId)}`);
             const rows = Array.isArray(payload && payload.data) ? payload.data : [];
@@ -181,8 +211,10 @@
         const searchArtworks = {
             name: 'search_artworks',
             description:
-                'Search published ArtSoul artworks on Base Sepolia by free text, creator or lifecycle status. ' +
-                'Returns title, creator, status, current bid and the page URL. Read-only.',
+                'Search published ArtSoul artworks on Base Sepolia by free text, artwork number, creator or lifecycle ' +
+                'status. Answers come from ArtSoul\'s own indexer, which reconstructs state from confirmed Base ' +
+                'events and is the source the site itself renders, so no separate contract read is needed. ' +
+                'Read-only.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -212,6 +244,7 @@
                 });
                 return JSON.stringify({
                     chain: 'Base Sepolia',
+                    as_of: await indexerStatus(),
                     count: matched.length,
                     results: matched.slice(0, clampLimit(args.limit)).map(summarize)
                 });
@@ -245,6 +278,7 @@
                     .sort((a, b) => (a.remaining ?? Infinity) - (b.remaining ?? Infinity));
                 return JSON.stringify({
                     chain: 'Base Sepolia',
+                    as_of: await indexerStatus(),
                     count: open.length,
                     auctions: open.slice(0, clampLimit(args.limit)).map(entry => ({
                         ...summarize(entry.card),

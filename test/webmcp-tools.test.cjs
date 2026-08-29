@@ -483,6 +483,81 @@ test('a storage that throws denies the permission instead of granting it', async
   assert.equal(wallet.calls.length, 2);
 });
 
+const INDEXER_STATUS = {
+  success: true,
+  chains: [{
+    chain_id: 84532,
+    last_indexed_block: 46109894,
+    last_confirmed_block: 46109894,
+    last_indexed_at: '2026-08-29T07:21:22.652508+00:00',
+    lag_to_observed_block: 0,
+    stale_projection: false
+  }]
+};
+
+test('every listing carries the auction number and how fresh the answer is', async () => {
+  // Both exist because of what a real agent did without them: to name auctions
+  // it went to the contract for their ids, and to claim the answer was current
+  // it proved freshness with an RPC read. Two round trips the page could have
+  // answered for free.
+  const win = load();
+  const requests = [];
+  const tools = toolsFrom(win, {
+    fetchJson: async (path) => {
+      requests.push(path);
+      if (path.includes('indexer-status')) return INDEXER_STATUS;
+      return { data: [{ ...AUCTION_CARD, active_auction_id: '32' }] };
+    },
+    now: () => Date.parse('2026-09-01T06:00:00+00:00')
+  });
+
+  const auctions = JSON.parse(await tools.get('find_active_auctions').execute({}));
+  assert.equal(auctions.auctions[0].auction_id, '32');
+  assert.deepEqual(auctions.as_of, {
+    indexed_block: 46109894,
+    confirmed_block: 46109894,
+    indexed_at: '2026-08-29T07:21:22.652508+00:00',
+    blocks_behind_chain: 0,
+    stale: false
+  });
+
+  const search = JSON.parse(await tools.get('search_artworks').execute({}));
+  assert.equal(search.results[0].auction_id, '32');
+  assert.ok(search.as_of, 'search answers are time-sensitive too');
+
+  // Freshness is read once per page, not once per tool call.
+  assert.equal(requests.filter((path) => path.includes('indexer-status')).length, 1);
+});
+
+test('a work with no auction reports no auction number rather than a stale one', async () => {
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({
+      '/api/public/indexer-status': INDEXER_STATUS,
+      '/api/public/artworks': { data: [SETTLED_CARD] }
+    })
+  });
+  const answer = JSON.parse(await tools.get('search_artworks').execute({}));
+  assert.equal(answer.results[0].auction_id, null);
+});
+
+test('an unreadable projection status costs the answer nothing', async () => {
+  // Freshness is context, never the answer itself.
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: async (path) => {
+      if (path.includes('indexer-status')) throw new Error('status endpoint down');
+      return { data: [{ ...AUCTION_CARD, active_auction_id: '32' }] };
+    },
+    now: () => Date.parse('2026-09-01T06:00:00+00:00')
+  });
+
+  const auctions = JSON.parse(await tools.get('find_active_auctions').execute({}));
+  assert.equal(auctions.as_of, null);
+  assert.equal(auctions.count, 1);
+  assert.equal(auctions.auctions[0].auction_id, '32');
+});
+
 test('search finds a work by its number, the way people actually refer to it', async () => {
   // The number is the identifier printed in the URL, so "31", "#31" and
   // "artwork 31" are all ordinary ways to name a work in a conversation.
