@@ -1383,6 +1383,44 @@ class IndexerSyncEngine {
             ]
         );
 
+        // An auction that ends with no bidder is over for good: no settlement
+        // and no default can follow it, so nothing else will ever release the
+        // artwork. On chain `endAuction` already sets Artwork.activeAuctionId
+        // back to 0 for exactly this case, and `createAuction` asks only that
+        // the work is unminted with no active auction - so the contract is ready
+        // to auction it again the moment this event lands. The projection was
+        // not: it kept pointing at the finished auction forever, which made a
+        // released artwork look permanently occupied to every surface that reads
+        // active_auction_id, and to the profile action that offers a new auction.
+        //
+        // The `active_auction_id = $5` guard keeps a replay harmless. Events are
+        // reprocessed by design, and by the time one is replayed the creator may
+        // already have started a new auction; clearing unconditionally would
+        // erase that newer, still-live auction from the projection.
+        if (this._isZeroAddress(winner)) {
+            const auctionRow = await client.query(
+                `SELECT artwork_id FROM v41_auctions WHERE chain_id = $1 AND auction_id = $2`,
+                [this._chainIdString(), this._asString(auctionId)]
+            );
+            const artworkId = auctionRow.rows[0]?.artwork_id ?? null;
+            if (artworkId) {
+                await client.query(
+                    `UPDATE v41_artworks
+                     SET active_auction_id = NULL,
+                         last_updated_block = $1,
+                         last_updated_at = to_timestamp($2 / 1000.0)
+                     WHERE chain_id = $3 AND artwork_id = $4 AND active_auction_id = $5`,
+                    [
+                        event.blockNumber,
+                        this._eventTimestampSqlValue(event),
+                        this._chainIdString(),
+                        artworkId,
+                        this._asString(auctionId)
+                    ]
+                );
+            }
+        }
+
         console.log(`[IndexerSyncEngine] Indexed AuctionEnded for auction ${auctionId}`);
     }
 

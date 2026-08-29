@@ -30,6 +30,33 @@ The implementation was validated with the production Vite build, Node syntax che
 
 The public site can be explored without credentials. Wallet transactions currently target Base Sepolia testnet. A testnet wallet is required only for protected actions such as publishing or bidding; read-only artwork, discovery, protocol documentation, and profile surfaces remain publicly accessible.
 
+## WebMCP Challenge
+
+ArtSoul was entered in the WebMCP Challenge (25 August – 3 September 2026) as a
+pre-existing project extended with WebMCP during the submission window. The
+boundary is stated here so prior work is never presented as new.
+
+**Existed before 25 August 2026:** the protocol canon and frozen economics, the
+Solidity core and NFT contracts deployed on Base Sepolia, the fail-closed event
+indexer, the public projection API, and the whole product interface — gallery,
+artwork and auction pages, publishing, profiles and provenance.
+
+**Added during the challenge window:** the agent interface. ArtSoul now declares
+eleven tools with JSON Schema inputs to a WebMCP-capable browser, so an agent
+reads auction state, provenance and lifecycle directly instead of inferring them
+from the page. Any action that moves value ends at the person's own wallet: the
+agent can open it with a prepared bid, and only after the person has granted that
+permission in the page, but the wallet always asks them to approve, and no
+website can delegate that click. New files: [`webmcp-tools.js`](webmcp-tools.js),
+[`test/webmcp-tools.test.cjs`](test/webmcp-tools.test.cjs) and
+[`docs/WEBMCP.md`](docs/WEBMCP.md). Changes to existing files are limited to one
+build-manifest line and one deferred script tag on three pages. Every commit in
+this work is prefixed `webmcp:` and dated inside the submission window.
+
+No contract, economic rule, API route or protocol behavior was changed for the
+challenge. How to enable WebMCP and what each tool answers is documented in
+[`docs/WEBMCP.md`](docs/WEBMCP.md).
+
 ## Protocol Lifecycle
 
 1. Creator uploads media and metadata.

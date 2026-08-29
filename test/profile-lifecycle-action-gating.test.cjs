@@ -87,6 +87,64 @@ test('creator during an active auction cannot start another auction', () => {
   assert.equal(profilePredicates.canCreateNewAuction(pendingSettlement, CREATOR), false);
 });
 
+test('A-77: an auction that ended with no bids releases the artwork for a new one', () => {
+  // Reproduced on production: artwork 31 ended with no bidder, and the
+  // projection answered status "defaulted" while still carrying
+  // active_auction_id "31". On chain endAuction had already set
+  // Artwork.activeAuctionId to 0, so createAuction would have succeeded - but
+  // the interface read the stale id, called it an active auction, and refused.
+  const endedNoBids = {
+    chain_id: 84532,
+    creator_id: CREATOR,
+    status: 'defaulted',
+    active_auction_id: '31',
+    current_bid: '0',
+    winner: null,
+    minted: false
+  };
+  assert.equal(profilePredicates.canCreateNewAuction(endedNoBids, CREATOR), true);
+  // Backfilled rows carry no id at all and must behave identically.
+  assert.equal(
+    profilePredicates.canCreateNewAuction({ ...endedNoBids, active_auction_id: null }, CREATOR),
+    true
+  );
+  // Still the creator's own decision, and still Base Sepolia only.
+  assert.equal(profilePredicates.canCreateNewAuction(endedNoBids, STRANGER), false);
+  assert.equal(profilePredicates.canCreateNewAuction({ ...endedNoBids, chain_id: 11155111 }, CREATOR), false);
+});
+
+test('A-77: a winner who never settled also leaves the artwork re-auctionable', () => {
+  // The same lifecycle word covers a defaulted winner. ArtSoulCore clears
+  // activeAuctionId on that path too, and the three-attempt limit in canon
+  // rule 8 applies only to a partner collection's first auction, never to an
+  // ordinary creator.
+  const winnerDefaulted = {
+    chain_id: 84532,
+    creator_id: CREATOR,
+    status: 'defaulted',
+    active_auction_id: '22',
+    current_bid: '0.05',
+    winner: BIDDER,
+    minted: false
+  };
+  assert.equal(profilePredicates.canCreateNewAuction(winnerDefaulted, CREATOR), true);
+});
+
+test('A-77: an expired auction still needs finalizing before a new one', () => {
+  // awaiting_end means the on-chain auction has not been ended yet, so
+  // activeAuctionId is still set and createAuction would revert. The artwork
+  // page offers the permissionless End Expired Auction action for this state.
+  const expired = { chain_id: 84532, creator_id: CREATOR, status: 'awaiting_end', active_auction_id: '27' };
+  assert.equal(profilePredicates.canCreateNewAuction(expired, CREATOR), false);
+});
+
+test('A-77: an unrecognised lifecycle still fails closed on the auction id', () => {
+  const unknownWithAuction = { chain_id: 84532, creator_id: CREATOR, status: 'syncing', active_auction_id: '9' };
+  const unknownWithout = { chain_id: 84532, creator_id: CREATOR, status: 'syncing' };
+  assert.equal(profilePredicates.canCreateNewAuction(unknownWithAuction, CREATOR), false);
+  assert.equal(profilePredicates.canCreateNewAuction(unknownWithout, CREATOR), true);
+});
+
 test('creator after a successful mint gets neither re-auction nor resale unless owner', () => {
   const mintedSold = { chain_id: 84532, creator_id: CREATOR, minted: true, token_id: '7', current_owner_address: COLLECTOR };
   assert.equal(profilePredicates.canCreateNewAuction(mintedSold, CREATOR), false);
