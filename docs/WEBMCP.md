@@ -68,6 +68,21 @@ No new API route was added. Every tool reads an endpoint the product already
 serves, which keeps the public egress pattern (server projection plus CDN cache)
 exactly as it was.
 
+## Answering completely, so the agent stops re-deriving
+
+Watching a real agent use these tools showed the cost of an incomplete answer.
+Asked which auctions were open, it produced a correct list — and then read the
+contract anyway: once to find the auction numbers, which the tools had not
+returned, and once more to prove the data was current. Two round trips the page
+could have answered for free, paid for in latency and in the person's usage.
+
+So every listing now carries the auction number alongside the artwork number, and
+an `as_of` block that says how current the projection is — last indexed and
+confirmed block, when it was indexed, how far behind the chain it is, and whether
+it has gone stale. That status is read once per page and reused. If it cannot be
+read the tools still answer; they simply do not claim a block, because freshness
+is context and never the answer itself.
+
 ## Cost to an ordinary visitor
 
 Nil. Without a WebMCP-capable browser the bootstrap exits before it registers a
