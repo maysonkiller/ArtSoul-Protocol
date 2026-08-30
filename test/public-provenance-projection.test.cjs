@@ -29,6 +29,7 @@ const RESALE_BUYER_1 = '0xBb01000000000000000000000000000000000006';
 const RESALE_BUYER_2 = '0xBb02000000000000000000000000000000000007';
 const LEGACY_COLLECTOR = '0x1e9a000000000000000000000000000000000008';
 const GENERATED_NAME_CREATOR = '0xGen0000000000000000000000000000000000009';
+const CREATOR_AVATAR = 'https://cdn.example/soulpainter-avatar.png';
 
 function artworkRow(overrides = {}) {
   return {
@@ -160,6 +161,7 @@ const FIXTURES = {
     {
       wallet_address: CREATOR.toLowerCase(),
       username: 'soulpainter',
+      avatar_url: CREATOR_AVATAR,
       bio: 'private-ish text that must never reach cards',
       twitter_handle: 'leak',
       discord_username: 'leak#1'
@@ -332,8 +334,19 @@ test('cards carry the creator public nickname from one batched profiles lookup',
   const card = cardById(body, 'v41:84532:1');
   assert.equal(card.creator_name, 'soulpainter');
   // Only the public display name is exposed — no other profile fields leak.
-  for (const field of ['bio', 'twitter_handle', 'discord_username', 'avatar_url', 'username']) {
+  for (const field of ['bio', 'twitter_handle', 'discord_username', 'avatar_url', 'creator_avatar_url', 'username']) {
     assert.equal(field in card, false, `${field} must not leak into public cards`);
+  }
+});
+
+test('an exact artwork read carries the public creator identity for its first ownership paint', async () => {
+  const body = await projectCards({ id: '1' });
+  const card = cardById(body, 'v41:84532:1');
+
+  assert.equal(card.creator_name, 'soulpainter');
+  assert.equal(card.creator_avatar_url, CREATOR_AVATAR);
+  for (const field of ['bio', 'twitter_handle', 'discord_username', 'avatar_url', 'username']) {
+    assert.equal(field in card, false, `${field} must not leak into an exact artwork response`);
   }
 });
 

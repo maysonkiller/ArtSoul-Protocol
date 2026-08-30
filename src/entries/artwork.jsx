@@ -849,8 +849,8 @@ const { useState, useEffect, useRef } = React;
                 return Boolean(left && right && String(left).toLowerCase() === String(right).toLowerCase());
             }
 
-            function getDefaultProfileAvatar(address) {
-                return `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(address || 'artsoul')}`;
+            function getDefaultProfileAvatar() {
+                return '/default-avatar.png';
             }
 
             function getProfileDisplayName(profileData, address = '') {
@@ -904,6 +904,11 @@ const { useState, useEffect, useRef } = React;
                             <img
                                 src={getProfileAvatarUrl(profile, address)}
                                 alt={label}
+                                onError={(event) => {
+                                    if (!event.currentTarget.src.endsWith('/default-avatar.png')) {
+                                        event.currentTarget.src = '/default-avatar.png';
+                                    }
+                                }}
                                 className={`w-12 h-12 rounded-full border-2 flex-shrink-0 ${
                                     isClassic ? 'border-current' : 'border-cyan-400'
                                 }`}
@@ -1782,7 +1787,12 @@ const { useState, useEffect, useRef } = React;
                     } else {
                         setBidActivity([]);
                     }
-                    setCreatorProfile(null);
+                    const projectedCreatorAddress = data.creator_id || data.creator || '';
+                    setCreatorProfile(projectedCreatorAddress ? {
+                        wallet_address: projectedCreatorAddress,
+                        username: data.creator_name || '',
+                        avatar_url: data.creator_avatar_url || ''
+                    } : null);
                     setAuctionWinnerProfile(null);
                     setCurrentOwnerProfile(null);
                     setSocialSignals(window.ArtSoulDiscovery?.getSocialSignals?.(data) || {
@@ -1817,7 +1827,10 @@ const { useState, useEffect, useRef } = React;
                             if (result.status === 'fulfilled') profiles.set(result.value.address, result.value.profile);
                             else console.warn('Could not load artwork profile:', result.reason);
                         });
-                        if (data.creator_id) setCreatorProfile(profiles.get(data.creator_id.toLowerCase()) || null);
+                        if (data.creator_id) {
+                            const hydratedCreatorProfile = profiles.get(data.creator_id.toLowerCase());
+                            if (hydratedCreatorProfile) setCreatorProfile(hydratedCreatorProfile);
+                        }
                         if (data.auction_winner_address && !isZeroAddress(data.auction_winner_address)) {
                             setAuctionWinnerProfile(profiles.get(data.auction_winner_address.toLowerCase()) || null);
                         }
