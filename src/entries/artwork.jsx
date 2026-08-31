@@ -879,10 +879,16 @@ const { useState, useEffect, useRef } = React;
                     animation: 'glow-pulse 3s ease-in-out infinite'
                 } : {};
 
-                const avatarStyle = !isClassic ? {
-                    boxShadow: '0 0 10px rgba(var(--c-accent-rgb), 0.5)',
-                    animation: 'colorShift 8s ease-in-out infinite'
-                } : {};
+                const avatarStyle = {
+                    backgroundImage: "url('/default-avatar.png')",
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: 'cover',
+                    ...(!isClassic ? {
+                        boxShadow: '0 0 10px rgba(var(--c-accent-rgb), 0.5)',
+                        animation: 'colorShift 8s ease-in-out infinite'
+                    } : {})
+                };
 
                 const nameStyle = !isClassic ? {
                     background: 'linear-gradient(90deg, var(--c-accent), var(--c-accent-2))',
@@ -904,12 +910,6 @@ const { useState, useEffect, useRef } = React;
                             <img
                                 src={getProfileAvatarUrl(profile, address)}
                                 alt={label}
-                                style={{
-                                    backgroundImage: "url('/default-avatar.png')",
-                                    backgroundPosition: 'center',
-                                    backgroundRepeat: 'no-repeat',
-                                    backgroundSize: 'cover'
-                                }}
                                 onLoad={(event) => {
                                     event.currentTarget.style.backgroundImage = 'none';
                                 }}

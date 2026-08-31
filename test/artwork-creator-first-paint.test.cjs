@@ -37,8 +37,15 @@ test('a broken uploaded avatar falls back to the same neutral local image as the
     detail.indexOf('function renderOwnershipRole'),
     detail.indexOf('function getAuctionStatus')
   );
+  const avatarTag = ownership.match(/<img[\s\S]*?\/>/)?.[0] || '';
 
   assert.match(ownership, /backgroundImage: "url\('\/default-avatar\.png'\)"/);
+  assert.match(avatarTag, /style=\{avatarStyle\}/);
+  assert.equal(
+    (avatarTag.match(/\bstyle=/g) || []).length,
+    1,
+    'the ownership avatar must have one effective style prop'
+  );
   assert.match(ownership, /event\.currentTarget\.style\.backgroundImage = 'none'/);
   assert.match(ownership, /onError=\{\(event\) => \{/);
   assert.match(ownership, /event\.currentTarget\.src = '\/default-avatar\.png'/);
