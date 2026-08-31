@@ -904,6 +904,15 @@ const { useState, useEffect, useRef } = React;
                             <img
                                 src={getProfileAvatarUrl(profile, address)}
                                 alt={label}
+                                style={{
+                                    backgroundImage: "url('/default-avatar.png')",
+                                    backgroundPosition: 'center',
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundSize: 'cover'
+                                }}
+                                onLoad={(event) => {
+                                    event.currentTarget.style.backgroundImage = 'none';
+                                }}
                                 onError={(event) => {
                                     if (!event.currentTarget.src.endsWith('/default-avatar.png')) {
                                         event.currentTarget.src = '/default-avatar.png';

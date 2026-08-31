@@ -38,6 +38,8 @@ test('a broken uploaded avatar falls back to the same neutral local image as the
     detail.indexOf('function getAuctionStatus')
   );
 
+  assert.match(ownership, /backgroundImage: "url\('\/default-avatar\.png'\)"/);
+  assert.match(ownership, /event\.currentTarget\.style\.backgroundImage = 'none'/);
   assert.match(ownership, /onError=\{\(event\) => \{/);
   assert.match(ownership, /event\.currentTarget\.src = '\/default-avatar\.png'/);
 });
