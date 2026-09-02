@@ -131,6 +131,10 @@
         // The wallet layer is optional. It is present once the page has an
         // initialized provider, and absent for a visitor who never connected.
         const readContracts = deps.readContracts || (() => null);
+        // The connected address, when the page has one. It is what makes the two
+        // contract rules below answerable before a transaction is built.
+        const readWalletAddress = deps.readWalletAddress ||
+            (() => (typeof window === 'undefined' ? '' : (window.getCurrentWalletAddress && window.getCurrentWalletAddress()) || ''));
         // Granting the agent access to the wallet is a human act, so it goes
         // through the browser's own dialog and is remembered per browser.
         const confirmAction = deps.confirmAction ||
@@ -415,6 +419,27 @@
             }
         };
 
+        /**
+         * ArtSoulCore refuses two bids outright: `CreatorCannotBid` and
+         * `BidderCannotSelfOutbid`. Both are answerable from the public card and
+         * the connected address, so the page answers them here instead of
+         * letting the person discover the rule from a reverted transaction and a
+         * spent gas fee. The contract stays the authority - this only reports
+         * what it will do.
+         */
+        function blockedBidReason(card, walletAddress) {
+            const bidder = text(walletAddress).toLowerCase();
+            if (!bidder) return null;
+            if (text(card.creator).toLowerCase() === bidder) {
+                return 'You created this artwork, and the contract does not let a creator bid on their own work. ' +
+                    'Bidding needs a different wallet.';
+            }
+            if (text(card.current_bidder).toLowerCase() === bidder) {
+                return 'You are already the highest bidder, and the contract does not let a bidder outbid themselves.';
+            }
+            return null;
+        }
+
         const prepareBid = {
             name: 'prepare_bid',
             description:
@@ -447,6 +472,17 @@
                         signed_by: 'the person, in their own wallet',
                         prepared: false,
                         reason: `Artwork ${artworkId} is "${status}", so it is not open for bidding.`,
+                        url: `/artwork/${artworkId}`
+                    });
+                }
+
+                const blocked = blockedBidReason(card, readWalletAddress());
+                if (blocked) {
+                    return JSON.stringify({
+                        artwork_id: artworkId,
+                        signed_by: 'the person, in their own wallet',
+                        prepared: false,
+                        reason: blocked,
                         url: `/artwork/${artworkId}`
                     });
                 }
@@ -523,6 +559,19 @@
                     return JSON.stringify({
                         submitted: false,
                         reason: `Artwork ${artworkId} is "${status}", so it is not open for bidding.`,
+                        url: `/artwork/${artworkId}`
+                    });
+                }
+
+                // Refused here rather than by a reverted transaction: the person
+                // would otherwise approve a bid in their wallet and pay gas to be
+                // told a rule the page already knew.
+                const blocked = blockedBidReason(card, readWalletAddress());
+                if (blocked) {
+                    return JSON.stringify({
+                        submitted: false,
+                        artwork_id: artworkId,
+                        reason: blocked,
                         url: `/artwork/${artworkId}`
                     });
                 }
