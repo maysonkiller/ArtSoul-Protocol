@@ -14,7 +14,8 @@
     "test:unit": "node scripts/run-unit-tests.mjs",
     "test:contracts": "hardhat test test/ArtSoulV41.test.cjs",
     "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/tailwind.css -o tailwind-build.css --minify",
-    "verify:tailwind": "node scripts/verify-tailwind.mjs"
+    "verify:tailwind": "node scripts/verify-tailwind.mjs",
+    "sync:phase-a": "node scripts/sync-phase-a-counts.mjs"
   },
   "repository": {
     "type": "git",
