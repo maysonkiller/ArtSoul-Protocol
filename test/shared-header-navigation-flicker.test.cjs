@@ -545,7 +545,7 @@ test('every shared-header page boots the header in the same order with the same 
     const stylesheet = html.indexOf('unified-styles.css?v=45');
     const prepaint = html.indexOf('header-prepaint.js?v=4');
     const component = html.indexOf('avatar-dropdown.js?v=53');
-    const appkit = html.indexOf('appkit-init.js?v=');
+    const walletRuntime = html.indexOf('wallet-runtime-loader.js');
     const shell = html.indexOf('<div id="navButtons"');
     const hydrate = html.indexOf("window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'))");
 
@@ -555,8 +555,8 @@ test('every shared-header page boots the header in the same order with the same 
     assert.ok(prepaint < stylesheet, `${page}: prepaint must not wait for stylesheets`);
     assert.ok(stylesheet < shell, `${page}: the stylesheet must precede the visible shell`);
     assert.ok(prepaint < component, `${page}: prepaint must snapshot storage before the deferred component`);
-    assert.ok(component < appkit, `${page}: the component must run before appkit-init`);
-    assert.ok(appkit < shell, `${page}: the boot scripts must precede the header shell`);
+    assert.ok(component < walletRuntime, `${page}: the component must run before the wallet runtime boundary`);
+    assert.ok(walletRuntime < shell, `${page}: the boot scripts must precede the header shell`);
     assert.ok(shell < hydrate, `${page}: first-frame hydration must follow the parsed shell`);
 
     // Hydration used to be an inline call placed after the shell. That is what
