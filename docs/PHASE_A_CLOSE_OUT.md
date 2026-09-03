@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **59 done, 14 in progress, 8 planned** across A-01 to A-81.
+Phase A stands at **60 done, 14 in progress, 7 planned** across A-01 to A-81.
 
 ## The shape of what is left
 
@@ -64,7 +64,6 @@ Ordered by what the founder can feel, not by row number.
 | **A-35** | Legacy runtime boundaries, second half | The migration ledger half is done |
 | **A-38** | Dependency and production warning triage | No forced upgrades |
 | **A-79** | Decide whether the profile publishes one frame or identity first | Two accepted repairs now contradict each other and whichever merges last wins by accident. Bound the first gallery read to one page so a coherent frame costs nothing to wait for |
-| **A-81** | Stop the Phase A counters conflicting on every branch | All four open pull requests conflicted, and every conflict was the same four documents. No application code collided |
 | **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
 
 ## 3. Waiting only on a look
