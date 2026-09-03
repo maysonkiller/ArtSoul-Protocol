@@ -785,6 +785,92 @@ test('an unknown connected address leaves the decision to the contract', async (
   assert.deepEqual(wallet.calls, [['31', '0.5']]);
 });
 
+test('a tool waits for the deferred wallet runtime before saying there is no wallet', async () => {
+  // A-80. The wallet SDK is moving off the first-load path, so a page can be
+  // interactive before the runtime exists. Deciding from the first read alone
+  // would tell a connected person to connect.
+  let loads = 0;
+  let contracts = null;
+  const wallet = walletStub();
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xother' }] } }),
+    readContracts: () => contracts,
+    readWalletAddress: () => '0xvisitor',
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    loadWalletRuntime: async () => {
+      loads += 1;
+      contracts = wallet.contracts;
+    }
+  });
+
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(loads, 1, 'the runtime must be given its chance exactly once');
+  assert.equal(answer.submitted, true);
+  assert.deepEqual(wallet.calls, [['31', '0.5']]);
+});
+
+test('a runtime that is already there is not waited for', async () => {
+  let loads = 0;
+  const wallet = walletStub();
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xother' }] } }),
+    readContracts: () => wallet.contracts,
+    readWalletAddress: () => '0xvisitor',
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    loadWalletRuntime: async () => { loads += 1; }
+  });
+
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(loads, 0, 'an available wallet must not pay for a runtime wait');
+  assert.equal(answer.submitted, true);
+});
+
+test('a runtime that never arrives is still reported as no wallet', async () => {
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xother' }] } }),
+    readContracts: () => null,
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    loadWalletRuntime: async () => { throw new Error('offline'); }
+  });
+
+  // A load that throws must not become an unhandled rejection or a promise of a
+  // wallet that is not there.
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(answer.submitted, false);
+  assert.match(answer.reason, /No wallet is connected/);
+});
+
+test('end_expired_auction waits for the same runtime', async () => {
+  let loads = 0;
+  let contracts = null;
+  const calls = [];
+  const ready = { isReady: () => true, endAuction: async (id) => { calls.push(id); return '0xended'; } };
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, status: 'awaiting_end' }] } }),
+    readContracts: () => contracts,
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    loadWalletRuntime: async () => { loads += 1; contracts = ready; }
+  });
+
+  const answer = JSON.parse(await tools.get('end_expired_auction').execute({ artwork_id: '31' }));
+  assert.equal(loads, 1);
+  assert.equal(answer.submitted, true);
+  assert.deepEqual(calls, ['31']);
+});
+
+test('the wallet wait goes through the documented runtime entry point', () => {
+  // Pinned so the boundary survives a refactor of the wallet loader: the tools
+  // must not reach past ArtSoulWalletRuntime.load() into the SDK themselves.
+  const source = fs.readFileSync('webmcp-tools.js', 'utf8');
+  assert.match(source, /window\.ArtSoulWalletRuntime/);
+  assert.match(source, /runtime\.load\(\)/);
+  assert.doesNotMatch(source, /import\(['"`]\.\/appkit-init/);
+});
+
 test('prepare_artwork_registration says registration is not a mint', async () => {
   const opened = [];
   const win = load();

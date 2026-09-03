@@ -133,6 +133,22 @@
         const readContracts = deps.readContracts || (() => null);
         // The connected address, when the page has one. It is what makes the two
         // contract rules below answerable before a transaction is built.
+        // A-80. The wallet SDK is being moved off the first-load path, so the
+        // page can be interactive for a moment before the runtime exists. An
+        // agent asking about a bid in that window must not be told the person is
+        // disconnected when they are - it must wait for the runtime the page
+        // already started, and only then decide.
+        const loadWalletRuntime = deps.loadWalletRuntime || (async () => {
+            if (typeof window === 'undefined') return;
+            const runtime = window.ArtSoulWalletRuntime;
+            if (!runtime || typeof runtime.load !== 'function') return;
+            try {
+                await runtime.load();
+            } catch {
+                // A runtime that cannot load is reported as no wallet below,
+                // which is the honest answer and the safe direction.
+            }
+        });
         const readWalletAddress = deps.readWalletAddress ||
             (() => (typeof window === 'undefined' ? '' : (window.getCurrentWalletAddress && window.getCurrentWalletAddress()) || ''));
         // Granting the agent access to the wallet is a human act, so it goes
@@ -440,6 +456,34 @@
             return null;
         }
 
+        /**
+         * Wallet readiness, asked once the deferred runtime has had its chance.
+         * `method` is the contract call the tool is about to make, so a runtime
+         * that loaded but did not provide it is still reported as unavailable.
+         */
+        async function walletReadyFor(method) {
+            const immediate = readContracts();
+            if (immediate && typeof immediate[method] === 'function' &&
+                (typeof immediate.isReady !== 'function' || immediate.isReady())) {
+                return immediate;
+            }
+
+            try {
+                await loadWalletRuntime();
+            } catch {
+                // A runtime that refuses to load is no wallet, which is the
+                // honest answer. The tool must never fail on the way to saying
+                // so, whoever supplied the loader.
+            }
+
+            const settled = readContracts();
+            if (settled && typeof settled[method] === 'function' &&
+                (typeof settled.isReady !== 'function' || settled.isReady())) {
+                return settled;
+            }
+            return null;
+        }
+
         const prepareBid = {
             name: 'prepare_bid',
             description:
@@ -541,10 +585,8 @@
                     return JSON.stringify({ submitted: false, reason: 'bid_eth must be a positive amount in ETH.' });
                 }
 
-                const contracts = readContracts();
-                const walletReady = contracts && typeof contracts.placeBid === 'function' &&
-                    (typeof contracts.isReady !== 'function' || contracts.isReady());
-                if (!walletReady) {
+                const contracts = await walletReadyFor('placeBid');
+                if (!contracts) {
                     return JSON.stringify({
                         submitted: false,
                         reason: 'No wallet is connected on this page. The person needs to connect a wallet on Base Sepolia first.',
@@ -729,10 +771,8 @@
                 const artworkId = normalizeId((input || {}).artwork_id);
                 if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
 
-                const contracts = readContracts();
-                const walletReady = contracts && typeof contracts.endAuction === 'function' &&
-                    (typeof contracts.isReady !== 'function' || contracts.isReady());
-                if (!walletReady) {
+                const contracts = await walletReadyFor('endAuction');
+                if (!contracts) {
                     return JSON.stringify({
                         submitted: false,
                         reason: 'No wallet is connected on this page. The person needs to connect a wallet on Base Sepolia first.',
