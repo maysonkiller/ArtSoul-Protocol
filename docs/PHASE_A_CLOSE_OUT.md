@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **57 done, 15 in progress, 5 planned** across A-01 to A-77.
+Phase A stands at **58 done, 15 in progress, 8 planned** across A-01 to A-81.
 
 ## The shape of what is left
 
@@ -53,7 +53,7 @@ Ordered by what the founder can feel, not by row number.
 | Row | What it is | Note |
 | --- | --- | --- |
 | **A-64** | Take the wallet SDK off the first-load critical path | Implemented behind a preview gate: all seven shared-header pages now mount and paint before dynamically importing the unchanged wallet runtime. The build manifest no longer makes AppKit a static dependency of the profile or homepage. The audit then closed an early-action race: the boundary now waits for AppKit boot, not merely module evaluation, before delegating a wallet action or announcing readiness. Needs connected desktop, Android and iOS runs covering cached reload, reconnect, SIWE, Base Sepolia switching and publish before merge |
-| **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. Production measurements put primary content at 0.7-2.4 seconds and video readiness at 1.6-3.2 seconds; production Android and the legacy-video tail remain open evidence |
+| **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. A later cold-import audit isolated the exact public projection from the shared all-routes serverless graph without changing live-state caching, and the exact response now carries Creator identity before the first content frame instead of briefly showing a generated avatar. Preview proof plus production desktop, iOS, Android and legacy-video timing remain open evidence |
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
@@ -63,6 +63,9 @@ Ordered by what the founder can feel, not by row number.
 | **A-34** | One reusable presentation-only aura frame shell | Canon 17; no economics |
 | **A-35** | Legacy runtime boundaries, second half | The migration ledger half is done |
 | **A-38** | Dependency and production warning triage | No forced upgrades |
+| **A-79** | Decide whether the profile publishes one frame or identity first | Two accepted repairs now contradict each other and whichever merges last wins by accident. Bound the first gallery read to one page so a coherent frame costs nothing to wait for |
+| **A-80** | Let an agent tool wake the deferred wallet runtime | Only actionable once the wallet-runtime pull request merges; a connected person can otherwise be told to connect |
+| **A-81** | Stop the Phase A counters conflicting on every branch | All four open pull requests conflicted, and every conflict was the same four documents. No application code collided |
 | **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
 
 ## 3. Waiting only on a look
@@ -72,6 +75,9 @@ Merged and measured, needing one confirmation each:
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
 - **A-72** quick loads showing no placeholder at all
 - **A-73** the balance in the account menu showing a number
+
+**A-78 closed on 2026-09-02.** A live auction now wins an id collision, so a
+bid placed by artwork id reaches the auction that is actually running.
 
 **A-77 closed on 2026-08-28.** The fix shipped to production and to the Hetzner
 indexer, the backfill released all ten affected artworks, and artwork 31 was

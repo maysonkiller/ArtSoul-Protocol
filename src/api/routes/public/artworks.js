@@ -445,10 +445,13 @@ function moderationVisibilityByArtwork(rows = []) {
 // to the shortened wallet address.
 const GENERATED_PROFILE_USERNAME = /^User[0-9a-fA-F]{4,6}$/;
 
-// One batched public-nickname lookup per snapshot rebuild for the unique
+// One batched public-identity lookup per snapshot rebuild for the unique
 // creator addresses already inside the cached projection — never per card,
-// never a full-table read. Only the public username is exposed.
-async function creatorNamesByAddress(artworks = [], warnings) {
+// never a full-table read. List cards expose only the public nickname. An
+// exact artwork read also carries the public avatar URL so the Ownership panel
+// can paint the real creator identity in its first content frame instead of
+// briefly inventing a placeholder identity while a second request is pending.
+async function creatorIdentitiesByAddress(artworks = [], warnings, { includeAvatar = false } = {}) {
   const addresses = [...new Set(
     artworks
       .map(artwork => normalizeText(artwork.creator).toLowerCase())
@@ -458,7 +461,7 @@ async function creatorNamesByAddress(artworks = [], warnings) {
 
   const rows = await queryTable(
     'profiles',
-    `select=wallet_address,username&wallet_address=in.(${addresses.map(encodeURIComponent).join(',')})&limit=${addresses.length}`,
+    `select=wallet_address,username${includeAvatar ? ',avatar_url' : ''}&wallet_address=in.(${addresses.map(encodeURIComponent).join(',')})&limit=${addresses.length}`,
     warnings
   );
 
@@ -466,9 +469,11 @@ async function creatorNamesByAddress(artworks = [], warnings) {
   for (const row of rows) {
     const wallet = normalizeText(row.wallet_address).toLowerCase();
     const username = normalizeText(row.username);
-    if (wallet && username && !GENERATED_PROFILE_USERNAME.test(username)) {
-      map.set(wallet, username);
-    }
+    if (!wallet) continue;
+    map.set(wallet, {
+      name: username && !GENERATED_PROFILE_USERNAME.test(username) ? username : null,
+      avatarUrl: includeAvatar ? normalizeText(row.avatar_url) || null : null
+    });
   }
   return map;
 }
@@ -542,6 +547,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
   const currentOwnerAddress = Boolean(artwork.minted)
     ? (addressOrNull(latestResale?.buyer) || addressOrNull(resale?.seller) || auctionWinnerAddress)
     : null;
+  const creatorIdentity = maps.creatorIdentities.get(normalizeText(artwork.creator).toLowerCase());
 
   return {
     id: `v41:${chain}:${artworkId}`,
@@ -556,7 +562,8 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     description,
     creator: artwork.creator,
     creator_id: artwork.creator,
-    creator_name: maps.creatorNames.get(normalizeText(artwork.creator).toLowerCase()) || null,
+    creator_name: creatorIdentity?.name || null,
+    ...(maps.includeCreatorAvatar ? { creator_avatar_url: creatorIdentity?.avatarUrl || null } : {}),
     media_url: mediaUrl,
     file_url: mediaUrl,
     animation_url: ['video', 'audio'].includes(mediaType) ? mediaUrl : null,
@@ -671,14 +678,15 @@ function parseDirectLookup(query = {}) {
 async function projectTableData(tableData, warnings, publicMetrics = null, preload = {}) {
   // Creator names and immutable metadata are independent reads. Starting them
   // together removes one serial network round trip from a cold projection.
-  const [creatorNames, metadataRows] = await Promise.all([
-    preload.creatorNames ?? creatorNamesByAddress(tableData.v41_artworks, warnings),
+  const [creatorIdentities, metadataRows] = await Promise.all([
+    preload.creatorIdentities ?? creatorIdentitiesByAddress(tableData.v41_artworks, warnings),
     preload.metadataRows ?? Promise.all(
       tableData.v41_artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
     )
   ]);
   const maps = {
-    creatorNames,
+    creatorIdentities,
+    includeCreatorAvatar: preload.includeCreatorAvatar === true,
     auctions: latestAuctionByArtwork(tableData.v41_auctions),
     settlements: latestCompletedSettlementByArtwork(tableData.v41_settlements),
     resales: resaleByToken(tableData.v41_resale_listings),
@@ -754,7 +762,8 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
   const v41Artworks = await v41ArtworksPromise;
   const tokenId = protocolId(v41Artworks[0]?.token_id);
   const preload = {
-    creatorNames: creatorNamesByAddress(v41Artworks, warnings),
+    creatorIdentities: creatorIdentitiesByAddress(v41Artworks, warnings, { includeAvatar: true }),
+    includeCreatorAvatar: true,
     metadataRows: Promise.all(
       v41Artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
     )

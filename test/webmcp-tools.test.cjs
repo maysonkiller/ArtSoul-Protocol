@@ -706,6 +706,85 @@ test('the tools that reach the chain are exactly the three that need a signature
   assert.equal((source.match(/readPermission\(\) !== PERMISSION_WALLET/g) || []).length, 2);
 });
 
+test('a creator is told they cannot bid on their own work, before any wallet opens', async () => {
+  // ArtSoulCore reverts this with CreatorCannotBid. Found while filming a demo:
+  // every live auction belonged to the connected wallet, so the only thing the
+  // agent could have produced was an approved transaction that reverted and a
+  // spent gas fee. The card and the connected address answer it beforehand.
+  const wallet = walletStub();
+  const win = load();
+  const deps = {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xABC' }] } }),
+    readContracts: () => wallet.contracts,
+    readWalletAddress: () => '0xabc',
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+  };
+  const tools = toolsFrom(win, deps);
+
+  const placed = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(placed.submitted, false);
+  assert.match(placed.reason, /created this artwork/);
+  assert.match(placed.reason, /different wallet/);
+  assert.deepEqual(wallet.calls, [], 'the wallet must never be opened for a bid the contract will refuse');
+
+  // The read-only path says the same thing rather than promising a bid.
+  const prepared = JSON.parse(await tools.get('prepare_bid').execute({ artwork_id: '31' }));
+  assert.equal(prepared.prepared, false);
+  assert.match(prepared.reason, /created this artwork/);
+});
+
+test('the highest bidder is told they cannot outbid themselves', async () => {
+  const wallet = walletStub();
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({
+      '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xother', current_bidder: '0xMe' }] }
+    }),
+    readContracts: () => wallet.contracts,
+    readWalletAddress: () => '0xme',
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+  });
+
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(answer.submitted, false);
+  assert.match(answer.reason, /already the highest bidder/);
+  assert.deepEqual(wallet.calls, []);
+});
+
+test('a different wallet is allowed through to the wallet as before', async () => {
+  const wallet = walletStub();
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({
+      '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xcreator', current_bidder: '0xsomeone' }] }
+    }),
+    readContracts: () => wallet.contracts,
+    readWalletAddress: () => '0xvisitor',
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+  });
+
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(answer.submitted, true);
+  assert.deepEqual(wallet.calls, [['31', '0.5']]);
+});
+
+test('an unknown connected address leaves the decision to the contract', async () => {
+  // Not knowing who is connected must not become a refusal: the wallet and the
+  // contract remain the authority, and this layer only reports what it knows.
+  const wallet = walletStub();
+  const win = load();
+  const tools = toolsFrom(win, {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xABC' }] } }),
+    readContracts: () => wallet.contracts,
+    readWalletAddress: () => '',
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+  });
+
+  const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
+  assert.equal(answer.submitted, true);
+  assert.deepEqual(wallet.calls, [['31', '0.5']]);
+});
+
 test('prepare_artwork_registration says registration is not a mint', async () => {
   const opened = [];
   const win = load();

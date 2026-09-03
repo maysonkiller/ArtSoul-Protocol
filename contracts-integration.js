@@ -184,6 +184,11 @@ const CORE_ABI = [
     'event ProjectNFTMinted(address indexed user, uint256 indexed tokenId, bytes32 eligibilityHash)'
 ];
 
+// AuctionStatus in ArtSoulCore: None, Active, SettlementPending, Settled,
+// Defaulted. Only the two the id resolver reasons about are named here.
+const AUCTION_STATUS_NONE = 0;
+const AUCTION_STATUS_ACTIVE = 1;
+
 class ArtSoulContracts {
     constructor() {
         this.provider = null;
@@ -341,18 +346,47 @@ class ArtSoulContracts {
         this.ensureCore();
         const rawId = BigInt(id.toString());
 
+        // Auction ids and artwork ids are separate counters over the same small
+        // integers, so they collide constantly: artwork 31's first auction was
+        // auction 31. Re-auctioning is what turns that collision into a defect -
+        // the artwork moves on to a new auction while a finished one keeps
+        // sitting at its number.
+        //
+        // The old order asked "is there an auction with this number?" first and
+        // accepted any status but None, so bidding on a re-auctioned artwork
+        // resolved to the dead auction and the contract answered
+        // AuctionNotActive, which the interface reported as "This auction has
+        // ended" on an auction that was live.
+        //
+        // A live auction is the one unambiguous reading, so it wins. An artwork
+        // cannot hold two active auctions at once, so an Active auction at this
+        // number and a different active auction on the artwork of the same
+        // number cannot both exist - the two branches can never disagree.
+        let auctionStatus = null;
         try {
             const auction = await this.getAuctionStruct(rawId);
-            if (Number(auction.status) !== 0) {
+            auctionStatus = Number(auction.status);
+            if (auctionStatus === AUCTION_STATUS_ACTIVE) {
                 return rawId;
             }
         } catch {
-            // Fall through to artwork lookup.
+            // Not readable as an auction; the artwork lookup below decides.
         }
 
-        const artwork = await this.getArtworkStruct(rawId);
-        if (artwork.activeAuctionId && artwork.activeAuctionId !== 0n) {
-            return artwork.activeAuctionId;
+        try {
+            const artwork = await this.getArtworkStruct(rawId);
+            if (artwork.activeAuctionId && artwork.activeAuctionId !== 0n) {
+                return artwork.activeAuctionId;
+            }
+        } catch {
+            // Not readable as an artwork either.
+        }
+
+        // No live auction anywhere. A finished auction at this number is still
+        // the right target for the paths that act on one - ending an expired
+        // auction, completing or defaulting a settlement.
+        if (auctionStatus !== null && auctionStatus !== AUCTION_STATUS_NONE) {
+            return rawId;
         }
 
         throw new Error('No active auction found for this artwork');
