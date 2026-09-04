@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **58 done, 14 in progress, 6 planned** across A-01 to A-78.
+Phase A stands at **60 done, 14 in progress, 7 planned** across A-01 to A-81.
 
 ## The shape of what is left
 
@@ -22,7 +22,7 @@ So the remaining work divides cleanly:
 | | who | count |
 | --- | --- | ---: |
 | Engineering, in this repository | anyone working here | 9 |
-| Operator ceremony and outside resources | the founder | 4 gates |
+| Operator ceremony and outside resources | the founder | 3 gates |
 | Acceptance on a real device | the founder | 3 |
 
 ## 1. Founder gates - nothing ships past these
@@ -32,9 +32,15 @@ These are the phase. Each is blocked on something no code change can supply.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Two operators completing [`testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md`](testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md), including an iOS run | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets |
-| **RG-02** project mailbox | A monitored mailbox for general, security and copyright contact, with a retention procedure | An outside service and a person who reads it |
 | **RG-03** → **A-39** moderation activation | Ordered migrations, archived verification output, two founder passkeys, the one-time audited bootstrap grant | Credentials and a multisig-authorised ceremony; canon rule 12 forbids a single operator deciding it |
 | **A8d** Safe recovery rehearsal | The successful ceremony plus all eleven denial cases in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md) section 6 | Signing keys held by three people |
+
+**RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
+against **C14**, and RG-03's own completion clause does not mention it, so a
+project mailbox gates Phase C rather than the moderation activation or Phase A
+exit. It was listed here as a founder-owned item and read as a gate it is not.
+It stays deferred, with private operational channels in use and no unmonitored
+mailbox published.
 
 The sequence is already written down and must not be improvised: the ordered
 migration steps and their backup discipline are in
@@ -63,6 +69,7 @@ Ordered by what the founder can feel, not by row number.
 | **A-34** | One reusable presentation-only aura frame shell | Canon 17; no economics |
 | **A-35** | Legacy runtime boundaries, second half | The migration ledger half is done |
 | **A-38** | Dependency and production warning triage | No forced upgrades |
+| **A-79** | Decide whether the profile publishes one frame or identity first | Two accepted repairs now contradict each other and whichever merges last wins by accident. Bound the first gallery read to one page so a coherent frame costs nothing to wait for |
 | **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
 
 ## 3. Waiting only on a look

@@ -54,3 +54,7 @@ docs/progress/PUBLIC_PROGRESS_2026-07-29_TO_2026-08-13.md
 
 # Generated brand/marketing renders. Decide per-asset whether to track them.
 brand/
+
+# Snapshot A exports are data, never source
+snapshot-a/
+snapshot-a-*/
