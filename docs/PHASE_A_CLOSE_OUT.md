@@ -22,7 +22,7 @@ So the remaining work divides cleanly:
 | | who | count |
 | --- | --- | ---: |
 | Engineering, in this repository | anyone working here | 9 |
-| Operator ceremony and outside resources | the founder | 4 gates |
+| Operator ceremony and outside resources | the founder | 3 gates |
 | Acceptance on a real device | the founder | 3 |
 
 ## 1. Founder gates - nothing ships past these
@@ -32,9 +32,15 @@ These are the phase. Each is blocked on something no code change can supply.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Two operators completing [`testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md`](testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md), including an iOS run | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets |
-| **RG-02** project mailbox | A monitored mailbox for general, security and copyright contact, with a retention procedure | An outside service and a person who reads it |
 | **RG-03** → **A-39** moderation activation | Ordered migrations, archived verification output, two founder passkeys, the one-time audited bootstrap grant | Credentials and a multisig-authorised ceremony; canon rule 12 forbids a single operator deciding it |
 | **A8d** Safe recovery rehearsal | The successful ceremony plus all eleven denial cases in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md) section 6 | Signing keys held by three people |
+
+**RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
+against **C14**, and RG-03's own completion clause does not mention it, so a
+project mailbox gates Phase C rather than the moderation activation or Phase A
+exit. It was listed here as a founder-owned item and read as a gate it is not.
+It stays deferred, with private operational channels in use and no unmonitored
+mailbox published.
 
 The sequence is already written down and must not be improvised: the ordered
 migration steps and their backup discipline are in
