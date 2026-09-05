@@ -1,5 +1,7 @@
 # ArtSoul Engineering Handoff
 
+Latest focused verification: [A-47 loading and media, 2026-09-05](testnet/A47_LOADING_MEDIA_CHECK_2026-09-05.md). This is local evidence, not device acceptance or a closure. The older production snapshot below is dated and must not be used as current HEAD.
+
 Updated: 2026-08-19
 
 Production code baseline: `main` includes `f4297ce` and currently heads at `f904d90` (merged PR #196)

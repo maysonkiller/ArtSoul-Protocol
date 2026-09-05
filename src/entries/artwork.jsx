@@ -1,5 +1,6 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
+import { decodeImage } from '../features/artwork/decoded-image.js';
 
 // A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
 // after the server signals a staff wallet needs passkey step-up/enrollment,
@@ -13,6 +14,37 @@ import '../../supabase-client.js';
 import '../../supabase-auth.js';
 
 const { useState, useEffect, useRef } = React;
+
+function useDecodedImage(source, fallback = '') {
+    const [prepared, setPrepared] = useState({ source: '', url: '', failed: false });
+    useEffect(() => {
+        let active = true;
+        if (!source) return () => { active = false; };
+        decodeImage(source).then(
+            url => { if (active) setPrepared({ source, url, failed: false }); },
+            () => {
+                if (active) setPrepared({ source, url: fallback, failed: !fallback });
+            }
+        );
+        return () => { active = false; };
+    }, [source, fallback]);
+    return prepared.source === source ? prepared : { url: '', failed: false };
+}
+
+function OwnershipIdentity({ source, label, name, className, style, nameStyle, isClassic }) {
+    const image = useDecodedImage(source, '/default-avatar.png');
+    return (
+        <>
+            {image.url ? <img src={image.url} alt={label} className={className} style={style} /> : (
+                <span className={className} style={style} role="status" aria-label={`Loading ${label.toLowerCase()} identity`} />
+            )}
+            <div className="min-w-0 flex-1">
+                <div className={`text-xs ${isClassic ? 'opacity-70' : 'opacity-90'}`}>{label}</div>
+                <div className="font-semibold truncate" style={nameStyle}>{name}</div>
+            </div>
+        </>
+    );
+}
         const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
         const WEI_PER_ETH = 1000000000000000000n;
         const MIN_ABSOLUTE_BID_INCREMENT_WEI = 10000000000000000n;
@@ -109,18 +141,17 @@ const { useState, useEffect, useRef } = React;
             const [mediaError, setMediaError] = React.useState(false);
             const [isPlaying, setIsPlaying] = React.useState(false);
             const [videoLoaded, setVideoLoaded] = React.useState(false);
-            const [posterFailed, setPosterFailed] = React.useState(false);
             const [isImageFullscreen, setIsImageFullscreen] = React.useState(false);
             const mediaType = media?.type || 'unknown';
             const url = media?.url || '';
             const poster = media?.poster || '';
             const sanitizedTitle = window.ArtSoulSecurity?.sanitizeText(title) || 'Artwork';
             const isSafeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(url);
+            const decodedImage = useDecodedImage(isSafeMediaUrl && ['image', 'gif'].includes(mediaType) ? url : '');
 
             React.useEffect(() => {
                 setMediaError(false);
                 setVideoLoaded(false);
-                setPosterFailed(false);
             }, [url]);
 
             React.useEffect(() => {
@@ -159,7 +190,7 @@ const { useState, useEffect, useRef } = React;
                 }
             };
 
-            if (!isSafeMediaUrl || mediaError) {
+            if (!isSafeMediaUrl || mediaError || decodedImage.failed) {
                 return renderMediaFallback();
             }
 
@@ -178,27 +209,20 @@ const { useState, useEffect, useRef } = React;
                             preload="metadata"
                             poster={poster || undefined}
                             className="artwork-detail-media-object artwork-detail-video"
-                            style={{ visibility: videoLoaded ? 'visible' : 'hidden' }}
                             onLoadedMetadata={(event) => {
                                 renderFirstVideoFrame(event);
-                                // iOS/mobile browsers with preload="metadata" never fire
-                                // loadeddata before playback starts, so metadata must
-                                // already reveal the (tappable) player.
-                                setVideoLoaded(true);
                             }}
-                            onLoadedData={() => setVideoLoaded(true)}
+                            onLoadedData={(event) => {
+                                if (!event.currentTarget.seeking) setVideoLoaded(true);
+                            }}
+                            onSeeked={() => setVideoLoaded(true)}
+                            onPlaying={() => setVideoLoaded(true)}
                             onError={() => setMediaError(true)}
                         >
                             Your browser does not support video playback.
                         </video>
-                        {!videoLoaded && <div className="artsoul-media-loading" role="status" aria-label="Loading media"></div>}
-                        {poster && !posterFailed && !videoLoaded && (
-                            <img
-                                src={poster}
-                                alt=""
-                                className="artsoul-video-poster"
-                                onError={() => setPosterFailed(true)}
-                            />
+                        {!videoLoaded && !poster && (
+                            <span className="artwork-video-loading-label" role="status">Loading video…</span>
                         )}
                     </div>
                 );
@@ -238,8 +262,9 @@ const { useState, useEffect, useRef } = React;
             // Images and GIFs share the same aspect-safe artwork surface and fullscreen control.
             return (
                 <div className="artwork-detail-image-shell">
-                    <img
-                        src={url}
+                    {!decodedImage.url && <div className="artsoul-media-loading" role="status" aria-label="Loading image" />}
+                    {decodedImage.url && <img
+                        src={decodedImage.url}
                         alt={sanitizedTitle}
                         className="artwork-detail-media-object artwork-detail-image artwork-detail-image-zoomable"
                         role="button"
@@ -253,7 +278,7 @@ const { useState, useEffect, useRef } = React;
                             }
                         }}
                         onError={() => setMediaError(true)}
-                    />
+                    />}
                     {isImageFullscreen && window.ReactDOM?.createPortal?.(
                         <div
                             className="artwork-image-lightbox"
@@ -294,6 +319,7 @@ const { useState, useEffect, useRef } = React;
             const [creatorProfile, setCreatorProfile] = useState(null);
             const [auctionWinnerProfile, setAuctionWinnerProfile] = useState(null);
             const [currentOwnerProfile, setCurrentOwnerProfile] = useState(null);
+            const [resolvedProfileAddresses, setResolvedProfileAddresses] = useState(() => new Set());
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [projectionRetryCount, setProjectionRetryCount] = useState(0);
@@ -872,6 +898,10 @@ const { useState, useEffect, useRef } = React;
 
             function renderOwnershipRole({ label, address, profile }) {
                 if (!address || isZeroAddress(address)) return null;
+                const resolvedProfile = profile || (
+                    isSameAddress(address, artwork.creator_id || artwork.creator) ? creatorProfile : null
+                );
+                const identityResolved = resolvedProfile || resolvedProfileAddresses.has(address.toLowerCase());
 
                 const roleCardStyle = !isClassic ? {
                     boxShadow: '0 0 15px rgba(var(--c-accent-rgb), 0.2)',
@@ -880,10 +910,7 @@ const { useState, useEffect, useRef } = React;
                 } : {};
 
                 const avatarStyle = {
-                    backgroundImage: "url('/default-avatar.png')",
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: 'cover',
+                    display: 'block',
                     ...(!isClassic ? {
                         boxShadow: '0 0 10px rgba(var(--c-accent-rgb), 0.5)',
                         animation: 'colorShift 8s ease-in-out infinite'
@@ -907,28 +934,18 @@ const { useState, useEffect, useRef } = React;
                             }`}
                             style={roleCardStyle}
                         >
-                            <img
-                                src={getProfileAvatarUrl(profile, address)}
-                                alt={label}
-                                onLoad={(event) => {
-                                    event.currentTarget.style.backgroundImage = 'none';
-                                }}
-                                onError={(event) => {
-                                    if (!event.currentTarget.src.endsWith('/default-avatar.png')) {
-                                        event.currentTarget.src = '/default-avatar.png';
-                                    }
-                                }}
+                            <OwnershipIdentity
+                                key={address.toLowerCase()}
+                                source={identityResolved ? getProfileAvatarUrl(resolvedProfile, address) : ''}
+                                label={label}
+                                name={getProfileDisplayName(resolvedProfile, address)}
+                                nameStyle={nameStyle}
+                                isClassic={isClassic}
                                 className={`w-12 h-12 rounded-full border-2 flex-shrink-0 ${
                                     isClassic ? 'border-current' : 'border-cyan-400'
                                 }`}
                                 style={avatarStyle}
                             />
-                            <div className="min-w-0 flex-1">
-                                <div className={`text-xs ${isClassic ? 'opacity-70' : 'opacity-90'}`}>{label}</div>
-                                <div className="font-semibold truncate" style={nameStyle}>
-                                    {getProfileDisplayName(profile, address)}
-                                </div>
-                            </div>
                         </a>
                     </div>
                 );
@@ -1802,8 +1819,8 @@ const { useState, useEffect, useRef } = React;
                         username: data.creator_name || '',
                         avatar_url: data.creator_avatar_url || ''
                     } : null);
-                    setAuctionWinnerProfile(null);
-                    setCurrentOwnerProfile(null);
+                    setAuctionWinnerProfile(current => isSameAddress(current?.wallet_address, data.auction_winner_address) ? current : null);
+                    setCurrentOwnerProfile(current => isSameAddress(current?.wallet_address, data.current_owner_address) ? current : null);
                     setSocialSignals(window.ArtSoulDiscovery?.getSocialSignals?.(data) || {
                         likes: data.vote_count || 0,
                         wouldBuy: 0,
@@ -1836,6 +1853,7 @@ const { useState, useEffect, useRef } = React;
                             if (result.status === 'fulfilled') profiles.set(result.value.address, result.value.profile);
                             else console.warn('Could not load artwork profile:', result.reason);
                         });
+                        setResolvedProfileAddresses(current => new Set([...current, ...profileAddresses]));
                         if (data.creator_id) {
                             const hydratedCreatorProfile = profiles.get(data.creator_id.toLowerCase());
                             if (hydratedCreatorProfile) setCreatorProfile(hydratedCreatorProfile);
