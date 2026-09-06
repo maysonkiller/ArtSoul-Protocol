@@ -41,22 +41,30 @@ function buildContractConfig(overrides = {}) {
 }
 
 function formatTransactionError(error, fallback = 'The transaction could not be completed. Please try again.') {
-    const nestedError = error?.info?.error || error?.error || {};
-    const code = String(error?.code || nestedError?.code || '').toUpperCase();
-    const messages = [
-        error?.shortMessage,
-        error?.reason,
-        error?.revert?.name ? `Contract rejected the transaction: ${error.revert.name}` : '',
-        nestedError?.message,
-        error?.data?.message,
-        error?.message
-    ].filter(message => typeof message === 'string' && message.trim());
-    const combined = messages.join(' | ').toLowerCase();
+    const nodes = [error];
+    const seen = new Set();
+    const messages = [];
+    const reasons = [];
+    const codes = [];
+    for (let i = 0; i < nodes.length && seen.size < 12; i += 1) {
+        const item = nodes[i];
+        if (!item || typeof item !== 'object' || seen.has(item)) continue;
+        seen.add(item);
+        codes.push(String(item.code || '').toUpperCase());
+        reasons.push(...[
+            item.reason,
+            item.revert?.name ? `Contract rejected the transaction: ${item.revert.name}` : ''
+        ].filter(value => typeof value === 'string' && value.trim()));
+        messages.push(...[item.shortMessage, item.details, item.message]
+            .filter(value => typeof value === 'string' && value.trim()));
+        nodes.push(item.cause, item.error, item.info?.error, item.data);
+    }
+    const combined = [...reasons, ...messages].join(' | ').toLowerCase();
 
-    if (code === 'ACTION_REJECTED' || code === '4001' || combined.includes('user rejected') || combined.includes('user denied')) {
+    if (codes.includes('ACTION_REJECTED') || codes.includes('4001') || combined.includes('user rejected') || combined.includes('user denied')) {
         return 'Transaction was rejected in your wallet.';
     }
-    if (combined.includes('insufficient funds') || combined.includes('insufficient gas') || combined.includes('not enough funds')) {
+    if (/insufficient funds|insufficient gas|not enough funds|outoffunds/.test(combined)) {
         return 'Not enough testnet ETH to cover the transaction and gas.';
     }
     if (combined.includes('nonce too low') || combined.includes('replacement transaction underpriced')) {
@@ -66,13 +74,19 @@ function formatTransactionError(error, fallback = 'The transaction could not be 
         return 'The wallet network changed or is unsupported. Switch back to the artwork network and try again.';
     }
 
-    const usefulMessage = messages.find(message => !/missing revert data|call_exception|unknown error/i.test(message));
+    const usefulMessage = [
+        ...reasons,
+        ...messages.filter(message => /^execution reverted:\s*\S/i.test(message)),
+        ...messages
+    ].find(message => !/missing revert data|call_exception|unknown error|internal json-rpc error/i.test(message));
     if (!usefulMessage) return fallback;
 
     return usefulMessage
         .replace(/^execution reverted(?::\s*)?/i, 'Transaction reverted: ')
+        .replace(/\b(?:URL|Request body|Request arguments|Contract Call|Details|Version):[\s\S]*$/i, '')
         .replace(/\s*\(action=.*$/i, '')
-        .trim() || fallback;
+        .replace(/\s+/g, ' ')
+        .trim().slice(0, 240) || fallback;
 }
 
 // Wallet methods that pop an approval sheet. On the external-mobile core path

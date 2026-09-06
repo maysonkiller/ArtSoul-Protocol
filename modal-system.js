@@ -27,6 +27,7 @@
             container.id = 'modal-container';
             container.style.cssText = `
                 position: fixed;
+                box-sizing: border-box;
                 top: 0;
                 left: 0;
                 width: 100%;
@@ -133,8 +134,12 @@
             modal.className = 'modal';
             modal.style.cssText = `
                 position: relative;
+                box-sizing: border-box;
                 max-width: 500px;
                 width: 100%;
+                max-height: calc(100vh - 2rem);
+                max-height: calc(100dvh - 2rem);
+                overflow-y: auto;
                 border-radius: 1rem;
                 padding: 2rem;
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
@@ -164,12 +169,14 @@
                 line-height: 1.6;
                 opacity: 0.9;
                 white-space: pre-wrap;
+                overflow-wrap: anywhere;
             `;
 
             // Buttons container
             const buttonsContainer = document.createElement('div');
             buttonsContainer.style.cssText = `
                 display: flex;
+                flex-wrap: wrap;
                 gap: 1rem;
                 justify-content: flex-end;
             `;
@@ -252,6 +259,10 @@
                             opacity: 1;
                             transform: translateY(0) scale(1);
                         }
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                        #modal-container .modal { animation: none !important; }
+                        #modal-container button { transition: none !important; }
                     }
                 `;
                 document.head.appendChild(style);
