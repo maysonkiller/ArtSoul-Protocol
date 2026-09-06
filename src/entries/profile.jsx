@@ -872,6 +872,22 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 const requestId = ++profileRequestRef.current;
+                // Initial loads and tab loads write the same list. They must
+                // share one generation so the slower writer cannot win later.
+                const artworkRequestId = ++artworksRequestRef.current;
+                const previousAddress = loadingProfileAddressRef.current || loadedProfileAddressRef.current;
+                const addressChanged = previousAddress !== normalizedAddress;
+                const requestedGallery = addressChanged ? 'created' : selectedGallery;
+                if (addressChanged) {
+                    galleryCacheRef.current.clear();
+                    setSelectedGallery('created');
+                    setDisplayedGallery('created');
+                    setHasSettledArtworks(false);
+                    setMyArtworks([]);
+                    setDiscoveryProfile(null);
+                    setProfile(null);
+                    setLoading(Boolean(walletAddress));
+                }
                 setArtworksLoading(true);
                 if (!walletAddress) {
                     if (requestId !== profileRequestRef.current) return;
@@ -910,7 +926,7 @@ const { useState, useEffect, useRef } = React;
                     const profilePromise = db.getProfile(walletAddress);
                     const artworksPromise = fetchProfileArtworks(
                         { wallet_address: walletAddress },
-                        selectedGallery,
+                        requestedGallery,
                         db
                     );
                     const genesisPromise = getGenesisState(walletAddress);
@@ -954,13 +970,19 @@ const { useState, useEffect, useRef } = React;
                         : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
                     const nextDiscoveryProfile = buildDiscoveryProfile(profileData, artworkData.corpus, genesisState);
 
-                    setMyArtworks(artworkData.items);
+                    if (artworkRequestId === artworksRequestRef.current) {
+                        galleryCacheRef.current.set(`${normalizedAddress}:${requestedGallery}`, artworkData.items);
+                        setMyArtworks(artworkData.items);
+                        setDisplayedGallery(requestedGallery);
+                        setHasSettledArtworks(true);
+                        setArtworksLoading(false);
+                    }
                     setDiscoveryProfile(nextDiscoveryProfile);
-                    setArtworksLoading(false);
                     loadedProfileAddressRef.current = normalizedAddress;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
                     console.error('Error loading profile:', error);
+                    if (artworkRequestId === artworksRequestRef.current) setArtworksLoading(false);
                 }
                 if (requestId !== profileRequestRef.current) return;
                 if (loadingProfileAddressRef.current === normalizedAddress) {
@@ -1815,7 +1837,7 @@ const { useState, useEffect, useRef } = React;
                                 }`}>
                                     {GALLERY_TYPES.find(g => g.id === selectedGallery)?.label}
                                 </h3>
-                                {artworksLoading && hasSettledArtworks ? (
+                                {artworksLoading ? (
                                     <span
                                         className={`profile-gallery-loading-note text-sm ${
                                             isClassic ? 'text-gray-400' : 'text-purple-300'
