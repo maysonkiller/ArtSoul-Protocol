@@ -2614,7 +2614,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     ? `Step ${step} of ${totalSteps}: ${step === totalSteps ? 'confirm the listing' : 'allow the marketplace to access this NFT'}`
                                     : 'Confirm the listing in your wallet'
                             );
-                        }
+                        },
+                        { idType: 'artwork' }
                     );
 
                     setConfirmedResaleListing(true);
@@ -2672,7 +2673,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     // Buy an already minted resale listing.
                     const txHash = await window.ArtSoulContracts.buyResale(
                         artwork.blockchain_id,
-                        artwork.sale_price
+                        artwork.sale_price,
+                        { idType: 'artwork' }
                     );
                     console.log('Resale purchase tx:', txHash);
 
