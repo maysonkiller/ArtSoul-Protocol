@@ -23,3 +23,7 @@ The founder's September 5 desktop recording shows a bid Notice around 01:32 and 
 Bible frontend/provenance and theme scope only; no contract behavior, fees, ownership, settlement or mint lifecycle changed. Existing transaction prechecks and network guards remain active. Incomplete/ambiguous RPC evidence is not treated as proof of an ended auction or a specific contract refusal.
 
 External-mobile switch failures, account reconciliation and a confirmation followed by stale indexer data remain separate. The recorded extension-injection failures are not hidden or patched by rewriting `window.ethereum`. A-33 stays in progress until relevant real-device feedback and composition checks pass.
+
+## Follow-up: validation must release the action state
+
+The adjacent profile Create Auction handler acquired its Processing lock before validating duration/price, but its early validation returns were outside `try/finally`. Three behavioral tests reproduced the stuck lock without requesting a wallet. Validation now runs inside the existing action lifetime so every return releases the lock. Allowed durations and positive-price rules are unchanged; no contract call is made for invalid input. This is a code-reproduced edge case, not a diagnosis of the signed-wallet waiting interval in the Android recording.

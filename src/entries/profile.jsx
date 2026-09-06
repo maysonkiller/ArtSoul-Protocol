@@ -1248,17 +1248,19 @@ const { useState, useEffect, useRef } = React;
                 const actionKey = beginTransactionAction('create-auction', artwork);
                 if (!actionKey) return;
 
-                // Primary auctions support 24h / 36h / 48h only. Canon rule 3.
-                if (![24, 36, 48].includes(Number(durationHours))) {
-                    alert('Auction duration must be 24, 36 or 48 hours.');
-                    return;
-                }
-                if (!(parseFloat(startingPrice) > 0)) {
-                    alert('The starting price must be greater than 0.');
-                    return;
-                }
-
                 try {
+                    // Validation also belongs to the action lifetime: every
+                    // return must release the Processing state in finally.
+                    // Primary auctions support 24h / 36h / 48h only. Canon rule 3.
+                    if (![24, 36, 48].includes(Number(durationHours))) {
+                        alert('Auction duration must be 24, 36 or 48 hours.');
+                        return;
+                    }
+                    if (!(parseFloat(startingPrice) > 0)) {
+                        alert('The starting price must be greater than 0.');
+                        return;
+                    }
+
                     // Check wallet connection
                     let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
