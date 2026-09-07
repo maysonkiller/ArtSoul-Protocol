@@ -6,6 +6,8 @@ Transaction feedback: [A-33 evidence and local verification, 2026-09-06](testnet
 
 Profile request ordering: [A-58 reproduction and local repair, 2026-09-06](testnet/A58_PROFILE_REQUEST_ORDERING_2026-09-06.md). This fixes delayed responses overwriting newer tabs; it does not claim A-79's first-frame performance decision is complete.
 
+Avatar failure handling: [A-61 local verification, 2026-09-07](testnet/A61_AVATAR_FAILURE_CHECK_2026-09-07.md). A failed image no longer leaves the hero busy forever; this is not a replacement for cold-load or real-device acceptance.
+
 Updated: 2026-08-19
 
 Production code baseline: `main` includes `f4297ce` and currently heads at `f904d90` (merged PR #196)

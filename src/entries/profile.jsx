@@ -57,6 +57,7 @@ const { useState, useEffect, useRef } = React;
             const [addressCopied, setAddressCopied] = useState(false);
             const addressCopiedTimerRef = useRef(null);
             const [decodedProfileAvatarUrl, setDecodedProfileAvatarUrl] = useState('');
+            const [profileAvatarFailed, setProfileAvatarFailed] = useState(false);
             const profileAvatarDecodeTokenRef = useRef(0);
 
             const isClassic = theme === 'classic';
@@ -218,6 +219,7 @@ const { useState, useEffect, useRef } = React;
             useEffect(() => {
                 const token = ++profileAvatarDecodeTokenRef.current;
                 setDecodedProfileAvatarUrl('');
+                setProfileAvatarFailed(false);
                 if (!resolvedAvatarUrl || resolvedAvatarUrl === 'uploading...') return undefined;
 
                 const preloader = typeof Image === 'function'
@@ -227,17 +229,18 @@ const { useState, useEffect, useRef } = React;
                     if (token !== profileAvatarDecodeTokenRef.current) return;
                     setDecodedProfileAvatarUrl(resolvedAvatarUrl);
                 };
-                preloader.onerror = () => {
-                    // Keep the stable shell instead of exposing a broken or
-                    // partially painted image. A later profile refresh retries.
+                const fail = () => {
+                    if (token !== profileAvatarDecodeTokenRef.current) return;
+                    setProfileAvatarFailed(true);
                 };
+                preloader.onerror = fail;
                 preloader.onload = () => {
                     if (token !== profileAvatarDecodeTokenRef.current) return;
                     if (typeof preloader.decode !== 'function') {
                         commit();
                         return;
                     }
-                    preloader.decode().then(commit, () => {});
+                    preloader.decode().then(commit, fail);
                 };
                 preloader.decoding = 'async';
                 preloader.src = resolvedAvatarUrl;
@@ -1508,10 +1511,14 @@ const { useState, useEffect, useRef } = React;
                                             animation: 'colorShift 8s ease-in-out infinite'
                                         } : {}}
                                         onClick={() => editMode && fileInputRef.current?.click()}
-                                        aria-busy={Boolean(resolvedAvatarUrl && !decodedProfileAvatarUrl)}
+                                        aria-busy={Boolean(resolvedAvatarUrl && !decodedProfileAvatarUrl && !profileAvatarFailed)}
                                     >
                                         {decodedProfileAvatarUrl ? (
                                             <img src={decodedProfileAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : profileAvatarFailed ? (
+                                            <div className="w-full h-full flex items-center justify-center text-center text-xs opacity-70" role="status">
+                                                Avatar unavailable
+                                            </div>
                                         ) : resolvedAvatarUrl ? (
                                             <div className="w-full h-full" aria-hidden="true"></div>
                                         ) : (
