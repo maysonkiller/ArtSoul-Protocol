@@ -27,3 +27,22 @@ Still separate: external-wallet network-switch failures, transaction-target ambi
 ## Canon interpretation
 
 Only frontend loading and provenance display are affected (Bible §5 and visual/theme rules). No protocol state, economics, ownership, chain selection, fees or lifecycle changed. A temporary avatar placeholder is not a new identity or role. No new dependency, page-wide loading gate or replacement design was introduced.
+
+## September 8 preview follow-up: first frame and card controls
+
+The earlier 4.4-second result measured navigation to a visible video element on one first visit, not video download duration or a comparison with the previous build. It must not be presented as a fixed playback delay or proof of a speed regression.
+
+Compared immutable deployments of `86feaf5` (production base) and `94c05a2` (PR #258) using actual Chrome, fresh browser contexts, alternating order and the same artwork. The first-frame proxy is a visible video with decoded data and no active seek, observed on an animation frame. It is not a field-performance percentile or real-device acceptance.
+
+| Artwork | Base, navigation to first-frame readiness | PR #258, same observation |
+| --- | --- | --- |
+| 7, three visits per version | 2.307 / 1.475 / 1.302 seconds | 1.751 / 1.280 / 1.139 seconds |
+| 19, one visit per version | 1.357 seconds | 1.646 seconds |
+
+On the slower artwork-19 preview visit, the exact-artwork request took 818 ms versus 165 ms on the base visit; media mount-to-frame time was about 482 ms versus 480 ms. The source of that individual delay is before the player mounts, not evidence that the new media renderer adds a playback wait. Deployment/backend caches were not controlled; do not extrapolate the small sample to all visits. No page errors occurred in these eight visits.
+
+Artwork 7 currently has no separate image/poster in either its public projection or its source metadata. Both versions seek the video to 0.1 seconds to obtain its first frame. Music 2 (artwork 32) likewise has no stored cover; home, gallery and profile share the existing branded audio-card layout. This follow-up does not replace either media preview, alter styling or invent a cover image.
+
+A separate keyboard defect was reproduced on the deployed Marketplace: Enter or Space on Music 2's play button opened artwork 32 instead of playing. The outer React card consumed bubbled key events from nested controls. It now handles activation only when the card itself is the event target, leaving native button activation intact. A failing behavioral test reproduced the defect before the one-line repair; the companion test preserves Enter/Space activation on the card itself. Actual Chrome with only the local card script substituted into the preview then played audio with both keys without navigating. Shared runtime version 12 is used by all four consuming pages and pinned in the cache guard.
+
+Verification after the repair: 889 unit tests, 882 passed, 7 skipped, 0 failed; production build passed with 10 routes and 178 Tailwind utilities. No contract code changed. The local-script substitution check is not yet evidence that this follow-up has deployed, and the original device/performance gates remain open.

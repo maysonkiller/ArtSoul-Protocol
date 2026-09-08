@@ -60,8 +60,46 @@ function loadDomCardRuntime() {
     { window, document }
   );
   vm.runInNewContext(source, { window, document });
-    return { api: window.ArtSoulArtworkCard, mediaElements };
+    return { api: window.ArtSoulArtworkCard, mediaElements, window };
 }
+
+test('React card leaves nested media and action keyboard activation to the focused control', () => {
+    const { api, window } = loadDomCardRuntime();
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState: value => [value, () => {}],
+        useEffect() {}
+    };
+    let opened = 0;
+    const card = api.ReactCard({ artwork: { file_type: 'audio', file_url: 'track.mp3' }, onOpen: () => { opened++; } });
+    const root = {};
+    for (const key of ['Enter', ' ']) {
+        for (const target of [{ type: 'play' }, { type: 'mute' }, { type: 'action' }]) {
+            let prevented = false;
+            card.props.onKeyDown({ key, target, currentTarget: root, preventDefault() { prevented = true; } });
+            assert.equal(opened, 0, `${key} from a nested control must not open the artwork`);
+            assert.equal(prevented, false, 'native button keyboard behavior must remain available');
+        }
+    }
+});
+
+test('React card still opens when the card itself receives Enter or Space', () => {
+    const { api, window } = loadDomCardRuntime();
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState: value => [value, () => {}],
+        useEffect() {}
+    };
+    let opened = 0;
+    const card = api.ReactCard({ artwork: { file_type: 'video', file_url: 'clip.mp4' }, onOpen: () => { opened++; } });
+    const root = {};
+    for (const key of ['Enter', ' ', 'Escape']) {
+        let prevented = false;
+        card.props.onKeyDown({ key, target: root, currentTarget: root, preventDefault() { prevented = true; } });
+        assert.equal(prevented, key !== 'Escape');
+    }
+    assert.equal(opened, 2);
+});
 
 test('card media keeps the uniform square frame and cover crop', () => {
     assert.match(css, /\.artsoul-card-media\s*\{[\s\S]*?aspect-ratio:\s*1\s*\/\s*1;/);
