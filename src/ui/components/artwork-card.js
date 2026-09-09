@@ -185,6 +185,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'artsoul-media-toggle';
+        button.dataset.allowRapid = 'true';
         button.dataset.state = 'paused';
         button.setAttribute('aria-label', `Play ${label}`);
         isolateMediaControl(button);
@@ -204,6 +205,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'artsoul-media-mute';
+        button.dataset.allowRapid = 'true';
         isolateMediaControl(button);
         button.addEventListener('click', () => {
             media.muted = !media.muted;
@@ -716,11 +718,11 @@
             h('div', { className: 'artsoul-card-media-controls', draggable: false,
                 onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                 onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
-                h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-state': playing ? 'playing' : 'paused',
+                h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-allow-rapid': 'true', 'data-state': playing ? 'playing' : 'paused',
                     'aria-label': `${playing ? 'Pause' : 'Play'} video preview`, draggable: false,
                     onClick: toggle, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation }),
-                h('button', { type: 'button', className: 'artsoul-media-mute', 'data-muted': String(muted),
+                h('button', { type: 'button', className: 'artsoul-media-mute', 'data-allow-rapid': 'true', 'data-muted': String(muted),
                     'aria-label': `${muted ? 'Unmute' : 'Mute'} video preview`, draggable: false,
                     onClick: toggleMute, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
@@ -765,11 +767,11 @@
                 h('div', { className: 'artsoul-card-media-controls', draggable: false,
                     onClick: stopCardActivation, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                     onTouchStart: stopCardPropagation, onDragStart: stopCardActivation },
-                    h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-state': playing ? 'playing' : 'paused',
+                    h('button', { type: 'button', className: 'artsoul-media-toggle', 'data-allow-rapid': 'true', 'data-state': playing ? 'playing' : 'paused',
                         'aria-label': `${playing ? 'Pause' : 'Play'} audio preview`, draggable: false,
                         onClick: toggle, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                         onTouchStart: stopCardPropagation, onDragStart: stopCardActivation }),
-                    h('button', { type: 'button', className: 'artsoul-media-mute', 'data-muted': String(muted),
+                    h('button', { type: 'button', className: 'artsoul-media-mute', 'data-allow-rapid': 'true', 'data-muted': String(muted),
                         'aria-label': `${muted ? 'Unmute' : 'Mute'} audio preview`, draggable: false,
                         onClick: toggleMute, onPointerDown: stopCardPropagation, onMouseDown: stopCardPropagation,
                         onTouchStart: stopCardPropagation, onDragStart: stopCardActivation })
