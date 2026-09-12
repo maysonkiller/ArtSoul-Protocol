@@ -20,7 +20,10 @@ test('late avatar decodes cannot commit after the profile source changes', () =>
 });
 
 test('the profile hero keeps a stable shell while its avatar is pending', () => {
-  assert.match(profile, /aria-busy=\{Boolean\(resolvedAvatarUrl && !decodedProfileAvatarUrl\)\}/);
+  assert.match(profile, /aria-busy=\{Boolean\(resolvedAvatarUrl && !decodedProfileAvatarUrl && !profileAvatarFailed\)\}/);
   assert.match(profile, /\) : resolvedAvatarUrl \? \(\s*<div className="w-full h-full" aria-hidden="true"><\/div>/);
-  assert.match(profile, /preloader\.onerror = \(\) => \{[\s\S]*?Keep the stable shell/);
+  // An unavailable image is not an endless pending decode. Keep its dimensions
+  // but finish the pending state with a truthful label, never a broken <img>.
+  assert.match(profile, /preloader\.onerror = fail;/);
+  assert.match(profile, /profileAvatarFailed \? \([\s\S]*?Avatar unavailable/);
 });

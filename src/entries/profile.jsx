@@ -57,6 +57,7 @@ const { useState, useEffect, useRef } = React;
             const [addressCopied, setAddressCopied] = useState(false);
             const addressCopiedTimerRef = useRef(null);
             const [decodedProfileAvatarUrl, setDecodedProfileAvatarUrl] = useState('');
+            const [profileAvatarFailed, setProfileAvatarFailed] = useState(false);
             const profileAvatarDecodeTokenRef = useRef(0);
 
             const isClassic = theme === 'classic';
@@ -218,6 +219,7 @@ const { useState, useEffect, useRef } = React;
             useEffect(() => {
                 const token = ++profileAvatarDecodeTokenRef.current;
                 setDecodedProfileAvatarUrl('');
+                setProfileAvatarFailed(false);
                 if (!resolvedAvatarUrl || resolvedAvatarUrl === 'uploading...') return undefined;
 
                 const preloader = typeof Image === 'function'
@@ -227,17 +229,18 @@ const { useState, useEffect, useRef } = React;
                     if (token !== profileAvatarDecodeTokenRef.current) return;
                     setDecodedProfileAvatarUrl(resolvedAvatarUrl);
                 };
-                preloader.onerror = () => {
-                    // Keep the stable shell instead of exposing a broken or
-                    // partially painted image. A later profile refresh retries.
+                const fail = () => {
+                    if (token !== profileAvatarDecodeTokenRef.current) return;
+                    setProfileAvatarFailed(true);
                 };
+                preloader.onerror = fail;
                 preloader.onload = () => {
                     if (token !== profileAvatarDecodeTokenRef.current) return;
                     if (typeof preloader.decode !== 'function') {
                         commit();
                         return;
                     }
-                    preloader.decode().then(commit, () => {});
+                    preloader.decode().then(commit, fail);
                 };
                 preloader.decoding = 'async';
                 preloader.src = resolvedAvatarUrl;
@@ -872,6 +875,22 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 const requestId = ++profileRequestRef.current;
+                // Initial loads and tab loads write the same list. They must
+                // share one generation so the slower writer cannot win later.
+                const artworkRequestId = ++artworksRequestRef.current;
+                const previousAddress = loadingProfileAddressRef.current || loadedProfileAddressRef.current;
+                const addressChanged = previousAddress !== normalizedAddress;
+                const requestedGallery = addressChanged ? 'created' : selectedGallery;
+                if (addressChanged) {
+                    galleryCacheRef.current.clear();
+                    setSelectedGallery('created');
+                    setDisplayedGallery('created');
+                    setHasSettledArtworks(false);
+                    setMyArtworks([]);
+                    setDiscoveryProfile(null);
+                    setProfile(null);
+                    setLoading(Boolean(walletAddress));
+                }
                 setArtworksLoading(true);
                 if (!walletAddress) {
                     if (requestId !== profileRequestRef.current) return;
@@ -910,7 +929,7 @@ const { useState, useEffect, useRef } = React;
                     const profilePromise = db.getProfile(walletAddress);
                     const artworksPromise = fetchProfileArtworks(
                         { wallet_address: walletAddress },
-                        selectedGallery,
+                        requestedGallery,
                         db
                     );
                     const genesisPromise = getGenesisState(walletAddress);
@@ -954,13 +973,19 @@ const { useState, useEffect, useRef } = React;
                         : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
                     const nextDiscoveryProfile = buildDiscoveryProfile(profileData, artworkData.corpus, genesisState);
 
-                    setMyArtworks(artworkData.items);
+                    if (artworkRequestId === artworksRequestRef.current) {
+                        galleryCacheRef.current.set(`${normalizedAddress}:${requestedGallery}`, artworkData.items);
+                        setMyArtworks(artworkData.items);
+                        setDisplayedGallery(requestedGallery);
+                        setHasSettledArtworks(true);
+                        setArtworksLoading(false);
+                    }
                     setDiscoveryProfile(nextDiscoveryProfile);
-                    setArtworksLoading(false);
                     loadedProfileAddressRef.current = normalizedAddress;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
                     console.error('Error loading profile:', error);
+                    if (artworkRequestId === artworksRequestRef.current) setArtworksLoading(false);
                 }
                 if (requestId !== profileRequestRef.current) return;
                 if (loadingProfileAddressRef.current === normalizedAddress) {
@@ -1226,17 +1251,19 @@ const { useState, useEffect, useRef } = React;
                 const actionKey = beginTransactionAction('create-auction', artwork);
                 if (!actionKey) return;
 
-                // Primary auctions support 24h / 36h / 48h only. Canon rule 3.
-                if (![24, 36, 48].includes(Number(durationHours))) {
-                    alert('Auction duration must be 24, 36 or 48 hours.');
-                    return;
-                }
-                if (!(parseFloat(startingPrice) > 0)) {
-                    alert('The starting price must be greater than 0.');
-                    return;
-                }
-
                 try {
+                    // Validation also belongs to the action lifetime: every
+                    // return must release the Processing state in finally.
+                    // Primary auctions support 24h / 36h / 48h only. Canon rule 3.
+                    if (![24, 36, 48].includes(Number(durationHours))) {
+                        alert('Auction duration must be 24, 36 or 48 hours.');
+                        return;
+                    }
+                    if (!(parseFloat(startingPrice) > 0)) {
+                        alert('The starting price must be greater than 0.');
+                        return;
+                    }
+
                     // Check wallet connection
                     let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
@@ -1282,43 +1309,23 @@ const { useState, useEffect, useRef } = React;
                         return;
                     }
 
-                    // Get current network before transaction
-                    const network = await window.ArtSoulContracts.provider.getNetwork();
-                    const initialChainId = Number(network.chainId);
-                    console.log('Initial network:', initialChainId);
-
-                    // Create auction on blockchain
-                    console.log('Creating auction for artwork:', artwork.blockchain_id);
+                    // The shared adapter guards the write chain before sending
+                    // and resolves only after confirmation. A later wallet
+                    // network read cannot reverse that confirmed outcome.
+                    await window.ArtSoulContracts.createAuction(
+                        artwork.blockchain_id,
+                        String(startingPrice),
+                        Number(durationHours)
+                    );
 
                     try {
-                        await window.ArtSoulContracts.createAuction(
-                            artwork.blockchain_id,
-                            String(startingPrice),
-                            Number(durationHours)
-                        );
-
-                        // Verify network didn't change during transaction
-                        const finalNetwork = await window.ArtSoulContracts.provider.getNetwork();
-                        const finalChainId = Number(finalNetwork.chainId);
-
-                        if (initialChainId !== finalChainId) {
-                            throw new Error(`Network changed during transaction. Please stay on the same network and try again.`);
-                        }
-
-                        try {
-                            await window.ArtSoulDB.updateArtwork(artwork.id, { status: 'auction' });
-                        } catch (syncError) {
-                            console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
-                        }
-
-                        alert('Auction created successfully! Public state will update shortly.');
-                        loadMyArtworks(null, { fresh: true }); // Reload artworks
-                    } catch (txError) {
-                        if (txError.message.includes('network changed') || txError.code === 'NETWORK_ERROR') {
-                            throw new Error('Network was changed during transaction. Please stay on the same network and try again.');
-                        }
-                        throw txError;
+                        await window.ArtSoulDB.updateArtwork(artwork.id, { status: 'auction' });
+                    } catch (syncError) {
+                        console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
                     }
+
+                    alert('Auction created successfully! Public state will update shortly.');
+                    loadMyArtworks(null, { fresh: true }); // Reload artworks
                 } catch (error) {
                     console.error('Create auction failed:', error);
                     const message = getTransactionErrorMessage(error, 'The auction could not be created. Please try again.');
@@ -1484,10 +1491,14 @@ const { useState, useEffect, useRef } = React;
                                             animation: 'colorShift 8s ease-in-out infinite'
                                         } : {}}
                                         onClick={() => editMode && fileInputRef.current?.click()}
-                                        aria-busy={Boolean(resolvedAvatarUrl && !decodedProfileAvatarUrl)}
+                                        aria-busy={Boolean(resolvedAvatarUrl && !decodedProfileAvatarUrl && !profileAvatarFailed)}
                                     >
                                         {decodedProfileAvatarUrl ? (
                                             <img src={decodedProfileAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : profileAvatarFailed ? (
+                                            <div className="w-full h-full flex items-center justify-center text-center text-xs opacity-70" role="status">
+                                                Avatar unavailable
+                                            </div>
                                         ) : resolvedAvatarUrl ? (
                                             <div className="w-full h-full" aria-hidden="true"></div>
                                         ) : (
@@ -1815,7 +1826,7 @@ const { useState, useEffect, useRef } = React;
                                 }`}>
                                     {GALLERY_TYPES.find(g => g.id === selectedGallery)?.label}
                                 </h3>
-                                {artworksLoading && hasSettledArtworks ? (
+                                {artworksLoading ? (
                                     <span
                                         className={`profile-gallery-loading-note text-sm ${
                                             isClassic ? 'text-gray-400' : 'text-purple-300'

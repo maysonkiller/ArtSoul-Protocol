@@ -443,7 +443,7 @@ class AuctionService {
 
         try {
             const auction = await this._callWithRetry(
-                () => this.contracts.getAuction(artworkId),
+                () => this.contracts.getAuction(artworkId, { idType: 'artwork' }),
                 artworkId
             );
 

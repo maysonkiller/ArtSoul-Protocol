@@ -48,6 +48,22 @@ function extractFunction(source, name) {
 
 const AuctionService = loadAuctionService();
 
+test('auction eligibility requests an artwork namespace and preserves a failed read', async () => {
+  const service = Object.create(AuctionService.prototype);
+  const stop = new Error('read unavailable');
+  const calls = [];
+  service.contracts = {
+    marketplaceContract: {},
+    getAuction: async (id, options) => { calls.push([id, options?.idType]); throw stop; }
+  };
+  service._getFromCache = service._getStaleCache = () => null;
+  service._checkCircuitBreaker = () => true;
+  service._callWithRetry = callback => callback();
+  service._recordCircuitBreakerFailure = () => {};
+  await assert.rejects(() => service.getAuctionState('37'), error => error === stop);
+  assert.deepEqual(calls, [['37', 'artwork']]);
+});
+
 test('auction timing accepts numeric and ISO timestamps consistently', () => {
   const service = Object.create(AuctionService.prototype);
   const iso = '2026-08-23T01:57:52+02:00';

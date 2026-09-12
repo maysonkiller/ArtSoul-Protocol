@@ -41,22 +41,30 @@ function buildContractConfig(overrides = {}) {
 }
 
 function formatTransactionError(error, fallback = 'The transaction could not be completed. Please try again.') {
-    const nestedError = error?.info?.error || error?.error || {};
-    const code = String(error?.code || nestedError?.code || '').toUpperCase();
-    const messages = [
-        error?.shortMessage,
-        error?.reason,
-        error?.revert?.name ? `Contract rejected the transaction: ${error.revert.name}` : '',
-        nestedError?.message,
-        error?.data?.message,
-        error?.message
-    ].filter(message => typeof message === 'string' && message.trim());
-    const combined = messages.join(' | ').toLowerCase();
+    const nodes = [error];
+    const seen = new Set();
+    const messages = [];
+    const reasons = [];
+    const codes = [];
+    for (let i = 0; i < nodes.length && seen.size < 12; i += 1) {
+        const item = nodes[i];
+        if (!item || typeof item !== 'object' || seen.has(item)) continue;
+        seen.add(item);
+        codes.push(String(item.code || '').toUpperCase());
+        reasons.push(...[
+            item.reason,
+            item.revert?.name ? `Contract rejected the transaction: ${item.revert.name}` : ''
+        ].filter(value => typeof value === 'string' && value.trim()));
+        messages.push(...[item.shortMessage, item.details, item.message]
+            .filter(value => typeof value === 'string' && value.trim()));
+        nodes.push(item.cause, item.error, item.info?.error, item.data);
+    }
+    const combined = [...reasons, ...messages].join(' | ').toLowerCase();
 
-    if (code === 'ACTION_REJECTED' || code === '4001' || combined.includes('user rejected') || combined.includes('user denied')) {
+    if (codes.includes('ACTION_REJECTED') || codes.includes('4001') || combined.includes('user rejected') || combined.includes('user denied')) {
         return 'Transaction was rejected in your wallet.';
     }
-    if (combined.includes('insufficient funds') || combined.includes('insufficient gas') || combined.includes('not enough funds')) {
+    if (/insufficient funds|insufficient gas|not enough funds|outoffunds/.test(combined)) {
         return 'Not enough testnet ETH to cover the transaction and gas.';
     }
     if (combined.includes('nonce too low') || combined.includes('replacement transaction underpriced')) {
@@ -66,13 +74,19 @@ function formatTransactionError(error, fallback = 'The transaction could not be 
         return 'The wallet network changed or is unsupported. Switch back to the artwork network and try again.';
     }
 
-    const usefulMessage = messages.find(message => !/missing revert data|call_exception|unknown error/i.test(message));
+    const usefulMessage = [
+        ...reasons,
+        ...messages.filter(message => /^execution reverted:\s*\S/i.test(message)),
+        ...messages
+    ].find(message => !/missing revert data|call_exception|unknown error|internal json-rpc error/i.test(message));
     if (!usefulMessage) return fallback;
 
     return usefulMessage
         .replace(/^execution reverted(?::\s*)?/i, 'Transaction reverted: ')
+        .replace(/\b(?:URL|Request body|Request arguments|Contract Call|Details|Version):[\s\S]*$/i, '')
         .replace(/\s*\(action=.*$/i, '')
-        .trim() || fallback;
+        .replace(/\s+/g, ' ')
+        .trim().slice(0, 240) || fallback;
 }
 
 // Wallet methods that pop an approval sheet. On the external-mobile core path
@@ -185,9 +199,8 @@ const CORE_ABI = [
 ];
 
 // AuctionStatus in ArtSoulCore: None, Active, SettlementPending, Settled,
-// Defaulted. Only the two the id resolver reasons about are named here.
+// Defaulted. An absent auction must never become another kind of identifier.
 const AUCTION_STATUS_NONE = 0;
-const AUCTION_STATUS_ACTIVE = 1;
 
 class ArtSoulContracts {
     constructor() {
@@ -342,79 +355,52 @@ class ArtSoulContracts {
         return await this.coreContract.auctions(auctionId);
     }
 
-    async resolveAuctionId(id) {
+    async resolveAuctionId(id, options = {}) {
         this.ensureCore();
+        const idType = options.idType ?? 'auction';
+        if (idType !== 'auction' && idType !== 'artwork') {
+            throw new Error('Unknown auction id type');
+        }
         const rawId = BigInt(id.toString());
+        if (rawId <= 0n || rawId >= 2n ** 256n) throw new Error('Invalid auction identifier');
 
-        // Auction ids and artwork ids are separate counters over the same small
-        // integers, so they collide constantly: artwork 31's first auction was
-        // auction 31. Re-auctioning is what turns that collision into a defect -
-        // the artwork moves on to a new auction while a finished one keeps
-        // sitting at its number.
-        //
-        // The old order asked "is there an auction with this number?" first and
-        // accepted any status but None, so bidding on a re-auctioned artwork
-        // resolved to the dead auction and the contract answered
-        // AuctionNotActive, which the interface reported as "This auction has
-        // ended" on an auction that was live.
-        //
-        // A live auction is the one unambiguous reading, so it wins. An artwork
-        // cannot hold two active auctions at once, so an Active auction at this
-        // number and a different active auction on the artwork of the same
-        // number cannot both exist - the two branches can never disagree.
-        let auctionStatus = null;
-        try {
-            const auction = await this.getAuctionStruct(rawId);
-            auctionStatus = Number(auction.status);
-            if (auctionStatus === AUCTION_STATUS_ACTIVE) {
-                return rawId;
-            }
-        } catch {
-            // Not readable as an auction; the artwork lookup below decides.
-        }
-
-        try {
+        // Separate counters can contain the same number for DIFFERENT artworks.
+        // Callers must name their namespace; state and RPC failures never change it.
+        if (idType === 'artwork') {
             const artwork = await this.getArtworkStruct(rawId);
-            if (artwork.activeAuctionId && artwork.activeAuctionId !== 0n) {
-                return artwork.activeAuctionId;
+            const auctionId = BigInt(artwork.activeAuctionId || 0);
+            if (auctionId === 0n) throw new Error('No active auction found for this artwork');
+            const auction = await this.getAuctionStruct(auctionId);
+            if (Number(auction.status) === AUCTION_STATUS_NONE) throw new Error('Auction not found');
+            if (BigInt(auction.artworkId) !== rawId) {
+                throw new Error('The auction does not belong to the requested artwork');
             }
-        } catch {
-            // Not readable as an artwork either.
+            return auctionId;
         }
-
-        // No live auction anywhere. A finished auction at this number is still
-        // the right target for the paths that act on one - ending an expired
-        // auction, completing or defaulting a settlement.
-        if (auctionStatus !== null && auctionStatus !== AUCTION_STATUS_NONE) {
-            return rawId;
-        }
-
-        throw new Error('No active auction found for this artwork');
+        const auction = await this.getAuctionStruct(rawId);
+        if (Number(auction.status) === AUCTION_STATUS_NONE) throw new Error('Auction not found');
+        return rawId;
     }
 
-    async resolveTokenId(id) {
+    async resolveTokenId(id, options = {}) {
         this.ensureCore();
+        const idType = options.idType ?? 'token';
+        if (idType !== 'token' && idType !== 'artwork') throw new Error('Unknown token id type');
         const rawId = BigInt(id.toString());
+        if (rawId <= 0n || rawId >= 2n ** 256n) throw new Error('Invalid token identifier');
 
-        try {
+        if (idType === 'artwork') {
             const artwork = await this.getArtworkStruct(rawId);
-            if (artwork.minted && artwork.tokenId !== 0n) {
-                return artwork.tokenId;
+            const tokenId = BigInt(artwork.tokenId || 0);
+            if (!artwork.minted || tokenId === 0n) {
+                throw new Error('NFT is not minted yet. Complete settlement first.');
             }
-        } catch {
-            // Fall through to token lookup.
+            return tokenId;
         }
 
-        try {
-            const owner = await this.nftContract.ownerOf(rawId);
-            if (!this.isZeroAddress(owner)) {
-                return rawId;
-            }
-        } catch {
-            // Fall through to user-facing error.
-        }
-
-        throw new Error('NFT is not minted yet. Complete settlement first.');
+        const owner = await this.nftContract.ownerOf(rawId);
+        if (this.isZeroAddress(owner)) throw new Error('NFT not found');
+        return rawId;
     }
 
     async registerArtwork(metadataURI, options = {}) {
@@ -455,10 +441,10 @@ class ArtSoulContracts {
         return tx.hash;
     }
 
-    async placeBid(auctionOrArtworkId, bidAmountEth) {
+    async placeBid(id, bidAmountEth, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
-        const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
+        const auctionId = await this.resolveAuctionId(id, options);
         const bidAmount = this.parseEth(bidAmountEth);
         const deposit = await this.coreContract.requiredDepositForBid(bidAmount);
         const tx = await this.coreContract.placeBid(auctionId, bidAmount, { value: deposit });
@@ -467,20 +453,20 @@ class ArtSoulContracts {
         return tx.hash;
     }
 
-    async endAuction(auctionOrArtworkId) {
+    async endAuction(id, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
-        const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
+        const auctionId = await this.resolveAuctionId(id, options);
         const tx = await this.coreContract.endAuction(auctionId);
         console.log('Ending V4.1 auction...', tx.hash);
         await tx.wait();
         return tx.hash;
     }
 
-    async completeSettlement(auctionOrArtworkId) {
+    async completeSettlement(id, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
-        const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
+        const auctionId = await this.resolveAuctionId(id, options);
         const auction = await this.getAuctionStruct(auctionId);
         const remainingPayment = auction.highestBid > auction.depositLocked
             ? auction.highestBid - auction.depositLocked
@@ -491,10 +477,10 @@ class ArtSoulContracts {
         return tx.hash;
     }
 
-    async claimSettlementDefault(auctionOrArtworkId) {
+    async claimSettlementDefault(id, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
-        const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
+        const auctionId = await this.resolveAuctionId(id, options);
         const tx = await this.coreContract.claimSettlementDefault(auctionId);
         console.log('Claiming settlement default...', tx.hash);
         await tx.wait();
@@ -546,9 +532,9 @@ class ArtSoulContracts {
         };
     }
 
-    async getAuction(auctionOrArtworkId) {
+    async getAuction(id, options = {}) {
         this.ensureCore();
-        const auctionId = await this.resolveAuctionId(auctionOrArtworkId);
+        const auctionId = await this.resolveAuctionId(id, options);
         const auction = await this.getAuctionStruct(auctionId);
         const statusName = this.auctionStatusName(auction.status);
         const uiState = {
@@ -601,10 +587,10 @@ class ArtSoulContracts {
         return await this.createAuction(artworkId, newPriceEth, 24);
     }
 
-    async listResale(tokenOrArtworkId, priceEth, onStep) {
+    async listResale(id, priceEth, onStep, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
-        const tokenId = await this.resolveTokenId(tokenOrArtworkId);
+        const tokenId = await this.resolveTokenId(id, options);
         const price = this.parseEth(priceEth);
         const coreAddress = await this.coreContract.getAddress();
         const seller = await this.signer.getAddress();
@@ -630,10 +616,10 @@ class ArtSoulContracts {
         return tx.hash;
     }
 
-    async buyResale(tokenOrArtworkId, priceEth) {
+    async buyResale(id, priceEth, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
-        const tokenId = await this.resolveTokenId(tokenOrArtworkId);
+        const tokenId = await this.resolveTokenId(id, options);
         const price = this.parseEth(priceEth);
         const tx = await this.coreContract.buyResale(tokenId, { value: price });
         console.log('Buying resale...', tx.hash);
@@ -641,8 +627,8 @@ class ArtSoulContracts {
         return tx.hash;
     }
 
-    async getAuctionBids(auctionOrArtworkId) {
-        const auction = await this.getAuction(auctionOrArtworkId);
+    async getAuctionBids(id, options = {}) {
+        const auction = await this.getAuction(id, options);
         if (!auction.highestBidder || this.isZeroAddress(auction.highestBidder)) {
             return [];
         }
@@ -655,9 +641,9 @@ class ArtSoulContracts {
         }];
     }
 
-    async getResaleListing(tokenOrArtworkId) {
+    async getResaleListing(id, options = {}) {
         this.ensureCore();
-        const tokenId = await this.resolveTokenId(tokenOrArtworkId);
+        const tokenId = await this.resolveTokenId(id, options);
         const listing = await this.coreContract.resaleListings(tokenId);
         return {
             tokenId: tokenId.toString(),

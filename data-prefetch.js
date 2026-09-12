@@ -111,6 +111,9 @@
         }
     } else if (path === '/artwork' || path.indexOf('/artwork/') === 0) {
         var id = artworkId(path);
+        // Short public URLs name Base Sepolia artworks; the consumer requests
+        // the composite id. Both sides must use the same request key.
+        if (/^\d{1,78}$/.test(id)) id = 'v41:84532:' + id;
         // Mirrors getPublicProjectionArtwork(): id first, then limit. Starting
         // this from the head overlaps the exact-artwork server cold path with
         // the page bundle instead of waiting for the bundle before dialing it.
