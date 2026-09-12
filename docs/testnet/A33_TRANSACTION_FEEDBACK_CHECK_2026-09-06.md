@@ -27,3 +27,13 @@ External-mobile switch failures, account reconciliation and a confirmation follo
 ## Follow-up: validation must release the action state
 
 The adjacent profile Create Auction handler acquired its Processing lock before validating duration/price, but its early validation returns were outside `try/finally`. Three behavioral tests reproduced the stuck lock without requesting a wallet. Validation now runs inside the existing action lifetime so every return releases the lock. Allowed durations and positive-price rules are unchanged; no contract call is made for invalid input. This is a code-reproduced edge case, not a diagnosis of the signed-wallet waiting interval in the Android recording.
+
+## Follow-up: preserve confirmed auction outcomes — 2026-09-12
+
+The profile discarded the confirmed result of `ArtSoulContracts.createAuction`, then read the wallet network again. The adapter already waits for the receipt before resolving. A failed subsequent network read, or switching networks after confirmation, therefore turned a confirmed auction into a false failure with a retry suggestion. The inner catch also rewrote every `NETWORK_ERROR` as a wallet network change, without evidence of a switch.
+
+Three behavioral tests failed before the repair and passed after it. The profile now relies on the existing adapter's pre-send Base Sepolia guard and confirmed result; the redundant before/after network comparison and unsupported error relabelling are removed. Actual adapter tests verify that the chain guard runs before a send, a rejecting guard prevents a send, and a pending receipt never reports success. A failed compatibility database update still does not invalidate the confirmed transaction.
+
+- Full unit suite: 898 tests, 891 passed, 7 skipped, 0 failed. Production build passed with 10 HTML routes and 178 Tailwind utilities.
+- No contract, wallet-runtime, signature, retry, pending-indexer, CSS, media, avatar, skeleton or rendering changes. The six new tests run the actual handler/adapter source with isolated mocks; no wallet or on-chain write was used.
+- This is an A-33 feedback correction, not real-device acceptance or a fix for the separately documented stale indexer action display. A-33 remains in progress. Canon §1–2 interpretation: confirmed receipts are truth; a later wallet read cannot undo their outcome. No architecture amendment is needed.

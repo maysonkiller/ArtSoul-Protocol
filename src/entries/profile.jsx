@@ -1309,43 +1309,23 @@ const { useState, useEffect, useRef } = React;
                         return;
                     }
 
-                    // Get current network before transaction
-                    const network = await window.ArtSoulContracts.provider.getNetwork();
-                    const initialChainId = Number(network.chainId);
-                    console.log('Initial network:', initialChainId);
-
-                    // Create auction on blockchain
-                    console.log('Creating auction for artwork:', artwork.blockchain_id);
+                    // The shared adapter guards the write chain before sending
+                    // and resolves only after confirmation. A later wallet
+                    // network read cannot reverse that confirmed outcome.
+                    await window.ArtSoulContracts.createAuction(
+                        artwork.blockchain_id,
+                        String(startingPrice),
+                        Number(durationHours)
+                    );
 
                     try {
-                        await window.ArtSoulContracts.createAuction(
-                            artwork.blockchain_id,
-                            String(startingPrice),
-                            Number(durationHours)
-                        );
-
-                        // Verify network didn't change during transaction
-                        const finalNetwork = await window.ArtSoulContracts.provider.getNetwork();
-                        const finalChainId = Number(finalNetwork.chainId);
-
-                        if (initialChainId !== finalChainId) {
-                            throw new Error(`Network changed during transaction. Please stay on the same network and try again.`);
-                        }
-
-                        try {
-                            await window.ArtSoulDB.updateArtwork(artwork.id, { status: 'auction' });
-                        } catch (syncError) {
-                            console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
-                        }
-
-                        alert('Auction created successfully! Public state will update shortly.');
-                        loadMyArtworks(null, { fresh: true }); // Reload artworks
-                    } catch (txError) {
-                        if (txError.message.includes('network changed') || txError.code === 'NETWORK_ERROR') {
-                            throw new Error('Network was changed during transaction. Please stay on the same network and try again.');
-                        }
-                        throw txError;
+                        await window.ArtSoulDB.updateArtwork(artwork.id, { status: 'auction' });
+                    } catch (syncError) {
+                        console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
                     }
+
+                    alert('Auction created successfully! Public state will update shortly.');
+                    loadMyArtworks(null, { fresh: true }); // Reload artworks
                 } catch (error) {
                     console.error('Create auction failed:', error);
                     const message = getTransactionErrorMessage(error, 'The auction could not be created. Please try again.');
