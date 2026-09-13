@@ -24,9 +24,14 @@ test('production and isolated diagnostics pin every Reown import to 1.8.21', () 
     }
     assert.equal(packageJson.dependencies['@reown/appkit'], '1.8.21');
     assert.equal(packageJson.dependencies['@reown/appkit-adapter-wagmi'], '1.8.21');
+    // A-64: pages boot the wallet through wallet-runtime-loader.js, which imports
+    // the pinned appkit entry after first paint. The pin still has to reach every
+    // page - it now arrives one hop away, so both halves are asserted rather than
+    // the loader silently satisfying a check that used to prove the version.
     for (const page of ['index.html', 'gallery.html', 'artwork.html', 'profile.html', 'upload.html', 'docs-protocol.html', 'admin.html']) {
-        assert.match(read(page), /appkit-init\.js\?v=54/, `${page} must load the standard wallet flow`);
+        assert.match(read(page), /wallet-runtime-loader\.js/, `${page} must load the standard wallet flow`);
     }
+    assert.match(read('wallet-runtime-loader.js'), /appkit-init\.js\?v=54/, 'the loader must import the pinned appkit entry');
     assert.match(appKit, /wallet-core-connect\.js\?v=18/);
     assert.match(walletTest, /wallet-core-connect\.js\?v=18/);
     assert.match(walletTest, /appkit-init\.js\?v=54/);
