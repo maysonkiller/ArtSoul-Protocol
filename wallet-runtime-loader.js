@@ -6,6 +6,10 @@
 // Wallet actions still have a bounded path to the exact same runtime through
 // the small async proxies below; AppKit replaces each proxy when it evaluates.
 
+// Long enough that a visible page always starts on its own frame first, short
+// enough that a hidden tab is not left without a wallet runtime.
+const WALLET_RUNTIME_START_FALLBACK_MS = 1500;
+
 let runtimePromise = null;
 let runtimeReady = false;
 
@@ -71,17 +75,26 @@ window.ArtSoulWalletRuntime = Object.freeze({
 });
 
 function startAfterFirstPaint() {
+    let started = false;
     const start = () => {
+        if (started) return;
+        started = true;
         loadWalletRuntime().catch(error => {
             console.warn('Wallet runtime unavailable:', error);
         });
     };
 
+    // requestAnimationFrame is the right signal - it fires after the browser has
+    // had a frame, which is the whole point of deferring the SDK. But a frame is
+    // exactly what a background tab never produces, and a page opened in one and
+    // read later would then sit with no wallet runtime at all: a restored session
+    // would not reconnect, and anything asking whether a wallet is present would
+    // be told no. So the frame is raced against a short timer, and whichever
+    // arrives first starts the import once.
     if (typeof requestAnimationFrame === 'function') {
         requestAnimationFrame(() => setTimeout(start, 0));
-    } else {
-        setTimeout(start, 0);
     }
+    setTimeout(start, WALLET_RUNTIME_START_FALLBACK_MS);
 }
 
 if (document.readyState === 'loading') {

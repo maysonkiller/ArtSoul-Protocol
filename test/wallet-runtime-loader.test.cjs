@@ -131,3 +131,27 @@ test('an action before DOMContentLoaded waits for the boot promise created by Ap
     assert.equal(implementationCalls, 1);
     assert.equal(window.ArtSoulWalletRuntime.isReady(), true);
 });
+
+test('a tab that never gets a frame still boots the wallet runtime', async () => {
+  // Found on a Vercel preview: the page had been open four seconds with the
+  // proxies installed, ArtSoulWalletRuntime present, and isReady() still false.
+  // requestAnimationFrame is the right signal - it fires after the browser has
+  // had a frame, which is the point of deferring the SDK - but a frame is
+  // exactly what a background tab never produces. A page opened in one and read
+  // later would sit with no wallet runtime: a restored session would not
+  // reconnect, and anything asking whether a wallet is present would be told no.
+  const source = fs.readFileSync(path.join(__dirname, '..', 'wallet-runtime-loader.js'), 'utf8');
+
+  assert.match(source, /WALLET_RUNTIME_START_FALLBACK_MS/, 'a fallback timer must exist');
+  assert.match(source, /setTimeout\(start, WALLET_RUNTIME_START_FALLBACK_MS\)/,
+    'the fallback must be scheduled unconditionally, not only when rAF is missing');
+
+  // The frame path and the timer path both call start(), so start() has to be
+  // idempotent or a visible page imports the runtime twice.
+  assert.match(source, /if \(started\) return;/, 'start must run once');
+
+  const fallback = Number((source.match(/WALLET_RUNTIME_START_FALLBACK_MS = (\d+)/) || [])[1]);
+  assert.ok(Number.isFinite(fallback), 'the fallback delay must be a literal');
+  assert.ok(fallback > 0 && fallback <= 3000,
+    'long enough for a visible page to win on its own frame, short enough that a hidden tab is not stranded');
+});
