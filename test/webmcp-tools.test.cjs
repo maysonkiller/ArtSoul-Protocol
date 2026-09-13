@@ -355,6 +355,24 @@ function walletStub(onBid) {
   };
 }
 
+test('auction tools explicitly identify artwork ids at the contract boundary', async () => {
+  const calls = [];
+  const contracts = {
+    isReady: () => true,
+    placeBid: async (id, amount, options) => { calls.push(['bid', id, amount, options?.idType]); return '0xbid'; },
+    endAuction: async (id, options) => { calls.push(['end', id, options?.idType]); return '0xend'; }
+  };
+  const build = card => toolsFrom(load(), {
+    fetchJson: jsonFetch({ '/api/public/artworks': { data: [card] } }),
+    readContracts: () => contracts,
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    confirmAction: () => true
+  });
+  await build(AUCTION_CARD).get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' });
+  await build({ ...AUCTION_CARD, status: 'awaiting_end' }).get('end_expired_auction').execute({ artwork_id: '31' });
+  assert.deepEqual(calls, [['bid', '31', '0.5', 'artwork'], ['end', '31', 'artwork']]);
+});
+
 test('place_bid opens the wallet only after the person grants permission themselves', async () => {
   const wallet = walletStub();
   const storage = memoryStorage();

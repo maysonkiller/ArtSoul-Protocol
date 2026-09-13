@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **60 done, 14 in progress, 7 planned** across A-01 to A-81.
+Phase A stands at **59 done, 16 in progress, 6 planned** across A-01 to A-81.
 
 ## The shape of what is left
 
@@ -80,8 +80,10 @@ Merged and measured, needing one confirmation each:
 - **A-72** quick loads showing no placeholder at all
 - **A-73** the balance in the account menu showing a number
 
-**A-78 closed on 2026-09-02.** A live auction now wins an id collision, so a
-bid placed by artwork id reaches the auction that is actually running.
+**A-78 reopened on 2026-09-06.** The active-first heuristic can target another
+artwork's auction when two counters collide. The same ambiguity affects token
+versus artwork resale inputs. Explicit identifier namespaces replace guessing;
+connected-flow acceptance remains outstanding. See the backlog for current scope.
 
 **A-77 closed on 2026-08-28.** The fix shipped to production and to the Hetzner
 indexer, the backfill released all ten affected artworks, and artwork 31 was

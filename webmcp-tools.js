@@ -638,7 +638,7 @@
                 }
 
                 try {
-                    const transactionHash = await contracts.placeBid(artworkId, amount);
+                    const transactionHash = await contracts.placeBid(artworkId, amount, { idType: 'artwork' });
                     return JSON.stringify({
                         submitted: true,
                         approved_by: 'the person, in their own wallet',
@@ -809,7 +809,7 @@
                 }
 
                 try {
-                    const transactionHash = await contracts.endAuction(artworkId);
+                    const transactionHash = await contracts.endAuction(artworkId, { idType: 'artwork' });
                     return JSON.stringify({
                         submitted: true,
                         approved_by: 'the person, in their own wallet',

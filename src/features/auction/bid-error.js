@@ -7,6 +7,7 @@ function collectErrorValues(error, depth = 0, seen = new Set()) {
         error.code,
         error.reason,
         error.shortMessage,
+        error.details,
         error.message,
         error.errorName,
         error.revert?.name,
@@ -30,8 +31,10 @@ function getRpcErrorCode(error) {
 function cleanErrorReason(error) {
     const candidates = collectErrorValues(error)
         .filter((value) => !/^\s*-?\d+\s*$/.test(value))
+        .filter((value) => !/^[A-Z]+(?:_[A-Z0-9]+)+$/.test(value.trim()))
         .map((value) => value
             .replace(/^execution reverted(?::\s*)?/i, '')
+            .replace(/\b(?:URL|Request body|Request arguments|Contract Call|Details|Version):[\s\S]*$/i, '')
             .replace(/\s*\(action=.*$/i, '')
             .replace(/\s+/g, ' ')
             .trim())
@@ -60,7 +63,7 @@ export function classifyBidFailure(error, context = {}) {
     if (
         rpcCode === 'BASE_SEPOLIA_REQUIRED' ||
         rpcCode === 'BASE_SEPOLIA_SWITCH_REJECTED' ||
-        /base sepolia|required network|wrong network|unsupported network|chain mismatch|network changed/.test(text)
+        /requires? base sepolia|switch (?:back )?to base sepolia|required network|wrong network|unsupported network|chain mismatch|network changed/.test(text)
     ) {
         return {
             category: 'wrong_network',
@@ -80,7 +83,7 @@ export function classifyBidFailure(error, context = {}) {
             rpcCode
         };
     }
-    if (/insufficient funds|exceeds balance|not enough.*eth|insufficient.*balance/.test(text)) {
+    if (/insufficient funds|outoffunds|exceeds balance|not enough.*eth|insufficient.*balance/.test(text)) {
         return {
             category: 'insufficient_funds',
             message: 'Not enough testnet ETH to cover the deposit and gas.',
@@ -94,14 +97,14 @@ export function classifyBidFailure(error, context = {}) {
             rpcCode
         };
     }
-    if (/auctionnotactive|auction not active|auction ended|not active|ended|expired|closed/.test(text)) {
+    if (/auctionnotactive|auction (?:is |has )?(?:not active|ended|expired|closed)/.test(text)) {
         return {
             category: 'auction_ended',
             message: 'This auction has ended.',
             rpcCode
         };
     }
-    if (/bidtoolow|bid too low|minimum|increment|too low|below/.test(text)) {
+    if (/bidtoolow|bid (?:is )?(?:too low|below)|minimum (?:next )?bid|bid increment/.test(text)) {
         return {
             category: 'bid_below_minimum',
             message: `Your bid is below the minimum. The minimum next bid is ${minimumEth} ETH.`,

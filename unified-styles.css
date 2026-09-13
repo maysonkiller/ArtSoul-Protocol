@@ -801,6 +801,18 @@ body.future .artsoul-artwork-card:focus-visible {
     height: 100%;
 }
 
+.artwork-video-loading-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0.5rem 0.75rem;
+    color: var(--c-text);
+    background: var(--c-surface);
+    border-radius: 0.5rem;
+    pointer-events: none;
+}
+
 .artsoul-card-media-controls {
     position: absolute;
     right: 10px;

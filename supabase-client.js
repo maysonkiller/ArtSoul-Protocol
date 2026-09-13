@@ -15,10 +15,11 @@ async function loadSupabasePublicConfig() {
     }
 
     if (!supabaseSingleton.configPromise) {
-        supabaseSingleton.configPromise = fetch('/api/public/config', {
+        const started = window.ArtSoulPrefetch?.take?.('/api/public/config');
+        supabaseSingleton.configPromise = (started || fetch('/api/public/config', {
             method: 'GET',
             credentials: 'omit'
-        }).then(async response => {
+        })).then(async response => {
             const text = await response.text();
             const data = text ? JSON.parse(text) : {};
             if (!response.ok) {

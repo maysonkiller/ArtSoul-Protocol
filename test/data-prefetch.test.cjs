@@ -86,6 +86,34 @@ test('a clean artwork route starts the exact projection request from the head', 
   ]);
 });
 
+test('a short artwork URL hands its response to the composite-id consumer', () => {
+  for (const [path, query] of [['/artwork/7', ''], ['/artwork.html', '?id=7']]) {
+    const { calls, api } = run(path, query);
+    const request = '/api/public/artworks?id=v41%3A84532%3A7&limit=1';
+    assert.equal(calls[1].url, request);
+    assert.ok(api.take(request));
+    assert.equal(api.take(request), null);
+  }
+});
+
+test('public configuration consumes the early request once across concurrent callers', async () => {
+  const body = client.slice(client.indexOf('async function loadSupabasePublicConfig()'), client.indexOf('// Export for OAuth'));
+  let takes = 0;
+  let fetches = 0;
+  const window = { ArtSoulPrefetch: { take(path) {
+    assert.equal(path, '/api/public/config');
+    takes++;
+    return Promise.resolve({ ok: true, text: async () => JSON.stringify({ supabaseUrl: 'https://example.test', supabaseAnonKey: 'public' }) });
+  } } };
+  const load = new Function('window', 'supabaseSingleton', 'fetch', body + '; return loadSupabasePublicConfig;')(
+    window, {}, () => { fetches++; throw new Error('duplicate config request'); }
+  );
+  const [a, b] = await Promise.all([load(), load()]);
+  assert.equal(a, b);
+  assert.equal(takes, 1);
+  assert.equal(fetches, 0);
+});
+
 test('the legacy artwork query starts the same exact projection request', () => {
   const { calls } = run('/artwork.html', '?id=v41%3A84532%3A31');
   assert.deepEqual(calls.map((call) => call.url), [
@@ -116,7 +144,7 @@ test('every shared-header page loads it, and the build ships it', () => {
     // this is not a first-paint concern. It still executes within a few hundred
     // milliseconds, long before the modules that would otherwise issue this
     // request at 3.3 seconds.
-    assert.match(html, /<script src="\/data-prefetch\.js\?v=3" async><\/script>/, `${page} must load the prefetch asynchronously`);
+    assert.match(html, /<script src="\/data-prefetch\.js\?v=4" async><\/script>/, `${page} must load the prefetch asynchronously`);
     assert.ok(
       html.indexOf('data-prefetch.js') > html.indexOf('header-prepaint.js'),
       `${page}: the first paint comes before the data`

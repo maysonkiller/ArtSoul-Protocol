@@ -1,134 +1,114 @@
-// A live auction wins an id collision.
-//
-// Auction ids and artwork ids are separate counters over the same small
-// integers, so they collide constantly - artwork 31's first auction was auction
-// 31. That collision is harmless until the artwork is re-auctioned: the artwork
-// moves to a new auction while the finished one keeps sitting at its number.
-//
-// Reproduced on production on 2 September 2026. Artworks 29, 30 and 31 each had
-// a live auction (38, 39, 37) and a Defaulted auction at their own number.
-// Bidding by artwork id resolved to the dead auction, the contract answered
-// AuctionNotActive, and the interface reported "This auction has ended" on an
-// auction with two days left.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'contracts-integration.js'), 'utf8');
-
-const NONE = 0;
+const source = fs.readFileSync('contracts-integration.js', 'utf8').replace(/^import .*;\r?\n/gm, '');
 const ACTIVE = 1;
 const SETTLEMENT_PENDING = 2;
 const DEFAULTED = 4;
+const row = (artworkId, status = ACTIVE) => ({
+  artworkId: BigInt(artworkId), status, highestBid: 10n, depositLocked: 1n,
+  originalEndTime: 100n, duration: 24n, endTime: 100n, startPrice: 1n,
+  settlementDeadline: 200n, totalExtension: 0n, highestBidder: 'bidder'
+});
 
-// The real method, lifted out and run against a stub of the two chain reads it
-// makes. Extracting it keeps the test on the shipped logic rather than a copy.
-function resolverFrom({ auctions = {}, artworks = {} }) {
-  const start = source.indexOf('    async resolveAuctionId(id) {');
-  assert.notEqual(start, -1, 'resolveAuctionId must be findable');
-  let depth = 0;
-  let index = source.indexOf('{', source.indexOf(')', start));
-  for (; index < source.length; index += 1) {
-    if (source[index] === '{') depth += 1;
-    else if (source[index] === '}') {
-      depth -= 1;
-      if (depth === 0) break;
-    }
-  }
-  const body = source.slice(start, index + 1).replace('async resolveAuctionId(id) {', 'async function resolveAuctionId(id) {');
-
-  const context = vm.createContext({
-    AUCTION_STATUS_NONE: NONE,
-    AUCTION_STATUS_ACTIVE: ACTIVE,
-    exported: {}
-  });
-  vm.runInContext(`${body}\nexported.resolve = resolveAuctionId;`, context);
-
-  const self = {
-    ensureCore() {},
-    async getAuctionStruct(id) {
-      const row = auctions[String(id)];
-      if (!row) throw new Error('no auction');
-      return row;
+// Execute the shipped adapter, not a copied resolver. Chain calls and wallet
+// writes are local stubs; no network or signing happens in these tests.
+function adapter({ auctions = {}, artworks = {}, auctionError } = {}) {
+  const window = {};
+  vm.runInNewContext(source, { window, console: { log() {} }, ethers: {} });
+  const api = window.ArtSoulContracts;
+  const calls = [];
+  const writes = [];
+  api.coreContract = {
+    auctions: async id => {
+      calls.push(['auction', String(id)]);
+      if (auctionError) throw auctionError;
+      return auctions[String(id)] || row(0, 0);
     },
-    async getArtworkStruct(id) {
-      const row = artworks[String(id)];
-      if (!row) throw new Error('no artwork');
-      return row;
-    }
+    artworks: async id => {
+      calls.push(['artwork', String(id)]);
+      return artworks[String(id)] || { activeAuctionId: 0n };
+    },
+    requiredDepositForBid: async () => 1n,
+    minimumBid: async () => 2n
   };
-  return (id) => context.exported.resolve.call(self, id);
+  for (const method of ['placeBid', 'endAuction', 'settleAuction', 'claimSettlementDefault']) {
+    api.coreContract[method] = async (...args) => {
+      writes.push([method, String(args[0])]);
+      return { hash: '0xtest', wait: async () => {} };
+    };
+  }
+  api.ensureBaseSepoliaWrite = async () => {};
+  api.parseEth = value => BigInt(value);
+  api.formatEth = value => String(value);
+  return { api, calls, writes };
 }
 
-test('a re-auctioned artwork resolves to its live auction, not the dead one at its number', async () => {
-  // Production shape: auction 31 is the Defaulted first auction of artwork 31,
-  // and auction 37 is the live one.
-  const resolve = resolverFrom({
-    auctions: { 31: { status: DEFAULTED }, 37: { status: ACTIVE } },
-    artworks: { 31: { activeAuctionId: 37n } }
-  });
+const collision = {
+  auctions: { 31: row(31, DEFAULTED), 37: row(31), 45: row(37) },
+  artworks: { 31: { activeAuctionId: 37n }, 37: { activeAuctionId: 45n } }
+};
 
-  assert.equal(await resolve(31), 37n, 'bidding by artwork id must reach the live auction');
+test('an explicit artwork id never selects another artwork active auction at the same number', async () => {
+  const { api } = adapter(collision);
+  assert.equal(await api.resolveAuctionId(37, { idType: 'artwork' }), 45n);
+  assert.equal(await api.resolveAuctionId(31, { idType: 'artwork' }), 37n);
 });
 
-test('a live auction passed by its own id is returned untouched', async () => {
-  // The artwork page passes a real auction id. It must not be reinterpreted as
-  // an artwork number, which is the mirror image of the defect above.
-  const resolve = resolverFrom({
-    auctions: { 37: { status: ACTIVE } },
-    artworks: { 37: { activeAuctionId: 99n } }
-  });
-
-  assert.equal(await resolve(37), 37n);
+test('auction ids keep their meaning for active, pending and historical auctions', async () => {
+  for (const status of [ACTIVE, SETTLEMENT_PENDING, DEFAULTED]) {
+    const { api, calls } = adapter({ ...collision, auctions: { ...collision.auctions, 37: row(31, status) } });
+    assert.equal(await api.resolveAuctionId(37), 37n);
+    assert.equal(calls.some(([kind]) => kind === 'artwork'), false);
+  }
 });
 
-test('an expired but unfinalized auction is still reachable by artwork id', async () => {
-  // end_expired_auction passes an artwork id. On chain the auction is still
-  // Active until someone ends it, so the first branch answers.
-  const resolve = resolverFrom({
-    auctions: { 27: { status: ACTIVE } },
-    artworks: { 27: { activeAuctionId: 27n } }
-  });
-
-  assert.equal(await resolve(27), 27n);
+test('a missing explicit auction does not fall through to an unrelated artwork', async () => {
+  const { api } = adapter({ artworks: { 5: { activeAuctionId: 45n } }, auctions: { 45: row(5) } });
+  await assert.rejects(() => api.resolveAuctionId(5), /Auction not found/);
+  assert.equal(await api.resolveAuctionId(5, { idType: 'artwork' }), 45n);
 });
 
-test('a settlement still resolves while the winner has not paid', async () => {
-  const resolve = resolverFrom({
-    auctions: { 12: { status: SETTLEMENT_PENDING } },
-    artworks: { 12: { activeAuctionId: 12n } }
-  });
-
-  assert.equal(await resolve(12), 12n);
+test('artwork resolution fails closed when there is no active pointer or it points at another artwork', async () => {
+  const { api } = adapter({ auctions: { 37: row(31), 45: row(99) }, artworks: { 37: { activeAuctionId: 0n }, 38: { activeAuctionId: 45n } } });
+  await assert.rejects(() => api.resolveAuctionId(37, { idType: 'artwork' }), /No active auction/);
+  await assert.rejects(() => api.resolveAuctionId(38, { idType: 'artwork' }), /does not belong/);
 });
 
-test('a finished auction with no live auction anywhere is still returned', async () => {
-  // Nothing is live, so the finished auction at this number is the only
-  // sensible target - this is the path that ends or defaults a past auction.
-  const resolve = resolverFrom({
-    auctions: { 22: { status: DEFAULTED } },
-    artworks: { 22: { activeAuctionId: 0n } }
-  });
-
-  assert.equal(await resolve(22), 22n);
+test('RPC failure is preserved instead of causing a second interpretation of the id', async () => {
+  const failure = new Error('RPC unavailable');
+  const { api, calls } = adapter({ ...collision, auctionError: failure });
+  await assert.rejects(() => api.resolveAuctionId(37), error => error === failure);
+  assert.deepEqual(calls, [['auction', '37']]);
 });
 
-test('an artwork that never had an auction is refused rather than guessed', async () => {
-  const resolve = resolverFrom({
-    auctions: {},
-    artworks: { 45: { activeAuctionId: 0n } }
-  });
-
-  await assert.rejects(() => resolve(45), /No active auction/);
+test('invalid ids and input kinds are rejected before chain reads', async () => {
+  const { api, calls } = adapter(collision);
+  for (const id of [0, -1, 'not-an-id']) await assert.rejects(() => api.resolveAuctionId(id));
+  await assert.rejects(() => api.resolveAuctionId(37, { idType: 'guess' }), /id type/);
+  assert.deepEqual(calls, []);
 });
 
-test('an artwork whose number matches no auction at all resolves through the artwork', async () => {
-  const resolve = resolverFrom({
-    auctions: { 41: { status: ACTIVE } },
-    artworks: { 5: { activeAuctionId: 41n } }
-  });
+test('bid and end adapters carry the artwork namespace through to the contract target', async () => {
+  const { api, writes } = adapter(collision);
+  await api.placeBid(37, '1', { idType: 'artwork' });
+  await api.endAuction(37, { idType: 'artwork' });
+  await api.placeBid(37, '1');
+  assert.deepEqual(writes, [['placeBid', '45'], ['endAuction', '45'], ['placeBid', '37']]);
+});
 
-  assert.equal(await resolve(5), 41n);
+test('settlement and default target the requested historical auction, never an artwork pointer', async () => {
+  const { api, writes } = adapter({ ...collision, auctions: { ...collision.auctions, 37: row(31, SETTLEMENT_PENDING) } });
+  await api.completeSettlement(37);
+  await api.claimSettlementDefault(37);
+  assert.deepEqual(writes, [['settleAuction', '37'], ['claimSettlementDefault', '37']]);
+});
+
+test('auction reads and bid reads use the same explicit namespace as writes', async () => {
+  const { api } = adapter(collision);
+  assert.equal((await api.getAuction(37)).artworkId, '31');
+  assert.equal((await api.getAuction(37, { idType: 'artwork' })).artworkId, '37');
+  assert.equal((await api.getAuctionBids(37, { idType: 'artwork' })).length, 1);
 });

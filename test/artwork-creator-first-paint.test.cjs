@@ -32,21 +32,12 @@ test('the exact projection seeds creator identity before the first content frame
   assert.doesNotMatch(loadArtwork, /setCreatorProfile\(profiles\.get\([^)]+\) \|\| null\)/);
 });
 
-test('a broken uploaded avatar falls back to the same neutral local image as the header', () => {
-  const ownership = detail.slice(
-    detail.indexOf('function renderOwnershipRole'),
-    detail.indexOf('function getAuctionStatus')
-  );
-  const avatarTag = ownership.match(/<img[\s\S]*?\/>/)?.[0] || '';
-
-  assert.match(ownership, /backgroundImage: "url\('\/default-avatar\.png'\)"/);
-  assert.match(avatarTag, /style=\{avatarStyle\}/);
-  assert.equal(
-    (avatarTag.match(/\bstyle=/g) || []).length,
-    1,
-    'the ownership avatar must have one effective style prop'
-  );
-  assert.match(ownership, /event\.currentTarget\.style\.backgroundImage = 'none'/);
-  assert.match(ownership, /onError=\{\(event\) => \{/);
-  assert.match(ownership, /event\.currentTarget\.src = '\/default-avatar\.png'/);
+test('ownership decodes the avatar without hiding the known name or painting a second background image', () => {
+  const ownership = detail.slice(detail.indexOf('function OwnershipIdentity'), detail.indexOf('const ZERO_ADDRESS'));
+  assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png'\)/);
+  assert.match(ownership, /image\.url \? <img/);
+  assert.match(ownership, /style=\{nameStyle\}>\{name\}/);
+  assert.doesNotMatch(ownership, /backgroundImage/);
+  assert.match(detail, /identityResolved \? getProfileAvatarUrl\(resolvedProfile, address\) : ''/);
+  assert.match(detail, /key=\{address\.toLowerCase\(\)\}/);
 });

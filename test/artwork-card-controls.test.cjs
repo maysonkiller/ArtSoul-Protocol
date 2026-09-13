@@ -60,8 +60,125 @@ function loadDomCardRuntime() {
     { window, document }
   );
   vm.runInNewContext(source, { window, document });
-    return { api: window.ArtSoulArtworkCard, mediaElements };
+    return { api: window.ArtSoulArtworkCard, mediaElements, window };
 }
+
+test('React card leaves nested media and action keyboard activation to the focused control', () => {
+    const { api, window } = loadDomCardRuntime();
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState: value => [value, () => {}],
+        useEffect() {}
+    };
+    let opened = 0;
+    const card = api.ReactCard({ artwork: { file_type: 'audio', file_url: 'track.mp3' }, onOpen: () => { opened++; } });
+    const root = {};
+    for (const key of ['Enter', ' ']) {
+        for (const target of [{ type: 'play' }, { type: 'mute' }, { type: 'action' }]) {
+            let prevented = false;
+            card.props.onKeyDown({ key, target, currentTarget: root, preventDefault() { prevented = true; } });
+            assert.equal(opened, 0, `${key} from a nested control must not open the artwork`);
+            assert.equal(prevented, false, 'native button keyboard behavior must remain available');
+        }
+    }
+});
+
+test('React card still opens when the card itself receives Enter or Space', () => {
+    const { api, window } = loadDomCardRuntime();
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState: value => [value, () => {}],
+        useEffect() {}
+    };
+    let opened = 0;
+    const card = api.ReactCard({ artwork: { file_type: 'video', file_url: 'clip.mp4' }, onOpen: () => { opened++; } });
+    const root = {};
+    for (const key of ['Enter', ' ', 'Escape']) {
+        let prevented = false;
+        card.props.onKeyDown({ key, target: root, currentTarget: root, preventDefault() { prevented = true; } });
+        assert.equal(prevented, key !== 'Escape');
+    }
+    assert.equal(opened, 2);
+});
+
+function loadActualClickGuard() {
+    const listeners = {};
+    const timers = [];
+    const document = {
+        readyState: 'loading',
+        querySelectorAll: () => [],
+        addEventListener: (name, listener) => { listeners[name] = listener; }
+    };
+    const runtime = fs.readFileSync(path.join(root, 'src/core/utils/performance-utils.js'), 'utf8')
+        .replace(/export\s*\{[^}]*\};/, '');
+    vm.runInNewContext(runtime, {
+        document,
+        window: { addEventListener() {}, matchMedia: () => ({ matches: false }) },
+        navigator: { hardwareConcurrency: 8, deviceMemory: 8 },
+        IntersectionObserver: class { observe() {} },
+        console: { log() {} },
+        setTimeout: (callback, duration) => { timers.push({ callback, duration }); }
+    });
+    listeners.DOMContentLoaded();
+    return { timers, click(button) {
+        button.classList.contains = name => (button.className || '').split(' ').includes(name);
+        listeners.click({ target: { closest: () => button } });
+    } };
+}
+
+function descendantButtons(node) {
+    if (!node) return [];
+    const self = node.tagName === 'BUTTON' || node.type === 'button' ? [node] : [];
+    return self.concat((node.children || []).flat().flatMap(descendantButtons));
+}
+
+test('DOM audio and video controls remain enabled through the existing rapid-click guard', () => {
+    const { api } = loadDomCardRuntime();
+    const guard = loadActualClickGuard();
+    for (const [file_type, file_url] of [['audio', 'track.mp3'], ['video', 'clip.mp4']]) {
+        const buttons = descendantButtons(api.createCardElement({ file_type, file_url }));
+        assert.equal(buttons.length, 2);
+        for (const button of buttons) {
+            guard.click(button);
+            assert.notEqual(button.disabled, true, `${file_type} ${button.className} must stay interactive`);
+            guard.click(button);
+        }
+    }
+    assert.equal(guard.timers.length, 0);
+});
+
+test('React audio and video controls use the same rapid-click exemption', () => {
+    const { api, window } = loadDomCardRuntime();
+    window.React = {
+        createElement: (type, props, ...children) => typeof type === 'function' ? type(props) : ({ type, props, children }),
+        useState: value => [value, () => {}], useEffect() {}, useRef: () => ({ current: null })
+    };
+    const guard = loadActualClickGuard();
+    for (const [file_type, file_url] of [['audio', 'track.mp3'], ['video', 'clip.mp4']]) {
+        const buttons = descendantButtons(api.ReactMedia({ artwork: { file_type, file_url } }));
+        assert.equal(buttons.length, 2);
+        for (const node of buttons) {
+            const button = new FakeElement('button', []);
+            button.className = node.props.className;
+            if (node.props['data-allow-rapid'] !== undefined) button.dataset.allowRapid = node.props['data-allow-rapid'];
+            guard.click(button);
+            assert.notEqual(button.disabled, true, `${file_type} ${button.className} must stay interactive`);
+            guard.click(button);
+        }
+    }
+    assert.equal(guard.timers.length, 0);
+});
+
+test('ordinary action buttons still receive the existing double-click protection', () => {
+    const guard = loadActualClickGuard();
+    const button = new FakeElement('button', []);
+    guard.click(button);
+    assert.equal(button.disabled, true);
+    assert.equal(guard.timers.length, 1);
+    assert.equal(guard.timers[0].duration, 500);
+    guard.timers[0].callback();
+    assert.equal(button.disabled, false);
+});
 
 test('card media keeps the uniform square frame and cover crop', () => {
     assert.match(css, /\.artsoul-card-media\s*\{[\s\S]*?aspect-ratio:\s*1\s*\/\s*1;/);
