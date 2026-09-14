@@ -37,7 +37,7 @@ test('a profile starts its identity and gallery requests from the head', () => {
   assert.deepEqual(calls.map((c) => c.url), [
     '/api/public/config',
     `/api/public/profile?address=${MIXED}`,
-    `/api/public/artworks?creator=${MIXED}&limit=200`
+    `/api/public/artworks?creator=${MIXED}&limit=24`
   ]);
   assert.equal(calls[0].init.credentials, 'include');
 });
@@ -46,7 +46,7 @@ test('your own profile carries no address, so the cached wallet is used', () => 
   const { calls } = run('/profile', '', { artsoul_wallet: MIXED.toLowerCase() });
   assert.deepEqual(calls.slice(1).map((call) => call.url), [
     `/api/public/profile?address=${MIXED.toLowerCase()}`,
-    `/api/public/artworks?creator=${MIXED.toLowerCase()}&limit=200`
+    `/api/public/artworks?creator=${MIXED.toLowerCase()}&limit=24`
   ]);
 });
 
@@ -57,7 +57,7 @@ test('no wallet anywhere means no gallery guess', () => {
 
 test('a request is handed to exactly one consumer, never cached', () => {
   const { api } = run('/profile', `?address=${MIXED}`);
-  const path = `/api/public/artworks?creator=${MIXED}&limit=200`;
+  const path = `/api/public/artworks?creator=${MIXED}&limit=24`;
   assert.ok(api.take(path), 'the first consumer receives it');
   assert.equal(api.take(path), null, 'a second consumer must issue its own request');
 });
@@ -65,7 +65,7 @@ test('a request is handed to exactly one consumer, never cached', () => {
 test('an address is matched whatever case it was written in', () => {
   // The URL carries the checksummed form and the database row is lower case.
   const { api } = run('/profile', `?address=${MIXED}`);
-  assert.ok(api.take(`/api/public/artworks?creator=${MIXED.toLowerCase()}&limit=200`));
+  assert.ok(api.take(`/api/public/artworks?creator=${MIXED.toLowerCase()}&limit=24`));
 });
 
 test('a path nobody prefetched returns nothing', () => {
@@ -131,7 +131,19 @@ test('the request string matches what the page will ask for', () => {
   // The key is the request string, so parameter order matters. profile.jsx
   // builds { creator, limit } and index.js builds { limit }.
   const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
-  assert.match(profile, /\{ creator: walletAddress, limit: 200/);
+  assert.match(profile, /\{ creator: walletAddress, limit,/);
+
+  // A-79 bounded the opening read, and the two sides have to agree on the size
+  // or the head start is never taken: the page issues a second request and the
+  // prefetch has spent bandwidth during first paint for nothing. Read the number
+  // from profile.jsx rather than repeating it, so changing it in one place fails
+  // here instead of silently costing the head start.
+  const firstPage = Number((profile.match(/const FIRST_GALLERY_PAGE = (\d+)/) || [])[1]);
+  assert.ok(Number.isFinite(firstPage), 'profile.jsx must name its first page size');
+  assert.ok(
+    script.includes("'/api/public/artworks?creator=' + wallet + '&limit=" + firstPage + "'"),
+    `the prefetch must request limit=${firstPage} to match the page's opening read`
+  );
   assert.match(client, /`\/api\/public\/profile\?address=\$\{encodeURIComponent\(normalizedAddress\)\}`/);
   const index = fs.readFileSync('src/entries/index.js', 'utf8');
   assert.match(index, /getPublicProjectionArtworks\(\{ limit: 100 \}\)/);
@@ -144,7 +156,7 @@ test('every shared-header page loads it, and the build ships it', () => {
     // this is not a first-paint concern. It still executes within a few hundred
     // milliseconds, long before the modules that would otherwise issue this
     // request at 3.3 seconds.
-    assert.match(html, /<script src="\/data-prefetch\.js\?v=4" async><\/script>/, `${page} must load the prefetch asynchronously`);
+    assert.match(html, /<script src="\/data-prefetch\.js\?v=5" async><\/script>/, `${page} must load the prefetch asynchronously`);
     assert.ok(
       html.indexOf('data-prefetch.js') > html.indexOf('header-prepaint.js'),
       `${page}: the first paint comes before the data`

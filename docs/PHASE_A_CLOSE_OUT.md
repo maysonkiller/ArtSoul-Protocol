@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **59 done, 17 in progress, 6 planned** across A-01 to A-82.
+Phase A stands at **60 done, 18 in progress, 4 planned** across A-01 to A-82.
 
 ## The shape of what is left
 
@@ -64,13 +64,12 @@ Ordered by what the founder can feel, not by row number.
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
 | **A-48** | The single full-document repaint on browser Back | Diagnosed and the code side is complete: every shared card image path defers. What remains is one measurement in an ordinary Chrome, reduced to two navigations and three console lines in [`testnet/A48_BACK_NAVIGATION_PROBE.md`](testnet/A48_BACK_NAVIGATION_PROBE.md). An embedded browser view cannot answer it |
-| **A-82** | The unloaded browser half of the graceful-shutdown module | Dead surface, not a production defect: it registers a leave-site confirmation dialog and nothing imports it. Recorded so the next person to import it for its Node signal handling does not ship the dialog |
 | **A-53** | The identity settle gap between header and profile | Never reproduced on a device |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
 | **A-34** | One reusable presentation-only aura frame shell | Canon 17; no economics |
 | **A-35** | Legacy runtime boundaries, second half | The migration ledger half is done |
 | **A-38** | Dependency and production warning triage | No forced upgrades |
-| **A-79** | Decide whether the profile publishes one frame or identity first | Two accepted repairs now contradict each other and whichever merges last wins by accident. Bound the first gallery read to one page so a coherent frame costs nothing to wait for |
+| **A-79** | Bound the profile's opening gallery read | Decided and shipped: one screenful first, the rest behind the frame, identity still committed on the narrow read. Needs one profile load on a device |
 | **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
 
 ## 3. Waiting only on a look
@@ -85,6 +84,11 @@ Merged and measured, needing one confirmation each:
 artwork's auction when two counters collide. The same ambiguity affects token
 versus artwork resale inputs. Explicit identifier namespaces replace guessing;
 connected-flow acceptance remains outstanding. See the backlog for current scope.
+
+**A-82 closed on 2026-09-14.** The graceful-shutdown module no longer registers
+a leave-site confirmation in the browser, and a repository-wide guard allows
+that registration only on the upload page, where warning about an unfinished
+upload is deliberate.
 
 **A-77 closed on 2026-08-28.** The fix shipped to production and to the Hetzner
 indexer, the backfill released all ten affected artworks, and artwork 31 was

@@ -22,19 +22,21 @@ class GracefulShutdown {
      * Initialize shutdown handlers
      */
     init() {
-        // Browser: beforeunload event
-        if (typeof window !== 'undefined') {
-            window.addEventListener('beforeunload', (e) => {
-                if (this.isShuttingDown) return;
-
-                // Trigger shutdown
-                this.shutdown();
-
-                // Show confirmation dialog
-                e.preventDefault();
-                e.returnValue = '';
-            });
-        }
+        // A-82: there is deliberately no browser branch here.
+        //
+        // This class flushes a write-ahead log, drains a queue and writes a
+        // checkpoint. None of those exist in a page, so the browser half was
+        // registering a `beforeunload` that called preventDefault() and set
+        // returnValue - the browser's "Leave site?" confirmation - on every
+        // navigation away, in exchange for running handlers that were never
+        // registered there.
+        //
+        // Nothing imported this module in the browser, so nobody saw the dialog.
+        // That is exactly why it is removed rather than left: importing this for
+        // its process-signal handling would otherwise ship a confirmation prompt
+        // across the whole site as a side effect of a constructor, and in the
+        // browsers that refuse the back/forward cache for `beforeunload` it
+        // would reopen A-48 with a cause nobody would think to look for.
 
         // Node.js: process signals
         if (typeof process !== 'undefined') {
