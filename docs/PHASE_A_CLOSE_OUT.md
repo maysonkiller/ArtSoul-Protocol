@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **60 done, 20 in progress, 2 planned** across A-01 to A-82.
+Phase A stands at **60 done, 21 in progress, 2 planned** across A-01 to A-83.
 
 ## The shape of what is left
 
