@@ -28,11 +28,11 @@ function sampleTables() {
       { chain_id: '84532', artwork_id: '31', creator: COLLECTOR, metadata_uri: 'ipfs://b', minted: false, token_id: '0', canonical_floor: '0', indexed_at: '2026-08-26T10:00:00Z' }
     ],
     v41_auctions: [
-      { chain_id: '84532', auction_id: '19', artwork_id: '19', creator: CREATOR, start_price: '1000', duration_seconds: 129600, end_time: '2026-07-05T02:20:10Z', status: 'settled', winner: COLLECTOR, winning_bid: '1000', indexed_at: '2026-07-03T14:20:47Z' }
+      { chain_id: '84532', auction_id: '19', artwork_id: '19', creator: CREATOR, start_price: '1000', duration: 129600, end_time: '2026-07-05T02:20:10Z', status: 'settled', winner: COLLECTOR, winning_bid: '1000', indexed_at: '2026-07-03T14:20:47Z' }
     ],
     v41_bids: [
-      { chain_id: '84532', auction_id: '19', bidder: COLLECTOR, bid_amount: '1000', deposit: '100', block_number: 1, transaction_hash: '0xaa', indexed_at: '2026-07-04T00:00:00Z' },
-      { chain_id: '84532', auction_id: '19', bidder: BIDDER, bid_amount: '900', deposit: '90', block_number: 2, transaction_hash: '0xbb', indexed_at: '2026-07-04T01:00:00Z' }
+      { chain_id: '84532', auction_id: '19', bidder: COLLECTOR, bid_amount: '1000', deposit_amount: '100', block_number: 1, transaction_hash: '0xaa', indexed_at: '2026-07-04T00:00:00Z' },
+      { chain_id: '84532', auction_id: '19', bidder: BIDDER, bid_amount: '900', deposit_amount: '90', block_number: 2, transaction_hash: '0xbb', indexed_at: '2026-07-04T01:00:00Z' }
     ],
     v41_auction_endings: [
       { chain_id: '84532', auction_id: '19', winner: COLLECTOR, winning_bid: '1000', settlement_deadline: '2026-07-06T07:45:34Z', transaction_hash: '0xcc', indexed_at: '2026-07-05T07:45:44Z' }
@@ -44,7 +44,7 @@ function sampleTables() {
       { chain_id: '84532', token_id: '3', seller: COLLECTOR, buyer: BIDDER, price: '1100', transaction_hash: '0xee', indexed_at: '2026-07-08T10:28:20Z' }
     ],
     v41_floor_history: [
-      { chain_id: '84532', artwork_id: '19', floor_price: '1000', source: 'settlement', indexed_at: '2026-07-05T07:46:19Z' }
+      { chain_id: '84532', artwork_id: '19', token_id: '7', floor_price: '1000', indexed_at: '2026-07-05T07:46:19Z' }
     ]
   };
 }

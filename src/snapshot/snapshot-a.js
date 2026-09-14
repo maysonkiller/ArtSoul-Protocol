@@ -40,6 +40,14 @@ export const ENTITLEMENT_NOTICE =
  * The exhaustive set of tables the export may read, and the columns kept from
  * each. An allowlist rather than a denylist: a column added to a table later
  * must be considered before it can reach a permanent public record.
+ *
+ * Every name here is checked against the migration that creates the table, by
+ * test, because the first rehearsal against the real database found three that
+ * were not real: `duration_seconds` for `duration`, `deposit` for
+ * `deposit_amount`, and a `source` column on the floor history that has never
+ * existed. The fixtures had been written from this list rather than from the
+ * schema, so fifteen green tests could not see any of it, and the capture would
+ * have failed on the announced cut-off date - the one day it cannot be retried.
  */
 export const EXPORTED_TABLES = Object.freeze([
     Object.freeze({
@@ -52,13 +60,13 @@ export const EXPORTED_TABLES = Object.freeze([
         name: 'auctions',
         table: 'v41_auctions',
         timeColumn: 'indexed_at',
-        columns: Object.freeze(['chain_id', 'auction_id', 'artwork_id', 'creator', 'start_price', 'duration_seconds', 'end_time', 'status', 'winner', 'winning_bid', 'indexed_at'])
+        columns: Object.freeze(['chain_id', 'auction_id', 'artwork_id', 'creator', 'start_price', 'duration', 'end_time', 'status', 'winner', 'winning_bid', 'indexed_at'])
     }),
     Object.freeze({
         name: 'bids',
         table: 'v41_bids',
         timeColumn: 'indexed_at',
-        columns: Object.freeze(['chain_id', 'auction_id', 'bidder', 'bid_amount', 'deposit', 'block_number', 'transaction_hash', 'indexed_at'])
+        columns: Object.freeze(['chain_id', 'auction_id', 'bidder', 'bid_amount', 'deposit_amount', 'block_number', 'transaction_hash', 'indexed_at'])
     }),
     Object.freeze({
         name: 'auction_endings',
@@ -82,7 +90,7 @@ export const EXPORTED_TABLES = Object.freeze([
         name: 'floor_history',
         table: 'v41_floor_history',
         timeColumn: 'indexed_at',
-        columns: Object.freeze(['chain_id', 'artwork_id', 'floor_price', 'source', 'indexed_at'])
+        columns: Object.freeze(['chain_id', 'artwork_id', 'token_id', 'floor_price', 'indexed_at'])
     })
 ]);
 
