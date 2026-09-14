@@ -72,6 +72,16 @@ Ordered by what the founder can feel, not by row number.
 | **A-79** | Bound the profile's opening gallery read | Decided and shipped: one screenful first, the rest behind the frame, identity still committed on the narrow read. Needs one profile load on a device |
 | **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
 
+## 2a. All the device acceptance, in five trips
+
+Sixteen rows below are code-complete and waiting on the same thing: somebody
+using the site on a real device. Run row by row and that is sixteen sessions.
+[`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)
+organises them by trip instead - arrive cold, connect, publish, settle, and the
+two wallet questions - because most of these rows are watching the same screens
+for different things. It is five sessions per device, and it carries the result
+table.
+
 ## 3. Waiting only on a look
 
 Merged and measured, needing one confirmation each:
