@@ -933,11 +933,46 @@ function bindProviderDiagnostics(instance) {
     }
 }
 
+// A-59: an account switched inside the wallet is not noticed, and the row could
+// not say why, because nothing here recorded the one payload that would answer
+// it. A WalletConnect session's approved account list is fixed at approval time
+// and changes only through `session_update`; that event is bound, but it was
+// summarised as topic/code/message, so its accounts were dropped before anyone
+// could read them. This records them - masked - so one device run decides
+// between a reconciliation read and a documented wallet limitation.
+function maskCoreAddress(value) {
+    const address = String(value || '');
+    return /^0x[a-fA-F0-9]{40}$/.test(address)
+        ? `${address.slice(0, 6)}...${address.slice(-4)}`
+        : null;
+}
+
+function summarizeSessionAccounts(session) {
+    const accounts = readCoreSessionAccounts(session);
+    return {
+        count: accounts.length,
+        accounts: accounts.map((entry) => `eip155:${entry.chainId}:${maskCoreAddress(entry.address)}`)
+    };
+}
+
 function summarizeEventPayload(eventName, payload) {
     if (eventName === 'display_uri') return { uriAvailable: Boolean(payload) };
     if (eventName === 'accountsChanged') {
         const accounts = Array.isArray(payload) ? payload : [];
-        return { count: accounts.length };
+        return { count: accounts.length, accounts: accounts.map(maskCoreAddress) };
+    }
+    if (eventName === 'session_update') {
+        // The payload carries the wallet's new namespaces; the provider still
+        // holds the ones it settled with. Both are recorded, because the
+        // question is whether they differ.
+        const updated = summarizeSessionAccounts({ namespaces: payload?.params?.namespaces || payload?.namespaces });
+        const held = summarizeSessionAccounts(providerInstance?.session);
+        return {
+            topic: payload?.topic || payload?.params?.topic || null,
+            updated,
+            held,
+            differs: updated.accounts.join(',') !== held.accounts.join(',')
+        };
     }
     if (eventName === 'chainChanged') return { chainId: parseCoreChainId(payload) };
     if (payload && typeof payload === 'object') {

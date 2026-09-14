@@ -1283,7 +1283,14 @@ function bindWalletResumeListeners() {
                 snapshot: getWalletDebugSnapshot()
             });
         } else if (document.visibilityState === 'visible') {
-            walletDebugLog('visibility changed', { state: document.visibilityState });
+            // A-59 asks what the provider holds on the way back, and the hidden
+            // branch above already records what it held on the way out. Without
+            // the matching snapshot here there is nothing to compare an
+            // in-wallet account switch against.
+            walletDebugLog('visibility changed', {
+                state: document.visibilityState,
+                snapshot: getWalletDebugSnapshot()
+            });
             notifyWalletResume('visibility return');
         }
     });
