@@ -52,6 +52,53 @@ function latestByChain(rows = []) {
   return latest;
 }
 
+// B-03: `lag_to_observed_block` measures the projection against its own newest
+// row, so it reads 0 exactly when the indexer has stopped writing - nothing new
+// arrives, nothing is behind anything, and a dead indexer looks perfectly
+// healthy. The legacy chain has reported `lag: 0, stale_projection: false`
+// since it was stopped in June.
+//
+// Liveness has to be measured against the clock instead. `last_indexed_at`
+// advances on every processed block range rather than only when events are
+// found, so a quiet chain still keeps it fresh; the poll interval is 15s.
+const LIVENESS = Object.freeze({
+  // Eight missed poll cycles, which also absorbs the 60s edge cache on this
+  // response. Anything inside this is a normal indexer.
+  HEALTHY_MAX_SECONDS: 120,
+  // Ten minutes with no processed range is not a slow block. Something is
+  // wrong and somebody should look.
+  DEGRADED_MAX_SECONDS: 600
+});
+
+// A chain the project stopped on purpose is not an incident. Ethereum Sepolia
+// is read-only legacy under canon 13 and its indexer is meant to be off.
+function describeLiveness(state, nowMs) {
+  const stoppedByDesign = String(state.status || '') === 'stopped';
+  const lastIndexedAt = state.last_indexed_at ? Date.parse(state.last_indexed_at) : NaN;
+  const ageSeconds = Number.isFinite(lastIndexedAt)
+    ? Math.max(0, Math.round((nowMs - lastIndexedAt) / 1000))
+    : null;
+
+  let liveness;
+  if (stoppedByDesign) liveness = 'stopped_by_design';
+  else if (ageSeconds === null) liveness = 'unknown';
+  else if (ageSeconds <= LIVENESS.HEALTHY_MAX_SECONDS) liveness = 'healthy';
+  else if (ageSeconds <= LIVENESS.DEGRADED_MAX_SECONDS) liveness = 'degraded';
+  else liveness = 'stalled';
+
+  return {
+    liveness,
+    seconds_since_last_indexed: ageSeconds,
+    // Stated in the response so a reader is not comparing against a number they
+    // had to find in the source, and so the runbook cannot drift from the code.
+    healthy_within_seconds: LIVENESS.HEALTHY_MAX_SECONDS,
+    degraded_within_seconds: LIVENESS.DEGRADED_MAX_SECONDS,
+    // This response is edge-cached, so an age can be up to this much older than
+    // the truth.
+    response_max_age_seconds: 60
+  };
+}
+
 function summarizeLatest(row) {
   if (!row) return null;
   return {
@@ -64,7 +111,7 @@ function summarizeLatest(row) {
   };
 }
 
-function buildChainStatus(stateRows, tableRows) {
+function buildChainStatus(stateRows, tableRows, nowMs = Date.now()) {
   const stateByChain = Object.fromEntries(
     stateRows.map(row => [chainKey(row.chain_id), row])
   );
@@ -94,6 +141,7 @@ function buildChainStatus(stateRows, tableRows) {
       confirmation_depth: toNumber(state.confirmation_depth),
       total_events_indexed: toNumber(state.total_events_indexed),
       last_indexed_at: state.last_indexed_at || null,
+      ...describeLiveness(state, nowMs),
       latest_observed_block: latestObservedBlock,
       lag_to_observed_block: Math.max(0, latestObservedBlock - lastIndexedBlock),
       stale_projection: staleProjection,
@@ -108,6 +156,8 @@ function buildChainStatus(stateRows, tableRows) {
     };
   });
 }
+
+export { LIVENESS, describeLiveness, buildChainStatus };
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
