@@ -571,6 +571,12 @@ body.future .artwork-page-compact-action {
     text-align: right;
 }
 
+/* A-33: the media type arrives from the record as a lowercase key. Every other
+   value in this list reads as prose, so it is capitalised for display only. */
+.artwork-detail-media-type {
+    text-transform: capitalize;
+}
+
 .artwork-page-right .artwork-mobile-auction { order: 1; }
 .artwork-page-right .artwork-mobile-auction-action { order: 2; }
 .artwork-page-right .artwork-mobile-people { order: 3; }

@@ -1285,6 +1285,24 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 );
             }
 
+            // A-33: the details list printed the stored enum - "sepolia" or
+            // "baseSepolia" - so a visitor read a legacy Ethereum record as if it
+            // were the network the protocol runs on, and the active one as a
+            // camelCase key. Canon 13: Base Sepolia is the only active product
+            // testnet, and legacy records stay readable without presenting as
+            // active. Chain id decides where it exists; the stored key is the
+            // fallback for older rows that carry no id.
+            function describeArtworkNetwork(artworkData) {
+                const chainId = Number(artworkData?.chain_id || artworkData?.chainId || 0);
+                if (chainId === 84532) return 'Base Sepolia';
+                if (chainId === 11155111) return 'Ethereum Sepolia (legacy, read-only)';
+                const networkKey = String(artworkData?.network || '').trim();
+                if (chainId) return networkKey;
+                if (networkKey === 'baseSepolia') return 'Base Sepolia';
+                if (networkKey === 'sepolia') return 'Ethereum Sepolia (legacy, read-only)';
+                return networkKey;
+            }
+
             function getTokenExplorerUrl(artworkData) {
                 const tokenId = artworkData?.token_id || artworkData?.tokenId;
                 if (!tokenId) return '';
@@ -3284,8 +3302,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     <div className="artwork-page-extra">
                                         <h2>Artwork details</h2>
                                         <dl className="artwork-page-detail-list">
-                                            {resolvedMedia.type && <><dt>Media</dt><dd>{resolvedMedia.type}</dd></>}
-                                            {artwork.network && <><dt>Network</dt><dd>{artwork.network}</dd></>}
+                                            {resolvedMedia.type && <><dt>Media</dt><dd className="artwork-detail-media-type">{resolvedMedia.type}</dd></>}
+                                            {describeArtworkNetwork(artwork) && <><dt>Network</dt><dd>{describeArtworkNetwork(artwork)}</dd></>}
                                             {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
                                             {artwork.token_id && (
                                                 <>
