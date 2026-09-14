@@ -1,0 +1,72 @@
+name: Controlled beta change request
+description: Something works as built, and you think it should work differently.
+title: "[Change request]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for "it should be different", not "it is broken". If something is broken, use the bug form instead — the two go to different places and mixing them is what this separation prevents.
+
+        Testnet information only. Never post a seed phrase, private key, session topic, credential, RPC URL containing a key, or database URL.
+
+        **Some of this is settled and will not change during the beta.** Fees, splits, bid increments, deposit sizes, auction durations and the settlement window are frozen protocol architecture. A change request about those is still worth filing — it is recorded and considered for a later phase — but it will not become a beta fix, and saying so now is more honest than leaving you waiting.
+
+  - type: checkboxes
+    id: not_a_defect
+    attributes:
+      label: This is not a defect report
+      options:
+        - label: The thing I am describing works. I am asking for it to work differently.
+          required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: What happens now
+      description: Describe the current behaviour as you observed it, not as you assume it is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: What you would like instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What went wrong for you because of the current behaviour
+      description: A change request grounded in something that actually happened is far easier to weigh than a preference. If nothing went wrong and you simply prefer the other way, say that — it is a valid answer.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: What area is this about
+      options:
+        - Wording, labels, or explanations
+        - Layout, visual design, or navigation
+        - What information is shown, and where
+        - Speed or responsiveness
+        - Fees, splits, deposits, or bid increments
+        - Auction timing, extensions, or settlement window
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Page URL
+      placeholder: https://artsoulprotocol.com/...
+
+  - type: checkboxes
+    id: final_check
+    attributes:
+      label: Final check
+      options:
+        - label: I searched open issues for the same request.
+          required: true

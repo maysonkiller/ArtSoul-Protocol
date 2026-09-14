@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security, privacy, or credential exposure
+    url: https://github.com/maysonkiller/ArtSoul-Protocol/security/advisories/new
+    about: Never post these publicly. Use a private advisory, or your invitation channel.
+  - name: How the protocol works
+    url: https://artsoulprotocol.com/docs-protocol
+    about: Fees, deposits, bid increments, settlement and floors are documented. A number that surprises you may be working as designed.
