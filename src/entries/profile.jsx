@@ -930,7 +930,8 @@ const { useState, useEffect, useRef } = React;
                     const artworksPromise = fetchProfileArtworks(
                         { wallet_address: walletAddress },
                         requestedGallery,
-                        db
+                        db,
+                        { limit: FIRST_GALLERY_PAGE }
                     );
                     const genesisPromise = getGenesisState(walletAddress);
                     const profileResult = await Promise.resolve(profilePromise).then(
@@ -982,6 +983,39 @@ const { useState, useEffect, useRef } = React;
                     }
                     setDiscoveryProfile(nextDiscoveryProfile);
                     loadedProfileAddressRef.current = normalizedAddress;
+
+                    // A-79: the frame is published, so the rest of the corpus can
+                    // arrive behind it. A short first page cannot tell a full
+                    // gallery from a short one, so anything that fills the page is
+                    // read again without a bound.
+                    //
+                    // No loading state is set for this: the cards already on
+                    // screen stay, and more appear under them. Showing a spinner
+                    // over content that is already correct is the staging effect
+                    // this row exists to remove.
+                    if (artworkData.corpus.length >= FIRST_GALLERY_PAGE) {
+                        try {
+                            const full = await fetchProfileArtworks(
+                                { wallet_address: walletAddress },
+                                requestedGallery,
+                                db,
+                                { limit: FULL_GALLERY_LIMIT }
+                            );
+                            // Both guards, same as the first commit: a newer
+                            // profile or a newer tab must win over a slower read
+                            // that started before it.
+                            if (requestId === profileRequestRef.current
+                                && artworkRequestId === artworksRequestRef.current) {
+                                galleryCacheRef.current.set(`${normalizedAddress}:${requestedGallery}`, full.items);
+                                setMyArtworks(full.items);
+                                setDiscoveryProfile(buildDiscoveryProfile(profileData, full.corpus, genesisState));
+                            }
+                        } catch (error) {
+                            // The bounded frame is already correct and on screen;
+                            // failing to extend it is not worth replacing it.
+                            console.warn('Could not load the rest of the gallery:', error);
+                        }
+                    }
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
                     console.error('Error loading profile:', error);
@@ -994,7 +1028,23 @@ const { useState, useEffect, useRef } = React;
                 setLoading(false);
             }
 
-            async function fetchProfileArtworks(activeProfile, galleryType = selectedGallery, dbOverride = null) {
+            // A-79. Two accepted repairs disagreed about the profile's first paint:
+            // one committed identity as soon as the narrow profile read resolved,
+            // the other published a single coherent frame. Both were right about
+            // what they saw and neither could be merged as a fix for the other,
+            // because one frame arrives no earlier than the slowest read and the
+            // slowest read was the whole corpus - up to 200 works.
+            //
+            // Bounding the first read settles it instead of picking a side. The
+            // opening request asks for one screenful, so the gallery lands close
+            // enough behind identity that the page no longer reads as assembling
+            // itself, and the rest arrives afterwards without a second loading
+            // state. Nothing is hidden: the full corpus still loads, it simply
+            // stops gating the first frame.
+            const FIRST_GALLERY_PAGE = 24;
+            const FULL_GALLERY_LIMIT = 200;
+
+            async function fetchProfileArtworks(activeProfile, galleryType = selectedGallery, dbOverride = null, { limit = FULL_GALLERY_LIMIT } = {}) {
                 if (!activeProfile?.wallet_address) return { items: [], corpus: [] };
 
                 const walletAddress = activeProfile.wallet_address;
@@ -1008,8 +1058,8 @@ const { useState, useEffect, useRef } = React;
                 };
 
                 const options = galleryType === 'collected'
-                    ? { owner: walletAddress, limit: 200 }
-                    : { creator: walletAddress, limit: 200, ...(galleryType === 'auction' ? { view: 'auctions' } : {}) };
+                    ? { owner: walletAddress, limit }
+                    : { creator: walletAddress, limit, ...(galleryType === 'auction' ? { view: 'auctions' } : {}) };
                 const projected = rememberSuppressedArtworks(
                     await db?.getPublicProjectionArtworks?.(options) || []
                 );

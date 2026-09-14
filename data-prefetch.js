@@ -103,11 +103,18 @@
 
     if (path === '/profile') {
         var wallet = profileWallet();
-        // Mirrors the default gallery in profile.jsx: created works, limit 200,
-        // in that parameter order, because the key is the request string.
+        // Mirrors the opening gallery read in profile.jsx: created works, one
+        // page, in that parameter order, because the key is the request string.
+        //
+        // A-79 bounded that first read to FIRST_GALLERY_PAGE. The number has to
+        // match here or the head start is never taken and the page issues a
+        // second request instead - a prefetch that misses is worse than none,
+        // because it spends bandwidth during first paint and saves nothing. The
+        // rest of the corpus is read after the frame and deliberately has no
+        // head start: nothing is waiting on it.
         if (wallet) {
             start('/api/public/profile?address=' + encodeURIComponent(wallet));
-            start('/api/public/artworks?creator=' + wallet + '&limit=200');
+            start('/api/public/artworks?creator=' + wallet + '&limit=24');
         }
     } else if (path === '/artwork' || path.indexOf('/artwork/') === 0) {
         var id = artworkId(path);
