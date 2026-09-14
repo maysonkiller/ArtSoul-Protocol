@@ -133,6 +133,11 @@ test('detail page keeps the three roles as individually clickable profile links'
   assert.match(panel, /label: 'Creator'/);
   assert.match(panel, /label: 'First Collector'/);
   assert.match(panel, /label: 'Owner'/);
-  // Owner is not duplicated when it equals the First Collector.
-  assert.match(panel, /!isSameAddress\(ownerAddress, artwork\.auction_winner_address\)/);
+  // Owner is not duplicated when it equals the First Collector. The rule moved
+  // into shouldShowOwnerRole in B-10 so a creator's buyback could be shown; the
+  // panel must still hand it the first collector, and the predicate must still
+  // suppress that case. Proven behaviourally in artwork-owner-after-buyback.
+  assert.match(panel, /firstCollectorAddress: artwork\.auction_winner_address/);
+  const predicate = detail.slice(detail.indexOf('function shouldShowOwnerRole'));
+  assert.match(predicate.slice(0, 700), /if \(minted && isSameAddress\(ownerAddress, firstCollectorAddress\)\) return false;/);
 });

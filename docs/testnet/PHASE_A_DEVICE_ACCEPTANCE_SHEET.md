@@ -134,6 +134,10 @@ timeline and a Token ID. The Ownership panel shows no Owner row on either, and
 that is correct - the row is suppressed when the owner is the creator or the
 first collector, so one person is not listed twice.
 
+Artwork `v41:84532:1` is the third case to open: its creator bought it back
+through a completed resale, so the panel must show an **Owner** row naming the
+creator. Before B-10 it did not.
+
 What is left for this trip is a completed resale, where owner, creator and first
 collector are three different addresses. That is the one arrangement no existing
 work has.

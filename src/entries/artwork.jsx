@@ -875,6 +875,26 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 return Boolean(left && right && String(left).toLowerCase() === String(right).toLowerCase());
             }
 
+            // Canon 11: every NFT surface shows Creator, First Collector and Owner.
+            // The Owner row is left out only where it would repeat a role that
+            // already says who holds the work. Before mint that is the creator;
+            // after settlement, until a resale, it is the first collector.
+            //
+            // After mint the creator holds the work again only by buying it back
+            // through a completed resale, and then the row is the whole point:
+            // Creator beside First Collector, with no Owner, reads as though the
+            // collector still has it. Artwork 1 on the public testnet showed
+            // exactly that while its own provenance timeline said "Resale
+            // completed - Owner" the creator. Profile > Owned NFTs already
+            // counted the buyback (issue #121); this page did not.
+            function shouldShowOwnerRole({ ownerAddress, creatorAddress, firstCollectorAddress, winnerAddress, minted, awaitingPayment }) {
+                if (!ownerAddress || isZeroAddress(ownerAddress)) return false;
+                if (!minted && isSameAddress(ownerAddress, creatorAddress)) return false;
+                if (minted && isSameAddress(ownerAddress, firstCollectorAddress)) return false;
+                if (awaitingPayment && isSameAddress(ownerAddress, winnerAddress)) return false;
+                return true;
+            }
+
             function getDefaultProfileAvatar() {
                 return '/default-avatar.png';
             }
@@ -3534,15 +3554,20 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             profile: auctionWinnerProfile
                                         })}
 
-                                        {ownerAddress &&
-                                            !isZeroAddress(ownerAddress) &&
-                                            !isSameAddress(ownerAddress, creatorAddress) &&
-                                            (!mintedArtwork || !isSameAddress(ownerAddress, artwork.auction_winner_address)) &&
-                                            (!awaitingPayment || !isSameAddress(ownerAddress, winnerAddress)) &&
+                                        {shouldShowOwnerRole({
+                                            ownerAddress,
+                                            creatorAddress,
+                                            firstCollectorAddress: artwork.auction_winner_address,
+                                            winnerAddress,
+                                            minted: mintedArtwork,
+                                            awaitingPayment
+                                        }) &&
                                             renderOwnershipRole({
                                                 label: 'Owner',
                                                 address: ownerAddress,
-                                                profile: currentOwnerProfile
+                                                // A buyback puts the same person in two rows; they
+                                                // must read the same, not a name above an address.
+                                                profile: currentOwnerProfile || (isSameAddress(ownerAddress, creatorAddress) ? creatorProfile : null)
                                             })}
                                     </div>
 
