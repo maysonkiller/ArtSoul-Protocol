@@ -18,6 +18,12 @@ let selectedFile = null;
         let authorizedWalletAddress = '';
         let publishNavigationLocked = false;
         let currentPublishStage = 'idle';
+        // registerArtwork reports the hash before it waits for the receipt, so
+        // from this point on a failure means the transaction is in flight rather
+        // than never sent. That difference decides what a person is told and
+        // whether the pending record survives, and mapPublishError cannot see
+        // the publish handler's local state.
+        let submittedRegisterTxHash = '';
 
         const AI_ANALYSIS_TIMEOUT_MS = 20000;
         const AI_PREVIEW_MAX_DATA_URL_LENGTH = 1800000;
@@ -309,12 +315,25 @@ let selectedFile = null;
             // successfully against another endpoint at the same moment. Calling
             // that a failed transaction told the person their artwork had been
             // rejected on-chain, which had not happened and was not true.
-            if (lower.includes('missing revert data')
+            const networkWentQuiet = lower.includes('missing revert data')
                 || lower.includes('could not coalesce error')
                 || lower.includes('no backend is currently healthy')
                 || code === 'NETWORK_ERROR'
                 || code === 'SERVER_ERROR'
-                || code === 'TIMEOUT') {
+                || code === 'TIMEOUT';
+            // The same ethers errors mean opposite things on either side of the
+            // broadcast. Before it, the node never took the transaction and
+            // nothing exists. After it, the registration is on its way and will
+            // be permanent once mined - and registration is the first of two
+            // transactions, so telling someone nothing was published sends them
+            // to publish the same artwork a second time.
+            if (networkWentQuiet && submittedRegisterTxHash) {
+                return {
+                    code: 'REGISTRATION_UNCONFIRMED',
+                    message: 'The registration was submitted to Base Sepolia and its confirmation has not come back yet. It may still complete. Open your profile and check for this artwork before publishing it again.'
+                };
+            }
+            if (networkWentQuiet) {
                 return {
                     code: 'NETWORK_UNAVAILABLE',
                     message: 'Base Sepolia did not answer, so nothing was sent and nothing was published. This is the network, not your artwork or your wallet. Wait a moment and try again.'
@@ -1058,6 +1077,7 @@ let selectedFile = null;
                     price,
                     {
                         onSubmitted: (registerTxHash) => {
+                            submittedRegisterTxHash = registerTxHash || '';
                             pendingArtwork = savePendingArtwork({
                                 ...pendingArtwork,
                                 register_tx_hash: registerTxHash || '',
@@ -1201,7 +1221,14 @@ let selectedFile = null;
                 const mapped = mapPublishError(error);
                 const errorMessage = `Publish failed: ${mapped.message}`;
 
-                if (pendingArtwork?.register_tx_hash && !pendingArtwork?.artwork_id) {
+                // A submitted register with no artwork id yet is exactly the
+                // state this record exists to hold: the indexer will project the
+                // real artwork once the transaction mines, and until then the
+                // profile has nothing else to show. Removing it here threw away
+                // the only trace that a transaction was in flight.
+                if (pendingArtwork?.register_tx_hash
+                    && !pendingArtwork?.artwork_id
+                    && mapped.code !== 'REGISTRATION_UNCONFIRMED') {
                     removePendingArtwork(pendingArtwork.temp_id);
                 }
 
@@ -1211,6 +1238,7 @@ let selectedFile = null;
                 publishNavigationLocked = false;
                 uploading = false;
                 currentPublishStage = 'idle';
+                submittedRegisterTxHash = '';
                 restoreTransactionButton(uploadBtn, originalMarkup);
             }
         }
