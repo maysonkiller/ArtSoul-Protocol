@@ -7,7 +7,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **59 done, 17 in progress, 5 planned** across A-01 to A-81.
+Phase A stands at **59 done, 17 in progress, 6 planned** across A-01 to A-82.
 
 ## The shape of what is left
 
@@ -63,7 +63,8 @@ Ordered by what the founder can feel, not by row number.
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
-| **A-48** | The single full-document repaint on browser Back | Diagnosis not started |
+| **A-48** | The single full-document repaint on browser Back | Diagnosed and the code side is complete: every shared card image path defers. What remains is one measurement in an ordinary Chrome, reduced to two navigations and three console lines in [`testnet/A48_BACK_NAVIGATION_PROBE.md`](testnet/A48_BACK_NAVIGATION_PROBE.md). An embedded browser view cannot answer it |
+| **A-82** | The unloaded browser half of the graceful-shutdown module | Dead surface, not a production defect: it registers a leave-site confirmation dialog and nothing imports it. Recorded so the next person to import it for its Node signal handling does not ship the dialog |
 | **A-53** | The identity settle gap between header and profile | Never reproduced on a device |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
 | **A-34** | One reusable presentation-only aura frame shell | Canon 17; no economics |
