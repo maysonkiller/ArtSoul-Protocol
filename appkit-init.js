@@ -509,8 +509,33 @@ function isPendingRequestError(error) {
         message.includes('previous request');
 }
 
+// A wallet can refuse a network switch for reasons reconnecting cannot repair.
+// EIP-1193 reserves 4200 for a method the wallet does not implement, and
+// WalletConnect returns 5100-5102 when a chain, method or event falls outside
+// what the session approved. Neither is a dead session.
+function isChainUnsupportedByWalletError(error) {
+    const code = Number(getWalletErrorCode(error));
+    const message = `${error?.message || ''} ${error?.data?.message || ''}`.toLowerCase();
+    return code === 4200 ||
+        code === 5100 ||
+        code === 5101 ||
+        code === 5102 ||
+        message.includes('unsupported method') ||
+        message.includes('method not supported') ||
+        message.includes('does not support the requested method') ||
+        message.includes('unsupported chains') ||
+        message.includes('chains are not supported');
+}
+
+// A switch that was asked for and never confirmed is not a failed session
+// either: the request may still be sitting in the wallet.
+function isUnconfirmedNetworkError(error) {
+    const code = String(getWalletErrorCode(error) || '');
+    return code === 'BASE_SEPOLIA_REQUIRED';
+}
+
 function describeNetworkSwitchFailure(error, target) {
-    if (isUserRejectedError(error)) {
+    if (isUserRejectedError(error) || getWalletErrorCode(error) === 'BASE_SEPOLIA_SWITCH_REJECTED') {
         return `Network switch was declined. Select ${target.chainName} to continue.`;
     }
     if (isPendingRequestError(error)) {
@@ -525,6 +550,18 @@ function describeNetworkSwitchFailure(error, target) {
         message.includes('did not establish a live session')
     ) {
         return `Your wallet session expired. Reconnect the wallet, then select ${target.chainName} again.`;
+    }
+    // A-57: the four branches below used to share the reconnect message above.
+    // Reconnecting repairs exactly one of them, so the other three sent people
+    // around a loop that could not end.
+    if (isChainUnsupportedByWalletError(error)) {
+        return `This wallet cannot add ${target.chainName} from a website. Reconnecting will not change that - a wallet that supports custom networks is needed.`;
+    }
+    if (isUnknownChainError(error)) {
+        return `${target.chainName} is not set up in your wallet, and the wallet did not accept adding it. Add ${target.chainName} in the wallet itself, then select it here again.`;
+    }
+    if (isUnconfirmedNetworkError(error)) {
+        return `Your wallet has not confirmed ${target.chainName} yet. Open the wallet, approve the network request, and check that it is on ${target.chainName}.`;
     }
     return `Could not switch to ${target.chainName}. Reconnect the wallet and try again.`;
 }
@@ -3108,9 +3145,11 @@ window.switchArtSoulNetwork = async (chainId) => {
                 alert(describeNetworkSwitchFailure(error, target));
                 return false;
             }
-            if (!isUnknownChainError(error)) throw error;
-            await addEthereumChain(provider, target);
-            await switchEthereumChain(provider, target);
+            // switchEthereumChain already runs switch -> add -> switch. Repeating
+            // that sequence here asked an unfamiliar wallet to add the chain
+            // twice and to switch up to four times in a single attempt, so each
+            // prompt the person approved was followed by the same prompt again.
+            throw error;
         }
 
         const confirmedChainId = await waitForProviderChainId(target.chainId, NETWORK_CONFIRMATION_TIMEOUT, provider);
