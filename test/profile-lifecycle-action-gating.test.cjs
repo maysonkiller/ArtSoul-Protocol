@@ -237,7 +237,9 @@ test('every artwork write-action section is gated on the Base write predicate', 
   assert.match(artworkSource, /const canCreateNewAuction = artworkWriteEnabled &&/);
   assert.match(artworkSource, /\{liveAuction && artworkWriteEnabled && \(/);
   assert.match(artworkSource, /\{artworkWriteEnabled && \(showWithdrawableDeposit \|\| withdrawalState\.message\) && \(/);
-  assert.match(artworkSource, /\{artworkWriteEnabled && walletRenderState\.settled && awaitingPayment && isSameAddress\(connectedWalletAddress, winnerAddress\) && \(/);
+  assert.match(artworkSource, /\{artworkWriteEnabled && walletRenderState\.settled && awaitingPayment && !settlementExpired && isSameAddress\(connectedWalletAddress, winnerAddress\) && \(/);
+  // B-11: closing an expired settlement is a write too.
+  assert.match(artworkSource, /\{artworkWriteEnabled && settlementExpired && \(/);
   assert.match(artworkSource, /\{artworkWriteEnabled && resaleEligibility\.showOwnerAction && \(/);
   assert.match(artworkSource, /\{listedForResale && !connectedWalletOwnsArtwork && artworkWriteEnabled && \(/);
 });
@@ -246,6 +248,7 @@ test('every artwork write handler re-checks the legacy guard at execution time',
   for (const handler of [
     'placeBidOnce',
     'endAuctionOnce',
+    'claimSettlementDefaultOnce',
     'settleAuctionOnce',
     'purchaseResaleOnce',
     'openResaleListingModal',
@@ -264,7 +267,8 @@ test('every artwork write handler re-checks the legacy guard at execution time',
 test('settlement is winner-only at both the button and the handler', () => {
   assert.match(
     artworkSource,
-    /awaitingPayment && isSameAddress\(connectedWalletAddress, winnerAddress\) && \(/
+    // B-11 added the expired check between the two; winner-only is unchanged.
+    /awaitingPayment && !settlementExpired && isSameAddress\(connectedWalletAddress, winnerAddress\) && \(/
   );
   const settle = extractFunction(artworkSource, 'settleAuctionOnce');
   assert.match(settle, /isSameAddress\(walletAddress, auctionWinner\)/);

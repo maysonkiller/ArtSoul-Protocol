@@ -15,6 +15,11 @@
         return Number.isFinite(parsed) ? parsed : fallback;
     }
 
+    // B-11: the same clock margin the artwork page waits out before it offers to
+    // close an expired settlement. A card must not call a window closed that the
+    // page would still offer to pay into, or the reverse. Pinned equal by test.
+    const SETTLEMENT_CLOCK_MARGIN_MS = 60 * 1000;
+
     function toTimestamp(value) {
         if (!value) return 0;
         if (typeof value === 'number') return value > 9999999999 ? value : value * 1000;
@@ -251,13 +256,24 @@
         const ended = status === 'awaiting_end' || status === 'auction_ended' || status === 'ended';
         const defaulted = status.includes('default') || status.includes('unsettled');
         const awaitingSettlement = status.includes('settlement_pending') || status === 'waiting_payment';
+        // A deadline can arrive as unix seconds, as a numeric string, or as an ISO
+        // date, depending on which projection built the card.
+        const rawDeadline = artwork.settlement_deadline ?? artwork.settlementDeadline ?? artwork.winner_deadline;
+        const settlementDeadline = toTimestamp(Number(rawDeadline) || rawDeadline);
+        const settlementClosed = Boolean(settlementDeadline && Date.now() > settlementDeadline + SETTLEMENT_CLOCK_MARGIN_MS);
         const pendingCreated = toTimestamp(artwork.created_at || artwork.createdAt || artwork.saved_at || artwork.savedAt);
         const recentPending = artwork.source === 'pending_indexer' && (!pendingCreated || Date.now() - pendingCreated <= RECENT_PENDING_MS);
 
         if (recentPending) return { key: 'finalizing', label: 'Finalizing...' };
         if (isListedForSale(artwork)) return { key: 'listed', label: 'For sale' };
         if (minted || status === 'sold' || status === 'settled') return { key: 'sold', label: 'Sold' };
-        if (awaitingSettlement) return { key: 'awaiting_settlement', label: 'Awaiting payment' };
+        if (awaitingSettlement) {
+            // "Awaiting payment" nine days after the deadline tells a winner to pay
+            // into a window the contract has already closed.
+            return settlementClosed
+                ? { key: 'settlement_expired', label: 'Payment window closed' }
+                : { key: 'awaiting_settlement', label: 'Awaiting payment' };
+        }
         if (noBids || ((expired || ended || defaulted) && !hasBid)) {
             return { key: 'ended_no_bids', label: 'No bids' };
         }
