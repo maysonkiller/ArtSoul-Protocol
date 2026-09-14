@@ -127,8 +127,16 @@ enforces that.
 | After settlement the artwork page shows **Creator, First Collector and Owner** together. | A-33 |
 | Token ID appears and links to the explorer. | A-33 |
 
-The provenance triple cannot be accepted any other way: until one work settles,
-there is no NFT to hold two of those three roles.
+**Most of this is already answerable without running an auction.** Five works
+have settled on the public testnet. Open `artwork?id=v41:84532:19` and
+`artwork?id=v41:84532:13`: both show Creator, First Collector, a full provenance
+timeline and a Token ID. The Ownership panel shows no Owner row on either, and
+that is correct - the row is suppressed when the owner is the creator or the
+first collector, so one person is not listed twice.
+
+What is left for this trip is a completed resale, where owner, creator and first
+collector are three different addresses. That is the one arrangement no existing
+work has.
 
 ---
 
