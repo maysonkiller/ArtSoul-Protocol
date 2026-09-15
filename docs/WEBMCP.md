@@ -118,6 +118,24 @@ it has gone stale. That status is read once per page and reused. If it cannot be
 read the tools still answer; they simply do not claim a block, because freshness
 is context and never the answer itself.
 
+## Voice (B-09)
+
+[`voice-commands.js`](../voice-commands.js) turns one spoken sentence into one of
+these tools and says the answer. It adds no ability of its own, so the tool list
+above is also the voice command list, and the write gate above applies unchanged.
+
+Speech is recognised and spoken by the browser. ArtSoul makes no request from
+that file and never receives audio; in Chrome the browser sends it to Google,
+and the person is told before the microphone first opens. The microphone opens
+only on a click, for one sentence, and closes when the tab is hidden. A wallet
+command the recogniser hears with low confidence is not run. Browsers without
+speech recognition get no button.
+
+Examples, in English or Russian: "what auctions are open" / «какие аукционы
+открыты», "bid 0.05 on artwork 31" / «ставка 0,05 на работу 31», "my activity" /
+«мой профиль», "stop using my wallet" / «стоп, не трогай кошелёк». Say "help" or
+«помощь» for the rest.
+
 ## Cost to an ordinary visitor
 
 Nil. Without a WebMCP-capable browser the bootstrap exits before it registers a

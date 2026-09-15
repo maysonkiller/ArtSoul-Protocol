@@ -1054,6 +1054,7 @@
                         items: listings.slice(0, MAX_RESULTS).map(card => ({ ...brief(card), resale_price_eth: text(card.sale_price) || null }))
                     },
                     pending_withdrawal_eth: pendingWithdrawal,
+                    needs_attention_count: needs.length,
                     needs_attention: needs.slice(0, MAX_RESULTS),
                     note: pendingWithdrawal === null
                         ? 'The withdrawable balance is read from the contract once the wallet layer is ready.'
@@ -1577,8 +1578,24 @@
         }
     }
 
+    // The dependencies a real page gives the tools. Exported so the voice layer
+    // (B-09) runs the very same tools against the very same page, rather than a
+    // second copy of how the page fetches, navigates and reaches the wallet.
+    function browserDependencies() {
+        return {
+            fetchJson: async (path) => {
+                const response = await fetch(path, { headers: { Accept: 'application/json' } });
+                if (!response.ok) throw new Error(`ArtSoul request failed: ${response.status}`);
+                return response.json();
+            },
+            openPath: (path) => window.location.assign(path),
+            readContracts: () => window.ArtSoulContracts || null
+        };
+    }
+
     window.ArtSoulWebMCP = Object.freeze({
         createTools,
+        browserDependencies,
         register,
         modelContextOf,
         permissionLevel,
@@ -1595,15 +1612,7 @@
     if (!context) return;
 
     const bootstrap = async () => {
-        const tools = createTools({
-            fetchJson: async (path) => {
-                const response = await fetch(path, { headers: { Accept: 'application/json' } });
-                if (!response.ok) throw new Error(`ArtSoul request failed: ${response.status}`);
-                return response.json();
-            },
-            openPath: (path) => window.location.assign(path),
-            readContracts: () => window.ArtSoulContracts || null
-        });
+        const tools = createTools(browserDependencies());
         await register(context, tools);
     };
 
