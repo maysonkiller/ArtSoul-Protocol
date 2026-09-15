@@ -69,7 +69,7 @@ test('an ordinary browser gets no tools, no requests and no handlers', () => {
   assert.equal(typeof win.ArtSoulWebMCP.createTools, 'function');
 });
 
-test('the eleven ArtSoul tools are registered when the browser supports WebMCP', async () => {
+test('the ArtSoul tools are registered when the browser supports WebMCP', async () => {
   const registered = [];
   const win = load({ modelContext: { registerTool: async (tool) => registered.push(tool.name) } });
   await new Promise((resolve) => setImmediate(resolve));
@@ -80,10 +80,18 @@ test('the eleven ArtSoul tools are registered when the browser supports WebMCP',
     'get_auction_state',
     'get_artwork_provenance',
     'explain_settlement',
+    'get_my_activity',
     'open_artwork',
     'prepare_bid',
     'place_bid',
     'end_expired_auction',
+    'complete_settlement',
+    'close_expired_settlement',
+    'start_auction',
+    'list_for_resale',
+    'buy_resale_listing',
+    'withdraw_pending_funds',
+    'revoke_wallet_access',
     'prepare_artwork_registration'
   ]);
   assert.equal(typeof win.ArtSoulWebMCP.register, 'function');
@@ -101,7 +109,7 @@ test('one rejected descriptor does not cost the other tools', async () => {
   const tools = win.ArtSoulWebMCP.createTools({ fetchJson: async () => ({}) });
   const names = await win.ArtSoulWebMCP.register(modelContext, tools);
   assert.equal(names.includes('search_artworks'), false);
-  assert.equal(accepted.length, 10);
+  assert.equal(accepted.length, tools.length - 1);
 });
 
 test('every tool declares a JSON Schema so the agent never guesses an input', () => {
@@ -397,9 +405,13 @@ test('place_bid opens the wallet only after the person grants permission themsel
   assert.match(prompts[0], /artwork 31/);
   assert.match(prompts[0], /never signs for you/);
 
-  // Granted once, remembered for this browser: no second dialog.
+  // Granted once, remembered for this browser: the grant is not asked again.
+  // The bid itself still is, because the wallet shows the deposit it sends and
+  // not the bid amount inside the transaction (B-12).
   await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.6' });
-  assert.equal(prompts.length, 1);
+  assert.equal(prompts.length, 2);
+  assert.doesNotMatch(prompts[1], /Allow this page/);
+  assert.match(prompts[1], /0\.6 ETH on artwork 31/);
   assert.equal(wallet.calls.length, 2);
 });
 
@@ -471,7 +483,8 @@ test('a rejected signature is reported as an ordinary outcome, not a crash', asy
   const tools = toolsFrom(win, {
     fetchJson: jsonFetch({ '/api/public/artworks': { data: [AUCTION_CARD] } }),
     readContracts: () => wallet.contracts,
-    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    confirmAction: () => true
   });
 
   const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
@@ -711,17 +724,33 @@ test('end_expired_auction needs a wallet and the same granted permission as a bi
   assert.deepEqual(calls, []);
 });
 
-test('the tools that reach the chain are exactly the three that need a signature', () => {
+test('the tools that reach the chain are exactly the reviewed set, and all use one gate', () => {
   // A guard against the layer growing a write nobody reviewed. Every other tool
-  // must stay readable by an anonymous visitor with no wallet at all.
+  // must stay readable by an anonymous visitor with no wallet at all. B-12 added
+  // six writes on purpose; a seventh must change this list on purpose too.
   const win = load();
   const source = fs.readFileSync('webmcp-tools.js', 'utf8');
-  const writes = win.ArtSoulWebMCP.createTools({ fetchJson: async () => ({}) })
-    .map((tool) => tool.name)
-    .filter((name) => /^(place_|end_|prepare_)/.test(name));
-  assert.deepEqual(writes, ['prepare_bid', 'place_bid', 'end_expired_auction', 'prepare_artwork_registration']);
-  // Only two of those actually call the wallet, and both go through the grant.
-  assert.equal((source.match(/readPermission\(\) !== PERMISSION_WALLET/g) || []).length, 2);
+  const tools = win.ArtSoulWebMCP.createTools({ fetchJson: async () => ({}) });
+  const writes = tools
+    .filter((tool) => /authorizeWalletAction\(/.test(tool.execute.toString()))
+    .map((tool) => tool.name);
+  assert.deepEqual(writes, [
+    'place_bid',
+    'end_expired_auction',
+    'complete_settlement',
+    'close_expired_settlement',
+    'start_auction',
+    'list_for_resale',
+    'buy_resale_listing',
+    'withdraw_pending_funds'
+  ]);
+  // The grant is checked in exactly one place, and nothing else writes it.
+  assert.equal((source.match(/readPermission\(\) !== PERMISSION_WALLET/g) || []).length, 1);
+  assert.equal((source.match(/writePermission\(PERMISSION_WALLET\)/g) || []).length, 1);
+  // Every write is serialised through the one-at-a-time lock.
+  for (const tool of tools.filter((entry) => writes.includes(entry.name))) {
+    assert.match(tool.execute.toString(), /withWalletAction\(/, `${tool.name} must hold the wallet lock`);
+  }
 });
 
 test('a creator is told they cannot bid on their own work, before any wallet opens', async () => {
@@ -778,7 +807,8 @@ test('a different wallet is allowed through to the wallet as before', async () =
     }),
     readContracts: () => wallet.contracts,
     readWalletAddress: () => '0xvisitor',
-    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    confirmAction: () => true
   });
 
   const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
@@ -795,7 +825,8 @@ test('an unknown connected address leaves the decision to the contract', async (
     fetchJson: jsonFetch({ '/api/public/artworks': { data: [{ ...AUCTION_CARD, creator: '0xABC' }] } }),
     readContracts: () => wallet.contracts,
     readWalletAddress: () => '',
-    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' })
+    storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    confirmAction: () => true
   });
 
   const answer = JSON.parse(await tools.get('place_bid').execute({ artwork_id: '31', bid_eth: '0.5' }));
@@ -816,6 +847,7 @@ test('a tool waits for the deferred wallet runtime before saying there is no wal
     readContracts: () => contracts,
     readWalletAddress: () => '0xvisitor',
     storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    confirmAction: () => true,
     loadWalletRuntime: async () => {
       loads += 1;
       contracts = wallet.contracts;
@@ -837,6 +869,7 @@ test('a runtime that is already there is not waited for', async () => {
     readContracts: () => wallet.contracts,
     readWalletAddress: () => '0xvisitor',
     storage: memoryStorage({ 'artsoul.agent.permission': 'wallet' }),
+    confirmAction: () => true,
     loadWalletRuntime: async () => { loads += 1; }
   });
 
