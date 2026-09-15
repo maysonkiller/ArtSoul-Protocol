@@ -60,6 +60,8 @@ const legacyRootAssets = [
     // Agent tools. A classic deferred script like the other root assets, so it
     // is copied verbatim rather than bundled into a page entry.
     'webmcp-tools.js',
+    // Voice commands. The same shape as the agent tools, which it drives.
+    'voice-commands.js',
     'supabase-client.js',
     'theme-sync.js',
     'ui-core.css',
