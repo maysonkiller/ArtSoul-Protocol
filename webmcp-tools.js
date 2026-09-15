@@ -9,7 +9,7 @@
  *
  * Two rules this file does not break:
  *
- * 1. The agent never signs. Reading is fully automatic. `place_bid` goes as far
+ * 1. The agent never signs. Reading is fully automatic. Every write goes as far
  *    as a website can: it opens the person's wallet with the transaction, and
  *    the wallet asks them to approve it. That last click is theirs and cannot be
  *    delegated from here - a website cannot make a wallet approve anything, and
@@ -117,6 +117,36 @@
         const limit = Number(value);
         if (!Number.isFinite(limit)) return DEFAULT_RESULTS;
         return Math.min(Math.max(Math.trunc(limit), 1), MAX_RESULTS);
+    }
+
+    // A clock margin, not an economic figure. The chain decides with
+    // block.timestamp and the browser with its own clock; B-11 waits out this
+    // margin on the artwork page and on every card before calling a settlement
+    // window closed, and the agent has to agree with both of them.
+    const SETTLEMENT_CLOCK_MARGIN_MS = 60 * 1000;
+
+    // ETH amounts are compared as integers of wei. Floating point cannot tell
+    // 0.1 + 0.2 from 0.3, and a floor comparison that rounds lets through a
+    // listing the contract then refuses at the person's expense.
+    function parseEthWei(value) {
+        const match = /^(\d+)(?:\.(\d{1,18}))?$/.exec(text(value));
+        if (!match) return null;
+        return BigInt(match[1]) * (10n ** 18n) + BigInt((match[2] || '').padEnd(18, '0'));
+    }
+
+    function sameAddress(left, right) {
+        const a = text(left).toLowerCase();
+        return Boolean(a) && a === text(right).toLowerCase();
+    }
+
+    // Deadlines arrive as unix seconds, numeric strings or ISO dates, depending
+    // on which projection built the row.
+    function timestampMs(value) {
+        if (value == null || value === '') return 0;
+        const numeric = Number(value);
+        if (Number.isFinite(numeric) && numeric > 0) return numeric > 9999999999 ? numeric : numeric * 1000;
+        const parsed = Date.parse(text(value));
+        return Number.isFinite(parsed) ? parsed : 0;
     }
 
     /**
@@ -484,6 +514,78 @@
             return null;
         }
 
+        async function connectedAddress() {
+            const immediate = text(readWalletAddress());
+            if (immediate) return immediate;
+            try {
+                await loadWalletRuntime();
+            } catch {
+                // No runtime is no wallet, reported as such by the caller.
+            }
+            return text(readWalletAddress());
+        }
+
+        /**
+         * The single gate every wallet-opening tool passes through.
+         *
+         * The first time, the person grants the agent wallet access with their
+         * own click, and the dialog names the action about to happen. After
+         * that, an action carrying an amount or a price is still confirmed one
+         * by one, because the wallet does not show those figures: a bid amount,
+         * a resale price and a starting price travel inside the transaction
+         * data, and the wallet shows only the value sent. A misheard "0.5" for
+         * "0.05" has to meet a person reading it before anything is signed.
+         *
+         * Returns null when the action may proceed, or the reason it may not.
+         */
+        function authorizeWalletAction(summary, confirmEachTime) {
+            if (readPermission() !== PERMISSION_WALLET) {
+                const granted = confirmAction(
+                    "Allow this page's AI agent to open your wallet on ArtSoul?\n\n" +
+                    `Next: ${summary}\n\n` +
+                    'Your wallet will still ask you to approve every transaction. ArtSoul never signs for you.'
+                );
+                if (!granted) return 'The person did not grant the agent permission to open the wallet.';
+                writePermission(PERMISSION_WALLET);
+                return null;
+            }
+            if (!confirmEachTime) return null;
+            const confirmed = confirmAction(
+                `Confirm on ArtSoul:\n\n${summary}\n\n` +
+                'Your wallet will ask you to approve it next. ArtSoul never signs for you.'
+            );
+            return confirmed ? null : 'The person did not confirm this action on the page.';
+        }
+
+        // One wallet action at a time. An agent retrying against a slow wallet,
+        // or a voice command heard twice, must not stack a second approval
+        // behind the first where the person could approve both believing they
+        // approved one.
+        let walletActionInFlight = false;
+        async function withWalletAction(run) {
+            if (walletActionInFlight) {
+                return JSON.stringify({
+                    submitted: false,
+                    reason: 'Another wallet action is still waiting for the person. It has to be approved or rejected in the wallet first.'
+                });
+            }
+            walletActionInFlight = true;
+            try {
+                return await run();
+            } finally {
+                walletActionInFlight = false;
+            }
+        }
+
+        function walletFailure(error, extra) {
+            // A rejected signature is the ordinary case, not a fault.
+            return JSON.stringify({
+                submitted: false,
+                ...extra,
+                reason: (error && error.message) || 'The wallet did not complete the transaction.'
+            });
+        }
+
         const prepareBid = {
             name: 'prepare_bid',
             description:
@@ -620,45 +722,34 @@
 
                 // The permission is granted by a human click in the page. An
                 // agent cannot grant it to itself: there is deliberately no tool
-                // that raises this level.
-                if (readPermission() !== PERMISSION_WALLET) {
-                    const granted = confirmAction(
-                        `Allow this page's AI agent to open your wallet with bids on ArtSoul?\n\n` +
-                        `Next: a bid of ${amount} ETH on artwork ${artworkId}.\n\n` +
-                        `Your wallet will still ask you to approve every transaction. ArtSoul never signs for you.`
+                // that raises this level. The bid amount is confirmed on every
+                // bid, because the wallet shows the deposit it sends and not the
+                // bid inside the transaction.
+                return withWalletAction(async () => {
+                    const refusal = authorizeWalletAction(
+                        `a bid of ${amount} ETH on artwork ${artworkId}, "${text(card.title) || 'Untitled'}".`,
+                        true
                     );
-                    if (!granted) {
+                    if (refusal) {
+                        return JSON.stringify({ submitted: false, reason: refusal, url: `/artwork/${artworkId}` });
+                    }
+
+                    try {
+                        const transactionHash = await contracts.placeBid(artworkId, amount, { idType: 'artwork' });
                         return JSON.stringify({
-                            submitted: false,
-                            reason: 'The person did not grant the agent permission to open the wallet.',
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            artwork_id: artworkId,
+                            bid_eth: amount,
+                            transaction_hash: transactionHash || null,
+                            note: 'The wallet asked the person to approve this transaction and they did. ' +
+                                'The required deposit was computed by the contract, not by this page.',
                             url: `/artwork/${artworkId}`
                         });
+                    } catch (error) {
+                        return walletFailure(error, { artwork_id: artworkId, bid_eth: amount, url: `/artwork/${artworkId}` });
                     }
-                    writePermission(PERMISSION_WALLET);
-                }
-
-                try {
-                    const transactionHash = await contracts.placeBid(artworkId, amount, { idType: 'artwork' });
-                    return JSON.stringify({
-                        submitted: true,
-                        approved_by: 'the person, in their own wallet',
-                        artwork_id: artworkId,
-                        bid_eth: amount,
-                        transaction_hash: transactionHash || null,
-                        note: 'The wallet asked the person to approve this transaction and they did. ' +
-                            'The required deposit was computed by the contract, not by this page.',
-                        url: `/artwork/${artworkId}`
-                    });
-                } catch (error) {
-                    // A rejected signature is the ordinary case, not a fault.
-                    return JSON.stringify({
-                        submitted: false,
-                        artwork_id: artworkId,
-                        bid_eth: amount,
-                        reason: (error && error.message) || 'The wallet did not complete the transaction.',
-                        url: `/artwork/${artworkId}`
-                    });
-                }
+                });
             }
         };
 
@@ -694,7 +785,11 @@
                     // ArtSoulNFT assigns the first token id 1, so a zero here is
                     // the projection saying "no token" - never token zero.
                     token_id: (normalizeId(card.token_id) || '0') === '0' ? null : normalizeId(card.token_id),
-                    resale_price_eth: text(card.listing_price || card.resale_price) || null,
+                    // The projection calls the listing price `sale_price`. The
+                    // names read before were never present, so this was always null.
+                    resale_price_eth: text(card.status) === 'for_sale'
+                        ? (text(card.sale_price || card.listing_price || card.resale_price) || null)
+                        : null,
                     bid_count: Array.isArray(card.bids) ? card.bids.length : null,
                     settlement_deadline: card.settlement_deadline || null,
                     // Discovery signals only. Canon keeps them away from price,
@@ -792,41 +887,30 @@
                     });
                 }
 
-                if (readPermission() !== PERMISSION_WALLET) {
-                    const granted = confirmAction(
-                        'Allow this page AI agent to open your wallet on ArtSoul?\n\n' +
-                        `Next: finalize the expired auction on artwork ${artworkId}. This pays you nothing and ` +
-                        'costs only gas.\n\nYour wallet will still ask you to approve every transaction.'
+                return withWalletAction(async () => {
+                    const refusal = authorizeWalletAction(
+                        `finalize the expired auction on artwork ${artworkId}. This pays you nothing and costs only gas.`,
+                        false
                     );
-                    if (!granted) {
+                    if (refusal) {
+                        return JSON.stringify({ submitted: false, reason: refusal, url: `/artwork/${artworkId}` });
+                    }
+
+                    try {
+                        const transactionHash = await contracts.endAuction(artworkId, { idType: 'artwork' });
                         return JSON.stringify({
-                            submitted: false,
-                            reason: 'The person did not grant the agent permission to open the wallet.',
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            artwork_id: artworkId,
+                            transaction_hash: transactionHash || null,
+                            note: 'With bids, settlement opens for the winner. With none, nothing is minted and the ' +
+                                'artwork becomes available for a new auction.',
                             url: `/artwork/${artworkId}`
                         });
+                    } catch (error) {
+                        return walletFailure(error, { artwork_id: artworkId, url: `/artwork/${artworkId}` });
                     }
-                    writePermission(PERMISSION_WALLET);
-                }
-
-                try {
-                    const transactionHash = await contracts.endAuction(artworkId, { idType: 'artwork' });
-                    return JSON.stringify({
-                        submitted: true,
-                        approved_by: 'the person, in their own wallet',
-                        artwork_id: artworkId,
-                        transaction_hash: transactionHash || null,
-                        note: 'With bids, settlement opens for the winner. With none, nothing is minted and the ' +
-                            'artwork becomes available for a new auction.',
-                        url: `/artwork/${artworkId}`
-                    });
-                } catch (error) {
-                    return JSON.stringify({
-                        submitted: false,
-                        artwork_id: artworkId,
-                        reason: (error && error.message) || 'The wallet did not complete the transaction.',
-                        url: `/artwork/${artworkId}`
-                    });
-                }
+                });
             }
         };
 
@@ -866,6 +950,563 @@
             }
         };
 
+
+        const NO_WALLET = 'No wallet is connected on this page. The person needs to connect a wallet on Base Sepolia first.';
+        const titleOf = card => text(card.title) || 'Untitled';
+        const artworkUrl = artworkId => `/artwork/${artworkId}`;
+
+        function requireArtworkId(input) {
+            return normalizeId((input || {}).artwork_id);
+        }
+
+        /**
+         * Everything the connected wallet has on ArtSoul, in one answer, with the
+         * actions that are waiting on it. Reading is free and needs no grant.
+         */
+        const getMyActivity = {
+            name: 'get_my_activity',
+            description:
+                'What the connected wallet has on ArtSoul: works it created, NFTs it owns, auctions it is leading, ' +
+                'settlements it has won and must pay with their deadlines, its resale listings, funds waiting to be ' +
+                'withdrawn, and the next actions that need it, each naming the tool that performs it. Read-only.',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => {
+                const address = await connectedAddress();
+                if (!address) return JSON.stringify({ connected: false, reason: NO_WALLET });
+
+                const at = now();
+                const cards = await listCards('');
+                const brief = card => summarize(card);
+                const created = cards.filter(card => sameAddress(card.creator, address));
+                const owned = cards.filter(card => card.minted === true && sameAddress(card.current_owner_address, address));
+                const leading = cards.filter(card =>
+                    ['auction', 'awaiting_end'].includes(text(card.status)) && sameAddress(card.current_bidder, address));
+                const won = cards.filter(card =>
+                    text(card.status) === 'settlement_pending' && sameAddress(card.current_bidder, address));
+                const listings = owned.filter(card => text(card.status) === 'for_sale');
+
+                const needs = [];
+                for (const card of won) {
+                    const deadline = timestampMs(card.settlement_deadline);
+                    if (!deadline || at <= deadline) {
+                        needs.push({ tool: 'complete_settlement', artwork_id: normalizeId(card.artwork_id),
+                            why: `You won "${titleOf(card)}". Pay before the settlement window closes or the deposit is lost.` });
+                    }
+                }
+                for (const card of leading.filter(entry => text(entry.status) === 'awaiting_end')) {
+                    needs.push({ tool: 'end_expired_auction', artwork_id: normalizeId(card.artwork_id),
+                        why: `Your bid on "${titleOf(card)}" is winning and the auction is over. Ending it opens your settlement window.` });
+                }
+                for (const card of created) {
+                    const status = text(card.status);
+                    const deadline = timestampMs(card.settlement_deadline);
+                    if (status === 'awaiting_end') {
+                        needs.push({ tool: 'end_expired_auction', artwork_id: normalizeId(card.artwork_id),
+                            why: `The auction on your work "${titleOf(card)}" is over and nobody has ended it.` });
+                    } else if (status === 'settlement_pending' && deadline && at > deadline + SETTLEMENT_CLOCK_MARGIN_MS) {
+                        needs.push({ tool: 'close_expired_settlement', artwork_id: normalizeId(card.artwork_id),
+                            why: `The winner of "${titleOf(card)}" did not pay in time. Closing it lets you auction the work again.` });
+                    } else if (card.minted !== true && ['registered', 'defaulted'].includes(status)) {
+                        needs.push({ tool: 'start_auction', artwork_id: normalizeId(card.artwork_id),
+                            why: `"${titleOf(card)}" has no auction running.` });
+                    }
+                }
+
+                let pendingWithdrawal = null;
+                const contracts = readContracts();
+                if (contracts && typeof contracts.getPendingWithdrawal === 'function' &&
+                    (typeof contracts.isReady !== 'function' || contracts.isReady())) {
+                    try {
+                        pendingWithdrawal = text(await contracts.getPendingWithdrawal(address)) || null;
+                    } catch {
+                        pendingWithdrawal = null;
+                    }
+                }
+                const pendingWei = parseEthWei(pendingWithdrawal);
+                if (pendingWei && pendingWei > 0n) {
+                    needs.push({ tool: 'withdraw_pending_funds', artwork_id: null,
+                        why: `${pendingWithdrawal} ETH is waiting for your wallet to withdraw it.` });
+                }
+
+                const capped = list => ({ count: list.length, items: list.slice(0, MAX_RESULTS).map(brief) });
+                return JSON.stringify({
+                    connected: true,
+                    address,
+                    chain: 'Base Sepolia',
+                    as_of: await indexerStatus(),
+                    created: capped(created),
+                    owned: capped(owned),
+                    leading_bids: capped(leading),
+                    won_awaiting_payment: {
+                        count: won.length,
+                        items: won.slice(0, MAX_RESULTS).map(card => {
+                            const deadline = timestampMs(card.settlement_deadline);
+                            return {
+                                ...brief(card),
+                                settlement_deadline: deadline ? new Date(deadline).toISOString() : null,
+                                window_open: deadline ? at <= deadline : null,
+                                hours_remaining: deadline ? Math.round(((deadline - at) / 3600000) * 100) / 100 : null
+                            };
+                        })
+                    },
+                    resale_listings: {
+                        count: listings.length,
+                        items: listings.slice(0, MAX_RESULTS).map(card => ({ ...brief(card), resale_price_eth: text(card.sale_price) || null }))
+                    },
+                    pending_withdrawal_eth: pendingWithdrawal,
+                    needs_attention: needs.slice(0, MAX_RESULTS),
+                    note: pendingWithdrawal === null
+                        ? 'The withdrawable balance is read from the contract once the wallet layer is ready.'
+                        : null
+                });
+            }
+        };
+
+        const completeSettlement = {
+            name: 'complete_settlement',
+            description:
+                'Pay for an ArtSoul auction the connected wallet won, which mints the NFT to that wallet. Opens the ' +
+                'wallet with the remaining payment the contract computes. Only the winner can settle, and only while ' +
+                'the settlement window is open. Confirmed by the person on the page and in their wallet.',
+            inputSchema: {
+                type: 'object',
+                properties: { artwork_id: { type: 'string', description: 'The artwork number shown in its page URL.' } },
+                required: ['artwork_id']
+            },
+            execute: async (input) => {
+                const artworkId = requireArtworkId(input);
+                if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
+                const url = artworkUrl(artworkId);
+
+                const contracts = await walletReadyFor('completeSettlement');
+                if (!contracts) return JSON.stringify({ submitted: false, reason: NO_WALLET, url });
+
+                const card = await lookupCard(artworkId);
+                if (!card) return JSON.stringify({ error: `No published artwork ${artworkId} on Base Sepolia.` });
+                const status = text(card.status);
+                if (status !== 'settlement_pending') {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: `Artwork ${artworkId} is "${status}", so there is no settlement waiting for payment.` });
+                }
+
+                // ArtSoulCore reverts NotAuctionWinner and SettlementExpired. Both
+                // are answerable here, before the person pays gas to learn them.
+                const address = text(readWalletAddress());
+                if (address && !sameAddress(card.current_bidder, address)) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: 'Only the winning bidder can complete this settlement, and the connected wallet did not win it.' });
+                }
+                const deadline = timestampMs(card.settlement_deadline);
+                if (deadline && now() > deadline) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: `The settlement window closed at ${new Date(deadline).toISOString()}. The contract no longer ` +
+                            'accepts payment; the settlement can only be closed as defaulted.' });
+                }
+
+                return withWalletAction(async () => {
+                    const refusal = authorizeWalletAction(
+                        `complete the settlement for "${titleOf(card)}" (artwork ${artworkId}), won with a bid of ` +
+                        `${text(card.current_bid) || 'unknown'} ETH. Your wallet shows the remaining payment, computed by ` +
+                        'the contract from the bid and the deposit already locked. Settlement mints the NFT to you.',
+                        true
+                    );
+                    if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
+                    try {
+                        const transactionHash = await contracts.completeSettlement(artworkId, { idType: 'artwork' });
+                        return JSON.stringify({
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            artwork_id: artworkId,
+                            transaction_hash: transactionHash || null,
+                            note: 'Once this confirms, the NFT is minted to the winner and becomes its First Collector.',
+                            url
+                        });
+                    } catch (error) {
+                        return walletFailure(error, { artwork_id: artworkId, url });
+                    }
+                });
+            }
+        };
+
+        const closeExpiredSettlement = {
+            name: 'close_expired_settlement',
+            description:
+                'Close an ArtSoul settlement whose payment window has passed without payment, recording the default ' +
+                'on-chain so the creator can auction the work again. Anyone may do this; the caller receives nothing ' +
+                'and pays only gas. Requires a connected wallet and the agent wallet permission.',
+            inputSchema: {
+                type: 'object',
+                properties: { artwork_id: { type: 'string', description: 'The artwork number shown in its page URL.' } },
+                required: ['artwork_id']
+            },
+            execute: async (input) => {
+                const artworkId = requireArtworkId(input);
+                if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
+                const url = artworkUrl(artworkId);
+
+                const contracts = await walletReadyFor('claimSettlementDefault');
+                if (!contracts) return JSON.stringify({ submitted: false, reason: NO_WALLET, url });
+
+                const card = await lookupCard(artworkId);
+                if (!card) return JSON.stringify({ error: `No published artwork ${artworkId} on Base Sepolia.` });
+                const status = text(card.status);
+                if (status !== 'settlement_pending') {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: `Artwork ${artworkId} is "${status}", so there is no settlement to close.` });
+                }
+                // SettlementStillActive otherwise. The same clock margin as the page.
+                const deadline = timestampMs(card.settlement_deadline);
+                if (!deadline || now() <= deadline + SETTLEMENT_CLOCK_MARGIN_MS) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: deadline
+                            ? `The winner can still pay until ${new Date(deadline).toISOString()}. The settlement cannot be closed before then.`
+                            : 'The settlement deadline could not be read, so closing it is not offered.' });
+                }
+
+                return withWalletAction(async () => {
+                    const refusal = authorizeWalletAction(
+                        `close the expired settlement on artwork ${artworkId}, "${titleOf(card)}". This pays you nothing and costs only gas.`,
+                        false
+                    );
+                    if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
+                    try {
+                        const transactionHash = await contracts.claimSettlementDefault(artworkId, { idType: 'artwork' });
+                        return JSON.stringify({
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            artwork_id: artworkId,
+                            transaction_hash: transactionHash || null,
+                            note: 'The locked deposit is split between the artist and the platform, nothing is minted, and ' +
+                                'the creator can start a new auction.',
+                            url
+                        });
+                    } catch (error) {
+                        return walletFailure(error, { artwork_id: artworkId, url });
+                    }
+                });
+            }
+        };
+
+        const listForResale = {
+            name: 'list_for_resale',
+            description:
+                'List an ArtSoul NFT the connected wallet owns for resale at a price in ETH, at or above its canonical ' +
+                'floor. The wallet may ask twice: once to let ArtSoul transfer the NFT when it sells, once for the ' +
+                'listing. Confirmed by the person on the page and in their wallet.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    artwork_id: { type: 'string', description: 'The artwork number shown in its page URL.' },
+                    price_eth: { type: 'string', description: 'The asking price in ETH.' }
+                },
+                required: ['artwork_id', 'price_eth']
+            },
+            execute: async (input) => {
+                const args = input || {};
+                const artworkId = requireArtworkId(args);
+                if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
+                const url = artworkUrl(artworkId);
+                const price = text(args.price_eth);
+                const priceWei = parseEthWei(price);
+                if (!priceWei || priceWei <= 0n) {
+                    return JSON.stringify({ submitted: false, url, reason: 'price_eth must be a positive amount in ETH, like 0.25.' });
+                }
+
+                const contracts = await walletReadyFor('listResale');
+                if (!contracts) return JSON.stringify({ submitted: false, reason: NO_WALLET, url });
+
+                const card = await lookupCard(artworkId);
+                if (!card) return JSON.stringify({ error: `No published artwork ${artworkId} on Base Sepolia.` });
+                if (card.minted !== true) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: `Artwork ${artworkId} has not been minted, so there is no NFT to resell.` });
+                }
+                const address = text(readWalletAddress());
+                if (address && !sameAddress(card.current_owner_address, address)) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: 'Only the current owner can list this NFT, and the connected wallet does not own it.' });
+                }
+                // PriceBelowCanonicalFloor otherwise. The floor is read from the
+                // projection, which reads it from the chain; it is never a figure
+                // this file carries.
+                const floor = text(card.canonical_floor);
+                const floorWei = parseEthWei(floor);
+                if (floorWei && priceWei < floorWei) {
+                    return JSON.stringify({ submitted: false, url, canonical_floor_eth: floor,
+                        reason: `${price} ETH is below this work's canonical floor of ${floor} ETH, and the contract refuses listings below the floor.` });
+                }
+
+                return withWalletAction(async () => {
+                    const replacing = text(card.status) === 'for_sale' && text(card.sale_price)
+                        ? ` This replaces the current listing at ${text(card.sale_price)} ETH.`
+                        : '';
+                    const refusal = authorizeWalletAction(
+                        `list "${titleOf(card)}" (artwork ${artworkId}) for resale at ${price} ETH. Canonical floor: ` +
+                        `${floor || 'unknown'} ETH.${replacing}`,
+                        true
+                    );
+                    if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
+                    try {
+                        const transactionHash = await contracts.listResale(artworkId, price, undefined, { idType: 'artwork' });
+                        return JSON.stringify({
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            artwork_id: artworkId,
+                            price_eth: price,
+                            transaction_hash: transactionHash || null,
+                            note: 'The listing is live once this confirms. Creator, First Collector and Owner stay on the provenance record.',
+                            url
+                        });
+                    } catch (error) {
+                        return walletFailure(error, { artwork_id: artworkId, price_eth: price, url });
+                    }
+                });
+            }
+        };
+
+        const buyResaleListing = {
+            name: 'buy_resale_listing',
+            description:
+                'Buy an ArtSoul NFT listed for resale, at the price the contract holds for the listing right now. Pass ' +
+                'the price the person agreed to as expected_price_eth, and the purchase is refused if the listing has ' +
+                'changed since. Confirmed by the person on the page and in their wallet.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    artwork_id: { type: 'string', description: 'The artwork number shown in its page URL.' },
+                    expected_price_eth: {
+                        type: 'string',
+                        description: 'The price in ETH the person agreed to. A different live price stops the purchase.'
+                    }
+                },
+                required: ['artwork_id']
+            },
+            execute: async (input) => {
+                const args = input || {};
+                const artworkId = requireArtworkId(args);
+                if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
+                const url = artworkUrl(artworkId);
+
+                const contracts = await walletReadyFor('buyResale');
+                if (!contracts || typeof contracts.getResaleListing !== 'function') {
+                    return JSON.stringify({ submitted: false, reason: NO_WALLET, url });
+                }
+
+                const card = await lookupCard(artworkId);
+                if (!card) return JSON.stringify({ error: `No published artwork ${artworkId} on Base Sepolia.` });
+                if (text(card.status) !== 'for_sale') {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: `Artwork ${artworkId} is "${text(card.status)}", so it is not listed for resale.` });
+                }
+
+                // The price comes from the contract, never from the conversation.
+                // buyResale sends exactly this value, so a price the agent
+                // misremembered cannot become the price paid.
+                let listing;
+                try {
+                    listing = await contracts.getResaleListing(artworkId, { idType: 'artwork' });
+                } catch {
+                    listing = null;
+                }
+                if (!listing || listing.active !== true || !parseEthWei(listing.price)) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: 'The listing could not be confirmed on the contract, so nothing was bought.' });
+                }
+                const address = text(readWalletAddress());
+                if (address && (sameAddress(listing.seller, address) || sameAddress(card.current_owner_address, address))) {
+                    return JSON.stringify({ submitted: false, url, reason: 'The connected wallet is the seller of this listing.' });
+                }
+                if (text(args.expected_price_eth)) {
+                    const expected = parseEthWei(args.expected_price_eth);
+                    if (expected === null || expected !== parseEthWei(listing.price)) {
+                        return JSON.stringify({ submitted: false, url, live_price_eth: text(listing.price),
+                            reason: `The listing price is ${text(listing.price)} ETH, not ${text(args.expected_price_eth)} ETH. Nothing was bought.` });
+                    }
+                }
+
+                return withWalletAction(async () => {
+                    const refusal = authorizeWalletAction(
+                        `buy "${titleOf(card)}" (artwork ${artworkId}) for ${text(listing.price)} ETH, the price the contract holds for this listing now.`,
+                        true
+                    );
+                    if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
+                    try {
+                        const transactionHash = await contracts.buyResale(artworkId, text(listing.price), { idType: 'artwork' });
+                        return JSON.stringify({
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            artwork_id: artworkId,
+                            price_eth: text(listing.price),
+                            transaction_hash: transactionHash || null,
+                            note: 'The NFT transfers to the buyer once this confirms. The creator royalty and platform fee are paid by the contract.',
+                            url
+                        });
+                    } catch (error) {
+                        return walletFailure(error, { artwork_id: artworkId, url });
+                    }
+                });
+            }
+        };
+
+        const withdrawPendingFunds = {
+            name: 'withdraw_pending_funds',
+            description:
+                'Withdraw the ETH ArtSoul holds for the connected wallet - sale proceeds, royalties and returned ' +
+                'deposits - to that same wallet. Requires a connected wallet and the agent wallet permission.',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => {
+                const contracts = await walletReadyFor('withdraw');
+                const address = await connectedAddress();
+                if (!contracts || !address || typeof contracts.getPendingWithdrawal !== 'function') {
+                    return JSON.stringify({ submitted: false, reason: NO_WALLET });
+                }
+
+                let amount;
+                try {
+                    amount = text(await contracts.getPendingWithdrawal(address));
+                } catch {
+                    return JSON.stringify({ submitted: false, reason: 'The withdrawable balance could not be read from the contract.' });
+                }
+                const amountWei = parseEthWei(amount);
+                if (!amountWei || amountWei <= 0n) {
+                    return JSON.stringify({ submitted: false, pending_withdrawal_eth: amount || '0', reason: 'There is nothing to withdraw.' });
+                }
+
+                return withWalletAction(async () => {
+                    // Money comes back to the person's own wallet, and the wallet
+                    // shows nothing it could misrepresent, so the grant is enough.
+                    const refusal = authorizeWalletAction(
+                        `withdraw ${amount} ETH that ArtSoul holds for this wallet, back to the same wallet.`,
+                        false
+                    );
+                    if (refusal) return JSON.stringify({ submitted: false, reason: refusal });
+                    try {
+                        const transactionHash = await contracts.withdraw();
+                        return JSON.stringify({
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            amount_eth: amount,
+                            transaction_hash: transactionHash || null
+                        });
+                    } catch (error) {
+                        return walletFailure(error, { amount_eth: amount });
+                    }
+                });
+            }
+        };
+
+        const startAuction = {
+            name: 'start_auction',
+            description:
+                'Start a primary auction for an unminted ArtSoul work the connected wallet created, with a starting ' +
+                'price in ETH and a duration in hours. The contract accepts only its fixed durations, and this tool ' +
+                'reads them from the chain. Confirmed by the person on the page and in their wallet.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    artwork_id: { type: 'string', description: 'The artwork number shown in its page URL.' },
+                    start_price_eth: { type: 'string', description: 'The starting price in ETH.' },
+                    duration_hours: { type: 'number', description: 'Auction length in hours, one the contract accepts.' }
+                },
+                required: ['artwork_id', 'start_price_eth', 'duration_hours']
+            },
+            execute: async (input) => {
+                const args = input || {};
+                const artworkId = requireArtworkId(args);
+                if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
+                const url = artworkUrl(artworkId);
+                const price = text(args.start_price_eth);
+                const priceWei = parseEthWei(price);
+                if (!priceWei || priceWei <= 0n) {
+                    return JSON.stringify({ submitted: false, url, reason: 'start_price_eth must be a positive amount in ETH.' });
+                }
+
+                const contracts = await walletReadyFor('createAuction');
+                if (!contracts) return JSON.stringify({ submitted: false, reason: NO_WALLET, url });
+
+                const card = await lookupCard(artworkId);
+                if (!card) return JSON.stringify({ error: `No published artwork ${artworkId} on Base Sepolia.` });
+                const status = text(card.status);
+                if (card.minted === true || !['registered', 'defaulted'].includes(status)) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: status === 'awaiting_end'
+                            ? `The previous auction on artwork ${artworkId} is over but has not been ended. End it first.`
+                            : `Artwork ${artworkId} is "${status}", so a new auction cannot start on it.` });
+                }
+                const address = text(readWalletAddress());
+                if (address && !sameAddress(card.creator, address)) {
+                    return JSON.stringify({ submitted: false, url, reason: 'Only the creator can start an auction for this work.' });
+                }
+
+                // The permitted durations are contract constants. Unreadable
+                // means unverifiable, and an unverifiable duration is refused
+                // rather than guessed.
+                const constants = await auctionConstants();
+                const allowed = constants && Array.isArray(constants.allowedDurations)
+                    ? constants.allowedDurations.map(Number).filter(Number.isFinite)
+                    : [];
+                if (!allowed.length) {
+                    return JSON.stringify({ submitted: false, url,
+                        reason: 'The allowed auction durations could not be read from the contract, so the auction was not started.' });
+                }
+                const seconds = Math.round(Number(args.duration_hours) * 3600);
+                if (!allowed.includes(seconds)) {
+                    return JSON.stringify({ submitted: false, url, allowed_duration_hours: allowed.map(value => value / 3600),
+                        reason: 'The contract does not accept that duration.' });
+                }
+
+                return withWalletAction(async () => {
+                    const refusal = authorizeWalletAction(
+                        `start an auction for "${titleOf(card)}" (artwork ${artworkId}) at a starting price of ${price} ETH, ` +
+                        `running ${seconds / 3600} hours.`,
+                        true
+                    );
+                    if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
+                    try {
+                        const transactionHash = await contracts.createAuction(artworkId, price, seconds);
+                        return JSON.stringify({
+                            submitted: true,
+                            approved_by: 'the person, in their own wallet',
+                            artwork_id: artworkId,
+                            start_price_eth: price,
+                            duration_hours: seconds / 3600,
+                            transaction_hash: transactionHash || null,
+                            url
+                        });
+                    } catch (error) {
+                        return walletFailure(error, { artwork_id: artworkId, url });
+                    }
+                });
+            }
+        };
+
+        /**
+         * The agent may lower its own access, never raise it. "Stop touching my
+         * wallet" has to be something a person can say and have obeyed at once.
+         */
+        const revokeWalletAccess = {
+            name: 'revoke_wallet_access',
+            description:
+                'Take away this page AI agent\'s ability to open the wallet in this browser. Reading continues; any ' +
+                'wallet action needs the person to grant access again with their own click.',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => {
+                try {
+                    if (storage && typeof storage.removeItem === 'function') storage.removeItem(PERMISSION_KEY);
+                } catch {
+                    // Reported truthfully below.
+                }
+                const level = readPermission();
+                return JSON.stringify({
+                    revoked: level !== PERMISSION_WALLET,
+                    level,
+                    note: level !== PERMISSION_WALLET
+                        ? 'The agent can no longer open the wallet from this browser.'
+                        : 'Site data could not be changed in this browser, so the access could not be removed here.'
+                });
+            }
+        };
+
         return [
             searchArtworks,
             findActiveAuctions,
@@ -873,10 +1514,18 @@
             getAuctionState,
             getArtworkProvenance,
             explainSettlement,
+            getMyActivity,
             openArtwork,
             prepareBid,
             placeBid,
             endExpiredAuction,
+            completeSettlement,
+            closeExpiredSettlement,
+            startAuction,
+            listForResale,
+            buyResaleListing,
+            withdrawPendingFunds,
+            revokeWalletAccess,
             prepareArtworkRegistration
         ];
     }

@@ -133,8 +133,12 @@ test('the page and the cards wait out the same margin', () => {
   assert.equal(margin(card), margin(page), 'a card must not call a window closed that the page would still offer to pay');
 });
 
-test('the agent layer did not gain a write', () => {
-  // webmcp-tools.js pins which tools may reach the chain. Closing a settlement
-  // from an agent is a separate decision, not a side effect of this row.
-  assert.doesNotMatch(webmcp, /claimSettlementDefault/);
+test('the agent closes a settlement only through its own reviewed tool', () => {
+  // B-11 deliberately left the agent layer alone. B-12 then added
+  // close_expired_settlement as a reviewed write, behind the wallet gate and the
+  // same clock margin; it must not appear anywhere else in that file.
+  assert.equal((webmcp.match(/claimSettlementDefault\(/g) || []).length, 1);
+  const tool = webmcp.slice(webmcp.indexOf("name: 'close_expired_settlement'"));
+  assert.match(tool.slice(0, 3000), /SETTLEMENT_CLOCK_MARGIN_MS/);
+  assert.match(tool.slice(0, 3000), /authorizeWalletAction\(/);
 });

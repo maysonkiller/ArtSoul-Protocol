@@ -18,7 +18,7 @@ tools hand over those answers, and nothing else.
 
 ## The two rules the layer does not break
 
-**The agent never signs.** Reading is fully automatic. `place_bid` goes as far as
+**The agent never signs.** Reading is fully automatic. Every write goes as far as
 a website can: it opens the person's wallet with the transaction, and the wallet
 asks them to approve it. That last click cannot be delegated from a page — no
 website can make a wallet approve anything — and it is where the boundary
@@ -40,6 +40,33 @@ independent audit.
 report state, open the relevant page and stop, and neither can return a
 transaction.
 
+### How a write stays safe (B-12)
+
+Every tool that opens the wallet passes through one gate, and the rules are the
+same for all of them:
+
+1. **Refuse what the contract would revert, before the wallet opens.** Not the
+   winner, a window already closed, a price below the floor, a listing that is
+   no longer active, a duration the contract does not accept. Nobody pays gas to
+   learn a rule the page already knew.
+2. **Amounts come from the chain, never from the conversation.** A purchase pays
+   the price the contract holds for the listing now; a settlement pays what the
+   contract computes; auction durations are read from the contract. Amounts are
+   compared as integers of wei, so exactly the floor passes and one wei under
+   does not.
+3. **An amount or a price is confirmed on the page every time.** The wallet
+   shows the value it sends, not the figures inside the transaction data: a bid
+   amount, a resale price and a starting price are all invisible there. So even
+   after the grant, the page names the work, its number and the figure, and a
+   person has to accept it. Actions that move nothing out of the person's wallet
+   - ending an auction, closing an expired settlement, withdrawing their own
+   funds - rely on the grant and the wallet approval alone.
+4. **One wallet action at a time.** A retried command or a voice command heard
+   twice cannot stack a second approval behind the first.
+5. **The agent can lower its own access and never raise it.**
+   `revoke_wallet_access` removes the grant; nothing restores it but the person's
+   click.
+
 **No economics live in the layer.** Deposit size, minimum bid increment, auction
 durations and the settlement window are contract constants on Base. When the
 wallet layer is initialized they are read from the chain; when it is not, the
@@ -60,8 +87,16 @@ economics.
 | `explain_settlement` | The publish → auction → settlement → mint lifecycle, and where one work sits in it | `/api/public/artworks` |
 | `open_artwork` | Opens an artwork page so the person can see it; navigates only | `/api/public/artworks` |
 | `prepare_bid` | Live auction state, then opens the auction for the person to sign | `/api/public/artworks` (+ contract constants when available) |
+| `get_my_activity` | What the connected wallet created, owns, is leading, has won and must pay, has listed and can withdraw, and which tool handles each waiting action | `/api/public/artworks` (+ withdrawable balance from the contract) |
 | `place_bid` | Opens the connected wallet with the bid, for the person to approve | `ArtSoulContracts.placeBid` (contract computes the deposit) |
 | `end_expired_auction` | Opens the wallet to finalize an auction whose time has passed | `ArtSoulContracts.endAuction` |
+| `complete_settlement` | The winner pays for a won auction, which mints the NFT | `ArtSoulContracts.completeSettlement` (contract computes the payment) |
+| `close_expired_settlement` | Closes a settlement nobody paid in time, so the creator can auction again | `ArtSoulContracts.claimSettlementDefault` |
+| `start_auction` | A creator starts a primary auction on an unminted work | `ArtSoulContracts.createAuction` (durations read from the contract) |
+| `list_for_resale` | An owner lists an NFT at or above its canonical floor | `ArtSoulContracts.listResale` |
+| `buy_resale_listing` | Buys a listed NFT at the price the contract holds now | `ArtSoulContracts.getResaleListing`, `buyResale` |
+| `withdraw_pending_funds` | Withdraws proceeds, royalties and returned deposits to the same wallet | `ArtSoulContracts.getPendingWithdrawal`, `withdraw` |
+| `revoke_wallet_access` | Takes away the agent's wallet access in this browser | — |
 | `prepare_artwork_registration` | Validates details, then opens the publish page for the person to sign | — |
 
 No new API route was added. Every tool reads an endpoint the product already
@@ -109,6 +144,13 @@ cover, for example:
   stops; the approval is yours.
 - "This auction has expired, can you finalize it?" — anyone may finalize an
   expired auction, and the caller receives nothing for it.
+- "What do I have on ArtSoul, and what needs me?" — works, NFTs, leading bids,
+  won auctions to pay, listings, withdrawable funds, and the tool for each.
+- "Pay for the auction I won." / "List artwork 19 for 0.002." / "Buy artwork 19."
+  — each names the work and the figure on the page before the wallet opens.
+- "Put artwork 31 up for auction for 36 hours at 0.005." — the duration is
+  checked against what the contract accepts.
+- "Withdraw my money." / "Stop using my wallet."
 
 Reading works with no wallet. The two `prepare_` tools end at a page where the
 person needs a wallet on Base Sepolia; testnet ETH comes from any Base Sepolia
@@ -123,3 +165,10 @@ malformed artwork id before any request is made, the refusal to bid on a closed
 auction, the absence of hardcoded economics, and Base Sepolia as the only network
 the layer will read. It also pins which tools may reach the chain, so a write
 cannot be added to this layer without a test noticing.
+
+`test/webmcp-agent-actions.test.cjs` covers the B-12 writes: every refusal the
+contract would otherwise revert, the price read from the contract rather than
+the conversation, wei-exact floor comparison, the per-action page confirmation,
+the one-action lock, revoking access, and the absence of copied durations and
+splits. Its safety assertions were checked by removing each guard and watching
+the test fail.
