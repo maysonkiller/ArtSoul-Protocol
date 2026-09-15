@@ -887,6 +887,22 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             // exactly that while its own provenance timeline said "Resale
             // completed - Owner" the creator. Profile > Owned NFTs already
             // counted the buyback (issue #121); this page did not.
+            // B-11: a settlement whose 24h window has passed can no longer be paid
+            // - settleAuction reverts with SettlementExpired - and it can only be
+            // closed by claimSettlementDefault, which the contract lets anyone call.
+            // The page had no way to call it, and kept offering the winner a
+            // payment the chain would refuse.
+            //
+            // The chain decides with block.timestamp and the page with the
+            // visitor's clock, and those can differ by seconds. Waiting out a
+            // margin on this side means the page never offers a default the
+            // contract would still reject as SettlementStillActive.
+            const SETTLEMENT_CLOCK_MARGIN_MS = 60 * 1000;
+            function isSettlementWindowClosed(deadlineMs, nowMs = Date.now()) {
+                const deadline = Number(deadlineMs);
+                return Number.isFinite(deadline) && deadline > 0 && nowMs > deadline + SETTLEMENT_CLOCK_MARGIN_MS;
+            }
+
             function shouldShowOwnerRole({ ownerAddress, creatorAddress, firstCollectorAddress, winnerAddress, minted, awaitingPayment }) {
                 if (!ownerAddress || isZeroAddress(ownerAddress)) return false;
                 if (!minted && isSameAddress(ownerAddress, creatorAddress)) return false;
@@ -2348,6 +2364,50 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 }
             }
 
+            async function handleClaimSettlementDefault() {
+                if (!beginTransactionAction('settlement-default')) return;
+
+                try {
+                    await claimSettlementDefaultOnce();
+                } finally {
+                    finishTransactionAction('settlement-default');
+                }
+            }
+
+            async function claimSettlementDefaultOnce() {
+                if (!ensureArtworkWriteEnabled()) return;
+                const confirmed = await confirmAuctionAction(
+                    'Close this expired settlement? The winner did not complete payment within 24 hours. Closing it records the default on-chain: the locked deposit is split between the artist and the platform, the artwork stays unminted, and the creator can auction it again.',
+                    'Close Expired Settlement'
+                );
+                if (!confirmed) return;
+                const auctionActionId = getAuctionActionId();
+                if (!auctionActionId) {
+                    alert('Auction ID is unavailable');
+                    return;
+                }
+
+                try {
+                    let provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider) {
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
+                    }
+                    if (!provider) return;
+
+                    await window.ArtSoulContracts.init(provider);
+                    await window.ArtSoulContracts.claimSettlementDefault(auctionActionId, { idType: 'auction' });
+
+                    alert('Settlement closed as defaulted. The creator can start a new auction after public state updates.');
+                    loadArtwork();
+                } catch (error) {
+                    console.error('Close expired settlement failed:', error);
+                    const message = getTransactionErrorMessage(error, 'The expired settlement could not be closed. Please try again.');
+                    console.log('Close expired settlement error shown to user:', message);
+                    alert(`Settlement could not be closed: ${message}`);
+                }
+            }
+
             async function handleVote() {
                 // Check if already voted
                 if (userVote) {
@@ -2851,6 +2911,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const creatorName = getProfileDisplayName(creatorProfile, artwork.creator_id || artwork.creator);
             const mintedArtwork = isArtworkMinted(artwork) || auction?.state === 'SOLD';
             const awaitingPayment = auction?.state === 'WAITING_PAYMENT';
+            const settlementExpired = awaitingPayment && isSettlementWindowClosed(settlementDeadlineMs);
             const liveAuction = Boolean(auction && !auctionEnded && !awaitingPayment && !mintedArtwork);
             const resaleStatus = String(artwork.status || artwork.listing_status || artwork.resale_status || '').toLowerCase();
             const listedForResale = mintedArtwork &&
@@ -2884,7 +2945,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const tokenExplorerUrl = mintedArtwork ? getTokenExplorerUrl(artwork) : '';
             const statusForState = mintedArtwork
                 ? { key: 'sold', label: 'Sold' }
-                : awaitingPayment
+                : settlementExpired
+                    ? { key: 'settlement_expired', label: 'Payment window closed' }
+                    : awaitingPayment
                     ? { key: 'awaiting_settlement', label: 'Awaiting payment' }
                     : liveAuction
                         ? { key: 'live', label: 'Live' }
@@ -3727,6 +3790,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                     <div className="text-xs opacity-70 text-center mt-2">
                                                         Deadline: {new Date(settlementDeadlineMs).toLocaleString()}
                                                     </div>
+                                                    {settlementExpired && (
+                                                        <p className="text-xs opacity-70 text-center mt-2" role="status">
+                                                            Payment is no longer possible. Until the default is recorded, the artwork cannot be auctioned again.
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
 
@@ -3873,6 +3941,24 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </div>
                                         )}
 
+                                        {/* Close Expired Settlement (for anyone after the 24h window passes) */}
+                                        {artworkWriteEnabled && settlementExpired && (
+                                            <div className="artwork-auction-next-step mt-4">
+                                                <p>The winner did not complete payment in time. Record the default on-chain so the creator can auction this artwork again.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClaimSettlementDefault}
+                                                    className="btn-secondary w-full artwork-page-primary-action"
+                                                    disabled={isTransactionActionPending('settlement-default')}
+                                                    aria-busy={isTransactionActionPending('settlement-default')}
+                                                >
+                                                    {isTransactionActionPending('settlement-default')
+                                                        ? <TransactionProcessingLabel />
+                                                        : 'Close Expired Settlement'}
+                                                </button>
+                                            </div>
+                                        )}
+
                                         {canCreateNewAuction && (
                                             <div className="artwork-auction-next-step mt-4">
                                                 <p>The previous auction is closed. Create a new auction when you are ready.</p>
@@ -3888,7 +3974,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         )}
 
                                         {/* Settlement button (24h window; winner only, Base Sepolia artworks only) */}
-                                        {artworkWriteEnabled && walletRenderState.settled && awaitingPayment && isSameAddress(connectedWalletAddress, winnerAddress) && (
+                                        {artworkWriteEnabled && walletRenderState.settled && awaitingPayment && !settlementExpired && isSameAddress(connectedWalletAddress, winnerAddress) && (
                                             <div className="mt-6 space-y-3">
                                                 <div className="artwork-settlement-notice p-4 rounded-lg border-2">
                                                     <div className="flex items-center gap-2 mb-2">
