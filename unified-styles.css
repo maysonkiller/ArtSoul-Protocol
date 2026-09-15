@@ -5998,3 +5998,14 @@ body.future .artsoul-voice-button.is-listening {
     white-space: pre-line;
     overflow-wrap: anywhere;
 }
+
+.artsoul-voice-spacer {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .artsoul-voice-spacer {
+        display: block;
+        height: calc(76px + env(safe-area-inset-bottom));
+    }
+}

@@ -473,6 +473,13 @@
         window.addEventListener('pagehide', stopListening);
 
         label();
+        // On a phone the fixed button would sit over the last controls on the
+        // page. A spacer at the very end lets them scroll clear of it; it takes
+        // no room on wider screens, where the corner is empty margin.
+        const spacer = document.createElement('div');
+        spacer.className = 'artsoul-voice-spacer';
+        spacer.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(spacer);
         document.body.appendChild(panel);
         document.body.appendChild(button);
     }

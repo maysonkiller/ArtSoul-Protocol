@@ -199,3 +199,13 @@ test('the voice script loads after the agent tools on every page that has them',
   }
   assert.match(fs.readFileSync('vite.config.js', 'utf8'), /'voice-commands\.js',/);
 });
+
+test('on a phone the last controls can scroll clear of the button', () => {
+  // Seen on the preview at 375px: the fixed button sat over the settlement
+  // text at the bottom of the artwork page. A spacer at the end of the page
+  // gives the final controls room; it takes none on wider screens.
+  assert.match(source, /spacer\.className = 'artsoul-voice-spacer';/);
+  const css = fs.readFileSync('unified-styles.css', 'utf8');
+  assert.match(css, /\.artsoul-voice-spacer \{\s*display: none;\s*\}/);
+  assert.match(css, /@media \(max-width: 768px\) \{\s*\.artsoul-voice-spacer \{\s*display: block;/);
+});
