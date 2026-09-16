@@ -49,7 +49,9 @@ Primary economics, deposit (10%), increment (2.5%), durations (24/36/48h), settl
 
 ## Part 2 — Target architecture
 
-### Contract count: **4 contracts, with the Ecosystem/Reward Pool as a module inside Core**
+### Contract count: **5 contracts, with the Ecosystem/Reward Pool as a module inside Core**
+
+*(Consolidated 2026-09-16: the founder-decided `Support the artist` feature adds contract 5. The first four are unchanged.)*
 
 | # | Contract | Upgradeability | Responsibility |
 | --- | --- | --- | --- |
@@ -57,6 +59,7 @@ Primary economics, deposit (10%), increment (2.5%), durations (24/36/48h), settl
 | 2 | **`ArtSoulArtworkNFT`** | **Immutable contract, mutable whitelist state** | ERC-721 + ERC-2981 at **5.5%** to creator, `mint` restricted to Core, **marketplace-approval whitelist** enforced in `approve`/`setApprovalForAll`. The whitelist is admin-settable data, so policy can change without a contract upgrade. |
 | 3 | **`ArtSoulGenesis`** | **Immutable** | New soulbound ERC-721, supply 10,000, `_update` reverts on transfer (soulbound), admin/eligibility-engine grant in batches, #0 founder + RESERVED_TEAM=200 + ~1,000 mainnet-activity + ~8,799 contest remainder. No economic privileges. |
 | 4 | **`ArtSoulCollections` (partner factory)** | **UUPS singleton _or_ minimal-clone factory** (open question) | Lets ArtSoul and approved partners create drops with configurable supply. Canonical first-auction-then-buy-now, reusing the per-artwork floor system — no separate collection-floor protocol. Partner onboarding gated by an approver role. |
+| 5 | **Donations contract** (working name `ArtSoulSupport`) | **Decided at C1**; its only administration is a Safe-controlled message threshold | Event-only creator donations per `SUPPORT_THE_ARTIST_DESIGN.md`: verifies the recipient is the artwork's canonical creator through the Core interface, forwards 100% immediately, reverts entirely if forwarding fails, emits `Donation` only after a successful transfer, takes no fee, holds no balance and stores no history. |
 
 **No token contract.** A token is a possible future phase only (§10) and is out of scope.
 
@@ -65,6 +68,7 @@ Primary economics, deposit (10%), increment (2.5%), durations (24/36/48h), settl
 - **Resale/marketplace stays in Core** because it already lives there and because one settlement + one `pendingWithdrawals` accounting surface means fewer cross-contract value transfers, one reentrancy boundary, and a smaller attack surface than a separate marketplace contract calling back into Core.
 - **Pool as a module in Core, not a 5th contract:** the 1% is computed in the same `buyResale`/settlement path that already splits funds, so a separate pool contract would only add an external call and more surface for no functional gain. The pool is an internal balance withdrawable **only** to the EcosystemTreasury multisig. (This is the recommendation the amendment asks Core to record.)
 - **NFT and Genesis favor immutability** because minted art and soulbound identity should not be silently rewritable; needed flexibility (marketplace whitelist, royalty receiver) is expressed as **mutable state**, not upgradeable logic.
+- **Donations sit outside Core** because they move value Core never accounts for. Keeping them in their own minimal contract leaves Core's `pendingWithdrawals` surface, reentrancy boundary and storage layout exactly as audited, and a contract that holds no balance has nothing for an attacker to drain. It reads the creator from Core rather than trusting a caller-supplied recipient.
 - **Core is UUPS** because its behavior genuinely evolves (keeper model, collections integration, pool accounting) and a storage-layout-reviewed upgrade path is safer than redeploy-and-migrate for the engine.
 
 ### Where OpenZeppelin replaces bespoke code
@@ -107,6 +111,7 @@ Primary economics, deposit (10%), increment (2.5%), durations (24/36/48h), settl
 8. **Metadata permanence:** confirm IPFS/Arweave as the mainnet metadata home (Bible/Phase D), plus the base/contract URI and project domain.
 9. **Partner onboarding criteria** and who holds `COLLECTION_APPROVER`.
 10. **Exact Genesis contest cadence** (currently ~10/week, marked tunable) and confirmation of the 200 / ~1,000 / ~8,799 split.
+11. **Donations contract:** upgradeability, and the exact UTF-8 byte ceiling that enforces the approved 140 user-visible-character message limit — Solidity byte length must not be presented as a character count.
 
 ---
 
@@ -114,7 +119,7 @@ Primary economics, deposit (10%), increment (2.5%), durations (24/36/48h), settl
 
 The rework does **not** mutate the live testnet contracts. It is built fresh, deployed clean, validated on a fresh public-testnet cycle, and then the mandatory **pre-mainnet migration / full data reset** in **Bible §16** runs before launch:
 
-1. Build the 4-contract set from this plan and the frozen canon.
+1. Build the 5-contract set from this plan and the frozen canon.
 2. Full unit + invariant tests; independent external audit; storage-layout review for Core's UUPS path.
 3. Fresh public-testnet cycle: publish → auction → settle → mint → resale, plus Genesis grant and a partner collection.
 4. Deploy audited contracts to Base mainnet.

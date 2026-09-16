@@ -1,6 +1,6 @@
 # Support the Artist — Phase C Design
 
-Status: founder-decided feature design; documentation only; no current implementation.
+Status: founder-decided feature design; documentation only; no current implementation. Canon consolidated 2026-09-16 — see the last section.
 
 Phase: C — Mainnet Preparation, together with the final contract rework, test, Base Sepolia rehearsal, and security-review cycle.
 
@@ -135,7 +135,9 @@ This feature does not add:
 
 ## Required Canon Consolidation Before Implementation
 
-The following architecture touchpoints are queued rather than changed silently:
+*Done 2026-09-16*, recorded in `CHANGELOG_2026-09-16_SUPPORT_THE_ARTIST.md`. Each item below now exists in the document it names. What remains before Solidity is C1 architecture sign-off, including the contract's upgradeability and the exact UTF-8 byte ceiling.
+
+The touchpoints, as originally queued:
 
 1. Canon Bible section 6 — explicitly preserve Trust and discovery neutrality.
 2. Canon Bible section 11 and `07_ADMIN_MODERATION_CANON.md` — extend complaint-driven UI moderation to donation-message visibility only.
