@@ -271,7 +271,7 @@
             // "Awaiting payment" nine days after the deadline tells a winner to pay
             // into a window the contract has already closed.
             return settlementClosed
-                ? { key: 'settlement_expired', label: 'Payment window closed' }
+                ? { key: 'settlement_expired', label: 'Payment expired' }
                 : { key: 'awaiting_settlement', label: 'Awaiting payment' };
         }
         if (noBids || ((expired || ended || defaulted) && !hasBid)) {

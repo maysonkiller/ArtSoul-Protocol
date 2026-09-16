@@ -52,7 +52,7 @@ never credited, and the page said *Awaiting payment* while still showing the
 winner a *Complete Settlement* button that the contract would revert with
 `SettlementExpired` after the winner had paid gas for it.
 
-The page now says *Payment window closed*, stops offering the payment, and offers
+The page now says *Payment expired*, stops offering the payment, and offers
 *Close Expired Settlement* to anyone connected, as the contract allows. Cards say
 the same.
 
