@@ -2946,7 +2946,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const statusForState = mintedArtwork
                 ? { key: 'sold', label: 'Sold' }
                 : settlementExpired
-                    ? { key: 'settlement_expired', label: 'Payment window closed' }
+                    ? { key: 'settlement_expired', label: 'Payment expired' }
                     : awaitingPayment
                     ? { key: 'awaiting_settlement', label: 'Awaiting payment' }
                     : liveAuction

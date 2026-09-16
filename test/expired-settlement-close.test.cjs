@@ -96,7 +96,7 @@ test('the confirmation explains the outcome without restating frozen figures', (
 });
 
 test('the status says the window is closed on the page and on every card', () => {
-  assert.match(page, /settlementExpired\s*\n?\s*\? \{ key: 'settlement_expired', label: 'Payment window closed' \}/);
+  assert.match(page, /settlementExpired\s*\n?\s*\? \{ key: 'settlement_expired', label: 'Payment expired' \}/);
 
   const cardSandbox = vm.createContext({ exported: {}, Number, Date, Boolean, String });
   const toTimestamp = extractFunction(card, 'toTimestamp');
@@ -125,6 +125,17 @@ test('the status says the window is closed on the page and on every card', () =>
   // Still open, and no deadline at all, keep the old answer.
   assert.equal(statusInfo({ status: 'settlement_pending', settlement_deadline: future }).label, 'Awaiting payment');
   assert.equal(statusInfo({ status: 'settlement_pending' }).label, 'Awaiting payment');
+});
+
+test('the status badge is short enough for the heading it sits in', () => {
+  // The auction heading centres its title and pins the badge to the right edge,
+  // so a long label runs into the title. "Payment window closed" did, at 375px,
+  // on the artwork page. The longest label the heading already carried is the
+  // width this one has to live within.
+  const labels = [...page.matchAll(/label: '([^']+)' \}/g)].map((match) => match[1]);
+  const expired = labels.find((label) => /payment/i.test(label));
+  assert.equal(expired, 'Payment expired');
+  assert.ok(expired.length <= 'Not yet minted'.length + 1, `"${expired}" is wider than the heading fits`);
 });
 
 test('the page and the cards wait out the same margin', () => {
