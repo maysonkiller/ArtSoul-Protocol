@@ -644,6 +644,13 @@
         body.appendChild(title);
         body.appendChild(creator);
         body.appendChild(meta);
+        if (artwork.pending_auction_sync) {
+            const sync = document.createElement('p');
+            sync.className = 'artsoul-card-creator';
+            sync.setAttribute('role', 'status');
+            sync.textContent = 'Transaction confirmed. Updating auction data.';
+            body.appendChild(sync);
+        }
 
         card.appendChild(createMediaElement(artwork, () => card.remove()));
         card.appendChild(body);
@@ -860,6 +867,7 @@
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
                 ),
+                artwork.pending_auction_sync ? h('p', { className: 'artsoul-card-creator', role: 'status' }, 'Transaction confirmed. Updating auction data.') : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             ),
             h(ReactCountdown, { artwork })

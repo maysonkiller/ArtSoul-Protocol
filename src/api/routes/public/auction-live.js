@@ -28,7 +28,7 @@ function weiToEth(value) {
     const base = 10n ** 18n;
     const whole = wei / base;
     const fraction = (wei % base).toString().padStart(18, '0').replace(/0+$/, '');
-    return fraction ? `${whole}.${fraction.slice(0, 6)}` : whole.toString();
+    return fraction ? `${whole}.${fraction}` : whole.toString();
   } catch {
     const parsed = Number(text);
     return Number.isFinite(parsed) ? String(parsed) : '0';

@@ -10,6 +10,7 @@ const pages = [
     'artwork.html',
     'profile.html',
     'upload.html',
+    'collection-builder.html',
     'admin.html',
     'docs-protocol.html',
     'wallet-test.html',
@@ -98,7 +99,7 @@ for (const file of javascriptAssets) {
     }
 }
 
-const expectedEntries = ['index', 'gallery', 'artwork', 'profile', 'upload', 'admin', 'docs-protocol', 'visual-lab', 'generate-favicon'];
+const expectedEntries = ['index', 'gallery', 'artwork', 'profile', 'upload', 'collection-builder', 'admin', 'docs-protocol', 'visual-lab', 'generate-favicon'];
 for (const entry of expectedEntries) {
     if (!javascriptAssets.some(file => file.startsWith(`${entry}-`))) {
         throw new Error(`Hashed ${entry} entry was not emitted`);
@@ -119,6 +120,7 @@ const sharedHeaderPages = [
     'artwork.html',
     'profile.html',
     'upload.html',
+    'collection-builder.html',
     'admin.html',
     'docs-protocol.html'
 ];

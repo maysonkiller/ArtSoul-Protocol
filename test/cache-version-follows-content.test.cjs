@@ -18,8 +18,8 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
-  'src/ui/components/artwork-card.js': { version: 14, sha256: '2a62e81911ada792' },
-  'contracts-integration.js': { version: 9, sha256: '175c860b87c94c23' },
+  'src/ui/components/artwork-card.js': { version: 15, sha256: '555fe539c28c3c22' },
+  'contracts-integration.js': { version: 10, sha256: 'a12814822cede799' },
   'modal-system.js': { version: 1, sha256: '73be2dadc241ea78' },
   'webmcp-tools.js': { version: 4, sha256: '0b6e7d5cd51be343' },
   'voice-commands.js': { version: 1, sha256: '4aab5e22a42d8cbb' },

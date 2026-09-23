@@ -1,6 +1,6 @@
 # ArtSoul Durable Backlog
 
-Updated: 2026-08-24
+Updated: 2026-09-21
 Canonical phase model: `A-D` from [`docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`](canon/ARTSOUL_CANON_BIBLE_FULL.md) section 17.
 
 This is the repository's durable work register. It consolidates verified completed work, open implementation work, founder-owned inputs, and code-level follow-ups so that ideas do not remain authoritative only in chat sessions or external prompt files.
@@ -16,6 +16,21 @@ This is the repository's durable work register. It consolidates verified complet
 7. Resource-gated work follows [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md). Missing funding defers activation; it never waives security, audit, role-separation, legal, migration, or mainnet acceptance requirements.
 
 ## Canonical Phase Mapping
+
+### Takeover intake — 2026-09-20
+
+Authority: [founder development amendment](canon/CHANGELOG_2026-09-20_COLLECTION_LAUNCH.md).
+The sequence is recorded in the canonical implementation backlog.
+
+| ID | Item | Why/source | Status | Phase | Notes |
+| --- | --- | --- | --- | --- | --- |
+| TA-01 | Audit current implementation and bound AI media reads | `src/api/routes/functions/ai/analyze.js`; takeover brief; local authenticated SSRF reproduction | in progress | A | Score 27. Local correction tested: allowlisted bounded media reads, no redirect following, strict model/stored guidance validation and upload request cancellation. Actual browser success/error/loading flow passed with AI/auth fixtures. Deployment and real Gemini acceptance remain outstanding; see [evidence](audits/STABILIZATION_EVIDENCE_2026-09-21.md). |
+| TA-02 | Restrict linked social identity edits to OAuth | `src/api/routes/profile.js`; `src/entries/profile.jsx`; authenticated local PUT reproduction | in progress | A | Local patch and 92 targeted tests passed; public links preserved separately, server flags derived from private OAuth IDs, typed names cannot satisfy legacy access checks. Browser fixture verified connect/self-reported display. See [checkpoint](audits/STABILIZATION_CHECKPOINT.md). No data cleanup or deployment. |
+| TA-03 | Build generic launch authoring with truthful review and draft states | Founder brief; development amendment; absent collection runtime at `607f213` | in progress | C | Local draft builder implemented: blank draft, optional explicitly proposed Origin template, phase editing, save/load/import/export, deterministic review and disabled publishing. Chain-aware identity and existing unfinished fields preserved. Deployment capability mapping, complete financial/utility authoring and connected publication remain separate unfinished work. |
+| TA-04 | Rehearse isolated collection, clearing-price auction and atomic forge contracts | Founder brief; development amendment | in progress | C | Additive local contracts preserved; 14 isolated tests plus 19 existing tests pass. Existing deployed contracts/storage unchanged. Local terms, fees and pricing fallbacks are not founder-approved final launch settings. Capability review, independent security review and configured testnet rehearsal remain outstanding. Genesis remains a proposal. |
+| TA-05 | Connect collection services and testnet journey | Founder brief; development amendment | planned | C | Additive schema and RLS, existing wallet/session/indexer, verification and email with real providers, event-derived provenance. Never enable unavailable integrations or report local fixtures as deployed. |
+| TA-06 | Stabilize auction state, creation and bid review across pages | Founder text report 2026-09-21, 00:16–01:48; executable merge/cache reproductions in current code | in progress | A | Score 36. Local patch/browser fixtures pass: receipt reconciliation, shared modal, round/request guards, exact wei values, account/deposit review, creator gate, retained page on failed refresh and moderation suppression. Profile/gallery agree on round 63 while API deliberately returns 35. Frozen economics/deployed contracts unchanged; live wallet and production acceptance remain outstanding. See [evidence](audits/STABILIZATION_EVIDENCE_2026-09-21.md). |
+
 
 | Canon phase | Purpose | Historical planning absorbed |
 | --- | --- | --- |

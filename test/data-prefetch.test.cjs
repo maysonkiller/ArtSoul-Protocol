@@ -175,7 +175,8 @@ test('a tab already seen this visit is shown without another round trip', () => 
   // Keyed by wallet too, so one profile can never read another's list.
   assert.match(profile, /const cacheKey = `\$\{String\(activeProfile\?\.wallet_address \|\| ''\)\.toLowerCase\(\)\}:\$\{requestedGallery\}`/);
   // A transaction just changed the chain: those callers ask for a fresh read.
-  assert.equal((profile.match(/loadMyArtworks\(null, \{ fresh: true \}\)/g) || []).length, 3);
+  assert.match(profile, /addEventListener\('artsoul:auction-confirmed', refresh\)/);
+  assert.match(profile, /const refresh = \(\) => \{ if \(profile\?\.wallet_address\) void loadMyArtworks\(null, \{fresh: true\}\)/);
   assert.match(profile, /if \(fresh\) galleryCacheRef\.current\.clear\(\);/);
   // It never becomes a source of truth: the network result always replaces it.
   assert.match(profile, /galleryCacheRef\.current\.set\(cacheKey, result\.items\);/);

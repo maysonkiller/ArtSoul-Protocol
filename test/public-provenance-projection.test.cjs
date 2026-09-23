@@ -184,6 +184,9 @@ function loadHandler() {
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },
     getModerationAccess: async () => ({ canModerate: false }),
+    readArtworkMetadata: async (url) => String(url).includes('missing')
+      ? {}
+      : { name: 'Fixture Art', image: 'https://img.test/a.png' },
     fetch: async (url) => String(url).includes('missing')
       ? { ok: false, json: async () => ({}) }
       : { ok: true, json: async () => ({ name: 'Fixture Art', image: 'https://img.test/a.png' }) },
@@ -194,7 +197,7 @@ function loadHandler() {
     console: { warn() {}, error() {}, log() {} },
     process: { env: {} }
   });
-  vm.runInContext(source, context);
+  vm.runInContext(fs.readFileSync('src/features/artwork/ai-valuation-values.js', 'utf8').replace(/^export /gm, '') + '\n' + source, context);
   return context.handler;
 }
 

@@ -223,17 +223,128 @@ async function backendRead(path) {
     return data;
 }
 
-async function getPublicProjectionArtworks(options = {}) {
+// Receipt-backed UI bridge, never authorization or indexer history. Records
+// are scoped to one artwork/chain, bounded, and expire after the cache window.
+const AUCTION_SYNC_KEY = 'artsoul_confirmed_auctions_v1';
+const AUCTION_SYNC_TTL = 10 * 60 * 1000;
+let confirmedAuctionMemory = [];
+function compareAuctionUpdates(left, right) {
+    const blockOrder = left.block_number - right.block_number;
+    if (blockOrder) return blockOrder;
+    const auctionOrder = BigInt(left.auction_id) - BigInt(right.auction_id);
+    if (auctionOrder) return auctionOrder > 0n ? 1 : -1;
+    const rank = {created: 1, ended: 2, defaulted: 3};
+    return rank[left.kind] - rank[right.kind];
+}
+function confirmedAuctionUpdates() {
+    let candidates = confirmedAuctionMemory;
+    try {
+        const stored = JSON.parse(window.localStorage.getItem(AUCTION_SYNC_KEY) || '[]');
+        if (Array.isArray(stored)) candidates = [...stored, ...confirmedAuctionMemory];
+    } catch { /* Storage may be unavailable; retain this page's receipts. */ }
+    const valid = candidates.filter(item => item && item.chain_id === 84532 &&
+        /^\d{1,78}$/.test(item.artwork_id) && /^\d{1,78}$/.test(item.auction_id) &&
+        /^0x[0-9a-f]{64}$/i.test(item.transaction_hash) &&
+        Number.isSafeInteger(item.block_number) && item.block_number > 0 &&
+        item.confirmed_at <= Date.now() && Date.now() - item.confirmed_at < AUCTION_SYNC_TTL &&
+        ['created', 'ended', 'defaulted'].includes(item.kind));
+    const latest = new Map();
+    for (const item of valid) {
+        const key = `${item.chain_id}:${item.artwork_id}`;
+        if (!latest.has(key) || compareAuctionUpdates(item, latest.get(key)) > 0) latest.set(key, item);
+    }
+    confirmedAuctionMemory = [...latest.values()].slice(-20);
+    return confirmedAuctionMemory;
+}
+
+function recordConfirmedAuction(record) {
+    const item = {...record, confirmed_at: Date.now()};
+    const key = row => `${row.chain_id}:${row.artwork_id}`;
+    const updates = confirmedAuctionUpdates();
+    const prior = updates.find(row => key(row) === key(item));
+    if (prior && compareAuctionUpdates(prior, item) >= 0) return;
+    confirmedAuctionMemory = [...updates.filter(row => key(row) !== key(item)), item].slice(-20);
+    try { window.localStorage.setItem(AUCTION_SYNC_KEY, JSON.stringify(confirmedAuctionMemory)); } catch { /* memory fallback */ }
+    window.dispatchEvent(new CustomEvent('artsoul:auction-confirmed', {detail: item}));
+}
+
+function applyConfirmedAuctionUpdate(row) {
+    const update = confirmedAuctionUpdates().find(item => String(item.artwork_id) === String(row.artwork_id || row.blockchain_id) && item.chain_id === Number(row.chain_id));
+    if (!update) return row;
+    const indexedId = BigInt(row.auction_id || row.active_auction_id || 0);
+    const confirmedId = BigInt(update.auction_id);
+    if (indexedId > confirmedId) return row;
+    const status = String(row.status || '').toLowerCase();
+    if (indexedId === confirmedId && (
+        (update.kind === 'created' && ['auction', 'awaiting_end', 'settlement_pending', 'ended_no_bids', 'defaulted', 'sold', 'for_sale'].includes(status)) ||
+        (update.kind === 'ended' && ['settlement_pending', 'ended_no_bids', 'defaulted', 'sold', 'for_sale'].includes(status)) ||
+        (update.kind === 'defaulted' && ['defaulted', 'sold', 'for_sale'].includes(status))
+    )) return row;
+    const patch = update.patch || {};
+    // Never take ownership, floor, metadata, eligibility or arbitrary keys from
+    // browser storage. Every transaction still checks current chain state.
+    const allowed = update.kind === 'created'
+        ? {status: 'auction', active_auction_id: update.auction_id, start_price: patch.start_price, auction_end_time: patch.auction_end_time, current_bid: '0', highest_bid: '0', current_bidder: null, bids: []}
+        : {status: update.kind === 'defaulted' ? 'defaulted' : (patch.has_winner === true ? 'settlement_pending' : 'ended_no_bids'), active_auction_id: patch.has_winner === true ? update.auction_id : '', settlement_deadline: patch.settlement_deadline};
+    return {...row, ...allowed, auction_id: update.auction_id, pending_auction_sync: true};
+}
+
+async function applyConfirmedAuctionUpdates(rows, options = {}, suppressedIds = []) {
+    const suppressed = new Set(suppressedIds);
+    let result = rows.map(applyConfirmedAuctionUpdate);
+    const updates = confirmedAuctionUpdates().filter(item =>
+        !suppressed.has(`v41:${item.chain_id}:${item.artwork_id}`) &&
+        (!options.chain_id || Number(options.chain_id) === item.chain_id) &&
+        (!options.id || options.id === `v41:${item.chain_id}:${item.artwork_id}` || String(options.id) === item.artwork_id) &&
+        (!options.artwork_id || String(options.artwork_id) === item.artwork_id)
+    ).slice(-4);
+    await Promise.all(updates.map(async item => {
+        try {
+            const fresh = await backendRead(`/api/public/artworks${buildQuery({chain_id: item.chain_id, artwork_id: item.artwork_id, fresh: '1', limit: 1})}`);
+            if (Array.isArray(fresh.suppressed_artwork_ids)) fresh.suppressed_artwork_ids.forEach(id => suppressed.add(id));
+            const raw = fresh.data?.[0];
+            if (!raw) return; // Never resurrect a suppressed artwork from a receipt.
+            const row = applyConfirmedAuctionUpdate(raw);
+            const index = result.findIndex(existing => existing.id === row.id);
+            if (index >= 0) {
+                const existing = result[index];
+                const oldId = BigInt(existing.auction_id || 0);
+                const newId = BigInt(row.auction_id || 0);
+                const rank = {auction: 1, awaiting_end: 1, settlement_pending: 2, ended_no_bids: 3, defaulted: 3, sold: 4, for_sale: 4};
+                if (newId > oldId || (newId === oldId && (rank[row.status] || 0) >= (rank[existing.status] || 0))) result[index] = row;
+            }
+            else if ((!options.creator || String(row.creator || row.creator_id).toLowerCase() === String(options.creator).toLowerCase()) &&
+                (!options.owner || String(row.current_owner_address).toLowerCase() === String(options.owner).toLowerCase())) result.push(row);
+        } catch { /* The confirmed bridge remains visible during a read outage. */ }
+    }));
+    if (options.view === 'auctions') result = result.filter(row => row.status === 'auction');
+    if (options.view === 'marketplace') result = result.filter(row => row.status === 'for_sale');
+    if (options.view === 'collections') result = [];
+    result = result.filter(row => !suppressed.has(row.id)).map(applyConfirmedAuctionUpdate);
+    result.suppressed_artwork_ids = [...suppressed];
+    return result;
+}
+
+window.addEventListener('storage', event => {
+    if (event.key === AUCTION_SYNC_KEY) window.dispatchEvent(new CustomEvent('artsoul:auction-confirmed'));
+});
+
+async function getPublicProjectionArtworks(options = {}, throwOnUnavailable = false) {
     try {
         const result = await backendRead(`/api/public/artworks${buildQuery(options)}`);
-        const rows = Array.isArray(result.data) ? result.data : [];
-        rows.suppressed_artwork_ids = Array.isArray(result.suppressed_artwork_ids)
+        const suppressed = Array.isArray(result.suppressed_artwork_ids)
             ? result.suppressed_artwork_ids
             : [];
+        const rows = await applyConfirmedAuctionUpdates(Array.isArray(result.data) ? result.data : [], options, suppressed);
         rows.public_metrics = result.public_metrics || null;
         return rows;
     } catch (error) {
         console.warn('[ArtSoulDB] V4.1 projection feed unavailable:', error.message);
+        if (throwOnUnavailable) {
+            const unavailable = new Error('Artwork data is temporarily unavailable. Please retry.');
+            unavailable.code = 'ARTWORK_READ_UNAVAILABLE';
+            throw unavailable;
+        }
         return [];
     }
 }
@@ -272,7 +383,7 @@ async function getPublicProjectionArtwork(idOrOptions) {
     const options = typeof idOrOptions === 'string'
         ? { id: idOrOptions, limit: 1 }
         : { ...(idOrOptions || {}), limit: 1 };
-    const rows = await getPublicProjectionArtworks(options);
+    const rows = await getPublicProjectionArtworks(options, true);
     return rows[0] || null;
 }
 
@@ -280,6 +391,12 @@ async function getPublicProjectionArtwork(idOrOptions) {
 const profileReadCache = new Map();
 const profileReadRequests = new Map();
 const PROFILE_READ_CACHE_MS = 15000;
+
+function invalidateProfileCache(walletAddress) {
+    const key = String(walletAddress || '').toLowerCase();
+    profileReadCache.delete(key);
+    profileReadRequests.delete(key);
+}
 
 async function createProfile(walletAddress, profileData) {
     return updateProfile(walletAddress, profileData);
@@ -301,9 +418,13 @@ async function getProfile(walletAddress) {
             `/api/public/profile?address=${encodeURIComponent(normalizedAddress)}`
         );
         const profile = result.profile || null;
-        profileReadCache.set(normalizedAddress, { data: profile, timestamp: Date.now() });
+        if (profileReadRequests.get(normalizedAddress) === request) {
+            profileReadCache.set(normalizedAddress, { data: profile, timestamp: Date.now() });
+        }
         return profile;
-    })().finally(() => profileReadRequests.delete(normalizedAddress));
+    })().finally(() => {
+        if (profileReadRequests.get(normalizedAddress) === request) profileReadRequests.delete(normalizedAddress);
+    });
 
     profileReadRequests.set(normalizedAddress, request);
     return request;
@@ -315,6 +436,7 @@ async function updateProfile(walletAddress, updates) {
     }
 
     const result = await backendWrite('/api/profile', updates, 'PUT');
+    invalidateProfileCache(walletAddress);
     profileReadCache.set(walletAddress.toLowerCase(), {
         data: result.profile || null,
         timestamp: Date.now()
@@ -992,6 +1114,10 @@ async function updateAuction(auctionId, updates) {
 
 // Export functions
 window.ArtSoulDB = {
+    invalidateProfileCache,
+    recordConfirmedAuction,
+    applyConfirmedAuctionUpdate,
+    confirmedAuctionUpdates,
     initSupabase,
     displayName,
     avatarUrl,

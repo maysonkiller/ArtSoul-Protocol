@@ -1,3 +1,5 @@
+import { readAIValuation } from './ai-valuation-values.js';
+
 (function (global) {
     'use strict';
 
@@ -37,13 +39,17 @@
             })
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data?.valuation) {
-            throw new Error(data?.message || 'AI value guidance is temporarily unavailable. Please try again.');
+        const valuation = readAIValuation(data?.valuation);
+        if (!response.ok || !valuation) {
+            const error = new Error(data?.message || 'AI value guidance is temporarily unavailable. Please try again.');
+            error.status = response.status;
+            error.code = data?.error || 'GEMINI_RESPONSE_INVALID';
+            throw error;
         }
 
         return {
             valuation: {
-                ...data.valuation,
+                ...valuation,
                 model: data.model || 'gemini-2.5-flash-lite',
                 guidance_only: true,
                 generated_at: new Date().toISOString()

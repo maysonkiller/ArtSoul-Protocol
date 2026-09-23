@@ -1,5 +1,7 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
+import { readArtworkMetadata } from '../../safe-artwork-fetch.js';
+import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
 // The active product chain. Ethereum Sepolia rows stay readable but are never
@@ -58,7 +60,7 @@ function weiToEth(value) {
     const base = 10n ** 18n;
     const whole = wei / base;
     const fraction = (wei % base).toString().padStart(18, '0').replace(/0+$/, '');
-    return fraction ? `${whole}.${fraction.slice(0, 6)}` : whole.toString();
+    return fraction ? `${whole}.${fraction}` : whole.toString();
   } catch {
     const parsed = Number(text);
     return Number.isFinite(parsed) ? String(parsed) : '0';
@@ -101,25 +103,6 @@ function statusFromProjection(artwork, auction, resaleListing) {
   return 'registered';
 }
 
-function parseMetadataLiteral(uri) {
-  if (!uri) return null;
-  const trimmed = uri.trim();
-
-  if (trimmed.startsWith('{')) {
-    return JSON.parse(trimmed);
-  }
-
-  if (trimmed.startsWith('data:application/json;base64,')) {
-    return JSON.parse(Buffer.from(trimmed.split(',')[1], 'base64').toString('utf8'));
-  }
-
-  if (trimmed.startsWith('data:application/json,')) {
-    return JSON.parse(decodeURIComponent(trimmed.split(',')[1] || ''));
-  }
-
-  return null;
-}
-
 function toHttpUri(uri) {
   const text = normalizeText(uri);
   if (!text) return '';
@@ -133,26 +116,7 @@ function toHttpUri(uri) {
 }
 
 async function loadMetadata(metadataUri) {
-  try {
-    const literal = parseMetadataLiteral(metadataUri);
-    if (literal) return literal;
-  } catch {
-    return {};
-  }
-
-  const url = toHttpUri(metadataUri);
-  if (!url) return {};
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-    if (!response.ok) return {};
-    return await response.json();
-  } catch {
-    return {};
-  }
+  return readArtworkMetadata(metadataUri);
 }
 
 // Metadata files are immutable (uploads use unique timestamped names), so a
@@ -248,19 +212,14 @@ function getPosterUrl(metadata = {}, mediaUrl = '') {
 }
 
 function getAIValueGuidance(metadata = {}) {
-  const guidance = metadata.ai_value_guidance || metadata.properties?.ai_value_guidance;
-  if (!guidance || typeof guidance !== 'object' || Array.isArray(guidance)) return null;
-
-  const minimum = Number(guidance.estimated_value_min_eth);
-  const maximum = Number(guidance.estimated_value_max_eth);
-  const suggested = Number(guidance.suggested_start_price_eth);
-  if (![minimum, maximum, suggested].every(Number.isFinite)) return null;
+  const guidance = readAIValuation(metadata.ai_value_guidance || metadata.properties?.ai_value_guidance);
+  if (!guidance) return null;
 
   const confidence = normalizeText(guidance.confidence).toLowerCase();
   return {
-    estimated_value_min_eth: Math.max(0, minimum),
-    estimated_value_max_eth: Math.max(Math.max(0, minimum), maximum),
-    suggested_start_price_eth: Math.max(0, suggested),
+    estimated_value_min_eth: guidance.estimated_value_min_eth,
+    estimated_value_max_eth: guidance.estimated_value_max_eth,
+    suggested_start_price_eth: guidance.suggested_start_price_eth,
     confidence: ['low', 'medium', 'high'].includes(confidence) ? confidence : 'medium',
     rationale: normalizeText(guidance.rationale).slice(0, 500),
     factors: Array.isArray(guidance.factors)
@@ -927,11 +886,13 @@ function getProjectionSnapshot() {
   return projectionSnapshotPromise;
 }
 
-function getDirectProjectionSnapshot(lookup) {
+function getDirectProjectionSnapshot(lookup, fresh = false) {
   const now = Date.now();
   const key = keyFor(lookup.chain, lookup.artworkId);
   const cached = directProjectionCache.get(key);
-  if (cached && now - cached.createdAt < PROJECTION_CACHE_MS) return cached.promise;
+  // A receipt-triggered lookup refreshes only one artwork. Coalesce repeated
+  // requests for one second; never rebuild the full public corpus on refresh.
+  if (cached && now - cached.createdAt < (fresh ? 1000 : PROJECTION_CACHE_MS)) return cached.promise;
 
   const cacheEntry = { createdAt: now, promise: null };
   const promise = buildDirectProjectionSnapshot(lookup).then(snapshot => {
@@ -961,7 +922,7 @@ export default async function handler(req, res) {
     const requestQuery = req.query || {};
     const directLookup = parseDirectLookup(requestQuery);
     const { cards, bids, diagnostics, warnings, publicMetrics } = directLookup
-      ? await getDirectProjectionSnapshot(directLookup)
+      ? await getDirectProjectionSnapshot(directLookup, requestQuery.fresh === '1')
       : await getProjectionSnapshot();
     const suppressedArtworkIds = cards
       .filter(card => card.moderation_hidden === true)

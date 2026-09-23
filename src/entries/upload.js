@@ -1,5 +1,6 @@
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
+import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import {
     ALLOWED_ARTWORK_MIME_TYPES,
     MAX_ARTWORK_UPLOAD_BYTES,
@@ -249,6 +250,9 @@ let selectedFile = null;
             const message = String(error?.message || '').toLowerCase();
             if (error?.name === 'AbortError') {
                 return 'AI value guidance took too long to respond. Please try again.';
+            }
+            if (error?.code === 'GEMINI_RESPONSE_INVALID') {
+                return 'AI returned an invalid estimate. Guidance is unavailable; please try again.';
             }
             if (status === 429 || message.includes('high demand') || message.includes('rate limit') || message.includes('limit reached')) {
                 return 'AI value guidance is temporarily busy because of high demand. Please try again shortly.';
@@ -502,6 +506,8 @@ let selectedFile = null;
             const values = getUploadFormValues();
             return JSON.stringify({
                 file: selectedFile ? [selectedFile.name, selectedFile.size, selectedFile.lastModified] : null,
+                wallet: String(window.getCurrentWalletAddress?.() || '').toLowerCase(),
+                chain: window.getCurrentChainId?.() || BASE_SEPOLIA_CHAIN_ID,
                 title: values.title,
                 description: values.description,
                 price: values.price,
@@ -701,9 +707,7 @@ let selectedFile = null;
         }
 
         function formatEthEstimate(value) {
-            const numeric = Number(value);
-            if (!Number.isFinite(numeric)) return '0';
-            return numeric.toLocaleString(undefined, { maximumFractionDigits: 6 });
+            return formatAIPrice(value);
         }
 
         function updateAIValuationRetryState() {
@@ -744,12 +748,15 @@ let selectedFile = null;
                 return;
             }
 
-            if (state === 'ready' && details.valuation) {
-                const valuation = details.valuation;
+            const valuation = readAIValuation(details.valuation);
+            if (state === 'ready' && valuation) {
                 const attemptsLeft = Math.max(0, AI_TOTAL_ATTEMPT_LIMIT - aiValuationAttemptCount);
                 status.textContent = `AI value guidance is ready. Review the estimate below. You have ${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left to run it again.`;
                 if (!details.logged) {
                     status.textContent += ' The estimate is ready, but its activity log is temporarily unavailable.';
+                }
+                if (valuation.used_media === false) {
+                    status.textContent += ' This estimate used text metadata only; the artwork image was not analyzed.';
                 }
                 range.textContent = `${formatEthEstimate(valuation.estimated_value_min_eth)} - ${formatEthEstimate(valuation.estimated_value_max_eth)} ETH`;
                 suggestion.textContent = `Suggested starting price: ${formatEthEstimate(valuation.suggested_start_price_eth)} ETH - ${valuation.confidence || 'medium'} confidence`;
@@ -766,15 +773,28 @@ let selectedFile = null;
             updatePublishReadiness();
         }
 
-        async function createAIImagePreview(file) {
+        async function createAIImagePreview(file, signal) {
+            signal?.throwIfAborted();
             if (!file?.type?.startsWith('image/')) return '';
 
             const objectUrl = URL.createObjectURL(file);
             try {
                 const image = await new Promise((resolve, reject) => {
                     const element = new Image();
-                    element.onload = () => resolve(element);
-                    element.onerror = reject;
+                    const cleanup = () => {
+                        element.onload = null;
+                        element.onerror = null;
+                        signal?.removeEventListener('abort', abort);
+                    };
+                    const abort = () => {
+                        cleanup();
+                        element.src = '';
+                        reject(signal.reason || new DOMException('Aborted', 'AbortError'));
+                    };
+                    element.onload = () => { cleanup(); resolve(element); };
+                    element.onerror = error => { cleanup(); reject(error); };
+                    signal?.addEventListener('abort', abort, { once: true });
+                    if (signal?.aborted) { abort(); return; }
                     element.src = objectUrl;
                 });
 
@@ -790,6 +810,7 @@ let selectedFile = null;
                     maxDimension = Math.round(maxDimension * 0.7);
                 }
             } catch (error) {
+                if (signal?.aborted) throw error;
                 console.warn('[AI Guidance] Could not prepare image preview:', error);
             } finally {
                 URL.revokeObjectURL(objectUrl);
@@ -837,8 +858,9 @@ let selectedFile = null;
 
             try {
                 const walletAddress = window.getCurrentWalletAddress?.();
-                const mediaDataUrl = await createAIImagePreview(file);
+                const mediaDataUrl = await createAIImagePreview(file, controller.signal);
                 if (requestId !== aiValuationRequestId) return;
+                controller.signal.throwIfAborted();
 
                 const result = await window.ArtSoulAIValuation.request({
                         title: requestValues.title,
@@ -857,7 +879,10 @@ let selectedFile = null;
                     return;
                 }
 
-                latestAIValuation = result.valuation;
+                latestAIValuation = readAIValuation(result.valuation);
+                if (!latestAIValuation) {
+                    throw createUploadError('GEMINI_RESPONSE_INVALID', 'AI returned an invalid estimate.');
+                }
                 latestAIValuationFormKey = requestFormKey;
                 if (!result.logged) {
                     console.warn('[AI Guidance] Estimate returned but ai_valuations logging was unavailable.');
@@ -881,9 +906,22 @@ let selectedFile = null;
             }
         }
 
+        function cancelAIValuation() {
+            aiValuationRequestId += 1;
+            aiValuationController?.abort();
+            aiValuationController = null;
+            latestAIValuation = null;
+            latestAIValuationFormKey = '';
+        }
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            cancelAIValuation();
+            aiValuationAttemptCount = 0;
+            authorizedWalletAddress = '';
+            document.getElementById('filePreview').style.display = 'none';
 
             const fileError = validateArtworkFile(file);
             if (fileError) {
@@ -901,11 +939,6 @@ let selectedFile = null;
             }
 
             selectedFile = file;
-            latestAIValuation = null;
-            latestAIValuationFormKey = '';
-            aiValuationAttemptCount = 0;
-            authorizedWalletAddress = '';
-            aiValuationController?.abort();
             setFileValidationError('');
             document.getElementById('fileName').textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
 
@@ -916,6 +949,7 @@ let selectedFile = null;
             // Show preview
             const reader = new FileReader();
             reader.onload = function(e) {
+                if (selectedFile !== file) return;
                 const preview = document.getElementById('filePreview');
                 const previewImg = document.getElementById('previewImage');
 
@@ -1244,9 +1278,8 @@ let selectedFile = null;
         }
 
         function handleUploadFormChange() {
-            if (latestAIValuation && latestAIValuationFormKey !== getAIValuationFormKey()) {
-                latestAIValuation = null;
-                latestAIValuationFormKey = '';
+            if (aiValuationController || (latestAIValuation && latestAIValuationFormKey !== getAIValuationFormKey())) {
+                cancelAIValuation();
                 setAIValuationState('unavailable', {
                     message: 'Artwork details changed. Request updated AI value guidance before publishing.'
                 });
@@ -1267,6 +1300,8 @@ let selectedFile = null;
                 const nextAddress = String(event?.detail?.address || '').toLowerCase();
                 if (!event?.detail?.isConnected || (authorizedWalletAddress && nextAddress !== authorizedWalletAddress)) {
                     authorizedWalletAddress = '';
+                    cancelAIValuation();
+                    setAIValuationState('unavailable', { message: 'Wallet changed. Authorize this wallet and request updated AI value guidance.' });
                 }
                 updatePublishReadiness();
             });

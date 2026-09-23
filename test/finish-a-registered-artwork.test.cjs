@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
+const artwork = fs.readFileSync('src/entries/artwork.jsx', 'utf8');
 const upload = fs.readFileSync('src/entries/upload.js', 'utf8');
 const uploadHtml = fs.readFileSync('upload.html', 'utf8');
 
@@ -16,10 +17,9 @@ test('an artwork whose auction failed can still be given one', () => {
   assert.match(profile, /const canStartAuction = isOwnProfile/);
   assert.match(profile, /handleStartAuction\(artwork\)/);
   assert.match(profile, /async function handleStartAuction\(artwork\)/);
-  assert.ok(
-    (profile.match(/handleCreateAuction/g) || []).length >= 2,
-    'handleCreateAuction must actually be called, not only declared'
-  );
+  assert.match(profile, /destination\.searchParams\.set\('action', 'create-auction'\)/);
+  assert.match(artwork, /get\('action'\) !== 'create-auction'/);
+  assert.match(artwork, /void openNewAuctionModal\(\)/);
 });
 
 test('the retry is offered only where it can work', () => {
@@ -43,12 +43,12 @@ test('the retry is offered only where it can work', () => {
 test('the auction takes its price and duration from the person, not from a record that has none', () => {
   // creator_value is 0 for exactly these artworks: the price only ever reaches
   // the chain through the auction call that failed.
-  assert.match(profile, /async function handleCreateAuction\(artwork, \{ startingPrice, durationHours \} = \{\}\)/);
-  assert.match(profile, /createAuction\(\s*artwork\.blockchain_id,\s*String\(startingPrice\),\s*Number\(durationHours\)/);
+  assert.match(artwork, /parseUserEthAmount\(newAuctionPrice\)/);
+  assert.match(artwork, /createAuction\(\s*artwork\.blockchain_id,\s*startingPrice\.eth,\s*Number\(newAuctionDuration\)/);
   assert.doesNotMatch(profile, /artwork\.creator_value\.toString\(\)/);
   // Canon rule 3: 24 / 36 / 48 only, and a starting price above zero.
-  assert.match(profile, /!\[24, 36, 48\]\.includes\(Number\(durationHours\)\)/);
-  assert.match(profile, /!\(parseFloat\(startingPrice\) > 0\)/);
+  assert.match(artwork, /!\[24, 36, 48\]\.includes\(Number\(newAuctionDuration\)\)/);
+  assert.doesNotMatch(profile.slice(profile.indexOf('async function handleStartAuction('), profile.indexOf('async function handleDeleteArtwork(')), /prompt\(|parseFloat/);
 });
 
 test('the reason a publish was refused appears where the click was', () => {

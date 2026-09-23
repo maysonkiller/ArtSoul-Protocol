@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('artsoul_theme') || 'classic';
+                document.documentElement.classList.add(theme === 'future' ? 'future' : 'classic');
+                if (/^0x[a-f0-9]{40}$/i.test(localStorage.getItem('artsoul_wallet') || '')) document.documentElement.classList.add('wallet-state-resolving');
+            } catch (error) {
+                document.documentElement.classList.add('classic');
+            }
+        })();
+    </script>
+    <title>Collection Draft | ArtSoul</title>
+    <meta name="description" content="Prepare a local collection draft, configure launch phases, and review its configuration. Publishing is not available.">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/jpeg" href="/favicon.jpg?v=3">
+    <script src="/header-prepaint.js?v=4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/design-system.css?v=1">
+    <link rel="stylesheet" href="/unified-styles.css?v=45">
+    <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
+    <link rel="stylesheet" href="/tailwind-build.css?v=1">
+    <script src="/storage-image.js?v=2" defer></script>
+    <script src="/base-network.js?v=2" defer></script>
+    <script src="/src/ui/theme-manager.js" defer></script>
+    <script src="/modal-system.js?v=1" defer></script>
+    <script type="module" src="/supabase-client.js"></script>
+    <script type="module" src="/supabase-auth.js?v=2"></script>
+    <script src="/avatar-dropdown.js?v=53" defer></script>
+    <script src="/webmcp-tools.js?v=4" defer></script>
+    <script src="/voice-commands.js?v=1" defer></script>
+    <script type="module" src="/wallet-runtime-loader.js"></script>
+</head>
+<body>
+    <header class="site-header">
+        <div class="site-header-shell">
+            <div class="site-header-row">
+                <div class="site-header-logo-zone">
+                    <a href="/" class="logo-link" aria-label="ArtSoul home">
+                        <img src="/ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                    </a>
+                </div>
+                <div class="site-header-center page-context" aria-hidden="true"></div>
+                <div class="site-header-actions">
+                    <div id="networkBadge"></div>
+                    <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
+                        <div class="avatar-dropdown-container">
+                            <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
+                                <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">
+                                <div class="avatar-info"><div data-avatar-name>ArtSoul Guest</div><div data-avatar-address hidden aria-hidden="true"></div><div data-avatar-resolving aria-hidden="true">Connecting…</div></div>
+                                <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <script>window.ArtSoulHeaderPrepaint?.hydrate(document.getElementById('navButtons'));</script>
+    <div id="app"></div>
+    <script type="module" src="/src/entries/collection-builder.jsx"></script>
+</body>
+</html>

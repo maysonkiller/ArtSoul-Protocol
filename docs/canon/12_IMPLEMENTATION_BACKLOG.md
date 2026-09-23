@@ -4,6 +4,21 @@ This backlog expands the canonical A–D phase model in `ARTSOUL_CANON_BIBLE_FUL
 
 Work proceeds one contained task at a time. One backlog item normally equals one focused PR. Contract changes require focused tests and explicit storage-layout review.
 
+## Founder-authorized takeover sequence — 2026-09-20
+
+The [development amendment](CHANGELOG_2026-09-20_COLLECTION_LAUNCH.md) permits
+this ordered sequence without marking the outstanding Phase A gates complete:
+
+1. **TA-01** — Audit current history/deployment and close AI media-fetch SSRF with regression evidence.
+2. **TA-02** — Keep provider identity fields under OAuth control, with authenticated negative tests.
+3. **TA-06** — Founder priority clarification 2026-09-21: stabilize the text-reported auction lifecycle, cross-page freshness, shared creation form, decimal entry, deposit explanation and wallet action guards before further Collection Launch implementation. Reuse existing audit evidence; do not repeat video analysis. Checkpoint: `docs/audits/STABILIZATION_CHECKPOINT.md`.
+4. **TA-03** — Implement and validate generic collection configuration and authoring, with explicit draft/launch boundaries.
+5. **TA-04** — Implement new isolated testnet collection/auction/craft contracts; test security and local lifecycle without modifying deployed storage.
+6. **TA-05** — Integrate verified projections, verification/newsletter/campaign services and reviewed wallet actions; rehearse testnet only after configuration and credentials exist.
+
+Durable findings, evidence and status live in `docs/BACKLOG.md`. Separate items
+remain reviewable; a successful local test never means a production rollout.
+
 ## Phase A — Stabilize Public Testnet (active)
 
 Goal: a production testnet trustworthy enough for a controlled beta.

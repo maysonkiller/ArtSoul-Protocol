@@ -1,6 +1,7 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
+import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 
@@ -536,6 +537,7 @@ const { useState, useEffect, useRef } = React;
                                 <span className={`artsoul-card-status artsoul-card-status-${status.key}`}>{status.label}</span>
                                 {price && <span className="artsoul-card-price">{price}</span>}
                             </div>
+                            {artwork.pending_auction_sync && <p className="artsoul-card-creator" role="status">Transaction confirmed. Updating auction data.</p>}
                             {canStartAuction && (
                                 <button
                                     type="button"
@@ -843,11 +845,12 @@ const { useState, useEffect, useRef } = React;
                     const walletAddress = getActiveWalletAddress() || await window.ensureWalletConnected?.() || '';
                     if (!walletAddress) return;
                     const result = await oauthIntegration.disconnect(provider, walletAddress);
+                    profileRequestRef.current++;
                     setProfile(result.profile || {
                         ...profile,
                         ...(provider === 'discord'
-                            ? { discord_id: null, discord_username: null }
-                            : { twitter_id: null, twitter_username: null, twitter_handle: null })
+                            ? { discord_connected: false, discord_username: null }
+                            : { twitter_connected: false, twitter_username: null })
                     });
                     setOAuthNotice({
                         type: 'success',
@@ -860,6 +863,17 @@ const { useState, useEffect, useRef } = React;
                     });
                 }
             }
+
+            useEffect(() => {
+                const refresh = () => { if (profile?.wallet_address) void loadMyArtworks(null, {fresh: true}); };
+                const onVisible = () => { if (document.visibilityState === 'visible' && window.ArtSoulDB?.confirmedAuctionUpdates?.().length) refresh(); };
+                window.addEventListener('artsoul:auction-confirmed', refresh);
+                document.addEventListener('visibilitychange', onVisible);
+                return () => {
+                    window.removeEventListener('artsoul:auction-confirmed', refresh);
+                    document.removeEventListener('visibilitychange', onVisible);
+                };
+            }, [profile?.wallet_address, selectedGallery]);
 
             async function loadProfile(walletAddressOverride = null, options = {}) {
                 // Check if viewing another user's profile
@@ -1140,6 +1154,7 @@ const { useState, useEffect, useRef } = React;
                     return;
                 }
 
+                const originalAvatar = profile?.avatar_url;
                 try {
                     // Ensure authenticated before upload
                     const isAuth = await window.ensureAuthenticated();
@@ -1149,7 +1164,6 @@ const { useState, useEffect, useRef } = React;
                     const fileName = `avatar_${walletAddress}_${Date.now()}.${file.name.split('.').pop()}`;
 
                     // Show loading feedback
-                    const originalAvatar = profile?.avatar_url;
                     setProfile({...profile, avatar_url: 'uploading...'});
 
                     const avatarUrl = await window.ArtSoulDB.uploadFile(file, fileName);
@@ -1177,8 +1191,7 @@ const { useState, useEffect, useRef } = React;
                     const profileData = {
                         username: profile.username,
                         bio: profile.bio,
-                        twitter_handle: profile.twitter_handle,
-                        discord_username: profile.discord_username,
+                        public_twitter_handle: profile.twitter_handle || '',
                         avatar_url: profile.avatar_url
                     };
 
@@ -1268,119 +1281,28 @@ const { useState, useEffect, useRef } = React;
              * through the auction call that failed.
              */
             async function handleStartAuction(artwork) {
-                const durations = { 24: '24', 36: '36', 48: '48' };
-                const rawHours = window.prompt(
-                    'Auction duration in hours - 24, 36 or 48.',
-                    '24'
-                );
-                if (rawHours === null) return;
-                const hours = String(rawHours).trim();
-                if (!durations[hours]) {
-                    alert('Choose 24, 36 or 48 hours.');
-                    return;
-                }
-
-                const rawPrice = window.prompt(
-                    `Starting price in ETH for "${artwork.title || 'this artwork'}".`,
-                    ''
-                );
-                if (rawPrice === null) return;
-                const price = String(rawPrice).trim().replace(',', '.');
-                if (!price || !(parseFloat(price) > 0)) {
-                    alert('The starting price must be greater than 0.');
-                    return;
-                }
-
-                await handleCreateAuction(artwork, {
-                    startingPrice: price,
-                    durationHours: Number(hours)
-                });
-            }
-
-            async function handleCreateAuction(artwork, { startingPrice, durationHours } = {}) {
                 const actionKey = beginTransactionAction('create-auction', artwork);
                 if (!actionKey) return;
-
                 try {
-                    // Validation also belongs to the action lifetime: every
-                    // return must release the Processing state in finally.
-                    // Primary auctions support 24h / 36h / 48h only. Canon rule 3.
-                    if (![24, 36, 48].includes(Number(durationHours))) {
-                        alert('Auction duration must be 24, 36 or 48 hours.');
-                        return;
-                    }
-                    if (!(parseFloat(startingPrice) > 0)) {
-                        alert('The starting price must be greater than 0.');
-                        return;
-                    }
-
-                    // Check wallet connection
                     let provider = await window.web3Modal?.getWalletProvider();
                     if (!provider) {
                         await window.ensureWalletConnected?.();
                         provider = await window.web3Modal?.getWalletProvider();
                     }
                     if (!provider) return;
-
-                    const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
-                    if (!walletAddress) return;
-
-                    if (!canCreateNewAuction(artwork, walletAddress)) {
-                        alert('A new primary auction is only available to the creator while the artwork is unminted and has no active auction.');
-                        return;
-                    }
-
-                    // Initialize contracts through the shared ethers BrowserProvider wrapper.
-                    await window.ArtSoulContracts.init(provider);
-
-                    // Check blockchain status first
-                    console.log('Checking blockchain status for artwork:', artwork.blockchain_id);
-                    const blockchainArtwork = await window.ArtSoulContracts.getArtwork(artwork.blockchain_id);
-                    console.log('Blockchain status:', blockchainArtwork.status);
-
-                    // Protocol status: 0=UNMINTED, 1=AUCTION, 3=MINTED
-                    if (blockchainArtwork.status === 1) {
-                        // Already in AUCTION status on blockchain, just sync database
-                        console.log(' Artwork already in AUCTION status on blockchain, syncing database...');
-                        try {
-                            await window.ArtSoulDB.updateArtwork(artwork.id, { status: 'auction' });
-                        } catch (syncError) {
-                            console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
-                        }
-                        alert('Auction was already active on the blockchain. Public state will update shortly.');
-                        loadMyArtworks(null, { fresh: true });
-                        return;
-                    }
-
-                    if (blockchainArtwork.status !== 0) {
-                        // Can only create/relaunch primary auctions while artwork remains unminted.
-                        const statusNames = ['UNMINTED', 'AUCTION', 'SETTLEMENT_PENDING', 'MINTED'];
-                        alert(`Cannot create auction. Artwork status: ${statusNames[blockchainArtwork.status]}`);
-                        return;
-                    }
-
-                    // The shared adapter guards the write chain before sending
-                    // and resolves only after confirmation. A later wallet
-                    // network read cannot reverse that confirmed outcome.
-                    await window.ArtSoulContracts.createAuction(
-                        artwork.blockchain_id,
-                        String(startingPrice),
-                        Number(durationHours)
-                    );
-
-                    try {
-                        await window.ArtSoulDB.updateArtwork(artwork.id, { status: 'auction' });
-                    } catch (syncError) {
-                        console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
-                    }
-
-                    alert('Auction created successfully! Public state will update shortly.');
-                    loadMyArtworks(null, { fresh: true }); // Reload artworks
+                    await inspectAuctionCreation({
+                        artworkId: artwork.blockchain_id || artwork.artwork_id,
+                        chainId: isBaseSepoliaArtwork(artwork) ? 84532 : 0,
+                        provider,
+                        contracts: window.ArtSoulContracts
+                    });
+                    const href = getProfileArtworkHref(artwork);
+                    if (!href) throw new Error('The artwork page is unavailable. Refresh the profile and try again.');
+                    const destination = new URL(href, window.location.origin);
+                    destination.searchParams.set('action', 'create-auction');
+                    window.location.assign(destination.pathname + destination.search);
                 } catch (error) {
-                    console.error('Create auction failed:', error);
-                    const message = getTransactionErrorMessage(error, 'The auction could not be created. Please try again.');
-                    console.log('Create auction error shown to user:', message);
-                    alert(`Auction could not be created: ${message}`);
+                    alert(getTransactionErrorMessage(error, 'Auction setup is unavailable. Please try again.'));
                 } finally {
                     finishTransactionAction(actionKey);
                 }
@@ -1596,10 +1518,21 @@ const { useState, useEffect, useRef } = React;
                                                         : 'bg-gray-800/50 border border-cyan-500/30 text-cyan-100'
                                                 } outline-none`}
                                             />
+                                            <label className="block text-sm">
+                                                Public X link (self-reported)
+                                                <input
+                                                    value={profile?.twitter_handle || ''}
+                                                    onChange={(e) => setProfile({...profile, twitter_handle: e.target.value})}
+                                                    placeholder="@username or https://x.com/username"
+                                                    className="w-full px-4 py-3 rounded-lg"
+                                                    style={{ background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)' }}
+                                                />
+                                                <span>This link does not verify an account. Use Connect below to confirm ownership.</span>
+                                            </label>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {/* X (Twitter) OAuth */}
                                                 <div className="overflow-hidden max-w-full">
-                                                    {profile?.twitter_username ? (
+                                                    {profile?.twitter_connected === true ? (
                                                         <div className={`flex items-center justify-between px-4 py-2 rounded-lg max-w-full ${
                                                             isClassic ? 'bg-gray-700 border border-gray-600' : 'bg-cyan-900/50 border border-cyan-500/30'
                                                         }`}>
@@ -1637,7 +1570,7 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                                 {/* Discord OAuth */}
                                                 <div className="overflow-hidden max-w-full">
-                                                    {profile?.discord_username ? (
+                                                    {profile?.discord_connected === true ? (
                                                         <div className={`flex items-center justify-between px-4 py-2 rounded-lg max-w-full ${
                                                             isClassic ? 'bg-gray-700 border border-gray-600' : 'bg-purple-900/50 border border-purple-500/30'
                                                         }`}>
@@ -1645,7 +1578,7 @@ const { useState, useEffect, useRef } = React;
                                                                 <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                                                                     <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
                                                                 </svg>
-                                                                <span className="truncate min-w-0">{profile.discord_username.replace('#0', '')}</span>
+                                                                <span className="truncate min-w-0">{String(profile.discord_username || '').replace('#0', '')}</span>
                                                             </span>
                                                             <button
                                                                 onClick={() => handleSocialDisconnect('discord')}
@@ -1726,6 +1659,11 @@ const { useState, useEffect, useRef } = React;
                                             </p>
                                             <div className="profile-social-action-row">
                                                 <div className="profile-social-links flex gap-3 flex-wrap">
+                                                    {profile?.twitter_connected === true && profile?.twitter_username && (
+                                                        <a href={`https://x.com/${encodeURIComponent(profile.twitter_username)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5">
+                                                            @{profile.twitter_username} (connected)
+                                                        </a>
+                                                    )}
                                                     {profile?.twitter_handle && (
                                                         <a
                                                             href={`https://twitter.com/${profile.twitter_handle.replace('@', '')}`}
@@ -1739,7 +1677,7 @@ const { useState, useEffect, useRef } = React;
                                                             <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                                                                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                                                             </svg>
-                                                            <span className="truncate min-w-0">@{profile.twitter_handle.replace('@', '')}</span>
+                                                            <span className="truncate min-w-0">@{profile.twitter_handle.replace('@', '')} (self-reported)</span>
                                                         </a>
                                                     )}
                                                     {profile?.discord_username && (
@@ -1751,7 +1689,7 @@ const { useState, useEffect, useRef } = React;
                                                             <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                                                                 <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
                                                             </svg>
-                                                            <span className="truncate min-w-0">{profile.discord_username.replace('#0', '')}</span>
+                                                            <span className="truncate min-w-0">{profile.discord_username.replace('#0', '')} ({profile.discord_connected === true ? 'connected' : 'self-reported'})</span>
                                                         </div>
                                                     )}
                                                 </div>

@@ -8,6 +8,7 @@ import {
   setOAuthState,
   supabaseRest
 } from '../backend.js';
+import { publicProfile } from '../profile-fields.js';
 
 const PROVIDERS = new Set(['discord', 'twitter']);
 
@@ -121,6 +122,9 @@ async function exchangeDiscord(code, redirectUri) {
     headers: { Authorization: `Bearer ${token.access_token}` }
   });
   const user = await parseProviderResponse(userResponse, 'Discord profile lookup failed');
+  if (!/^\d+$/.test(String(user.id || '')) || typeof user.username !== 'string' || !user.username.trim()) {
+    throw new Error('Discord did not return a valid account');
+  }
   const discriminator = user.discriminator && user.discriminator !== '0' ? `#${user.discriminator}` : '';
   return {
     discord_id: user.id,
@@ -153,8 +157,7 @@ async function exchangeTwitter(code, redirectUri, codeVerifier) {
   }
   return {
     twitter_id: payload.data.id,
-    twitter_username: payload.data.username,
-    twitter_handle: `@${payload.data.username}`
+    twitter_username: payload.data.username
   };
 }
 
@@ -291,13 +294,13 @@ export async function oauthUnlinkHandler(req, res) {
 
     const updates = provider === 'discord'
       ? { discord_id: null, discord_username: null }
-      : { twitter_id: null, twitter_username: null, twitter_handle: null };
+      : { twitter_id: null, twitter_username: null };
     const rows = await supabaseRest(`profiles?wallet_address=eq.${encodeURIComponent(wallet)}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=representation' },
       body: { ...updates, updated_at: new Date().toISOString() }
     });
-    res.status(200).json({ success: true, profile: rows?.[0] || { wallet_address: wallet, ...updates } });
+    res.status(200).json({ success: true, profile: publicProfile(rows?.[0] || { wallet_address: wallet, ...updates }) });
   } catch (error) {
     const status = error.statusCode || 500;
     res.status(status).json({

@@ -56,6 +56,7 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/observability_dashboard.sql` | `not recorded`. Manual observability migration. |
 | `sql/migrations/stabilization_layer.sql` | `not recorded`. Manual stabilization migration. |
 | `sql/migrations/indexer_dedup_setup.sql` | `not recorded`. Manual deduplication setup. |
+| `sql/migrations/collection_launch_services.sql` | **LOCAL DRAFT, DO NOT APPLY.** Added during the September takeover; not applied by this task. Services remain unwired/disabled. Inline RLS/service-role restrictions are statically checked; PostgreSQL execution and newsletter delivery consistency remain unverified. |
 | `migrations/001_ai_integration.sql` | Historical/manual, third tree. Its `001` prefix does **not** belong to the indexer sequence; the numbering collision with `sql/migrations/001_core_indexer_schema.sql` is real. Verify schema before any use. |
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.

@@ -14,6 +14,7 @@ import session from 'express-session';
 import rateLimit from 'express-rate-limit';
 import { resolveIndexerChainConfigs } from '../indexer/chain-config.js';
 import { validateSiweMessage } from './backend.js';
+import { cleanProfile, publicProfile } from './profile-fields.js';
 
 dotenv.config();
 
@@ -323,13 +324,7 @@ function normalizeApiChainId(value) {
 }
 
 function cleanProfilePayload(body = {}) {
-    const allowedFields = ['username', 'bio', 'twitter_handle', 'discord_username', 'avatar_url'];
-    return allowedFields.reduce((profile, field) => {
-        if (body[field] !== undefined) {
-            profile[field] = typeof body[field] === 'string' ? body[field].trim() : body[field];
-        }
-        return profile;
-    }, {});
+    return cleanProfile(body);
 }
 
 app.put('/api/profile', authenticateWallet, async (req, res) => {
@@ -352,32 +347,23 @@ app.put('/api/profile', authenticateWallet, async (req, res) => {
             }
         }
 
+        // Keys come only from the shared whitelist; values stay parameterized.
+        // Partial edits must preserve omitted fields, including OAuth identity.
+        const fields = Object.keys(profile);
+        const columns = ['wallet_address', ...fields];
         const rows = await database.query(
-            `INSERT INTO profiles (
-                wallet_address, username, bio, avatar_url, twitter_handle, discord_username, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, now())
-            ON CONFLICT (wallet_address) DO UPDATE SET
-                username = EXCLUDED.username,
-                bio = EXCLUDED.bio,
-                avatar_url = EXCLUDED.avatar_url,
-                twitter_handle = EXCLUDED.twitter_handle,
-                discord_username = EXCLUDED.discord_username,
-                updated_at = now()
-            RETURNING *`,
-            [
-                wallet,
-                profile.username || null,
-                profile.bio || null,
-                profile.avatar_url || null,
-                profile.twitter_handle || null,
-                profile.discord_username || null
-            ]
+            `INSERT INTO profiles (${columns.join(',')}, updated_at)
+             VALUES (${columns.map((_, index) => `$${index + 1}`).join(',')}, now())
+             ON CONFLICT (wallet_address) DO UPDATE SET
+             ${[...fields.map(field => `${field} = EXCLUDED.${field}`), 'updated_at = now()'].join(',')}
+             RETURNING *`,
+            [wallet, ...fields.map(field => profile[field])]
         );
 
-        res.json({ success: true, profile: rows[0] });
+        res.json({ success: true, profile: publicProfile(rows[0]) });
     } catch (error) {
         console.error('[ProfileAPI] Profile upsert failed:', error);
-        res.status(500).json({ error: 'PROFILE_SAVE_FAILED' });
+        res.status(error.statusCode || 500).json({ error: error.code || 'PROFILE_SAVE_FAILED' });
     }
 });
 

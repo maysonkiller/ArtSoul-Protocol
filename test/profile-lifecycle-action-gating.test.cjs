@@ -281,10 +281,10 @@ test('re-auction stays creator-only, unminted-only, and lifecycle-restricted', (
   assert.match(predicate, /!isArtworkMinted\(artworkData\)/);
   assert.match(predicate, /active_auction_id/);
   const handler = extractFunction(artworkSource, 'handleConfirmNewAuction');
-  assert.match(handler, /canCreateNewAuctionForWallet\(artwork, walletAddress\)/);
-  // The handler re-verifies creator/minted/active state against the chain.
-  assert.match(handler, /isSameAddress\(blockchainArtwork\.creator, walletAddress\)/);
-  assert.match(handler, /blockchainArtwork\.minted \|\| hasProtocolId\(blockchainArtwork\.tokenId\)/);
+  assert.match(handler, /await inspectAuctionCreation\(/);
+  assert.match(handler, /expectedWallet: openingContext\.walletAddress/);
+  // The shared preflight's creator/minted/active guards execute behaviorally in
+  // auction-creation-flow.test.mjs, including account changes and stale cards.
 });
 
 test('resale submit re-checks owner and chain; buyer can never self-purchase', () => {
@@ -551,6 +551,14 @@ function loadModerationAccess({ sessionWallet, roleRows, profileRows, registryDo
 }
 
 const STAFF_PROFILE = [{ wallet_address: CREATOR, twitter_id: 't1', discord_id: 'd1' }];
+
+test('self-reported social names cannot satisfy legacy staff connection checks', async () => {
+  const access = await loadModerationAccess({ sessionWallet: CREATOR, roleRows: [{ role: 'moderator' }],
+    profileRows: [{ wallet_address: CREATOR, twitter_handle: '@claimed', twitter_username: 'claimed', discord_username: 'claimed' }]
+  })({});
+  assert.equal(access.canModerate, false);
+  assert.deepEqual([...access.missingFactors], ['x', 'discord']);
+});
 
 test('staff moderation requires a server-verified wallet session plus an active staff role', async () => {
   const staff = await loadModerationAccess({

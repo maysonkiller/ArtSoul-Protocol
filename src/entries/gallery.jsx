@@ -93,6 +93,15 @@ const { useState, useEffect, useMemo, useRef } = React;
 
             useEffect(() => {
                 loadArtworks();
+                const refresh = () => { void loadArtworks(); };
+                const onVisible = () => { if (document.visibilityState === 'visible' && window.ArtSoulDB?.confirmedAuctionUpdates?.().length) refresh(); };
+                window.addEventListener('artsoul:auction-confirmed', refresh);
+                document.addEventListener('visibilitychange', onVisible);
+                return () => {
+                    window.removeEventListener('artsoul:auction-confirmed', refresh);
+                    document.removeEventListener('visibilitychange', onVisible);
+                    loadSequenceRef.current++;
+                };
             }, []);
 
             function sleep(ms) {

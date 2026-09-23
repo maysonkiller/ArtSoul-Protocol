@@ -1,6 +1,9 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
 import { decodeImage } from '../features/artwork/decoded-image.js';
+import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
+import { parseUserEthAmount } from '../features/auction/eth-amount.js';
+import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 
 // A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
 // after the server signals a staff wallet needs passkey step-up/enrollment,
@@ -322,6 +325,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [resolvedProfileAddresses, setResolvedProfileAddresses] = useState(() => new Set());
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
+            const [refreshError, setRefreshError] = useState('');
             const [projectionRetryCount, setProjectionRetryCount] = useState(0);
             const [bidAmount, setBidAmount] = useState('');
             const [bidActivity, setBidActivity] = useState([]);
@@ -363,6 +367,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [newAuctionPrice, setNewAuctionPrice] = useState('');
             const [newAuctionDuration, setNewAuctionDuration] = useState(24);
             const [isNewAuctionModalOpen, setIsNewAuctionModalOpen] = useState(false);
+            const [auctionCreationError, setAuctionCreationError] = useState('');
+            const [auctionCreationChecking, setAuctionCreationChecking] = useState(false);
+            const auctionCreationCheckRef = useRef({ pending: false, context: null, autoOpened: false });
             const [reauctionEstimateState, setReauctionEstimateState] = useState('idle');
             const [reauctionEstimate, setReauctionEstimate] = useState(null);
             const [isResaleModalOpen, setIsResaleModalOpen] = useState(false);
@@ -383,6 +390,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [confirmedResaleListing, setConfirmedResaleListing] = useState(false);
             const bidPollInFlightRef = useRef(false);
             const bidCursorRef = useRef(null);
+            const artworkLoadSequenceRef = useRef(0);
+            const loadedArtworkIdRef = useRef(null);
+            const liveAuctionIdentityRef = useRef('');
             const bidderProfileCacheRef = useRef(new Map());
             const transactionActionsRef = useRef(new Set());
             const reauctionValuationControllerRef = useRef(null);
@@ -481,7 +491,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }
 
             function requiredDepositForBidWei(value) {
-                const bidWei = parseEthToWei(value);
+                let bidWei;
+                try { bidWei = parseUserEthAmount(String(value)).wei; } catch { return 0n; }
                 if (!bidWei || bidWei <= 0n) return 0n;
                 const percentageDeposit = (bidWei * 1000n + 9999n) / 10000n;
                 const minimumDeposit = 10000000000000000n;
@@ -628,6 +639,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             useEffect(() => () => reauctionValuationControllerRef.current?.abort(), []);
 
             useEffect(() => {
+                if (!artwork || !walletRenderState.settled || auctionCreationCheckRef.current.autoOpened) return;
+                if (new URLSearchParams(window.location.search).get('action') !== 'create-auction') return;
+                auctionCreationCheckRef.current.autoOpened = true;
+                void openNewAuctionModal();
+            }, [artwork, walletRenderState.settled]);
+
+            useEffect(() => {
                 if (!isResaleModalOpen) return undefined;
                 const previousOverflow = document.body.style.overflow;
                 document.body.style.overflow = 'hidden';
@@ -721,7 +739,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     artworkData?.status || artworkData?.auction_state || artworkData?.lifecycle_state || ''
                 ).toLowerCase();
                 const presentationStatus = window.ArtSoulArtworkCard?.statusInfo?.(artworkData)?.key;
-                const eligibleLifecycle = presentationStatus === 'ended_no_bids' ||
+                const eligibleLifecycle = rawStatus === 'registered' ||
+                    presentationStatus === 'ended_no_bids' ||
                     presentationStatus === 'unsettled' ||
                     rawStatus.includes('no_bid') ||
                     rawStatus.includes('default') ||
@@ -1010,7 +1029,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 return BigInt(whole || '0') * WEI_PER_ETH + BigInt(paddedFraction || '0');
             }
 
-            function formatWeiToEth(wei, maxDecimals = 6) {
+            function formatWeiToEth(wei, maxDecimals = 18) {
                 if (wei === undefined || wei === null) return '0';
                 const value = typeof wei === 'bigint' ? wei : BigInt(String(wei));
                 const whole = value / WEI_PER_ETH;
@@ -1065,6 +1084,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
                 return {
                     auctionId,
+                    chainId: projection.chain_id,
                     artworkId: projection.artwork_id || projection.blockchain_id,
                     seller: projection.creator_id || projection.creator,
                     startingPrice: firstDefined(projection.start_price, projection.creator_value, '0'),
@@ -1094,6 +1114,19 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 const projectedAuction = projectedAuctionFromArtwork(projection);
                 if (!projectedAuction) return currentAuction;
                 if (!currentAuction) return projectedAuction;
+
+                // Bid monotonicity belongs to one round. A new auction must not
+                // inherit the previous round's ID, price or highest bidder.
+                const sameArtwork = String(currentAuction.artworkId) === String(projectedAuction.artworkId);
+                const sameChain = !currentAuction.chainId || !projectedAuction.chainId || Number(currentAuction.chainId) === Number(projectedAuction.chainId);
+                if (!sameArtwork || !sameChain) return projectedAuction;
+                const currentId = BigInt(currentAuction.auctionId || 0);
+                const projectedId = BigInt(projectedAuction.auctionId || 0);
+                if (projectedId > currentId) return projectedAuction;
+                if (projectedId < currentId) return currentAuction;
+                // A stale indexer response cannot reopen a confirmed round.
+                if (currentAuction.ended && !projectedAuction.ended) return currentAuction;
+                if ((currentAuction.settled || currentAuction.defaulted) && !projectedAuction.settled && !projectedAuction.defaulted) return currentAuction;
 
                 const projectedBidWei = parseEthToWei(projectedAuction.highestBid) || 0n;
                 const currentBidWei = getAuctionHighestBidWei(currentAuction);
@@ -1159,6 +1192,15 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }
 
             async function applyLiveAuctionProjection(projection) {
+                const identity = `${projection?.chain_id}:${projection?.artwork_id || projection?.blockchain_id}:${projection?.auction_id || projection?.active_auction_id || ''}`;
+                const previous = liveAuctionIdentityRef.current.split(':');
+                const incoming = identity.split(':');
+                if (previous[0] === incoming[0] && previous[1] === incoming[1] &&
+                    BigInt(previous[2] || 0) > BigInt(incoming[2] || 0)) return;
+                if (identity !== liveAuctionIdentityRef.current) {
+                    liveAuctionIdentityRef.current = identity;
+                    bidCursorRef.current = null;
+                }
                 const nextBids = Array.isArray(projection?.bids)
                     ? [...projection.bids].sort((left, right) => {
                         const blockDelta = Number(right.block_number || 0) - Number(left.block_number || 0);
@@ -1183,6 +1225,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 if (!auctionActionId) return;
 
                 bidPollInFlightRef.current = true;
+                const identity = liveAuctionIdentityRef.current;
+                const generation = artworkLoadSequenceRef.current;
                 try {
                     const cursor = bidCursorRef.current;
                     const live = await window.ArtSoulDB.getLiveAuctionActivity({
@@ -1191,7 +1235,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         after_block: cursor ? cursor.block : undefined,
                         after_log: cursor ? cursor.log : undefined
                     });
-                    if (!live) return;
+                    if (!live || identity !== liveAuctionIdentityRef.current || generation !== artworkLoadSequenceRef.current) return;
 
                     const newBids = Array.isArray(live.bids) ? live.bids : [];
                     if (newBids.length > 0) {
@@ -1632,19 +1676,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     return { wei: contractMinimumWei, eth: formatWeiToEth(contractMinimumWei) };
                 }
 
-                const helper = getAuctionHelper('calculateMinimumBid');
-                if (helper) {
-                    try {
-                        const helperMinimum = helper(auctionData?.highestBid, auctionData?.startingPrice);
-                        const helperMinimumWei = parseEthToWei(helperMinimum);
-                        if (helperMinimumWei && helperMinimumWei > 0n) {
-                            return { wei: helperMinimumWei, eth: formatWeiToEth(helperMinimumWei) };
-                        }
-                    } catch (error) {
-                        console.warn('Minimum bid helper failed; using local fallback.', error.message);
-                    }
-                }
-
+                // Match the contract's integer ceiling rule without passing
+                // through floating-point helpers or rounding the input value.
                 const currentBidWei = getAuctionHighestBidWei(auctionData);
                 if (currentBidWei > 0n) {
                     const absoluteIncrement = currentBidWei + MIN_ABSOLUTE_BID_INCREMENT_WEI;
@@ -1667,25 +1700,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }
 
             function validateBidAmountSafe(amount, minimumBidDetails) {
-                const helper = getAuctionHelper('validateBidAmount');
-                if (helper) {
-                    try {
-                        const validation = helper(amount, minimumBidDetails?.eth || minimumBidDetails);
-                        if (validation) {
-                            return validation.valid
-                                ? validation
-                                : { valid: false, error: friendlyMinimumBidMessage(minimumBidDetails) };
-                        }
-                    } catch (error) {
-                        console.warn('Bid validation helper failed; using local fallback.', error.message);
-                    }
+                let bidWei;
+                try {
+                    bidWei = parseUserEthAmount(amount).wei;
+                } catch (error) {
+                    return { valid: false, error: error.message || 'Enter a valid bid amount.' };
                 }
-
-                const bidWei = parseEthToWei(amount);
                 const minimumWei = minimumBidDetails?.wei ?? parseEthToWei(minimumBidDetails);
-                if (!bidWei || bidWei <= 0n) {
-                    return { valid: false, error: 'Enter a valid bid amount.' };
-                }
                 if (minimumWei && bidWei < minimumWei) {
                     return { valid: false, error: friendlyMinimumBidMessage(minimumBidDetails) };
                 }
@@ -1840,15 +1861,29 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     clearInterval(interval);
                     document.removeEventListener('visibilitychange', onVisibilityChange);
                 };
-            }, [artworkId, isV41CompositeId, auction?.status, auction?.state, auction?.endTime]);
+            }, [artworkId, isV41CompositeId, auction?.auctionId, auction?.status, auction?.state, auction?.endTime]);
+
+            useEffect(() => {
+                const refresh = () => { void loadArtwork(); };
+                window.addEventListener('artsoul:auction-confirmed', refresh);
+                return () => {
+                    window.removeEventListener('artsoul:auction-confirmed', refresh);
+                    artworkLoadSequenceRef.current++;
+                };
+            }, [artworkId]);
 
             async function loadArtwork() {
+                const sequence = ++artworkLoadSequenceRef.current;
+                const isCurrent = () => sequence === artworkLoadSequenceRef.current;
                 try {
                     console.log('[Artwork] Loading artwork:', artworkId);
                     // Load from Supabase
                     const data = await window.ArtSoulDB.getArtwork(artworkId);
+                    if (!isCurrent()) return false;
                     console.log('[Artwork] Loaded data:', data);
                     setError(null);
+                    setRefreshError('');
+                    loadedArtworkIdRef.current = artworkId;
                     setProjectionRetryCount(0);
                     setArtwork(data);
                     setNewAuctionPrice(current => current || String(firstDefined(
@@ -1880,7 +1915,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         wouldBuy: 0,
                         watching: 0
                     });
-                    setAiGuidance(data.ai_guidance || window.ArtSoulDiscovery?.getAIGuidance?.(data) || null);
+                    // Only display stored model guidance. Creator prices and
+                    // discovery heuristics are not a Gemini analysis.
+                    setAiGuidance(readAIValuation(data.ai_guidance));
 
                     // Keep share previews branded; artwork-specific data stays in the page content.
                     const pageUrl = window.location.href;
@@ -1902,6 +1939,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         const profile = await window.ArtSoulDB.getProfile(address);
                         return { address, profile };
                     })).then(results => {
+                        if (!isCurrent()) return;
                         const profiles = new Map();
                         results.forEach(result => {
                             if (result.status === 'fulfilled') profiles.set(result.value.address, result.value.profile);
@@ -1928,6 +1966,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         }
                         try {
                             const allVotes = await window.ArtSoulDB.getVotes(artworkId);
+                            if (!isCurrent()) return;
                             setVotes(allVotes || []);
                             setSocialSignals(current => ({
                                 ...current,
@@ -1951,6 +1990,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     ? Promise.resolve(readV41InteractionState(walletAddress))
                                     : Promise.resolve(window.ArtSoulDiscovery?.getInteractionState?.(artworkId, walletAddress))
                             ]);
+                            if (!isCurrent() || walletAddress !== window.getCurrentWalletAddress?.()) return;
                             const existingVote = voteResult.status === 'fulfilled' ? voteResult.value : null;
                             if (existingVote) setUserVote(existingVote);
                             const discoveryState = discoveryResult.status === 'fulfilled' ? discoveryResult.value : null;
@@ -1980,6 +2020,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             chain_id: data.chain_id,
                             artwork_id: data.artwork_id
                         });
+                        if (!isCurrent()) return;
                         setProvenanceState(projection
                             ? {
                                 status: 'ready',
@@ -1989,18 +2030,37 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             : { status: 'unavailable', events: [], complete: false });
                     })();
 
-                    const auctionActionId = getAuctionActionId(data, null);
                     const contractPromise = (async () => {
-                        if (!auctionActionId || !window.ArtSoulContracts) return;
+                        if (!window.ArtSoulContracts || !data.blockchain_id) return;
                         try {
                             const provider = await window.web3Modal?.getWalletProvider();
                             if (!provider) return;
                             await window.ArtSoulContracts.init(provider);
+                            if (!isCurrent()) return;
+                            const chain = Number(await provider.request({method: 'eth_chainId'}));
+                            if (chain !== Number(data.chain_id)) return;
+                            const chainArtwork = await window.ArtSoulContracts.getArtwork(data.blockchain_id);
+                            if (!isCurrent()) return;
+                            // Resolve the live pointer by artwork, never reuse a
+                            // cached previous auction ID after a re-auction.
+                            const auctionActionId = hasProtocolId(chainArtwork.activeAuctionId)
+                                ? chainArtwork.activeAuctionId : getAuctionActionId(data, null);
+                            if (!auctionActionId) return;
                             const auctionData = await window.ArtSoulContracts.getAuction(auctionActionId);
+                            if (!isCurrent() || Number(await provider.request({method: 'eth_chainId'})) !== chain) return;
                             if (auctionData && auctionData.seller !== '0x0000000000000000000000000000000000000000') {
-                                setAuction(current => ({
-                                    ...current,
+                                const identity = `${chain}:${data.artwork_id || data.blockchain_id}:${auctionData.auctionId}`;
+                                if (identity !== liveAuctionIdentityRef.current) {
+                                    liveAuctionIdentityRef.current = identity;
+                                    bidCursorRef.current = null;
+                                    setBidActivity([]);
+                                }
+                                setAuction(current => {
+                                    if (BigInt(current?.auctionId || 0) > BigInt(auctionData.auctionId || 0)) return current;
+                                    if (String(current?.auctionId) === String(auctionData.auctionId) && current?.ended && !auctionData.ended) return current;
+                                    return {
                                     ...auctionData,
+                                    chainId: chain,
                                     winnerDeadline: firstPositiveTimestamp(
                                         auctionData.winnerDeadline,
                                         auctionData.winner_deadline,
@@ -2008,7 +2068,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         auctionData.settlement_deadline,
                                         data.settlement_deadline
                                     )
-                                }));
+                                    };
+                                });
                             }
                         } catch (error) {
                             console.warn('Could not load blockchain auction data:', error);
@@ -2027,6 +2088,15 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     return true;
                 } catch (error) {
                     console.error('Error loading artwork:', error);
+                    if (!isCurrent()) return false;
+                    // A failed read cannot undo a loaded, receipt-confirmed
+                    // state. A successful empty/hidden response still follows
+                    // the normal unavailable-artwork path below.
+                    if (error?.code === 'ARTWORK_READ_UNAVAILABLE' && loadedArtworkIdRef.current === artworkId) {
+                        setRefreshError('Auction data could not be refreshed. Showing the last available state.');
+                        setLoading(false);
+                        return false;
+                    }
                     if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
                         setError({
                             code: 'V41_ARTWORK_NOT_INDEXED',
@@ -2060,6 +2130,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             async function placeBidOnce() {
                 if (!ensureArtworkWriteEnabled()) return;
+                let enteredBid;
+                try { enteredBid = parseUserEthAmount(bidAmount); } catch (error) { alert(error.message); return; }
                 if (isAuctionClosedForBidding(auction)) {
                     alert('This auction has ended.');
                     return;
@@ -2070,6 +2142,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
                 if (!walletAddress) return;
                 const creatorAddress = artwork?.creator_id || artwork?.creator;
+                if (isSameAddress(walletAddress, creatorAddress)) {
+                    alert('Creators cannot bid on their own artwork.');
+                    return;
+                }
                 const highestBidder = getAuctionHighestBidder(auction);
                 const bidContext = {
                     walletAddress,
@@ -2078,13 +2154,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     minimumBidDetails,
                     auctionEnded: isAuctionClosedForBidding(auction),
                     bidBelowMinimum: Boolean(
-                        parseEthToWei(bidAmount) &&
                         minimumBidDetails?.wei &&
-                        parseEthToWei(bidAmount) < minimumBidDetails.wei
+                        enteredBid.wei < minimumBidDetails.wei
                     )
                 };
 
-                if (!parseEthToWei(bidAmount) || parseEthToWei(bidAmount) <= 0n) {
+                if (enteredBid.wei <= 0n) {
                     alert('Enter a valid bid amount.');
                     return;
                 }
@@ -2113,7 +2188,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 }
 
                 // Validate bid amount
-                const validation = validateBidAmountSafe(bidAmount, minimumBidDetails);
+                const validation = validateBidAmountSafe(enteredBid.eth, minimumBidDetails);
                 if (!validation.valid) {
                     alert(validation.error);
                     return;
@@ -2129,7 +2204,16 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     if (!provider) return;
 
                     await window.ArtSoulContracts.init(provider);
-                    await window.ArtSoulContracts.placeBid(auctionActionId, bidAmount);
+                    const liveWallet = await getLiveProviderAccount();
+                    if (!isSameAddress(liveWallet, walletAddress)) throw new Error('The wallet changed. Review your bid again.');
+                    const deposit = BigInt(await window.ArtSoulContracts.getRequiredBidDeposit(enteredBid.eth));
+                    const remainder = enteredBid.wei > deposit ? enteredBid.wei - deposit : 0n;
+                    const confirmed = await confirmAuctionAction(
+                        `Bid: ${enteredBid.eth} ETH. Pay now: ${formatWeiToEth(deposit, 18)} ETH deposit, plus wallet-estimated gas on Base Sepolia. Deposit is the greater of 10% (rounded up to wei) and 0.01 ETH. If you win, the remaining settlement payment is ${formatWeiToEth(remainder, 18)} ETH within 24 hours. Losing deposits are refundable.`,
+                        'Review Bid'
+                    );
+                    if (!confirmed) return;
+                    await window.ArtSoulContracts.placeBid(auctionActionId, enteredBid.eth, {expectedWallet: liveWallet, expectedChainId: 84532});
 
                     alert('Bid placed successfully!');
                     await refreshLiveBidActivity();
@@ -2219,15 +2303,41 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 }
             }
 
-            function openNewAuctionModal() {
-                setIsNewAuctionModalOpen(true);
-                void requestFreshReauctionValuation();
+            async function openNewAuctionModal() {
+                if (!ensureArtworkWriteEnabled() || auctionCreationCheckRef.current.pending) return;
+                auctionCreationCheckRef.current.pending = true;
+                setAuctionCreationChecking(true);
+                setAuctionCreationError('');
+                try {
+                    let provider = await window.web3Modal?.getWalletProvider();
+                    if (!provider) {
+                        await window.ensureWalletConnected?.();
+                        provider = await window.web3Modal?.getWalletProvider();
+                    }
+                    if (!provider) return;
+                    const context = await inspectAuctionCreation({
+                        artworkId: artwork.blockchain_id || artwork.artwork_id,
+                        chainId: getArtworkWriteChainId(),
+                        provider,
+                        contracts: window.ArtSoulContracts
+                    });
+                    auctionCreationCheckRef.current.context = context;
+                    setIsNewAuctionModalOpen(true);
+                    void requestFreshReauctionValuation();
+                } catch (error) {
+                    setAuctionCreationError(getTransactionErrorMessage(error, 'Auction setup is unavailable. Please try again.'));
+                } finally {
+                    auctionCreationCheckRef.current.pending = false;
+                    setAuctionCreationChecking(false);
+                }
             }
 
             function closeNewAuctionModal() {
                 if (isTransactionActionPending('create-auction')) return;
                 reauctionValuationControllerRef.current?.abort();
                 reauctionValuationControllerRef.current = null;
+                auctionCreationCheckRef.current.context = null;
+                setAuctionCreationError('');
                 setIsNewAuctionModalOpen(false);
             }
 
@@ -2236,49 +2346,29 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 if (!beginTransactionAction('create-auction')) return;
 
                 try {
-                    const walletAddress = window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
-                    if (!walletAddress) return;
-
-                    if (!canCreateNewAuctionForWallet(artwork, walletAddress)) {
-                        alert('Re-auction is available only to the creator for an ended-no-bids or defaulted artwork that is unminted and has no active auction.');
-                        return;
-                    }
-
-                    const startingPriceWei = parseEthToWei(newAuctionPrice);
-                    if (!startingPriceWei || startingPriceWei <= 0n) {
-                        alert('Enter a valid starting price greater than 0 ETH.');
-                        return;
-                    }
+                    setAuctionCreationError('');
+                    const startingPrice = parseUserEthAmount(newAuctionPrice);
 
                     if (![24, 36, 48].includes(Number(newAuctionDuration))) {
-                        alert('Choose a 24h, 36h, or 48h auction duration.');
-                        return;
+                        throw new Error('Choose a 24h, 36h, or 48h auction duration.');
                     }
-
-                    let provider = await window.web3Modal?.getWalletProvider();
-                    if (!provider) {
-                        await window.ensureWalletConnected?.();
-                        provider = await window.web3Modal?.getWalletProvider();
+                    const openingContext = auctionCreationCheckRef.current.context;
+                    if (!openingContext) {
+                        throw new Error('Close this form and reopen auction setup to check the current wallet and artwork.');
                     }
-                    if (!provider) return;
-
-                    await window.ArtSoulContracts.init(provider);
-
-                    const blockchainArtwork = await window.ArtSoulContracts.getArtwork(artwork.blockchain_id);
-                    if (!isSameAddress(blockchainArtwork.creator, walletAddress)) {
-                        throw new Error('Only the artwork creator can create a new primary auction.');
-                    }
-                    if (blockchainArtwork.minted || hasProtocolId(blockchainArtwork.tokenId)) {
-                        throw new Error('This NFT is already minted. The current owner must use the resale flow instead.');
-                    }
-                    if (hasProtocolId(blockchainArtwork.activeAuctionId)) {
-                        throw new Error('This artwork already has an active auction.');
-                    }
-
+                    const provider = await window.web3Modal?.getWalletProvider();
+                    const context = await inspectAuctionCreation({
+                        artworkId: artwork.blockchain_id || artwork.artwork_id,
+                        chainId: getArtworkWriteChainId(),
+                        provider,
+                        contracts: window.ArtSoulContracts,
+                        expectedWallet: openingContext.walletAddress
+                    });
                     const txHash = await window.ArtSoulContracts.createAuction(
                         artwork.blockchain_id,
-                        newAuctionPrice,
-                        Number(newAuctionDuration)
+                        startingPrice.eth,
+                        Number(newAuctionDuration),
+                        { expectedWallet: context.walletAddress, expectedChainId: context.chainId }
                     );
                     console.log('New auction transaction:', txHash);
 
@@ -2288,7 +2378,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     console.error('Create new auction failed:', error);
                     const message = getTransactionErrorMessage(error, 'The new auction could not be created. Please try again.');
                     console.log('Create new auction error shown to user:', message);
-                    alert(`New auction could not be created: ${message}`);
+                    setAuctionCreationError(message);
                 } finally {
                     finishTransactionAction('create-auction');
                 }
@@ -2333,28 +2423,15 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     // End auction on blockchain
                     await window.ArtSoulContracts.endAuction(auctionActionId);
 
-                    // Ending the auction opens the settlement window.
-                    // NFT ownership changes only after successful settlement.
-                    try {
-                        if (auctionData.highestBidder && auctionData.highestBidder !== '0x0000000000000000000000000000000000000000') {
-                            await window.ArtSoulDB.updateArtwork(artwork.id, {
-                                auction_winner_address: auctionData.highestBidder.toLowerCase(),
-                                status: 'settlement_pending'
-                            });
-                        } else {
-                            // No bids - artwork remains unminted and can be relaunched.
-                            await window.ArtSoulDB.updateArtwork(artwork.id, {
-                                status: 'draft'
-                            });
-                        }
-                    } catch (syncError) {
-                        console.warn('Legacy artwork sync skipped; indexer projection remains source of truth.', syncError.message);
-                    }
-
                     const hasWinner = !isZeroAddress(auctionData.highestBidder);
+                    // The adapter has awaited confirmation. Apply the receipt
+                    // bridge before any stale projection can paint another CTA.
+                    setAuction(current => String(current?.auctionId) === String(auctionActionId)
+                        ? {...current, ended: true, status: hasWinner ? 'settlement_pending' : 'ended_no_bids', state: hasWinner ? 'WAITING_PAYMENT' : 'ENDED_NO_BIDS'} : current);
+                    setArtwork(current => window.ArtSoulDB.applyConfirmedAuctionUpdate?.(current) || current);
                     alert(hasWinner
                         ? 'Auction ended. The winner settlement window is now open. Public state will update shortly.'
-                        : 'Auction ended with no bids. The creator can create a new auction after public state updates.');
+                        : 'Auction confirmed closed with no bids. The creator can now create a new auction.');
                     loadArtwork();
                 } catch (error) {
                     console.error('End auction failed:', error);
@@ -2397,8 +2474,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
                     await window.ArtSoulContracts.init(provider);
                     await window.ArtSoulContracts.claimSettlementDefault(auctionActionId, { idType: 'auction' });
-
-                    alert('Settlement closed as defaulted. The creator can start a new auction after public state updates.');
+                    setAuction(current => String(current?.auctionId) === String(auctionActionId)
+                        ? {...current, ended: true, defaulted: true, status: 'defaulted', state: 'DEFAULTED'} : current);
+                    setArtwork(current => window.ArtSoulDB.applyConfirmedAuctionUpdate?.(current) || current);
+                    alert('Settlement confirmed closed as defaulted. The creator can start a new auction.');
                     loadArtwork();
                 } catch (error) {
                     console.error('Close expired settlement failed:', error);
@@ -2928,6 +3007,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 : firstDefined(artwork.final_price, artwork.floor_price, '0');
             const winnerAddress = currentHighestBidder || artwork.auction_winner_address;
             const creatorAddress = artwork.creator_id || artwork.creator;
+            const bidIdentityBlocked = walletRenderState.settled && (isSameAddress(connectedWalletAddress, creatorAddress) || isSameAddress(connectedWalletAddress, currentHighestBidder));
             const ownerAddress = artwork.current_owner_address;
             const connectedWalletOwnsArtwork = walletRenderState.settled &&
                 isSameAddress(connectedWalletAddress, ownerAddress);
@@ -3121,7 +3201,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             >
                                 <div className="reauction-modal-header">
                                     <div>
-                                        <p className="reauction-modal-eyebrow">Re-list artwork</p>
+                                        <p className="reauction-modal-eyebrow">Primary auction</p>
                                         <h2 id="reauction-modal-title">Create New Auction</h2>
                                     </div>
                                     <button
@@ -3141,14 +3221,17 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 <input
                                     id="newAuctionPrice"
                                     className="new-auction-input rounded-lg px-4 py-3"
-                                    type="number"
-                                    min="0.000001"
-                                    step="0.000001"
+                                    type="text"
+                                    inputMode="decimal"
+                                    aria-describedby="new-auction-price-help new-auction-error"
+                                    aria-invalid={Boolean(auctionCreationError)}
                                     value={newAuctionPrice}
                                     onChange={event => setNewAuctionPrice(event.target.value)}
                                     disabled={isTransactionActionPending('create-auction')}
                                     autoFocus
                                 />
+                                <p id="new-auction-price-help">Use a decimal point or comma, with up to 18 decimal places. The price must be greater than zero.</p>
+                                <p id="new-auction-error" role="alert">{auctionCreationError}</p>
 
                                 <fieldset className="reauction-fieldset">
                                     <legend className="reauction-field-label">Duration</legend>
@@ -3176,12 +3259,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     {reauctionEstimateState === 'ready' && reauctionEstimate && (
                                         <div>
                                             <p className="reauction-estimate-range">
-                                                {Number(reauctionEstimate.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                                                {formatAIPrice(reauctionEstimate.estimated_value_min_eth)}
                                                 {' to '}
-                                                {Number(reauctionEstimate.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                {formatAIPrice(reauctionEstimate.estimated_value_max_eth)} ETH
                                             </p>
                                             <p>
-                                                Suggested start: {Number(reauctionEstimate.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                Suggested start: {formatAIPrice(reauctionEstimate.suggested_start_price_eth)} ETH
                                                 {' · '}{reauctionEstimate.confidence || 'medium'} confidence
                                             </p>
                                             {reauctionEstimate.rationale && <p className="reauction-estimate-rationale">{reauctionEstimate.rationale}</p>}
@@ -3440,21 +3523,16 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 </span>
                                             )}
                                         </div>
-                                        {aiGuidance?.estimated_value_min_eth != null && aiGuidance?.estimated_value_max_eth != null && Number.isFinite(Number(aiGuidance.estimated_value_min_eth)) && Number.isFinite(Number(aiGuidance.estimated_value_max_eth)) ? (
+                                        {aiGuidance ? (
                                             <>
                                                 <p className="artwork-page-ai-range">
-                                                    {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} to {Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                    {formatAIPrice(aiGuidance.estimated_value_min_eth)} to {formatAIPrice(aiGuidance.estimated_value_max_eth)} ETH
                                                 </p>
-                                                <p className="artwork-page-copy">Suggested starting price: {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH</p>
+                                                <p className="artwork-page-copy">Suggested starting price: {formatAIPrice(aiGuidance.suggested_start_price_eth)} ETH</p>
                                                 {aiGuidance.rationale && <p className="artwork-page-copy">{aiGuidance.rationale}</p>}
                                             </>
-                                        ) : aiGuidance?.range ? (
-                                            <>
-                                                <p className="artwork-page-ai-range">{aiGuidance.range.low} to {aiGuidance.range.high} ETH</p>
-                                                {aiGuidance.reason && <p className="artwork-page-copy">{aiGuidance.reason}</p>}
-                                            </>
                                         ) : (
-                                            <p className="artwork-page-copy">{aiGuidance?.reason || 'AI analysis is unavailable for this artwork.'}</p>
+                                            <p className="artwork-page-copy">AI analysis is unavailable for this artwork.</p>
                                         )}
                                         <p className="artwork-page-note">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</p>
                                 </section>
@@ -3735,6 +3813,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </span>
                                         </div>
 
+                                        {(artwork.pending_auction_sync || refreshError) && (
+                                            <p className="text-sm mb-3" role="status">
+                                                {artwork.pending_auction_sync && 'Transaction confirmed. Updating auction data. '}
+                                                {refreshError}
+                                                {refreshError && <button type="button" className="underline ml-2" onClick={() => void loadArtwork()}>Retry</button>}
+                                            </p>
+                                        )}
                                         <div className="space-y-3">
                                             {getAuctionActionId() && (
                                             <div className="flex justify-between artwork-auction-fact artwork-auction-id">
@@ -3801,7 +3886,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             {/* Deposit Info */}
                                             {liveAuction && auction.depositAmount > 0 && (
                                                 <div className="flex justify-between text-sm">
-                                                    <span className="opacity-70">Deposit (10%):</span>
+                                                    <span className="opacity-70">Locked deposit:</span>
                                                     <span className="font-mono">{auction.depositAmount} ETH</span>
                                                 </div>
                                             )}
@@ -3862,13 +3947,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         {liveAuction && artworkWriteEnabled && (
                                             <div className="mt-6 space-y-3">
                                                 <input
-                                                    type="number"
-                                                    step="0.000001"
-                                                    min={minimumBidDetails.eth}
+                                                    type="text"
+                                                    inputMode="decimal"
                                                     placeholder="Enter bid amount (ETH)"
                                                     value={bidAmount}
                                                     onChange={(e) => setBidAmount(e.target.value)}
-                                                    disabled={isTransactionActionPending('bid')}
+                                                    disabled={isTransactionActionPending('bid') || bidIdentityBlocked}
                                                     className="artwork-bid-input w-full px-4 py-3 rounded-lg"
                                                 />
                                                 <div className="text-sm opacity-70 text-center">
@@ -3876,18 +3960,18 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 </div>
                                                 <div className="artwork-bid-deposit-note" aria-live="polite">
                                                     {enteredBidDepositWei > 0n
-                                                        ? `Your deposit: ${formatWeiToEth(enteredBidDepositWei, 8)} ETH. Fully refundable if you are outbid.`
+                                                        ? `Pay now: ${formatWeiToEth(enteredBidDepositWei, 18)} ETH deposit plus gas on Base Sepolia. The deposit is max(10% of your bid, 0.01 ETH), rounded up to wei. Fully refundable if you are outbid.`
                                                         : 'Your deposit is 10% of the bid or 0.01 ETH minimum. It is fully refundable if you are outbid.'}
                                                 </div>
                                                 <button
                                                     onClick={handlePlaceBid}
                                                     className="btn-main w-full artwork-page-primary-action"
-                                                    disabled={isTransactionActionPending('bid')}
+                                                    disabled={isTransactionActionPending('bid') || bidIdentityBlocked}
                                                     aria-busy={isTransactionActionPending('bid')}
                                                 >
                                                     {isTransactionActionPending('bid')
                                                         ? <TransactionProcessingLabel />
-                                                        : 'Place Bid (10% deposit required)'}
+                                                        : bidIdentityBlocked ? (isSameAddress(connectedWalletAddress, creatorAddress) ? 'Creators cannot bid on their own artwork' : 'You are already the highest bidder') : 'Review Bid and Deposit'}
                                                 </button>
                                             </div>
                                         )}
@@ -3959,16 +4043,20 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </div>
                                         )}
 
+                                        {!isNewAuctionModalOpen && auctionCreationError && (
+                                            <p role="alert">{auctionCreationError}</p>
+                                        )}
                                         {canCreateNewAuction && (
                                             <div className="artwork-auction-next-step mt-4">
-                                                <p>The previous auction is closed. Create a new auction when you are ready.</p>
+                                                <p>Create a primary auction when you are ready. The current on-chain state will be checked before setup.</p>
                                                 <button
                                                     type="button"
                                                     className="btn-main w-full artwork-page-primary-action"
                                                     onClick={openNewAuctionModal}
-                                                    disabled={isTransactionActionPending('create-auction')}
+                                                    disabled={auctionCreationChecking || isTransactionActionPending('create-auction')}
+                                                    aria-busy={auctionCreationChecking}
                                                 >
-                                                    Create New Auction
+                                                    {auctionCreationChecking ? 'Checking auction eligibility…' : 'Create New Auction'}
                                                 </button>
                                             </div>
                                         )}
@@ -4111,21 +4199,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             }}
                                         >
                                             <div className="font-semibold mb-1">Value Guidance</div>
-                                            {Number.isFinite(Number(aiGuidance.estimated_value_min_eth)) && Number.isFinite(Number(aiGuidance.estimated_value_max_eth)) ? (
                                                 <div className="opacity-80">
-                                                    Estimated range: {Number(aiGuidance.estimated_value_min_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} - {Number(aiGuidance.estimated_value_max_eth).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH
+                                                    Estimated range: {formatAIPrice(aiGuidance.estimated_value_min_eth)} - {formatAIPrice(aiGuidance.estimated_value_max_eth)} ETH
                                                     <div className="mt-1">
-                                                        Suggested starting price: {Number(aiGuidance.suggested_start_price_eth || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH - {aiGuidance.confidence || 'medium'} confidence
+                                                        Suggested starting price: {formatAIPrice(aiGuidance.suggested_start_price_eth)} ETH - {aiGuidance.confidence || 'medium'} confidence
                                                     </div>
                                                     {aiGuidance.rationale && <div className="mt-1 opacity-80">{aiGuidance.rationale}</div>}
                                                 </div>
-                                            ) : aiGuidance.range ? (
-                                                <div className="opacity-80">
-                                                    Estimated range: {aiGuidance.range.low} - {aiGuidance.range.high} ETH - Confidence {aiGuidance.confidence}%
-                                                </div>
-                                            ) : (
-                                                <div className="opacity-80">{aiGuidance.reason}</div>
-                                            )}
                                             <div className="text-xs opacity-60 mt-1">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</div>
                                         </div>
                                     )}

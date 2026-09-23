@@ -1,8 +1,8 @@
-// A-82: nothing shipped to a browser may register a leave-site confirmation.
+// A-82: leave-site confirmation is limited to explicit authoring pages.
 //
 // `beforeunload` with preventDefault() or returnValue produces the browser's
-// "Leave site?" dialog on every navigation away. ArtSoul has exactly one place
-// where that is wanted - an unfinished upload - and everywhere else it is a
+// "Leave site?" dialog on every navigation away. It is wanted for an unfinished
+// upload or an unsaved local collection draft; everywhere else it is a
 // defect waiting for an import, because a constructor side effect can ship it
 // across the whole site without anyone choosing it.
 //
@@ -12,13 +12,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
 
-// The upload page warns before losing an in-progress upload. That is the one
-// legitimate case, and it is listed rather than pattern-matched so adding a
-// second one is a decision somebody makes on purpose.
-const ALLOWED = new Set(['src/entries/upload.js']);
+// These two authoring pages protect unsaved work. Keep an explicit allowlist
+// so a shared lifecycle helper cannot add a site-wide navigation prompt.
+const ALLOWED = new Set(['src/entries/upload.js', 'src/entries/collection-builder.jsx']);
 
 function sourceFiles(dir, found = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -33,7 +33,7 @@ function sourceFiles(dir, found = []) {
   return found;
 }
 
-test('only the upload page may register a leave-site confirmation', () => {
+test('only the two explicit authoring pages may register a leave-site confirmation', () => {
   const offenders = [];
 
   for (const file of sourceFiles(ROOT)) {
@@ -50,8 +50,29 @@ test('only the upload page may register a leave-site confirmation', () => {
   assert.deepEqual(
     offenders,
     [],
-    `these files register a leave-site confirmation outside the upload page: ${offenders.join(', ')}`
+    `these files register a leave-site confirmation outside the authoring pages: ${offenders.join(', ')}`
   );
+});
+
+test('collection draft navigation protection exists only while unsaved and cleans up its listener', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'src/entries/collection-builder.jsx'), 'utf8');
+  const body = source.match(/useEffect\(\(\) => \{([\s\S]*?)\}, \[dirty\]\)/)?.[1];
+  assert.ok(body, 'the effect is tied to the actual dirty state');
+  const listeners = new Map();
+  const window = {
+    addEventListener(name, listener) { listeners.set(name, listener); },
+    removeEventListener(name, listener) { if (listeners.get(name) === listener) listeners.delete(name); }
+  };
+  assert.equal(vm.runInNewContext(`(function () { ${body} })()`, { dirty: false, window }), undefined);
+  assert.equal(listeners.size, 0, 'saved and untouched drafts allow navigation');
+  const cleanup = vm.runInNewContext(`(function () { ${body} })()`, { dirty: true, window });
+  let prevented = false;
+  const event = { preventDefault() { prevented = true; }, returnValue: undefined };
+  listeners.get('beforeunload')(event);
+  assert.equal(prevented, true, 'unsaved work requests the native navigation warning');
+  assert.equal(event.returnValue, '');
+  cleanup();
+  assert.equal(listeners.size, 0, 'saving or unmounting removes the exact handler');
 });
 
 test('the shutdown manager keeps its process signals and grows no browser branch', () => {

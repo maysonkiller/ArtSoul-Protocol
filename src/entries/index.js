@@ -181,8 +181,7 @@ let morphActive = false;
                 const profileData = {
                     username: document.getElementById('profileUsername').value,
                     bio: document.getElementById('profileBio').value,
-                    twitter_handle: document.getElementById('profileTwitter').value,
-                    discord_username: document.getElementById('profileDiscord').value,
+                    public_twitter_handle: document.getElementById('profileTwitter').value,
                     avatar_url: avatarUrl
                 };
 

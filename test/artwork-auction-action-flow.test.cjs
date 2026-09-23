@@ -50,7 +50,7 @@ test('auction confirmations and the shared Base Sepolia guard gate wallet transa
     );
 
     const bidSource = functionSource('placeBidOnce', 'requestFreshReauctionValuation');
-    assert.match(bidSource, /ArtSoulContracts\.placeBid\(auctionActionId, bidAmount\)/);
+    assert.match(bidSource, /ArtSoulContracts\.placeBid\(auctionActionId, enteredBid\.eth/);
 
     const guardedWrites = [
         'registerArtwork',
@@ -73,9 +73,9 @@ test('auction confirmations and the shared Base Sepolia guard gate wallet transa
 test('new auction action is explicit, eligible, and redirects only after success', () => {
     const createSource = functionSource('handleConfirmNewAuction', 'handleEndAuction');
 
-    assert.match(createSource, /canCreateNewAuctionForWallet\(artwork, walletAddress\)/);
-    assert.match(createSource, /blockchainArtwork\.minted/);
-    assert.match(createSource, /blockchainArtwork\.activeAuctionId/);
+    assert.match(createSource, /await inspectAuctionCreation\(/);
+    assert.match(createSource, /expectedWallet: openingContext\.walletAddress/);
+    // Current creator/mint/active checks execute in auction-creation-flow.test.mjs.
     assert.match(createSource, /\[24, 36, 48\]/);
     assert.ok(
         createSource.indexOf('ArtSoulContracts.createAuction(') <

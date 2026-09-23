@@ -12,7 +12,7 @@
     "monitor:indexer": "node scripts/check-indexer-health.mjs",
     "test": "npm run test:unit && npm run test:contracts",
     "test:unit": "node scripts/run-unit-tests.mjs",
-    "test:contracts": "hardhat test test/ArtSoulV41.test.cjs",
+    "test:contracts": "hardhat test test/ArtSoulV41.test.cjs test/CollectionLaunch.test.cjs",
     "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/tailwind.css -o tailwind-build.css --minify",
     "verify:tailwind": "node scripts/verify-tailwind.mjs",
     "sync:phase-a": "node scripts/sync-phase-a-counts.mjs"

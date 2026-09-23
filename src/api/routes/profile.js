@@ -5,17 +5,7 @@ import {
   sendError,
   supabaseRest
 } from '../backend.js';
-
-const PROFILE_FIELDS = ['username', 'bio', 'twitter_handle', 'discord_username', 'avatar_url'];
-
-function cleanProfile(body) {
-  return PROFILE_FIELDS.reduce((profile, field) => {
-    if (body[field] !== undefined) {
-      profile[field] = typeof body[field] === 'string' ? body[field].trim() : body[field];
-    }
-    return profile;
-  }, {});
-}
+import { cleanProfile, publicProfile } from '../profile-fields.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['PUT'])) return;
@@ -42,7 +32,7 @@ export default async function handler(req, res) {
       body: [{ wallet_address: wallet, ...profile, updated_at: now }]
     });
 
-    res.status(200).json({ success: true, profile: rows?.[0] || { wallet_address: wallet, ...profile } });
+    res.status(200).json({ success: true, profile: publicProfile(rows?.[0] || { wallet_address: wallet, ...profile }) });
   } catch (error) {
     sendError(res, error);
   }
