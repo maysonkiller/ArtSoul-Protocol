@@ -139,15 +139,8 @@ export async function getModerationAccess(req, options = {}) {
   // passkey enrollment. Social identifiers are NOT authentication factors.
   const factors = {
     profile: Boolean(profile),
-    x: Boolean(profile && (
-      hasText(profile.twitter_id) ||
-      hasText(profile.twitter_handle) ||
-      hasText(profile.twitter_username)
-    )),
-    discord: Boolean(profile && (
-      hasText(profile.discord_id) ||
-      hasText(profile.discord_username)
-    )),
+    x: Boolean(profile && hasText(profile.twitter_id)),
+    discord: Boolean(profile && hasText(profile.discord_id)),
     wallet: true
   };
   const missingFactors = Object.entries(factors)

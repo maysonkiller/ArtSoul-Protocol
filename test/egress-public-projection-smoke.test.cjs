@@ -72,6 +72,7 @@ function loadHandler({ missDirectArtworkOnce = false } = {}) {
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },
     getModerationAccess: async () => ({ canModerate: false }),
+    readArtworkMetadata: async () => ({ name: 'Smoke Art', image: 'https://img.test/a.png' }),
     fetch: async () => ({ ok: true, json: async () => ({ name: 'Smoke Art', image: 'https://img.test/a.png' }) }),
     AbortController: class { constructor() { this.signal = {}; } abort() {} },
     setTimeout: () => 0,
@@ -79,7 +80,7 @@ function loadHandler({ missDirectArtworkOnce = false } = {}) {
     console: { warn() {}, error() {}, log() {} },
     process: { env: {} }
   });
-  vm.runInContext(source, context);
+  vm.runInContext(fs.readFileSync('src/features/artwork/ai-valuation-values.js', 'utf8').replace(/^export /gm, '') + '\n' + source, context);
   return { handler: context.handler, calls };
 }
 

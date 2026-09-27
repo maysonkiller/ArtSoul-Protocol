@@ -695,6 +695,10 @@ body.future .artwork-page-compact-action {
     --c-accent: var(--accent-classic);
     --c-accent-2: var(--accent-classic);
     --c-accent-3: var(--accent-classic);
+    --c-aura-gold: var(--accent-classic);
+    --c-aura-blue: var(--accent-classic);
+    --c-back-button-background: var(--c-accent);
+    --c-back-button-text: var(--c-bg);
     --c-border: rgba(169, 221, 211, 0.72);
     --c-border-soft: rgba(169, 221, 211, 0.3);
     --c-card-border: rgba(169, 221, 211, 0.52);
@@ -715,6 +719,10 @@ body.future .artwork-page-compact-action {
     --c-accent: var(--accent-future);
     --c-accent-2: var(--neon-purple);
     --c-accent-3: var(--accent-future-2);
+    --c-aura-gold: #d4af37;
+    --c-aura-blue: #3b82f6;
+    --c-back-button-background: linear-gradient(135deg, var(--c-accent-2), var(--c-accent));
+    --c-back-button-text: #ffffff;
     --c-border: rgba(0, 245, 255, 0.64);
     --c-border-soft: rgba(0, 245, 255, 0.3);
     --c-card-border: rgba(0, 245, 255, 0.48);
@@ -723,6 +731,66 @@ body.future .artwork-page-compact-action {
     --c-accent-rgb: 0, 245, 255;
     --c-accent-2-rgb: 191, 0, 255;
     --c-accent-3-rgb: 255, 0, 191;
+}
+
+.back-button {
+    background: var(--c-back-button-background);
+    color: var(--c-back-button-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .back-button { transition: none !important; }
+}
+
+/* A-34: a reusable decoration only. No public surface assigns an aura yet.
+   Keep the frame inside its wrapper so cards and contained detail media keep
+   their original dimensions, cropping and pointer/keyboard interactions. */
+.artsoul-aura-frame {
+    position: relative;
+}
+
+.artsoul-aura-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border: 2px solid var(--c-accent);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.artsoul-aura-frame--genesis::after {
+    border-color: var(--c-aura-gold);
+}
+
+@supports (mask-composite: exclude) or (-webkit-mask-composite: xor) {
+    .future .artsoul-aura-frame--platform::after,
+    .future .artsoul-aura-frame--partner::after {
+        border: 0;
+        padding: 2px;
+        background: linear-gradient(120deg, var(--c-accent), var(--c-aura-blue));
+        -webkit-mask: linear-gradient(currentColor 0 0) content-box, linear-gradient(currentColor 0 0);
+        mask: linear-gradient(currentColor 0 0) content-box, linear-gradient(currentColor 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+    }
+
+    .future .artsoul-aura-frame--platform::after {
+        background: linear-gradient(120deg, var(--c-accent), var(--c-accent-2), var(--c-accent-3), var(--c-accent));
+        background-size: 300% 100%;
+        animation: artsoulAuraShimmer 6s linear infinite;
+    }
+}
+
+@keyframes artsoulAuraShimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .artsoul-aura-frame::after {
+        animation: none !important;
+    }
 }
 
 .artsoul-artwork-card {
@@ -735,7 +803,7 @@ body.future .artwork-page-compact-action {
     overflow: hidden;
     border-radius: 8px;
     background: var(--c-surface);
-    /* TODO: Use an iridescent ownership border after the canonical project wallet is defined. */
+    /* C-14 will bind verified status to the shared presentation-only aura frame. */
     border: 1px solid var(--c-card-border);
     color: var(--c-text);
     text-decoration: none;

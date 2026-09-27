@@ -33,8 +33,11 @@ test('title polish is surface-scoped and keeps homepage shimmer available', () =
 
 test('borders, Add New alignment, and status pills use shared themed styling', () => {
   assert.match(css, /--c-card-border:/);
-  assert.match(css, /border: 1px solid var\(--c-card-border\)/);
-  assert.match(css, /TODO: Use an iridescent ownership border/);
+  const baseCard = css.match(/\.artsoul-artwork-card\s*\{([^}]+)\}/)?.[1];
+  assert.ok(baseCard, 'all cards retain their neutral shared frame before verified aura assignment');
+  assert.match(baseCard, /border: 1px solid var\(--c-card-border\)/);
+  assert.doesNotMatch(baseCard, /animation\s*:|linear-gradient\(/,
+    'an opt-in aura must not decorate every artwork by default');
   assert.match(profile, /artsoul-add-new-card text-center/);
   assert.match(css, /artsoul-add-new-card \.artsoul-card-body[\s\S]*text-align: center/);
   assert.match(css, /\.artsoul-card-status,[\s\S]*justify-content: center/);

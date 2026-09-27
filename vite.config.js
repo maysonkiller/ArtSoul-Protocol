@@ -13,6 +13,7 @@ const pageInputs = {
     artwork: 'artwork.html',
     profile: 'profile.html',
     upload: 'upload.html',
+    'collection-builder': 'collection-builder.html',
     admin: 'admin.html',
     'docs-protocol': 'docs-protocol.html',
     'wallet-test': 'wallet-test.html',

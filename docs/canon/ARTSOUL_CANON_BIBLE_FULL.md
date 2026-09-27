@@ -1,5 +1,10 @@
 # ArtSoul Canon Bible
 
+Development amendment (2026-09-20): [Collection Launch](CHANGELOG_2026-09-20_COLLECTION_LAUNCH.md)
+authorizes a separate chain-aware collection path for local/testnet development.
+It qualifies §§1, 4, 8, 9, 12 and 17 for that path only; the existing Base 1/1
+protocol and unapproved Genesis/mainnet economics remain unchanged.
+
 ArtSoul is an auction-first NFT art protocol on Base. Artists publish work, the community discovers and signals interest, a primary auction establishes the first collector and canonical floor, settlement lazily mints the NFT, and later resale preserves creator royalties and public provenance.
 
 The internal codename is V4.1. Do not expose the version label in user-facing UI, investor materials, or public marketing copy.

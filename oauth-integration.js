@@ -92,7 +92,9 @@ class OAuthIntegration {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ provider })
         });
-        return this.readResponse(response, `Could not remove the linked ${this.providerLabels[provider]} account.`);
+        const result = await this.readResponse(response, `Could not remove the linked ${this.providerLabels[provider]} account.`);
+        window.ArtSoulDB?.invalidateProfileCache?.(walletAddress);
+        return result;
     }
 }
 

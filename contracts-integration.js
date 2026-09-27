@@ -430,6 +430,7 @@ class ArtSoulContracts {
         this.ensureCore();
         const startPrice = this.parseEth(startingPriceEth);
         const durationSeconds = this.normalizeDuration(duration);
+        await this.assertExpectedWallet(options);
         const tx = await this.coreContract.createAuction(artworkId, startPrice, durationSeconds);
         console.log('Creating V4.1 auction...', tx.hash);
         try {
@@ -437,8 +438,70 @@ class ArtSoulContracts {
         } catch (error) {
             console.warn('Auction submission persistence failed:', error);
         }
-        await tx.wait();
-        return tx.hash;
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        await this.publishAuctionReceipt(receipt, 'AuctionCreated', {artworkId});
+        return receipt?.hash || tx.hash;
+    }
+
+    async waitForConfirmedTransaction(tx) {
+        try {
+            const receipt = await tx.wait();
+            if (!receipt) throw new Error('Transaction confirmation is unavailable.');
+            if (Number(receipt.status) !== 1) throw new Error('Transaction reverted.');
+            return receipt;
+        } catch (error) {
+            // A gas-only replacement is the same reviewed action. Cancellation
+            // or a replacement with different calldata must never be success.
+            const replacement = error.replacement;
+            if (error.code === 'TRANSACTION_REPLACED' && !error.cancelled &&
+                error.reason === 'repriced' && replacement &&
+                replacement.to?.toLowerCase() === tx.to?.toLowerCase() &&
+                replacement.data === tx.data && String(replacement.value) === String(tx.value) &&
+                Number(error.receipt?.status) === 1) return error.receipt;
+            throw error;
+        }
+    }
+
+    async assertExpectedWallet(options = {}) {
+        if (!options.expectedWallet && !options.expectedChainId) return;
+        const provider = await window.web3Modal?.getWalletProvider?.();
+        if (!provider?.request) throw new Error('Reconnect your wallet and review the action again.');
+        const [accounts, chainId] = await Promise.all([
+            provider.request({method: 'eth_accounts'}), provider.request({method: 'eth_chainId'})
+        ]);
+        if (options.expectedWallet && String(accounts?.[0]).toLowerCase() !== options.expectedWallet.toLowerCase()) {
+            throw new Error('The wallet changed. Review the action again.');
+        }
+        if (options.expectedChainId && Number(chainId) !== Number(options.expectedChainId)) {
+            throw new Error('The network changed. Review the action again.');
+        }
+    }
+
+    async getRequiredBidDeposit(bidAmountEth) {
+        this.ensureCore();
+        return await this.coreContract.requiredDepositForBid(this.parseEth(bidAmountEth));
+    }
+
+    async publishAuctionReceipt(receipt, eventName, context = {}) {
+        try {
+            if (!receipt || Number(receipt.status) !== 1) return;
+            const event = await this.waitForEvent(receipt, eventName);
+            if (!event) return;
+            const args = event.args;
+            const kind = eventName === 'AuctionCreated' ? 'created' : eventName === 'AuctionEnded' ? 'ended' : 'defaulted';
+            window.ArtSoulDB?.recordConfirmedAuction?.({
+                chain_id: 84532,
+                artwork_id: String(args.artworkId ?? context.artworkId),
+                auction_id: String(args.auctionId),
+                transaction_hash: receipt.hash,
+                block_number: Number(receipt.blockNumber), kind,
+                patch: kind === 'created'
+                    ? {start_price: this.formatEth(args.startPrice), auction_end_time: Number(args.endTime)}
+                    : {has_winner: kind === 'ended' && !this.isZeroAddress(args.winner), settlement_deadline: Number(args.settlementDeadline || 0)}
+            });
+        } catch (error) {
+            console.warn('Auction confirmed; local refresh notice could not be saved.', error);
+        }
     }
 
     async placeBid(id, bidAmountEth, options = {}) {
@@ -447,20 +510,23 @@ class ArtSoulContracts {
         const auctionId = await this.resolveAuctionId(id, options);
         const bidAmount = this.parseEth(bidAmountEth);
         const deposit = await this.coreContract.requiredDepositForBid(bidAmount);
+        await this.assertExpectedWallet(options);
         const tx = await this.coreContract.placeBid(auctionId, bidAmount, { value: deposit });
         console.log('Placing V4.1 deposit bid...', tx.hash);
-        await tx.wait();
-        return tx.hash;
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        return receipt?.hash || tx.hash;
     }
 
     async endAuction(id, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const auctionId = await this.resolveAuctionId(id, options);
+        const auction = await this.getAuctionStruct(auctionId);
         const tx = await this.coreContract.endAuction(auctionId);
         console.log('Ending V4.1 auction...', tx.hash);
-        await tx.wait();
-        return tx.hash;
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        await this.publishAuctionReceipt(receipt, 'AuctionEnded', {artworkId: auction.artworkId});
+        return receipt?.hash || tx.hash;
     }
 
     async completeSettlement(id, options = {}) {
@@ -481,10 +547,12 @@ class ArtSoulContracts {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         const auctionId = await this.resolveAuctionId(id, options);
+        const auction = await this.getAuctionStruct(auctionId);
         const tx = await this.coreContract.claimSettlementDefault(auctionId);
         console.log('Claiming settlement default...', tx.hash);
-        await tx.wait();
-        return tx.hash;
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        await this.publishAuctionReceipt(receipt, 'SettlementDefaulted', {artworkId: auction.artworkId});
+        return receipt?.hash || tx.hash;
     }
 
     async withdraw() {

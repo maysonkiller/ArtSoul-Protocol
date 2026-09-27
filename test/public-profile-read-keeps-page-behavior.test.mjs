@@ -111,7 +111,7 @@ function loadArtSoulDB(routes = {}) {
       if (body === undefined) {
         return new Response('{}', { status: 404, headers: { 'Content-Type': 'application/json' } });
       }
-      return new Response(JSON.stringify(typeof body === 'function' ? body(String(path), init) : body), {
+      return new Response(JSON.stringify(typeof body === 'function' ? await body(String(path), init) : body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -182,11 +182,12 @@ test('the public profile read still withholds private provider identifiers', asy
       !(field in res.body.profile),
       `${field} is not needed by any public surface and must not be published`
     );
-    assert.ok(
-      !new RegExp(`(select=|,)${field}(,|$|&)`).test(requestedUrl),
-      `${field} must not even be selected from the database`
-    );
+    if (!['twitter_id', 'discord_id'].includes(field)) {
+      assert.ok(!new RegExp(`(select=|,)${field}(,|$|&)`).test(requestedUrl), `${field} must not even be selected`);
+    }
   }
+  assert.equal(res.body.profile.twitter_connected, true);
+  assert.equal(res.body.profile.discord_connected, true);
 });
 
 test('an aged profile keeps its account-age contribution to trust and influence', async () => {
@@ -233,6 +234,21 @@ test('a first visit with no profile row still reads as a normal empty result', a
 
   const { db } = loadArtSoulDB({ '/api/public/profile': res.body });
   assert.equal(await db.getProfile(WALLET), null);
+});
+
+test('disconnect invalidation prevents an older profile request from restoring connected cache state', async () => {
+  const pending = [];
+  const {db} = loadArtSoulDB({'/api/public/profile': () => new Promise(resolve => pending.push(resolve))});
+  const old = db.getProfile(WALLET);
+  db.invalidateProfileCache(WALLET);
+  const fresh = db.getProfile(WALLET);
+  assert.equal(pending.length, 2);
+  pending[1]({profile: {wallet_address: WALLET, twitter_connected: false}});
+  await fresh;
+  pending[0]({profile: {wallet_address: WALLET, twitter_connected: true}});
+  await old;
+  assert.equal((await db.getProfile(WALLET)).twitter_connected, false);
+  assert.equal(pending.length, 2, 'the fresh disconnected result remains cached');
 });
 
 test('a creator artwork query cannot degrade into an unfiltered read of every artwork', async () => {

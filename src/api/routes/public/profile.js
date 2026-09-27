@@ -4,6 +4,7 @@ import {
   sendError,
   supabaseRest
 } from '../../backend.js';
+import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../../profile-fields.js';
 
 // The exact set the public profile page consumes, and nothing else. This list
 // is a behavioural contract rather than a detail of this route: it is the whole
@@ -15,17 +16,7 @@ import {
 // silently changes what the product does. Private provider identifiers -
 // twitter_id, discord_id, discord_avatar - stay out, with every other column no
 // public surface reads.
-const PUBLIC_PROFILE_FIELDS = [
-  'id',
-  'created_at',
-  'wallet_address',
-  'username',
-  'bio',
-  'avatar_url',
-  'twitter_handle',
-  'twitter_username',
-  'discord_username'
-].join(',');
+const PROFILE_SELECT = [...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id'].join(',');
 
 export default async function publicProfileHandler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
@@ -40,7 +31,7 @@ export default async function publicProfileHandler(req, res) {
     }
 
     const rows = await supabaseRest(
-      `profiles?wallet_address=eq.${encodeURIComponent(wallet)}&select=${PUBLIC_PROFILE_FIELDS}&limit=1`
+      `profiles?wallet_address=eq.${encodeURIComponent(wallet)}&select=${PROFILE_SELECT}&limit=1`
     );
 
     // Profile edits must be visible immediately after save. The speedup comes
@@ -48,7 +39,7 @@ export default async function publicProfileHandler(req, res) {
     res.setHeader('Cache-Control', 'private, no-store');
     return res.status(200).json({
       success: true,
-      profile: rows?.[0] || null
+      profile: publicProfile(rows?.[0])
     });
   } catch (error) {
     return sendError(res, error);

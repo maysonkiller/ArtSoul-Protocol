@@ -63,6 +63,20 @@ function loadDomCardRuntime() {
     return { api: window.ArtSoulArtworkCard, mediaElements, window };
 }
 
+test('both card renderers disclose the confirmed transaction while projection synchronization is pending', () => {
+    const { api, window } = loadDomCardRuntime();
+    window.React = {
+        createElement: (type, props, ...children) => ({ type, props, children }),
+        useState: value => [value, () => {}], useEffect() {}
+    };
+    const artwork = { file_type: 'image', file_url: 'image.png', pending_auction_sync: true };
+    const text = node => typeof node === 'string' ? node : [node?.textContent || '', ...(node?.children || []).map(text)].join(' ');
+    for (const render of [value => api.createCardElement(value, { href: false }), value => api.ReactCard({ artwork: value })]) {
+        assert.match(text(render(artwork)), /Transaction confirmed\. Updating auction data\./);
+        assert.doesNotMatch(text(render({ ...artwork, pending_auction_sync: false })), /Transaction confirmed/);
+    }
+});
+
 test('React card leaves nested media and action keyboard activation to the focused control', () => {
     const { api, window } = loadDomCardRuntime();
     window.React = {

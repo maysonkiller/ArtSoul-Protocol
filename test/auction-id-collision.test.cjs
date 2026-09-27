@@ -37,7 +37,7 @@ function adapter({ auctions = {}, artworks = {}, auctionError } = {}) {
   for (const method of ['placeBid', 'endAuction', 'settleAuction', 'claimSettlementDefault']) {
     api.coreContract[method] = async (...args) => {
       writes.push([method, String(args[0])]);
-      return { hash: '0xtest', wait: async () => {} };
+      return { hash: '0xtest', wait: async () => ({ status: 1, hash: '0xtest', logs: [] }) };
     };
   }
   api.ensureBaseSepoliaWrite = async () => {};

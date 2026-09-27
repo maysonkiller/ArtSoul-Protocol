@@ -58,7 +58,11 @@ test('public profile exposes exactly the fields used by the public page', async 
   assert.match(requestedUrl, /profiles\?wallet_address=eq\./);
   assert.match(requestedUrl, /select=id,created_at,wallet_address,username,bio,avatar_url,twitter_handle,twitter_username,discord_username/);
   assert.doesNotMatch(requestedUrl, /select=\*/);
-  assert.doesNotMatch(requestedUrl, /twitter_id|discord_id|discord_avatar/);
+  assert.doesNotMatch(requestedUrl, /discord_avatar/);
+  assert.equal(res.body.profile.twitter_connected, false);
+  assert.equal(res.body.profile.discord_connected, false);
+  assert.ok(!('twitter_id' in res.body.profile));
+  assert.ok(!('discord_id' in res.body.profile));
 });
 
 test('public profile rejects an invalid address before querying the database', async () => {

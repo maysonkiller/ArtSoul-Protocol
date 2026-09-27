@@ -58,45 +58,51 @@ class AuctionService {
 
         const contract = this.contracts.marketplaceContract;
 
-        this.eventListeners.auctionCreated = contract.on('AuctionCreated', (auctionId, artworkId) => {
+        this.eventListeners.auctionCreated = (auctionId, artworkId) => {
             if (DEBUG_CONFIG.LOG_EVENTS) {
                 console.log('[EVENT] AuctionCreated', { auctionId: auctionId.toString(), artworkId: artworkId.toString() });
             }
             this.metrics?.recordEvent('auctionCreated');
             this.invalidateCache(artworkId.toString());
-        });
+        };
 
-        this.eventListeners.bidPlaced = contract.on('BidPlaced', (auctionId, bidder, bidAmount, depositAmount) => {
+        this.eventListeners.bidPlaced = (auctionId, bidder, bidAmount, depositAmount) => {
             if (DEBUG_CONFIG.LOG_EVENTS) {
                 console.log('[EVENT] BidPlaced', { auctionId: auctionId.toString(), bidder, bidAmount: ethers.formatEther(bidAmount), depositAmount: ethers.formatEther(depositAmount) });
             }
             this.metrics?.recordEvent('bidPlaced');
-            this.invalidateCache(auctionId.toString());
-        });
+            return this.invalidateAuctionCache(auctionId);
+        };
 
-        this.eventListeners.auctionEnded = contract.on('AuctionEnded', (auctionId, winner, winningBid, settlementDeadline) => {
+        this.eventListeners.auctionEnded = (auctionId, winner, winningBid, settlementDeadline) => {
             if (DEBUG_CONFIG.LOG_EVENTS) {
                 console.log('[EVENT] AuctionEnded', { auctionId: auctionId.toString(), winner, winningBid: ethers.formatEther(winningBid), settlementDeadline: Number(settlementDeadline) });
             }
             this.metrics?.recordEvent('auctionEnded');
-            this.invalidateCache(auctionId.toString());
-        });
+            return this.invalidateAuctionCache(auctionId);
+        };
 
-        this.eventListeners.settlementCompleted = contract.on('SettlementCompleted', (auctionId, artworkId, winner, finalPrice, tokenId) => {
+        this.eventListeners.settlementCompleted = (auctionId, artworkId, winner, finalPrice, tokenId) => {
             if (DEBUG_CONFIG.LOG_EVENTS) {
                 console.log('[EVENT] SettlementCompleted', { auctionId: auctionId.toString(), artworkId: artworkId.toString(), winner, finalPrice: ethers.formatEther(finalPrice), tokenId: tokenId.toString() });
             }
             this.metrics?.recordEvent('settlementCompleted');
             this.invalidateCache(artworkId.toString());
-        });
+        };
 
-        this.eventListeners.settlementDefaulted = contract.on('SettlementDefaulted', (auctionId, winner) => {
+        this.eventListeners.settlementDefaulted = (auctionId, winner) => {
             if (DEBUG_CONFIG.LOG_EVENTS) {
                 console.log('[EVENT] SettlementDefaulted', { auctionId: auctionId.toString(), winner });
             }
             this.metrics?.recordEvent('settlementDefaulted');
-            this.invalidateCache(auctionId.toString());
-        });
+            return this.invalidateAuctionCache(auctionId);
+        };
+
+        contract.on('AuctionCreated', this.eventListeners.auctionCreated);
+        contract.on('BidPlaced', this.eventListeners.bidPlaced);
+        contract.on('AuctionEnded', this.eventListeners.auctionEnded);
+        contract.on('SettlementCompleted', this.eventListeners.settlementCompleted);
+        contract.on('SettlementDefaulted', this.eventListeners.settlementDefaulted);
 
         console.log('Event listeners setup complete');
     }
@@ -340,6 +346,19 @@ class AuctionService {
 
         if (DEBUG_CONFIG.LOG_CACHE) {
             console.log('[CACHE] Write', { artworkId, cacheSize: this.cache.size });
+        }
+    }
+
+    async invalidateAuctionCache(auctionId) {
+        // These events carry an auction id, while this cache is keyed by artwork.
+        // The counters are independent; equal numbers can refer to other works.
+        try {
+            const auction = await this.contracts.getAuctionStruct(auctionId);
+            if (!auction?.artworkId || BigInt(auction.artworkId) <= 0n) throw new Error('Auction artwork unavailable');
+            this.invalidateCache(auction.artworkId.toString());
+        } catch (error) {
+            // A failed read must not keep known-outdated eligibility cached.
+            this.clearCache();
         }
     }
 

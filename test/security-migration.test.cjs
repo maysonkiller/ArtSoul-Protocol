@@ -162,7 +162,8 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     'a8b_artwork_report_intake.sql',
     'a8c_protocol_admin_review.sql',
     'a8d_moderation_safe_recovery.sql',
-    '015_public_metrics_projection.sql'
+    '015_public_metrics_projection.sql',
+    'collection_launch_services.sql'
   ]);
 
   for (const root of sqlRoots) {
@@ -181,6 +182,21 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   );
   const missing = [...createdTables].filter(table => !hardening.includes(`'${table}'`));
   assert.deepEqual(missing, []);
+});
+
+test('the unapplied collection service draft keeps all tables and quota RPC private', () => {
+  const sql = fs.readFileSync(path.join(REPO_ROOT, 'sql/migrations/collection_launch_services.sql'), 'utf8');
+  const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS public\.([a-z_]+)/g)].map(match => match[1]);
+  assert.deepEqual(tables, ['launch_service_quotas', 'collection_ai_reviews', 'email_subscriptions']);
+  for (const table of tables) assert.ok(sql.includes(`'${table}'`), 'every new table must be in the hardening loop');
+  assert.match(sql, /FOREACH t IN ARRAY ARRAY\['launch_service_quotas', 'collection_ai_reviews', 'email_subscriptions'\]/);
+  assert.match(sql, /ALTER TABLE public\.%I ENABLE ROW LEVEL SECURITY/);
+  assert.match(sql, /ALTER TABLE public\.%I FORCE ROW LEVEL SECURITY/);
+  assert.match(sql, /REVOKE ALL ON public\.%I FROM PUBLIC, anon, authenticated/);
+  assert.match(sql, /GRANT ALL ON public\.%I TO service_role/);
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.consume_launch_service_quota\(text, integer, integer\) FROM PUBLIC, anon, authenticated/);
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.consume_launch_service_quota\(text, integer, integer\) TO service_role/);
+  assert.doesNotMatch(sql, /CREATE POLICY|TO anon|TO authenticated/);
 });
 
 test('A8a self-hardens its own tables inline so phase18_7b stays immutable', () => {

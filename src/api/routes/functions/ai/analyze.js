@@ -1,4 +1,6 @@
 import { allowMethods, readJson, requireWallet, sendError, supabaseRest } from '../../../backend.js';
+import { fetchArtworkResource } from '../../../safe-artwork-fetch.js';
+import { parseAIPrice, readAIValuation } from '../../../../features/artwork/ai-valuation-values.js';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -111,7 +113,7 @@ function buildPrompt(payload, wallet) {
   const facts = {
     title: cleanText(payload.title, 160),
     description: cleanText(payload.description, 1000),
-    creator_value_eth: cleanText(payload.creator_value ?? payload.start_price ?? payload.price, 40),
+    creator_starting_price_eth: parseAIPrice(payload.creator_value ?? payload.start_price ?? payload.price),
     media_type: cleanText(payload.media_type || payload.file_type, 40),
     artwork_id: cleanText(payload.artwork_id || payload.id, 128),
     creator: cleanText(payload.creator || payload.creator_id || wallet, 80),
@@ -137,49 +139,20 @@ function buildPrompt(payload, wallet) {
     '  "factors": ["short factor", "..."],',
     '  "risk_flags": ["short risk", "..."]',
     '}',
-    'Use the creator value as context, not as truth. Be cautious for testnet, missing metadata, or limited market history.',
+    'All price fields must be finite, non-negative ETH amounts; the minimum must not exceed the maximum.',
+    'Use the creator-supplied starting price as context, not as truth. A null price means no valid price was supplied; never infer one.',
+    'Describe the supplied price, never the value or worth of the creator. Be cautious for testnet, missing metadata, or limited market history.',
     `Artwork facts: ${JSON.stringify(facts)}`
   ].join('\n');
 }
 
 async function fetchInlineMedia(mediaUrl) {
-  if (!mediaUrl) return null;
-
-  let url;
-  try {
-    url = new URL(mediaUrl);
-  } catch {
-    return null;
-  }
-
-  if (!['http:', 'https:'].includes(url.protocol)) return null;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), MEDIA_FETCH_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
-
-    const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim() || '';
-    if (!mimeType.startsWith('image/')) return null;
-
-    const contentLength = Number(response.headers.get('content-length') || 0);
-    if (contentLength > MAX_INLINE_MEDIA_BYTES) return null;
-
-    const arrayBuffer = await response.arrayBuffer();
-    if (arrayBuffer.byteLength > MAX_INLINE_MEDIA_BYTES) return null;
-
-    return {
-      inlineData: {
-        mimeType,
-        data: Buffer.from(arrayBuffer).toString('base64')
-      }
-    };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  const resource = await fetchArtworkResource(mediaUrl, {
+    maxBytes: MAX_INLINE_MEDIA_BYTES,
+    timeoutMs: MEDIA_FETCH_TIMEOUT_MS,
+    acceptContentType: mimeType => mimeType.startsWith('image/')
+  });
+  return resource ? { inlineData: { mimeType: resource.mimeType, data: resource.data.toString('base64') } } : null;
 }
 
 function readInlineMediaData(dataUrl) {
@@ -241,14 +214,18 @@ async function callGemini({ apiKey, model, payload, wallet }) {
     throw err;
   }
 
-  const min = clampNumber(parsed.estimated_value_min_eth, 0, 1000000, 0);
-  const max = Math.max(min, clampNumber(parsed.estimated_value_max_eth, 0, 1000000, min));
-  const start = clampNumber(parsed.suggested_start_price_eth, 0, 1000000, min);
+  const prices = readAIValuation(parsed);
+  if (!prices) {
+    const err = new Error('AI returned an invalid price estimate. Guidance is unavailable; please try again.');
+    err.statusCode = 502;
+    err.code = 'GEMINI_RESPONSE_INVALID';
+    throw err;
+  }
 
   return {
-    estimated_value_min_eth: min,
-    estimated_value_max_eth: max,
-    suggested_start_price_eth: start,
+    estimated_value_min_eth: prices.estimated_value_min_eth,
+    estimated_value_max_eth: prices.estimated_value_max_eth,
+    suggested_start_price_eth: prices.suggested_start_price_eth,
     confidence: normalizeConfidence(parsed.confidence),
     rationale: cleanText(parsed.rationale, 500),
     factors: Array.isArray(parsed.factors) ? parsed.factors.map(item => cleanText(item, 120)).filter(Boolean).slice(0, 6) : [],

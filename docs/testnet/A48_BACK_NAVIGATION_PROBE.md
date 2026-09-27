@@ -26,13 +26,17 @@ Run it in the same Chrome a visitor would use.
 
 ## The probe
 
-Two navigations and three lines. About a minute.
+Two navigations and a page-restoration marker. About a minute.
 
 **1.** Open `https://artsoulprotocol.com/gallery` in a normal window, wait for
 cards to appear, then open DevTools (F12) and run in the Console:
 
 ```js
 window.__bfProbe = 'marker-' + Date.now();
+window.__bfRestored = false;
+window.addEventListener('pageshow', event => {
+  window.__bfRestored = event.persisted;
+});
 ```
 
 **2.** Navigate to `https://artsoulprotocol.com/docs-protocol`, wait two seconds,
@@ -43,17 +47,26 @@ then press the browser Back button — the button, not a link.
 ```js
 JSON.stringify({
   marker: typeof window.__bfProbe === 'string' ? window.__bfProbe : 'LOST',
-  navType: performance.getEntriesByType('navigation')[0]?.type
+  restored: window.__bfRestored === true,
+  navType: performance.getEntriesByType('navigation')[0]?.type,
+  notRestoredReasons: performance.getEntriesByType('navigation')[0]?.notRestoredReasons
 })
 ```
 
 ## Reading the result
 
-| `marker` | `navType` | Meaning |
+| `marker` | `restored` | Meaning |
 | --- | --- | --- |
-| `marker-…` | `back_forward` | **Restored from cache.** A-48 passes. The document was never rebuilt, so there is no repaint to see. |
-| `LOST` | `back_forward` | **Rebuilt.** The cache was refused and the repaint is real. Continue below. |
-| anything | `navigate` | Back was not what happened — a link was followed. Redo the run. |
+| `marker-…` | `true` | **Restored from cache.** The same document survived and `pageshow.persisted` confirms restoration. |
+| `LOST` | `false`, with `navType: back_forward` | **Rebuilt history navigation.** Continue below to record why the cache was not used. |
+| Any other combination | Any | **Inconclusive.** Verify that the probe was installed before a full document navigation and that browser Back was used. |
+
+Corrected 2026-09-27: `navType` is diagnostic only. A restored document retains
+its original navigation timing entry, so `navigate` can accompany a successful
+restoration. It must not be classified as a failed Back action. A null or missing
+`notRestoredReasons` also does not prove success. See the browser maintainers'
+[restoration/performance guidance](https://web.dev/articles/bfcache#performance_measurement)
+and [not-restored diagnostics](https://developer.chrome.com/docs/web-platform/bfcache-notrestoredreasons/).
 
 A pass needs the marker to survive on **desktop, iOS and Android**. The iOS run
 matters most: WebKit first reproduced this, and its cache rules differ from
@@ -73,8 +86,8 @@ cause and the deferral has a path it missed. Anything else — an open socket, a
 row rather than being folded into this one.
 
 Repository-side checks already done, so they need not be repeated: no `unload`
-listener exists anywhere in shipped code; the only `beforeunload` is on the
-upload page, where warning about an unfinished upload is deliberate, and Chrome
+listener exists anywhere in shipped code; deliberate `beforeunload` warnings
+cover unfinished uploads and unsaved collection drafts, and Chrome
 does not refuse the cache for `beforeunload` alone; the document responds
 `public, max-age=0, must-revalidate`, which is cacheable, not `no-store`.
 

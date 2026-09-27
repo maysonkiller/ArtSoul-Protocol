@@ -50,7 +50,7 @@
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
     <script defer src="/src/ui/themed-selects.js?v=1"></script>
     <script defer src="/src/ui/theme-validator.js"></script>
-    <script src="/src/ui/navigation-manager.js?v=5" defer></script>
+    <script src="/src/ui/navigation-manager.js?v=6" defer></script>
     <script defer src="/src/ui/status-banner-system.js"></script>
     <script defer src="/src/ui/system-logger.js"></script>
     <script defer src="/src/ui/log-viewer-ui.js"></script>
@@ -66,7 +66,7 @@
         });
     </script>
     <script src="/modal-system.js?v=1" defer></script>
-    <script src="/src/features/artwork/ai-valuation-client.js?v=2" defer></script>
+    <script type="module" src="/src/features/artwork/ai-valuation-client.js?v=4"></script>
     <script src="/data-prefetch.js?v=5" async></script>
     <script src="/avatar-dropdown.js?v=53" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
@@ -76,7 +76,7 @@
     <script src="/webmcp-tools.js?v=4" defer></script>
     <!-- Voice commands: the same agent tools, spoken. Absent where the browser has no speech recognition. -->
     <script src="/voice-commands.js?v=1" defer></script>
-    <script type="module" src="/contracts-integration.js?v=9"></script>
+    <script type="module" src="/contracts-integration.js?v=10"></script>
 
     <!-- AI Integration -->
 
@@ -593,6 +593,14 @@
             <h1 class="text-4xl font-light">Publish Artwork</h1>
             <p>Prepare artwork for auction discovery</p>
         </div>
+
+        <nav class="publish-panel mb-6" aria-label="Publication type">
+            <p class="form-hint">What do you want to publish?</p>
+            <div class="flex flex-wrap gap-3 mt-3">
+                <a href="/upload" class="btn-secondary" aria-current="page">1/1 Artwork</a>
+                <a href="/collection-builder" class="btn-secondary">Collection · local draft</a>
+            </div>
+        </nav>
 
         <div class="upload-form-stack space-y-8">
             <div class="upload-zone rounded-xl p-12 text-center" onclick="document.getElementById('fileInput').click()">

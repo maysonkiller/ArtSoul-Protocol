@@ -2,6 +2,11 @@
   "name": "artsoul",
   "version": "1.0.0",
   "packageManager": "npm@11.6.2",
+  "overrides": {
+    "@base-org/account": {
+      "@coinbase/cdp-sdk": "1.55.0"
+    }
+  },
   "description": "Auction-first NFT art discovery protocol on Base.",
   "main": "appkit-init.js",
   "scripts": {
@@ -12,7 +17,7 @@
     "monitor:indexer": "node scripts/check-indexer-health.mjs",
     "test": "npm run test:unit && npm run test:contracts",
     "test:unit": "node scripts/run-unit-tests.mjs",
-    "test:contracts": "hardhat test test/ArtSoulV41.test.cjs",
+    "test:contracts": "hardhat test test/ArtSoulV41.test.cjs test/CollectionLaunch.test.cjs",
     "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/tailwind.css -o tailwind-build.css --minify",
     "verify:tailwind": "node scripts/verify-tailwind.mjs",
     "sync:phase-a": "node scripts/sync-phase-a-counts.mjs"
@@ -76,7 +81,7 @@
     "asynckit": "^0.4.0",
     "at-least-node": "^1.0.0",
     "available-typed-arrays": "^1.0.7",
-    "axios": "^1.15.2",
+    "axios": "1.18.0",
     "balanced-match": "^1.0.2",
     "base-x": "^3.0.11",
     "bech32": "^1.1.4",
@@ -162,7 +167,7 @@
     "ethereum-bloom-filters": "^1.2.0",
     "ethereum-cryptography": "^0.1.3",
     "ethereumjs-util": "^7.1.5",
-    "ethers": "^6.16.0",
+    "ethers": "6.17.0",
     "ethjs-unit": "^0.1.6",
     "evp_bytestokey": "^1.0.3",
     "express": "^5.2.1",
@@ -415,7 +420,7 @@
     "workerpool": "^6.5.1",
     "wrap-ansi": "^7.0.0",
     "wrappy": "^1.0.2",
-    "ws": "^8.17.1",
+    "ws": "8.21.0",
     "y18n": "^5.0.8",
     "yargs": "^16.2.0",
     "yargs-parser": "^20.2.9",

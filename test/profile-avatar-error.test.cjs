@@ -44,3 +44,20 @@ test('a disposed profile cannot receive a late avatar failure', () => {
   staleError();
   assert.equal(h.state.failed, false);
 });
+
+test('a rejected avatar upload restores the previous image and reports the original error', async () => {
+  const upload = profile.slice(profile.indexOf('async function handleAvatarUpload('), profile.indexOf('async function saveProfile('));
+  const state = [];
+  const notices = [];
+  const scope = {
+    profile: {avatar_url: 'https://example.test/original.png'},
+    setProfile: value => state.push(value), alert: message => notices.push(message), console: {error() {}},
+    window: {ensureAuthenticated: async () => true, getCurrentWalletAddress: () => '0xartist',
+      ArtSoulDB: {uploadFile: async () => {throw new Error('Upload unavailable');}}}
+  };
+  vm.runInNewContext(upload + '\nthis.upload = handleAvatarUpload;', scope);
+  await scope.upload({target: {files: [{name: 'avatar.png', type: 'image/png', size: 1024}]}});
+  assert.equal(state[0].avatar_url, 'uploading...');
+  assert.equal(state[1].avatar_url, 'https://example.test/original.png');
+  assert.deepEqual(notices, ['Error uploading avatar: Upload unavailable']);
+});

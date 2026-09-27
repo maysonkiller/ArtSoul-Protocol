@@ -222,37 +222,10 @@ class NavigationManager {
             transition: all 0.3s ease;
         `;
 
-        // Apply theme-aware styles
-        this.applyBackButtonTheme(backBtn);
-
         // Insert at beginning of nav
         nav.insertBefore(backBtn, nav.firstChild);
 
         return backBtn;
-    }
-
-    /**
-     * Apply theme to back button
-     */
-    applyBackButtonTheme(btn) {
-        if (!btn) return;
-
-        const theme = window.ThemeManager ? window.ThemeManager.getTheme() : 'classic';
-
-        if (theme === 'classic') {
-            btn.style.background = '#a9ddd3';
-            btn.style.color = '#010101';
-        } else {
-            btn.style.background = 'linear-gradient(135deg, #bf00ff, #00f5ff)';
-            btn.style.color = '#ffffff';
-        }
-
-        // Register for theme changes
-        if (window.ThemeManager) {
-            window.ThemeManager.registerComponent('backButton', (newTheme) => {
-                this.applyBackButtonTheme(btn);
-            });
-        }
     }
 
     /**
