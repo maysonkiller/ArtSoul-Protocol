@@ -4,6 +4,9 @@ The founder designated `C:\Projects\ArtSoul` as the single active implementation
 workspace on 2026-09-23. All agents and local checks for this task now use it.
 The working branch is `codex/takeover-audit`; the preserved implementation commit
 is `25917f09edaa683b22049989d23600e5ad8d9d1f`.
+The verified September 27 continuation is
+`e3dc7384de91ac4d0fdde753aeb9c349400924e3`; subsequent checkpoint-only commits
+do not change its tested implementation.
 
 The earlier `.codex/worktrees/artsoul-takeover-audit/ArtSoul` directory was a Git
 worktree of this same repository. It isolated the takeover from the older main
