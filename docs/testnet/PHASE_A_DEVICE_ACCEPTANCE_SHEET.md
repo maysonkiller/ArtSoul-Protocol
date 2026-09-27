@@ -51,7 +51,7 @@ visit.
 ### If Back rebuilds the page
 
 Run the probe in [`A48_BACK_NAVIGATION_PROBE.md`](A48_BACK_NAVIGATION_PROBE.md)
-— three console lines — and paste Chrome's own list of blocking reasons rather
+— a page-restoration marker — and paste Chrome's own list of blocking reasons rather
 than guessing.
 
 ---
