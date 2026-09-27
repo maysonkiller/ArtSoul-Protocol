@@ -1,5 +1,10 @@
 # ArtSoul Project State
 
+Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
+and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-09-23. Implementation
+now uses `C:\Projects\ArtSoul`; older dates and deployment SHAs below remain
+historical evidence.
+
 Audit date: 2026-07-15
 Reconciled: 2026-08-20 against `main` at `0bbeec5` (merged PR #201)
 
@@ -110,7 +115,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 60 `done`, 21 `in progress`, 2 `planned` across A-01 to A-83
+current position is 62 `done`, 21 `in progress`, 0 `planned` across A-01 to A-83
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that

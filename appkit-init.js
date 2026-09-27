@@ -3620,6 +3620,7 @@ async function initializeAppKit() {
                 },
                 themeMode: 'dark',
                 themeVariables: {
+                    '--w3m-font-family': 'system-ui, -apple-system, "Segoe UI", Arial, sans-serif',
                     '--w3m-accent': getThemeValue('--c-accent', fallbackAccent),
                     '--w3m-color-mix': getThemeValue('--c-accent-2', fallbackAccentMix)
                 },

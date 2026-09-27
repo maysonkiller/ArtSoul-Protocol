@@ -145,6 +145,46 @@ export function loadDraft(storage) {
     return raw ? parseDraft(raw) : null;
 }
 
+// This matches the isolated local source, not a deployed address or approved sale.
+// It deliberately returns findings, never transaction arguments or inferred terms.
+export function reviewLocalContractCapabilities(config) {
+    const findings = [];
+    const add = (code, message) => findings.push({ code, message });
+    const uint32 = value => positive(value) && BigInt(value) <= 0xffffffffn;
+    const allowlists = ['merkle', 'wallet-allowlist'];
+    if (!uint32(config.maxSupply)) add('CONTRACT_SUPPLY_WIDTH', 'CollectionLaunch maximum supply must fit a positive uint32 (at most 4,294,967,295).');
+    if (config.phases.length > 32) add('CONTRACT_PHASE_LIMIT', 'CollectionLaunch supports at most 32 phases; this draft may be saved but cannot be represented by that contract.');
+    config.phases.forEach((phase, index) => {
+        const label = phase.name || `Phase ${index + 1}`;
+        if (!uint32(phase.allocation) || !uint32(phase.walletLimit)) add('CONTRACT_PHASE_WIDTH', `${label}: allocation and wallet limit must fit positive uint32 values.`);
+        for (const field of ['startAt', 'endAt']) {
+            const timestamp = scheduleTimestamp(phase[field]);
+            if (!Number.isFinite(timestamp) || timestamp < 0 || timestamp % 1000 !== 0) add('CONTRACT_TIMESTAMP', `${label}: ${field === 'startAt' ? 'start' : 'end'} must be an exact non-negative whole Unix second; the contract cannot preserve fractional seconds.`);
+        }
+        if (!['free', 'fixed', 'claim', 'fcfs', 'uniform-auction'].includes(phase.mechanism)) {
+            add('CONTRACT_MECHANISM', `${label}: ${Object.hasOwn(MECHANISMS, phase.mechanism) ? MECHANISMS[phase.mechanism] : 'this mechanism'} is not a CollectionLaunch phase. Guaranteed reservation is not implemented; burning and crafting belong to a separate Forge contract.`);
+        }
+        const eligibility = phase.eligibility.kind;
+        if (eligibility !== 'public' && !allowlists.includes(eligibility)) add('CONTRACT_ELIGIBILITY', `${label}: the local contract enforces public access or a Merkle allowlist only. Holder, activity, role and other eligibility require a separately reviewed proof path; they cannot be treated as public access.`);
+        if (allowlists.includes(eligibility) && (!/^0x[a-fA-F0-9]{64}$/.test(phase.eligibility.merkleRoot) || /^0x0{64}$/i.test(phase.eligibility.merkleRoot))) add('CONTRACT_MERKLE_ROOT', `${label}: Merkle phases require a non-zero bytes32 root; a wallet list must use the same reviewed proof format.`);
+        if (eligibility === 'public' && phase.eligibility.merkleRoot) add('CONTRACT_PUBLIC_ROOT', `${label}: public phases require a zero root. Remove the saved allowlist root explicitly before selecting public access.`);
+        if (['public', ...allowlists].includes(eligibility) && phase.eligibility.contractAddress) add('CONTRACT_HOLDER_RULE', `${label}: the saved holder contract has no enforcing field in this phase. Remove it explicitly or keep this draft blocked.`);
+        if (phase.mechanism === 'uniform-auction') {
+            if (!integer(phase.walletLimit) || Number(phase.walletLimit) !== 1) add('CONTRACT_AUCTION_LIMIT', `${label}: uniform auctions accept exactly one funded bid for one NFT per wallet; multi-unit bids are not implemented.`);
+            if (eligibility !== 'public') add('CONTRACT_AUCTION_ELIGIBILITY', `${label}: uniform auctions are public in the local contract; it has no allowlist or holder-proof bid entry.`);
+            if (phase.pricing.sourcePhaseId) add('CONTRACT_AUCTION_PRICE_SOURCE', `${label}: an auction requires its own positive reserve and cannot reference another auction's price.`);
+        }
+        if (['free', 'claim'].includes(phase.mechanism) && phase.pricing.sourcePhaseId) add('CONTRACT_FREE_PRICE_SOURCE', `${label}: a free phase cannot reference an auction price that could charge collectors.`);
+        if (phase.pricing.fallback !== 'pause') add('CONTRACT_FALLBACK_POLICY', `${label}: this draft supports stopping minting when a price source is unavailable. The contract's optional fixed fallback needs explicit reviewed economics and is not inferred here.`);
+        if (!['unminted', 'next'].includes(phase.unusedSupply)) add('CONTRACT_UNUSED_SUPPLY', `${label}: the contract can leave unused supply unminted or roll it into the immediate next phase only; it cannot jump to a later public phase or return it to an administrable reserve.`);
+        if (phase.unusedSupply === 'next' && index === config.phases.length - 1) add('CONTRACT_FINAL_ROLLOVER', `${label}: the final phase cannot roll allocation into a missing next phase.`);
+    });
+    if (config.creatorEarnings.recipients.length > 1) add('CONTRACT_ROYALTY_SPLIT', 'The local ERC-2981 implementation stores one royalty receiver. Multiple recipients require a reviewed splitter; the builder does not deploy or invent one.');
+    if (!integer(config.support.bps) || Number(config.support.bps) !== 0) add('CONTRACT_SUPPORT', 'Voluntary support routing is not implemented in CollectionLaunch or CollectionForge. A non-zero support proposal cannot be activated by this contract.');
+    if (config.crafting.enabled && (!integer(config.crafting.inputCount) || Number(config.crafting.inputCount) < 2 || Number(config.crafting.inputCount) > 32)) add('CONTRACT_FORGE_INPUTS', 'CollectionForge accepts 2 to 32 ingredients from one configured collection per output. Crafting is separate from launch phases.');
+    return findings;
+}
+
 export function reviewConfig(config) {
     const findings = [];
     const add = (category, code, message) => findings.push({ category, code, message });
@@ -218,14 +258,28 @@ export function reviewConfig(config) {
     if (config.crafting.enabled && (!positive(config.crafting.inputCount) || !positive(config.crafting.outputMaxSupply) || BigInt(config.crafting.inputCount) * BigInt(config.crafting.outputMaxSupply) > BigInt(positive(config.maxSupply) ? config.maxSupply : 0))) add('utility', 'CRAFT_SUPPLY', 'Craft output supply times the ingredient count must not exceed base maximum supply.');
     const categories = ['content', 'network', 'supply', 'phases', 'schedule', 'pricing', 'eligibility', 'utility', 'fees'];
     const factors = categories.map(category => ({ category, passed: !findings.some(f => f.category === category) }));
+    const contractFindings = reviewLocalContractCapabilities(config);
     return {
         findings, factors, allocationTotal: total.toString(),
         reserve: positive(config.maxSupply) ? (BigInt(config.maxSupply) - total).toString() : null,
         // The factor count is transparent deterministic validation, never an AI score.
         passedFactors: factors.filter(f => f.passed).length,
+        contractCompatibility: {
+            compatible: findings.length === 0 && contractFindings.length === 0,
+            findings: contractFindings,
+            notes: [
+                'Free, claim, fixed-price and first-come phases map to Fixed for public access or Merkle for reviewed allowlists. A Merkle allowance limits claims; it does not reserve a guaranteed allocation.',
+                'Uniform auctions escrow the full bid, accept one bid per wallet with no replacement or cancellation, and prefer earlier equal bids. A linked phase remains unavailable until its source closes and sells out; a partially subscribed source does not qualify, even when it has winners.',
+                'Unused supply can move only to the immediate next phase. Unallocated or retained supply has no later admin mint path after configuration lock. Burns never replenish lifetime issuance.',
+                'The local contract credits 97.5% of primary proceeds to its creator and 2.5% to its protocol receiver. ERC-2981 royalties are advisory and use one receiver; voluntary support and a collection resale settlement adapter are not implemented. These observations do not approve final launch economics.',
+                'A separate Forge can atomically burn 2–32 owned and approved inputs from this collection and mint one output. Its recipe, output metadata and receiver configuration must be reviewed and wired before launch lock. No Genesis right is created.'
+            ]
+        },
         deploymentBlockers: [
             'No verified Collection Launch deployment is configured for this page.',
-            'Contract capability matching, immutable phase locking and wallet transaction review are not connected.',
+            'Compatibility is checked against local source only. Deployment arguments, immutable phase locking and wallet transaction review are not connected.',
+            'A symbol, creator, protocol receiver and royalty receiver must be reviewed separately; no missing constructor address is inferred, even for zero royalties. The first phase must still be in the future when locking.',
+            'Merkle roots need a durable reviewed claimant/allowance manifest bound to the actual chain, collection address and phase; a root string alone is not proof of eligibility.',
             'Collection marketplace fees and royalty/support receiver policy require reviewed configuration.',
             'Metadata persistence, indexed collection state and a testnet rehearsal are required before publishing.'
         ],

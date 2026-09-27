@@ -36,7 +36,11 @@ test('A11 evidence remains scoped while current backlogs preserve unresolved ope
 
   assert.match(canonicalBacklog, /^- \[ \] \*\*A10 — Controlled beta entry\.\*\*/m);
   assert.match(canonicalBacklog, /^- \[x\] \*\*A12 — Remove stale network copy\.\*\*/m);
-  assert.match(durableBacklog, /^\| A-38 \|[^]*?19 low, 12 moderate, and 24 high/m);
+  const dependencies = durableBacklog.match(/^\| A-38 \|[^\n]*/m)?.[0];
+  assert.ok(dependencies, 'dependency follow-up must not disappear behind the older A11 acceptance');
+  assert.match(dependencies, /audits\/DEPENDENCY_TRIAGE_[\d-]+\.md/);
+  assert.match(dependencies, /residual.*documented/i,
+    'current exposure and remaining work belong to the dated dependency review, not a frozen July count');
   assert.match(runbook, /No partial or invented migration-ledger\s+entry was created/);
   assert.match(runbook, /does not close A10 controlled-beta entry or A12 stale network copy/);
 });

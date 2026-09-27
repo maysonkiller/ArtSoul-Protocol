@@ -599,7 +599,7 @@ app.get('/health', async (req, res) => {
         res.json({
             status: 'healthy',
             timestamp: new Date().toISOString(),
-            database: dbHlth,
+            database: dbHealth,
             indexer: indexerHealth
         });
     } catch (error) {

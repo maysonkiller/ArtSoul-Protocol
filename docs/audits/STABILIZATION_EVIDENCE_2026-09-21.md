@@ -69,3 +69,47 @@ The public artwork API returned `v41:84532:28`, auction/active auction `63`, sta
 5. Network parameters were checked against official [Robinhood connection documentation](https://docs.robinhood.com/chain/connecting/) and [Base chain-ID documentation](https://docs.base.org/base-chain/api-reference/ethereum-json-rpc-api/eth_chainId). Draft networks: Base Sepolia 84532 and Robinhood testnet 46630, ETH with 18 decimals, writes disabled. Existing 1/1 writes remain Base Sepolia only.
 6. Collection contracts, services and SQL from prior work are preserved. Services remain unwired, SQL unapplied, and deployment/terms-locking unavailable. Newsletter send/save consistency still needs a dedicated implementation decision. No real-provider acceptance, newsletter send, collection deployment or launch is claimed.
 7. The prior contract audit remains open, including pause/default timing, resale listing revival, recipient recovery, unsafe mint handling and repeat core configuration. Those findings require separate scoped fixes and deployment review; this stabilization patch does not certify the entire live protocol.
+
+## Continuation — September 23–27
+
+The active workspace is now `C:\Projects\ArtSoul`. The prior implementation was
+preserved in local commit `25917f0`, then the original checkout was switched to
+that reviewed branch through Git. Its three dirty files were line-ending-only
+changes and were backed up first. All 77 implementation/test fingerprints matched;
+86 evidence files copied without a conflict. The former Codex worktree is detached
+and locked as an archive. See [workspace evidence](../WORKSPACE.md).
+
+A-34 now has a reusable presentation-only aura frame with no production eligibility
+assignment; two tests and 32 theme/state/surface/viewport browser cases passed.
+A-35 maps the active and dormant runtimes and all migration trees. A-38's bounded
+dependency, CI and font changes have a clean install and explicit residual-risk
+classification in the [dependency review](DEPENDENCY_TRIAGE_2026-09-23.md).
+
+Collection Draft now checks compatibility with the isolated local contracts.
+Twenty-nine focused tests pass; seven otherwise valid drafts reproduce unsupported
+settings. Desktop/mobile edits, import/export, preservation and disabled publication
+are verified. This closes the earlier capability-matching slice, not deployment or
+approval of final launch terms. Wallet allowlists require reviewed Merkle proofs;
+later-public routing is not silently converted to next-phase routing, and unknown
+fields or missing constructor addresses never become activated configuration.
+
+The September 27 built-browser replay exercised the actual profile, AI, auction and
+collection pages with fixtures. The guest wallet check additionally loaded and
+settled the real built SDK, confirmed guest state and system fonts, and observed
+no external font preloads. External requests were deliberately blocked; console
+errors from those blocks and injected API failures are classified in
+`output/audit/final-browser-summary-2026-09-27.json`. These are not live OAuth,
+Gemini, signed-wallet or real-phone acceptance results.
+
+That replay found a real Back button recursion: applying its theme registered a
+callback which ThemeManager immediately invoked, recursively registering again.
+The source regression failed before the fix. Shared CSS variables now own the
+button's appearance; history behavior is unchanged, reduced motion is respected,
+and all five script references use version 6 with a content-hash guard. The built
+AI replay after rebuilding passed with no unexpected console errors.
+
+Final aggregate results and immutable source fingerprints are recorded in the
+[current checkpoint](STABILIZATION_CHECKPOINT.md). Failed intermediate attempts are
+retained: stale TODO/count assertions and source scans entering generated evidence
+were corrected without weakening the actual UI/navigation invariants. Production
+remains untouched. A8/A10 and the existing contract audit remain open.

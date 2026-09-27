@@ -122,7 +122,9 @@ test('every other grid in the product declares its own columns', () => {
   const offenders = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (['node_modules', 'dist', '.git', '.playwright-cli', 'brand'].includes(entry.name)) continue;
+      if (['node_modules', 'dist', 'brand'].includes(entry.name) || entry.name.startsWith('.')) continue;
+      // The root evidence folder and hidden historical worktrees are not product inputs.
+      if (dir === '.' && entry.name === 'output') continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) { walk(full); continue; }
       if (!/\.(html|jsx)$/.test(entry.name)) continue;

@@ -211,6 +211,12 @@ function Builder() {
                     <div className="launch-footer"><h3>{review.findings.length ? `${review.findings.length} configuration items to review` : 'Configuration checks passed'}</h3>
                         {review.findings.map((finding, index) => <p className="launch-finding" key={finding.code + ':' + index}><strong>{finding.category}</strong>{finding.message}</p>)}
                     </div>
+                    <section className="launch-footer" aria-label="Local contract compatibility">
+                        <h3>Local contract compatibility</h3>
+                        <p className="launch-help">{review.contractCompatibility.compatible ? 'These draft settings fit the current local contract checks. Deployment and sale approval are still required.' : 'This draft needs changes before it can fit the current local contracts. Resolve the configuration items above and the limitations below.'}</p>
+                        {review.contractCompatibility.findings.map((finding, index) => <p className="launch-finding" key={finding.code + ':' + index}>{finding.message}</p>)}
+                        <details className="launch-details"><summary>How the local contracts interpret these settings</summary>{review.contractCompatibility.notes.map(note => <p className="launch-finding" key={note}>{note}</p>)}</details>
+                    </section>
                     <details className="launch-details"><summary>Utility and financial declarations</summary><div className="launch-stack">
                         <UtilityList config={draft} />
                         <p className="launch-help">Imported utility, crafting, creator earnings and support fields are preserved in your export. This first draft editor does not activate them or verify their enforcement.</p>
@@ -224,7 +230,7 @@ function Builder() {
                 <p className="launch-eyebrow">Your draft</p><h3>{draft.name || 'Untitled collection'}</h3>
                 <dl><div><dt>Network</dt><dd><NetworkLabel chainId={draft.chainId} /></dd></div><div><dt>Maximum supply</dt><dd>{draft.maxSupply || 'Not set'}</dd></div><div><dt>Allocated</dt><dd>{review.allocationTotal}</dd></div><div><dt>Unallocated</dt><dd>{review.reserve ?? 'Not set'}</dd></div><div><dt>Phases</dt><dd>{draft.phases.length}</dd></div></dl>
                 <div className="launch-progress" aria-hidden="true">{review.factors.map(factor => <span key={factor.category} data-passed={factor.passed} />)}</div>
-                <p className="launch-help">{review.passedFactors} of {review.factors.length} configuration categories pass. Publishing remains unavailable.</p>
+                <p className="launch-help">{review.passedFactors} of {review.factors.length} configuration categories pass. {review.contractCompatibility.compatible ? 'Local contract checks pass.' : 'Local contract compatibility needs review.'} Publishing remains unavailable.</p>
             </aside>
         </div>
     </main>;

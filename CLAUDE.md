@@ -11,6 +11,13 @@ When a task or the user requests a change:
 - Never silently skip, refuse, or downgrade a requested change just because the canon currently says otherwise. Surface the conflict and follow the explicit-authorization rule above.
 
 ## IMPLEMENTATION DISCIPLINE
+Workspace ownership (founder instruction, 2026-09-23): continue this project in
+`C:\Projects\ArtSoul`. Do not create another checkout/worktree unless the founder
+requests isolation. Other registered worktrees are historical/recovery copies,
+not parallel task versions. Before integrating any of them, compare ancestry and
+uncommitted changes, preserve a recovery snapshot, and use reviewed Git changes;
+never copy one source tree over another. See `docs/WORKSPACE.md`.
+
 Before writing new code, prefer the simplest solution:
 
 - Check whether the project ALREADY has a function / component / util that does this - reuse it instead of duplicating.
