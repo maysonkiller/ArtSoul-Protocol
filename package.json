@@ -2,6 +2,11 @@
   "name": "artsoul",
   "version": "1.0.0",
   "packageManager": "npm@11.6.2",
+  "overrides": {
+    "@base-org/account": {
+      "@coinbase/cdp-sdk": "1.55.0"
+    }
+  },
   "description": "Auction-first NFT art discovery protocol on Base.",
   "main": "appkit-init.js",
   "scripts": {

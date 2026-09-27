@@ -112,6 +112,32 @@ cleanup, wallet SDK acceptance and contract toolchain modernization remain open.
 
 ## Interpretation and next action
 
+### Hosted clean-install correction — September 27
+
+PR #280 CI run `36314235038` failed on both Ubuntu and Windows before build:
+npm 11.6.2 reconstructed the optional Base Account branch as CDP SDK 1.57.0,
+where the lock contains the already-tested 1.55.0. Base Account requests `^1.0.0`;
+the message was npm's exact-location lock validation, not a new direct requirement.
+A manifest-only fixture with fresh registry metadata reproduced the same failure
+using the exact pinned npm executable. The managed shell's default npm is 10.9.7,
+so subsequent installation checks use the explicit existing npm 11.6.2 CLI.
+
+A scoped override now fixes only `@base-org/account -> @coinbase/cdp-sdk` to 1.55.0.
+Regenerating the lock with npm 11.6.2 produced **zero lockfile changes**; the same
+fixture then passed `npm ci --dry-run` without force, legacy-peer flags or scripts.
+This freezes the reviewed SDK, not an upgrade or remediation of its residual
+advisories. Optional graph gaps/peer conflicts and connector acceptance remain
+part of the follow-up above. Fresh hosted CI must pass before merging.
+Evidence: `release-ci-36314235038-failed.log`, `release-ci-npm11-reproduction.log`,
+`release-ci-lock-proposal-diff.json` and `release-ci-lock-proposal-check.log`.
+
+The actual workspace then passed a clean npm 11.6.2 install (1,009 packages),
+184 wallet/navigation regression checks and the build (11 routes, 178 utilities).
+The installed CDP version is 1.55.0 and the tracked lockfile remains unchanged.
+Logs: `release-ci-local-npm11-install.log`, `release-ci-wallet-regression.log`
+and `release-ci-local-build.log`. These additional checks validate the override;
+the prior 1,227-test suite remains evidence for the preceding source revision.
+
 This task treats A-38 as **triage plus bounded compatible fixes**, not permission
 to replace the wallet/contract toolchains or to declare all 58 findings resolved.
 The distinction between an installed package and an executed production path is
