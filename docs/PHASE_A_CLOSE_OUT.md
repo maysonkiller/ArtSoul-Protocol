@@ -8,24 +8,26 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **62 done, 21 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **64 done, 19 in progress, 0 planned** across A-01 to A-83.
 
 ## The shape of what is left
 
 Phase A remains **NO-GO** until A8/A10 acceptance is evidenced. The moderation
 chain - A-39, A-21, A-22, A-23 - has merged code, but activation and real operator
-acceptance remain outstanding. A read-only production check on 2026-09-23 returned
+acceptance remain outstanding. A read-only production check on 2026-09-27 returned
 `reportingEnabled: false`; it does not reveal or certify the migration ledger.
 
 Local PostgreSQL rehearsals now pass all 46 checks across seven integration
 suites, with no Docker skips. They validate SQL/RPC behavior, not production
 activation, real passkey ceremonies or Safe signatures. The Base Sepolia indexer
 also returned healthy with zero lag in that dated read-only snapshot. Neither
-observation deploys the current profile, AI and auction patches.
+observation by itself proves deployment. The profile, AI and auction patches
+were subsequently published through PR #280 at `81627ab`, after green CI and
+preview checks; [apex acceptance](audits/STABILIZATION_RELEASE_2026-09-27.md) passed.
 
 A-34's presentation shell and A-35's runtime boundary map are complete locally.
 They do not activate aura eligibility or the dormant Express server. Remaining
-work separates into dependency CI/rollout acceptance, production/operator steps and connected
+work separates into residual dependency cleanup, production/operator steps and connected
 device acceptance, as listed below.
 
 ## 1. Founder gates - nothing ships past these
@@ -66,11 +68,9 @@ Ordered by what the founder can feel, not by row number.
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
-| **A-48** | The single full-document repaint on browser Back | Diagnosed and the code side is complete: every shared card image path defers. The [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) checks a surviving document marker and `pageshow.persisted`; navigation timing alone cannot identify a cache restore. Desktop, iOS and Android acceptance remain separate. An embedded browser view cannot answer it |
+| **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS and Android acceptance remain open; navigation timing or desktop viewport emulation cannot replace them |
 | **A-53** | The identity settle gap between header and profile | Reproduced in founder desktop and Android captures in August; the repair still needs production iOS/Android reload and navigation acceptance |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
-| **A-38** | Accept the bounded dependency and warning fixes | Local triage, clean install, 1227 combined tests with no skips, 33 contract tests and build passed. Root Ethers/ws/Axios paths, CI action pins and Reown font preloads are repaired. Hosted CI/deployed acceptance remains; 58 residual package findings are explicitly classified, not waived. See [dependency review](audits/DEPENDENCY_TRIAGE_2026-09-23.md) |
-| **A-79** | Bound the profile's opening gallery read | Decided and shipped: one screenful first, the rest behind the frame, identity still committed on the narrow read. Needs one profile load on a device |
 | **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
 
 ## 2a. All the device acceptance, in five trips
@@ -84,6 +84,16 @@ for different things. It is five sessions per device, and it carries the result
 table.
 
 ## 3. Waiting only on a look
+
+**A-38 accepted on September 27:** the bounded fixes passed candidate and
+post-merge Linux/Windows CI and apex guest warning/font checks. The current audit
+retains 64 affected package names, including six inherited parent-package findings
+that explain the earlier 58-count report. This closes triage/rollout acceptance;
+it does not close residual dependency cleanup or certify the protocol as secure.
+
+**A-79 accepted on September 27:** the actual apex profile opened with 24 works,
+committed identity first and loaded the remaining corpus without clearing settled
+cards. This closes its one-device criterion; the separate mobile rows stay open.
 
 Merged and measured, needing one confirmation each:
 
