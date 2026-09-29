@@ -182,6 +182,13 @@ Moderation is complaint-driven and reviewable:
 - Critical or irreversible actions are gated by multisig.
 - Social logins alone are not sufficient for critical moderator actions.
 
+Founder scheduling amendment, 2026-09-29: real founder passkey enrollment and
+the associated operator recovery ceremony are deferred to mainnet preparation,
+before activation of any service that requires them. Isolated testnet engineering
+continues; live authorization checks and disabled moderation flags stay in place.
+This is not evidence of enrollment or permission to bypass staff authorization.
+See `CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md` for the exact boundary.
+
 ## 12. AI Valuation
 
 AI valuation is guidance-only.
@@ -258,6 +265,10 @@ This is the mandatory pre-mainnet migration checklist. It runs after the reworke
 - **Phase B: Public Beta**.
 - **Phase C: Mainnet Preparation**.
 - **Phase D: Staged Mainnet Launch**.
+
+The 2026-09-29 founder amendment schedules real passkey setup and its operator
+ceremony in Phase C, before dependent activation and mainnet launch. Other
+unaccepted Phase A requirements are not automatically waived by this decision.
 
 `17_ROADMAP_PHASES.md` and `12_IMPLEMENTATION_BACKLOG.md` expand this model but remain subordinate to this Bible. They may schedule work; they may not create economics, contract mechanics, Genesis grant cadence, treasury triggers, legal-entity decisions, or product scope that the Bible has not approved.
 

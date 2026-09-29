@@ -18,10 +18,12 @@ function getActiveWalletAddress() {
 
 function setBackendSession(wallet) {
     const normalizedWallet = normalizeWalletAddress(wallet);
+    const previousWallet = authenticatedWallet;
     if (!normalizedWallet) {
         backendSessionCache = null;
         authenticatedWallet = null;
         localStorage.removeItem('artsoul_authenticated_wallet');
+        if (previousWallet) window.dispatchEvent(new CustomEvent('artsoul:auth-state-changed'));
         return null;
     }
 
@@ -39,6 +41,7 @@ function setBackendSession(wallet) {
     authenticatedWallet = normalizedWallet;
     localStorage.setItem('artsoul_authenticated_wallet', normalizedWallet);
     localStorage.setItem('artsoul_auth_method', 'siwe');
+    if (previousWallet !== normalizedWallet) window.dispatchEvent(new CustomEvent('artsoul:auth-state-changed'));
 
     return backendSessionCache;
 }
@@ -52,6 +55,7 @@ function clearBackendSessionCache({ preserveActiveWallet = true } = {}) {
     if (!preserveActiveWallet) {
         localStorage.removeItem('artsoul_wallet');
     }
+    window.dispatchEvent(new CustomEvent('artsoul:auth-state-changed'));
 }
 
 async function initSupabase() {

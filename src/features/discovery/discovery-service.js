@@ -832,21 +832,14 @@
     }
 
     function getGenesisProgress(profile = {}, artworks = [], extra = {}) {
-        const signals = computeTrustProfile(profile, artworks, extra).signals;
-        const requirements = [
-            { key: 'profile', label: 'Profile created', current: signals.profileCreated ? 1 : 0, target: 1 },
-            { key: 'artworks', label: 'Artworks uploaded', current: signals.artworkCount, target: 3 },
-            { key: 'participation', label: 'Auction participations', current: signals.auctionParticipations, target: 5 },
-            { key: 'settlement', label: 'Successful settlement', current: signals.successfulSettlements, target: 1 },
-            { key: 'interactions', label: 'Artwork interactions', current: signals.interactionCount, target: 10 }
-        ];
-
-        const completed = requirements.filter(item => item.current >= item.target).length;
+        // The testnet cannot establish Genesis entitlement. Mainnet grant
+        // categories and verified records are a separate, unactivated feature.
         return {
-            completed,
-            total: requirements.length,
-            eligible: completed === requirements.length,
-            requirements
+            completed: 0,
+            total: 0,
+            eligible: false,
+            requirements: [],
+            availability: 'mainnet-only'
         };
     }
 

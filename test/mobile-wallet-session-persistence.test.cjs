@@ -771,6 +771,7 @@ test('SIWE signs hex UTF-8 while backend verification receives the original plai
     const address = '0x1111111111111111111111111111111111111111';
     const storage = new Map();
     const walletRequests = [];
+    const authEvents = [];
     let verifyBody = null;
     const response = (status, data) => ({
         status,
@@ -800,7 +801,8 @@ test('SIWE signs hex UTF-8 while backend verification receives the original plai
             host: 'artsoul.vercel.app',
             origin: 'https://artsoul.vercel.app'
         },
-        getCurrentWalletAddress: () => address
+        getCurrentWalletAddress: () => address,
+        dispatchEvent: event => authEvents.push(event.type)
     };
     const localStorage = {
         getItem: (key) => storage.get(key) ?? null,
@@ -810,6 +812,7 @@ test('SIWE signs hex UTF-8 while backend verification receives the original plai
 
     vm.runInNewContext(authSource, {
         window,
+        CustomEvent: class CustomEvent { constructor(type) { this.type = type; } },
         localStorage,
         fetch,
         TextEncoder,
@@ -832,6 +835,10 @@ test('SIWE signs hex UTF-8 while backend verification receives the original plai
     assert.doesNotMatch(verifyBody.message, /^0x/);
     assert.match(verifyBody.message, /Chain ID: 8453/);
     assert.equal(verifyBody.signature, '0xsigned');
+    assert.ok(authEvents.includes('artsoul:auth-state-changed'), 'successful SIWE notifies private UI subscribers');
+    authEvents.length = 0;
+    await window.SupabaseAuth.signOut();
+    assert.deepEqual(authEvents, ['artsoul:auth-state-changed'], 'sign-out invalidates private UI even if the connected address is unchanged');
 });
 
 test('only a newly paired mobile session defers SIWE; a restored live session proceeds', () => {

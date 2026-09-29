@@ -39,13 +39,15 @@ test('no open row is left out of the close-out', () => {
   }
 });
 
-test('the founder gates are named as gates, not as engineering', () => {
-  // The moderation chain is built and merged; what remains is a ceremony that
-  // needs credentials and a multisig, which no code change can supply.
+test('activation gates remain explicit without claiming unfinished delivery is complete', () => {
+  // Deferring a ceremony neither completes recipient delivery nor authorizes
+  // weak live access. Keep implementation and operational evidence distinct.
   for (const gate of ['RG-01', 'RG-02', 'RG-03', 'A8d']) {
     assert.ok(closeOut.includes(gate), `${gate} must be named`);
   }
-  assert.match(closeOut, /A-21, A-22 and A-23 close behind A-39/);
+  assert.match(closeOut, /A-21, A-22 and A-23 do not close from merged foundations alone/);
+  assert.match(closeOut, /recipient-facing notification delivery/);
+  assert.match(closeOut, /Passkey\/recovery setup is deferred/);
   assert.match(closeOut, /canon rule 12 forbids a single operator deciding it/);
 });
 

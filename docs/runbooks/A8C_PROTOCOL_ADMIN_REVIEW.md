@@ -68,6 +68,17 @@ the entire decision back. Notification rows are durable delivery obligations;
 external delivery workers are out of this slice and must not be claimed as
 delivered notifications.
 
+September 29 recipient delivery addition: the own-profile Notifications panel
+reads `GET /api/moderation/notifications` using the exact server SIWE wallet.
+It returns at most 20 messages per page, a precise BIGINT cursor, and safe
+artwork references. It exposes no report UUID, complaint content, contact,
+evidence or staff reason. Another wallet, including a nonrecipient staff
+wallet, cannot select or read the recipient's history. Wallet/session changes
+clear displayed messages and invalidate pending responses. History remains
+readable when intake/review write flags are off; missing storage is explicitly
+unavailable. This is in-app delivery, not email, push or a read receipt.
+No schema, role, passkey gate or live write flag changes are required by the inbox.
+
 Critical or irreversible actions are not added here and remain multisig-only.
 
 ## Environment (keep disabled before activation)

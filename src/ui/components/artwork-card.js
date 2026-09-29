@@ -233,7 +233,8 @@
     }
 
     function isMinted(artwork = {}) {
-        return Boolean(artwork.minted) || Boolean(artwork.token_id || artwork.tokenId);
+        const tokenId = normalize(artwork.token_id || artwork.tokenId);
+        return Boolean(artwork.minted) || Boolean(tokenId && tokenId !== '0' && tokenId !== 'none');
     }
 
     function isListedForSale(artwork = {}) {
@@ -367,19 +368,12 @@
     }
 
     function formatPrice(artwork = {}) {
-        const price = artwork.current_bid || artwork.highest_bid || artwork.creator_value || artwork.start_price || artwork.price || '';
-        const numeric = toNumber(price, NaN);
-        if (!Number.isFinite(numeric) || numeric <= 0) return '';
-        return `${price} ETH`;
-    }
-
-    function formatDiscoveryPrice(artwork = {}) {
         const candidates = isMinted(artwork)
             ? [artwork.sale_price, artwork.resale_price, artwork.listing_price, artwork.floor_price, artwork.canonical_floor, artwork.price]
             : [artwork.current_bid, artwork.highest_bid, artwork.start_price, artwork.creator_value, artwork.price];
 
         for (const value of candidates) {
-            const numeric = toNumber(value, NaN);
+            const numeric = Number(value);
             if (Number.isFinite(numeric) && numeric > 0) return `${value} ETH`;
         }
         return '';
@@ -633,7 +627,7 @@
         badge.textContent = status.label;
         meta.appendChild(badge);
 
-        const price = minimal ? formatDiscoveryPrice(artwork) : formatPrice(artwork);
+        const price = formatPrice(artwork);
         if (price) {
             const priceEl = document.createElement('span');
             priceEl.className = 'artsoul-card-price';
@@ -845,7 +839,7 @@
         if (!hasSafeMedia(artwork) || mediaUnavailable) return null;
 
         const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
-        const price = minimal ? formatDiscoveryPrice(artwork) : formatPrice(artwork);
+        const price = formatPrice(artwork);
         return h('div', {
             className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surface ? ` artsoul-artwork-card-${surface}` : ''}`,
             onClick: onOpen || undefined,
@@ -891,6 +885,7 @@
         ReactMedia,
         ReactCountdown,
         creatorLabel,
+        formatPrice,
         statusInfo,
         auctionEndTimestamp,
         formatAuctionCountdown,

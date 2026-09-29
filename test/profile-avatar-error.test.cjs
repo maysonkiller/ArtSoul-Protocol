@@ -4,7 +4,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
-const effect = profile.slice(profile.indexOf('const resolvedAvatarUrl ='), profile.indexOf('// Base mainnet explorer:'));
+const effect = profile.slice(profile.indexOf('const resolvedAvatarUrl ='), profile.indexOf('function getExplorerAddressUrl('));
 
 function loadAvatar() {
   let image, cleanup;

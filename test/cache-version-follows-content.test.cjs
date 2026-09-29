@@ -19,7 +19,7 @@ const fs = require('node:fs');
  */
 const RUNTIME = {
   'src/ui/navigation-manager.js': { version: 6, sha256: '82407872e2309eb0' },
-  'src/ui/components/artwork-card.js': { version: 15, sha256: '555fe539c28c3c22' },
+  'src/ui/components/artwork-card.js': { version: 16, sha256: 'a380efd42d686e82' },
   'contracts-integration.js': { version: 10, sha256: 'a12814822cede799' },
   'modal-system.js': { version: 1, sha256: '73be2dadc241ea78' },
   'webmcp-tools.js': { version: 4, sha256: '0b6e7d5cd51be343' },
@@ -43,6 +43,21 @@ function shortHash(file) {
   return crypto.createHash('sha256').update(normalised, 'utf8').digest('hex').slice(0, 16);
 }
 
+function runtimeVersions(html, file) {
+  const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const references = new RegExp(String.raw`\bsrc\s*=\s*(["'])/${escaped}(?:\?([^"']*))?\1`, 'g');
+  return [...html.matchAll(references)].map(match => {
+    const versions = new URLSearchParams(match[2] || '').getAll('v');
+    return versions.length === 1 && /^\d+$/.test(versions[0]) ? Number(versions[0]) : null;
+  });
+}
+
+function assertRuntimeVersion(html, page, file, expectedVersion) {
+  for (const version of runtimeVersions(html, file)) {
+    assert.equal(version, expectedVersion, `${page} loads ${file} at v=${version}, expected v=${expectedVersion}`);
+  }
+}
+
 test('a changed runtime file forces its cache version to change with it', () => {
   for (const [file, expected] of Object.entries(RUNTIME)) {
     assert.equal(
@@ -55,25 +70,37 @@ test('a changed runtime file forces its cache version to change with it', () => 
 
 test('every page agrees on the version of every runtime file', () => {
   for (const [file, expected] of Object.entries(RUNTIME)) {
-    const escaped = file.replace('.', '\.');
     for (const page of PAGES) {
       const html = fs.readFileSync(page, 'utf8');
-      const found = [...html.matchAll(new RegExp(`${escaped}\?v=(\d+)`, 'g'))].map((m) => Number(m[1]));
-      if (!found.length) continue;
-      for (const version of found) {
-        assert.equal(version, expected.version, `${page} loads ${file} at v=${version}, expected v=${expected.version}`);
-      }
+      assertRuntimeVersion(html, page, file, expected.version);
     }
   }
 });
 
 test('no page loads one of these without a version at all', () => {
   for (const file of Object.keys(RUNTIME)) {
-    const escaped = file.replace('.', '\.');
-    const unversioned = new RegExp(`src="/${escaped}"`);
     for (const page of PAGES) {
-      assert.doesNotMatch(fs.readFileSync(page, 'utf8'), unversioned,
+      assert.ok(!runtimeVersions(fs.readFileSync(page, 'utf8'), file).includes(null),
         `${page} loads ${file} with no ?v=, so it can never be invalidated`);
     }
   }
+});
+
+test('version guard rejects a stale v15 reference when v16 is required', () => {
+  const file = 'src/ui/components/artwork-card.js';
+  const reference = version => `<script src="/${file}?v=${version}" defer></script>`;
+  assert.doesNotThrow(() => assertRuntimeVersion(reference(16), 'fixture.html', file, 16));
+  assert.throws(() => assertRuntimeVersion(reference(15), 'fixture.html', file, 16), /at v=15, expected v=16/);
+  assert.throws(() => assertRuntimeVersion(reference(16) + reference(15), 'fixture.html', file, 16), /expected v=16/);
+});
+
+test('runtime matching handles bare references, quote styles and escaped filename characters', () => {
+  const file = 'src/ui/components/artwork-card.js';
+  for (const reference of [`<script src="/${file}"></script>`, `<script src='/${file}?v=oops'></script>`, `<script src="/${file}?v=16&v=15"></script>`]) {
+    assert.throws(() => assertRuntimeVersion(reference, 'fixture.html', file, 16), /at v=null/);
+  }
+  assert.deepEqual(runtimeVersions(`<script src='/${file}?v=16'></script>`, file), [16]);
+  assert.deepEqual(runtimeVersions('<script src="/src/ui/components/artwork-cardXjs?v=15"></script>', file), []);
+  assert.deepEqual(runtimeVersions('<script src="/runtime/[core]+.js?v=16"></script>', 'runtime/[core]+.js'), [16]);
+  assert.deepEqual(runtimeVersions('<script src="/runtime/coreXjs?v=15"></script>', 'runtime/[core]+.js'), []);
 });

@@ -35,14 +35,17 @@ test('contract readiness is observable without throwing', () => {
   assert.match(contracts, /ensureCore\(\) \{/);
 });
 
-test('genesis state treats an uninitialised contract layer as expected', () => {
-  // The wallet provider is not always available when the profile mounts.
-  // Reporting that as "Could not load Genesis state: Contracts not initialized"
-  // put an error in every fresh profile load for a state that resolves itself.
-  const genesisBlock = profileEntry.slice(
-    profileEntry.indexOf('const provider = await window.web3Modal?.getWalletProvider?.()'),
-    profileEntry.indexOf('Could not load Genesis state')
-  );
-  assert.match(genesisBlock, /window\.ArtSoulContracts\.isReady\?\.\(\) === false/);
-  assert.match(genesisBlock, /return fallback;/);
+test('genesis display neither initializes a wallet nor reads the unrelated testnet prototype', async () => {
+  const genesisBlock = profileEntry.match(/async function getGenesisState\(walletAddress\) \{[\s\S]*?\n            \}/)?.[0];
+  assert.ok(genesisBlock);
+  let providerReads = 0;
+  const window = {
+    web3Modal: { getWalletProvider() { providerReads++; throw new Error('Unexpected wallet request'); } },
+    ArtSoulContracts: { getProjectNFTState() { providerReads++; return { minted: true, balance: 100 }; } }
+  };
+  const readState = new Function('window', `${genesisBlock}; return getGenesisState;`)(window);
+  for (const address of ['', '0x' + '1'.repeat(40)]) {
+    assert.deepEqual(await readState(address), { owned: false, tokenId: null, eligibilityHash: null, source: 'mainnet-not-deployed' });
+  }
+  assert.equal(providerReads, 0);
 });
