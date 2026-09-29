@@ -57,6 +57,27 @@ test('the indexer runner is never pointed at feature migrations', () => {
   assert.match(section, /manages the\s*\n\s*indexer sequence only and must not be pointed at them/);
 });
 
+test('dormant A8 schema preparation does not waive live activation gates', () => {
+  const rollout = fs.readFileSync('docs/runbooks/A8_MODERATION_ROLLOUT.md', 'utf8');
+  for (const document of [runbook, rollout]) {
+    const preparationAt = document.indexOf('### Dormant schema preparation');
+    const activationAt = document.indexOf('### Live activation');
+    assert.ok(preparationAt >= 0 && activationAt > preparationAt);
+    const preparation = document.slice(preparationAt, activationAt);
+    const activation = document.slice(activationAt);
+    assert.match(preparation, /founder authorization/i);
+    assert.match(preparation, /full backup and a schema-only export/);
+    assert.match(preparation, /one transaction each/);
+    for (const flag of ['ARTSOUL_MODERATION_PASSKEY_ENABLED', 'ARTSOUL_PROTOCOL_ADMIN_ENABLED', 'ARTSOUL_REPORTING_ENABLED']) {
+      assert.ok(preparation.includes(flag), `${flag} must remain disabled during preparation`);
+    }
+    assert.match(preparation, /remain absent\s+or false/);
+    assert.match(activation, /RG-03/);
+    assert.match(activation, /two independent founder passkeys/);
+    assert.match(activation, /all 11 mandatory denials/);
+  }
+});
+
 test('the numbering collision between the two 001 files stays documented', () => {
   // migrations/001_ai_integration.sql shares a prefix with the indexer 001 and
   // belongs to neither sequence.

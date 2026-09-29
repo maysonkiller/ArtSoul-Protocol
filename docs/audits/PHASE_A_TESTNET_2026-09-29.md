@@ -1,13 +1,36 @@
 # Phase A testnet execution — 2026-09-29
 
 Canonical checkout: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`,
-HEAD `1d8877a6579bd57c3aa504a141540ae356c5e081` plus the recorded working diff.
+Released application HEAD `9dcf82bda0619e1009dcdadc0268f63b78f7a6f8`.
 The session began with published application `81627ab`. The previously reviewed
 PR #281 was subsequently merged independently at `3d1f989`; its post-merge
 Linux/Windows/static CI run `36634233062` passed. Its newsletter route remains
-unwired and no email/SQL/flag activation was performed. New Phase A changes
-remain in the working diff until their separate release checks complete.
+unwired and no newsletter email/SQL/flag activation was performed. Phase A
+application changes were published separately through PR #282 after the checks
+below. The September 30 dormant A8 schema preparation is recorded separately in
+[its verified application report](PHASE_A_A8_SCHEMA_2026-09-30.md).
 These are controlled operator tests, not user adoption or trading traction.
+
+## Published application verification
+
+[PR #282](https://github.com/maysonkiller/ArtSoul-Protocol/pull/282) merged at
+`9dcf82b` on September 29, 21:58:54 UTC. Corrected candidate `0a24c33` passed
+[CI 36636435784](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/36636435784):
+Linux 1339 passing Node checks with two Windows-only skips; Windows 1284 passing
+with eight PostgreSQL-suite skips that ran on Linux. Both passed 33 contract
+tests. Post-merge [CI 36636763773](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/36636763773)
+passed all three jobs. The final local suite passed **1341 checks, zero failures
+or skips**, including actual Windows custody and all PostgreSQL suites.
+
+Production deployment `6746439656` succeeded at 21:59:28 UTC; the immutable URL
+is `https://artsoul-48duy8hot-maysonkiller-be9112b5.vercel.app`. The apex card,
+session and CSS artifacts match the reviewed source. All four card references
+use v16. A fresh apex profile shows artwork 34 at the actual 0.011 bid, Live,
+the Base Sepolia explorer and mainnet-only Genesis copy, with no page errors.
+The Base Sepolia indexer was healthy with zero lag; legacy Ethereum Sepolia
+remains stopped by design. Guest notification access returns 401 with private
+no-store caching. Final evidence: `phase-a-apex-artifact-2026-09-29.json`,
+`phase-a-apex-profile-2026-09-29.png` and `.txt` under `output/audit/`.
 
 ## Live publish and bid continuation
 
@@ -123,10 +146,12 @@ reports more specific disagreement codes without resending a signed operation.
   Fifty-two focused checks, eleven real PostgreSQL checks and ten built-browser
   scenarios pass. This is user-visible history, not external email or a read
   receipt. Root review required distinguishable artwork references before
-  acceptance; the final patch and tests include them. Live write flags and
-  migrations remain unchanged. Full local handoff: `output/audit/A8C_INBOX_HANDOFF_2026-09-29.md`.
+  acceptance; the final patch and tests include them. The app is now published;
+  the separate September 30 dormant schema preparation corrected its initial
+  live 503. Authenticated reads now return 200; all activation flags remain off.
+  Full local handoff: `output/audit/A8C_INBOX_HANDOFF_2026-09-29.md`.
 
-Latest command `node scripts/run-unit-tests.mjs`: **1338 passed, zero failed or
+Latest application command `node scripts/run-unit-tests.mjs`: **1341 passed, zero failed or
 skipped**, including real disposable PostgreSQL suites. The preceding 1316-pass
 run predates the inbox and card-price changes. The first final run
 exposed three avatar tests extracting code by an obsolete comment; their stable
@@ -140,14 +165,14 @@ JSON. Both pipe consumers now accept that encoding marker while retaining key,
 account and policy validation. Explicit UTF-8 byte writes preserve non-ASCII path
 encoding. Fifty focused checks, including actual Windows and BOM-console DPAPI
 roundtrips and fail-closed identity checks, pass. The failed hosted log is retained;
-the corrected candidate requires green hosted CI before publication.
+the corrected candidate passed hosted CI and was published as recorded above.
 
 Evidence is retained under `output/audit/`: `phase-a-final-unit-2026-09-29-v2.log`,
 `phase-a-final-build-2026-09-29.log`, `phase-a-media-containment-regression-2026-09-29.json`,
 `phase-a-profile-boundary-built-2026-09-29.png` and the moderation journey record.
 Private journals and complete RPC snapshots remain ignored under `docs/private/`;
 keys remain encrypted outside the checkout, never in evidence or source.
-Latest complete logs: `phase-a-release-unit-2026-09-29.log` and
+Latest complete logs: `phase-a-release-unit-final-2026-09-29.log` and
 `phase-a-release-build-2026-09-29.log`. Final review also reproduced and repaired
 the zero-token card sentinel and the stale-version cache-test guard. Fourteen
 focused card/cache/classification checks passed. Earlier inbox logs are retained. The failed build attempt before that
@@ -174,4 +199,6 @@ evidence requirements, not an outstanding general permission request.
 Phase A is not declared complete. Open evidence includes actual iOS/Android and
 OAuth flows, connected-browser publish/auction feedback, the actual settlement
 and mint of artwork 34 after auction 66 ends, reviewed moderation activation and the beta go/no-go record. No mainnet, DNS,
-production migration, contract deployment or real passkey ceremony occurred.
+contract deployment or real passkey ceremony occurred. The four authorized A8
+schema migrations are now applied and verified; dependent live activation
+remains disabled.
