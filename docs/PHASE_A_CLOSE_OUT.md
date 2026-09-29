@@ -41,8 +41,10 @@ database remains pre-ledger; no old migration entries were fabricated.
 Activation and real operator acceptance remain outstanding. Reporting, admin and
 passkey flags remain disabled. See [schema evidence](audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
 
-Local PostgreSQL rehearsals now pass all 46 checks across seven integration
-suites, with no Docker skips. They validate SQL/RPC behavior, not production
+The initial September 29 PostgreSQL baseline passed 46 checks across seven
+integration suites. The final application run includes the additional 11-check
+moderation journey: 57 checks across eight groups, with no Docker skips.
+They validate SQL/RPC behavior, not production
 activation, real passkey ceremonies or Safe signatures. The Base Sepolia indexer
 also returned healthy with zero lag in that dated read-only snapshot. Neither
 observation by itself proves deployment. The profile, AI and auction patches
