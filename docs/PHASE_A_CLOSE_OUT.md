@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-09-27. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-09-29. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -10,11 +10,30 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **64 done, 19 in progress, 0 planned** across A-01 to A-83.
 
+**Founder scheduling decision, September 29:** real passkey enrollment and its
+operator recovery ceremony move to mainnet preparation, before dependent live
+activation. Engineering tests continue now; the live admin/reporting flags stay
+disabled. The activation gates below are retained as deferred requirements, not
+represented as completed. Real phone and OAuth evidence remain separate. See
+the [exact amendment](canon/CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md).
+
+September 29 execution evidence: eleven real Base Sepolia transactions now cover
+resale purchase/listing/withdrawal and artwork 28's no-bid ending; three distinct
+provenance roles were verified on the apex. Local regression passed 1338 checks
+with no skips and the build passed. Portrait containment and profile network /
+Genesis corrections are local and unpublished. Separately authorized live
+SIWE/Gemini/media/metadata verification passed all 13 steps. New artwork 34 /
+auction 66 has two bids, and the losing bidder received its full deposit back.
+Its earliest currently recorded end is September 30 21:25:20 UTC; settlement
+and mint remain untested for this new artwork. See
+[the evidence and limits](audits/PHASE_A_TESTNET_2026-09-29.md).
+
 ## The shape of what is left
 
 Phase A remains **NO-GO** until A8/A10 acceptance is evidenced. The moderation
-chain - A-39, A-21, A-22, A-23 - has merged code, but activation and real operator
-acceptance remain outstanding. A read-only production check on 2026-09-27 returned
+chain - A-39, A-21, A-22, A-23 - has merged foundations. A-22 recipient-facing
+notification delivery is now implemented/tested locally, awaiting release; activation and
+real operator acceptance remain outstanding. A read-only production check on 2026-09-27 returned
 `reportingEnabled: false`; it does not reveal or certify the migration ledger.
 
 Local PostgreSQL rehearsals now pass all 46 checks across seven integration
@@ -30,13 +49,16 @@ They do not activate aura eligibility or the dormant Express server. Remaining
 work separates into residual dependency cleanup, production/operator steps and connected
 device acceptance, as listed below.
 
-## 1. Founder gates - nothing ships past these
+## 1. Activation and acceptance requirements
 
-These are the phase. Each is blocked on something no code change can supply.
+Passkey/recovery setup is deferred as recorded above. Code and regression work
+continues; deferred ceremonies are not prerequisites for publishing independent
+fixes. They still gate dependent live activation, and A10 requires a demonstrated
+operationally safe reporting/moderation path before a beta GO.
 
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
-| **RG-01** apex-origin acceptance | Two operators completing [`testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md`](testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md), including an iOS run | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets |
+| **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
 | **RG-03** → **A-39** moderation activation | Ordered migrations, archived verification output, two founder passkeys, the one-time audited bootstrap grant | Credentials and a multisig-authorised ceremony; canon rule 12 forbids a single operator deciding it |
 | **A8d** Safe recovery rehearsal | The successful ceremony plus all eleven denial cases in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md) section 6 | Signing keys held by three people |
 
@@ -53,9 +75,10 @@ migration steps and their backup discipline are in
 Moderation Activation**, and the surrounding rollout in
 [`runbooks/A8_MODERATION_ROLLOUT.md`](runbooks/A8_MODERATION_ROLLOUT.md).
 
-**A-21, A-22 and A-23 close behind A-39.** Their code is merged; they are waiting
-on the same activation, and A-23 stays NO-GO until every gate above is evidenced
-and no P1 issue is open.
+**A-21, A-22 and A-23 do not close from merged foundations alone.** A-22 also
+needs deployed recipient-facing notification delivery; A-21 needs intake acceptance and
+A-23 needs the recorded beta review. A-23 remains NO-GO while its required safe
+operating path or evidence is missing, or a P1 issue remains open.
 
 ## 2. Implementation and acceptance still open
 
@@ -75,8 +98,9 @@ Ordered by what the founder can feel, not by row number.
 
 ## 2a. All the device acceptance, in five trips
 
-Sixteen rows below are code-complete and waiting on the same thing: somebody
-using the site on a real device. Run row by row and that is sixteen sessions.
+Fifteen rows remain for device and connected-flow acceptance after A-79 closed.
+Most underlying repairs are published; the September 29 portrait/profile
+corrections are still local. A failed acceptance may require another fix.
 [`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)
 organises them by trip instead - arrive cold, connect, publish, settle, and the
 two wallet questions - because most of these rows are watching the same screens
@@ -95,7 +119,7 @@ it does not close residual dependency cleanup or certify the protocol as secure.
 committed identity first and loaded the remaining corpus without clearing settled
 cards. This closes its one-device criterion; the separate mobile rows stay open.
 
-Merged and measured, needing one confirmation each:
+Merged and measured, needing the device coverage specified in each backlog row:
 
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
 - **A-72** quick loads showing no placeholder at all

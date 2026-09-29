@@ -126,10 +126,13 @@ self-skips when Docker is unavailable.
      unexpired bootstrap grant raises `A8A_ACTIVE_BOOTSTRAP_EXISTS`. Once any
      bootstrap grant is consumed or a bootstrap credential exists, it raises
      `A8A_BOOTSTRAP_ALREADY_ESTABLISHED` and no further bootstrap is possible.
-4. On the staging origin with the flag enabled, open an artwork page with
+4. On the configured origin with the passkey flag enabled, open an artwork page with
    the founder wallet, use "Enroll passkey (grant required)", paste the raw
    token, then "Verify passkey". This consumes the bootstrap grant and writes
    `grant_consumed` + `passkey_enrolled` audit events.
+   Use non-production credentials for the preliminary staging rehearsal. Final
+   acceptance requires enrollment and verification on the approved apex RP ID
+   and origin; a passkey enrolled for a preview domain is not evidence of this.
 5. Enroll the SECOND founder passkey from the new device: on the already
    verified device issue a self-grant (`/api/moderation/passkey-grant`,
    requires the active step-up), which returns a fresh raw token once; paste

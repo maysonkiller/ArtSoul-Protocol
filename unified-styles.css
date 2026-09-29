@@ -2298,11 +2298,11 @@ body.future .gallery-filter-panel {
         max-width: 100%;
         max-height: 100%;
         padding: 0;
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .artwork-page-left .artwork-detail-image {
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .artwork-page-left .artwork-detail-video-shell {
@@ -2414,7 +2414,7 @@ body.future .gallery-filter-panel {
         max-width: 100%;
         max-height: none;
         padding: 0;
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .artwork-page-left .artwork-detail-image-shell {
@@ -2423,7 +2423,7 @@ body.future .gallery-filter-panel {
     }
 
     .artwork-page-left .artwork-detail-image {
-        object-fit: cover;
+        object-fit: contain;
     }
 
     .artwork-page-header {

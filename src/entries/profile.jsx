@@ -1,6 +1,7 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
+import { NotificationInbox } from '../features/moderation/notification-inbox.jsx';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
@@ -255,12 +256,11 @@ const { useState, useEffect, useRef } = React;
                 };
             }, [resolvedAvatarUrl]);
 
-            // Base mainnet explorer: the protocol targets Base mainnet, so the
-            // profile address always links to basescan.org.
+            // Profiles currently display the active Base Sepolia product data.
             function getExplorerAddressUrl(address) {
                 const normalized = String(address || '').trim();
                 if (!/^0x[a-fA-F0-9]{40}$/.test(normalized)) return null;
-                return `https://basescan.org/address/${normalized}`;
+                return `https://sepolia.basescan.org/address/${normalized}`;
             }
 
             async function handleCopyAddress(address) {
@@ -448,18 +448,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             function getProfileArtworkPrice(artwork = {}) {
-                const minted = isMintedArtwork(artwork);
-                const candidates = minted
-                    ? [artwork.listing_price, artwork.resale_price, artwork.sale_price, artwork.price, artwork.floor_price, artwork.canonical_floor]
-                    : [artwork.start_price, artwork.creator_value, artwork.price];
-
-                for (const value of candidates) {
-                    const numeric = Number(value);
-                    if (Number.isFinite(numeric) && numeric > 0) {
-                        return `${numeric.toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH`;
-                    }
-                }
-                return '';
+                return window.ArtSoulArtworkCard?.formatPrice?.(artwork) || '';
             }
 
             function getProfileArtworkHref(artwork = {}) {
@@ -743,40 +732,14 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function getGenesisState(walletAddress) {
-                const fallback = {
+                // ProjectNFT is a transferable testnet prototype, not Genesis.
+                // A verified mainnet Genesis source belongs to the later rollout.
+                return {
                     owned: false,
                     tokenId: null,
                     eligibilityHash: null,
-                    source: 'indexer-pending'
+                    source: 'mainnet-not-deployed'
                 };
-
-                if (!walletAddress || typeof window.ArtSoulContracts?.getProjectNFTState !== 'function') {
-                    return fallback;
-                }
-
-                try {
-                    const provider = await window.web3Modal?.getWalletProvider?.();
-                    if (provider && !window.ArtSoulContracts.provider) {
-                        await window.ArtSoulContracts.init(provider);
-                    }
-                    // The wallet provider is not always available by the time the
-                    // profile mounts. Genesis state is presentational, so an
-                    // uninitialised contract layer is an expected state that
-                    // resolves on a later render, not an error worth reporting.
-                    if (window.ArtSoulContracts.isReady?.() === false) {
-                        return fallback;
-                    }
-                    const state = await window.ArtSoulContracts.getProjectNFTState(walletAddress);
-                    return {
-                        owned: Boolean(state?.minted || state?.hasProjectNFT || state?.owned || state?.balance > 0),
-                        tokenId: state?.tokenId || null,
-                        eligibilityHash: state?.eligibilityHash || null,
-                        source: 'contract'
-                    };
-                } catch (error) {
-                    console.warn('Could not load Genesis state:', error);
-                    return fallback;
-                }
             }
 
             function buildDiscoveryProfile(profileData, fullArtworkCorpus, genesisState) {
@@ -1717,10 +1680,10 @@ const { useState, useEffect, useRef } = React;
                                                     }`}>
                                                         <div className="opacity-70 mb-1">Genesis Status</div>
                                                         <div className="text-lg font-bold">
-                                                            {discoveryProfile.genesisState.owned ? 'Genesis Holder' : 'In Progress'}
+                                                            Mainnet only
                                                         </div>
                                                         <div className="text-xs opacity-70">
-                                                            {discoveryProfile.genesisProgress.completed}/{discoveryProfile.genesisProgress.total} requirements
+                                                            Testnet activity does not qualify for Genesis.
                                                         </div>
                                                     </div>
                                                     <div className={`profile-stat-card p-3 rounded-lg ${
@@ -1764,6 +1727,10 @@ const { useState, useEffect, useRef } = React;
                                 </div>
                             </div>
                         </div>
+
+                        {isOwnProfile && walletStateSettled && connectedWalletAddress && (
+                            <NotificationInbox key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} />
+                        )}
 
                         {/* Gallery Tabs */}
                         <div className={`profile-sections-nav rounded-xl p-6 mb-6 ${

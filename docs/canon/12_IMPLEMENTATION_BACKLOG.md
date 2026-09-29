@@ -23,6 +23,13 @@ remain reviewable; a successful local test never means a production rollout.
 
 Goal: a production testnet trustworthy enough for a controlled beta.
 
+Scheduling amendment, 2026-09-29: the founder deferred real passkey enrollment
+and its operator recovery ceremony to Phase C. A8 engineering verification
+continues with isolated test credentials. The activation requirements below
+remain mandatory before live moderation is enabled; they are not falsely marked
+complete or replaced by a test-only bypass. See
+`CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md`.
+
 - [x] **A1 — Security and migration verification.** Accepted 2026-08-07 through the public runtime evidence in `docs/testnet/A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md` and the redacted private-operation record in `docs/testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`. Repository hardening, forced production RLS, the historical testnet migration baseline, bucket guardrails, GitHub Secret Scanning and push protection, preview/production headers, desktop and external-mobile SIWE, signed uploads, authenticated negative upload-policy probes, server-only credential validation, retirement of the exposed secondary development key, and the explicit decision to retain repository history under the active scanning controls are verified. No secret value is stored in either acceptance record.
 - [x] **A2 — Mobile wallet acceptance.** Complete real-phone external-browser, in-app-browser, desktop, navigation, reload, background, write-guard, and explicit-disconnect acceptance. Preserve Base Sepolia as the only operational write chain.
 - [x] **A3 — Production diagnostics cleanup.** Remove the visual wallet debug overlay from production pages while retaining the isolated `wallet-test.html` bench.
@@ -53,6 +60,10 @@ Phase B exit: stable beta, feedback processed, moderation proven with real cases
 ## Phase C — Mainnet Preparation
 
 Goal: audited, product-grade contracts and production operations.
+
+The 2026-09-29 founder amendment adds the deferred real founder passkey setup
+and operator recovery ceremony to C0/C8/C13, before dependent activation and
+mainnet launch. Existing A8 implementation and regression evidence is retained.
 
 - [ ] **C0 — Founder inputs.** Provide ProtocolTreasury and EcosystemTreasury Safe addresses (plus Base Sepolia rehearsal Safes), project domain, and required contract-design answers. These inputs are resource-gated as detailed in `docs/RESOURCE_GATED_WORK.md`: they do not block zero-incremental-spend Phase A engineering, but they remain mandatory before their activation and mainnet gates. Legal entity type and jurisdiction remain founder/counsel decisions; the roadmap must not assume a specific form such as a Polish `sp. z o.o.`.
 - [ ] **C1 — Contract architecture sign-off.** Complete the required research, threat model, storage-layout plan, upgrade-pattern decision, and invariants before Solidity changes.

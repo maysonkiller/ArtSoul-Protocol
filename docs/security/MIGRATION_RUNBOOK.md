@@ -214,16 +214,26 @@ verification discipline lived only here. One path, not two:
    These are feature migrations. `scripts/apply-migrations.js` manages the
    indexer sequence only and must not be pointed at them.
 4. Run each matching read-only file in `sql/verification/` and archive its
-   output with timestamp and environment label. Those files end in `ROLLBACK`;
-   never replace it with `COMMIT`.
+   output with timestamp and environment label. The four A8 verification files
+   contain read-only queries and do not include a `BEGIN`/`ROLLBACK` wrapper;
+   do not confuse them with the separately wrapped indexer baseline check or
+   add data-changing statements to verification.
 5. Confirm forced RLS, no anon or authenticated table or RPC grant, no raw
    signature, token or private-key column, and the SECURITY DEFINER RPC with a
    fixed `search_path`.
 6. Only then configure RP ID, origin, the moderation-session secret, the Safe,
-   the chain and two independent recovery RPCs, enrol two founder passkeys, and
-   issue the one-time audited bootstrap grant.
-7. Rehearse the full A8d recovery ceremony including every mandatory denial in
-   `runbooks/A8D_SAFE_RECOVERY.md` section 6 before enabling any flag.
+   the chain and two independent recovery RPCs. Through the reviewed deployment,
+   enable only `ARTSOUL_MODERATION_PASSKEY_ENABLED`; keep Protocol Admin and
+   public reporting disabled. Confirm the founder's active staff role, issue the
+   one-time audited bootstrap grant, and then enrol and verify two independent
+   founder passkeys as described in `runbooks/A8A_PASSKEY_FOUNDATION.md`.
+7. Complete the A8d recovery ceremony and every mandatory denial in
+   `runbooks/A8D_SAFE_RECOVERY.md` section 6 before enabling Protocol Admin or
+   public reporting. The recovery route requires the passkey flag above. Run
+   destructive fault injection only in the isolated rehearsal environment, not
+   against the live database; preserve the runbook's final RP/origin evidence
+   requirement. Continue with the admin-then-reporting activation and acceptance
+   order in `runbooks/A8_MODERATION_ROLLOUT.md`.
 
 Stop at the first unexpected verification result. Applying a later A8 migration
 over an unverified earlier one is the failure this ordering exists to prevent.
