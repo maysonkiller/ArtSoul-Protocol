@@ -173,7 +173,12 @@ of these say iOS *and* Android, and desktop alone does not satisfy them.
 
 | Date | Device | Browser | Trip | Rows answered | Result |
 | --- | --- | --- | --- | --- | --- |
-| | | | | | |
+| 2026-09-27 | Windows desktop, Chrome 153.0.8010.53 | Ordinary installed Chrome; headed window for BFCache | Trip 1, partial | A-79; desktop portion of A-48 | Apex at release `81627ab`: opening creator read limit 24, identity before cards and full corpus, no settled-content reset. A-79 accepted. Headed Back restored the same marker with `pageshow.persisted=true`; A-48 phones remain open. See [release evidence](../audits/STABILIZATION_RELEASE_2026-09-27.md). |
+
+The same read-only run checked A-33's public provenance cases: five of 34 public
+records were minted, but none had three different Creator / First Collector /
+Owner addresses. This does not complete Trip 4 or connected transaction feedback.
+Mobile viewport screenshots are layout checks, not iPhone/Android acceptance.
 
 ## What this sheet does not cover
 

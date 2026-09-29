@@ -1,6 +1,7 @@
 # A-38 dependency and frontend warning triage
 
-Status: **local changes; not deployed**. Scope: canon §§15 and 17, operational
+Status: **bounded fixes deployed September 27 through PR #280, release `81627ab`;
+CI and apex guest acceptance passed**. Scope: canon §§15 and 17, operational
 security and build tooling. No contract source, storage layout, economics, chain,
 wallet connector version or deployment target changed.
 
@@ -9,10 +10,27 @@ Repository: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, starting commi
 
 ## Current evidence
 
-The 2026-09-23 lockfile audit reports **58 affected package names: 26 high,
+The 2026-09-23 lockfile audit reported **58 affected package names: 26 high,
 13 moderate, 19 low, zero critical**. This supersedes the July count. The count
-is unchanged by this bounded patch because vulnerable copies remain in other
+was unchanged by this bounded patch because vulnerable copies remain in other
 dependency branches. It is not a count of exploitable production defects.
+
+September 27 correction: hosted clean installs and a repeated exact npm 11.6.2
+audit report **64 affected package names: 26 high, 19 moderate, 19 low, zero
+critical**. Two audits with the same unchanged lock/install and a separate cache
+returned 58 then 64. Independent virtual/ideal tree audits both returned 64 with
+no graph difference; this is not an operating-system or installed-version delta.
+The six additional moderate names are `@base-org/account`, `@reown/appkit`,
+`@reown/appkit-adapter-wagmi`, `@reown/appkit-pay`, `@reown/appkit-scaffold-ui`
+and `@reown/appkit-utils`. They inherit the already recorded CDP/Axios finding;
+they are not six new advisory IDs. All belong to the residual wallet branch
+below, not the API/indexer entry roots. The larger count is retained for current
+reporting; neither result is a waiver or proof of exploitability.
+Evidence: `release-audit-warm-cache-2026-09-27.json` and
+`release-audit-repeated-cache-2026-09-27.json` under `output/audit/`. The retained
+`release-audit-disposition-2026-09-27.md` records the installed npm calculator's
+cache-dependent reproduction and static reachability of all six extra names.
+Both reports contain the same 75 underlying advisory IDs.
 
 The root manifest declares hundreds of transitive/tooling packages as direct
 production dependencies. Consequently, `npm audit --omit=dev` is not an accurate
@@ -70,8 +88,10 @@ cleanup, wallet SDK acceptance and contract toolchain modernization remain open.
   reintroduce the CDN to hide a build issue.
 - Reown external-font preloads are removed by the supported theme option above.
   The test verifies SDK behavior, rather than merely searching for a string.
-- CI action Node 20 warnings are addressed in source. Hosted CI has not run this
-  unpushed change, so absence of the warning on GitHub is not yet verified.
+- Hosted Linux/Windows CI passed with the pinned Node 24 actions; the superseded
+  action Node 20 warning was absent. Existing package deprecations, build pure
+  annotations and a setup-node dependency's `url.parse` deprecation remain
+  classified tooling warnings, not a warning-free-build claim.
 
 ## Validation
 
@@ -87,7 +107,8 @@ cleanup, wallet SDK acceptance and contract toolchain modernization remain open.
   font-preload reproduction and configured fix, profile OAuth, Safe recovery,
   receipt reconciliation, mobile wallet lifecycle and wallet runtime loading.
 - CI YAML parsed with the installed parser; action pins were resolved from the
-  official GitHub release tags. Hosted CI remains unrun for this local change.
+  official GitHub release tags. Candidate and post-merge hosted CI passed on
+  September 27; see the [release record](STABILIZATION_RELEASE_2026-09-27.md).
 - Post-install `npm audit --json`: **58 findings**, with root Ethers/Axios/ws
   affected nodes removed but the residual branches above retained. Exit 1 is the
   expected audit status for these unresolved findings.
@@ -107,8 +128,9 @@ cleanup, wallet SDK acceptance and contract toolchain modernization remain open.
 - Seven built-browser checks passed; the actual guest SDK settled with the
   configured system font and no font preloads. External services were blocked;
   this proves local initialization, not an online connector/signing journey.
-- Hosted CI and deployed warning acceptance remain outstanding. Local success
-  does not claim the changed actions have already run on GitHub.
+- Hosted CI and apex guest warning/font acceptance passed September 27. This
+  completes the bounded A-38 triage/repair acceptance, not wallet signing,
+  residual dependency cleanup, a security sign-off or Phase A completion.
 
 ## Interpretation and next action
 
