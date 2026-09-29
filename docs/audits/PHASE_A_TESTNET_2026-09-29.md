@@ -133,7 +133,14 @@ exposed three avatar tests extracting code by an obsolete comment; their stable
 function boundary was corrected and the full suite rerun. Both logs are retained.
 Build: **11 routes / 178 utilities**, passed. The unchanged contract source retains
 the same day's **33 passing contract tests**; no deployed storage was changed.
-New Phase A source has not yet run hosted CI or been published.
+PR #282 candidate ce17895 passed Linux (1337 checks, one Windows-only skip;
+33 contract tests) and static CI, but Windows failed at the public-vector custody
+child pipe. An isolated local reproduction confirmed a leading UTF-8 BOM before
+JSON. Both pipe consumers now accept that encoding marker while retaining key,
+account and policy validation. Explicit UTF-8 byte writes preserve non-ASCII path
+encoding. Fifty focused checks, including actual Windows and BOM-console DPAPI
+roundtrips and fail-closed identity checks, pass. The failed hosted log is retained;
+the corrected candidate requires green hosted CI before publication.
 
 Evidence is retained under `output/audit/`: `phase-a-final-unit-2026-09-29-v2.log`,
 `phase-a-final-build-2026-09-29.log`, `phase-a-media-containment-regression-2026-09-29.json`,

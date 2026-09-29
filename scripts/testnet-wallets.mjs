@@ -39,7 +39,8 @@ async function main() {
     }
     const input = Buffer.concat(chunks);
     try {
-        const { privateKey, expectedAddress, policy } = JSON.parse(input.toString('utf8'));
+        // Windows PowerShell 5.1 may prefix the redirected pipe with a UTF-8 BOM.
+        const { privateKey, expectedAddress, policy } = JSON.parse(input.toString('utf8').replace(/^\uFEFF/, ''));
         process.stdout.write(JSON.stringify(validateImport(privateKey, expectedAddress, policy)));
     } finally {
         input.fill(0);

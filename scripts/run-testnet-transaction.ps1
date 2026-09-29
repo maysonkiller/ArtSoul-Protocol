@@ -30,7 +30,11 @@ try {
     $child.StartInfo=$info
     if (!$child.Start()) { throw 'SIGNER_START_FAILED' }
     $outputTask=$child.StandardOutput.ReadToEndAsync(); $errorTask=$child.StandardError.ReadToEndAsync()
-    $child.StandardInput.Write($payload); $child.StandardInput.Close(); $payload=$null
+    $inputBytes=[Text.Encoding]::UTF8.GetBytes($payload)
+    try {
+        $child.StandardInput.BaseStream.Write($inputBytes,0,$inputBytes.Length)
+        $child.StandardInput.BaseStream.Close()
+    } finally { [Array]::Clear($inputBytes,0,$inputBytes.Length); $payload=$null }
     if (!$child.WaitForExit(180000)) { $child.Kill(); throw 'SIGNER_TIMEOUT_CHECK_JOURNAL' }
     $publicOutput=$outputTask.GetAwaiter().GetResult(); $publicError=$errorTask.GetAwaiter().GetResult()
     if ($child.ExitCode -ne 0) {

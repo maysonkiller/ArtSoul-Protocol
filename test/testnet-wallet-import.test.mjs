@@ -48,10 +48,32 @@ test('the helper does not offer a signing or broadcast command', () => {
     assert.equal(run.stderr, 'TESTNET_WALLET_VALIDATION_FAILED\n');
 });
 
+test('the validator accepts a UTF-8 BOM without relaxing account validation', () => {
+    for (const expectedAddress of [address, other]) {
+        const run = spawnSync(process.execPath, ['scripts/testnet-wallets.mjs', 'validate-import'], {
+            input: '\uFEFF' + JSON.stringify({ privateKey: key, expectedAddress, policy }), encoding: 'utf8'
+        });
+        assert.equal(run.status, expectedAddress === address ? 0 : 1);
+        if (expectedAddress === address) assert.deepEqual(JSON.parse(run.stdout), { address, chainId: 84532 });
+        else assert.equal(run.stderr, 'TESTNET_WALLET_VALIDATION_FAILED\n');
+        assert.ok(!(run.stdout + run.stderr).includes(key));
+    }
+});
+
 test('Windows DPAPI roundtrips without printing stored material', { skip: process.platform !== 'win32' }, () => {
     const run = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File',
         'scripts/testnet-wallets.ps1', '-Action', 'SelfTest'], { encoding: 'utf8', timeout: 20000 });
     assert.equal(run.status, 0, run.stdout || 'DPAPI self-test must succeed');
+    assert.equal(run.stdout.trim(), 'DPAPI_SELF_TEST_PASSED');
+    assert.equal(run.stderr, '');
+});
+
+test('Windows JSON custody pipe is independent of a BOM-emitting console encoding', { skip: process.platform !== 'win32' }, () => {
+    const run = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-Command', '-'], {
+        input: '[Console]::InputEncoding = [Text.UTF8Encoding]::new($true)\n& ./scripts/testnet-wallets.ps1 -Action SelfTest\n',
+        encoding: 'utf8', timeout: 20000
+    });
+    assert.equal(run.status, 0, run.stdout || 'UTF-8 console self-test must succeed');
     assert.equal(run.stdout.trim(), 'DPAPI_SELF_TEST_PASSED');
     assert.equal(run.stderr, '');
 });

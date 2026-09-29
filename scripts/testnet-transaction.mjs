@@ -248,7 +248,7 @@ async function main() {
     for await (const chunk of process.stdin) { length += chunk.length; if (length > 8192) fail('INPUT_TOO_LARGE'); chunks.push(chunk); }
     const buffer = Buffer.concat(chunks);
     let input;
-    try { input = JSON.parse(buffer.toString('utf8')); } finally { buffer.fill(0); for (const chunk of chunks) chunk.fill(0); }
+    try { input = JSON.parse(buffer.toString('utf8').replace(/^\uFEFF/, '')); } finally { buffer.fill(0); for (const chunk of chunks) chunk.fill(0); }
     if (!input || typeof input !== 'object' || Array.isArray(input) ||
         Object.keys(input).some(key => !['privateKey', 'address', 'vaultPath'].includes(key))) fail('INVALID_INPUT');
     if (getAddress(input.address) !== getAddress(plan.from)) fail('WRONG_STORED_ACCOUNT');

@@ -78,8 +78,12 @@ function Invoke-ImportValidation([System.Security.SecureString]$Secret, [string]
         if (!$child.Start()) { throw 'VALIDATION_START_FAILED' }
         $outputTask = $child.StandardOutput.ReadToEndAsync()
         $errorTask = $child.StandardError.ReadToEndAsync()
-        $child.StandardInput.Write($payload)
-        $child.StandardInput.Close()
+        # Write UTF-8 bytes directly: the PowerShell 5.1 console writer may add a BOM.
+        $inputBytes = [Text.Encoding]::UTF8.GetBytes($payload)
+        try {
+            $child.StandardInput.BaseStream.Write($inputBytes, 0, $inputBytes.Length)
+            $child.StandardInput.BaseStream.Close()
+        } finally { [Array]::Clear($inputBytes, 0, $inputBytes.Length) }
         if (!$child.WaitForExit(15000)) {
             $child.Kill()
             throw 'VALIDATION_TIMEOUT'

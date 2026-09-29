@@ -288,3 +288,18 @@ test('CLI stdin cannot override file-derived plan, policy, digest or test runtim
     }
     assert.equal(fs.existsSync(h.journal), false);
 });
+
+test('a BOM-prefixed transaction pipe still enforces stored-account identity before execution', t => {
+    const h = harness(t);
+    const planFile = path.join(h.vaultPath, 'plan.json');
+    const policyFile = path.join(h.vaultPath, 'policy.json');
+    fs.writeFileSync(planFile, JSON.stringify(h.plan));
+    fs.writeFileSync(policyFile, JSON.stringify(h.policy));
+    const runner = fileURLToPath(new URL('../scripts/testnet-transaction.mjs', import.meta.url));
+    const child = spawnSync(process.execPath, [runner, planFile, policyFile], { encoding: 'utf8',
+        input: '\uFEFF' + JSON.stringify({ address: other, privateKey: 'not-a-key', vaultPath: h.vaultPath }) });
+    assert.equal(child.status, 1);
+    assert.equal(child.stdout, '');
+    assert.deepEqual(JSON.parse(child.stderr), { status: 'STOPPED', code: 'WRONG_STORED_ACCOUNT' });
+    assert.equal(fs.existsSync(h.journal), false);
+});
