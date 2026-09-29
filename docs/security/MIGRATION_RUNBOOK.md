@@ -39,10 +39,10 @@ Verify against the database before applying or re-applying it.
 | `src/indexer/migrations/013_chain_scoped_v41_projections.sql` | Indexer sequence 13. Runner-managed. |
 | `src/indexer/migrations/014_schema_aware_reorg_rollback.sql` | Indexer sequence 14. **Applied to production** after backup; accepted as backlog A-14. |
 | `src/indexer/migrations/015_public_metrics_projection.sql` | Indexer sequence 15. **Applied to production** 2026-07-28; accepted as backlog A-26. |
-| `sql/migrations/a8a_moderation_passkey_foundation.sql` | A8 activation step 1. **Unapplied**, per `RESOURCE_GATED_WORK.md` RG-03. Founder-gated. |
-| `sql/migrations/a8b_artwork_report_intake.sql` | A8 activation step 2. **Unapplied.** Founder-gated. |
-| `sql/migrations/a8c_protocol_admin_review.sql` | A8 activation step 3. **Unapplied.** Founder-gated. |
-| `sql/migrations/a8d_moderation_safe_recovery.sql` | A8 activation step 4. **Unapplied**, per `runbooks/A8D_SAFE_RECOVERY.md`. Founder-gated. |
+| `sql/migrations/a8a_moderation_passkey_foundation.sql` | A8 schema step 1. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. RG-03 activation remains open; see the dated A8 application record below. |
+| `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
+| `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
+| `sql/migrations/a8d_moderation_safe_recovery.sql` | A8 schema step 4. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. The passkey/recovery gates in `runbooks/A8D_SAFE_RECOVERY.md` remain open. |
 | `sql/migrations/phase18_7a_supabase_security_hardening.sql` | Prior partial classification. Superseded by 18.7b. |
 | `sql/migrations/phase18_7b_supabase_security_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
 | `sql/migrations/phase18_7c_supabase_storage_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
@@ -77,6 +77,35 @@ The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-mi
 - Post-change state: all 37 public tables have RLS enabled and forced; client non-SELECT grants are zero; the artworks bucket has zero direct client write policies and exactly one public read policy, `artsoul_artworks_public_read`.
 - Production public API and existing artwork-media reads remained available after application.
 - This record does not reconcile the historical migration ledger and does not complete bucket guardrails or authenticated upload/SIWE smoke tests.
+
+## Dormant A8 Application Addendum (2026-09-30)
+
+Under founder authorization, the four exact reviewed A8 migrations committed
+in A8a → A8b → A8c → A8d order, one transaction per file. The date is local
+Europe/Warsaw; the private journal records the corresponding UTC timestamps.
+This addendum supersedes earlier statements that these four migrations were
+unapplied; those statements describe the earlier foundation checkpoints.
+
+- The verified dormant schema contains eight A8 tables, seven RPCs and five
+  identity sequences. RLS, effective client denial, required service privileges,
+  RPC signatures/search paths, indexes, constraints and matching verification
+  results passed before commit. All eight new feature tables contained zero
+  rows at the recorded verification.
+- A full custom-format backup and a separate schema-only export were retained
+  with verified hashes. The custom archive could be listed and fully read;
+  **no database restore drill was performed**.
+- The historical `artsoul_schema_migrations` ledger remains absent. No ledger
+  or historical baseline was fabricated; the new operations have a separate
+  checksum-bound, per-stage application journal.
+- Passkey, Protocol Admin and reporting flags remained disabled. No staff role,
+  bootstrap grant, passkey, report, review decision or recovery request was
+  created by this schema operation. RG-03 live activation and the deferred real
+  passkey/Safe ceremonies remain open.
+
+See [the A8 schema evidence record](../audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
+Schema installation is not moderation activation, delivered-notification
+acceptance or a Phase A completion decision. Do not rerun these files based on
+the historical unapplied wording.
 
 ## Existing Production Database
 
@@ -196,38 +225,83 @@ Rollback, if required, is a database restore or a new reviewed forward migration
 
 ## A8 Moderation Activation
 
-The four A8 migrations are the first step of the only dependency chain still
-gating Phase B. They were absent from this runbook until 2026-08-21, so the
-sequence lived only in `runbooks/A8_MODERATION_ROLLOUT.md` while the backup and
-verification discipline lived only here. One path, not two:
+Schema preparation and live moderation activation are separate stages. Under
+explicit founder authorization, the reviewed additive A8 schema may be prepared
+while RG-03 activation remains blocked. The September 29 founder deferral of
+real passkey enrollment and Safe recovery to Phase C does not waive those gates
+before the dependent authority is enabled. Consult the dated application record
+above before using this procedure; do not repeat already completed migrations.
 
-1. Satisfy the preconditions in `RESOURCE_GATED_WORK.md` RG-03 first. Apex-origin
-   acceptance is one of them, recorded through
-   `testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md`.
-2. Create and validate a full backup and a schema-only export, exactly as the
-   existing production procedure above requires.
-3. Apply, **in this order and one transaction each**:
+### Dormant schema preparation
+
+1. Record founder authorization for the target database and the exact reviewed
+   migration checksums. Confirm the project, database and authenticated TLS
+   connection. Create and validate a full backup and a schema-only export;
+   retain the protected restore artifacts, catalog export and migration ledger
+   evidence before any write. A missing historical ledger requires explicit
+   reconciliation, never an inferred baseline or blind indexer-runner execution.
+2. Confirm `ARTSOUL_MODERATION_PASSKEY_ENABLED`,
+   `ARTSOUL_PROTOCOL_ADMIN_ENABLED` and `ARTSOUL_REPORTING_ENABLED` remain absent
+   or false throughout preparation. Keep Safe recovery configuration unchanged.
+   Do not assign staff roles, issue bootstrap grants, enroll credentials, submit
+   reports, call review/recovery RPCs or change artwork visibility in this stage.
+3. Compare the prerequisite catalog with the reviewed source: the `public`
+   schema; `anon`, `authenticated` and `service_role` roles; `pgcrypto` available
+   or already installed; the authorized database role's DDL privileges;
+   `artsoul_staff_roles`; `v41_artworks` including `chain_id`, `artwork_id` and
+   `creator`; `artwork_moderation_visibility`; `artwork_moderation_log`; and
+   `public.set_artwork_moderation_visibility(numeric,numeric,boolean,text,text)`.
+   Verify full definitions, constraints, indexes, RLS and effective privileges,
+   not just object names. The visibility function must remain SECURITY DEFINER
+   with fixed `search_path` and service-only execution. Establish each A8
+   object's absence or reconcile its existing definition and checksum first;
+   `IF NOT EXISTS` is not schema validation. Do not reapply historical visibility
+   or security migrations to guess missing prerequisites.
+4. Apply, **in this order and one transaction each**:
    `a8a_moderation_passkey_foundation.sql`,
    `a8b_artwork_report_intake.sql`,
    `a8c_protocol_admin_review.sql`,
    `a8d_moderation_safe_recovery.sql`.
    These are feature migrations. `scripts/apply-migrations.js` manages the
    indexer sequence only and must not be pointed at them.
-4. Run each matching read-only file in `sql/verification/` and archive its
-   output with timestamp and environment label. The four A8 verification files
-   contain read-only queries and do not include a `BEGIN`/`ROLLBACK` wrapper;
-   do not confuse them with the separately wrapped indexer baseline check or
-   add data-changing statements to verification.
-5. Confirm forced RLS, no anon or authenticated table or RPC grant, no raw
-   signature, token or private-key column, and the SECURITY DEFINER RPC with a
-   fixed `search_path`.
-6. Only then configure RP ID, origin, the moderation-session secret, the Safe,
+   The four files have no transaction wrapper: the operator must provide
+   explicit `BEGIN`/`COMMIT` and roll back on any error. They replace functions
+   and some check constraints; new objects and their privilege restrictions
+   must commit atomically. Check each stage before proceeding to the next.
+5. Run the matching SELECT-only verification file after its schema exists:
+   `a8a_passkey_foundation_verification.sql`,
+   `a8b_artwork_report_intake_verification.sql`,
+   `a8c_protocol_admin_review_verification.sql`, then
+   `a8d_moderation_safe_recovery_verification.sql`, all in `sql/verification/`.
+   Some queries reference feature tables directly; use catalogs for preflight
+   instead of running those queries against absent tables. Also run
+   `phase_a_security_verification.sql`, including its effective RPC privilege
+   and `search_path` check. The A8 verification files contain no transaction
+   wrappers and must not acquire data-changing statements.
+6. Accept only the reviewed table/constraint/index/function definitions, forced
+   RLS, no effective anon/authenticated table or RPC access, expected service
+   grants, no raw authorization-secret columns, and fixed SECURITY DEFINER
+   `search_path`. Newly created feature tables must remain empty; archive only
+   aggregate counts and catalog evidence, not complaint or credential records.
+   Record verified checksums, timestamp, database role and environment in the
+   approved migration record. Recheck that all three flags remain off and
+   existing public reads remain healthy. An available empty recipient inbox
+   proves schema availability, not notification delivery or A8 acceptance.
+
+### Live activation
+
+1. Satisfy the activation preconditions in `RESOURCE_GATED_WORK.md` RG-03,
+   including final apex-origin acceptance recorded through
+   `testnet/RG01_APEX_ORIGIN_SMOKE_CHECKLIST.md`. Dormant schema preparation
+   does not satisfy RG-03 or authorize staff access.
+2. Only then configure RP ID, origin, the moderation-session secret, the Safe,
    the chain and two independent recovery RPCs. Through the reviewed deployment,
    enable only `ARTSOUL_MODERATION_PASSKEY_ENABLED`; keep Protocol Admin and
    public reporting disabled. Confirm the founder's active staff role, issue the
-   one-time audited bootstrap grant, and then enrol and verify two independent
-   founder passkeys as described in `runbooks/A8A_PASSKEY_FOUNDATION.md`.
-7. Complete the A8d recovery ceremony and every mandatory denial in
+   one-time audited bootstrap grant, and then enrol and verify
+   two independent founder passkeys as described in
+   `runbooks/A8A_PASSKEY_FOUNDATION.md`.
+3. Complete the A8d recovery ceremony and all 11 mandatory denials in
    `runbooks/A8D_SAFE_RECOVERY.md` section 6 before enabling Protocol Admin or
    public reporting. The recovery route requires the passkey flag above. Run
    destructive fault injection only in the isolated rehearsal environment, not

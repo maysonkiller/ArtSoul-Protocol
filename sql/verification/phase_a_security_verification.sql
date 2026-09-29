@@ -1,5 +1,5 @@
 -- Phase A read-only Supabase security verification.
--- Run in the Supabase SQL editor before and after Phase 18.7b.
+-- Run before and after reviewed security or dormant A8 schema preparation.
 -- Export every result grid with the execution timestamp. This file does not
 -- modify schema, data, grants, policies, functions, or storage configuration.
 
@@ -10,6 +10,12 @@ WITH classified(object_name) AS (
     VALUES
         ('admin_users'), ('ai_suggestions'), ('ai_worker_logs'),
         ('artsoul_schema_migrations'), ('artsoul_staff_roles'),
+        ('artsoul_staff_passkeys'), ('artsoul_staff_enrollment_grants'),
+        ('artsoul_webauthn_challenges'), ('artsoul_staff_auth_events'),
+        ('artsoul_staff_recovery_requests'), ('artwork_reports'),
+        ('artwork_report_events'), ('artwork_report_notifications'),
+        ('v41_public_metric_events'), ('v41_public_metric_participants'),
+        ('v41_public_metrics'),
         ('artwork_moderation_log'), ('artwork_moderation_visibility'),
         ('artwork_social_signals'), ('audit_log'), ('audit_log_entries'),
         ('audit_log_hash_chain'), ('block_confirmations'), ('block_hashes'),
@@ -69,6 +75,12 @@ WITH internal(table_name) AS (
     VALUES
         ('admin_users'), ('ai_suggestions'), ('ai_worker_logs'),
         ('artsoul_schema_migrations'), ('artsoul_staff_roles'),
+        ('artsoul_staff_passkeys'), ('artsoul_staff_enrollment_grants'),
+        ('artsoul_webauthn_challenges'), ('artsoul_staff_auth_events'),
+        ('artsoul_staff_recovery_requests'), ('artwork_reports'),
+        ('artwork_report_events'), ('artwork_report_notifications'),
+        ('v41_public_metric_events'), ('v41_public_metric_participants'),
+        ('v41_public_metrics'),
         ('artwork_moderation_log'), ('artwork_moderation_visibility'),
         ('artwork_social_signals'), ('audit_log'), ('audit_log_entries'),
         ('audit_log_hash_chain'), ('block_confirmations'), ('block_hashes'),

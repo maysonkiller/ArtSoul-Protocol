@@ -4,6 +4,25 @@ Status: implementation and activation plan. This runbook coordinates the
 A8a/A8b/A8c foundations and the disabled A8d Safe recovery foundation.
 It does not amend protocol architecture or economics.
 
+## Application addendum — 2026-09-30
+
+The exact reviewed A8a, A8b, A8c and A8d migrations have committed in order,
+one transaction each, under founder authorization. This supersedes their earlier
+unapplied status; it does not activate the features. The dormant schema has
+eight tables, seven service-only RPCs and five protected identity sequences,
+with zero new feature rows at verification. All three feature flags remain
+disabled; no staff role, bootstrap grant, enrollment or recovery was created.
+
+Full and schema-only backups were retained with verified hashes, and the full
+custom archive was readable. This was not a database restore drill. The
+historical migration ledger remains absent; no historical baseline was invented.
+The operation has a separate checksum-bound application journal. See
+[the A8 schema evidence record](../audits/PHASE_A_A8_SCHEMA_2026-09-30.md) and
+the dated record in `security/MIGRATION_RUNBOOK.md`.
+
+RG-03 activation, real passkey enrollment, Safe recovery and production workflow
+acceptance remain open. The September 29 Phase C scheduling deferral is preserved.
+
 ## 1. Build now, behind disabled flags
 
 Complete A-22 without exposing production authority:
@@ -26,42 +45,77 @@ Complete A-22 without exposing production authority:
 The public Report button and all staff authority remain disabled throughout
 this stage.
 
-## 2. Satisfy the resource gates
+## 2. Prepare the activation resources
 
-Before production activation:
+Prepare these resources for live activation; they are not prerequisites for
+the separately authorized dormant schema stage in section 3:
 
 1. Connect and verify the final project domain and WebAuthn RP ID.
-2. Configure and rehearse the Safe-only founder recovery path according to
-   `A8D_SAFE_RECOVERY.md`.
-3. Prepare the reviewed A8a, A8b, A8c and A8d migrations. Passkey enrollment and
-   feature activation happen only in the ordered deployment stage below.
-4. Assign each moderator an active least-privilege role and an individually
-   enrolled passkey. Do not store private staff wallet assignments in source.
+2. Identify the Safe-only founder recovery prerequisites in
+   `A8D_SAFE_RECOVERY.md`; configuration and rehearsal follow the ordered live
+   activation stage below.
+3. Review the A8a, A8b, A8c and A8d migrations and their backup/catalog evidence.
+4. Plan each moderator's least-privilege role and individual passkey enrollment.
+   Do not assign roles during schema preparation or store private staff wallet
+   assignments in source.
 
 These steps follow `RESOURCE_GATED_WORK.md`,
 `runbooks/A8A_PASSKEY_FOUNDATION.md`, and
 `runbooks/A8D_SAFE_RECOVERY.md`.
 
-## 3. Activate the database and deployment
+## 3. Prepare the database, then activate the deployment
 
-Only after the Protocol Admin workflow is operational:
+### Dormant schema preparation
 
-1. Take and verify a current Supabase backup.
-2. Apply, in order, `sql/migrations/a8a_moderation_passkey_foundation.sql`,
+Explicit founder authorization may permit this stage while RG-03 activation
+remains blocked. Follow `security/MIGRATION_RUNBOOK.md` for the complete
+catalog, checksum, backup and rollback procedure. Consult the dated application
+addendum above first; do not repeat the completed production migrations.
+
+1. Verify the target database and approved checksums; create and validate a
+   full backup and a schema-only export, then reconcile the prerequisite catalog
+   and migration record. Do not infer historical migration status from names.
+2. Confirm `ARTSOUL_MODERATION_PASSKEY_ENABLED`,
+   `ARTSOUL_PROTOCOL_ADMIN_ENABLED` and `ARTSOUL_REPORTING_ENABLED` remain absent
+   or false. Keep Safe configuration unchanged. No staff-role assignment,
+   bootstrap grant, enrollment, report/review/recovery call or visibility change
+   belongs to schema preparation.
+3. Apply, in order and one transaction each,
+   `sql/migrations/a8a_moderation_passkey_foundation.sql`,
    `sql/migrations/a8b_artwork_report_intake.sql`,
    `sql/migrations/a8c_protocol_admin_review.sql`, and
-   `sql/migrations/a8d_moderation_safe_recovery.sql`.
-3. Run the matching read-only A8a, A8b, A8c and A8d verification files and retain
-   the evidence.
-4. Configure the final RP ID/origin/name, dedicated moderation-session secret,
-   exact Safe/chain and two independent recovery RPCs. Enable only the passkey
-   flag, create the one-time auditable bootstrap grant, enrol the two
-   independent founder passkeys, and complete the Safe recovery rehearsal.
-5. Enable `ARTSOUL_PROTOCOL_ADMIN_ENABLED=true`, redeploy, and complete the
+   `sql/migrations/a8d_moderation_safe_recovery.sql`. The operator must wrap each
+   file in an explicit transaction and stop/roll back on error; the files have
+   no wrappers. Never route these feature files through the indexer runner.
+4. Verify each stage before proceeding, using its matching read-only A8 file
+   and `sql/verification/phase_a_security_verification.sql`. Retain catalog,
+   aggregate-count and checksum evidence privately. Confirm forced RLS,
+   service-only access, fixed RPC `search_path`, empty newly created tables,
+   unchanged disabled flags and healthy public reads. An empty recipient inbox
+   is not proof of notification delivery or completion of moderation acceptance.
+
+### Live activation
+
+RG-03 remains required before activating the dependent authority. The September
+29 deferral of real passkey/Safe ceremonies to Phase C does not permit a bypass.
+The Protocol Admin implementation must pass its local acceptance first; it need
+not already be operational in production to prepare the schema.
+
+1. Complete the final-domain/RP and other RG-03 activation prerequisites from
+   `RESOURCE_GATED_WORK.md`, including the required apex-origin evidence.
+2. Configure the final RP ID/origin/name, dedicated moderation-session secret,
+   exact Safe/chain and two independent recovery RPCs. Enable only
+   `ARTSOUL_MODERATION_PASSKEY_ENABLED`, confirm the authorized active founder
+   role, and create the one-time auditable bootstrap grant. Enrol and verify
+   two independent founder passkeys, then complete the Safe recovery rehearsal
+   and all 11 mandatory denials in `A8D_SAFE_RECOVERY.md` section 6. Preserve
+   the final RP/origin evidence; destructive fault injection belongs only in
+   the isolated rehearsal environment.
+3. Enable `ARTSOUL_PROTOCOL_ADMIN_ENABLED=true`, redeploy, and complete the
    protected admin acceptance checklist while public reporting remains off.
-6. Set `ARTSOUL_REPORT_DAILY_LIMIT=5` and only then enable
+4. Set `ARTSOUL_REPORT_DAILY_LIMIT=5` and only then enable
    `ARTSOUL_REPORTING_ENABLED=true` for the controlled beta.
-7. Redeploy and allow the public-config cache to expire.
+5. Redeploy and allow the public-config cache to expire.
 
 Five new reports per reporter wallet across a rolling 24-hour window is the
 approved controlled-beta starting value. It may be tuned later from observed

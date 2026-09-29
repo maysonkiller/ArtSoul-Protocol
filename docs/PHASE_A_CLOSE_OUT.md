@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-09-29. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-09-30. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -19,9 +19,11 @@ the [exact amendment](canon/CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md).
 
 September 29 execution evidence: eleven real Base Sepolia transactions now cover
 resale purchase/listing/withdrawal and artwork 28's no-bid ending; three distinct
-provenance roles were verified on the apex. Local regression passed 1338 checks
-with no skips and the build passed. Portrait containment and profile network /
-Genesis corrections are local and unpublished. Separately authorized live
+provenance roles were verified on the apex. Final application regression passed
+1341 checks with no skips and the build passed. Portrait containment, card price,
+profile network / Genesis and recipient notification corrections were published
+through PR #282 at `9dcf82b`, with green candidate/post-merge CI and apex artifact
+and profile acceptance. Separately authorized live
 SIWE/Gemini/media/metadata verification passed all 13 steps. New artwork 34 /
 auction 66 has two bids, and the losing bidder received its full deposit back.
 Its earliest currently recorded end is September 30 21:25:20 UTC; settlement
@@ -32,12 +34,17 @@ and mint remain untested for this new artwork. See
 
 Phase A remains **NO-GO** until A8/A10 acceptance is evidenced. The moderation
 chain - A-39, A-21, A-22, A-23 - has merged foundations. A-22 recipient-facing
-notification delivery is now implemented/tested locally, awaiting release; activation and
-real operator acceptance remain outstanding. A read-only production check on 2026-09-27 returned
-`reportingEnabled: false`; it does not reveal or certify the migration ledger.
+notification delivery is implemented, tested and published. The four dormant A8
+schema migrations were applied and verified on September 30; real signed-in
+notification reads now return 200 instead of the reproduced 503. The historical
+database remains pre-ledger; no old migration entries were fabricated.
+Activation and real operator acceptance remain outstanding. Reporting, admin and
+passkey flags remain disabled. See [schema evidence](audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
 
-Local PostgreSQL rehearsals now pass all 46 checks across seven integration
-suites, with no Docker skips. They validate SQL/RPC behavior, not production
+The initial September 29 PostgreSQL baseline passed 46 checks across seven
+integration suites. The final application run includes the additional 11-check
+moderation journey: 57 checks across eight groups, with no Docker skips.
+They validate SQL/RPC behavior, not production
 activation, real passkey ceremonies or Safe signatures. The Base Sepolia indexer
 also returned healthy with zero lag in that dated read-only snapshot. Neither
 observation by itself proves deployment. The profile, AI and auction patches
@@ -59,7 +66,7 @@ operationally safe reporting/moderation path before a beta GO.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
-| **RG-03** → **A-39** moderation activation | Ordered migrations, archived verification output, two founder passkeys, the one-time audited bootstrap grant | Credentials and a multisig-authorised ceremony; canon rule 12 forbids a single operator deciding it |
+| **RG-03** → **A-39** moderation activation | Dormant schema and verification are complete; two founder passkeys, the one-time audited bootstrap grant and live workflow acceptance remain open | Credentials and a multisig-authorised ceremony; canon rule 12 forbids a single operator deciding it |
 | **A8d** Safe recovery rehearsal | The successful ceremony plus all eleven denial cases in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md) section 6 | Signing keys held by three people |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
@@ -76,7 +83,7 @@ Moderation Activation**, and the surrounding rollout in
 [`runbooks/A8_MODERATION_ROLLOUT.md`](runbooks/A8_MODERATION_ROLLOUT.md).
 
 **A-21, A-22 and A-23 do not close from merged foundations alone.** A-22 also
-needs deployed recipient-facing notification delivery; A-21 needs intake acceptance and
+needs real recipient-facing notification delivery acceptance following a staff decision; A-21 needs intake acceptance and
 A-23 needs the recorded beta review. A-23 remains NO-GO while its required safe
 operating path or evidence is missing, or a P1 issue remains open.
 
@@ -99,8 +106,8 @@ Ordered by what the founder can feel, not by row number.
 ## 2a. All the device acceptance, in five trips
 
 Fifteen rows remain for device and connected-flow acceptance after A-79 closed.
-Most underlying repairs are published; the September 29 portrait/profile
-corrections are still local. A failed acceptance may require another fix.
+The underlying repairs, including the September 29 portrait/profile
+corrections, are published. A failed acceptance may require another fix.
 [`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)
 organises them by trip instead - arrive cold, connect, publish, settle, and the
 two wallet questions - because most of these rows are watching the same screens

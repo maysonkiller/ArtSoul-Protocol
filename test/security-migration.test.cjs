@@ -245,7 +245,40 @@ test('A8c Protocol Admin review self-hardens its notification ledger inline', ()
   assert.match(a8c, /GRANT EXECUTE ON FUNCTION public\.review_artwork_report[\s\S]*TO service_role/);
 });
 
+test('read-only security verification classifies every A8 table as internal', () => {
+  const verification = fs.readFileSync(
+    path.join(REPO_ROOT, 'sql/verification/phase_a_security_verification.sql'), 'utf8'
+  );
+  const tables = new Set();
+  for (const file of [
+    'a8a_moderation_passkey_foundation.sql',
+    'a8b_artwork_report_intake.sql',
+    'a8c_protocol_admin_review.sql',
+    'a8d_moderation_safe_recovery.sql'
+  ]) {
+    const sql = fs.readFileSync(path.join(REPO_ROOT, 'sql/migrations', file), 'utf8');
+    for (const match of sql.matchAll(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.([a-z0-9_]+)/gi)) {
+      tables.add(match[1]);
+    }
+  }
+  assert.equal(tables.size, 8, 'review any change to the A8 table inventory');
+  for (const cte of ['classified', 'internal']) {
+    const values = verification.match(new RegExp(`WITH ${cte}\\([a-z_]+\\) AS \\(\\s*VALUES([\\s\\S]*?)\\n\\)`));
+    assert.ok(values, `${cte} classification must exist`);
+    const classified = new Set([...values[1].matchAll(/\('([a-z0-9_]+)'\)/g)].map(match => match[1]));
+    assert.deepEqual([...tables].filter(table => !classified.has(table)), [],
+      `${cte} must include all eight private A8 tables`);
+  }
+  const statements = verification.replace(/--[^\r\n]*/g, '').split(';').map(part => part.trim()).filter(Boolean);
+  assert.ok(statements.length > 0);
+  for (const statement of statements) {
+    assert.match(statement, /^(SELECT|WITH)\b/i, 'verification must remain read-only');
+    assert.doesNotMatch(statement, /\b(INSERT\s+INTO|DELETE\s+FROM|UPDATE\s+public\.|CREATE\s+|ALTER\s+|DROP\s+)\b/i);
+  }
+});
+
 test('A11 public metrics projection self-hardens its aggregate and backing ledger', () => {
+  const verification = fs.readFileSync(path.join(REPO_ROOT, 'sql/verification/phase_a_security_verification.sql'), 'utf8');
   const metrics = fs.readFileSync(
     path.join(REPO_ROOT, 'src/indexer/migrations/015_public_metrics_projection.sql'),
     'utf8'
@@ -259,6 +292,10 @@ test('A11 public metrics projection self-hardens its aggregate and backing ledge
     assert.match(metrics, new RegExp(`ALTER TABLE public\\.${table} FORCE ROW LEVEL SECURITY;`));
     assert.match(metrics, new RegExp(`REVOKE ALL ON public\\.${table} FROM PUBLIC, anon, authenticated;`));
     assert.match(metrics, new RegExp(`GRANT ALL ON public\\.${table} TO service_role;`));
+    for (const cte of ['classified', 'internal']) {
+      const values = verification.match(new RegExp(`WITH ${cte}\\([a-z_]+\\) AS \\(\\s*VALUES([\\s\\S]*?)\\n\\)`));
+      assert.ok(values?.[1].includes(`('${table}')`), `${cte} must include the already-applied metrics table ${table}`);
+    }
   }
   assert.match(metrics, /REVOKE ALL ON FUNCTION public\.record_v41_public_metric_event\(/);
   assert.match(metrics, /GRANT EXECUTE ON FUNCTION public\.record_v41_public_metric_event\([\s\S]*TO service_role;/);
