@@ -1,9 +1,40 @@
 # September 30 profile and loading correction
 
-Status: local implementation, automated suite and built edit journey passed; hosted release verification pending. Not a Phase A acceptance or deployment record.
+Status: implemented, tested, built and published. TA-09 repair is complete;
+real-device RG-01 and dependent operator activation acceptance remain separate.
 Workspace: `C:\Projects\ArtSoul`, `codex/takeover-audit`, baseline
 `82ab404e4e9b2b0d2949e1017f0aed990739e131`. Historical worktrees remain recovery
 copies. No source trees were overlaid.
+
+## Release
+
+- [PR #284](https://github.com/maysonkiller/ArtSoul-Protocol/pull/284) merged
+  reviewed candidate `f293733685194ae96102116874204fd8503e1af3` as
+  `aacbc5aedd76f7d668f1db3f1f0ca2ed1bdb0531` at 13:05:27 UTC.
+- [Candidate CI](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/36718205321)
+  passed Linux, Windows and static checks. Linux passed 1,378 tests and skipped
+  two Windows DPAPI cases. Windows passed 1,323 and skipped eight PostgreSQL
+  suites because hosted Windows lacks Docker; Linux executed those suites.
+  Both platforms passed 33 unchanged contract tests. The local Windows/Docker
+  run executed all 1,380 application tests without skips.
+- Production deployment `6760112584` succeeded at 13:06:02 UTC:
+  [immutable artifact](https://artsoul-pdcnfoeux-maysonkiller-be9112b5.vercel.app).
+  [Post-merge CI](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/36719161906)
+  also passed Linux, Windows and static checks.
+- Preview and apex profile/artwork JS and every linked built stylesheet match
+  the locally checked artifact hashes. Real public reads on desktop/mobile
+  viewports passed at both origins: the saved profile renders one X link with
+  no overflow, and artwork 28 renders current auction 68 as Live. No page
+  exceptions or HTTP failures occurred during these four-case smoke runs.
+  Earlier preview warm-up saw a WalletConnect telemetry 403; it was not an
+  application/profile failure and did not recur in the recorded smoke matrix.
+- No application write, wallet action, schema change, contract deployment,
+  mainnet action or activation was performed by the release smoke checks.
+  Reporting remains disabled. Rollback baseline is `82ab404`; no rollback ran.
+
+Local evidence: `output/audit/rg01-{preview,apex}-artifact-2026-09-30.json`,
+`rg01-{preview,apex}-live-browser-2026-09-30.log`. These files remain private
+generated evidence rather than public source additions.
 
 ## Scope correction
 
@@ -80,6 +111,10 @@ failure/Retry. There were five intercepted local writes and zero page errors
 gallery loading-to-completion cases also passed without synthetic cards or page
 errors. Independent final review passed 104 focused checks and the deferred
 save/create, unlink/gallery and avatar completion/negative probes.
+
+Four additional built Discord/X restoration cases and two built tab-switch cases
+passed with zero page errors. The full profile browser set therefore has 13
+case groups, recorded in the edit, OAuth and tab built-browser logs.
 
 Previous
 full-suite/build results from before the scope correction are not evidence for
