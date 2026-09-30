@@ -16,6 +16,8 @@ this ordered sequence without marking the outstanding Phase A gates complete:
 5. **TA-04** — Implement new isolated testnet collection/auction/craft contracts; test security and local lifecycle without modifying deployed storage.
 6. **TA-05** — Integrate verified projections, verification/newsletter/campaign services and reviewed wallet actions; rehearse testnet only after configuration and credentials exist.
 
+**September 30 continuation — TA-09, founder-corrected scope:** repair verified profile/OAuth, save/cancel/reload, duplicate-link, mobile layout and loading-feedback regressions from the two new recordings. AI valuation is intended behavior and is explicitly excluded; its unsolicited patch was rejected and reverted. Auction publication, IDs and economics are not defects in this report. The September 21 old-video restriction still applies to that old source. Preserve Phase A evidence requirements; see `docs/BACKLOG.md`.
+
 Durable findings, evidence and status live in `docs/BACKLOG.md`. Separate items
 remain reviewable; a successful local test never means a production rollout.
 

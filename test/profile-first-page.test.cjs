@@ -80,7 +80,7 @@ test('identity is still committed before the gallery, not after it', () => {
   // Bounding the read makes a coherent frame affordable; it does not reinstate
   // the gate A-54 removed. Identity must still land on the narrow profile read.
   const commit = source.indexOf('setProfile(profileData);');
-  const settle = source.indexOf('const [artworksResult, genesisResult] = await Promise.allSettled');
+  const settle = source.indexOf('const [artworksResult, genesisResult] = await secondaryResults');
 
   assert.notEqual(commit, -1);
   assert.notEqual(settle, -1);

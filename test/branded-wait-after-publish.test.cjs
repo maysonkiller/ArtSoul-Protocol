@@ -4,6 +4,7 @@ const fs = require('node:fs');
 
 const upload = fs.readFileSync('src/entries/upload.js', 'utf8');
 const artwork = fs.readFileSync('src/entries/artwork.jsx', 'utf8');
+const feedback = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
 const styles = fs.readFileSync('unified-styles.css', 'utf8');
 
 test('publishing hands the artwork page the one fact it cannot work out', () => {
@@ -16,31 +17,27 @@ test('publishing hands the artwork page the one fact it cannot work out', () => 
 });
 
 test('that wait is named, not filled with a placeholder', () => {
-  assert.match(artwork, /if \(\(loading && justPublished\) \|\| error\?\.code === 'V41_ARTWORK_NOT_INDEXED'\) \{/);
-  // It is decided before the skeleton branch, which would otherwise own it.
-  assert.ok(
-    artwork.indexOf('loading && justPublished') < artwork.indexOf('<ArtworkPageSkeleton immediate={initialSkeletonVisible} />'),
-    'the branded wait must be chosen before the skeleton'
-  );
-  // One renderer for both waits, not two that can drift apart.
-  assert.equal((artwork.match(/artsoul-wait-screen/g) || []).length, 1);
-  assert.equal((artwork.match(/artsoul-wait-word/g) || []).length, 1);
+  assert.match(artwork, /if \(loading \|\| error\?\.code === 'V41_ARTWORK_NOT_INDEXED'\) \{/);
+  assert.match(artwork, /immediate=\{initialSkeletonVisible \|\| justPublished \|\| Boolean\(error\)\}/);
+  assert.equal((artwork.match(/<ArtworkPageSkeleton\b/g) || []).length, 1);
+  assert.equal((feedback.match(/artsoul-wait-word/g) || []).length, 1);
 });
 
-test('an ordinary visit still gets the skeleton', () => {
-  // Nothing is being waited for that we can name, so nothing is claimed.
+test('an ordinary visit uses the same branded loading component', () => {
+  // The exported compatibility name now renders a loading mark without synthetic content.
   const loadingBranch = artwork.slice(
-    artwork.indexOf('if (loading) {'),
+    artwork.indexOf("if (loading || error?.code === 'V41_ARTWORK_NOT_INDEXED') {"),
     artwork.indexOf('if (error) {')
   );
-  assert.match(loadingBranch, /<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
+  assert.match(loadingBranch, /className="artwork-page-root"/);
+  assert.match(loadingBranch, /<ArtworkPageSkeleton\s+immediate=\{initialSkeletonVisible \|\| justPublished/);
 });
 
 test('the branded wait keeps its own styling and its accessible text', () => {
   assert.match(styles, /\.artsoul-wait-screen \{/);
   assert.match(styles, /\.artsoul-wait-stage \{/);
-  assert.match(artwork, /role="status" aria-live="polite" aria-busy="true"/);
-  assert.match(artwork, /<span className="sr-only">Loading artwork/);
+  assert.match(feedback, /role="status" aria-label=\{label\} aria-busy="true" aria-live="polite"/);
+  assert.match(feedback, /Loading artwork \$\{artworkId\}/);
 });
 
 test('justPublished is declared inside the component that uses it', () => {
@@ -49,7 +46,7 @@ test('justPublished is declared inside the component that uses it', () => {
   // green because these assertions read source text, which cannot see scope.
   const componentStart = artwork.indexOf('function ArtworkPage({ initialSkeletonVisible = false }) {');
   const declaration = artwork.indexOf('const justPublished =');
-  const usage = artwork.indexOf('loading && justPublished');
+  const usage = artwork.indexOf('initialSkeletonVisible || justPublished');
   assert.ok(componentStart > -1, 'the component must be discoverable');
   assert.ok(declaration > componentStart, 'declared inside the component, not above it');
   assert.ok(usage > declaration, 'declared before it is read');

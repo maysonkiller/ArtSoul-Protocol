@@ -223,8 +223,9 @@ test('a saved profile that already exists takes the update path, not the create 
   const end = entry.indexOf('function handleQuickUpload()', start);
   assert.ok(start >= 0 && end > start, 'saveProfile must still be the save entry point');
   const save = entry.slice(start, end);
-  assert.match(save, /if \(profile\.id\) \{\s*\n\s*await window\.ArtSoulDB\.updateProfile\(/);
-  assert.match(save, /\} else \{\s*\n\s*const newProfile = await window\.ArtSoulDB\.createProfile\(/);
+  assert.match(save, /if \(profile\.id\) \{\s*\n\s*savedProfile = await window\.ArtSoulDB\.updateProfile\(/);
+  assert.match(save, /\} else \{\s*\n\s*savedProfile = await window\.ArtSoulDB\.createProfile\(/);
+  assert.match(save, /setProfile\(savedProfile\)/);
 });
 
 test('a first visit with no profile row still reads as a normal empty result', async () => {

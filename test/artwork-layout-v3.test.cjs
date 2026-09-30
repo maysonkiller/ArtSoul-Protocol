@@ -57,7 +57,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=45/);
+    assert.match(html, /unified-styles\.css\?v=46/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -160,7 +160,7 @@ test('artwork has a visible pre-module skeleton and a bounded module failure sta
 
 test('React keeps the already-visible artwork skeleton visible when it mounts', () => {
     assert.match(source, /function ArtworkPage\(\{ initialSkeletonVisible = false \}\)/);
-    assert.match(source, /<ArtworkPageSkeleton immediate=\{initialSkeletonVisible\} \/>/);
+    assert.match(source, /<ArtworkPageSkeleton\s+immediate=\{initialSkeletonVisible \|\| justPublished \|\| Boolean\(error\)\}/);
     assert.match(source, /artworkAppRoot\.querySelector\('\[data-artwork-static-skeleton\]'\)/);
     assert.match(source, /data-artwork-static-skeleton=\{initialSkeletonVisible \? '' : undefined\}/);
     assert.match(source, /document\.createTreeWalker\(artworkAppRoot, NodeFilter\.SHOW_TEXT\)/);
@@ -173,7 +173,7 @@ test('React keeps the already-visible artwork skeleton visible when it mounts', 
     assert.match(runtime, /export \{ React, createRoot, hydrateRoot \};/);
 
     const skeletons = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
-    assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false \}\)/);
+    assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false, artworkId = '' \}\)/);
     assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/);
 });
 

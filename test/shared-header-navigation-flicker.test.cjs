@@ -538,11 +538,11 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=45">/, `${page} stylesheet pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=46">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=4"><\/script>/, `${page} prepaint pin`);
     assert.match(html, /<script src="\/avatar-dropdown\.js\?v=53" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=45');
+    const stylesheet = html.indexOf('unified-styles.css?v=46');
     const prepaint = html.indexOf('header-prepaint.js?v=4');
     const component = html.indexOf('avatar-dropdown.js?v=53');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is

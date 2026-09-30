@@ -194,6 +194,13 @@
     color: var(--c-text);
 }
 
+.artsoul-wait-word,
+.artsoul-wait-dots,
+.artsoul-wait-dot {
+    /* Keep the mark's responsive scale through generic mobile span rules. */
+    font-size: inherit;
+}
+
 .artsoul-wait-dots {
     display: inline-flex;
     align-items: center;
@@ -5528,16 +5535,20 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     .profile-social-links > * {
         width: 100%;
         min-width: 0;
-        max-width: none !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
         overflow: visible;
         padding: 0.35rem 0.45rem !important;
         font-size: clamp(0.62rem, 2.8vw, 0.72rem);
-        white-space: nowrap;
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 
     .profile-social-links .truncate {
         overflow: visible;
         text-overflow: clip;
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 
     .profile-inline-edit-action {
