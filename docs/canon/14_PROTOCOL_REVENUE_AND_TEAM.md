@@ -38,6 +38,14 @@ Not allowed:
 - Passive income.
 - Any token or airdrop accounting.
 
+## Creator Donations
+
+*(Consolidated 2026-09-16 for Support the artist.)*
+
+A `Support the artist` donation is not protocol revenue. It goes 100% to the artwork's canonical creator in the same transaction, with no protocol fee, no custody and no retained balance. It never passes through ProtocolTreasury, EcosystemTreasury or company operating capital.
+
+There is no donation path to a treasury, a company wallet, or a general project-development wallet. Company fundraising, grants and investment stay entirely separate from this feature.
+
 ## Deployed Contract Deviation (prototype, to fix in the rework)
 
 The deployed Base Sepolia testnet contracts currently implement resale as 90% seller / 7.5% creator / 2.5% protocol with **no** Ecosystem Pool split, and the NFT stores a 7.5% royalty. This is a known prototype deviation from the frozen 92.5 / 5.5 / 1 / 1 split and 5.5% creator royalty. It is corrected in the mainnet contract rework, not by mutating the live testnet. See `CONTRACT_REWORK_PLAN.md`.

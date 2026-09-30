@@ -17,6 +17,16 @@ Required public surfaces:
 
 A valid copyright claim may hide the reported work while it is reviewed. Dispute and restoration paths must exist.
 
+## Donation Messages
+
+*(Consolidated 2026-09-16 for Support the artist.)*
+
+The complaint-driven flow extends to one more thing: the on-site visibility of a `Support the artist` donation message. A report against a message follows the same queue, notification and audit-log path as any other report.
+
+Hiding a message changes what ArtSoul's own pages show and nothing else. The donation, donor, recipient, amount, anonymity flag and on-chain event remain immutable and publicly inspectable. Moderation never deletes, reverses or refunds a donation, and it never hides the donation itself.
+
+Messages are plain text. ArtSoul never renders them as HTML or markup and never makes a link inside them clickable.
+
 Do not build a self-hosted content fingerprinting system for this phase. A cheap upload flag can ride along the AI valuation path if the existing provider supports it.
 
 ## Moderator Access

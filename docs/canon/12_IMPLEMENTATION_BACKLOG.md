@@ -96,6 +96,7 @@ mainnet launch. Existing A8 implementation and regression evidence is retained.
 - [ ] **C13 — Fresh Base Sepolia rehearsal.** Deploy the final topology, hand roles to rehearsal Safes, exercise pool operations and the full lifecycle, and prove recovery/runbooks.
 - [ ] **C14 — Legal and operational readiness.** Complete counsel-approved entity, ToS, Privacy/GDPR, IP assignment, domain/email, audit, and operating procedures. Exact legal form remains undecided until counsel/founder approval.
 - [ ] **C15 — Final visual pass.** Apply premium homepage, cards, artwork, aura, accessibility, and responsive polish after functionality is stable.
+- [ ] **C16 — Support the artist.** *(Scheduled 2026-09-16.)* Only after C1 architecture sign-off, build the minimal event-only donations contract in `SUPPORT_THE_ARTIST_DESIGN.md`, project its events through C7 with moderation visibility kept separate, expose the cached public reads, extend C8 moderation to donation-message visibility, and cover it in C11, C12 and C13. No Phase B or standalone early version.
 
 Phase C exit: audit passed, fresh rehearsal green, treasuries/domain/legal ready, Snapshot A independently readable, and a signed launch decision recorded.
 

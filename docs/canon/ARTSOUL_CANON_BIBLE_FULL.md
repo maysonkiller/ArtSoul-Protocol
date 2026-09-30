@@ -78,6 +78,8 @@ Use the label "First Collector". Do not use "winner" or "auctioner" in provenanc
 
 Trust affects discovery ordering only. It never changes price, floor, ownership, settlement, royalties, or treasury rules.
 
+Creator donations through `Support the artist` never affect Trust, discovery ordering, contests, rankings, or any public metric those systems use. A donation is social support, not a signal. *(Consolidated 2026-09-16 for Support the artist; see `CHANGELOG_2026-09-16_SUPPORT_THE_ARTIST.md`.)*
+
 Public trust weights:
 
 - Verified: 1x
@@ -181,6 +183,7 @@ Moderation is complaint-driven and reviewable:
 - Review queue, notifications, and audit log.
 - Critical or irreversible actions are gated by multisig.
 - Social logins alone are not sufficient for critical moderator actions.
+- The same complaint-driven flow may hide a `Support the artist` donation message from ArtSoul's own pages. Hiding affects the on-site message display only: the donation, donor, recipient, amount, anonymity flag and on-chain event stay immutable and publicly inspectable, and a donation is never deleted or reversed by moderation. *(Consolidated 2026-09-16 for Support the artist; see `CHANGELOG_2026-09-16_SUPPORT_THE_ARTIST.md`.)*
 
 Founder scheduling amendment, 2026-09-29: real founder passkey enrollment and
 the associated operator recovery ceremony are deferred to mainnet preparation,
@@ -217,6 +220,7 @@ ProtocolTreasury and EcosystemTreasury are separate from company operating capit
 - Ecosystem Pool receives the 1% resale allocation.
 - **Ecosystem Pool funds emerging-artist grants, community growth, and the community reward/contest loop** *(Amended 2026-07-13 by founder decision)*.
 - Ecosystem Pool is never used for team salaries, investor distributions, or passive income.
+- Creator donations through `Support the artist` go 100% to the artwork's canonical creator at the moment they are made. They bypass ProtocolTreasury, EcosystemTreasury and company operating capital, carry no protocol fee, are held in custody by nobody, and are not protocol revenue. There is no donation path to a treasury, a company wallet, or a general project-development wallet. *(Consolidated 2026-09-16 for Support the artist; see `CHANGELOG_2026-09-16_SUPPORT_THE_ARTIST.md`.)*
 
 ### 14.1 Ecosystem / Reward Pool as a closed loop — Amended 2026-07-13 by founder decision
 
@@ -271,5 +275,7 @@ ceremony in Phase C, before dependent activation and mainnet launch. Other
 unaccepted Phase A requirements are not automatically waived by this decision.
 
 `17_ROADMAP_PHASES.md` and `12_IMPLEMENTATION_BACKLOG.md` expand this model but remain subordinate to this Bible. They may schedule work; they may not create economics, contract mechanics, Genesis grant cadence, treasury triggers, legal-entity decisions, or product scope that the Bible has not approved.
+
+`Support the artist`, the creator-donation feature designed in `SUPPORT_THE_ARTIST_DESIGN.md`, is Phase C work delivered with the contract rework. It has no Phase B or standalone early version, and it adds one minimal event-only contract to the target topology in `CONTRACT_REWORK_PLAN.md`. *(Consolidated 2026-09-16 for Support the artist; see `CHANGELOG_2026-09-16_SUPPORT_THE_ARTIST.md`.)*
 
 Earlier informal A–G plans are retired. Their stabilization and testnet work maps to Phase A; beta and cohort work maps to Phase B; contract rework, Genesis, Collections, security review, legal readiness, and final visual work map to Phase C; deployment and staged activation map to Phase D. Historical token or multichain phases have no current mapping and remain out of scope.
