@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const test = require('node:test');
 
 const artwork = fs.readFileSync('src/entries/artwork.jsx', 'utf8');
+const feedback = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
 
 test('the exact-artwork pending state retries projection reads in a bounded visible-tab loop', () => {
   assert.match(artwork, /error\?\.code !== 'V41_ARTWORK_NOT_INDEXED'/);
@@ -50,18 +51,19 @@ test('the pending screen shows the wordmark and nothing else', () => {
   // The wait state is the ArtSoul mark centred on the screen. Explanatory copy,
   // the raw id chip and the escape buttons were noise on a screen that resolves
   // itself in under a second.
-  assert.match(pending, /artsoul-wait-word/);
+  assert.match(pending, /<ArtworkPageSkeleton/);
+  assert.match(feedback, /artsoul-wait-word/);
   assert.doesNotMatch(pending, /Refresh now|Explore Art/);
   assert.doesNotMatch(pending, /artsoul-wait-copy|artsoul-wait-id/);
 
   // The id still has to reach assistive technology.
-  assert.match(pending, /className="sr-only">Loading artwork/);
+  assert.match(pending, /artworkId=\{error\?\.code === 'V41_ARTWORK_NOT_INDEXED' \? \(error\.artworkId \|\| artworkId\) : ''\}/);
 });
 
 test('the pending screen is the branded wait indicator, not raw theme hex', () => {
-  assert.match(artwork, /className="artsoul-wait/);
-  assert.match(artwork, /artsoul-wait-dot/);
-  assert.match(artwork, /aria-live="polite"/);
+  assert.match(feedback, /className="artsoul-wait/);
+  assert.match(feedback, /artsoul-wait-dot/);
+  assert.match(feedback, /aria-live="polite"/);
 
   // Canon 16: theme colors live in unified-styles.css as variables, never as
   // hardcoded utility colors on the page.

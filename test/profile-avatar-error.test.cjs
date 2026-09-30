@@ -10,7 +10,7 @@ function loadAvatar() {
   let image, cleanup;
   const state = { url: '', failed: false };
   const scope = {
-    profile: {}, getProfileAvatarUrl: () => 'https://example.test/avatar.png',
+    profile: {}, profileDraft: null, editMode: false, getProfileAvatarUrl: () => 'https://example.test/avatar.png',
     profileAvatarDecodeTokenRef: { current: 0 },
     setDecodedProfileAvatarUrl: value => { state.url = value; },
     setProfileAvatarFailed: value => { state.failed = value; },
@@ -50,8 +50,10 @@ test('a rejected avatar upload restores the previous image and reports the origi
   const state = [];
   const notices = [];
   const scope = {
-    profile: {avatar_url: 'https://example.test/original.png'},
-    setProfile: value => state.push(value), alert: message => notices.push(message), console: {error() {}},
+    profile: {wallet_address: '0xartist', avatar_url: 'https://example.test/original.png'}, profileDraft: null,
+    profileRequestRef: {current: 0}, profileEditRef: {current: 0}, getActiveWalletAddress: () => '0xartist',
+    setProfileDraft: value => state.push(typeof value === 'function' ? value(state.at(-1)) : value),
+    alert: message => notices.push(message), console: {error() {}},
     window: {ensureAuthenticated: async () => true, getCurrentWalletAddress: () => '0xartist',
       ArtSoulDB: {uploadFile: async () => {throw new Error('Upload unavailable');}}}
   };
@@ -59,5 +61,6 @@ test('a rejected avatar upload restores the previous image and reports the origi
   await scope.upload({target: {files: [{name: 'avatar.png', type: 'image/png', size: 1024}]}});
   assert.equal(state[0].avatar_url, 'uploading...');
   assert.equal(state[1].avatar_url, 'https://example.test/original.png');
+  assert.equal(scope.profile.avatar_url, 'https://example.test/original.png', 'upload never changes the saved profile');
   assert.deepEqual(notices, ['Error uploading avatar: Upload unavailable']);
 });

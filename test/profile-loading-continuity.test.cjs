@@ -6,11 +6,11 @@ const html = fs.readFileSync('profile.html', 'utf8');
 const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
 const skeletons = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
 
-test('a targeted profile paints a static skeleton before its module loads', () => {
+test('a targeted profile paints a static loading frame before its module loads', () => {
   const app = html.indexOf('<div id="app"></div>');
   const template = html.indexOf('<template id="profileInitialSkeleton">');
   const staticSkeleton = html.indexOf('data-profile-static-skeleton');
-  const entry = html.indexOf('<script type="module" src="/src/entries/profile.jsx"></script>');
+  const entry = html.indexOf('<script type="module" src="/src/entries/profile.jsx"');
 
   assert.ok(app >= 0 && app < template);
   assert.ok(template < staticSkeleton && staticSkeleton < entry);
@@ -24,7 +24,7 @@ test('a targeted profile paints a static skeleton before its module loads', () =
   );
 });
 
-test('React adopts the static profile skeleton instead of replacing it', () => {
+test('React adopts the static profile loading frame instead of replacing it', () => {
   assert.match(profile, /import \{ React, createRoot, hydrateRoot \} from '\.\/react-runtime\.js'/);
   assert.match(profile, /function ProfilePage\(\{ initialSkeletonVisible = false \}\)/);
   assert.match(profile, /profileAppRoot\.querySelector\('\[data-profile-static-skeleton\]'\)/);
@@ -34,10 +34,10 @@ test('React adopts the static profile skeleton instead of replacing it', () => {
   assert.match(profile, /createRoot\(profileAppRoot\)\.render\(profilePage\)/);
 });
 
-test('immediate profile skeletons bypass both placeholder delays', () => {
+test('immediate profile loading feedback bypasses the placeholder delay', () => {
   assert.match(skeletons, /ProfilePageSkeleton\(\{ className = '', immediate = false \}\)/);
   assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/);
-  assert.match(skeletons, /<CardGridSkeleton count=\{6\} immediate=\{immediate\} \/>/);
+  assert.match(skeletons, /<LoadingMark label="Loading profile" \/>/);
 });
 
 test('profile identity commits before the slower gallery settles', () => {
@@ -46,12 +46,14 @@ test('profile identity commits before the slower gallery settles', () => {
   const block = profile.slice(loadStart, loadEnd);
   const profileAwait = block.indexOf('const profileResult = await');
   const identityCommit = block.indexOf('setProfile(profileData);');
-  const galleryAwait = block.indexOf('await Promise.allSettled([', identityCommit);
+  const galleryAwait = block.indexOf('await secondaryResults', identityCommit);
   const loadingRelease = block.indexOf('setLoading(false);', identityCommit);
 
   assert.ok(profileAwait >= 0 && profileAwait < identityCommit);
   assert.ok(identityCommit < loadingRelease && loadingRelease < galleryAwait);
   assert.match(block, /const artworksPromise = fetchProfileArtworks\(/);
+  assert.ok(block.indexOf('const secondaryResults = Promise.allSettled(') < profileAwait,
+    'sibling rejections are handled while identity is pending');
   assert.match(block, /setMyArtworks\(artworkData\.items\);/);
   assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
 });

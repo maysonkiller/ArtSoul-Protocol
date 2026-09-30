@@ -36,7 +36,7 @@ function harness() {
     setHasSettledArtworks: value => { state.settled = value; },
     setArtworksLoading: value => { state.loading = value; },
     setLoading: value => { state.profileLoading = value; },
-    setDiscoveryProfile() {}, setIsOwnProfile() {}, setEditMode() {}
+    setDiscoveryProfile() {}, setIsOwnProfile() {}, setEditMode() {}, setProfileLoadError() {}
   };
   vm.runInNewContext(loadProfile + '\n' + loadTab + '\nthis.api = { loadProfile, loadMyArtworks };', scope);
   return { scope, reads, state, ...scope.api };

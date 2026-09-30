@@ -38,7 +38,7 @@
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
     <script src="/header-prepaint.js?v=4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=45">
+    <link rel="stylesheet" href="/unified-styles.css?v=46">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=2">
@@ -250,68 +250,15 @@
     <div id="app"></div>
     <template id="profileInitialSkeleton">
         <div class="min-h-screen" data-profile-static-skeleton>
-            <main class="site-page-container profile-page-main py-8" role="status" aria-label="Loading profile" aria-busy="true">
-                <section class="profile-skeleton-header rounded-xl p-6 mb-6">
-                    <div class="profile-skeleton-identity">
-                        <div class="artsoul-skeleton profile-skeleton-avatar" aria-hidden="true"></div>
-                        <div class="profile-skeleton-copy">
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-heading" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line" aria-hidden="true"></div>
-                        </div>
-                    </div>
-                </section>
-                <section class="profile-skeleton-tabs rounded-xl p-6 mb-6">
-                    <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
-                    <div class="profile-skeleton-tab-row">
-                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton artsoul-skeleton-button" aria-hidden="true"></div>
-                    </div>
-                </section>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" role="status" aria-label="Loading artworks" aria-busy="true">
-                    <div class="artsoul-skeleton-card" aria-hidden="true">
-                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton-card-copy">
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
-                        </div>
-                    </div>
-                    <div class="artsoul-skeleton-card" aria-hidden="true">
-                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton-card-copy">
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
-                        </div>
-                    </div>
-                    <div class="artsoul-skeleton-card" aria-hidden="true">
-                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton-card-copy">
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
-                        </div>
-                    </div>
-                    <div class="artsoul-skeleton-card" aria-hidden="true">
-                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton-card-copy">
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
-                        </div>
-                    </div>
-                    <div class="artsoul-skeleton-card" aria-hidden="true">
-                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton-card-copy">
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
-                        </div>
-                    </div>
-                    <div class="artsoul-skeleton-card" aria-hidden="true">
-                        <div class="artsoul-skeleton artsoul-skeleton-media" aria-hidden="true"></div>
-                        <div class="artsoul-skeleton-card-copy">
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-title" aria-hidden="true"></div>
-                            <div class="artsoul-skeleton artsoul-skeleton-line artsoul-skeleton-line-short" aria-hidden="true"></div>
-                        </div>
+            <main class="artsoul-wait-stage">
+                <div class="artsoul-wait" role="status" aria-label="Loading profile" aria-busy="true" aria-live="polite">
+                    <div class="artsoul-wait-mark" aria-hidden="true">
+                        <span class="artsoul-wait-word">ArtSoul</span>
+                        <span class="artsoul-wait-dots">
+                            <span class="artsoul-wait-dot"></span>
+                            <span class="artsoul-wait-dot"></span>
+                            <span class="artsoul-wait-dot"></span>
+                        </span>
                     </div>
                 </div>
             </main>
@@ -333,7 +280,30 @@
             }
         })();
     </script>
-    <script type="module" src="/src/entries/profile.jsx"></script>
+    <template id="profileEntryFailure">
+        <main class="site-page-container py-12">
+            <section class="profile-connect-state max-w-xl mx-auto p-8 text-center" role="alert">
+                <h1 class="text-2xl font-semibold mb-3">Profile could not start</h1>
+                <p class="text-sm opacity-70 mb-6">The page did not load. Check your connection and try again.</p>
+                <button type="button" class="btn-secondary" onclick="window.location.reload()">Retry</button>
+            </section>
+        </main>
+    </template>
+    <script>
+        (() => {
+            const app = document.getElementById('app');
+            const failure = document.getElementById('profileEntryFailure');
+            let timeoutId;
+            const showFailure = () => {
+                if (!app || app.dataset.profileEntryMounted === 'true' || !failure) return;
+                app.replaceChildren(failure.content.cloneNode(true));
+            };
+            window.ArtSoulProfileEntryFailed = showFailure;
+            window.addEventListener('artsoul:profile-entry-mounted', () => clearTimeout(timeoutId), { once: true });
+            timeoutId = window.setTimeout(showFailure, 15000);
+        })();
+    </script>
+    <script type="module" src="/src/entries/profile.jsx" onerror="window.ArtSoulProfileEntryFailed?.()"></script>
     <script>
         window.addEventListener('load', () => {
             if (window.StatusBannerSystem) {

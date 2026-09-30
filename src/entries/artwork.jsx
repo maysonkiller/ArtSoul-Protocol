@@ -2876,37 +2876,18 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 }
             }
 
-            // Opened straight out of a publish, or waiting for the indexer to
-            // catch up: both are the same wait, and the branded mark already
-            // exists to name it. The generic page skeleton was a placeholder
-            // standing in for a wait we can describe.
-            if ((loading && justPublished) || error?.code === 'V41_ARTWORK_NOT_INDEXED') {
-                return (
-                    <div className="artsoul-wait-screen">
-                        <main className="artsoul-wait-stage">
-                            <div className="artsoul-wait" role="status" aria-live="polite" aria-busy="true">
-                                <div className="artsoul-wait-mark">
-                                    <span className="artsoul-wait-word">ArtSoul</span>
-                                    <span className="artsoul-wait-dots" aria-hidden="true">
-                                        <span className="artsoul-wait-dot"></span>
-                                        <span className="artsoul-wait-dot"></span>
-                                        <span className="artsoul-wait-dot"></span>
-                                    </span>
-                                </div>
-                                <span className="sr-only">Loading artwork {error?.artworkId || artworkId}</span>
-                            </div>
-                        </main>
-                    </div>
-                );
-            }
-
-            if (loading) {
+            // Adopt the same loading tree on every entry path. Switching the
+            // root after first paint makes React discard the static frame.
+            if (loading || error?.code === 'V41_ARTWORK_NOT_INDEXED') {
                 return (
                     <div
                         className="artwork-page-root"
                         data-artwork-static-skeleton={initialSkeletonVisible ? '' : undefined}
                     >
-                        <ArtworkPageSkeleton immediate={initialSkeletonVisible} />
+                        <ArtworkPageSkeleton
+                            immediate={initialSkeletonVisible || justPublished || Boolean(error)}
+                            artworkId={error?.code === 'V41_ARTWORK_NOT_INDEXED' ? (error.artworkId || artworkId) : ''}
+                        />
                     </div>
                 );
             }

@@ -8,6 +8,22 @@ import '../../supabase-auth.js';
 
 const { useState, useEffect, useRef } = React;
 
+        function getProfileXLinks(profile) {
+            const normalize = value => {
+                const handle = String(value || '').trim()
+                    .replace(/^https:\/\/(?:www\.)?(?:x|twitter)\.com\//i, '')
+                    .replace(/^@/, '').replace(/\/$/, '');
+                return /^[A-Za-z0-9_]{1,15}$/.test(handle) ? handle : '';
+            };
+            const connected = profile?.twitter_connected === true ? normalize(profile.twitter_username) : '';
+            const reported = normalize(profile?.twitter_handle);
+            const links = connected ? [{ handle: connected, connected: true }] : [];
+            if (reported && reported.toLowerCase() !== connected.toLowerCase()) {
+                links.push({ handle: reported, connected: false });
+            }
+            return links;
+        }
+
         const GALLERY_TYPES = [
             { id: 'created', label: 'Created Artworks', icon: '', description: 'Artworks you created' },
             { id: 'auction', label: 'Auctions', icon: '', description: 'Artwork currently in auction' },
@@ -33,8 +49,12 @@ const { useState, useEffect, useRef } = React;
                 !hasInitialWalletHint;
             const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
             const [profile, setProfile] = useState(null);
+            const [profileDraft, setProfileDraft] = useState(null);
+            const [profileLoadError, setProfileLoadError] = useState(null);
             const [editMode, setEditMode] = useState(false);
             const [selectedGallery, setSelectedGallery] = useState('created');
+            const selectedGalleryRef = useRef(selectedGallery);
+            selectedGalleryRef.current = selectedGallery;
             const [myArtworks, setMyArtworks] = useState([]);
             // The tab the visible result belongs to. It lags selectedGallery until a
             // fetch commits, so the heading and the list are never out of step.
@@ -49,11 +69,13 @@ const { useState, useEffect, useRef } = React;
             const fileInputRef = useRef(null);
             const profileSignalRef = useRef({ address: null, chainId: null, initialized: false });
             const profileRequestRef = useRef(0);
+            const profileEditRef = useRef(0);
             const loadedProfileAddressRef = useRef(null);
             const loadingProfileAddressRef = useRef(null);
             const artworksRequestRef = useRef(0);
             // Per-visit tab results. Presentation only; see loadMyArtworks.
             const galleryCacheRef = useRef(new Map());
+            const galleryPanelRef = useRef(null);
             const transactionActionsRef = useRef(new Set());
             const [transactionActions, setTransactionActions] = useState({});
             const [addressCopied, setAddressCopied] = useState(false);
@@ -159,6 +181,12 @@ const { useState, useEffect, useRef } = React;
                 }
             }, [selectedGallery]);
 
+            useEffect(() => {
+                if (galleryPanelRef.current) galleryPanelRef.current.style.minHeight = '';
+                profileEditRef.current++;
+                setProfileDraft(null);
+            }, [profile?.wallet_address]);
+
             function sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
             }
@@ -217,7 +245,7 @@ const { useState, useEffect, useRef } = React;
                 return resolver?.(profileData, '') || '';
             }
 
-            const resolvedAvatarUrl = getProfileAvatarUrl(profile);
+            const resolvedAvatarUrl = getProfileAvatarUrl(editMode ? profileDraft || profile : profile);
             useEffect(() => {
                 const token = ++profileAvatarDecodeTokenRef.current;
                 setDecodedProfileAvatarUrl('');
@@ -766,15 +794,16 @@ const { useState, useEffect, useRef } = React;
                         setOAuthNotice({ type: 'error', message: result.message });
                         return;
                     }
-                    const walletAddress = getActiveWalletAddress();
                     setOAuthNotice({
                         type: 'success',
                         message: `${result.provider === 'discord' ? 'Discord' : 'X'} account linked successfully.`
                     });
-                    // Reload profile to show connected account
-                    setTimeout(() => {
-                        loadProfile(walletAddress, { force: true });
-                    }, 250);
+                    // OAuth can return before the wallet provider restores. A
+                    // stored address is safe for a public read, never ownership.
+                    await waitForArtSoulDB();
+                    const walletAddress = getViewAddress() || getActiveWalletAddress() || getStoredWalletHint();
+                    if (!/^0x[a-f0-9]{40}$/i.test(walletAddress)) return;
+                    await loadProfile(walletAddress, { force: true });
                 }
             }
 
@@ -807,7 +836,13 @@ const { useState, useEffect, useRef } = React;
                     if (!oauthIntegration) throw new Error('Social linking is still loading. Please try again.');
                     const walletAddress = getActiveWalletAddress() || await window.ensureWalletConnected?.() || '';
                     if (!walletAddress) return;
+                    if (profile?.wallet_address?.toLowerCase() !== walletAddress.toLowerCase()) {
+                        throw new Error('Connect the wallet for this profile before removing an account.');
+                    }
+                    const requestId = profileRequestRef.current;
                     const result = await oauthIntegration.disconnect(provider, walletAddress);
+                    if (requestId !== profileRequestRef.current ||
+                        getActiveWalletAddress().toLowerCase() !== walletAddress.toLowerCase()) return;
                     profileRequestRef.current++;
                     setProfile(result.profile || {
                         ...profile,
@@ -819,6 +854,11 @@ const { useState, useEffect, useRef } = React;
                         type: 'success',
                         message: `${provider === 'discord' ? 'Discord' : 'X'} account removed.`
                     });
+                    // Retire a superseded initial gallery load without clearing
+                    // the confirmed identity or the current editing draft.
+                    loadedProfileAddressRef.current = walletAddress.toLowerCase();
+                    loadingProfileAddressRef.current = null;
+                    await loadProfile(walletAddress, { force: true, gallery: selectedGalleryRef.current });
                 } catch (error) {
                     setOAuthNotice({
                         type: 'error',
@@ -852,12 +892,13 @@ const { useState, useEffect, useRef } = React;
                 }
 
                 const requestId = ++profileRequestRef.current;
+                setProfileLoadError(null);
                 // Initial loads and tab loads write the same list. They must
                 // share one generation so the slower writer cannot win later.
                 const artworkRequestId = ++artworksRequestRef.current;
                 const previousAddress = loadingProfileAddressRef.current || loadedProfileAddressRef.current;
                 const addressChanged = previousAddress !== normalizedAddress;
-                const requestedGallery = addressChanged ? 'created' : selectedGallery;
+                const requestedGallery = addressChanged ? 'created' : options.gallery || selectedGallery;
                 if (addressChanged) {
                     galleryCacheRef.current.clear();
                     setSelectedGallery('created');
@@ -903,6 +944,7 @@ const { useState, useEffect, useRef } = React;
                         throw new Error('ArtSoulDB is not ready');
                     }
 
+                    if (options.force) db.invalidateProfileCache?.(walletAddress);
                     const profilePromise = db.getProfile(walletAddress);
                     const artworksPromise = fetchProfileArtworks(
                         { wallet_address: walletAddress },
@@ -911,11 +953,13 @@ const { useState, useEffect, useRef } = React;
                         { limit: FIRST_GALLERY_PAGE }
                     );
                     const genesisPromise = getGenesisState(walletAddress);
+                    const secondaryResults = Promise.allSettled([artworksPromise, genesisPromise]);
                     const profileResult = await Promise.resolve(profilePromise).then(
                         value => ({ status: 'fulfilled', value }),
                         reason => ({ status: 'rejected', reason })
                     );
-                    let profileData = profileResult.status === 'fulfilled' ? profileResult.value : null;
+                    if (profileResult.status === 'rejected') throw profileResult.reason;
+                    let profileData = profileResult.value;
                     if (!profileData) {
                         profileData = {
                             wallet_address: walletAddress,
@@ -935,13 +979,12 @@ const { useState, useEffect, useRef } = React;
                     if (isOwn !== null) {
                         setIsOwnProfile(isOwn);
                     }
-                    setEditMode(Boolean(isOwn === true && profileResult.status === 'fulfilled' && !profileResult.value));
+                    if (addressChanged || !profileResult.value) {
+                        setEditMode(Boolean(isOwn === true && !profileResult.value));
+                    }
                     setLoading(false);
 
-                    const [artworksResult, genesisResult] = await Promise.allSettled([
-                        artworksPromise,
-                        genesisPromise
-                    ]);
+                    const [artworksResult, genesisResult] = await secondaryResults;
                     if (requestId !== profileRequestRef.current) return;
                     const artworkData = artworksResult.status === 'fulfilled'
                         ? artworksResult.value
@@ -996,6 +1039,7 @@ const { useState, useEffect, useRef } = React;
                 } catch (error) {
                     if (requestId !== profileRequestRef.current) return;
                     console.error('Error loading profile:', error);
+                    setProfileLoadError('Your profile could not be loaded. Please retry.');
                     if (artworkRequestId === artworksRequestRef.current) setArtworksLoading(false);
                 }
                 if (requestId !== profileRequestRef.current) return;
@@ -1003,6 +1047,11 @@ const { useState, useEffect, useRef } = React;
                     loadingProfileAddressRef.current = null;
                 }
                 setLoading(false);
+            }
+
+            function retryProfile() {
+                const walletAddress = getViewAddress() || getActiveWalletAddress() || getStoredWalletHint();
+                if (walletAddress) void loadProfile(walletAddress, { force: true });
             }
 
             // A-79. Two accepted repairs disagreed about the profile's first paint:
@@ -1101,6 +1150,19 @@ const { useState, useEffect, useRef } = React;
                 }
             }
 
+            function startProfileEdit() {
+                if (!profile) return;
+                profileEditRef.current++;
+                setProfileDraft({ ...profile });
+                setEditMode(true);
+            }
+
+            function cancelProfileEdit() {
+                profileEditRef.current++;
+                setProfileDraft(null);
+                setEditMode(false);
+            }
+
             async function handleAvatarUpload(e) {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -1117,31 +1179,52 @@ const { useState, useEffect, useRef } = React;
                     return;
                 }
 
-                const originalAvatar = profile?.avatar_url;
+                const draft = profileDraft || profile;
+                const walletAddress = getActiveWalletAddress();
+                if (!draft?.wallet_address || draft.wallet_address.toLowerCase() !== walletAddress.toLowerCase()) return;
+                const editId = profileEditRef.current;
+                const originalAvatar = draft.avatar_url;
                 try {
                     // Ensure authenticated before upload
                     const isAuth = await window.ensureAuthenticated();
                     if (!isAuth) return;
 
-                    const walletAddress = window.getCurrentWalletAddress?.();
+                    if (editId !== profileEditRef.current ||
+                        getActiveWalletAddress().toLowerCase() !== walletAddress.toLowerCase()) return;
                     const fileName = `avatar_${walletAddress}_${Date.now()}.${file.name.split('.').pop()}`;
 
                     // Show loading feedback
-                    setProfile({...profile, avatar_url: 'uploading...'});
+                    setProfileDraft(current => ({ ...draft, ...current, avatar_url: 'uploading...' }));
 
                     const avatarUrl = await window.ArtSoulDB.uploadFile(file, fileName);
-                    setProfile({...profile, avatar_url: avatarUrl});
+                    if (editId !== profileEditRef.current ||
+                        getActiveWalletAddress().toLowerCase() !== walletAddress.toLowerCase()) return;
+                    setProfileDraft(current => ({ ...draft, ...current, avatar_url: avatarUrl }));
                 } catch (error) {
                     console.error('Error uploading avatar:', error);
                     alert('Error uploading avatar: ' + error.message);
                     // Restore original avatar on error
-                    setProfile({...profile, avatar_url: originalAvatar});
+                    if (editId === profileEditRef.current &&
+                        getActiveWalletAddress().toLowerCase() === walletAddress.toLowerCase()) {
+                        setProfileDraft(current => ({ ...draft, ...current, avatar_url: originalAvatar }));
+                    }
                 }
             }
 
             async function saveProfile() {
-                const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
+                const draft = profileDraft || profile;
+                if (!profile?.wallet_address) {
+                    alert('Your profile is still loading. Please wait and try again.');
+                    return;
+                }
+                const requestId = profileRequestRef.current;
+                const editId = profileEditRef.current;
+                const walletAddress = getActiveWalletAddress() || await window.ensureWalletConnected?.();
                 if (!walletAddress) return;
+                if (profile.wallet_address.toLowerCase() !== walletAddress.toLowerCase()) {
+                    alert('Connect the wallet for this profile before saving.');
+                    return;
+                }
 
                 try {
                     // Authenticate before saving (only once)
@@ -1150,27 +1233,42 @@ const { useState, useEffect, useRef } = React;
                         alert('Authentication required to save profile');
                         return;
                     }
+                    if (requestId !== profileRequestRef.current || editId !== profileEditRef.current ||
+                        getActiveWalletAddress().toLowerCase() !== walletAddress.toLowerCase()) {
+                        throw new Error('The wallet or profile changed during sign-in. Please try again.');
+                    }
+                    if (draft.avatar_url === 'uploading...') {
+                        throw new Error('Wait for your avatar upload to finish before saving.');
+                    }
 
                     const profileData = {
-                        username: profile.username,
-                        bio: profile.bio,
-                        public_twitter_handle: profile.twitter_handle || '',
-                        avatar_url: profile.avatar_url
+                        username: draft.username,
+                        bio: draft.bio,
+                        public_twitter_handle: draft.twitter_handle || '',
+                        avatar_url: draft.avatar_url
                     };
 
+                    let savedProfile;
                     if (profile.id) {
-                        await window.ArtSoulDB.updateProfile(walletAddress, profileData);
+                        savedProfile = await window.ArtSoulDB.updateProfile(walletAddress, profileData);
                     } else {
-                        const newProfile = await window.ArtSoulDB.createProfile(walletAddress, profileData);
-                        setProfile(newProfile);
+                        savedProfile = await window.ArtSoulDB.createProfile(walletAddress, profileData);
                     }
+                    if (requestId !== profileRequestRef.current || editId !== profileEditRef.current ||
+                        getActiveWalletAddress().toLowerCase() !== walletAddress.toLowerCase()) return;
+                    if (savedProfile?.wallet_address?.toLowerCase() !== walletAddress.toLowerCase()) {
+                        throw new Error('The saved profile could not be confirmed. Reload and try again.');
+                    }
+                    setProfile(savedProfile);
+                    setProfileDraft(null);
+                    setEditMode(false);
 
                     // The shared header caches the profile for the page lifetime,
                     // so a saved name or avatar only reaches it through the
                     // component's own refresh entry point.
                     await window.AvatarDropdown?.refresh?.(walletAddress);
-
-                    setEditMode(false);
+                    if (requestId !== profileRequestRef.current || editId !== profileEditRef.current ||
+                        getActiveWalletAddress().toLowerCase() !== walletAddress.toLowerCase()) return;
                     alert('Profile saved!');
                 } catch (error) {
                     console.error('Error saving profile:', error);
@@ -1362,6 +1460,7 @@ const { useState, useEffect, useRef } = React;
             const bgClass = isClassic ? 'bg-gray-900 text-gray-100' : 'bg-black text-cyan-100';
             const viewAddress = getViewAddress();
             const connectedWalletAddress = getActiveWalletAddress();
+            const editableProfile = profileDraft || profile;
 
             if (!viewAddress && !walletStateSettled) {
                 return (
@@ -1381,6 +1480,20 @@ const { useState, useEffect, useRef } = React;
                         data-profile-static-skeleton={initialSkeletonVisible ? '' : undefined}
                     >
                         <ProfilePageSkeleton immediate={initialSkeletonVisible} />
+                    </div>
+                );
+            }
+
+            if (profileLoadError && !profile) {
+                return (
+                    <div className={`min-h-screen ${bgClass}`}>
+                        <main className="site-page-container py-12">
+                            <section className="profile-connect-state max-w-xl mx-auto p-8 text-center" role="alert">
+                                <h1 className="text-2xl font-semibold mb-3">Profile unavailable</h1>
+                                <p className="text-sm opacity-70 mb-6">{profileLoadError}</p>
+                                <button type="button" onClick={retryProfile} className="btn-main">Retry</button>
+                            </section>
+                        </main>
                     </div>
                 );
             }
@@ -1461,8 +1574,8 @@ const { useState, useEffect, useRef } = React;
                                         <div className="space-y-4">
                                             <input
                                                 type="text"
-                                                value={profile?.username || ''}
-                                                onChange={(e) => setProfile({...profile, username: e.target.value})}
+                                                value={editableProfile?.username || ''}
+                                                onChange={(e) => setProfileDraft({ ...editableProfile, username: e.target.value })}
                                                 placeholder="Your Name"
                                                 className={`w-full px-4 py-3 rounded-lg text-2xl font-bold ${
                                                     isClassic
@@ -1471,8 +1584,8 @@ const { useState, useEffect, useRef } = React;
                                                 } outline-none`}
                                             />
                                             <textarea
-                                                value={profile?.bio || ''}
-                                                onChange={(e) => setProfile({...profile, bio: e.target.value})}
+                                                value={editableProfile?.bio || ''}
+                                                onChange={(e) => setProfileDraft({ ...editableProfile, bio: e.target.value })}
                                                 placeholder="Tell us about yourself..."
                                                 rows={3}
                                                 className={`w-full px-4 py-3 rounded-lg ${
@@ -1484,8 +1597,8 @@ const { useState, useEffect, useRef } = React;
                                             <label className="block text-sm">
                                                 Public X link (self-reported)
                                                 <input
-                                                    value={profile?.twitter_handle || ''}
-                                                    onChange={(e) => setProfile({...profile, twitter_handle: e.target.value})}
+                                                    value={editableProfile?.twitter_handle || ''}
+                                                    onChange={(e) => setProfileDraft({ ...editableProfile, twitter_handle: e.target.value })}
                                                     placeholder="@username or https://x.com/username"
                                                     className="w-full px-4 py-3 rounded-lg"
                                                     style={{ background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)' }}
@@ -1622,14 +1735,10 @@ const { useState, useEffect, useRef } = React;
                                             </p>
                                             <div className="profile-social-action-row">
                                                 <div className="profile-social-links flex gap-3 flex-wrap">
-                                                    {profile?.twitter_connected === true && profile?.twitter_username && (
-                                                        <a href={`https://x.com/${encodeURIComponent(profile.twitter_username)}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5">
-                                                            @{profile.twitter_username} (connected)
-                                                        </a>
-                                                    )}
-                                                    {profile?.twitter_handle && (
+                                                    {getProfileXLinks(profile).map(link => (
                                                         <a
-                                                            href={`https://twitter.com/${profile.twitter_handle.replace('@', '')}`}
+                                                            key={link.handle.toLowerCase()}
+                                                            href={`https://x.com/${encodeURIComponent(link.handle)}`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity max-w-full ${
@@ -1640,9 +1749,9 @@ const { useState, useEffect, useRef } = React;
                                                             <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                                                                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                                                             </svg>
-                                                            <span className="truncate min-w-0">@{profile.twitter_handle.replace('@', '')} (self-reported)</span>
+                                                            <span className="truncate min-w-0">@{link.handle} ({link.connected ? 'connected' : 'public link'})</span>
                                                         </a>
-                                                    )}
+                                                    ))}
                                                     {profile?.discord_username && (
                                                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg max-w-full ${
                                                             isClassic
@@ -1658,7 +1767,7 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                                 {isOwnProfile && (
                                                     <div className="profile-inline-edit-action">
-                                                        <button onClick={() => setEditMode(true)} className="btn-main">
+                                                        <button onClick={startProfileEdit} className="btn-main">
                                                             Edit Profile
                                                         </button>
                                                     </div>
@@ -1698,6 +1807,12 @@ const { useState, useEffect, useRef } = React;
                                         </div>
                                     )}
 
+                                    {profileLoadError && (
+                                        <div className="profile-oauth-notice is-error mt-4" role="alert">
+                                            {profileLoadError}{' '}
+                                            <button type="button" onClick={retryProfile}>Retry</button>
+                                        </div>
+                                    )}
                                     {oauthNotice && (
                                         <p
                                             className={`profile-oauth-notice mt-4 ${oauthNotice.type === 'error' ? 'is-error' : 'is-success'}`}
@@ -1714,7 +1829,7 @@ const { useState, useEffect, useRef } = React;
                                                     Save Profile
                                                 </button>
                                                 <button
-                                                    onClick={() => setEditMode(false)}
+                                                    onClick={cancelProfileEdit}
                                                     className={`px-6 py-2 rounded-lg font-medium ${
                                                         isClassic ? 'bg-gray-700 text-gray-300' : 'bg-gray-700 text-gray-300'
                                                     }`}
@@ -1749,6 +1864,10 @@ const { useState, useEffect, useRef } = React;
                                         key={gallery.id}
                                         onClick={() => {
                                             if (gallery.id !== selectedGallery) {
+                                                // Keep the viewport filled while the old list
+                                                // is replaced, including when the new tab is empty.
+                                                const panel = galleryPanelRef.current;
+                                                if (panel) panel.style.minHeight = `${Math.max(0, window.innerHeight - panel.getBoundingClientRect().top)}px`;
                                                 setArtworksLoading(true);
                                                 setSelectedGallery(gallery.id);
                                             }
@@ -1770,7 +1889,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
 
                         {/* Gallery Content */}
-                        <div className={`profile-gallery-panel rounded-xl p-6 ${
+                        <div ref={galleryPanelRef} className={`profile-gallery-panel rounded-xl p-6 ${
                             isClassic
                                 ? 'bg-gray-800/50 border border-gray-700'
                                 : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30'
@@ -1864,6 +1983,8 @@ const { useState, useEffect, useRef } = React;
             } else {
                 createRoot(profileAppRoot).render(profilePage);
             }
+            profileAppRoot.dataset.profileEntryMounted = 'true';
+            window.dispatchEvent(new CustomEvent('artsoul:profile-entry-mounted'));
         }
 
         // Theme is managed by ThemeManager

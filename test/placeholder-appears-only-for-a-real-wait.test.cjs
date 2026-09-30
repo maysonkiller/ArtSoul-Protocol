@@ -17,11 +17,11 @@ test('a load that finishes quickly shows no placeholder at all', () => {
 
 test('new placeholder roots wait while already-visible static skeletons stay visible', () => {
   const roots = [...skeletons.matchAll(/role="status" aria-label="Loading/g)];
-  assert.equal(roots.length, 3, 'card grid, artwork page, profile page');
+  assert.equal(roots.length, 1, 'the gallery has a compact status; full pages share the branded mark');
   assert.equal((skeletons.match(/\$\{immediate \? '' : PLACEHOLDER\}/g) || []).length, 3,
     'each placeholder waits by default but can adopt an already-painted static tree');
   assert.match(skeletons, /CardGridSkeleton\(\{[\s\S]*?immediate = false[\s\S]*?\}\)/);
-  assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false \}\)/);
+  assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false, artworkId = '' \}\)/);
   assert.match(skeletons, /ProfilePageSkeleton\(\{ className = '', immediate = false \}\)/);
   assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/,
     'React must not hide a skeleton the document already painted');
@@ -40,7 +40,5 @@ test('the element keeps its box the whole time', () => {
 test('a wait we can name is never held back', () => {
   // The branded mark after publishing answers a question the person just asked,
   // so it appears at once.
-  assert.doesNotMatch(artwork, /artsoul-wait-screen[^"]*artsoul-placeholder/);
-  const wait = artwork.slice(artwork.indexOf('artsoul-wait-screen'));
-  assert.doesNotMatch(wait.slice(0, 400), /artsoul-placeholder/);
+  assert.match(artwork, /immediate=\{initialSkeletonVisible \|\| justPublished \|\| Boolean\(error\)\}/);
 });
