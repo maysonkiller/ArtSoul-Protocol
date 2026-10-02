@@ -27,12 +27,11 @@ remain reviewable; a successful local test never means a production rollout.
 
 Goal: a production testnet trustworthy enough for a controlled beta.
 
-Scheduling amendment, 2026-09-29: the founder deferred real passkey enrollment
-and its operator recovery ceremony to Phase C. A8 engineering verification
-continues with isolated test credentials. The activation requirements below
-remain mandatory before live moderation is enabled; they are not falsely marked
-complete or replaced by a test-only bypass. See
-`CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md`.
+Scheduling amendment, 2026-10-03: the founder authorizes real passkey enrollment
+and its operator recovery ceremony now, superseding the September 29 deferral.
+The activation requirements below remain mandatory before live moderation is
+enabled; they are not marked complete or replaced by a test-only bypass. See
+`CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md`.
 
 - [x] **A1 — Security and migration verification.** Accepted 2026-08-07 through the public runtime evidence in `docs/testnet/A1_MOBILE_AUTH_UPLOAD_POLICY_ACCEPTANCE_2026-08-04.md` and the redacted private-operation record in `docs/testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`. Repository hardening, forced production RLS, the historical testnet migration baseline, bucket guardrails, GitHub Secret Scanning and push protection, preview/production headers, desktop and external-mobile SIWE, signed uploads, authenticated negative upload-policy probes, server-only credential validation, retirement of the exposed secondary development key, and the explicit decision to retain repository history under the active scanning controls are verified. No secret value is stored in either acceptance record.
 - [x] **A2 — Mobile wallet acceptance.** Complete real-phone external-browser, in-app-browser, desktop, navigation, reload, background, write-guard, and explicit-disconnect acceptance. Preserve Base Sepolia as the only operational write chain.
@@ -52,7 +51,7 @@ complete or replaced by a test-only bypass. See
   migration ledger remains absent and was not fabricated. See
   [the A8 schema evidence record](../audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
   This closes the missing-schema preparation step, not live moderation,
-  notification delivery, RG-03 activation or the deferred real passkey/recovery
+  notification delivery, RG-03 activation or the real passkey/recovery
   gates. A8 and A10 are not marked accepted by this addendum.
 
 - [x] **A9 — Infrastructure cost and alerting.** Accepted 2026-07-28. Repository health-check tooling, fail-closed event-failure handling, no-cost plan constraints, thresholds, restart checks, and the Tuesday/Friday manual cadence are defined in `docs/runbooks/A9_INFRA_COST_MONITORING.md`. A-15, A-40, A-41, A-42, and A-43 retain their production acceptance evidence there. The consecutive 2026-07-22 through 2026-07-28 provider-dashboard window recorded 14.1K Alchemy CUs, a 22.9M month-end forecast against the 30M hard limit, ArtSoul-only Supabase uncached egress of 41.0–59.4 MB/day, current-cycle uncached/cached totals of 0.246/0.764 GB, and an enabled Supabase Spend Cap. Native custom Alchemy alerts remain unavailable on the current plan and Supabase has no fine-grained budget-threshold notifications, so hard limits plus the documented manual review are the accepted no-cost controls.
@@ -78,9 +77,9 @@ Phase B exit: stable beta, feedback processed, moderation proven with real cases
 
 Goal: audited, product-grade contracts and production operations.
 
-The 2026-09-29 founder amendment adds the deferred real founder passkey setup
-and operator recovery ceremony to C0/C8/C13, before dependent activation and
-mainnet launch. Existing A8 implementation and regression evidence is retained.
+The October 3 founder amendment moves the previously deferred passkey/recovery
+ceremony back into current A8 activation. Final mainnet custody and configuration
+still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
 
 - [ ] **C0 — Founder inputs.** Provide ProtocolTreasury and EcosystemTreasury Safe addresses (plus Base Sepolia rehearsal Safes), project domain, and required contract-design answers. These inputs are resource-gated as detailed in `docs/RESOURCE_GATED_WORK.md`: they do not block zero-incremental-spend Phase A engineering, but they remain mandatory before their activation and mainnet gates. Legal entity type and jurisdiction remain founder/counsel decisions; the roadmap must not assume a specific form such as a Polish `sp. z o.o.`.
 - [ ] **C1 — Contract architecture sign-off.** Complete the required research, threat model, storage-layout plan, upgrade-pattern decision, and invariants before Solidity changes.

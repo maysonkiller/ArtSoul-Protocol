@@ -1,15 +1,16 @@
 # A8a Moderation Passkey Foundation — Founder Runbook
 
-Status: development complete behind a DISABLED feature flag. Nothing in this
-runbook has been applied to production. Follow `docs/RESOURCE_GATED_WORK.md`
-RG-03/RG-04 for the activation gates.
+Status updated October 3: schema applied and verified September 30; the live
+feature remains disabled pending operator activation. Do not repeat the migration
+steps below. The founder now authorizes the real ceremony; follow
+`docs/RESOURCE_GATED_WORK.md` RG-03/RG-04 and the current A8 rollout order.
 
 Founder decisions preserved (2026-07-20): 15-minute step-up sessions, two
 independent founder passkeys before activation, one one-time auditable
 bootstrap grant, Safe-only founder recovery, and X/Discord as eligibility/
 profile data rather than authentication factors. A8d now implements the
-disabled Safe-only recovery foundation, but migration, configuration and the
-founder ceremony remain unapplied/unrehearsed.
+Safe-only recovery foundation. Its migration is applied; configuration and the
+founder ceremony remain uncompleted until recorded in the current checkpoint.
 
 ## 1. What ships in this phase
 

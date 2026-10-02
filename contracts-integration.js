@@ -2,6 +2,7 @@
 // Frontend action adapter for auction-first lazy mint protocol.
 
 import { ethers } from 'https://esm.sh/ethers@6.7.0';
+import { donationMessageState } from './src/features/artwork/donation-message.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -567,6 +568,107 @@ class ArtSoulContracts {
     async getPendingWithdrawal(address) {
         this.ensureCore();
         return this.formatEth(await this.coreContract.pendingWithdrawals(address));
+    }
+
+    async donateToArtist(deployment, artworkId, creator, amountEth, message, anonymous, options = {}) {
+        if (!options.expectedWallet || Number(options.expectedChainId) !== 84532 ||
+            !ethers.isAddress(deployment) || this.isZeroAddress(deployment) ||
+            !ethers.isAddress(creator) || this.isZeroAddress(creator) ||
+            !/^[1-9]\d{0,77}$/.test(String(artworkId)) || BigInt(artworkId) >= 2n ** 256n ||
+            !donationMessageState(message).valid || typeof anonymous !== 'boolean') {
+            throw new Error('Review the artwork, wallet and donation details again.');
+        }
+        await this.ensureBaseSepoliaWrite();
+        await this.assertExpectedWallet(options);
+        const signer = this.signer;
+        if (!signer?.getAddress || (await signer.getAddress()).toLowerCase() !== options.expectedWallet.toLowerCase()) {
+            throw new Error('The wallet signer changed. Review the support again.');
+        }
+        const support = new ethers.Contract(deployment, [
+            'function core() view returns (address)', 'function paused() view returns (bool)',
+            'function donate(address creator,uint256 artworkId,string message,bool isAnonymous) payable',
+            'event Donation(address indexed donor,address indexed creator,uint256 indexed artworkId,uint256 amount,string message,bool isAnonymous)'
+        ], signer);
+        const value = this.parseEth(amountEth);
+        if (value <= 0n) throw new Error('Enter a donation greater than zero.');
+        const [configuredCore, paused, artwork] = await Promise.all([
+            support.core(), support.paused(), this.getArtworkStruct(artworkId)
+        ]);
+        if (configuredCore.toLowerCase() !== (await this.coreContract.getAddress()).toLowerCase() ||
+            artwork.creator.toLowerCase() !== creator.toLowerCase()) {
+            throw new Error('The donation recipient does not match this artwork.');
+        }
+        if (paused) throw new Error('Artist support is temporarily paused.');
+        await this.assertExpectedWallet(options);
+        if ((await signer.getAddress()).toLowerCase() !== options.expectedWallet.toLowerCase()) {
+            throw new Error('The wallet signer changed. Review the support again.');
+        }
+        const tx = await support.donate(creator, artworkId, message, anonymous, {value});
+        try {
+            await options.onSubmitted?.(tx.hash);
+        } catch (error) {
+            console.warn('Support submission persistence failed:', error);
+        }
+        let receipt;
+        try {
+            receipt = await this.waitForConfirmedTransaction(tx);
+        } catch (error) {
+            // A broadcast with an uncertain outcome must not become a fresh
+            // enabled payment form. Ethers also marks changed-calldata replacements
+            // as cancelled; only an actual self-cancellation or revert is retryable.
+            const cancelled = error.code === 'TRANSACTION_REPLACED' &&
+                error.cancelled === true && error.reason === 'cancelled';
+            if (Number(error.receipt?.status) !== 0 && !cancelled) {
+                error.transactionHash = error.receipt?.hash || tx.hash;
+            }
+            throw error;
+        }
+        const confirmed = this.matchesArtistDonationReceipt(receipt, deployment, artworkId, creator,
+            options.expectedWallet, {value, message, anonymous});
+        if (!confirmed) {
+            const error = new Error('The transaction was confirmed, but its donation event could not be verified. Check the transaction before trying again.');
+            error.transactionHash = receipt.hash || tx.hash;
+            throw error;
+        }
+        return receipt.hash || tx.hash;
+    }
+
+    matchesArtistDonationReceipt(receipt, deployment, artworkId, creator, donor, details) {
+        if (Number(receipt.status) !== 1) return false;
+        const events = new ethers.Interface([
+            'event Donation(address indexed donor,address indexed creator,uint256 indexed artworkId,uint256 amount,string message,bool isAnonymous)'
+        ]);
+        return receipt.logs?.some(log => {
+            if (log.address?.toLowerCase() !== deployment.toLowerCase()) return false;
+            try {
+                const event = events.parseLog(log);
+                return event?.name === 'Donation' && event.args.donor.toLowerCase() === donor.toLowerCase() &&
+                    event.args.creator.toLowerCase() === creator.toLowerCase() && event.args.artworkId === BigInt(artworkId) &&
+                    (!details || (event.args.amount === details.value && event.args.message === details.message &&
+                        event.args.isAnonymous === details.anonymous));
+            } catch { return false; }
+        });
+    }
+
+    async checkArtistDonation(deployment, artworkId, creator, hash, options = {}) {
+        if (Number(options.expectedChainId) !== 84532 || !ethers.isAddress(options.expectedWallet || '') ||
+            !ethers.isAddress(deployment) || this.isZeroAddress(deployment) ||
+            !ethers.isAddress(creator) || this.isZeroAddress(creator) ||
+            !/^[1-9]\d{0,77}$/.test(String(artworkId)) || BigInt(artworkId) >= 2n ** 256n ||
+            !/^0x[0-9a-f]{64}$/i.test(hash)) throw new Error('Review the support transaction and wallet again.');
+        await this.assertExpectedWallet(options);
+        const rawProvider = await window.web3Modal?.getWalletProvider?.();
+        if (!rawProvider?.request) throw new Error('Reconnect your wallet to check this transaction.');
+        const provider = new ethers.BrowserProvider(rawProvider);
+        if (Number((await provider.getNetwork()).chainId) !== 84532) {
+            throw new Error('Switch to Base Sepolia to check this transaction.');
+        }
+        const receipt = await provider.getTransactionReceipt(hash);
+        await this.assertExpectedWallet(options);
+        if (!receipt) return {status:'unverified', hash};
+        if (Number(receipt.status) === 0) return {status:'reverted', hash};
+        return {status:this.matchesArtistDonationReceipt(receipt, deployment, artworkId, creator,
+            options.expectedWallet) ? 'confirmed' : 'unverified', hash};
     }
 
     async getArtwork(artworkId) {

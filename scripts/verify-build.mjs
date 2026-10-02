@@ -70,6 +70,21 @@ for (const page of pages) {
         throw new Error(`${page} does not reference a hashed build asset`);
     }
 
+    if (['gallery.html', 'profile.html', 'artwork.html'].includes(page)) {
+        const name = page.slice(0, -5);
+        const entry = built.match(new RegExp(`<script type="module"[^>]*src="/assets/${name}-[^"<>]+\\.js"[^>]*><\\/script>`))?.[0];
+        const entryPosition = entry ? built.indexOf(entry) : -1;
+        const contractPosition = built.indexOf('src="/contracts-integration.js');
+        const servicePosition = built.indexOf('src="/src/index.js');
+        const cardPosition = built.indexOf('src="/src/ui/components/artwork-card.js');
+        if (entryPosition < 0 || contractPosition < entryPosition || servicePosition < entryPosition) {
+            throw new Error(`${page}: public entry must precede legacy contract/service modules`);
+        }
+        if (cardPosition < 0 || cardPosition > entryPosition) {
+            throw new Error(`${page}: classic artwork cards must initialize before the public entry`);
+        }
+    }
+
     const localReferences = [...built.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
         .map(([, reference]) => reference.split('?')[0].split('#')[0])
         .filter(reference => reference && !/^(?:[a-z]+:|\/\/|#)/i.test(reference));

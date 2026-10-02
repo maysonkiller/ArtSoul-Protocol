@@ -135,13 +135,13 @@ test('changing the wallet during authentication cancels the old profile save', a
   assert.match(h.state.alerts[0], /wallet.*changed/i);
 });
 
-test('saving preserves the public-link-only payload and updates the existing profile', async () => {
+test('saving edits profile fields without rewriting a retained public link or provider identity', async () => {
   const h = harness({ active: OWNER, profile: stored({ twitter_handle: '@public_link', twitter_connected: true, twitter_username: 'verified_name', twitter_id: 'private-provider-id' }) });
   await h.saveProfile();
   assert.equal(h.state.writes.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(h.state.writes[0])), {
     address: OWNER,
-    data: { username: 'Artist', bio: 'Saved biography', public_twitter_handle: '@public_link', avatar_url: '/avatar.png' }
+    data: { username: 'Artist', bio: 'Saved biography', avatar_url: '/avatar.png' }
   });
   assert.equal(h.state.alerts[0], 'Profile saved!');
 });

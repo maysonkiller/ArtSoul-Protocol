@@ -7,7 +7,9 @@ const MESSAGES = Object.freeze({
   REPORT_RESOLVED: 'A report you submitted has been resolved.',
   REPORT_REOPENED: 'A report you submitted has been reopened for review.',
   ARTWORK_HIDDEN: 'One of your artworks has been hidden from public discovery following a moderation review.',
-  ARTWORK_RESTORED: 'One of your artworks has been restored to public discovery following a moderation review.'
+  ARTWORK_RESTORED: 'One of your artworks has been restored to public discovery following a moderation review.',
+  DONATION_MESSAGE_HIDDEN: 'A message attached to your donation has been hidden following a moderation review. Your donation remains recorded.',
+  DONATION_MESSAGE_RESTORED: 'A message attached to your donation has been restored following a moderation review.'
 });
 const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
 const validReportId = value => typeof value === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);

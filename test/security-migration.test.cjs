@@ -163,7 +163,11 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     'a8c_protocol_admin_review.sql',
     'a8d_moderation_safe_recovery.sql',
     '015_public_metrics_projection.sql',
-    'collection_launch_services.sql'
+    'collection_launch_services.sql',
+    'profile_email_verification.sql',
+    'launch_service_quotas.sql',
+    'artist_support_moderation.sql',
+    'artist_support.sql'
   ]);
 
   for (const root of sqlRoots) {

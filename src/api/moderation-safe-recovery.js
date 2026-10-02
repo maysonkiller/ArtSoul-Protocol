@@ -144,8 +144,10 @@ async function callEip1271(provider, safeAddress, messageHash, signature, iface,
 
 async function verifyWithRpc(rpcUrl, config, messageHash, signature, providerFactory) {
   const provider = providerFactory(rpcUrl, config.chainId);
-  const network = await provider.getNetwork();
-  if (Number(network.chainId) !== config.chainId) return false;
+  // A static provider's getNetwork() returns its configured chain without an
+  // RPC read. Recovery must verify the endpoint's actual chain before its code.
+  const chainId = await provider.send('eth_chainId', []);
+  if (BigInt(chainId) !== BigInt(config.chainId)) return false;
   if (await provider.getCode(config.safeAddress) === '0x') return false;
 
   try {

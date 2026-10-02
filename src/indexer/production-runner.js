@@ -43,6 +43,7 @@ function resolveProductionIndexerConfig() {
         nftAddress: chain.nftAddress,
         projectNFTAddress: chain.projectNFTAddress,
         chainId: chain.chainId,
+        donationAddress: chain.donationAddress,
         chainSlug: chain.slug,
         startBlock: chain.startBlock,
         lockName: chain.lockName,
@@ -73,6 +74,7 @@ class ProductionIndexer {
             rpcUrl: rpcUrls,
             readRpcUrls: config.readRpcUrls,
             contractAddress: config.contractAddress,
+            donationAddress: config.donationAddress,
             chainId: config.chainId
         }, this.metrics);
 

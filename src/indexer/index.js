@@ -12,6 +12,7 @@ class ArtSoulIndexer {
             rpcUrl: config.rpcUrl,
             readRpcUrls: config.readRpcUrls,
             contractAddress: config.contractAddress,
+            donationAddress: config.donationAddress,
             chainId: this.chainId
         });
 
@@ -227,7 +228,7 @@ class ArtSoulIndexer {
     async getRecentEvents(limit = 100) {
         const events = await this.db.query(
             `SELECT * FROM contract_events
-             WHERE chain_id = $1
+             WHERE chain_id = $1 AND event_name <> 'Donation'
              ORDER BY block_number DESC, log_index DESC
              LIMIT $2`,
             [this._chainIdString(), limit]

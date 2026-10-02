@@ -159,6 +159,7 @@ export function resolveIndexerChainConfig(slug) {
         coreAddress: requireEnv(chain.coreAddressEnv, `${chain.label} ArtSoulCore address`),
         nftAddress: readEnv(chain.nftAddressEnv),
         projectNFTAddress: readEnv(chain.projectNFTAddressEnv),
+        donationAddress: chain.chainId === 84532 ? readEnv(['ARTSOUL_DONATIONS_ADDRESS_BASE_SEPOLIA']) : '',
         startBlock: resolveStartBlock(chain),
         confirmationDepth: resolveConfirmationDepth(chain),
         lockName: `indexer_leader_${chain.slug}`

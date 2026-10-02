@@ -26,10 +26,12 @@ import {
   oauthUnlinkHandler
 } from '../src/api/routes/oauth.js';
 import profileHandler from '../src/api/routes/profile.js';
+import profileEmailHandler from '../src/api/routes/profile-email.js';
 import publicArtworksHandler from '../src/api/routes/public/artworks.js';
 import publicArtworkProvenanceHandler from '../src/api/routes/public/artwork-provenance.js';
 import publicAuctionLiveHandler from '../src/api/routes/public/auction-live.js';
 import publicConfigHandler from '../src/api/routes/public/config.js';
+import publicDonationsHandler from '../src/api/routes/public/donations.js';
 import publicIndexerStatusHandler from '../src/api/routes/public/indexer-status.js';
 import publicProfileHandler from '../src/api/routes/public/profile.js';
 import uploadFileHandler from '../src/api/routes/upload/file.js';
@@ -40,12 +42,14 @@ const ROUTES = new Map([
   ['auth/session', sessionHandler],
   ['auth/verify', verifyHandler],
   ['profile', profileHandler],
+  ['profile/email', profileEmailHandler],
   ['discovery/like', likeHandler],
   ['discovery/signal', signalHandler],
   ['public/artworks', publicArtworksHandler],
   ['public/artwork-provenance', publicArtworkProvenanceHandler],
   ['public/auction-live', publicAuctionLiveHandler],
   ['public/config', publicConfigHandler],
+  ['public/donations', publicDonationsHandler],
   ['public/indexer-status', publicIndexerStatusHandler],
   ['public/profile', publicProfileHandler],
   ['upload/file', uploadFileHandler],

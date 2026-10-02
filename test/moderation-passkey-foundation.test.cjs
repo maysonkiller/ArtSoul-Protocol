@@ -291,10 +291,11 @@ function loadEnvironment({ env = {}, db = createDb(), webauthn = {}, recoveryRpc
   };
   class MockJsonRpcProvider {
     constructor(url, chainId) { this.url = url.url || url; this.chainId = chainId; }
-    async getNetwork() {
+    async send(method) {
+      assert.equal(method, 'eth_chainId');
       const item = recoveryControl[this.url] || {};
       if (item.networkError) throw new Error('network unavailable');
-      return { chainId: BigInt(item.chainId ?? this.chainId) };
+      return '0x' + BigInt(item.chainId ?? this.chainId).toString(16);
     }
     async getCode() {
       const item = recoveryControl[this.url] || {};

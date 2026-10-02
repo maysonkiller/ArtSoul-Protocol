@@ -49,6 +49,7 @@ function resolveApiIndexerConfig() {
         rpcUrl: chain.rpcUrl,
         readRpcUrls: chain.readRpcUrls,
         contractAddress: chain.coreAddress,
+        donationAddress: chain.donationAddress,
         chainId: chain.chainId,
         startBlock: chain.startBlock
     };

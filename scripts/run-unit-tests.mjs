@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 // The Hardhat contract suite runs separately via `npm run test:contracts`
 // and must never be collected by the generic Node runner.
 export const CONTRACT_SUITE = 'ArtSoulV41.test.cjs';
-export const CONTRACT_SUITES = [CONTRACT_SUITE, 'CollectionLaunch.test.cjs'];
+export const CONTRACT_SUITES = [CONTRACT_SUITE, 'CollectionLaunch.test.cjs', 'ArtSoulDonations.test.cjs'];
 
 // Every supported Node unit-test extension. Shell globs are avoided so the
 // same rule is applied identically on Windows and Ubuntu.

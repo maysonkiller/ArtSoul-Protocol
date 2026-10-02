@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { V41_CORE_ABI, parseV41EventData } from './v4-1-event-schema.js';
+import { DONATION_ABI, parseDonationEvent } from './donation-events.js';
 
 function redactRpcUrl(value) {
     try {
@@ -31,6 +32,13 @@ class EventListener {
         this.contractAddress = config.contractAddress;
         this.contract = new ethers.Contract(this.contractAddress, V41_CORE_ABI, this.provider);
         this.chainId = config.chainId;
+        this.donationAddress = String(config.donationAddress || '').toLowerCase();
+        if (this.donationAddress && (Number(this.chainId) !== 84532 ||
+            !/^0x[0-9a-f]{40}$/.test(this.donationAddress) || /^0x0{40}$/.test(this.donationAddress) ||
+            this.donationAddress === String(this.contractAddress).toLowerCase())) {
+            throw new Error('Invalid Base Sepolia donation deployment configuration.');
+        }
+        this.donationInterface = this.donationAddress ? new ethers.Interface(DONATION_ABI) : null;
         this.handlers = new Map();
         this.isListening = false;
 
@@ -581,7 +589,7 @@ class EventListener {
         return await this._retryRpcCall(async () => {
             // Query all events at once using contract filter
             const filter = {
-                address: this.contractAddress,
+                address: this.donationAddress ? [this.contractAddress, this.donationAddress] : this.contractAddress,
                 fromBlock,
                 toBlock
             };
@@ -607,7 +615,9 @@ class EventListener {
 
                 for (const log of logs) {
                     try {
-                        const parsedLog = this.contract.interface.parseLog({
+                        const isDonation = Boolean(this.donationAddress) && log.address?.toLowerCase() === this.donationAddress;
+                        if (!isDonation && log.address?.toLowerCase() !== this.contractAddress.toLowerCase()) continue;
+                        const parsedLog = (isDonation ? this.donationInterface : this.contract.interface).parseLog({
                             topics: log.topics,
                             data: log.data
                         });
@@ -615,7 +625,8 @@ class EventListener {
                         if (parsedLog) {
                             allEvents.push({
                                 eventName: parsedLog.name,
-                                eventData: this._parseEventData(parsedLog.name, parsedLog.args),
+                                eventData: isDonation ? parseDonationEvent(parsedLog.args) : this._parseEventData(parsedLog.name, parsedLog.args),
+                                contractAddress: log.address,
                                 blockNumber: log.blockNumber,
                                 transactionHash: log.transactionHash,
                                 logIndex: log.index

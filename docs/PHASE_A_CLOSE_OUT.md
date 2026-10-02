@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-09-30. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-03. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -10,12 +10,11 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **64 done, 19 in progress, 0 planned** across A-01 to A-83.
 
-**Founder scheduling decision, September 29:** real passkey enrollment and its
-operator recovery ceremony move to mainnet preparation, before dependent live
-activation. Engineering tests continue now; the live admin/reporting flags stay
-disabled. The activation gates below are retained as deferred requirements, not
-represented as completed. Real phone and OAuth evidence remain separate. See
-the [exact amendment](canon/CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md).
+**Founder scheduling decision, October 3:** perform real passkey enrollment and
+its operator recovery ceremony now. This supersedes the September 29 deferral;
+the activation gates below remain required and are not represented as completed.
+Real phone and OAuth evidence remain separate. See the
+[exact amendment](canon/CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md).
 
 September 29 execution evidence: eleven real Base Sepolia transactions now cover
 resale purchase/listing/withdrawal and artwork 28's no-bid ending; three distinct
@@ -26,8 +25,10 @@ through PR #282 at `9dcf82b`, with green candidate/post-merge CI and apex artifa
 and profile acceptance. Separately authorized live
 SIWE/Gemini/media/metadata verification passed all 13 steps. New artwork 34 /
 auction 66 has two bids, and the losing bidder received its full deposit back.
-Its earliest currently recorded end is September 30 21:25:20 UTC; settlement
-and mint remain untested for this new artwork. See
+The October 2 continuation ended and settled auction 66, minted token 6 with
+floor 0.011 test ETH, and verified the creator's 0.010725 test ETH withdrawal.
+Both-RPC accounting and eleven public apex browser checks passed. This closes
+the bounded settlement rehearsal, not the remaining device/operator gates. See
 [the evidence and limits](audits/PHASE_A_TESTNET_2026-09-29.md).
 
 ## The shape of what is left
@@ -58,8 +59,8 @@ device acceptance, as listed below.
 
 ## 1. Activation and acceptance requirements
 
-Passkey/recovery setup is deferred as recorded above. Code and regression work
-continues; deferred ceremonies are not prerequisites for publishing independent
+Passkey/recovery setup is authorized now as recorded above. Code and regression
+work continues; these ceremonies are not prerequisites for publishing independent
 fixes. They still gate dependent live activation, and A10 requires a demonstrated
 operationally safe reporting/moderation path before a beta GO.
 

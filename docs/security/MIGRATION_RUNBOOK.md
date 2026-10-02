@@ -57,6 +57,10 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/stabilization_layer.sql` | `not recorded`. Manual stabilization migration. |
 | `sql/migrations/indexer_dedup_setup.sql` | `not recorded`. Manual deduplication setup. |
 | `sql/migrations/collection_launch_services.sql` | **LOCAL DRAFT, DO NOT APPLY.** Added during the September takeover; not applied by this task. Services remain unwired/disabled. Inline RLS/service-role restrictions are statically checked; PostgreSQL execution and newsletter delivery consistency remain unverified. |
+| `sql/migrations/profile_email_verification.sql` | **LOCAL DRAFT, UNAPPLIED.** Private wallet-bound mailbox verification. Review atomic token consumption, forced RLS, quotas and provider delivery before activation; newsletter consent is separate. |
+| `sql/migrations/launch_service_quotas.sql` | **LOCAL DRAFT, UNAPPLIED.** Quota-only prerequisite for private email; no Collection Launch tables or services. Existing quota RPC behavior/state and later collection migration compatibility are exercised in isolated PostgreSQL. |
+| `sql/migrations/artist_support.sql` | **LOCAL DRAFT, UNAPPLIED.** Event-only donation projections and independent message visibility. Verify cascade rollback, idempotency, anonymous public responses and the reviewed deployment before activation. |
+| `sql/migrations/artist_support_moderation.sql` | **LOCAL DRAFT, UNAPPLIED.** Extends existing complaint/review workflow to donation-message text only, with target-specific audit and notifications. Depends on the reviewed A8 schema and artist support projection. |
 | `migrations/001_ai_integration.sql` | Historical/manual, third tree. Its `001` prefix does **not** belong to the indexer sequence; the numbering collision with `sql/migrations/001_core_indexer_schema.sql` is real. Verify schema before any use. |
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.

@@ -1,9 +1,10 @@
 # A8d Safe-Only Passkey Recovery Runbook
 
-Status: implementation complete behind the existing disabled A8 passkey
-feature flag. The A8d migration is unapplied, no Safe or RPC is configured in
-production, and the founder recovery ceremony is not yet rehearsed. This file
-does not authorize activation.
+Status updated October 3: the A8d migration was applied and verified September 30;
+do not repeat it. The founder authorizes the real ceremony now, with configuration
+and acceptance tracked in the stabilization checkpoint. The live feature remains
+disabled until its staged activation prerequisites pass. This file alone is not
+evidence of activation or a completed recovery rehearsal.
 
 ## 1. Security boundary
 

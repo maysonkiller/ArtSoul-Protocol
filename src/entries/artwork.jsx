@@ -4,6 +4,7 @@ import { decodeImage } from '../features/artwork/decoded-image.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
+import { ArtistSupport } from '../features/artwork/artist-support.jsx';
 
 // A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
 // after the server signals a staff wallet needs passkey step-up/enrollment,
@@ -377,11 +378,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [resaleModalError, setResaleModalError] = useState('');
             const [resaleModalStepLabel, setResaleModalStepLabel] = useState('');
             const [reportingEnabled, setReportingEnabled] = useState(false);
+            const [donationDeployment, setDonationDeployment] = useState(null);
             const [isReportModalOpen, setIsReportModalOpen] = useState(false);
             const [artworkReport, setArtworkReport] = useState(emptyArtworkReport);
             const [reportBusy, setReportBusy] = useState(false);
             const [reportError, setReportError] = useState('');
             const [reportReceipt, setReportReceipt] = useState(null);
+            const [reportDonationTarget, setReportDonationTarget] = useState(null);
             const [withdrawalState, setWithdrawalState] = useState({
                 status: 'idle',
                 amount: '0',
@@ -397,6 +400,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const transactionActionsRef = useRef(new Set());
             const reauctionValuationControllerRef = useRef(null);
             const reportTriggerRef = useRef(null);
+            const reportReturnFocusRef = useRef(null);
+            const reportSubmissionRef = useRef(false);
             const [transactionActions, setTransactionActions] = useState({});
 
             const isClassic = theme === 'classic';
@@ -665,7 +670,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 let active = true;
                 window.ArtSoulPublicConfig?.load?.()
                     .then(config => {
-                        if (active) setReportingEnabled(config?.reportingEnabled === true);
+                        if (active) {
+                            setReportingEnabled(config?.reportingEnabled === true);
+                            setDonationDeployment(config?.donations || null);
+                        }
                     })
                     .catch(() => {
                         if (active) setReportingEnabled(false);
@@ -682,7 +690,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 const closeOnEscape = event => {
                     if (event.key === 'Escape' && !reportBusy) {
                         setIsReportModalOpen(false);
-                        window.requestAnimationFrame(() => reportTriggerRef.current?.focus());
+                        window.requestAnimationFrame(() => (reportReturnFocusRef.current || reportTriggerRef.current)?.focus());
                     }
                 };
                 window.addEventListener('keydown', closeOnEscape);
@@ -1503,7 +1511,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 }
             }
 
-            function openArtworkReport() {
+            function openArtworkReport(donation = null) {
+                reportReturnFocusRef.current = document.activeElement;
+                setReportDonationTarget(donation);
                 setArtworkReport(emptyArtworkReport());
                 setReportError('');
                 setReportReceipt(null);
@@ -1511,14 +1521,14 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }
 
             function closeArtworkReport() {
-                if (reportBusy) return;
+                if (reportSubmissionRef.current) return;
                 setIsReportModalOpen(false);
-                window.requestAnimationFrame(() => reportTriggerRef.current?.focus());
+                window.requestAnimationFrame(() => (reportReturnFocusRef.current || reportTriggerRef.current)?.focus());
             }
 
             async function submitArtworkReport(event) {
                 event.preventDefault();
-                if (reportBusy || !artwork) return;
+                if (reportSubmissionRef.current || !artwork) return;
 
                 const chainId = Number(artwork.chain_id || v41CompositeId?.chainId || 0);
                 const reportArtworkId = String(
@@ -1540,15 +1550,15 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     return;
                 }
 
-                const authenticated = await window.ensureAuthenticated?.();
-                if (!authenticated) {
-                    setReportError('Connect and sign in with your wallet to submit a report.');
-                    return;
-                }
-
+                const requestedWallet = String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
+                reportSubmissionRef.current = true;
                 setReportBusy(true);
                 setReportError('');
                 try {
+                    const authenticated = await window.ensureAuthenticated?.();
+                    if (!authenticated) throw new Error('Connect and sign in with your wallet to submit a report.');
+                    const currentWallet = String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
+                    if (requestedWallet && requestedWallet !== currentWallet) throw new Error('Your wallet changed. Review the report before submitting again.');
                     const response = await fetch('/api/moderation/reports', {
                         method: 'POST',
                         credentials: 'include',
@@ -1556,6 +1566,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         body: JSON.stringify({
                             chain_id: chainId,
                             artwork_id: reportArtworkId,
+                            ...(reportDonationTarget ? {
+                                target_type: 'donation_message',
+                                donation_transaction_hash: reportDonationTarget.transaction_hash,
+                                donation_log_index: reportDonationTarget.log_index
+                            } : {}),
                             category: artworkReport.category,
                             details: artworkReport.details.trim(),
                             reference_url: artworkReport.referenceUrl.trim() || null,
@@ -1574,6 +1589,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 } catch (error) {
                     setReportError(error.message || 'The report could not be submitted.');
                 } finally {
+                    reportSubmissionRef.current = false;
                     setReportBusy(false);
                 }
             }
@@ -3034,12 +3050,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 <div className="report-modal-header">
                                     <div>
                                         <p className="report-modal-eyebrow">Notice and takedown</p>
-                                        <h2 id="artworkReportTitle">Report this artwork</h2>
+                                        <h2 id="artworkReportTitle">{reportDonationTarget ? 'Report this message' : 'Report this artwork'}</h2>
                                     </div>
                                     <button
                                         type="button"
                                         className="report-modal-close"
-                                        aria-label="Close artwork report"
+                                        aria-label={reportDonationTarget ? 'Close message report' : 'Close artwork report'}
+                                        data-allow-rapid="true"
                                         onClick={closeArtworkReport}
                                         disabled={reportBusy}
                                     >
@@ -3052,7 +3069,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         <h3>{reportReceipt.alreadySubmitted ? 'Report already received' : 'Report received'}</h3>
                                         <p>
                                             {reportReceipt.alreadySubmitted
-                                                ? 'A report from this wallet for the same artwork and category is already pending review.'
+                                                ? `A report from this wallet for the same ${reportDonationTarget ? 'message' : 'artwork'} and category is already pending review.`
                                                 : 'Your report is stored for moderator review. Submitting a report does not decide ownership or remove on-chain history.'}
                                         </p>
                                         {reportReceipt.reference && (
@@ -3061,7 +3078,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </p>
                                         )}
                                         <div className="report-modal-actions">
-                                            <button type="button" className="btn-main" onClick={closeArtworkReport}>
+                                            <button type="button" className="btn-main" data-allow-rapid="true" onClick={closeArtworkReport}>
                                                 Done
                                             </button>
                                         </div>
@@ -3069,7 +3086,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 ) : (
                                     <form onSubmit={submitArtworkReport}>
                                         <p id="artworkReportDescription" className="report-modal-copy">
-                                            Report copyright, impersonation, harmful content, spam, or another concern. Reports are reviewed and do not change blockchain ownership.
+                                            {reportDonationTarget
+                                                ? 'Report a concern about this message. Moderation can hide its text on ArtSoul; it cannot remove or reverse the donation.'
+                                                : 'Report copyright, impersonation, harmful content, spam, or another concern. Reports are reviewed and do not change blockchain ownership.'}
                                         </p>
 
                                         <label className="report-field-label" htmlFor="artworkReportCategory">
@@ -3147,6 +3166,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             <button
                                                 type="button"
                                                 className="btn-secondary"
+                                                data-allow-rapid="true"
                                                 onClick={closeArtworkReport}
                                                 disabled={reportBusy}
                                             >
@@ -3156,6 +3176,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 type="submit"
                                                 className="btn-main"
                                                 disabled={reportBusy || !artworkReport.details.trim() || !artworkReport.goodFaithConfirmed}
+                                                data-allow-rapid="true"
                                                 aria-busy={reportBusy}
                                             >
                                                 {reportBusy ? 'Submitting...' : 'Submit report'}
@@ -3715,15 +3736,20 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             <button
                                                 type="button"
                                                 ref={reportTriggerRef}
-                                                onClick={openArtworkReport}
+                                                data-allow-rapid="true"
+                                                onClick={() => openArtworkReport()}
                                                 className="btn-secondary artwork-page-compact-action artwork-page-report"
                                             >
                                                 Report
                                             </button>
                                         )}
                                     </div>
+                                    {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
+                                        <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
+                                            creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
+                                            onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
+                                    )}
                                 </div>
-
                                 {isV41CompositeId && (
                                     <section className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">
                                         <div className="artwork-page-card-heading">

@@ -1,0 +1,12 @@
+.artist-support { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; align-items: center; }
+.artist-support-top, .artist-support-history { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+.artist-support-dialog { margin: auto; max-width: min(34rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; color: var(--c-text); background: var(--c-bg); }
+.artist-support-dialog::backdrop { background: var(--c-bg); opacity: .8; }
+.artist-support-dialog form, .artist-support-dialog label { display: grid; gap: .5rem; }
+.artist-support-dialog form { gap: 1rem; }
+.artist-support-dialog h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: .75rem; }
+.artist-support-dialog label.artist-support-check { display: flex; align-items: flex-start; }
+.artist-support-dialog input[type=checkbox] { display: inline-block; width: auto; }
+.artist-support-dialog input, .artist-support-dialog textarea, .artist-support-history select { color: inherit; background: var(--c-bg); border: 1px solid currentColor; padding: .5rem; max-width: 100%; }
+.artist-support-address, .artist-support-message { overflow-wrap: anywhere; }
+.artist-support-history article { padding-block: .75rem; border-bottom: 1px solid currentColor; }

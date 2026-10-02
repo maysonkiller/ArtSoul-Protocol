@@ -1,5 +1,6 @@
 // Editable public links are not provider identities. Only OAuth writes IDs and
-// canonical provider names; IDs are used server-side and never published.
+// canonical provider names. Raw provider-ID fields are omitted; the verified
+// Discord numeric identity appears only in the requested public profile URL.
 export const PUBLIC_PROFILE_FIELDS = ['id', 'created_at', 'wallet_address', 'username', 'bio', 'avatar_url', 'twitter_handle', 'twitter_username', 'discord_username'];
 
 export function publicProfile(row) {
@@ -7,6 +8,8 @@ export function publicProfile(row) {
   const profile = Object.fromEntries(PUBLIC_PROFILE_FIELDS.filter(key => key in row).map(key => [key, row[key]]));
   profile.twitter_connected = typeof row.twitter_id === 'string' && row.twitter_id.trim().length > 0;
   profile.discord_connected = typeof row.discord_id === 'string' && row.discord_id.trim().length > 0;
+  profile.discord_profile_url = typeof row.discord_id === 'string' && /^\d{1,20}$/.test(row.discord_id)
+    ? `https://discord.com/users/${row.discord_id}` : null;
   return profile;
 }
 

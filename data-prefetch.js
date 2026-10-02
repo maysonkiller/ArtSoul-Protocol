@@ -127,5 +127,7 @@
         if (id) start('/api/public/artworks?id=' + encodeURIComponent(id) + '&limit=1');
     } else if (path === '/') {
         start('/api/public/artworks?limit=100');
+    } else if (path === '/gallery') {
+        start('/api/public/artworks?limit=200');
     }
 })();

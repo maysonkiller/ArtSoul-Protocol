@@ -12,14 +12,30 @@ const WALLET_RUNTIME_START_FALLBACK_MS = 1500;
 
 let runtimePromise = null;
 let runtimeReady = false;
+let documentReadyPromise = null;
 
-async function waitForWalletRuntimeBoot() {
-    if (document.readyState === 'loading') {
-        await new Promise(resolve => {
+function waitForDocumentReady() {
+    if (!documentReadyPromise) {
+        documentReadyPromise = new Promise(resolve => {
+            const navigation = window.performance?.getEntriesByType?.('navigation')?.[0];
+            // Deferred modules run while readyState is already interactive.
+            // The actual event must finish their ordered legacy dependencies
+            // before AppKit can expose connected controls.
+            const alreadyReady = document.readyState === 'complete' ||
+                navigation?.domContentLoadedEventStart > 0 ||
+                window.performance?.timing?.domContentLoadedEventStart > 0;
+            if (alreadyReady) {
+                resolve();
+                return;
+            }
             document.addEventListener('DOMContentLoaded', resolve, { once: true });
+            window.addEventListener?.('load', resolve, { once: true });
         });
     }
+    return documentReadyPromise;
+}
 
+async function waitForWalletRuntimeBoot() {
     const bootPromise = window.__artsoulAppKitBootPromise;
     if (!bootPromise || typeof bootPromise.then !== 'function') {
         throw new Error('Wallet runtime boot did not start.');
@@ -29,7 +45,8 @@ async function waitForWalletRuntimeBoot() {
 
 function loadWalletRuntime() {
     if (!runtimePromise) {
-        runtimePromise = import('./appkit-init.js?v=54')
+        runtimePromise = waitForDocumentReady()
+            .then(() => import('./appkit-init.js?v=54'))
             .then(async module => {
                 await waitForWalletRuntimeBoot();
                 runtimeReady = true;
@@ -97,8 +114,4 @@ function startAfterFirstPaint() {
     setTimeout(start, WALLET_RUNTIME_START_FALLBACK_MS);
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startAfterFirstPaint, { once: true });
-} else {
-    startAfterFirstPaint();
-}
+void waitForDocumentReady().then(startAfterFirstPaint);
