@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import test from 'node:test';
 import handler from '../src/api/routes/profile-email.js';
 import publicConfigHandler from '../src/api/routes/public/config.js';
@@ -67,6 +68,21 @@ function harness(t) {
   state.token = () => state.mails.at(-1)?.text.match(/#verify_email=([0-9a-f]{64})/)[1];
   return state;
 }
+
+test('the deployed email URL reaches the private handler through the hosting rewrite', async t => {
+  const state = harness(t);
+  const config = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const rewrite = config.rewrites.find(row => row.source === '/api/profile/email');
+  assert.ok(rewrite, 'the dispatcher alone does not publish a nested profile endpoint');
+  const destination = new URL(rewrite.destination, 'https://artsoul.example');
+  assert.equal(destination.pathname, '/api/[...route]');
+  const res = response();
+  await dispatch({method: 'GET', headers: {}, query: Object.fromEntries(destination.searchParams)}, res);
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.body.error, 'UNAUTHENTICATED');
+  assert.equal(res.headers['Cache-Control'], 'private, no-store');
+  assert.deepEqual(state.calls, []);
+});
 
 test('email linking requires the signed current wallet before any private read or send', async t => {
   const state = harness(t);
