@@ -47,7 +47,7 @@ test('menu links preserve artwork identity across short and legacy URLs and neve
 });
 
 test('a report deeplink only opens the existing form after artwork and live config are ready', () => {
-    const source = fs.readFileSync('src/entries/artwork.jsx', 'utf8');
+    const source = fs.readFileSync('src/entries/artwork.jsx', 'utf8').replace(/\r\n/g, '\n');
     const start = source.indexOf('            useEffect(() => {\n                if (!artwork || !cardActionsReady');
     assert.notEqual(start, -1);
     const end = source.indexOf('}, [artwork, cardActionsReady', start);

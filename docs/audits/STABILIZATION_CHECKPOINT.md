@@ -57,6 +57,9 @@ October 3 activation and card alignment (active; supersedes prior pending-work s
   is retained. Current logs: `output/audit/card-menu-unit-verified-2026-10-03.log`,
   `card-menu-build-final-2026-10-03.log` and
   `shared-card-actions-built-browser-2026-10-03.log` in that same directory.
+  Hosted Windows then exposed a test-only LF/CRLF assumption in callback
+  extraction; the test now normalizes line endings before parsing. Application
+  source and the verified build are unchanged; require the corrected CI run.
 - Interpretation recorded: each menu shows available View/Donate/Report actions
   and creator/owner controls. Existing checked artwork forms own submission;
   moving an entry into the menu never grants permission or submits a transaction.
