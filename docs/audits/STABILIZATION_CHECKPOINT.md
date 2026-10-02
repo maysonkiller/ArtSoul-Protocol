@@ -5,9 +5,13 @@ Updated: 2026-10-03. Continue only in `C:\Projects\ArtSoul`, branch
 
 October 3 release candidate (active; supersedes prior pending-work summaries):
 
-- Working HEAD is `4e67451617be3bf96dc814026d45243f82f1b2b7`; GitHub main was
-  re-read at the same revision. All work remains in the canonical checkout;
-  recovery archives and the September 30 diff are preserved.
+- PR #286 is merged as `aaf24cd5b03241f380a20efa2ca1e407a9d519a4`, now the
+  working HEAD. Candidate and post-merge CI passed. Production deployment
+  `6820025852` succeeded; its immutable host is
+  `artsoul-otar63kt2-maysonkiller-be9112b5.vercel.app`. Preview and apex checks
+  matched 48 assets across four pages to the tested candidate build. Evidence:
+  `output/audit/phase-a-{preview,apex}-artifact-2026-10-03.json`.
+  All work remains in the canonical checkout; recovery archives are preserved.
 - The founder authorizes real passkey/recovery setup now and removes the Donate
   message amount threshold. Any non-zero donation may include a message; 100%
   goes to the creator. The separate contract has no minimum/setter. Exact prior
@@ -35,13 +39,20 @@ October 3 release candidate (active; supersedes prior pending-work summaries):
   and sender/origin configuration were saved to Vercel Production under explicit
   founder approval. No value is in Git or this document. Email activation and a
   real verification roundtrip still require the reviewed schema and release.
-- Current release/activation is not yet recorded as complete. The four new
-  feature migrations remain unapplied; reporting/admin/passkey/email/Donate
-  activation is not inferred from code or configured mail credentials. Auction
-  66 is complete and must never be replayed.
-- Exactly next step: finish the reviewed candidate release, then apply verified
-  feature prerequisites and carry out
-  the now-authorized operator and Donate activation with their separate journals.
+- Four feature schema stages are now committed and verified: shared quotas,
+  private email, donations, and typed donation-message reports. A fresh protected
+  backup was read and validated before application; eight isolated runner checks
+  include actual transaction rollback. The private application journal records
+  every stage. Existing A8 migrations were reconciled and were not rerun.
+- The founder selected the existing testnet wallet ending `6989B` for moderation.
+  No role or bootstrap grant has been issued yet. The separate second-passkey UI
+  is being tested. Email/passkey flags are saved for the next deployment; that
+  is not proof of runtime activation, delivery or authenticator enrollment.
+  Reporting, Protocol Admin and Donate remain inactive. Auction 66 is complete
+  and must never be replayed.
+- Exactly next step: publish and verify the bounded second-passkey interface,
+  then complete the authorized email, operator and Donate activation using their
+  separate journals; native authenticator confirmations remain human actions.
 
 October 2 auction 66 continuation (completed):
 
