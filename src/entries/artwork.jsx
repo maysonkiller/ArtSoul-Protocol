@@ -19,6 +19,97 @@ import '../../supabase-auth.js';
 
 const { useState, useEffect, useRef } = React;
 
+function AdditionalPasskeyGrant({walletAddress, api, onStepUpRequired}) {
+    const wallet = String(walletAddress || '').toLowerCase();
+    const activeWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
+    const [grant, setGrant] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [notice, setNotice] = useState('');
+    const operationRef = useRef(0);
+    const busyRef = useRef(false);
+    const grantRef = useRef(null);
+    function clearGrant() {
+        operationRef.current++;
+        grantRef.current = null;
+        busyRef.current = false;
+        setGrant(null); setBusy(false); setNotice('');
+    }
+    useEffect(() => {
+        const invalidate = () => {clearGrant(); onStepUpRequired();};
+        const storage = event => {if (!event.key || event.key === 'artsoul_authenticated_wallet') invalidate();};
+        window.addEventListener('artsoul:wallet-state-changed', invalidate);
+        window.addEventListener('artsoul:auth-state-changed', invalidate);
+        window.addEventListener('storage', storage);
+        window.addEventListener('pagehide', clearGrant);
+        return () => {
+            operationRef.current++; grantRef.current = null;
+            window.removeEventListener('artsoul:wallet-state-changed', invalidate);
+            window.removeEventListener('artsoul:auth-state-changed', invalidate);
+            window.removeEventListener('storage', storage);
+            window.removeEventListener('pagehide', clearGrant);
+        };
+    }, [wallet]);
+    useEffect(() => {
+        if (!grant) return;
+        const timer = setTimeout(() => {
+            if (grantRef.current !== grant) return;
+            clearGrant();
+            setNotice('The enrollment code expired. Verify your passkey before creating another.');
+            onStepUpRequired();
+        }, Math.max(0, grant.expiresAt - Date.now()));
+        return () => clearTimeout(timer);
+    }, [grant]);
+    async function issueGrant() {
+        if (busyRef.current || grantRef.current || !wallet || activeWallet() !== wallet) return;
+        busyRef.current = true; setBusy(true); setNotice('');
+        const operation = ++operationRef.current;
+        try {
+            const authenticated = await window.ensureAuthenticated?.();
+            if (operation !== operationRef.current || activeWallet() !== wallet) return;
+            if (!authenticated) {onStepUpRequired(); return;}
+            // The existing route rechecks SIWE, role and the live passkey session.
+            const result = await api('passkey-grant');
+            if (operation !== operationRef.current || activeWallet() !== wallet) return;
+            const expiresAt = Math.min(Date.parse(result.expires_at), Date.now() + 15 * 60 * 1000);
+            if (result.success !== true || !/^[A-Za-z0-9_-]{43}$/.test(result.token || '') || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error('INVALID_GRANT');
+            const next = {token: result.token, expiresAt};
+            grantRef.current = next; setGrant(next);
+        } catch (error) {
+            if (operation !== operationRef.current || activeWallet() !== wallet) return;
+            if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED', 'ADMIN_REQUIRED', 'PASSKEY_DISABLED'].includes(error.code)) onStepUpRequired();
+            else setNotice('Could not create an enrollment code. Verify your passkey and try again.');
+        } finally {
+            if (operation === operationRef.current && activeWallet() === wallet) {busyRef.current = false; setBusy(false);}
+        }
+    }
+    async function copyGrant() {
+        const current = grantRef.current;
+        if (!current || activeWallet() !== wallet || current.expiresAt <= Date.now()) {clearGrant(); return;}
+        const operation = operationRef.current;
+        try {
+            await navigator.clipboard.writeText(current.token);
+            if (operation === operationRef.current && activeWallet() === wallet) setNotice('Code copied. Paste it only into Enroll passkey on your other device.');
+        } catch {
+            if (operation === operationRef.current && activeWallet() === wallet) setNotice('Select the code and copy it manually.');
+        }
+    }
+    return (
+        <div className="space-y-2" aria-label="Add another passkey">
+            {!grant && <button type="button" className="btn-secondary w-full" data-allow-rapid="true" disabled={busy} onClick={issueGrant}>{busy ? 'Creating code...' : 'Add a passkey on another device'}</button>}
+            {grant && <>
+                <p className="text-sm">On your other device, sign in with this wallet, open an artwork and select Enroll passkey (grant required). Use an independent authenticator.</p>
+                <label className="block text-sm">One-time enrollment code
+                    <input readOnly autoComplete="off" spellCheck={false} value={grant.token} className="w-full px-3 py-2 rounded-lg" style={{background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)'}} />
+                </label>
+                <p className="text-xs">Expires at {new Date(grant.expiresAt).toLocaleTimeString()}. Keep it private. Clearing this page does not revoke a copied code.</p>
+                <button type="button" className="btn-secondary" data-allow-rapid="true" onClick={copyGrant}>Copy code</button>
+            </>}
+            {(grant || busy) && <button type="button" className="btn-secondary" data-allow-rapid="true" onClick={clearGrant}>{busy ? 'Cancel' : 'Clear code'}</button>}
+            {notice && <p className="text-sm" role="status">{notice}</p>}
+        </div>
+    );
+}
+
 function useDecodedImage(source, fallback = '') {
     const [prepared, setPrepared] = useState({ source: '', url: '', failed: false });
     useEffect(() => {
@@ -1434,7 +1525,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         // The API serializes machine codes as { error, message },
                         // so the code lives in result.error (not result.code).
                         if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.error)) {
-                            setPasskeyAccess({ required: true, active: false });
+                            setPasskeyAccess({ required: true, active: false, wallet: result.access?.wallet });
                             setModerationAccess(null);
                             return false;
                         }
@@ -1450,7 +1541,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     });
                     const staffPasskeyRequired = result.access?.passkeyRequired === true && Boolean(result.access?.role);
                     setPasskeyAccess(staffPasskeyRequired
-                        ? { required: true, active: result.access.stepUpActive === true }
+                        ? { required: true, active: result.access.stepUpActive === true, wallet: result.access.wallet }
                         : null);
                     setModerationReason(result.data?.hidden_reason || '');
                     setModerationMessage('');
@@ -1625,6 +1716,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             async function startPasskeyStepUp() {
                 if (passkeyBusy) return;
+                const wallet = String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
                 setPasskeyBusy(true);
                 setPasskeyMessage('');
                 try {
@@ -1632,7 +1724,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     const optionsResult = await passkeyApi('passkey-auth-options');
                     const assertion = await startAuthentication({ optionsJSON: optionsResult.options });
                     await passkeyApi('passkey-auth-verify', { response: assertion });
-                    setPasskeyAccess({ required: true, active: true });
+                    setPasskeyAccess({ required: true, active: true, wallet });
                     setPasskeyMessage('Moderation session active for 15 minutes.');
                     await loadModerationVisibility(artwork, { interactive: true });
                     await loadModerationPasskeys();
@@ -3545,7 +3637,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 {/* A8a staff passkey step-up. Rendered only when the server
                                     reports the passkey requirement for this staff wallet;
                                     completely absent while the feature flag is disabled. */}
-                                {passkeyAccess?.required && (
+                                {passkeyAccess?.required && isSameAddress(passkeyAccess.wallet, connectedWalletAddress) && (
                                     <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff passkey">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                             <h3 className="text-lg font-bold">Staff passkey</h3>
@@ -3575,6 +3667,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             >
                                                 Enroll passkey (grant required)
                                             </button>
+                                            {passkeyAccess.active && <AdditionalPasskeyGrant key={String(connectedWalletAddress).toLowerCase()} walletAddress={connectedWalletAddress} api={passkeyApi} onStepUpRequired={() => {
+                                                setPasskeyAccess(current => current ? {...current, active: false} : null);
+                                                setPasskeyMessage('Verify your passkey before adding another device.');
+                                            }} />}
                                             {passkeyCredentials === null ? (
                                                 <button
                                                     type="button"

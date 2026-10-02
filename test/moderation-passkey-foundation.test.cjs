@@ -799,7 +799,7 @@ test('the client consumes server-confirmed staff passkey state and exposes passk
   assert.doesNotMatch(client, /includes\(result\.code\)/);
   assert.match(client, /result\.access\?\.passkeyRequired === true && Boolean\(result\.access\?\.role\)/);
   // Entering passkey-required state renders the Verify and Enroll controls.
-  assert.match(client, /\{ required: true, active: result\.access\.stepUpActive === true \}/);
+  assert.match(client, /\{ required: true, active: result\.access\.stepUpActive === true, wallet: result\.access\.wallet \}/);
   assert.match(client, /onClick=\{startPasskeyStepUp\}/);
   assert.match(client, /onClick=\{enrollModerationPasskey\}/);
 });

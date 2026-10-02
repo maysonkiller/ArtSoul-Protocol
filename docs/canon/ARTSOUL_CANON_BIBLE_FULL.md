@@ -283,9 +283,9 @@ or authorize mainnet deployment.
 - **Phase C: Mainnet Preparation**.
 - **Phase D: Staged Mainnet Launch**.
 
-The 2026-09-29 founder amendment schedules real passkey setup and its operator
-ceremony in Phase C, before dependent activation and mainnet launch. Other
-unaccepted Phase A requirements are not automatically waived by this decision.
+The 2026-10-03 founder amendment brings real passkey setup and its operator
+ceremony into current Phase A activation, superseding the September 29 deferral
+to Phase C. Existing acceptance gates remain required; mainnet is not authorized.
 
 `17_ROADMAP_PHASES.md` and `12_IMPLEMENTATION_BACKLOG.md` expand this model but remain subordinate to this Bible. They may schedule work; they may not create economics, contract mechanics, Genesis grant cadence, treasury triggers, legal-entity decisions, or product scope that the Bible has not approved.
 
