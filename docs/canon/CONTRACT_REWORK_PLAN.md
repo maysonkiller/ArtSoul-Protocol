@@ -49,6 +49,13 @@ Primary economics, deposit (10%), increment (2.5%), durations (24/36/48h), settl
 
 ## Part 2 — Target architecture
 
+September 30 consolidation: the founder-authorized artist-support addition is a
+separate optional fifth immutable contract, `ArtSoulDonations`, with no Core/NFT
+storage change. The four-contract table below continues to describe the original
+auction/NFT/Genesis/collection topology. See
+[the support amendment](CHANGELOG_2026-09-30_ARTIST_SUPPORT.md) for exact routing,
+message limits, administration, verification and rollback boundaries.
+
 ### Contract count: **4 contracts, with the Ecosystem/Reward Pool as a module inside Core**
 
 | # | Contract | Upgradeability | Responsibility |

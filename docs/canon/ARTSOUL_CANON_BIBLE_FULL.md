@@ -76,6 +76,9 @@ Use the label "First Collector". Do not use "winner" or "auctioner" in provenanc
 
 ## 6. Trust And Discovery
 
+Artist-support consolidation (2026-09-30): voluntary donations never affect Trust
+or discovery. See [the bounded support amendment](CHANGELOG_2026-09-30_ARTIST_SUPPORT.md).
+
 Trust affects discovery ordering only. It never changes price, floor, ownership, settlement, royalties, or treasury rules.
 
 Public trust weights:
@@ -173,6 +176,10 @@ Any future token decision requires a new explicit canon amendment and is out of 
 
 ## 11. Moderation And Copyright
 
+Donation messages use this same complaint-driven review system. Staff may hide a
+message on ArtSoul; they cannot reverse a donation or alter its immutable event,
+recipient, amount or anonymity flag.
+
 Moderation is complaint-driven and reviewable:
 
 - Report button on artwork surfaces.
@@ -182,12 +189,12 @@ Moderation is complaint-driven and reviewable:
 - Critical or irreversible actions are gated by multisig.
 - Social logins alone are not sufficient for critical moderator actions.
 
-Founder scheduling amendment, 2026-09-29: real founder passkey enrollment and
-the associated operator recovery ceremony are deferred to mainnet preparation,
-before activation of any service that requires them. Isolated testnet engineering
-continues; live authorization checks and disabled moderation flags stay in place.
-This is not evidence of enrollment or permission to bypass staff authorization.
-See `CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md` for the exact boundary.
+Founder scheduling amendment, 2026-10-03: perform real founder passkey enrollment
+and the associated operator recovery ceremony now, superseding the September 29
+deferral. Preserve the two independent passkeys, audited bootstrap and ordered
+activation checks; authorization to prepare is not evidence of enrollment or
+permission to bypass staff authorization. See
+`CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md` for the exact boundary.
 
 ## 12. AI Valuation
 
@@ -210,6 +217,11 @@ Classic and Future themes are strictly separated.
 - Mobile and desktop may differ in layout only, not color semantics.
 
 ## 14. Treasury Rules
+
+Artist donations route 100% to the canonical creator and bypass both protocol
+treasuries and company capital. They are not protocol revenue or artwork payments.
+Any non-zero donation is permitted with or without a message; there is no message
+amount threshold (founder amendment, October 3).
 
 ProtocolTreasury and EcosystemTreasury are separate from company operating capital.
 
@@ -258,6 +270,11 @@ When the reworked contracts are deployed and testnet validation is complete, a *
 This is the mandatory pre-mainnet migration checklist. It runs after the reworked contracts pass a fresh public-testnet cycle and before any mainnet marketing.
 
 ## 17. Phase Status And Canonical Phase Model
+
+September 30 scheduling amendment: the founder requests implementation of the
+previously approved artist-support feature now, as an isolated, tested addition.
+See `CHANGELOG_2026-09-30_ARTIST_SUPPORT.md`; this does not itself close Phase A
+or authorize mainnet deployment.
 
 *Aligned 2026-07-16 by founder decision.* The canonical roadmap has four phases:
 

@@ -78,6 +78,42 @@ test('the homepage asks for the feed it actually renders', () => {
   assert.deepEqual(calls.map((c) => c.url), ['/api/public/config', '/api/public/artworks?limit=100']);
 });
 
+test('the gallery starts its exact public feed once before page modules are ready', () => {
+  const gallery = fs.readFileSync('src/entries/gallery.jsx', 'utf8');
+  const limit = Number(gallery.match(/getPublicProjectionArtworks\(\{\s*limit:\s*(\d+)/)?.[1]);
+  assert.ok(Number.isFinite(limit), 'the opening gallery query has an explicit limit');
+  const request = `/api/public/artworks?limit=${limit}`;
+  for (const path of ['/gallery', '/gallery/', '/gallery.html']) {
+    const { calls, api } = run(path, '?performanceProbe=fresh');
+    assert.deepEqual(calls.map(call => call.url), ['/api/public/config', request]);
+    assert.deepEqual(calls[1].init, { method: 'GET', credentials: 'include' });
+    assert.ok(api.take(request));
+    assert.equal(api.take(request), null, 'a later refresh must issue a new request');
+  }
+});
+
+test('a failed gallery head start reaches the normal error path and the next read can recover', async () => {
+  const request = '/api/public/artworks?limit=200';
+  const win = { location: { pathname: '/gallery', search: '' }, localStorage: { getItem: () => null } };
+  let galleryCalls = 0;
+  const fetch = async url => {
+    if (url !== request) return { ok: true, text: async () => '{}' };
+    galleryCalls++;
+    if (galleryCalls === 1) throw new Error('Temporary network failure');
+    return { ok: true, text: async () => JSON.stringify({ data: [{ id: 'fresh' }] }) };
+  };
+  new Function('window', 'fetch', 'URLSearchParams', 'localStorage', 'Map', script)(
+    win, fetch, URLSearchParams, win.localStorage, Map
+  );
+  assert.equal(galleryCalls, 1, 'the head starts the request');
+  const readSource = client.slice(client.indexOf('async function backendRead('), client.indexOf('// Receipt-backed UI bridge'));
+  const read = new Function('window', 'fetch', readSource + '; return backendRead;')(win, fetch);
+  await assert.rejects(read(request), /Temporary network failure/);
+  assert.equal(galleryCalls, 1, 'a consumed failure is not duplicated');
+  assert.deepEqual(await read(request), { data: [{ id: 'fresh' }] });
+  assert.equal(galleryCalls, 2, 'the next read uses the normal fresh request');
+});
+
 test('a clean artwork route starts the exact projection request from the head', () => {
   const { calls } = run('/artwork/v41%3A84532%3A31', '');
   assert.deepEqual(calls.map((call) => call.url), [
@@ -156,7 +192,7 @@ test('every shared-header page loads it, and the build ships it', () => {
     // this is not a first-paint concern. It still executes within a few hundred
     // milliseconds, long before the modules that would otherwise issue this
     // request at 3.3 seconds.
-    assert.match(html, /<script src="\/data-prefetch\.js\?v=5" async><\/script>/, `${page} must load the prefetch asynchronously`);
+    assert.match(html, /<script src="\/data-prefetch\.js\?v=6" async><\/script>/, `${page} must load the prefetch asynchronously`);
     assert.ok(
       html.indexOf('data-prefetch.js') > html.indexOf('header-prepaint.js'),
       `${page}: the first paint comes before the data`

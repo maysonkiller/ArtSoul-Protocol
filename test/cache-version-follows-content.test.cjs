@@ -20,13 +20,13 @@ const fs = require('node:fs');
 const RUNTIME = {
   'src/ui/navigation-manager.js': { version: 6, sha256: '82407872e2309eb0' },
   'src/ui/components/artwork-card.js': { version: 16, sha256: 'a380efd42d686e82' },
-  'contracts-integration.js': { version: 10, sha256: 'a12814822cede799' },
+  'contracts-integration.js': { version: 12, sha256: 'd706fe72f0847339' },
   'modal-system.js': { version: 1, sha256: '73be2dadc241ea78' },
   'webmcp-tools.js': { version: 4, sha256: '0b6e7d5cd51be343' },
   'voice-commands.js': { version: 1, sha256: '4aab5e22a42d8cbb' },
   'avatar-dropdown.js': { version: 53, sha256: 'ee3fb1b622c14938' },
   'header-prepaint.js': { version: 4, sha256: '8b23a80e58fb9ad2' },
-  'data-prefetch.js': { version: 5, sha256: '2b4d6f18b3c64830' },
+  'data-prefetch.js': { version: 6, sha256: '339cad21ebc03f47' },
   'base-network.js': { version: 2, sha256: 'bc527f32ea3df5f9' },
   'storage-image.js': { version: 2, sha256: '07216bbe6946e7e5' }
 };

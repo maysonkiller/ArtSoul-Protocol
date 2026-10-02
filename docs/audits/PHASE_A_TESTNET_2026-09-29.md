@@ -1,5 +1,60 @@
 # Phase A testnet execution — 2026-09-29
 
+## October 2 auction 66 completion
+
+The authorized continuation completed on Base Sepolia on October 2. It did not
+change or publish the existing uncommitted September 30 implementation. Canonical
+checkout and branch remain `C:\Projects\ArtSoul`, `codex/takeover-audit`, HEAD
+`4e67451617be3bf96dc814026d45243f82f1b2b7`. Historical pending-settlement statements
+below are superseded by this section only.
+
+Before signing, both independent RPCs agreed on chain 84532, pinned Core/NFT
+bytecode and wiring, all eleven prior journal receipts, the artwork 34 / auction
+66 mapping, unchanged winner and end time, 0.011 test ETH bid and 0.01 deposit.
+The artwork was still unminted with zero floor. All three operations used fresh
+bounded plans and the existing encrypted old test accounts; the protected new
+founder account was excluded. No recorded operation was replayed.
+
+| Operation | Confirmed result | Receipt |
+| --- | --- | --- |
+| End auction 66 | Settlement window opened at the actual ending block plus 24 hours; no premature mint or floor | [Ending](https://sepolia.basescan.org/tx/0x42e58aa00e83f90393915f871accbb24aac61a70ee2dd3e6a1e3a474124545a2) |
+| Settle as the unchanged authorized buyer | Exact 0.001 test ETH payment; token 6 minted, floor 0.011, auction mapping cleared | [Settlement and mint](https://sepolia.basescan.org/tx/0x210e66598581d780330a34a103c9a4377c6d0bd4f3c84a2d6c5ec557f6e2c1b2) |
+| Creator withdraws its own credit | 0.010725 test ETH received before transaction fees; credit becomes zero | [Creator withdrawal](https://sepolia.basescan.org/tx/0x2dae1686fd11f11b790806517a97bba9b0552e7a8bc3314ab0089e4e6054234a) |
+
+The real before-end, after-end and after-settlement verification stages all
+passed against the same explicit baseline. They verify lazy mint, exact primary
+97.5/2.5 accounting, owner/creator/token metadata and mappings, incremented supply
+and settlement count, canonical floor, cleared deposit, unchanged losing-bidder
+refund and rejection of unauthorized/wrong-payment/double-settlement simulations.
+The new treasury credit is 0.000275 test ETH; it remains a credit, not an external
+treasury payout.
+
+The separate post-withdrawal verifier passed both-RPC receipt reconciliation,
+exact creator/Core balance deltas, unchanged settlement/NFT state, zero remaining
+creator credit and a second-withdraw simulation rejected as `NothingToWithdraw`.
+Withdrawal fees were 185766000000 execution wei plus 6189312831 L1 wei, total
+191955312831 wei. Settlement was verified before withdrawal so neither proof
+silently mixed credit creation and payout. Offline checks passed 31/31 for the
+settlement verifier and 20/20 for the withdrawal verifier.
+
+Private evidence is retained under `docs/private/`: the timestamped
+`phase-a-settlement-{before-end,after-end,after-settlement}-2026-10-02...json`
+files, `phase-a-creator-withdrawal-2026-10-02T21-44-13-832Z.json` and
+`auction66-public-projection-2026-10-02.json`. Public API provenance includes the
+exact ending and settlement hashes; the Base Sepolia indexer was healthy and
+had processed beyond the settlement block.
+
+Eleven actual apex browser checks passed, without fixtures or page exceptions:
+desktop/mobile artwork status, token 6, final/floor price and exact timeline;
+creator Created/Sales, buyer Owned NFTs and gallery convergence. Screenshots
+and the run log are retained in `output/playwright/auction66-*2026-10-02*`.
+These are public Chromium viewport checks, not wallet-signature or physical-phone
+acceptance. The completed continuation automation was deleted. Phase A remains
+open for the separate device/OAuth, connected UI, operator/moderation and go/no-go
+gates. No mainnet, new contract, migration or moderation activation occurred.
+
+## September 29 historical execution
+
 Canonical checkout: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`,
 Released application HEAD `9dcf82bda0619e1009dcdadc0268f63b78f7a6f8`.
 The session began with published application `81627ab`. The previously reviewed

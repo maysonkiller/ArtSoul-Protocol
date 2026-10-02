@@ -14,8 +14,8 @@ import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../../profile-fields.js';
 // to take the update path instead of the create/upsert fallback, and the
 // discovery service scores account age from `created_at`, so dropping either
 // silently changes what the product does. Private provider identifiers -
-// twitter_id, discord_id, discord_avatar - stay out, with every other column no
-// public surface reads.
+// twitter_id, discord_id, discord_avatar - stay out as raw fields. The serializer
+// derives a validated Discord profile URL for the requested public social link.
 const PROFILE_SELECT = [...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id'].join(',');
 
 export default async function publicProfileHandler(req, res) {

@@ -41,11 +41,15 @@ async function api(path, options = {}) {
 function groupReports(reports = []) {
     const groups = new Map();
     for (const report of reports) {
-        const key = `${report.chain_id}:${report.artwork_id}`;
+        const targetType = report.target_type || 'artwork';
+        const key = `${report.chain_id}:${report.artwork_id}:${targetType}:${targetType === 'donation_message' ? `${report.donation_transaction_hash}:${report.donation_log_index}` : ''}`;
         const group = groups.get(key) || {
             key,
             chainId: report.chain_id,
             artworkId: report.artwork_id,
+            targetType,
+            transactionHash: report.donation_transaction_hash,
+            logIndex: report.donation_log_index,
             reports: []
         };
         group.reports.push(report);
@@ -104,6 +108,7 @@ function DecisionDialog({ decision, onClose, onSubmit, busy }) {
             >
                 <h2 id="reviewDecisionTitle">Record {decision.action} decision</h2>
                 <p>Report {decision.report.id}</p>
+                {decision.report.target_type === 'donation_message' && <p>This decision affects only the donation message. The donation and artwork remain recorded.</p>}
                 <label htmlFor="reviewDecisionReason">Review reason</label>
                 <textarea
                     id="reviewDecisionReason"
@@ -128,7 +133,7 @@ function ReportActions({ report, onChoose }) {
     if (report.status === 'pending_review') {
         return (
             <div className="protocol-admin-card-actions">
-                <button type="button" onClick={() => onChoose(report, 'hide')}>Hide pending review</button>
+                <button type="button" onClick={() => onChoose(report, 'hide')}>{report.target_type === 'donation_message' ? 'Hide message pending review' : 'Hide pending review'}</button>
                 <button type="button" onClick={() => onChoose(report, 'dismiss')}>Dismiss</button>
             </div>
         );
@@ -138,7 +143,7 @@ function ReportActions({ report, onChoose }) {
         // Reopening it would leave the artwork hidden with no active report.
         return (
             <div className="protocol-admin-card-actions">
-                <button type="button" onClick={() => onChoose(report, 'restore')}>Resolve and restore if clear</button>
+                <button type="button" onClick={() => onChoose(report, 'restore')}>{report.target_type === 'donation_message' ? 'Resolve and restore message if clear' : 'Resolve and restore if clear'}</button>
             </div>
         );
     }
@@ -278,14 +283,15 @@ function ProtocolAdminPage() {
                     report_id: decision.report.id,
                     expected_updated_at: decision.report.updated_at,
                     action: decision.action,
+                    target_type: decision.report.target_type || 'artwork',
                     reason
                 })
             });
             setDecision(null);
             await loadQueue(queueStatus);
             setMessage(
-                decision.action === 'restore' && result.report?.artwork_hidden
-                    ? 'Report resolved. Artwork remains hidden because another actioned report is active.'
+                decision.action === 'restore' && (result.report?.artwork_hidden || result.report?.message_hidden)
+                    ? `Report resolved. ${result.report?.message_hidden ? 'Message' : 'Artwork'} remains hidden because another actioned report is active.`
                     : 'Review decision recorded.'
             );
         } catch (error) {
@@ -357,8 +363,9 @@ function ProtocolAdminPage() {
                         <article key={group.key} className="protocol-admin-group">
                             <header>
                                 <div>
-                                    <h3>Artwork {group.artworkId}</h3>
+                                    <h3>{group.targetType === 'donation_message' ? 'Donation message for artwork' : 'Artwork'} {group.artworkId}</h3>
                                     <p>Chain {group.chainId} · {group.reports.length} independent report{group.reports.length === 1 ? '' : 's'}</p>
+                                    {group.targetType === 'donation_message' && <p>Transaction {shortWallet(group.transactionHash)} · Log {group.logIndex}</p>}
                                 </div>
                                 <a href={window.ArtSoulArtworkUrl.artworkPath(`v41:${group.chainId}:${group.artworkId}`)}>Open artwork</a>
                             </header>
@@ -370,6 +377,12 @@ function ProtocolAdminPage() {
                                             <span>{new Date(report.created_at).toLocaleString()}</span>
                                         </div>
                                         <p className="protocol-admin-report-text">{report.details}</p>
+                                        {report.target_type === 'donation_message' && <div className="protocol-admin-report-text">
+                                            <strong>Indexed donation message{report.donation_message_hidden ? ' (hidden from public view)' : ''}</strong>
+                                            <p>{report.donation_message_available
+                                                ? report.donation_message || 'No displayable message is present.'
+                                                : 'Message is temporarily unavailable from the indexed chain history.'}</p>
+                                        </div>}
                                         {safeExternalUrl(report.reference_url) && (
                                             <a href={safeExternalUrl(report.reference_url)} target="_blank" rel="noopener noreferrer">Reference evidence</a>
                                         )}

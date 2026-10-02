@@ -6,6 +6,7 @@ import {
   supabaseRest
 } from '../../backend.js';
 import { readReportingConfig } from '../../reporting-config.js';
+import { readDonationConfig } from '../../donation-config.js';
 
 const PUBLIC_ARTWORK_CHAINS = new Set([84532, 11155111]);
 const REPORT_CATEGORIES = new Set([
@@ -63,6 +64,26 @@ export default async function handler(req, res) {
     const category = String(body.category || '').trim().toLowerCase();
     const details = String(body.details || '').trim();
     const referenceUrl = optionalHttpUrl(body.reference_url);
+    const targetType = body.target_type === undefined ? 'artwork' : body.target_type;
+    let donationTarget;
+    if (!['artwork', 'donation_message'].includes(targetType)) {
+      throw requestError('Choose a valid report target.', 'INVALID_REPORT_TARGET');
+    }
+    if (targetType === 'donation_message') {
+      const config = readDonationConfig();
+      if (!config.enabled) throw requestError('Donation-message reporting is not enabled yet.', 'DONATION_REPORTING_DISABLED', 503);
+      const transactionHash = String(body.donation_transaction_hash || '').toLowerCase();
+      const logIndex = body.donation_log_index;
+      if (chainId !== config.chainId || !/^0x[0-9a-f]{64}$/.test(transactionHash)
+          || !Number.isSafeInteger(logIndex) || logIndex < 0 || logIndex > 2147483647) {
+        throw requestError('Choose a valid donation message.', 'INVALID_REPORT_TARGET');
+      }
+      // The deployment and author are resolved server-side, never selected by a caller.
+      donationTarget = { p_target_type: targetType, p_donation_contract_address: config.address,
+        p_donation_transaction_hash: transactionHash, p_donation_log_index: logIndex };
+    } else if (body.donation_transaction_hash !== undefined || body.donation_log_index !== undefined) {
+      throw requestError('Donation identifiers require a donation-message target.', 'INVALID_REPORT_TARGET');
+    }
 
     if (!PUBLIC_ARTWORK_CHAINS.has(chainId)) {
       throw requestError('This artwork network cannot be reported through this form.', 'UNSUPPORTED_ARTWORK_CHAIN');
@@ -82,7 +103,7 @@ export default async function handler(req, res) {
 
     let rows;
     try {
-      rows = await supabaseRest('rpc/submit_artwork_report', {
+      rows = await supabaseRest(donationTarget ? 'rpc/submit_moderation_report' : 'rpc/submit_artwork_report', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
         body: {
@@ -93,10 +114,16 @@ export default async function handler(req, res) {
           p_details: details,
           p_reference_url: referenceUrl || null,
           p_good_faith_confirmed: true,
-          p_daily_limit: reportingConfig.dailyLimit
+          p_daily_limit: reportingConfig.dailyLimit,
+          ...donationTarget
         }
       });
     } catch (error) {
+      const detail = String(error?.details?.message || error?.message || '');
+      if (detail.includes('DONATION_MESSAGE_NOT_FOUND')) {
+        throw requestError('This donation message is not available for reporting.', 'DONATION_MESSAGE_NOT_FOUND', 404);
+      }
+      if (detail.includes('INVALID_REPORT_TARGET')) throw requestError('Choose a valid report target.', 'INVALID_REPORT_TARGET');
       if (String(error?.details?.message || error?.message || '').includes('REPORT_DAILY_LIMIT_REACHED')) {
         throw requestError('This wallet has reached the artwork-report limit for the last 24 hours.', 'REPORT_DAILY_LIMIT_REACHED', 429);
       }

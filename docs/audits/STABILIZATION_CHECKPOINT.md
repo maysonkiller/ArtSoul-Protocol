@@ -1,9 +1,138 @@
 # Stabilization checkpoint
 
-Updated: 2026-09-30. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-03. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-September 30 current continuation point:
+October 3 release candidate (active; supersedes prior pending-work summaries):
+
+- Working HEAD is `4e67451617be3bf96dc814026d45243f82f1b2b7`; GitHub main was
+  re-read at the same revision. All work remains in the canonical checkout;
+  recovery archives and the September 30 diff are preserved.
+- The founder authorizes real passkey/recovery setup now and removes the Donate
+  message amount threshold. Any non-zero donation may include a message; 100%
+  goes to the creator. The separate contract has no minimum/setter. Exact prior
+  rules and the amendment are recorded in
+  `../canon/CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md`.
+- Profile email now clears immediately on same-wallet sign-out and fences old
+  reads/writes without cancelling initial sign-in. Donate rejects obsolete
+  receipt-check completions and keeps changed-calldata replacements locked for
+  verification. Three real local HTTP reproductions also exposed an A8d
+  wrong-chain check that trusted static provider configuration; it now explicitly
+  queries each RPC's chain ID before accepting Safe code/signatures.
+- Current complete Node regression: **1,512/1,512 passed, zero skips** in
+  `output/audit/phase-a-unit-final-2026-10-03.log`. The initial run's only failure
+  was an obsolete test requiring the now-superseded passkey deferral; its log is
+  retained. Final build passed **11 routes / 177 utilities** in
+  `output/audit/phase-a-build-final-2026-10-03.log`.
+- Current full contract suite passed **46/46**, including the amended any-positive-
+  amount donation cases, in `output/audit/phase-a-contracts-final-2026-10-03.log`.
+- Actual built browser checks passed: profile **13 groups**, Donate UI **26**,
+  Donate recovery **22**, Report **3**; zero uncaught page exceptions. Wallet,
+  mail and transaction transport were local fixtures in these runs. They do not
+  prove real delivery, signatures, OAuth, physical phones or passkey enrollment.
+- Resend verified the mail domain; Cloudflare contains the three authorized
+  records and the original seven are preserved. A domain-restricted sending key
+  and sender/origin configuration were saved to Vercel Production under explicit
+  founder approval. No value is in Git or this document. Email activation and a
+  real verification roundtrip still require the reviewed schema and release.
+- Current release/activation is not yet recorded as complete. The four new
+  feature migrations remain unapplied; reporting/admin/passkey/email/Donate
+  activation is not inferred from code or configured mail credentials. Auction
+  66 is complete and must never be replayed.
+- Exactly next step: finish the reviewed candidate release, then apply verified
+  feature prerequisites and carry out
+  the now-authorized operator and Donate activation with their separate journals.
+
+October 2 auction 66 continuation (completed):
+
+- HEAD remains `4e67451617be3bf96dc814026d45243f82f1b2b7`. The September 30
+  uncommitted implementation remains intact, with a tracked patch and new-source
+  recovery archive in `output/recovery/auction66-20261002`. No release, migration,
+  contract deployment, moderation activation or mainnet operation occurred here.
+- Both Base Sepolia RPCs reconciled all eleven previous journal records and the
+  pinned Core/NFT hashes. Auction 66 still mapped to artwork 34, remained Active
+  after its unchanged deadline, and retained the authorized buyer at 0.011 test
+  ETH with a 0.01 deposit. The new real `before-end` verification passed.
+- Exactly three new authorized transactions completed: end auction 66, settle
+  with the exact 0.001 test ETH remainder, then withdraw the creator's own
+  0.010725 test ETH credit. Token 6 was minted to the buyer, floor became 0.011,
+  active auction mapping cleared, and treasury credit increased by 0.000275.
+  Treasury credit was not withdrawn; the earlier losing-bidder refund was not
+  repeated. [Receipt and verification evidence](PHASE_A_TESTNET_2026-09-29.md#october-2-auction-66-completion).
+- All three real settlement verifier stages passed against one explicit
+  before-end basis. The separate withdrawal verifier passed exact wallet/Core
+  balance deltas including execution and L1 fees, zero creator credit, unchanged
+  NFT state and `NothingToWithdraw` for a repeat simulation. Offline verifier
+  checks: 31 settlement and 20 withdrawal, all passed.
+- Public projection/provenance/indexer reads converged. Eleven actual apex
+  browser checks passed: desktop/mobile artwork, token/floor/timeline, creator
+  Created and Sales, buyer Owned NFTs and gallery. Zero page exceptions; no
+  connected wallet or physical-device acceptance is inferred. The scheduled
+  `finish-artsoul-auction-66-rehearsal` automation was deleted after completion.
+- Phase A remains open for retained phone/OAuth, connected wallet UI, reviewed
+  moderation/operator activation and go/no-go evidence. The separate September
+  30 social/email/Donate implementation still needs its final changed-tree
+  checks/release and outstanding activation inputs; this heartbeat did not resume
+  its DNS/browser setup or merge that diff.
+- Exactly next step: resume the existing September 30 candidate's final
+  email-session/Donate-recovery browser regression and current-tree release checks;
+  never replay auction 66's now-completed operations.
+
+September 30 17:31 desktop follow-up (active):
+
+- Canonical workspace/branch: `C:\Projects\ArtSoul`, `codex/takeover-audit`,
+  starting HEAD `4e67451617be3bf96dc814026d45243f82f1b2b7`; tracked tree was clean.
+  No new checkout, source overlay or historical worktree integration occurred.
+- New recording: 252.90 seconds, 1920x1080, SHA-256
+  `91902a2fa6d51624a6960235168d41d3299bf825dd3f8a8267170a53dd7ff370`.
+  All 126 two-second samples were visually reviewed. Local chunked speech
+  recognition is approximate and is not a verified quotation. Evidence stays in
+  ignored `output/audit/video-review-2026-09-30-173100`.
+- Confirmed request: remove visible connected qualifiers and manual X editor;
+  link verified Discord profile; add private verified email after wallet sign-in;
+  reduce measured loading delay; deliver Report/moderation and artist support.
+  AI valuation remains excluded. The recording shows an X unlink/relink roundtrip
+  and profile cancel/navigation, not every RG-01 mobile or wallet-signature step.
+- Existing Report/review/notifications are implemented but disabled. Their schema
+  is already applied. Operator passkey/recovery activation conflicts with the
+  retained deferral; a narrow decision is pending, not a reason to stop other work.
+- Local social changes remove redundant qualifiers and the manual X editor;
+  verified Discord links are derived from the server-held provider identity.
+  Private email uses existing wallet sign-in, single-use expiring tokens, revision
+  fencing and isolated storage. Email/quota schema is unapplied; mail delivery is
+  not configured locally. A catalog-only read confirms the quota prerequisite is
+  absent, so a separate quota-only migration avoids applying unrelated launch work.
+- Loading work adds gallery head prefetch and prioritizes the three public page
+  entries before legacy wallet/contract modules. Controlled 390px runs reduced
+  gallery first-card mean from 2188.95 to 1273.40 ms with one feed request per run.
+  Built connected-wallet readiness and confirmed-auction propagation checks pass;
+  this is controlled local evidence, not a production timing percentile.
+- Artist support has a separate local contract, bounded indexer projection/API,
+  optional artwork UI and wallet adapter. The dated canon amendment records the
+  earlier implementation request and unchanged full-creator/no-benefit economics.
+  Combined contract checks: 46/46; unit-runner checks: 6/6. Donation API, projection
+  and adapter checks: 20/20; event-source checks: 7/7; isolated real PostgreSQL
+  indexing/reorg/RLS checks: 9/9. Raw NUL message bytes are retained as hex before
+  PostgreSQL ingestion. No new contract is deployed and feature flags remain off.
+- Profile-focused verification passes 192/192; the fresh built social/email matrix
+  passes 11/11, including the disabled/missing feature flag and wallet race cases.
+  Moderation API/compatibility checks pass 46/46, combined real PostgreSQL review
+  journeys 32/32, and ten built admin checks pass at desktop/mobile widths. Three
+  normal-click report groups pass with two intercepted writes and no external write.
+- The full changed-tree run passes 1,487/1,487 with zero failures/skips in
+  `output/audit/desktop-followup-unit-final-2026-09-30.log`. Subsequent independent
+  review found Donation signer, receipt recovery and event-time edges; their final
+  source and regression completion must precede a fresh release result. Do not
+  present that earlier full run as verification of those last changes.
+- All current work is local and uncommitted. Existing AI valuation files remain
+  excluded. No database migration, external mail or chain write was performed in
+  this follow-up. Local builds pass 11 routes and 177 CSS utilities. Resend login
+  confirmed only the separate ArtSoul OS domain was verified; Protocol sending
+  configuration is still being prepared, not asserted active.
+- Exactly next step: finish the bounded Donation recovery/timestamp regression,
+  rerun the current suite/build, then release the reviewed inactive-feature candidate.
+
+September 30 prior release (retained evidence):
 
 - Published application revision: `aacbc5aedd76f7d668f1db3f1f0ca2ed1bdb0531` via [PR #284](https://github.com/maysonkiller/ArtSoul-Protocol/pull/284). The single checkout fast-forwarded to the exact merge. Subsequent evidence-only commits do not change this application artifact. Candidate CI `36718205321` passed Linux, Windows and static jobs; post-merge run is `36719161906`. Production deployment `6760112584` succeeded at 13:06:02 UTC, immutable host `artsoul-pdcnfoeux-maysonkiller-be9112b5.vercel.app`. Preview and apex JS/CSS hashes match the checked local build.
 - TA-09 repair is published and read-only apex acceptance passed: real saved profile, one X link/no overflow, artwork 28/current auction 68 Live at 1280px and 390px; no page exceptions, no failed HTTP requests in the recorded smoke matrix. All 13 built profile fixture groups passed (edit/recovery 7, Discord/X restoration 4, tab continuity 2). No fixture is being promoted to real OAuth or physical-device evidence. [Release evidence](RG01_PROFILE_VIDEO_2026-09-30.md) contains exact tests, limits and rollback baseline.

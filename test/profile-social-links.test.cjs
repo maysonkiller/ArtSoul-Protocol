@@ -34,3 +34,13 @@ test('invalid legacy links and empty profiles do not produce broken profile URLs
   }
   assert.deepEqual(links(null), []);
 });
+
+test('Discord links require a confirmed provider identity and the exact safe profile URL', () => {
+  const url = 'https://discord.com/users/123456789012345678';
+  assert.equal(context.getProfileDiscordUrl({discord_connected: true, discord_profile_url: url}), url);
+  for (const unsafe of ['javascript:alert(1)', 'https://evil.example/users/123', 'https://discord.com.evil.example/users/123', url + '?redirect=evil', url + '/extra', 'https://discord.com/users/name']) {
+    assert.equal(context.getProfileDiscordUrl({discord_connected: true, discord_profile_url: unsafe}), '');
+  }
+  assert.equal(context.getProfileDiscordUrl({discord_connected: false, discord_profile_url: url}), '');
+  assert.equal(context.getProfileDiscordUrl(null), '');
+});

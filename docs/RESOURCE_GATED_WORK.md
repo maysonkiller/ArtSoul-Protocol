@@ -37,11 +37,11 @@ Before any paid commitment, refresh the exact purchase, renewal, gas, audit, leg
 
 ## A8a Decisions Preserved
 
-**2026-09-29 scheduling update:** real founder passkey setup and the associated
-operator recovery ceremony are deferred to Phase C by explicit founder decision.
-RG-03 retains its activation criteria and disabled flags; this is a deferral,
-not a passed ceremony or authorization bypass. Isolated engineering tests proceed
-now. See [`the amendment`](canon/CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md).
+**2026-10-03 scheduling update:** the founder authorizes real passkey setup and
+the associated operator recovery ceremony now, superseding the September 29
+deferral. RG-03 retains its activation criteria; authorization to prepare is not
+a passed ceremony or authorization bypass. See
+[`the amendment`](canon/CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md).
 
 The founder approved the following implementation constraints on 2026-07-20:
 

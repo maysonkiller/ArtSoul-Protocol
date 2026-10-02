@@ -1,4 +1,5 @@
 import { enqueueAIJob } from '../queue.js';
+import { projectDonation } from './donation-events.js';
 import cacheService from '../services/cache-service.js';
 import {
     V41_EVENT_REQUIRED_FIELDS,
@@ -476,7 +477,7 @@ class IndexerSyncEngine {
                         'block_hashes',
                         ['chain_id', 'block_number', 'block_hash', 'parent_hash', 'timestamp'],
                         toInsert,
-                        '(chain_id, block_number) DO UPDATE SET block_hash = EXCLUDED.block_hash, parent_hash = EXCLUDED.parent_hash'
+                        '(chain_id, block_number) DO UPDATE SET block_hash = EXCLUDED.block_hash, parent_hash = EXCLUDED.parent_hash, timestamp = EXCLUDED.timestamp'
                     );
                 }
             } catch (error) {
@@ -491,7 +492,7 @@ class IndexerSyncEngine {
                     'block_hashes',
                     ['chain_id', 'block_number', 'block_hash', 'parent_hash', 'timestamp'],
                     allBlockData,
-                    '(chain_id, block_number) DO UPDATE SET block_hash = EXCLUDED.block_hash, parent_hash = EXCLUDED.parent_hash'
+                    '(chain_id, block_number) DO UPDATE SET block_hash = EXCLUDED.block_hash, parent_hash = EXCLUDED.parent_hash, timestamp = EXCLUDED.timestamp'
                 );
             } catch (error) {
                 console.error(`[IndexerSyncEngine] Failed to store remaining block hashes:`, error.message);
@@ -899,6 +900,27 @@ class IndexerSyncEngine {
             if (handler) {
                 await handler(event, client);
             }
+            if (event.eventName === 'Donation') {
+                let timestamp = event.timestamp;
+                if (timestamp === undefined || timestamp === null) {
+                    // Historical log objects omit time. Reuse the chain-scoped
+                    // block data already fetched by historical sync, not index time.
+                    const result = await client.query(
+                        'SELECT timestamp FROM block_hashes WHERE chain_id = $1 AND block_number = $2',
+                        [this._chainIdString(), event.blockNumber]
+                    );
+                    const seconds = Number(result.rows?.[0]?.timestamp);
+                    if (result.rows?.length !== 1 || result.rows[0].timestamp === null
+                        || !Number.isSafeInteger(seconds) || seconds < 0 || !Number.isSafeInteger(seconds * 1000)) {
+                        throw new Error('Donation block timestamp is unavailable; retry this range.');
+                    }
+                    timestamp = seconds * 1000;
+                }
+                const recordedAt = new Date(Number(timestamp));
+                if (!Number.isFinite(recordedAt.getTime())) throw new Error('Donation block timestamp is invalid.');
+                await projectDonation(client, event, this.chainId, this.eventListener.donationAddress,
+                    recordedAt);
+            }
             await this._recordPublicMetricEventTx(event, client);
 
             await stopHeartbeat();
@@ -927,12 +949,14 @@ class IndexerSyncEngine {
                 await cacheService.del(cacheService.keys.stats(`global:${this._chainIdString()}`));
             }
 
-            await enqueueAIJob(
-                event.eventName,
-                event.eventData,
-                workerId,
-                correlationId
-            );
+            if (event.eventName !== 'Donation') {
+                await enqueueAIJob(
+                    event.eventName,
+                    event.eventData,
+                    workerId,
+                    correlationId
+                );
+            }
         } catch (error) {
             if (transactionStarted && client) {
                 try {

@@ -90,6 +90,17 @@ async function copyRelative(relativePath) {
     await copyFile(source, destination);
 }
 
+export function prioritizePublicPageEntry(html, page) {
+    if (!['gallery.html', 'profile.html', 'artwork.html'].includes(page)) return html;
+    const name = page.slice(0, -5);
+    const entry = html.match(new RegExp(`<script type="module"[^>]*src="/assets/${name}-[^"<>]+\\.js"[^>]*><\\/script>`))?.[0];
+    const legacy = html.match(/<script type="module"[^>]*src="\/contracts-integration\.js(?:\?[^"<>]*)?"[^>]*><\/script>/)?.[0];
+    if (!entry || !legacy || html.indexOf(entry) < html.indexOf(legacy)) return html;
+    // Public projections do not need the legacy ethers/service graph. Keep
+    // earlier classic scripts in place and let the public page evaluate first.
+    return html.replace(entry, '').replace(legacy, `${entry}\n    ${legacy}`);
+}
+
 function keepLegacyRuntimeModulesSeparate() {
     return {
         name: 'keep-legacy-runtime-modules-separate',
@@ -116,10 +127,10 @@ function keepLegacyRuntimeModulesSeparate() {
                 const output = await readFile(outputPath, 'utf8');
                 await writeFile(
                     outputPath,
-                    output.replaceAll(
+                    prioritizePublicPageEntry(output.replaceAll(
                         'type="application/x-artsoul-module" data-artsoul-legacy-module',
                         'type="module"'
-                    )
+                    ), page)
                 );
             }));
         }

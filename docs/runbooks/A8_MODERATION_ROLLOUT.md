@@ -21,7 +21,9 @@ The operation has a separate checksum-bound application journal. See
 the dated record in `security/MIGRATION_RUNBOOK.md`.
 
 RG-03 activation, real passkey enrollment, Safe recovery and production workflow
-acceptance remain open. The September 29 Phase C scheduling deferral is preserved.
+acceptance remain open. The founder superseded the September 29 deferral on
+October 3 and authorized these ceremonies now; see
+`../canon/CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md`.
 
 ## 1. Build now, behind disabled flags
 
@@ -96,8 +98,8 @@ addendum above first; do not repeat the completed production migrations.
 
 ### Live activation
 
-RG-03 remains required before activating the dependent authority. The September
-29 deferral of real passkey/Safe ceremonies to Phase C does not permit a bypass.
+RG-03 remains required before activating the dependent authority. The October 3
+authorization to perform real passkey/Safe ceremonies does not permit a bypass.
 The Protocol Admin implementation must pass its local acceptance first; it need
 not already be operational in production to prepare the schema.
 

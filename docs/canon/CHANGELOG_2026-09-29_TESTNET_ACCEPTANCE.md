@@ -1,5 +1,8 @@
 # Testnet acceptance scheduling amendment — 2026-09-29
 
+Historical scheduling record: the passkey/recovery deferral below was explicitly
+superseded on October 3 by `CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md`.
+
 Status: **approved direction**, recorded from the founder's explicit instruction
 to automate the existing testnet verification and defer real passkey setup until
 mainnet preparation. This is not an acceptance certificate or deployment approval.

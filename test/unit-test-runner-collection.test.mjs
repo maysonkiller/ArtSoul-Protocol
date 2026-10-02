@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { collectUnitTestFiles, CONTRACT_SUITE } from '../scripts/run-unit-tests.mjs';
+import { collectUnitTestFiles, CONTRACT_SUITE, CONTRACT_SUITES } from '../scripts/run-unit-tests.mjs';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 
@@ -19,9 +19,9 @@ test('collects all three supported test extensions', () => {
     assert.deepEqual(collected, ['alpha.test.cjs', 'beta.test.mjs', 'gamma.test.js']);
 });
 
-test('excludes the Hardhat contract suite', () => {
-    const collected = collectUnitTestFiles([CONTRACT_SUITE, 'unit.test.cjs']);
-    assert.ok(!collected.includes(CONTRACT_SUITE), 'contract suite must be excluded');
+test('excludes every Hardhat contract suite', () => {
+    const collected = collectUnitTestFiles([...CONTRACT_SUITES, 'unit.test.cjs']);
+    for (const suite of CONTRACT_SUITES) assert.ok(!collected.includes(suite), `${suite} must be excluded`);
     assert.deepEqual(collected, ['unit.test.cjs']);
 });
 
@@ -55,7 +55,7 @@ test('the real test directory includes the previously uncollected .mjs and .js s
         collected.includes('resale-eligibility.test.js'),
         'the .js resale-eligibility suite must now be collected'
     );
-    assert.ok(!collected.includes(CONTRACT_SUITE), 'the contract suite stays excluded');
+    for (const suite of CONTRACT_SUITES) assert.ok(!collected.includes(suite), `${suite} stays excluded`);
 });
 
 test('importing the runner module does not spawn the suite (no self-run on import)', () => {

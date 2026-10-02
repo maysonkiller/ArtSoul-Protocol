@@ -73,6 +73,17 @@ test('public links remain editable without becoming OAuth evidence', () => {
   assert.ok(!('twitter_id' in view) && !('discord_id' in view) && !('role' in view));
 });
 
+test('the public Discord profile URL is derived only from the server-owned numeric provider identity', () => {
+  const profile = publicProfile({discord_id: '123456789012345678', discord_profile_url: 'https://evil.example/forged', email: 'private@example.test', email_verified: true});
+  assert.equal(profile.discord_profile_url, 'https://discord.com/users/123456789012345678');
+  assert.equal(profile.discord_connected, true);
+  assert.ok(!('discord_id' in profile) && !('email' in profile) && !('email_verified' in profile));
+  for (const discord_id of [null, '', 'name', '123/redirect', '9'.repeat(21)]) {
+    assert.equal(publicProfile({discord_id, discord_profile_url: 'https://discord.com/users/999'}).discord_profile_url, null);
+  }
+  assert.deepEqual(cleanProfile({discord_profile_url: 'https://discord.com/users/999', discord_id: '999', email: 'forged@example.test', email_verified: true}), {});
+});
+
 test('OAuth callback binds provider response to the signed wallet and unlink preserves public links', async t => {
   const settings = {SESSION_SECRET: 'oauth-test-secret-only', SUPABASE_URL: 'https://database.example', SUPABASE_SERVICE_ROLE_KEY: 'test-only', DISCORD_CLIENT_ID: 'test-id', DISCORD_CLIENT_SECRET: 'test-secret', X_CLIENT_ID: 'test-id', X_CLIENT_SECRET: 'test-secret'};
   const previous = Object.fromEntries(Object.keys(settings).map(key => [key, process.env[key]]));

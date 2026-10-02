@@ -17,7 +17,7 @@ function deferred() {
     return { promise, resolve, reject };
 }
 
-function executeLoader(loadModuleForTest, readyState = 'complete') {
+function executeLoader(loadModuleForTest, readyState = 'complete', domContentLoadedEventStart = 0) {
     const transformed = SOURCE.replace(
         "import('./appkit-init.js?v=54')",
         'loadModuleForTest()'
@@ -27,6 +27,14 @@ function executeLoader(loadModuleForTest, readyState = 'complete') {
     const listeners = new Map();
     const events = [];
     const window = {
+        performance: {
+            getEntriesByType: () => [{ domContentLoadedEventStart }]
+        },
+        addEventListener(name, listener) {
+            const registered = listeners.get(name) || [];
+            registered.push(listener);
+            listeners.set(name, registered);
+        },
         dispatchEvent(event) {
             events.push(event.type);
         }
@@ -129,6 +137,91 @@ test('an action before DOMContentLoaded waits for the boot promise created by Ap
     boot.resolve();
     assert.equal(await connection, 'connected');
     assert.equal(implementationCalls, 1);
+    assert.equal(window.ArtSoulWalletRuntime.isReady(), true);
+});
+
+test('interactive before DOMContentLoaded does not import or expose the wallet runtime', async () => {
+    let moduleLoads = 0;
+    let implementationCalls = 0;
+    let window;
+    const boot = deferred();
+    const harness = executeLoader(async () => {
+        moduleLoads += 1;
+        window.__artsoulAppKitBootPromise = boot.promise;
+        window.safeConnectWallet = async () => {
+            implementationCalls += 1;
+            return 'connected';
+        };
+        return {};
+    }, 'interactive', 0);
+    window = harness.window;
+    const action = window.safeConnectWallet();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(moduleLoads, 0, 'a deferred legacy adapter may still be evaluating');
+    assert.equal(implementationCalls, 0);
+    assert.equal(window.ArtSoulWalletRuntime.isLoading(), true);
+    assert.equal(window.ArtSoulWalletRuntime.isReady(), false);
+    harness.fire('DOMContentLoaded');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(moduleLoads, 1);
+    assert.equal(implementationCalls, 0, 'the AppKit boot barrier still applies after document readiness');
+    boot.resolve();
+    assert.equal(await action, 'connected');
+    assert.equal(implementationCalls, 1);
+});
+
+test('interactive after DOMContentLoaded boots immediately without waiting for a missed event', async () => {
+    let window;
+    let moduleLoads = 0;
+    const harness = executeLoader(async () => {
+        moduleLoads += 1;
+        window.__artsoulAppKitBootPromise = Promise.resolve();
+        window.safeConnectWallet = async () => 'connected';
+        return {};
+    }, 'interactive', 15);
+    window = harness.window;
+    assert.equal(await window.safeConnectWallet(), 'connected');
+    assert.equal(moduleLoads, 1);
+    assert.equal(window.ArtSoulWalletRuntime.isReady(), true);
+});
+
+test('document load resolves readiness when navigation timing is unavailable', async () => {
+    let moduleLoads = 0;
+    let window;
+    const harness = executeLoader(async () => {
+        moduleLoads += 1;
+        window.__artsoulAppKitBootPromise = Promise.resolve();
+        window.safeConnectWallet = async () => 'connected';
+        return {};
+    }, 'interactive');
+    window = harness.window;
+    delete window.performance;
+    const action = window.safeConnectWallet();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(moduleLoads, 0);
+    harness.fire('load');
+    assert.equal(await action, 'connected');
+    assert.equal(moduleLoads, 1);
+});
+
+test('failed wallet boot can retry after document readiness without a second DOM event', async () => {
+    let moduleLoads = 0;
+    let window;
+    const harness = executeLoader(async () => {
+        moduleLoads += 1;
+        window.__artsoulAppKitBootPromise = moduleLoads === 1
+            ? Promise.reject(new Error('Fixture wallet boot failure'))
+            : Promise.resolve();
+        window.safeConnectWallet = async () => 'connected';
+        return {};
+    }, 'interactive', 15);
+    window = harness.window;
+    const firstAction = window.safeConnectWallet();
+    await assert.rejects(firstAction, /Fixture wallet boot failure/);
+    assert.equal(window.ArtSoulWalletRuntime.isReady(), false);
+    await window.ArtSoulWalletRuntime.load();
+    assert.equal(await window.safeConnectWallet(), 'connected');
+    assert.equal(moduleLoads, 2);
     assert.equal(window.ArtSoulWalletRuntime.isReady(), true);
 });
 

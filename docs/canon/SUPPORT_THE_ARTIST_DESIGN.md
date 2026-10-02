@@ -1,6 +1,11 @@
 # Support the Artist — Phase C Design
 
-Status: founder-decided feature design; documentation only; no current implementation.
+Status: founder-decided design. October 3 removes the message amount threshold
+under [the explicit amendment](CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md).
+September 30 implementation is authorized earlier
+by [the dated amendment](CHANGELOG_2026-09-30_ARTIST_SUPPORT.md). Historical Phase C
+scheduling below is superseded by that amendment only; delivery status is recorded
+in the stabilization checkpoint, not inferred from this design.
 
 Phase: C — Mainnet Preparation, together with the final contract rework, test, Base Sepolia rehearsal, and security-review cycle.
 
@@ -81,22 +86,17 @@ The contract must:
 - revert the entire donation if forwarding fails, so no value becomes trapped and no misleading event is emitted;
 - emit the event only after a successful transfer;
 - follow OpenZeppelin and checks-effects-interactions/reentrancy-safe patterns;
-- expose only the smallest Safe-controlled administration surface needed for the message threshold;
+- expose only the Safe-controlled pause and ownership administration surface;
 - operate only under the canonical Base write policy. Base Sepolia `84532` is the rehearsal/testnet chain; Base is the production chain.
 
 The exact UTF-8 byte ceiling used to enforce the approved 140 user-visible-character limit in Solidity must be fixed during C-06 architecture sign-off. Solidity byte length must not be silently presented as a user-visible character count.
 
-## Message Floor And Abuse Controls
+## Amounts And Message Controls
 
-The primary spam defense is economic:
-
-- a donation with a non-empty message must meet a configurable native-ETH threshold;
-- the initial rehearsal value is `0.0005 ETH`, approximately USD 1 at the reference ETH price used on 2026-07-26;
-- this is not an on-chain USD peg;
-- no price oracle is added;
-- the founder reconfirms the value against the then-current ETH price before deployment;
-- a Safe-controlled administrator can adjust the threshold without redeployment;
-- an empty-message donation is not subject to the message threshold, but must still be non-zero.
+Any non-zero donation is accepted with or without a message. There is no
+message-specific minimum, threshold setter or price oracle. This October 3
+founder decision supersedes the former proposed 0.0005 ETH message floor.
+The prior rule remains documented in the dated amendment for review and rollback.
 
 Messages are plain text only. ArtSoul never renders their content as HTML or markup and never makes message links clickable.
 
@@ -129,7 +129,8 @@ This feature does not add:
 ## Founder Decisions Recorded
 
 - On-site anonymous display: approved.
-- Message threshold: configurable, initially `0.0005 ETH`, with deploy-time reconfirmation and no oracle.
+- Amount: any non-zero value, with or without a message; no message threshold
+  (amended October 3).
 - Delivery phase: Phase C with the full contract rework; no Phase B version.
 - Creator routing: 100% of each successful donation, with no protocol cut or custody.
 

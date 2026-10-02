@@ -44,6 +44,25 @@ The sequence is recorded in the canonical implementation backlog.
 
 Earlier informal `A-G` plans are retired. Their stabilization/testnet work maps to A, beta validation to B, contract/security/legal/final-product work to C, and migration/deployment/activation to D. Historical token or multichain phases have no mapping and remain out of scope. Source: [`17_ROADMAP_PHASES.md`](canon/17_ROADMAP_PHASES.md) and [`CHANGELOG_2026-07-16_ROADMAP_ALIGNMENT.md`](canon/CHANGELOG_2026-07-16_ROADMAP_ALIGNMENT.md).
 
+## September 30 desktop follow-up
+
+The founder's 17:31 desktop recording and accompanying request authorize the
+following contained continuation, without reopening AI valuation or the earlier
+full audit. Delivery evidence is tracked in the stabilization checkpoint.
+
+| ID | Task | Status | Boundary |
+| --- | --- | --- | --- |
+| TA-10 | Simplify linked social profiles and remove the manual X editor | in progress | Preserve OAuth proof and stored historical links; make the verified Discord identity navigable. |
+| TA-11 | Add private wallet-bound email verification | in progress | Reuse existing mail delivery; a typed address, newsletter consent or provider acceptance is not ownership proof. No public email disclosure. |
+| TA-12 | Measure and reduce page-loading delays | in progress | Fix measured blocking work; do not remove wallet authorization or alter AI valuation. |
+| TA-13 | Deliver the approved artist-support implementation earlier | in progress | Separate contract and indexed donation UI; preserve the approved creator routing and neutrality. No mainnet deployment or invented destination. |
+
+Live moderation activation still depends on the operator-access decision: the
+same request asks for activation and retains the earlier passkey deferral.
+Independent implementation and regression work continues while that is resolved.
+Robinhood wallet support versus a new network target is being clarified before
+changing operational network selection. No Phase A gate is marked accepted here.
+
 ## Source Audit Boundary
 
 This consolidation audited the repository through `main` commit `ab0b1d7`, [`PROJECT_STATE.md`](PROJECT_STATE.md), [`HANDOFF.md`](HANDOFF.md), the Canon Bible and split canon, [`CONTRACT_REWORK_PLAN.md`](canon/CONTRACT_REWORK_PLAN.md), merged and open pull-request descriptions from [PR #60](https://github.com/maysonkiller/ArtSoul-Protocol/pull/60) through [PR #110](https://github.com/maysonkiller/ArtSoul-Protocol/pull/110), and every current `TODO`/`FIXME` code search result.
