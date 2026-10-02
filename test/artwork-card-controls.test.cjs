@@ -275,7 +275,7 @@ test('card bodies contain title, canonical Creator attribution, and status-price
         creator_value: '1'
     });
     const body = card.children[1];
-    assert.equal(body.children.length, 3);
+    assert.equal(body.children.length, 4);
     assert.equal(body.children[0].className, 'artsoul-card-title');
     assert.equal(body.children[1].className, 'artsoul-card-creator');
     assert.equal(body.children[1].textContent, 'Creator: 0x100000...000001');

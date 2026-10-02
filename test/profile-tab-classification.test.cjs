@@ -44,7 +44,11 @@ test('trust is computed once from the complete creator corpus, independent of ta
 
 test('profile omits missing and failed media cards', () => {
   assert.match(profile, /filter\(artwork => window\.ArtSoulArtworkCard\?\.hasSafeMedia/);
-  assert.match(profile, /onUnavailable=\{\(\) => setMediaUnavailable\(true\)\}/);
+  assert.match(profile, /SharedCard = window\.ArtSoulArtworkCard\?\.ReactCard/);
+  const shared = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
+  const card = shared.slice(shared.indexOf('function ReactCard('));
+  assert.match(card, /if \(!hasSafeMedia\(artwork\) \|\| mediaUnavailable\) return null/);
+  assert.match(card, /h\(ReactMedia, \{ artwork, onUnavailable: \(\) => setMediaUnavailable\(true\) \}\)/);
 });
 
 test('empty states render only after loading for all four tabs', () => {

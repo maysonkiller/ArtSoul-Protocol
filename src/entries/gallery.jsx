@@ -541,7 +541,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                                 artwork={artwork}
                                                 minimal={true}
                                                 surface="gallery"
-                                                onOpen={() => window.location.href = window.ArtSoulArtworkUrl.artworkPath(artwork.id)}
+                                                href={window.ArtSoulArtworkCard.detailHref(artwork)}
                                                 actions={isGlobalSearch ? (
                                                     <span
                                                         className="inline-flex rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-wide"

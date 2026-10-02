@@ -95,8 +95,8 @@ test('pre-mint and minted cards keep identical compact body structure', () => {
   });
   // Same rows (title, creator, meta) in both states — no state-dependent
   // extra lines, so compact card dimensions stay consistent.
-  assert.equal(preMint.children[1].children.length, 3);
-  assert.equal(minted.children[1].children.length, 3);
+  assert.equal(preMint.children[1].children.length, 4);
+  assert.equal(minted.children[1].children.length, 4);
   assert.deepEqual(
     preMint.children[1].children.map(child => child.className),
     minted.children[1].children.map(child => child.className)
@@ -116,8 +116,8 @@ test('cards stay single-link: no nested creator anchor inside the clickable card
 });
 
 test('profile cards reuse the shared creator attribution without new requests', () => {
-  assert.match(profile, /creatorLabel = sharedCards\?\.creatorLabel/);
-  assert.match(profile, /Creator: \{creatorLabel\(artwork\)\}/);
+  assert.match(profile, /SharedCard = window.ArtSoulArtworkCard\?\.ReactCard/);
+  assert.match(profile, /<SharedCard[\s\S]*minimal=\{true\}[\s\S]*surface="profile"/);
 });
 
 test('detail page keeps the three roles as individually clickable profile links', () => {

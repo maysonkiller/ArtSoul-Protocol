@@ -3,7 +3,70 @@
 Updated: 2026-10-03. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 3 release candidate (active; supersedes prior pending-work summaries):
+October 3 activation and card alignment (active; supersedes prior pending-work summaries):
+
+- Workspace remains `C:\Projects\ArtSoul`, `codex/takeover-audit`; base HEAD for
+  this follow-up is `1c55599bfabf848b41321a7452507dfec419c443` (PR #288).
+  PR #287 released the second-device passkey interface. PR #288 repaired a
+  missing Vercel rewrite for `/api/profile/email`; candidate CI `37077626390`
+  and post-merge CI `37077971791` passed. Production deployment `6820404323`
+  succeeded at `artsoul-ipoondbg2-maysonkiller-be9112b5.vercel.app`.
+- Email and passkey routes are active on the apex. Reporting, Protocol Admin
+  and Donate remain off. One real verification email was accepted and reported
+  Delivered by Resend; screenshot: `output/audit/profile-email-delivered-2026-10-03.png`.
+  The request did not mark email ownership verified, and the signed-in test
+  session was logged out. The mailbox-link confirmation is still outstanding.
+  Preserve the initial zero-send failure and the one-send retry evidence; do
+  not blindly send again.
+- The founder-authorized test wallet now has one active staff role and one
+  audited bootstrap grant. A read-only check at October 2, 23:40 UTC found zero
+  passkeys and the grant unused. Native registration, a second independent
+  authenticator and Safe recovery remain human/operational acceptance steps.
+  Never replay the initial role/bootstrap helper. An expired unused grant can
+  only be superseded through the existing audited grant procedure.
+- The isolated Donate contract is deployed on Base Sepolia at
+  `0xA36bD0Da05fA5Aa113834aD355363C66cd42a22b`, block `47607186`, transaction
+  `0xa4e943175ecf2b0641b869436277fc9c79a5ff734a2cd099a1a9c5771fbfd7ae`.
+  Both RPCs verified canonical inclusion, runtime code, Core and Safe owner.
+  The initial runner stopped on a receipt disagreement; read-only recovery
+  finalized that exact transaction without re-signing or rebroadcasting.
+  No donation payment has been sent. Indexer source registration still needs
+  authenticated host access; the current SSH identities were rejected.
+  Preserve the existing cursor and prove the deployment-to-registration gap
+  before payment tests or public activation.
+- The founder requested matching preview metadata and an ellipsis menu on
+  home/gallery/profile. The pending patch reuses the shared card, removes the
+  profile-only body/action layout, and exposes available actions through that
+  menu. Donate/Report links open the existing checked forms only; feature gates
+  remain authoritative. AI valuation, auction economics and contracts are
+  outside this patch. Existing source differences were preserved under
+  `output/recovery/card-menu-2026-10-03/` before release preparation.
+- Unfinished public diff: shared card/menu, profile/gallery integration, narrow
+  artwork action links, matching CSS/cache references, regressions and status
+  documentation. `.codex/`, `output/` and ignored private material must not be
+  bulk-staged. Phase A remains open; device, OAuth and native key ceremonies are
+  not inferred from fixtures or an enabled flag.
+- Final card candidate checks: **1,528/1,528 Node tests passed, zero skips**;
+  build **11 routes / 177 utilities**; **76/76 built-browser checks** across
+  home/gallery/profile, both themes and 1280/390px widths, zero page exceptions
+  or write/auth/transaction calls. Native links, menu keyboard/focus behavior,
+  delayed wallet restoration, checked forms and disabled gates were covered.
+  Wallet/data/config were fixtures, not physical-device or real payment proof.
+  Independent review passed 29 checks with no remaining P1/P2 finding in scope.
+  The first full run found one obsolete profile-wrapper assertion; its failure
+  is retained. Current logs: `output/audit/card-menu-unit-verified-2026-10-03.log`,
+  `card-menu-build-final-2026-10-03.log` and
+  `shared-card-actions-built-browser-2026-10-03.log` in that same directory.
+- Interpretation recorded: each menu shows available View/Donate/Report actions
+  and creator/owner controls. Existing checked artwork forms own submission;
+  moving an entry into the menu never grants permission or submits a transaction.
+  No architecture amendment was needed. The moderator canon's stale September
+  29 scheduling sentence now references the already approved October 3 amendment.
+- Exactly next step: publish this verified card candidate, require its hosted CI
+  and preview acceptance, then verify the apex artifact before resuming the
+  pending native-passkey and indexer-access steps.
+
+October 3 initial release candidate (completed; retained evidence):
 
 - PR #286 is merged as `aaf24cd5b03241f380a20efa2ca1e407a9d519a4`, now the
   working HEAD. Candidate and post-merge CI passed. Production deployment

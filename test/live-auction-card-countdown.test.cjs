@@ -99,7 +99,7 @@ test('DOM cards share one timer and keep their compact body structure', () => {
 
   assert.equal(intervals.length, 1, 'all cards must reuse one interval');
   assert.equal(first.children[1].className, 'artsoul-card-body');
-  assert.equal(first.children[1].children.length, 3);
+  assert.equal(first.children[1].children.length, 4);
   assert.equal(first.children[2].className, 'artsoul-card-countdown');
   assert.equal(first.children[2].attributes.role, 'timer');
   assert.equal(first.children[2].attributes['aria-live'], 'off');
@@ -116,8 +116,8 @@ test('shared React countdown is used by both common and profile cards', () => {
   assert.match(source, /function ReactCountdown\(\{ artwork = \{\} \}\)/);
   assert.match(source, /h\(ReactCountdown, \{ artwork \}\)/);
   assert.match(source, /ReactCountdown,/);
-  assert.match(profile, /SharedCountdown = sharedCards\?\.ReactCountdown/);
-  assert.match(profile, /<SharedCountdown artwork=\{artwork\} \/>/);
+  assert.match(profile, /SharedCard = window.ArtSoulArtworkCard\?\.ReactCard/);
+  assert.match(profile, /<SharedCard\s+artwork=\{artwork\}/);
 });
 
 test('countdown is a height-neutral theme-safe media overlay', () => {

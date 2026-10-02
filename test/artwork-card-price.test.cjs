@@ -6,11 +6,7 @@ const vm = require('node:vm');
 const window = { addEventListener() {} };
 vm.runInNewContext(fs.readFileSync('src/ui/components/artwork-card.js', 'utf8'), { window });
 const source = fs.readFileSync('src/entries/profile.jsx', 'utf8');
-const start = source.indexOf('function getProfileArtworkPrice(');
-const end = source.indexOf('function getProfileArtworkHref(', start);
-const profilePrice = vm.runInNewContext(`(${source.slice(start, end).trim()})`, {
-    window, isMintedArtwork: artwork => Boolean(artwork.minted || artwork.token_id)
-});
+const profilePrice = window.ArtSoulArtworkCard.formatPrice;
 
 test('profile auction price follows the actual current bid rather than its starting price', () => {
     const artwork = { status: 'auction', current_bid: '0.011', highest_bid: '0.011', start_price: '0.001', creator_value: '0.001' };
@@ -18,6 +14,7 @@ test('profile auction price follows the actual current bid rather than its start
 });
 
 test('all card surfaces share the same price resolver', () => {
+    assert.match(source, /ArtSoulArtworkCard\?\.ReactCard/);
     assert.equal(typeof window.ArtSoulArtworkCard.formatPrice, 'function');
     for (const artwork of [
         { current_bid: '0', highest_bid: '0', start_price: '0.001', creator_value: '0.002' },

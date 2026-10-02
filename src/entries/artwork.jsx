@@ -470,6 +470,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [resaleModalStepLabel, setResaleModalStepLabel] = useState('');
             const [reportingEnabled, setReportingEnabled] = useState(false);
             const [donationDeployment, setDonationDeployment] = useState(null);
+            const [cardActionsReady, setCardActionsReady] = useState(false);
+            const [cardActionNotice, setCardActionNotice] = useState('');
+            const [openDonationFromCard, setOpenDonationFromCard] = useState(false);
+            const cardActionOpenedRef = useRef(false);
             const [isReportModalOpen, setIsReportModalOpen] = useState(false);
             const [artworkReport, setArtworkReport] = useState(emptyArtworkReport);
             const [reportBusy, setReportBusy] = useState(false);
@@ -764,15 +768,35 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         if (active) {
                             setReportingEnabled(config?.reportingEnabled === true);
                             setDonationDeployment(config?.donations || null);
+                            setCardActionsReady(true);
                         }
                     })
                     .catch(() => {
-                        if (active) setReportingEnabled(false);
+                        if (active) { setReportingEnabled(false); setCardActionsReady(true); }
                     });
                 return () => {
                     active = false;
                 };
             }, []);
+
+            useEffect(() => {
+                if (!artwork || !cardActionsReady || cardActionOpenedRef.current) return;
+                const action = new URLSearchParams(window.location.search).get('action');
+                if (!['report', 'donate'].includes(action)) return;
+                if (action === 'donate' && !walletRenderState.settled) return;
+                cardActionOpenedRef.current = true;
+                const config = { reportingEnabled, donations: donationDeployment };
+                const allowed = window.ArtSoulArtworkCard?.cardActionItems?.(artwork, config)
+                    .some(item => item.href.endsWith(`action=${action}`));
+                if (!allowed) {
+                    setCardActionNotice(action === 'report' ? 'Reporting is unavailable for this artwork.' : 'Donations are unavailable for this artwork.');
+                    return;
+                }
+                // A navigation may open a form; only its explicit submit action
+                // may request authentication or a wallet transaction.
+                if (action === 'report') openArtworkReport();
+                else setOpenDonationFromCard(true);
+            }, [artwork, cardActionsReady, reportingEnabled, donationDeployment, walletRenderState.settled]);
 
             useEffect(() => {
                 if (!isReportModalOpen) return undefined;
@@ -3840,9 +3864,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </button>
                                         )}
                                     </div>
+                                    {cardActionNotice && <p role="status">{cardActionNotice}</p>}
                                     {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
                                         <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
                                             creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
+                                            initialOpen={openDonationFromCard}
                                             onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
                                     )}
                                 </div>
@@ -3908,7 +3934,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 )}
 
                                 {/* Auction Info */}
-                                <div className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">
+                                <div id="artwork-actions" className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">
                                         <div className="artwork-page-card-heading">
                                             <h3 className="artwork-page-card-title">Auction</h3>
                                             <span className={`artsoul-card-status artsoul-card-status-${statusForState.key}`}>

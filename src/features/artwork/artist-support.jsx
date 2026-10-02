@@ -17,8 +17,9 @@ function Donor({ donation }) {
     </a>;
 }
 
-export function ArtistSupport({ deployment, artworkId, creator, creatorName, connectedWallet, onReportDonation }) {
+export function ArtistSupport({ deployment, artworkId, creator, creatorName, connectedWallet, onReportDonation, initialOpen = false }) {
     const dialog = useRef(null), trigger = useRef(null), busyRef = useRef(false), generation = useRef(0);
+    const openedFromCard = useRef(false);
     const [open, setOpen] = useState(false), [amount, setAmount] = useState('');
     const [message, setMessage] = useState(''), [anonymous, setAnonymous] = useState(false);
     const [accepted, setAccepted] = useState(false), [busy, setBusy] = useState(false);
@@ -45,6 +46,12 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
         apply(donationOperations.read(identity));
         return donationOperations.subscribe(identity, apply);
     }, [identity, artworkId, creator, enabled]);
+    useEffect(() => {
+        if (enabled && initialOpen && !openedFromCard.current) {
+            openedFromCard.current = true;
+            setOpen(true);
+        }
+    }, [enabled, initialOpen]);
     useEffect(() => {
         setFeed(null); setFeedError(false); setList(false); setSort('newest'); setOffset(0);
     }, [artworkId, creator, deployment?.address]);

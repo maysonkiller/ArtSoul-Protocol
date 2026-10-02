@@ -26,8 +26,9 @@ Staff access uses the authenticated wallet, an active least-privilege staff role
 and the configured passkey step-up. X/Discord handles are not authentication
 factors and a public profile link never grants staff rights.
 
-Real founder passkey enrollment and the operator recovery ceremony are scheduled
-for mainnet preparation under `CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md`.
+The founder authorized real passkey enrollment and the operator recovery ceremony
+now under `CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md`, superseding the September 29
+deferral to mainnet preparation.
 Live activation still requires the configured authorization and recovery gates;
 isolated tests do not satisfy a real ceremony.
 

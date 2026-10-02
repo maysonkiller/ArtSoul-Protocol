@@ -6,6 +6,7 @@ const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
 const artwork = fs.readFileSync('src/entries/artwork.jsx', 'utf8');
 const upload = fs.readFileSync('src/entries/upload.js', 'utf8');
 const uploadHtml = fs.readFileSync('upload.html', 'utf8');
+const cards = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
 
 test('an artwork whose auction failed can still be given one', () => {
   // Publishing is two transactions. The first is permanent the moment it
@@ -14,7 +15,7 @@ test('an artwork whose auction failed can still be given one', () => {
   // did not exist: handleCreateAuction was declared and never called, and the
   // card was only a link. Confirmed on artwork 31, status "registered",
   // creator_value "0", no auction id.
-  assert.match(profile, /const canStartAuction = isOwnProfile/);
+  assert.match(profile, /onStartAuction=\{\(\) => handleStartAuction\(artwork\)\}/);
   assert.match(profile, /handleStartAuction\(artwork\)/);
   assert.match(profile, /async function handleStartAuction\(artwork\)/);
   assert.match(profile, /destination\.searchParams\.set\('action', 'create-auction'\)/);
@@ -30,12 +31,9 @@ test('the retry is offered only where it can work', () => {
   // `defaulted`, so the retry was refused in the one state it was most needed.
   // The lifecycle now decides; the auction id no longer does, because that is
   // the field the projection had wrong.
-  const start = profile.indexOf('const canStartAuction');
-  const block = profile.slice(start, profile.indexOf(';', start) + 1);
-  assert.match(block, /isOwnProfile/, 'only on your own profile');
-  assert.match(block, /isBaseSepoliaArtwork\(artwork\)/, 'only on the active testnet');
-  assert.match(block, /!isMintedArtwork\(artwork\)/, 'never for a minted work');
-  assert.match(block, /lifecycle === 'registered' \|\| lifecycle === 'defaulted'/, 'only where a new auction is possible');
+  assert.match(cards, /chain === 84532 && registered && ownsRole/);
+  assert.match(cards, /address === creator && !isMinted\(artwork\)/);
+  assert.match(cards, /\['registered', 'defaulted'\]\.includes/);
   // Which lifecycle states qualify, per wallet role, is proven behaviorally in
   // profile-lifecycle-action-gating.test.cjs rather than by matching source.
 });
@@ -69,5 +67,5 @@ test('the failure message names a control that exists', () => {
   // profile could do that.
   assert.doesNotMatch(upload, /Retry the auction from your profile/);
   assert.match(upload, /use Start auction on this artwork to finish it/);
-  assert.match(profile, />\s*Start auction\s*</);
+  assert.match(cards, /label: 'Start auction'/);
 });
