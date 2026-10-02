@@ -105,6 +105,10 @@
       "destination": "/api/[...route]?route=ai/:route*"
     },
     {
+      "source": "/api/profile/email",
+      "destination": "/api/[...route]?route=profile/email"
+    },
+    {
       "source": "/api/profile",
       "destination": "/api/[...route]?route=profile"
     },
