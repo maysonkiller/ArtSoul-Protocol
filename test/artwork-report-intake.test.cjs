@@ -256,7 +256,7 @@ test('the SQL path is atomic, private, deduplicated, and never auto-hides artwor
 });
 
 test('the artwork UI exposes a flag-gated accessible Report form with no wallet or contract mutation', () => {
-  const source = fs.readFileSync(path.join(ROOT, 'src/entries/artwork.jsx'), 'utf8');
+  const source = fs.readFileSync(path.join(ROOT, 'src/entries/artwork.jsx'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(source, /reportingEnabled && \(/);
   assert.match(source, />\s*Report\s*<\/button>/);
   assert.match(source, /aria-labelledby="artworkReportTitle"/);
@@ -264,10 +264,10 @@ test('the artwork UI exposes a flag-gated accessible Report form with no wallet 
   assert.match(source, /\(reportReturnFocusRef\.current \|\| reportTriggerRef\.current\)\?\.focus\(\)/);
   assert.match(source, /fetch\('\/api\/moderation\/reports'/);
   assert.match(source, /await window\.ensureAuthenticated\?\.\(\)/);
-  const submitBlock = source.slice(
-    source.indexOf('async function submitArtworkReport'),
-    source.indexOf('async function passkeyApi')
-  );
+  const submitStart = source.indexOf('async function submitArtworkReport');
+  const submitEnd = source.indexOf('function calculateMinimumBidDetails', submitStart);
+  assert.ok(submitStart >= 0 && submitEnd > submitStart, 'the report handler boundaries must exist');
+  const submitBlock = source.slice(submitStart, submitEnd);
   assert.doesNotMatch(submitBlock, /ArtSoulContracts|eth_sendTransaction|writeContract|set_artwork_moderation_visibility/);
 });
 

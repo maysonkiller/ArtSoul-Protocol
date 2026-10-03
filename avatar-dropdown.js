@@ -186,6 +186,7 @@
             this.protocolAdminWallet = null;
             this.protocolAdminEligible = false;
             this.protocolAdminRequest = null;
+            this.protocolAdminGeneration = 0;
         }
 
         getNavContainer() {
@@ -618,7 +619,7 @@
             const link = this.protocolAdminEligible && !isCurrentPage
                 ? `
                     <a href="/admin" class="dropdown-item dropdown-protocol-admin-item">
-                        <span>Protocol Admin</span>
+                        <span>Admin panel</span>
                     </a>
                 `
                 : '';
@@ -630,12 +631,13 @@
             if (!slot) return;
             const currentPath = window.location.pathname;
             slot.innerHTML = this.protocolAdminEligible && !this.isPage(currentPath, 'admin')
-                ? '<a href="/admin" class="dropdown-item dropdown-protocol-admin-item"><span>Protocol Admin</span></a>'
+                ? '<a href="/admin" class="dropdown-item dropdown-protocol-admin-item"><span>Admin panel</span></a>'
                 : '';
             this.applyThemeStyles();
         }
 
         clearProtocolAdminAccess() {
+            this.protocolAdminGeneration += 1;
             this.protocolAdminWallet = null;
             this.protocolAdminEligible = false;
             this.protocolAdminRequest = null;
@@ -656,7 +658,7 @@
         }
 
         // Lazy menu discovery: called when the account dropdown opens, at most
-        // one request per wallet for this page lifetime. Eligibility is always
+        // one request per wallet/session generation. Eligibility is always
         // decided by the server; protected admin endpoints still re-check
         // SIWE + staff role + passkey step-up on every request.
         async requestProtocolAdminAccessOnce() {
@@ -675,35 +677,36 @@
             }
             if (this.protocolAdminRequest?.wallet === wallet) return this.protocolAdminRequest.promise;
 
-            const request = fetch('/api/moderation/access', {
+            const generation = this.protocolAdminGeneration;
+            const isCurrent = () => generation === this.protocolAdminGeneration && wallet === String(
+                window.currentWalletAddress || window.artsoulSettledWalletState?.address || ''
+            ).toLowerCase();
+            const request = fetch(`/api/moderation/access?expectedWallet=${encodeURIComponent(wallet)}`, {
                 method: 'GET',
                 credentials: 'include',
+                cache: 'no-store',
                 headers: { Accept: 'application/json' }
             })
                 .then(async response => {
                     const result = await response.json().catch(() => ({}));
-                    const activeWallet = String(
-                        window.currentWalletAddress
-                        || window.artsoulSettledWalletState?.address
-                        || ''
-                    ).toLowerCase();
-                    if (activeWallet !== wallet) return false;
+                    if (!isCurrent()) return false;
                     this.protocolAdminWallet = wallet;
                     this.protocolAdminEligible = response.ok
-                        && result.enabled === true
+                        && (result.enabled === true || result.setupEnabled === true)
                         && result.authenticated === true
                         && result.eligible === true;
                     this.updateProtocolAdminSlot();
                     return this.protocolAdminEligible;
                 })
                 .catch(() => {
+                    if (!isCurrent()) return false;
                     this.protocolAdminWallet = wallet;
                     this.protocolAdminEligible = false;
                     this.updateProtocolAdminSlot();
                     return false;
                 })
                 .finally(() => {
-                    if (this.protocolAdminRequest?.wallet === wallet) this.protocolAdminRequest = null;
+                    if (this.protocolAdminRequest?.promise === request) this.protocolAdminRequest = null;
                 });
 
             this.protocolAdminRequest = { wallet, promise: request };
@@ -2113,6 +2116,13 @@
     window.AvatarDropdown = new AvatarDropdown();
     window.ThemeManager?.addListener?.((theme) => {
         window.AvatarDropdown.applyThemeStyles(theme);
+    });
+
+    // A connected wallet can sign in or out without changing its address.
+    // Drop both cached eligibility and pending responses for that old session.
+    window.addEventListener('artsoul:auth-state-changed', () => window.AvatarDropdown.clearProtocolAdminAccess());
+    window.addEventListener('storage', (event) => {
+        if (!event.key || event.key === 'artsoul_authenticated_wallet') window.AvatarDropdown.clearProtocolAdminAccess();
     });
 
     const syncCurrentMenu = (options = {}) => {

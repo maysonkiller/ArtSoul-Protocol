@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const source = fs.readFileSync('src/entries/artwork.jsx', 'utf8');
-const submitSource = source.slice(source.indexOf('async function submitArtworkReport'), source.indexOf('async function passkeyApi')).trim();
+const source = fs.readFileSync('src/entries/artwork.jsx', 'utf8').replace(/\r\n/g, '\n');
+const submitStart = source.indexOf('async function submitArtworkReport');
+const submitEnd = source.indexOf('function calculateMinimumBidDetails', submitStart);
+assert.ok(submitStart >= 0 && submitEnd > submitStart, 'the report handler boundaries must exist');
+const submitSource = source.slice(submitStart, submitEnd).trim();
 const wallet = `0x${'11'.repeat(20)}`;
 const target = {transaction_hash: `0x${'55'.repeat(32)}`, log_index: 1};
 function setup({donation = target, authenticate = async () => true} = {}) {

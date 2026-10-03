@@ -3,7 +3,98 @@
 Updated: 2026-10-03. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 3 activation and card alignment (active; supersedes prior pending-work summaries):
+October 3 admin-access placement correction (current, local verification):
+
+- Workspace remains `C:\Projects\ArtSoul`, `codex/takeover-audit`, based on
+  `a47d57847c047a30ca68ace077433ef9599dd4ea`. The previous checkpoint diff is
+  preserved in `output/recovery/admin-passkey-modal-2026-10-03/before.patch`.
+- Founder correction: remove the Staff passkey panel from artwork pages and
+  put enrollment/verification in an Admin panel dialog with clear steps and
+  a dark backdrop. Scope is UI/access continuity (canon 05/07/16), with no
+  economic, contract, AI valuation or live-moderation activation changes.
+- Discovery now distinguishes passkey setup from enabled moderation queues.
+  Only server-confirmed staff may receive the menu link. Expected-wallet
+  comparison and menu session-generation guards prevent old SIWE/wallet
+  responses from restoring stale menu eligibility. Protected queue/action
+  gates stay intact.
+- The broader admin-page stale-response correction is an inert reviewed
+  candidate in `output/audit/admin-passkey-host-candidate.jsx` (11 passing
+  candidate regressions). Automatic approval review rejected applying it as
+  broader than the latest UI placement request. A precise human authorization
+  question is pending; do not apply that candidate without the answer. The
+  independently reviewed UI-only relocation is now applied; existing admin
+  authentication, queue and decision handlers are preserved.
+- Local verification: **1,548/1,548 Node checks passed, zero skips**, including
+  disposable PostgreSQL integration; **11 built routes / 176 CSS utilities**.
+  Logs: `output/audit/admin-modal-unit-verified-2026-10-03.log` and
+  `output/audit/admin-modal-build-verified-2026-10-03.log`. The first restricted
+  run exposed outdated source-extraction/cache assertions and could not access
+  Docker/private-directory enumeration; those results are retained, not reused
+  as passing evidence. Build used the installed npm CLI with a process-local
+  prefix because the ordinary npm shim selected an inaccessible global path.
+- The new dialog reuses the existing registration/authentication/grant routes,
+  with labelled code input, explicit native-device actions and transient codes.
+  Artwork no longer imports or renders passkey setup. Native dialog presentation
+  opens only when verification is needed; active sessions retain Manage passkeys.
+  Interpretation: setup is independent of review-queue activation, not a bypass
+  of that flag or a new staff role. Real native ceremonies remain outstanding.
+- Built-browser acceptance: **81/81 assertions passed**, desktop/mobile in
+  Classic/Future, zero uncaught page errors, zero queue requests or external
+  writes. Eight POST requests used intercepted local fixtures and synthetic
+  native-credential responses, not real credentials. The pending broad host
+  race cases are explicitly excluded in
+  `output/audit/admin-passkey-relocation-ui-only-browser-summary-2026-10-03.json`.
+  Screenshots are in `output/playwright/admin-passkey-{classic,future}-{1280,390}.png`.
+- The existing renewal process is still waiting for human READY; no renewal
+  journal was present at the placement correction's initial check. Do not
+  restart that process merely to replace its old artwork-page instructions.
+  After release, direct the human to `/admin`; the same wallet/RP/grant rules
+  apply. The helper's future display text now names that route.
+- Exactly next step: publish through required hosted checks and verify the apex
+  before handing the new `/admin` entry to
+  the founder; retain real ceremonies and the requested session follow-up as open.
+
+October 3 card release and native handoff (completed):
+
+- Canonical path/branch: `C:\Projects\ArtSoul`, `codex/takeover-audit`; current
+  HEAD and published application: `a47d57847c047a30ca68ace077433ef9599dd4ea`,
+  [PR #289](https://github.com/maysonkiller/ArtSoul-Protocol/pull/289).
+  Corrected candidate `98a7a7c7f42d1d303f526fdd7de91472bd6601fc` passed all
+  Linux, Windows and static jobs in CI `37080015592`. The earlier Windows
+  failure was a test-only LF/CRLF assumption; its log remains retained.
+  Post-merge CI `37080283906` also passed all three jobs.
+- Production deployment `6820742214` succeeded at October 3, 00:02:17 UTC,
+  immutable host `artsoul-gwbb386xv-maysonkiller-be9112b5.vercel.app`. Apex
+  verification matches 49 JS/CSS assets across four pages to the tested build.
+  The final test/document-only commit did not change application artifacts.
+  Evidence: `output/audit/card-menu-{preview,apex}-artifact-2026-10-03.json`.
+  Email remains enabled; Report/Admin/Donate remain gated. The Base indexer is
+  healthy with zero observed lag; legacy Ethereum Sepolia stays stopped by design.
+- Shared preview metadata and ellipsis actions are published. Local evidence:
+  1,528 Node checks, 76 built-browser checks, 11 built routes/177 CSS utilities,
+  and 29 independent focused checks passed. Real profile data loaded correctly
+  on the preview host, then the wallet extension redirected it to a security
+  warning. Browser interaction was stopped, not bypassed. The extension now
+  blocks automation until the user closes its warning. No final connected-browser
+  or physical-device acceptance is claimed from asset equality.
+- The October 2, 23:57 UTC operator read still found one role, zero passkeys,
+  one unused grant and zero available grants: the first code expired. A separate
+  reviewed renewal window (28 offline checks) is waiting for human READY.
+  Its journal was still absent in the latest process check; no renewed grant is
+  claimed. Initial bootstrap and completed auction 66 transactions must not be
+  replayed. Enroll/Verify on native authenticators remain human actions.
+- Resend delivery and Donate deployment are complete as recorded below. Mailbox
+  link confirmation, indexer host access/source registration and real Donate
+  payment/projection tests remain outstanding. Phase A is not closed; the
+  retained device/OAuth/moderation/recovery and A10 gates are unchanged.
+- Application source is committed and published. The only new local tracked
+  change after release is this checkpoint; `.codex/`, `output/` and private
+  journals are preserved and excluded from staging.
+- Exactly next step: after the user closes the extension warning and completes
+  Enroll/Verify, read the credential/grant audit state and continue the second
+  independent passkey. Resume Donate host inspection when Hetzner login is ready.
+
+October 3 activation and card alignment (completed preparation; retained evidence):
 
 - Workspace remains `C:\Projects\ArtSoul`, `codex/takeover-audit`; base HEAD for
   this follow-up is `1c55599bfabf848b41321a7452507dfec419c443` (PR #288).

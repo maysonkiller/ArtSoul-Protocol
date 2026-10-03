@@ -140,3 +140,94 @@ test('render paths call only the non-fetching wallet sync', () => {
   // Discovery stays on the menu-open path only.
   assert.match(SOURCE, /if \(this\.isOpen\) \{\s*\n\s*void this\.requestProtocolAdminAccessOnce\(\);/);
 });
+
+function authChanged(harness) {
+  harness.context.window.dispatchEvent(new harness.context.CustomEvent('artsoul:auth-state-changed'));
+}
+
+function accessResponse(overrides = {}) {
+  return { ok: true, json: async () => ({
+    enabled: false, setupEnabled: true, authenticated: true, eligible: true, ...overrides
+  }) };
+}
+
+test('server-confirmed staff can reach Admin panel for setup without enabling the review queue', async () => {
+  const harness = createHarness();
+  harness.context.window.currentWalletAddress = WALLET_A;
+  harness.setAccessResponse(() => accessResponse());
+  await harness.dropdown.requestProtocolAdminAccessOnce();
+  assert.equal(harness.dropdown.protocolAdminEligible, true);
+  assert.match(harness.dropdown.renderProtocolAdminSlot('/'), />Admin panel</);
+  assert.equal(harness.accessCalls[0].options.cache, 'no-store');
+  assert.equal(new URL(harness.accessCalls[0].url, 'https://example.com').searchParams.get('expectedWallet'), WALLET_A);
+  for (const override of [{ authenticated: false }, { eligible: false }, { setupEnabled: false }]) {
+    authChanged(harness);
+    harness.setAccessResponse(() => accessResponse(override));
+    await harness.dropdown.requestProtocolAdminAccessOnce();
+    assert.equal(harness.dropdown.protocolAdminEligible, false);
+  }
+});
+
+test('same-wallet sign-in invalidates a guest result without automatic authentication or discovery', async () => {
+  const harness = createHarness();
+  harness.context.window.currentWalletAddress = WALLET_A;
+  await harness.dropdown.renderWalletInfo(WALLET_A);
+  harness.setAccessResponse(() => accessResponse({ authenticated: false, eligible: false }));
+  await harness.dropdown.requestProtocolAdminAccessOnce();
+  assert.equal(harness.dropdown.protocolAdminEligible, false);
+  authChanged(harness);
+  assert.equal(harness.dropdown.protocolAdminWallet, null);
+  assert.equal(harness.accessCalls.length, 1);
+  harness.setAccessResponse(() => accessResponse());
+  harness.dropdown.toggle();
+  await harness.flush();
+  assert.equal(harness.accessCalls.length, 2);
+  assert.equal(harness.dropdown.protocolAdminEligible, true);
+});
+
+for (const fail of [false, true]) {
+  test(`old-session ${fail ? 'failure' : 'success'} cannot overwrite a newer same-wallet result`, async () => {
+    const harness = createHarness();
+    harness.context.window.currentWalletAddress = WALLET_A;
+    let resolveOld, rejectOld;
+    harness.setAccessResponse(() => new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject; }));
+    const oldRequest = harness.dropdown.requestProtocolAdminAccessOnce();
+    authChanged(harness);
+    harness.setAccessResponse(() => accessResponse({ eligible: fail }));
+    await harness.dropdown.requestProtocolAdminAccessOnce();
+    if (fail) rejectOld(new Error('old session failed'));
+    else resolveOld(accessResponse());
+    await oldRequest;
+    assert.equal(harness.dropdown.protocolAdminEligible, fail);
+  });
+}
+
+test('old request cleanup cannot clear the newer request for the same wallet', async () => {
+  const harness = createHarness();
+  harness.context.window.currentWalletAddress = WALLET_A;
+  let resolveOld, resolveNew;
+  harness.setAccessResponse(() => new Promise(resolve => { resolveOld = resolve; }));
+  const oldRequest = harness.dropdown.requestProtocolAdminAccessOnce();
+  authChanged(harness);
+  harness.setAccessResponse(() => new Promise(resolve => { resolveNew = resolve; }));
+  const newRequest = harness.dropdown.requestProtocolAdminAccessOnce();
+  resolveOld(accessResponse());
+  await oldRequest;
+  assert.ok(harness.dropdown.protocolAdminRequest);
+  resolveNew(accessResponse());
+  await newRequest;
+  assert.equal(harness.dropdown.protocolAdminEligible, true);
+});
+
+test('cross-tab logout immediately removes the admin link and rejects pending eligibility', async () => {
+  const harness = createHarness();
+  harness.context.window.currentWalletAddress = WALLET_A;
+  let resolveOld;
+  harness.setAccessResponse(() => new Promise(resolve => { resolveOld = resolve; }));
+  const oldRequest = harness.dropdown.requestProtocolAdminAccessOnce();
+  harness.context.window.dispatchEvent({ type: 'storage', key: 'artsoul_authenticated_wallet' });
+  resolveOld(accessResponse());
+  await oldRequest;
+  assert.equal(harness.dropdown.protocolAdminEligible, false);
+  assert.equal(harness.dropdown.protocolAdminWallet, null);
+});

@@ -26,6 +26,13 @@ Staff access uses the authenticated wallet, an active least-privilege staff role
 and the configured passkey step-up. X/Discord handles are not authentication
 factors and a public profile link never grants staff rights.
 
+Staff passkey enrollment, verification and key management belong in the Admin
+panel, reached through the account menu after server-confirmed staff discovery.
+The verification dialog explains the required steps; credential controls do not
+occupy public artwork layouts. Setup may be available before the separately
+gated review queue is enabled. Moving these controls does not grant a role,
+waive passkey verification or complete the real-device acceptance ceremony.
+
 The founder authorized real passkey enrollment and the operator recovery ceremony
 now under `CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md`, superseding the September 29
 deferral to mainnet preparation.
