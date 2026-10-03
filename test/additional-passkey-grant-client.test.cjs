@@ -3,8 +3,8 @@ const fs = require('node:fs');
 const test = require('node:test');
 const vm = require('node:vm');
 
-const source = fs.readFileSync('src/entries/artwork.jsx', 'utf8').replace(/\r\n/g, '\n');
-const component = source.slice(source.indexOf('function AdditionalPasskeyGrant('), source.indexOf('\nfunction useDecodedImage('));
+const source = fs.readFileSync('src/features/admin/staff-passkeys.jsx', 'utf8').replace(/\r\n/g, '\n');
+const component = source.slice(source.indexOf('function AdditionalPasskeyGrant('), source.indexOf('\nexport function StaffPasskeyDialog('));
 const logic = component.slice(0, component.indexOf('    return (\n')) + '    return {issueGrant, copyGrant, clearGrant};\n}';
 const WALLET = '0x' + '1'.repeat(40), OTHER = '0x' + '2'.repeat(40), TOKEN = 'T'.repeat(43);
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -131,8 +131,8 @@ test('an expired server step-up requests verification without displaying a grant
 });
 
 test('staff-only grant UI uses ordinary buttons, ephemeral display and no token persistence', () => {
-  assert.match(source, /passkeyAccess\?\.required && isSameAddress\(passkeyAccess\.wallet, connectedWalletAddress\)/);
-  assert.match(source, /passkeyAccess\.active && <AdditionalPasskeyGrant/);
+  assert.match(source, /sessionActive && <AdditionalPasskeyGrant/);
+  assert.match(source, /activeWallet\(\) !== wallet/);
   assert.match(component, /onClick=\{issueGrant\}/); assert.match(component, /onClick=\{copyGrant\}/);
   assert.match(component, /onClick=\{clearGrant\}/); assert.match(component, /autoComplete="off"/);
   assert.doesNotMatch(component, /localStorage\.|sessionStorage\.|console\.|history\.|location\.|sendBeacon|clipboard\.read/);

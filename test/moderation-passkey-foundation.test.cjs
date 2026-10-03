@@ -792,16 +792,17 @@ test('the moderation-visibility read exposes step-up state but no visibility dat
   assert.equal(res.body.data, null);
 });
 
-test('the client consumes server-confirmed staff passkey state and exposes passkey controls', () => {
+test('artwork keeps no enrollment surface and admin owns passkey controls', () => {
   const client = read(path.join('src', 'entries', 'artwork.jsx'));
   // Error codes remain a defensive fallback for rejected protected requests.
   assert.match(client, /\[['"]STEP_UP_REQUIRED['"], ['"]STEP_UP_WALLET_MISMATCH['"], ['"]CREDENTIAL_REVOKED['"]\]\.includes\(result\.error\)/);
   assert.doesNotMatch(client, /includes\(result\.code\)/);
-  assert.match(client, /result\.access\?\.passkeyRequired === true && Boolean\(result\.access\?\.role\)/);
-  // Entering passkey-required state renders the Verify and Enroll controls.
-  assert.match(client, /\{ required: true, active: result\.access\.stepUpActive === true, wallet: result\.access\.wallet \}/);
-  assert.match(client, /onClick=\{startPasskeyStepUp\}/);
-  assert.match(client, /onClick=\{enrollModerationPasskey\}/);
+  assert.doesNotMatch(client, /Staff passkey|passkeyAccess|passkeyCredentials|loadWebAuthnBrowser|AdditionalPasskeyGrant/);
+  const admin = read(path.join('src', 'features', 'admin', 'staff-passkeys.jsx'));
+  assert.match(admin, /onClick=\{\(\) => perform\('verify'\)\}/);
+  assert.match(admin, /onClick=\{\(\) => perform\('enroll'\)\}/);
+  assert.match(admin, /htmlFor="adminEnrollmentCode"/);
+  assert.doesNotMatch(admin, /window\.prompt/);
 });
 
 // ---------------------------------------------------------------------------
@@ -969,7 +970,8 @@ test('threshold-valid Safe recovery issues one additional-device grant and rejec
 // ---------------------------------------------------------------------------
 
 test('the WebAuthn browser library is lazy-loaded, never a top-level import', () => {
-  const client = read(path.join('src', 'entries', 'artwork.jsx'));
+  const client = read(path.join('src', 'features', 'admin', 'staff-passkeys.jsx'));
+  assert.doesNotMatch(read(path.join('src', 'entries', 'artwork.jsx')), /@simplewebauthn|loadWebAuthnBrowser/);
   assert.doesNotMatch(client, /^import[^\n]*@simplewebauthn\/browser/m, 'no eager top-level import');
   assert.match(client, /import\(['"]@simplewebauthn\/browser['"]\)/, 'must dynamically import the browser helper');
   assert.match(client, /await loadWebAuthnBrowser\(\)/);

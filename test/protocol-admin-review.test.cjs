@@ -97,12 +97,14 @@ test('Protocol Admin and passkey flags fail closed independently', async () => {
   };
   try {
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'false';
+    process.env.ARTSOUL_MODERATION_PASSKEY_ENABLED = 'false';
     const disabled = responseHarness();
     await accessHandler(request('GET', '/api/moderation/access', { cookie: await authCookie() }), disabled);
     assert.equal(disabled.statusCode, 200);
     assert.equal(disabled.body.enabled, false);
+    assert.equal(disabled.body.setupEnabled, false);
     assert.equal(disabled.body.eligible, false);
-    // With the flag off the endpoint answers without any Supabase lookup.
+    // With both flags off there is no setup or role discovery.
     assert.equal(disabledCalls.length, 0);
 
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'true';
@@ -114,6 +116,50 @@ test('Protocol Admin and passkey flags fail closed independently', async () => {
   } finally {
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = previousAdmin;
     process.env.ARTSOUL_MODERATION_PASSKEY_ENABLED = previousPasskey;
+    global.fetch = previousFetch;
+  }
+});
+
+test('passkey setup discovers only the signed-in staff role while the review queue stays disabled', async () => {
+  const [{ default: accessHandler }, { default: queueHandler }] = await modules;
+  const previousAdmin = process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED;
+  const previousFetch = global.fetch;
+  const calls = [];
+  global.fetch = async url => {
+    calls.push(String(url));
+    return supabaseResponse(String(url).includes('artsoul_staff_passkeys')
+      ? [{ credential_id: 'credential-1' }] : [{ role: 'admin' }]);
+  };
+  try {
+    process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'false';
+    const guest = responseHarness();
+    await accessHandler(request('GET', '/api/moderation/access'), guest);
+    assert.equal(guest.body.enabled, false);
+    assert.equal(guest.body.setupEnabled, true);
+    assert.equal(guest.body.authenticated, false);
+    assert.equal(guest.body.eligible, false);
+    assert.equal(guest.body.access.role, null);
+    assert.equal(calls.length, 0);
+
+    const cookie = await authCookie({ stepUp: true });
+    const staff = responseHarness();
+    await accessHandler(request('GET', '/api/moderation/access', { cookie }), staff);
+    assert.equal(staff.body.enabled, false);
+    assert.equal(staff.body.setupEnabled, true);
+    assert.equal(staff.body.authenticated, true);
+    assert.equal(staff.body.eligible, true);
+    assert.equal(staff.body.access.stepUpActive, true);
+    assert.equal(staff.headers['Cache-Control'], 'private, no-store');
+    assert.equal(JSON.stringify(staff.body).includes(STAFF), false);
+    assert.equal(calls.every(url => /artsoul_staff_roles|artsoul_staff_passkeys/.test(url)), true);
+    const discovered = calls.length;
+    const queue = responseHarness();
+    await queueHandler(request('GET', '/api/moderation/review-queue', { cookie }), queue);
+    assert.equal(queue.statusCode, 503);
+    assert.equal(queue.body.error, 'PROTOCOL_ADMIN_DISABLED');
+    assert.equal(calls.length, discovered);
+  } finally {
+    process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = previousAdmin;
     global.fetch = previousFetch;
   }
 });
@@ -143,6 +189,39 @@ test('menu discovery exposes eligibility but no wallet or protected complaint da
   } finally {
     global.fetch = previousFetch;
   }
+});
+
+test('discovery compares the connected wallet with SIWE without looking up caller-supplied identities', async () => {
+  const [{ default: accessHandler }] = await modules;
+  const cookie = await authCookie();
+  const previousFetch = global.fetch;
+  const calls = [];
+  global.fetch = async url => { calls.push(String(url)); return supabaseResponse([{ role: 'admin' }]); };
+  try {
+    for (const [session, expectedWallet] of [[cookie, '0x2222222222222222222222222222222222222222'], ['', STAFF]]) {
+      const res = responseHarness();
+      await accessHandler(request('GET', '/api/moderation/access', { cookie: session, query: { expectedWallet } }), res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.body.authenticated, false);
+      assert.equal(res.body.eligible, false);
+      assert.equal(res.body.access, null);
+      assert.equal(calls.length, 0);
+    }
+    for (const expectedWallet of ['', 'not-a-wallet', [STAFF, STAFF]]) {
+      const res = responseHarness();
+      await accessHandler(request('GET', '/api/moderation/access', { cookie, query: { expectedWallet } }), res);
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.body.error, 'INVALID_WALLET');
+      assert.equal(calls.length, 0);
+    }
+    const res = responseHarness();
+    await accessHandler(request('GET', '/api/moderation/access', { cookie, query: { expectedWallet: STAFF } }), res);
+    assert.equal(res.body.authenticated, true);
+    assert.equal(res.body.eligible, true);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0], new RegExp(`wallet_address=eq.${STAFF}`));
+    assert.equal(JSON.stringify(res.body).includes(STAFF), false);
+  } finally { global.fetch = previousFetch; }
 });
 
 test('protected queue data is denied before passkey step-up', async () => {
@@ -369,7 +448,7 @@ test('Protocol Admin UI treats complaint text as untrusted and menu authority as
   assert.doesNotMatch(actionedBlock, /'reopen'/);
   assert.match(page, /report\.status === 'dismissed' \|\| report\.status === 'resolved'/);
   assert.match(page, /\['pending_review', 'actioned', 'dismissed', 'resolved'\]/);
-  assert.match(header, /fetch\('\/api\/moderation\/access'/);
+  assert.match(header, /fetch\(`\/api\/moderation\/access\?expectedWallet=\$\{encodeURIComponent\(wallet\)\}`/);
   assert.match(header, /result\.eligible === true/);
   assert.doesNotMatch(header, /localStorage[^\n]*(?:admin|moderator|staff)/i);
   assert.match(html, /noindex,nofollow/);

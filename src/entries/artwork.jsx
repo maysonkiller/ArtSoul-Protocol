@@ -6,12 +6,6 @@ import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import { ArtistSupport } from '../features/artwork/artist-support.jsx';
 
-// A8a: the WebAuthn browser helper is loaded lazily (dynamic import) ONLY
-// after the server signals a staff wallet needs passkey step-up/enrollment,
-// so it never ships in the artwork bundle for ordinary visitors.
-function loadWebAuthnBrowser() {
-    return import('@simplewebauthn/browser');
-}
 import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
 import '../../supabase-client.js';
@@ -19,96 +13,6 @@ import '../../supabase-auth.js';
 
 const { useState, useEffect, useRef } = React;
 
-function AdditionalPasskeyGrant({walletAddress, api, onStepUpRequired}) {
-    const wallet = String(walletAddress || '').toLowerCase();
-    const activeWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
-    const [grant, setGrant] = useState(null);
-    const [busy, setBusy] = useState(false);
-    const [notice, setNotice] = useState('');
-    const operationRef = useRef(0);
-    const busyRef = useRef(false);
-    const grantRef = useRef(null);
-    function clearGrant() {
-        operationRef.current++;
-        grantRef.current = null;
-        busyRef.current = false;
-        setGrant(null); setBusy(false); setNotice('');
-    }
-    useEffect(() => {
-        const invalidate = () => {clearGrant(); onStepUpRequired();};
-        const storage = event => {if (!event.key || event.key === 'artsoul_authenticated_wallet') invalidate();};
-        window.addEventListener('artsoul:wallet-state-changed', invalidate);
-        window.addEventListener('artsoul:auth-state-changed', invalidate);
-        window.addEventListener('storage', storage);
-        window.addEventListener('pagehide', clearGrant);
-        return () => {
-            operationRef.current++; grantRef.current = null;
-            window.removeEventListener('artsoul:wallet-state-changed', invalidate);
-            window.removeEventListener('artsoul:auth-state-changed', invalidate);
-            window.removeEventListener('storage', storage);
-            window.removeEventListener('pagehide', clearGrant);
-        };
-    }, [wallet]);
-    useEffect(() => {
-        if (!grant) return;
-        const timer = setTimeout(() => {
-            if (grantRef.current !== grant) return;
-            clearGrant();
-            setNotice('The enrollment code expired. Verify your passkey before creating another.');
-            onStepUpRequired();
-        }, Math.max(0, grant.expiresAt - Date.now()));
-        return () => clearTimeout(timer);
-    }, [grant]);
-    async function issueGrant() {
-        if (busyRef.current || grantRef.current || !wallet || activeWallet() !== wallet) return;
-        busyRef.current = true; setBusy(true); setNotice('');
-        const operation = ++operationRef.current;
-        try {
-            const authenticated = await window.ensureAuthenticated?.();
-            if (operation !== operationRef.current || activeWallet() !== wallet) return;
-            if (!authenticated) {onStepUpRequired(); return;}
-            // The existing route rechecks SIWE, role and the live passkey session.
-            const result = await api('passkey-grant');
-            if (operation !== operationRef.current || activeWallet() !== wallet) return;
-            const expiresAt = Math.min(Date.parse(result.expires_at), Date.now() + 15 * 60 * 1000);
-            if (result.success !== true || !/^[A-Za-z0-9_-]{43}$/.test(result.token || '') || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error('INVALID_GRANT');
-            const next = {token: result.token, expiresAt};
-            grantRef.current = next; setGrant(next);
-        } catch (error) {
-            if (operation !== operationRef.current || activeWallet() !== wallet) return;
-            if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED', 'ADMIN_REQUIRED', 'PASSKEY_DISABLED'].includes(error.code)) onStepUpRequired();
-            else setNotice('Could not create an enrollment code. Verify your passkey and try again.');
-        } finally {
-            if (operation === operationRef.current && activeWallet() === wallet) {busyRef.current = false; setBusy(false);}
-        }
-    }
-    async function copyGrant() {
-        const current = grantRef.current;
-        if (!current || activeWallet() !== wallet || current.expiresAt <= Date.now()) {clearGrant(); return;}
-        const operation = operationRef.current;
-        try {
-            await navigator.clipboard.writeText(current.token);
-            if (operation === operationRef.current && activeWallet() === wallet) setNotice('Code copied. Paste it only into Enroll passkey on your other device.');
-        } catch {
-            if (operation === operationRef.current && activeWallet() === wallet) setNotice('Select the code and copy it manually.');
-        }
-    }
-    return (
-        <div className="space-y-2" aria-label="Add another passkey">
-            {!grant && <button type="button" className="btn-secondary w-full" data-allow-rapid="true" disabled={busy} onClick={issueGrant}>{busy ? 'Creating code...' : 'Add a passkey on another device'}</button>}
-            {grant && <>
-                <p className="text-sm">On your other device, sign in with this wallet, open an artwork and select Enroll passkey (grant required). Use an independent authenticator.</p>
-                <label className="block text-sm">One-time enrollment code
-                    <input readOnly autoComplete="off" spellCheck={false} value={grant.token} className="w-full px-3 py-2 rounded-lg" style={{background: 'var(--c-surface)', color: 'var(--c-text)', border: '1px solid var(--c-border)'}} />
-                </label>
-                <p className="text-xs">Expires at {new Date(grant.expiresAt).toLocaleTimeString()}. Keep it private. Clearing this page does not revoke a copied code.</p>
-                <button type="button" className="btn-secondary" data-allow-rapid="true" onClick={copyGrant}>Copy code</button>
-            </>}
-            {(grant || busy) && <button type="button" className="btn-secondary" data-allow-rapid="true" onClick={clearGrant}>{busy ? 'Cancel' : 'Clear code'}</button>}
-            {notice && <p className="text-sm" role="status">{notice}</p>}
-        </div>
-    );
-}
 
 function useDecodedImage(source, fallback = '') {
     const [prepared, setPrepared] = useState({ source: '', url: '', failed: false });
@@ -431,12 +335,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [moderationReason, setModerationReason] = useState('');
             const [moderationBusy, setModerationBusy] = useState(false);
             const [moderationMessage, setModerationMessage] = useState('');
-            // A8a passkey step-up (rendered only when the server says the
-            // feature applies to this staff wallet; inert while the flag is off).
-            const [passkeyAccess, setPasskeyAccess] = useState(null);
-            const [passkeyCredentials, setPasskeyCredentials] = useState(null);
-            const [passkeyBusy, setPasskeyBusy] = useState(false);
-            const [passkeyMessage, setPasskeyMessage] = useState('');
             const [walletRenderState, setWalletRenderState] = useState(() => ({
                 settled: window.artsoulWalletStateSettled === true,
                 address: window.artsoulSettledWalletState?.address || window.currentWalletAddress || null,
@@ -1549,7 +1447,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         // The API serializes machine codes as { error, message },
                         // so the code lives in result.error (not result.code).
                         if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.error)) {
-                            setPasskeyAccess({ required: true, active: false, wallet: result.access?.wallet });
                             setModerationAccess(null);
                             return false;
                         }
@@ -1563,10 +1460,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         ...result.access,
                         ...(result.data || {})
                     });
-                    const staffPasskeyRequired = result.access?.passkeyRequired === true && Boolean(result.access?.role);
-                    setPasskeyAccess(staffPasskeyRequired
-                        ? { required: true, active: result.access.stepUpActive === true, wallet: result.access.wallet }
-                        : null);
                     setModerationReason(result.data?.hidden_reason || '');
                     setModerationMessage('');
                     return true;
@@ -1706,95 +1599,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 } finally {
                     reportSubmissionRef.current = false;
                     setReportBusy(false);
-                }
-            }
-
-            async function passkeyApi(path, payload) {
-                const response = await fetch(`/api/moderation/${path}`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: payload ? JSON.stringify(payload) : undefined
-                });
-                const result = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    const error = new Error(result.message || result.error || 'Passkey request failed');
-                    error.code = result.error;
-                    throw error;
-                }
-                return result;
-            }
-
-            async function loadModerationPasskeys() {
-                try {
-                    const response = await fetch('/api/moderation/passkeys', {
-                        method: 'GET',
-                        credentials: 'include'
-                    });
-                    const result = await response.json().catch(() => ({}));
-                    if (response.ok) setPasskeyCredentials(result.credentials || []);
-                } catch {
-                    // The list is informational; step-up errors surface elsewhere.
-                }
-            }
-
-            async function startPasskeyStepUp() {
-                if (passkeyBusy) return;
-                const wallet = String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
-                setPasskeyBusy(true);
-                setPasskeyMessage('');
-                try {
-                    const { startAuthentication } = await loadWebAuthnBrowser();
-                    const optionsResult = await passkeyApi('passkey-auth-options');
-                    const assertion = await startAuthentication({ optionsJSON: optionsResult.options });
-                    await passkeyApi('passkey-auth-verify', { response: assertion });
-                    setPasskeyAccess({ required: true, active: true, wallet });
-                    setPasskeyMessage('Moderation session active for 15 minutes.');
-                    await loadModerationVisibility(artwork, { interactive: true });
-                    await loadModerationPasskeys();
-                } catch (error) {
-                    setPasskeyMessage(error.code === 'NO_CREDENTIALS'
-                        ? 'No passkey is enrolled for this wallet yet. Enroll one with a valid token first.'
-                        : error.message || 'Passkey step-up failed.');
-                } finally {
-                    setPasskeyBusy(false);
-                }
-            }
-
-            async function enrollModerationPasskey() {
-                if (passkeyBusy) return;
-                // Enrollment requires the one-time bearer token issued by the
-                // bootstrap runbook or a step-up self-grant.
-                const token = (window.prompt('Paste your one-time enrollment token') || '').trim();
-                if (!token) return;
-                setPasskeyBusy(true);
-                setPasskeyMessage('');
-                try {
-                    const { startRegistration } = await loadWebAuthnBrowser();
-                    const optionsResult = await passkeyApi('passkey-register-options', { token });
-                    const attestation = await startRegistration({ optionsJSON: optionsResult.options });
-                    await passkeyApi('passkey-register-verify', { token, response: attestation });
-                    setPasskeyMessage('Passkey enrolled. Verify it to start a moderation session.');
-                    await loadModerationPasskeys();
-                } catch (error) {
-                    setPasskeyMessage(error.message || 'Passkey enrollment failed.');
-                } finally {
-                    setPasskeyBusy(false);
-                }
-            }
-
-            async function revokeModerationPasskey(credentialId) {
-                if (passkeyBusy) return;
-                setPasskeyBusy(true);
-                setPasskeyMessage('');
-                try {
-                    await passkeyApi('passkeys', { action: 'revoke', credential_id: credentialId });
-                    setPasskeyMessage('Passkey revoked.');
-                    await loadModerationPasskeys();
-                } catch (error) {
-                    setPasskeyMessage(error.message || 'Passkey revocation failed.');
-                } finally {
-                    setPasskeyBusy(false);
                 }
             }
 
@@ -3658,84 +3462,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
                             {/* Artwork Info */}
                             <aside className="artwork-page-right">
-                                {/* A8a staff passkey step-up. Rendered only when the server
-                                    reports the passkey requirement for this staff wallet;
-                                    completely absent while the feature flag is disabled. */}
-                                {passkeyAccess?.required && isSameAddress(passkeyAccess.wallet, connectedWalletAddress) && (
-                                    <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff passkey">
-                                        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                                            <h3 className="text-lg font-bold">Staff passkey</h3>
-                                            <span className="moderation-state rounded-full px-3 py-1 text-xs font-bold">
-                                                {passkeyAccess.active ? 'Session active (15 min)' : 'Step-up required'}
-                                            </span>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {!passkeyAccess.active && (
-                                                <p className="text-sm opacity-80">
-                                                    Verify a registered passkey to open a 15-minute moderation session.
-                                                </p>
-                                            )}
-                                            <button
-                                                type="button"
-                                                className="btn-main w-full"
-                                                disabled={passkeyBusy}
-                                                onClick={startPasskeyStepUp}
-                                            >
-                                                {passkeyBusy ? 'Working...' : 'Verify passkey'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn-secondary w-full"
-                                                disabled={passkeyBusy}
-                                                onClick={enrollModerationPasskey}
-                                            >
-                                                Enroll passkey (grant required)
-                                            </button>
-                                            {passkeyAccess.active && <AdditionalPasskeyGrant key={String(connectedWalletAddress).toLowerCase()} walletAddress={connectedWalletAddress} api={passkeyApi} onStepUpRequired={() => {
-                                                setPasskeyAccess(current => current ? {...current, active: false} : null);
-                                                setPasskeyMessage('Verify your passkey before adding another device.');
-                                            }} />}
-                                            {passkeyCredentials === null ? (
-                                                <button
-                                                    type="button"
-                                                    className="btn-secondary w-full"
-                                                    disabled={passkeyBusy}
-                                                    onClick={loadModerationPasskeys}
-                                                >
-                                                    Show my passkeys
-                                                </button>
-                                            ) : (
-                                                <ul className="space-y-2 text-sm">
-                                                    {passkeyCredentials.length === 0 && (
-                                                        <li className="opacity-70">No passkeys enrolled yet.</li>
-                                                    )}
-                                                    {passkeyCredentials.map(credential => (
-                                                        <li key={credential.credential_id} className="flex items-center justify-between gap-2">
-                                                            <span className="min-w-0 truncate">
-                                                                {credential.label || `${credential.credential_id.slice(0, 10)}...`}
-                                                                {credential.revoked_at ? ' (revoked)' : ''}
-                                                            </span>
-                                                            {!credential.revoked_at && (
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn-secondary"
-                                                                    disabled={passkeyBusy}
-                                                                    onClick={() => revokeModerationPasskey(credential.credential_id)}
-                                                                >
-                                                                    Revoke
-                                                                </button>
-                                                            )}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                            {passkeyMessage && (
-                                                <p className="text-sm" role="status">{passkeyMessage}</p>
-                                            )}
-                                        </div>
-                                    </section>
-                                )}
-
                                 {moderationAccess?.canModerate && (
                                     <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">

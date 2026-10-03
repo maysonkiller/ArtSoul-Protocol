@@ -693,6 +693,7 @@ body.future .artwork-page-compact-action {
 }
 
 .classic {
+    --c-modal-backdrop: rgba(10, 18, 24, 0.82);
     --c-bg: var(--bg-classic);
     --c-surface: #010101;
     --c-surface-muted: rgba(169, 221, 211, 0.05);
@@ -717,6 +718,7 @@ body.future .artwork-page-compact-action {
 }
 
 .future {
+    --c-modal-backdrop: rgba(0, 0, 0, 0.86);
     --c-bg: #000000;
     --c-surface: #020611;
     --c-surface-muted: rgba(0, 245, 255, 0.05);
@@ -3126,6 +3128,27 @@ body.future .resale-modal {
     gap: 8px;
     margin-top: 0;
 }
+
+.protocol-admin-dialog.protocol-admin-passkeys::backdrop { background: var(--c-modal-backdrop); }
+.protocol-admin-dialog.protocol-admin-passkeys {
+    width: min(560px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    color: var(--c-text);
+    background: var(--c-surface);
+}
+.protocol-admin-passkey-content { display: grid; gap: 20px; }
+.protocol-admin-passkey-content header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.protocol-admin-passkey-content h2,
+.protocol-admin-passkey-content h3 { margin: 0; color: var(--c-text); -webkit-text-fill-color: currentColor; background: none; animation: none; }
+.protocol-admin-passkey-content section { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--c-border-soft); }
+.protocol-admin-passkey-content p { margin: 0; line-height: 1.5; }
+.protocol-admin-passkey-content input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); }
+.protocol-admin-passkey-content button { min-height: 44px; }
+.protocol-admin-passkey-content ul { padding: 0; list-style: none; }
+.protocol-admin-passkey-content li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.protocol-admin-setup { margin-top: 24px; }
+.protocol-admin-setup > p { color: var(--c-text-muted); line-height: 1.5; }
 
 .artsoul-card-menu-host { display: contents; }
 .artsoul-card-link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }

@@ -1,10 +1,7 @@
 import { React, createRoot } from './react-runtime.js';
+import { StaffPasskeyDialog } from '../features/admin/staff-passkeys.jsx';
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
-
-function loadWebAuthnBrowser() {
-    return import('@simplewebauthn/browser');
-}
 
 function shortWallet(value = '') {
     const wallet = String(value || '');
@@ -157,13 +154,15 @@ function ReportActions({ report, onChoose }) {
     return null;
 }
 
-function AccessGate({ state, busy, message, onAuthenticate, onStepUp, onRetry }) {
+function AccessGate({ state, busy, message, onAuthenticate, onStepUp, onRetry, setupAvailable }) {
     const copy = {
         loading: ['Checking access', 'Confirming the current server session.'],
         disabled: ['Protocol Admin is disabled', 'The review workspace is not active in this environment.'],
         unauthenticated: ['Wallet verification required', 'Verify the connected wallet before the server checks staff access.'],
         ineligible: ['Access unavailable', 'This wallet does not have an active staff role.'],
-        step_up: ['Passkey verification required', 'Verify a registered passkey to open a 15-minute moderation session.'],
+        step_up: ['Admin panel', 'Open verification below to use a saved passkey or add your first one.'],
+        setup: ['Admin panel', 'Set up your passkeys here. The review workspace is not active yet.'],
+        setup_verified: ['Admin access confirmed', 'Your passkey is verified. The review workspace is not active yet.'],
         error: ['Protocol Admin unavailable', message || 'The access check could not be completed.']
     }[state] || ['Protocol Admin', message || 'Access is not ready.'];
 
@@ -172,8 +171,8 @@ function AccessGate({ state, busy, message, onAuthenticate, onStepUp, onRetry })
             <h1>{copy[0]}</h1>
             <p>{copy[1]}</p>
             {state === 'unauthenticated' && <button type="button" onClick={onAuthenticate} disabled={busy}>Verify wallet</button>}
-            {state === 'step_up' && <button type="button" onClick={onStepUp} disabled={busy}>{busy ? 'Verifying...' : 'Verify passkey'}</button>}
-            {state === 'error' && <button type="button" onClick={onRetry} disabled={busy}>Retry</button>}
+            {state === 'step_up' && setupAvailable && <button type="button" onClick={onStepUp} disabled={busy}>Verify admin access</button>}
+            {(state === 'error' || (!setupAvailable && ['setup', 'setup_verified', 'step_up'].includes(state))) && <button type="button" onClick={onRetry} disabled={busy}>Retry</button>}
         </section>
     );
 }
@@ -188,6 +187,26 @@ function ProtocolAdminPage() {
     const [message, setMessage] = useState('');
     const [decision, setDecision] = useState(null);
     const queueStatusRef = useRef(queueStatus);
+    const [setupWallet, setSetupWallet] = useState('');
+    const [passkeyOpen, setPasskeyOpen] = useState(false);
+    const setupEpoch = useRef(0), openedSetupFor = useRef('');
+    const currentSetupWallet = () => window.artsoulWalletStateSettled === true
+        ? String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase() : '';
+    useEffect(() => {
+        const clearSetup = () => { setupEpoch.current++; openedSetupFor.current = ''; setSetupWallet(''); setPasskeyOpen(false); };
+        const storage = event => { if (!event.key || ['artsoul_wallet', 'artsoul_authenticated_wallet'].includes(event.key)) clearSetup(); };
+        window.addEventListener('artsoul:wallet-state-changed', clearSetup);
+        window.addEventListener('artsoul:auth-state-changed', clearSetup);
+        window.addEventListener('storage', storage);
+        window.addEventListener('pagehide', clearSetup);
+        return () => {
+            setupEpoch.current++;
+            window.removeEventListener('artsoul:wallet-state-changed', clearSetup);
+            window.removeEventListener('artsoul:auth-state-changed', clearSetup);
+            window.removeEventListener('storage', storage);
+            window.removeEventListener('pagehide', clearSetup);
+        };
+    }, []);
 
     useEffect(() => {
         queueStatusRef.current = queueStatus;
@@ -202,14 +221,24 @@ function ProtocolAdminPage() {
         setBusy(true);
         setMessage('');
         try {
-            const result = await api('access');
+            const wallet = currentSetupWallet(), epoch = setupEpoch.current;
+            const result = await api(`access${wallet ? `?expectedWallet=${encodeURIComponent(wallet)}` : ''}`);
+            const canSetup = result.setupEnabled === true && result.authenticated === true && result.eligible === true &&
+                /^0x[0-9a-f]{40}$/.test(wallet) && wallet === currentSetupWallet() && epoch === setupEpoch.current;
+            if (epoch === setupEpoch.current) {
+                setSetupWallet(canSetup ? wallet : '');
+                if (!canSetup) setPasskeyOpen(false);
+                else if (!result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
+            }
             setAccess(result.access || null);
-            if (!result.enabled) {
+            if (!result.enabled && !result.setupEnabled) {
                 setAccessState('disabled');
             } else if (!result.authenticated) {
                 setAccessState('unauthenticated');
             } else if (!result.eligible) {
                 setAccessState('ineligible');
+            } else if (!result.enabled) {
+                setAccessState(result.access?.stepUpActive ? 'setup_verified' : 'setup');
             } else if (!result.access?.stepUpActive) {
                 setAccessState('step_up');
             } else {
@@ -225,7 +254,14 @@ function ProtocolAdminPage() {
     }, [loadQueue]);
 
     useEffect(() => {
-        checkAccess();
+        if (window.artsoulWalletStateSettled === true) { checkAccess(); return undefined; }
+        const ready = () => {
+            if (window.artsoulWalletStateSettled !== true) return;
+            window.removeEventListener('artsoul:wallet-state-changed', ready);
+            checkAccess();
+        };
+        window.addEventListener('artsoul:wallet-state-changed', ready);
+        return () => window.removeEventListener('artsoul:wallet-state-changed', ready);
     }, [checkAccess]);
 
     const authenticate = async () => {
@@ -242,21 +278,7 @@ function ProtocolAdminPage() {
         }
     };
 
-    const stepUp = async () => {
-        setBusy(true);
-        setMessage('');
-        try {
-            const { startAuthentication } = await loadWebAuthnBrowser();
-            const optionsResult = await api('passkey-auth-options', { method: 'POST' });
-            const assertion = await startAuthentication({ optionsJSON: optionsResult.options });
-            await api('passkey-auth-verify', { method: 'POST', body: JSON.stringify({ response: assertion }) });
-            await checkAccess();
-        } catch (error) {
-            setMessage(error.message || 'Passkey verification failed.');
-            setAccessState('step_up');
-            setBusy(false);
-        }
-    };
+    const stepUp = () => { if (setupWallet) setPasskeyOpen(true); };
 
     const changeQueueStatus = async status => {
         setQueueStatus(status);
@@ -303,6 +325,16 @@ function ProtocolAdminPage() {
         }
     };
 
+    const verification = setupWallet && <section className="protocol-admin-setup" aria-label="Admin verification">
+        {accessState !== 'step_up' && <button type="button" className="protocol-admin-primary" disabled={busy} onClick={stepUp}>{access?.stepUpActive ? 'Manage passkeys' : 'Verify admin access'}</button>}
+        <p>Only your device can approve a passkey request. Enrollment codes stay on this page and are cleared when you close verification.</p>
+        {passkeyOpen && <StaffPasskeyDialog key={setupWallet} walletAddress={setupWallet} sessionActive={access?.stepUpActive === true}
+            api={api} onClose={() => setPasskeyOpen(false)} onAccessChanged={checkAccess} onStepUpRequired={() => {
+                setAccess(current => current ? { ...current, stepUpActive: false } : null);
+                setAccessState('step_up');
+            }} />}
+    </section>;
+
     const groups = useMemo(() => groupReports(data.reports), [data.reports]);
 
     if (accessState !== 'ready') {
@@ -310,12 +342,14 @@ function ProtocolAdminPage() {
             <div className="protocol-admin-shell">
                 <AccessGate
                     state={accessState}
+                    setupAvailable={Boolean(setupWallet)}
                     busy={busy}
                     message={message}
                     onAuthenticate={authenticate}
                     onStepUp={stepUp}
                     onRetry={checkAccess}
                 />
+                {verification}
             </div>
         );
     }
@@ -325,7 +359,7 @@ function ProtocolAdminPage() {
             <header className="protocol-admin-heading">
                 <div>
                     <p className="protocol-admin-kicker">Protected workspace</p>
-                    <h1>Protocol Admin</h1>
+                    <h1>Admin panel</h1>
                     <p>Role: {access?.role || 'staff'} · passkey session active for up to 15 minutes</p>
                 </div>
                 <button type="button" onClick={() => changeQueueStatus(queueStatus)} disabled={busy}>Refresh</button>
@@ -446,6 +480,7 @@ function ProtocolAdminPage() {
             )}
 
             <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} />
+            {verification}
         </div>
     );
 }
