@@ -3143,7 +3143,7 @@ body.future .resale-modal {
 .protocol-admin-passkey-content h3 { margin: 0; color: var(--c-text); -webkit-text-fill-color: currentColor; background: none; animation: none; }
 .protocol-admin-passkey-content section { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--c-border-soft); }
 .protocol-admin-passkey-content p { margin: 0; line-height: 1.5; }
-.protocol-admin-passkey-content input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); }
+.protocol-admin-passkey-content input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); font: inherit; }
 .protocol-admin-passkey-content button { min-height: 44px; }
 .protocol-admin-passkey-content ul { padding: 0; list-style: none; }
 .protocol-admin-passkey-content li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
@@ -5763,6 +5763,18 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 }
 
 /* Protocol Admin: protected, feature-flagged moderation workspace. */
+.protocol-admin-page {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+.protocol-admin-page,
+.protocol-admin-page *,
+.protocol-admin-page *::before,
+.protocol-admin-page *::after {
+    box-sizing: border-box;
+}
+
 .protocol-admin-root {
     min-height: calc(100vh - var(--site-header-height, 96px));
     background: var(--c-bg);
