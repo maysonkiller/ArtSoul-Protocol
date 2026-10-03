@@ -14,7 +14,7 @@ test('all card surfaces use the shared first-paint media descriptor', () => {
   assert.match(source, /if \(!descriptor\.known\)[\s\S]*createMediaLoadingElement/);
   assert.match(homepage, /surface: 'homepage'/);
   assert.match(gallery, /surface="gallery"/);
-  assert.match(profile, /ArtSoulArtworkCard\?\.ReactMedia/);
+  assert.match(profile, /ArtSoulArtworkCard\?\.ReactCard/);
 });
 
 test('detail uses the shared descriptor and never defaults unresolved media to audio UI', () => {
@@ -24,11 +24,9 @@ test('detail uses the shared descriptor and never defaults unresolved media to a
   assert.doesNotMatch(detail, /const getMediaType =/);
 });
 
-test('title polish is surface-scoped and keeps homepage shimmer available', () => {
-  assert.match(css, /artsoul-artwork-card-gallery \.artsoul-card-title[\s\S]*animation: none !important/);
-  assert.match(css, /profile-artwork-card \.artsoul-card-title/);
+test('all card titles share the same styling while page headings keep their theme', () => {
+  assert.match(css, /artsoul-artwork-card \.artsoul-card-title[\s\S]*animation: none !important/);
   assert.match(css, /\.future h1,[\s\S]*\.future h3[\s\S]*animation: gradientFlow/);
-  assert.doesNotMatch(css, /artsoul-artwork-card-homepage \.artsoul-card-title[\s\S]*animation: none/);
 });
 
 test('borders, Add New alignment, and status pills use shared themed styling', () => {

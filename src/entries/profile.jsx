@@ -487,111 +487,22 @@ const { useState, useEffect, useRef } = React;
                 return result;
             }
 
-            function getProfileArtworkStatus(artwork = {}) {
-                return window.ArtSoulArtworkCard?.statusInfo?.(artwork) || {
-                    key: 'not_minted',
-                    label: 'Not yet minted'
-                };
-            }
-
-            function getProfileArtworkPrice(artwork = {}) {
-                return window.ArtSoulArtworkCard?.formatPrice?.(artwork) || '';
-            }
-
             function getProfileArtworkHref(artwork = {}) {
                 const sharedHref = window.ArtSoulArtworkCard?.detailHref?.(artwork) || '';
                 if (!sharedHref || sharedHref.includes('id=pending%3A')) return '';
                 return sharedHref;
             }
 
-            function ProfileArtworkMedia({ artwork, onUnavailable }) {
-                const SharedMedia = window.ArtSoulArtworkCard?.ReactMedia;
-                return SharedMedia ? <SharedMedia artwork={artwork} onUnavailable={onUnavailable} /> : null;
-            }
-
             function ProfileArtworkCard({ artwork }) {
-                const [mediaUnavailable, setMediaUnavailable] = useState(false);
-                const sharedCards = window.ArtSoulArtworkCard;
-                const mediaKey = sharedCards?.mediaUrl?.(artwork) || '';
-                useEffect(() => setMediaUnavailable(false), [mediaKey]);
-                if (!sharedCards?.hasSafeMedia?.(artwork) || mediaUnavailable) return null;
-
-                const status = getProfileArtworkStatus(artwork);
-                const price = getProfileArtworkPrice(artwork);
+                const SharedCard = window.ArtSoulArtworkCard?.ReactCard;
                 const href = getProfileArtworkHref(artwork);
-                const creatorLabel = sharedCards?.creatorLabel;
-                const SharedCountdown = sharedCards?.ReactCountdown;
-                const CardElement = href ? 'a' : 'div';
-                // An artwork registered on-chain whose auction never went through
-                // has nowhere else to go: publishing is two transactions, and if
-                // the second one fails the first is already permanent. Until now
-                // the failure message sent people to their profile for a retry
-                // that did not exist, and the card was only a link. This is that
-                // retry. It appears for your own work, on Base Sepolia, that is
-                // registered with no auction of any kind.
-                //
-                // A-77 widened this. The first version asked for status
-                // `registered` and no auction id, which covered only the failed
-                // second transaction. An auction that runs and ends with no bids
-                // leaves the artwork in exactly the same position - unminted,
-                // with no auction, free to be auctioned again - but its status is
-                // `defaulted` and, until the indexer fix in this change, the
-                // projection still carried the finished auction's id. Both
-                // conditions were false, so the one state the contract was most
-                // ready to auction again was the state the interface refused to
-                // offer. Verified against `ArtSoulCore.createAuction`, which asks
-                // only that the work is unminted with `activeAuctionId == 0`, and
-                // all three on-chain paths that finish an auction - no bids,
-                // settlement, winner default - set it back to 0.
-                //
-                // Deliberately gated on lifecycle rather than on the auction id:
-                // that id is the field that was wrong, and rows already stored
-                // with it stay wrong until the backfill runs. `auction` and
-                // `awaiting_end` are excluded because a live auction must not be
-                // replaced and an expired one has to be finalized first;
-                // `settlement_pending` is excluded because the winner may still
-                // settle.
-                const lifecycle = String(artwork.status || '').toLowerCase();
-                const canStartAuction = isOwnProfile
-                    && isBaseSepoliaArtwork(artwork)
-                    && !isMintedArtwork(artwork)
-                    && (lifecycle === 'registered' || lifecycle === 'defaulted');
-
-                return (
-                    <CardElement
-                        href={href || undefined}
-                        className="artsoul-artwork-card profile-artwork-card"
-                        aria-label={href ? `Open ${artwork.title || 'artwork'}` : undefined}
-                    >
-                        <ProfileArtworkMedia artwork={artwork} onUnavailable={() => setMediaUnavailable(true)} />
-                        <div className="artsoul-card-body">
-                            <h4 className="artsoul-card-title">{artwork.title || 'Untitled Artwork'}</h4>
-                            {creatorLabel && (
-                                <p className="artsoul-card-creator">Creator: {creatorLabel(artwork)}</p>
-                            )}
-                            <div className="artsoul-card-meta">
-                                <span className={`artsoul-card-status artsoul-card-status-${status.key}`}>{status.label}</span>
-                                {price && <span className="artsoul-card-price">{price}</span>}
-                            </div>
-                            {artwork.pending_auction_sync && <p className="artsoul-card-creator" role="status">Transaction confirmed. Updating auction data.</p>}
-                            {canStartAuction && (
-                                <button
-                                    type="button"
-                                    className="btn-main profile-start-auction"
-                                    onClick={(event) => {
-                                        // The card itself is a link to the artwork.
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                        handleStartAuction(artwork);
-                                    }}
-                                >
-                                    Start auction
-                                </button>
-                            )}
-                        </div>
-                        {SharedCountdown && <SharedCountdown artwork={artwork} />}
-                    </CardElement>
-                );
+                return SharedCard ? <SharedCard
+                    artwork={artwork}
+                    minimal={true}
+                    surface="profile"
+                    href={href}
+                    onStartAuction={() => handleStartAuction(artwork)}
+                /> : null;
             }
 
             // Canon rule 13 / Phase A7: write eligibility fails closed. Only

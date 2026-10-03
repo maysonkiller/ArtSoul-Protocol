@@ -122,7 +122,7 @@ prototype. It is not acceptance of these deviations for mainnet:
 | Project NFT | Transferable 100-supply prototype | Retired; it is not Genesis and is never migrated |
 | No-bid lifecycle | Automatic no-bid transition is not implemented | Permissionless, automation-compatible mainnet transition |
 | Moderation step-up | Implementation and migrations may remain disabled behind resource gates | Final domain, reviewed WebAuthn RP ID, founder passkeys and Safe recovery before activation |
-| Domain and support email | Temporary Vercel origin; no final project mailbox | Funded permanent domain and monitored copyright/security contact before mainnet readiness |
+| Domain and support email | Permanent `artsoulprotocol.com` apex is live; `www` redirects to the apex. Sending-domain configuration exists, but real delivery and the monitored operational receive/reply path are not accepted by that setup alone | Verified monitored copyright/security contact and retention procedure before mainnet readiness |
 | Historical chain | Ethereum Sepolia data can remain readable | No active writes, selection, or migration of testnet ownership into mainnet |
 
 Frozen primary and resale economics are not changed by this document.

@@ -39,8 +39,18 @@ notification delivery is implemented, tested and published. The four dormant A8
 schema migrations were applied and verified on September 30; real signed-in
 notification reads now return 200 instead of the reproduced 503. The historical
 database remains pre-ledger; no old migration entries were fabricated.
-Activation and real operator acceptance remain outstanding. Reporting, admin and
-passkey flags remain disabled. See [schema evidence](audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
+Real operator acceptance remains outstanding. PR #288 is deployed at
+`1c55599bfabf848b41321a7452507dfec419c443`; candidate and post-merge CI passed.
+Apex runtime checks confirm the passkey and email flags are enabled. Reporting,
+Protocol Admin and Donate remain disabled. The October 2, 23:40 UTC read records
+one authorized founder role and one unused bootstrap grant, but zero passkeys;
+enabled routes and a grant do not prove enrollment or recovery. The corrected
+email hosting route accepted one real verification request, and Resend reports
+Delivered to the designated mailbox. Email-link confirmation remains unverified.
+The separate Donate contract is deployed and verified on Base Sepolia; payments
+and public activation still await indexer registration. See the
+[current checkpoint](audits/STABILIZATION_CHECKPOINT.md) and
+[schema evidence](audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
 
 The initial September 29 PostgreSQL baseline passed 46 checks across seven
 integration suites. The final application run includes the additional 11-check

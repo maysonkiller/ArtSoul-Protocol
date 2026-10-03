@@ -814,6 +814,7 @@ body.future .artwork-page-compact-action {
     border: 1px solid var(--c-card-border);
     color: var(--c-text);
     text-decoration: none;
+    cursor: pointer;
     transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
@@ -2544,6 +2545,7 @@ body.future .gallery-filter-panel {
 }
 
 .artsoul-card-body {
+    position: relative;
     display: flex;
     flex: 1;
     min-height: 0;
@@ -3066,6 +3068,7 @@ body.future .resale-modal {
 
 .artsoul-card-title {
     margin: 0;
+    padding-right: 28px;
     color: var(--c-text);
     font-size: 16px;
     font-weight: 700;
@@ -3086,8 +3089,7 @@ body.future .resale-modal {
     white-space: nowrap;
 }
 
-.future .artsoul-artwork-card-gallery .artsoul-card-title,
-.future .profile-artwork-card .artsoul-card-title,
+.future .artsoul-artwork-card .artsoul-card-title,
 .future .artwork-detail-title {
     background: none !important;
     color: var(--c-text) !important;
@@ -3100,6 +3102,7 @@ body.future .resale-modal {
 .artsoul-add-new-card .artsoul-card-title {
     align-items: center;
     text-align: center;
+    padding-right: 0;
 }
 
 .artsoul-card-description {
@@ -3117,11 +3120,67 @@ body.future .resale-modal {
 
 .artsoul-card-meta {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-top: auto;
+    margin-top: 0;
 }
+
+.artsoul-card-menu-host { display: contents; }
+.artsoul-card-link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.artsoul-card-link:focus-visible { outline: 2px solid var(--c-accent); outline-offset: -2px; }
+.artsoul-card-actions { position: relative; z-index: 2; }
+.artsoul-card-menu {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 3;
+}
+
+.artsoul-card-menu-toggle {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    color: var(--c-text);
+    cursor: pointer;
+    list-style: none;
+    font: 700 24px/1 sans-serif;
+}
+
+.artsoul-card-menu-toggle::-webkit-details-marker { display: none; }
+.artsoul-card-menu-toggle:hover,
+.artsoul-card-menu-toggle:focus-visible { background: var(--c-surface-muted); }
+.artsoul-artwork-card:has(.artsoul-card-menu[open]) { overflow: visible; z-index: 5; }
+.artsoul-artwork-card .artsoul-card-media { border-radius: 7px 7px 0 0; }
+.artsoul-card-menu-list {
+    position: absolute;
+    top: 32px;
+    right: 0;
+    width: max-content;
+    min-width: 150px;
+    max-width: 220px;
+    padding: 4px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 8px;
+    background: var(--c-surface);
+    box-shadow: 0 8px 24px rgba(var(--c-accent-rgb), 0.14);
+}
+
+.artsoul-card-menu-list a {
+    display: block;
+    min-height: 40px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    color: var(--c-text);
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 20px;
+}
+.artsoul-card-menu-list a:hover,
+.artsoul-card-menu-list a:focus-visible { background: var(--c-surface-muted); }
 
 .artsoul-card-status,
 .artsoul-card-price {
@@ -3158,6 +3217,7 @@ body.future .resale-modal {
 
 .artsoul-card-price {
     color: var(--c-text);
+    white-space: nowrap;
     background: rgba(var(--c-accent-rgb), 0.06);
 }
 

@@ -404,6 +404,106 @@
         return window.ArtSoulArtworkUrl.artworkPath(id);
     }
 
+    function cardActionItems(artwork = {}, config = {}, wallet = '') {
+        const href = detailHref(artwork);
+        if (!href || href.includes('id=pending%3A')) return [];
+        const items = [{ label: 'View artwork', href }];
+        const actionHref = action => `${href}${href.includes('?') ? '&' : '?'}action=${action}`;
+        const id = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):(\d{1,78})$/);
+        const chain = Number(artwork.chain_id ?? artwork.chainId ?? id?.[1]);
+        const registeredId = String(artwork.blockchain_id ?? artwork.artwork_id ?? id?.[2] ?? '');
+        const registered = /^\d{1,78}$/.test(registeredId);
+        const address = normalize(wallet);
+        const creator = normalize(artwork.creator_id || artwork.creator);
+        const owner = normalize(artwork.current_owner_address);
+        const ownsRole = /^0x[0-9a-f]{40}$/.test(address) && (address === creator || address === owner);
+        if (chain === 84532 && registered && ownsRole) {
+            const canStart = address === creator && !isMinted(artwork) &&
+                ['registered', 'defaulted'].includes(normalize(artwork.status));
+            items.push(canStart
+                ? { label: 'Start auction', href: actionHref('create-auction'), action: 'create-auction' }
+                : { label: 'Manage artwork', href: `${href}#artwork-actions` });
+        }
+        if (registered && chain === 84532 && creator && config.donations?.enabled === true && config.donations.chainId === 84532) {
+            items.push({ label: 'Donate', href: actionHref('donate') });
+        }
+        if (registered && [84532, 11155111].includes(chain) && config.reportingEnabled === true) {
+            items.push({ label: 'Report', href: actionHref('report') });
+        }
+        return items;
+    }
+
+    // Both renderers use this disclosure; opening it only reads cached public
+    // configuration. Actual writes remain in the artwork page's checked forms.
+    function createActionMenu(artwork, onStartAuction = null) {
+        if (!cardActionItems(artwork).length) return null;
+        const menu = document.createElement('details');
+        menu.className = 'artsoul-card-menu';
+        const toggle = document.createElement('summary');
+        toggle.className = 'artsoul-card-menu-toggle';
+        toggle.textContent = '⋯';
+        toggle.setAttribute('aria-label', `Actions for ${artwork.title || 'artwork'}`);
+        toggle.dataset.allowRapid = 'true';
+        const list = document.createElement('div');
+        list.className = 'artsoul-card-menu-list';
+        menu.append(toggle, list);
+        ['click', 'pointerdown', 'mousedown', 'touchstart', 'keydown'].forEach(type =>
+            menu.addEventListener(type, stopCardPropagation));
+        menu.addEventListener('keydown', event => {
+            if (event.key === 'Escape') { event.preventDefault(); menu.open = false; toggle.focus(); }
+        });
+        let request = 0;
+        let renderedItems = '';
+        const render = config => {
+            const wallet = window.currentWalletAddress || window.getCurrentWalletAddress?.() || '';
+            const items = cardActionItems(artwork, config, wallet);
+            const signature = JSON.stringify(items);
+            if (signature === renderedItems) return;
+            renderedItems = signature;
+            const focusedHref = list.contains(document.activeElement) ? document.activeElement.href : '';
+            list.replaceChildren();
+            items.forEach(item => {
+                const link = document.createElement('a');
+                link.href = item.href;
+                link.textContent = item.label;
+                link.dataset.allowRapid = 'true';
+                link.addEventListener('click', event => {
+                    event.stopPropagation();
+                    menu.open = false;
+                    if (item.action === 'create-auction' && onStartAuction && !event.defaultPrevented &&
+                        event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+                        event.preventDefault();
+                        onStartAuction();
+                    }
+                });
+                list.appendChild(link);
+                if (focusedHref && link.href === focusedHref) link.focus();
+            });
+        };
+        menu.addEventListener('toggle', async () => {
+            const current = ++request;
+            if (!menu.open) return;
+            document.querySelectorAll('.artsoul-card-menu[open]').forEach(other => { if (other !== menu) other.open = false; });
+            render(window.ArtSoulPublicConfigData || {});
+            try {
+                const config = await window.ArtSoulPublicConfig?.load?.();
+                if (menu.isConnected && menu.open && current === request && config) render(config);
+            } catch { /* Keep owner actions available; feature gates fail closed. */ }
+        });
+        return menu;
+    }
+
+    function ReactActionMenu({ artwork, onStartAuction }) {
+        const React = window.React;
+        const ref = React.useRef(null);
+        React.useEffect(() => {
+            const menu = createActionMenu(artwork, onStartAuction);
+            if (menu) ref.current?.appendChild(menu);
+            return () => menu?.remove();
+        }, [artwork, onStartAuction]);
+        return React.createElement('span', { ref, className: 'artsoul-card-menu-host' });
+    }
+
     function prepareVideoPreview(video, artwork = {}, options = {}) {
         if (!video || (video.dataset.artsoulPreviewPrepared === 'true' && !options.force)) return;
         video.dataset.artsoulPreviewPrepared = 'true';
@@ -601,11 +701,10 @@
         if (!hasSafeMedia(artwork)) return null;
 
         const href = options.href === false ? '' : (options.href || detailHref(artwork));
-        const card = document.createElement(href ? 'a' : 'div');
+        const card = document.createElement('div');
         const minimal = options.minimal === true;
         const surfaceClass = options.surface ? ` artsoul-artwork-card-${options.surface}` : '';
         card.className = `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surfaceClass}`;
-        if (href) card.href = href;
         if (options.onClick) card.addEventListener('click', options.onClick);
 
         const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
@@ -638,6 +737,8 @@
         body.appendChild(title);
         body.appendChild(creator);
         body.appendChild(meta);
+        const menu = href ? createActionMenu(artwork, options.onStartAuction) : null;
+        if (menu) body.appendChild(menu);
         if (artwork.pending_auction_sync) {
             const sync = document.createElement('p');
             sync.className = 'artsoul-card-creator';
@@ -650,6 +751,13 @@
         card.appendChild(body);
         const countdown = createCountdownElement(artwork);
         if (countdown) card.appendChild(countdown);
+        if (href) {
+            const link = document.createElement('a');
+            link.className = 'artsoul-card-link';
+            link.href = href;
+            link.setAttribute('aria-label', `Open ${artwork.title || 'artwork'}`);
+            card.appendChild(link);
+        }
         return card;
     }
 
@@ -830,7 +938,7 @@
         }, display.label);
     }
 
-    function ReactCard({ artwork = {}, onOpen = null, actions = null, respectHidden = true, minimal = false, surface = '' }) {
+    function ReactCard({ artwork = {}, href = '', onOpen = null, actions = null, onStartAuction = null, respectHidden = true, minimal = false, surface = '' }) {
         const React = window.React;
         const h = React.createElement;
         const [mediaUnavailable, setMediaUnavailable] = React.useState(false);
@@ -861,10 +969,12 @@
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
                 ),
+                href || onOpen ? h(ReactActionMenu, { artwork, onStartAuction }) : null,
                 artwork.pending_auction_sync ? h('p', { className: 'artsoul-card-creator', role: 'status' }, 'Transaction confirmed. Updating auction data.') : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             ),
-            h(ReactCountdown, { artwork })
+            h(ReactCountdown, { artwork }),
+            href ? h('a', { className: 'artsoul-card-link', href, 'aria-label': `Open ${artwork.title || 'artwork'}` }) : null
         );
     }
 
@@ -878,12 +988,20 @@
         });
     }
 
+    window.addEventListener('click', event => {
+        document.querySelectorAll('.artsoul-card-menu[open]').forEach(menu => { if (!menu.contains(event.target)) menu.open = false; });
+    });
+    window.addEventListener('artsoul:wallet-state-changed', () => {
+        document.querySelectorAll('.artsoul-card-menu[open]').forEach(menu => { menu.open = false; });
+    });
+
     window.ArtSoulArtworkCard = {
         createCardElement,
         createMediaElement,
         ReactCard,
         ReactMedia,
         ReactCountdown,
+        cardActionItems,
         creatorLabel,
         formatPrice,
         statusInfo,
