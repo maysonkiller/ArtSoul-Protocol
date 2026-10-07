@@ -116,7 +116,8 @@ test('recipient notifications authenticate, scope, paginate and project safely',
 
 function model(fetchPage) {
   let wallet = A, state;
-  const inbox = createNotificationInbox({wallet: A, getWallet: () => wallet, onChange: value => { state = value; }, fetchPage});
+  const inbox = createNotificationInbox({wallet: A, getWallet: () => wallet, onChange: value => { state = value; },
+    fetchPage: (url, options) => url.startsWith('/api/moderation/access?') ? Response.json({authenticated: true, eligible: false}) : fetchPage(url, options)});
   return {inbox, get state() {return state;}, switchWallet(value) {wallet = value; inbox.invalidate('auth');}};
 }
 const payload = (wallet = A, items = [{id: '2', message: 'Safe update'}], nextCursor = null) => Response.json({wallet, items, nextCursor});

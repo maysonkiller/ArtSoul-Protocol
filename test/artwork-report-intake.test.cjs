@@ -214,6 +214,42 @@ test('the database intake-limit signal is returned as a stable 429 response', as
   }
 });
 
+test('new and duplicate intake return without email claims or provider calls even when email is enabled', async t => {
+  const [{ default: handler }] = await modules;
+  const cookie = await sessionCookie();
+  const values = {
+    ARTSOUL_MODERATION_EMAIL_ENABLED: 'true', ARTSOUL_MODERATION_ALERT_EMAIL: 'review@example.test',
+    ARTSOUL_EMAIL_FROM: 'ArtSoul <review@example.test>', ARTSOUL_EMAIL_API_KEY: 'local-fixture',
+    ARTSOUL_PUBLIC_ORIGIN: 'https://artsoul.example'
+  };
+  const saved = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+  const previousFetch = global.fetch;
+  Object.assign(process.env, values);
+  t.after(() => {
+    global.fetch = previousFetch;
+    for (const [key, value] of Object.entries(saved)) value === undefined ? delete process.env[key] : process.env[key] = value;
+  });
+  for (const duplicate of [false, true]) {
+    const calls = [];
+    global.fetch = async url => {
+      calls.push(String(url));
+      if (String(url).endsWith('/rpc/submit_artwork_report')) return supabaseResponse([{
+        report_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', report_status: 'pending_review',
+        report_created_at: '2026-07-21T10:00:00.000Z', already_submitted: duplicate
+      }]);
+      throw new Error('Unexpected email claim or provider call in report intake');
+    };
+    const res = responseHarness();
+    await handler(request({chain_id: 84532, artwork_id: '42', category: 'other', details: 'Local fixture report', good_faith_confirmed: true}, cookie), res);
+    assert.equal(res.statusCode, duplicate ? 200 : 201);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.alreadySubmitted, duplicate);
+    assert.equal(res.body.report.reference, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    assert.deepEqual(calls, ['https://example.supabase.co/rest/v1/rpc/submit_artwork_report'],
+      'the committed intake response must not claim delivery or contact an email provider');
+  }
+});
+
 test('a duplicate pending category returns the existing report without creating a second receipt', async () => {
   const [{ default: handler }] = await modules;
   const cookie = await sessionCookie();

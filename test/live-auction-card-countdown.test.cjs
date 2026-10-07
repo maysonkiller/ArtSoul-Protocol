@@ -99,16 +99,18 @@ test('DOM cards share one timer and keep their compact body structure', () => {
 
   assert.equal(intervals.length, 1, 'all cards must reuse one interval');
   assert.equal(first.children[1].className, 'artsoul-card-body');
-  assert.equal(first.children[1].children.length, 4);
-  assert.equal(first.children[2].className, 'artsoul-card-countdown');
-  assert.equal(first.children[2].attributes.role, 'timer');
-  assert.equal(first.children[2].attributes['aria-live'], 'off');
+  assert.equal(first.children[1].children.length, 3);
+  assert.equal(first.children[2].className, 'artsoul-card-menu');
+  const firstTimer = first.children.find(child => child.className === 'artsoul-card-countdown');
+  const secondTimer = second.children.find(child => child.className === 'artsoul-card-countdown');
+  assert.equal(firstTimer.attributes.role, 'timer');
+  assert.equal(firstTimer.attributes['aria-live'], 'off');
 
   clock.now = future + 1;
   intervals[0]();
-  assert.equal(first.children[2].textContent, 'Ended');
-  assert.equal(second.children[2].textContent, 'Ended');
-  assert.match(first.children[2].className, /is-ended/);
+  assert.equal(firstTimer.textContent, 'Ended');
+  assert.equal(secondTimer.textContent, 'Ended');
+  assert.match(firstTimer.className, /is-ended/);
   assert.deepEqual(cleared, [1]);
 });
 

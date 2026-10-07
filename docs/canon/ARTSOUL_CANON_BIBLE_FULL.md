@@ -5,6 +5,14 @@ authorizes a separate chain-aware collection path for local/testnet development.
 It qualifies §§1, 4, 8, 9, 12 and 17 for that path only; the existing Base 1/1
 protocol and unapproved Genesis/mainnet economics remain unchanged.
 
+Approved direction (2026-10-07): [Administration and verified collections](CHANGELOG_2026-10-07_ADMIN_AUTHORITY.md)
+records mandatory approval by both designated authority wallets for role and
+critical changes, authenticator-app or security-key login, and reviewed
+collection-origin marks. These extensions to §§11 and 16 are not evidence of
+deployment or activation; current capabilities and remaining gates are stated
+in canon 07 and the stabilization checkpoint. Ordinary reports remain human
+moderator decisions. Auction economics and Trust weights are unchanged.
+
 ArtSoul is an auction-first NFT art protocol on Base. Artists publish work, the community discovers and signals interest, a primary auction establishes the first collector and canonical floor, settlement lazily mints the NFT, and later resale preserves creator royalties and public provenance.
 
 The internal codename is V4.1. Do not expose the version label in user-facing UI, investor materials, or public marketing copy.
@@ -195,6 +203,18 @@ deferral. Preserve the two independent passkeys, audited bootstrap and ordered
 activation checks; authorization to prepare is not evidence of enrollment or
 permission to bypass staff authorization. See
 `CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md` for the exact boundary.
+
+First-enrollment amendment, 2026-10-03: an authenticated, actively assigned staff
+wallet may explicitly create its first passkey without entering a code when its
+live, unused and audited bootstrap approval already exists. The server binds and
+atomically consumes that exact approval and challenge; it cannot create or renew
+approval through registration. Historical keys or an established bootstrap deny
+this path. Additional-device and Safe recovery enrollment keep their one-time
+tokens and authorization; a verified user's explicit native add-key flow may
+transfer its self-grant internally without displaying a code. The first approved
+bootstrap no longer requires separate code possession;
+the two independent founder passkeys, native user verification and Safe-only
+recovery requirements remain. See canon 07 and the A8a runbook for the boundary.
 
 ## 12. AI Valuation
 

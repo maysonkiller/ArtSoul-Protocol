@@ -148,16 +148,27 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
                 setCredentials(null); setMessage('Passkey removed. Show your passkeys to refresh the list.');
                 await onAccessChanged();
             } else {
+                if (action === 'add' && !sessionActive) { onStepUpRequired(); return; }
                 const browser = await loadWebAuthnBrowser();
                 if (!current()) return;
-                const enrolling = action === 'enroll';
-                const options = await post(enrolling ? 'passkey-register-options' : 'passkey-auth-options', enrolling ? { token } : undefined);
+                const enrolling = ['enroll', 'setup', 'add'].includes(action);
+                let approval = action === 'setup' ? { mode: 'approved-bootstrap' } : { token };
+                if (action === 'add') {
+                    // Existing step-up-protected self-grant, kept only for this
+                    // explicit native registration. No code is displayed or saved.
+                    const result = await post('passkey-grant');
+                    if (!current()) return;
+                    if (result.success !== true || !/^[A-Za-z0-9_-]{43}$/.test(result.token || '') ||
+                        !(Date.parse(result.expires_at) > Date.now())) throw new Error('INVALID_GRANT');
+                    approval = { token: result.token };
+                }
+                const options = await post(enrolling ? 'passkey-register-options' : 'passkey-auth-options', enrolling ? approval : undefined);
                 if (!current()) return;
                 const response = enrolling
                     ? await browser.startRegistration({ optionsJSON: options.options })
                     : await browser.startAuthentication({ optionsJSON: options.options });
                 if (!current()) return;
-                await post(enrolling ? 'passkey-register-verify' : 'passkey-auth-verify', enrolling ? { token, response } : { response });
+                await post(enrolling ? 'passkey-register-verify' : 'passkey-auth-verify', enrolling ? { ...approval, response } : { response });
                 if (!current()) return;
                 setEnrollmentCode(''); setCredentials(null);
                 setMessage(enrolling ? 'Passkey saved. Select Verify passkey to continue.' : 'Verified. Your admin session is active for up to 15 minutes.');
@@ -166,7 +177,8 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
         } catch (error) {
             if (!current()) return;
             const messages = {
-                NO_CREDENTIALS: 'No passkey is saved for this wallet. Add your first passkey using an enrollment code.',
+                NO_CREDENTIALS: 'No passkey is saved for this wallet. Select Set up passkey if your first enrollment has been approved.',
+                FIRST_ENROLLMENT_UNAVAILABLE: 'First passkey setup is not available for this wallet right now. Use a saved passkey, or ask the administrator to check your enrollment approval.',
                 LAST_ACTIVE_CREDENTIAL: 'Keep at least one active passkey. Add another before removing this one.',
                 ENROLLMENT_GRANT_REQUIRED: 'This enrollment code is invalid or expired. Use a new code.',
                 STEP_UP_REQUIRED: 'Verify your passkey before managing saved passkeys.'
@@ -184,21 +196,34 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
             <div className="protocol-admin-passkey-content">
                 <header><h2 id="adminPasskeyTitle">Verify admin access</h2><button ref={closeRef} type="button" onClick={close} aria-label="Close verification">Close</button></header>
                 <p id="adminPasskeyDescription">Use your device's fingerprint, face recognition, or security key to confirm it is you. Your wallet stays the same.</p>
+                {!sessionActive && <section aria-labelledby="firstPasskeyTitle">
+                    <h3 id="firstPasskeyTitle">Set up your first passkey</h3>
+                    <p>If your first enrollment is approved, your device will guide you through saving a passkey. No enrollment code is needed.</p>
+                    <button type="button" className="protocol-admin-primary" disabled={busy} onClick={() => perform('setup')}>Set up passkey</button>
+                </section>}
                 <section aria-labelledby="existingPasskeyTitle">
                     <h3 id="existingPasskeyTitle">Already have a passkey?</h3>
                     <p>Select Verify passkey, then follow your device's instructions.</p>
                     <button type="button" className="protocol-admin-primary" disabled={busy} onClick={() => perform('verify')}>{busy ? 'Please wait...' : 'Verify passkey'}</button>
                     {sessionActive && <p role="status">Admin verification is active for up to 15 minutes.</p>}
                 </section>
-                <section aria-labelledby="newPasskeyTitle">
-                    <h3 id="newPasskeyTitle">Add a passkey</h3>
-                    <p>Paste your private enrollment code, select Enroll passkey, and save the passkey on this device. Then verify it above.</p>
+                {sessionActive && <section aria-labelledby="additionalPasskeyTitle">
+                    <h3 id="additionalPasskeyTitle">Add a backup passkey</h3>
+                    <p>Your device will offer available passkey options. Choose an independent device or security key for a separate backup.</p>
+                    <button type="button" className="protocol-admin-primary" disabled={busy} onClick={() => perform('add')}>Add another passkey</button>
+                </section>}
+                <details>
+                    <summary>Advanced: another device or recovery code</summary>
+                    <section aria-labelledby="newPasskeyTitle">
+                    <h3 id="newPasskeyTitle">Use an enrollment code</h3>
+                    <p>For an additional device or approved recovery, paste your private code and save a passkey on this device. Then verify it above.</p>
                     <label htmlFor="adminEnrollmentCode">Enrollment code</label>
                     <input id="adminEnrollmentCode" type="password" autoComplete="off" spellCheck={false} value={enrollmentCode} disabled={busy}
                         onChange={event => setEnrollmentCode(event.target.value)} />
                     <button type="button" className="protocol-admin-secondary" disabled={busy || !enrollmentCode.trim()} onClick={() => perform('enroll')}>Enroll passkey</button>
-                </section>
+                    </section>
                 {sessionActive && <AdditionalPasskeyGrant walletAddress={wallet} api={post} onStepUpRequired={onStepUpRequired} />}
+                </details>
                 <section aria-labelledby="savedPasskeysTitle">
                     <h3 id="savedPasskeysTitle">Saved passkeys</h3>
                     <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => perform('show')}>Show my passkeys</button>

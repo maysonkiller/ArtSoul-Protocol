@@ -407,7 +407,7 @@
     function cardActionItems(artwork = {}, config = {}, wallet = '') {
         const href = detailHref(artwork);
         if (!href || href.includes('id=pending%3A')) return [];
-        const items = [{ label: 'View artwork', href }];
+        const items = [];
         const actionHref = action => `${href}${href.includes('?') ? '&' : '?'}action=${action}`;
         const id = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):(\d{1,78})$/);
         const chain = Number(artwork.chain_id ?? artwork.chainId ?? id?.[1]);
@@ -433,19 +433,35 @@
         return items;
     }
 
+    function cardDetailsText(artwork) {
+        return [artwork.title || 'Untitled Artwork', `Creator: ${creatorLabel(artwork)}`,
+            `Status: ${statusInfo(artwork).label}`, formatPrice(artwork)].filter(Boolean).join('\n');
+    }
+
     // Both renderers use this disclosure; opening it only reads cached public
     // configuration. Actual writes remain in the artwork page's checked forms.
     function createActionMenu(artwork, onStartAuction = null) {
-        if (!cardActionItems(artwork).length) return null;
+        const href = detailHref(artwork);
+        if (!href || href.includes('id=pending%3A')) return null;
         const menu = document.createElement('details');
         menu.className = 'artsoul-card-menu';
         const toggle = document.createElement('summary');
         toggle.className = 'artsoul-card-menu-toggle';
         toggle.textContent = '⋯';
-        toggle.setAttribute('aria-label', `Actions for ${artwork.title || 'artwork'}`);
+        toggle.setAttribute('aria-label', `Actions and details for ${artwork.title || 'artwork'}`);
         toggle.dataset.allowRapid = 'true';
         const list = document.createElement('div');
         list.className = 'artsoul-card-menu-list';
+        const actionList = document.createElement('div');
+        const info = document.createElement('details');
+        info.className = 'artsoul-card-info';
+        const infoToggle = document.createElement('summary');
+        infoToggle.textContent = 'Artwork details';
+        infoToggle.dataset.allowRapid = 'true';
+        const infoText = document.createElement('p');
+        infoText.textContent = cardDetailsText(artwork);
+        info.append(infoToggle, infoText);
+        list.append(actionList, info);
         menu.append(toggle, list);
         ['click', 'pointerdown', 'mousedown', 'touchstart', 'keydown'].forEach(type =>
             menu.addEventListener(type, stopCardPropagation));
@@ -460,8 +476,8 @@
             const signature = JSON.stringify(items);
             if (signature === renderedItems) return;
             renderedItems = signature;
-            const focusedHref = list.contains(document.activeElement) ? document.activeElement.href : '';
-            list.replaceChildren();
+            const focusedHref = actionList.contains(document.activeElement) ? document.activeElement.href : '';
+            actionList.replaceChildren();
             items.forEach(item => {
                 const link = document.createElement('a');
                 link.href = item.href;
@@ -476,9 +492,10 @@
                         onStartAuction();
                     }
                 });
-                list.appendChild(link);
+                actionList.appendChild(link);
                 if (focusedHref && link.href === focusedHref) link.focus();
             });
+            if (focusedHref && !actionList.contains(document.activeElement)) toggle.focus();
         };
         menu.addEventListener('toggle', async () => {
             const current = ++request;
@@ -738,7 +755,6 @@
         body.appendChild(creator);
         body.appendChild(meta);
         const menu = href ? createActionMenu(artwork, options.onStartAuction) : null;
-        if (menu) body.appendChild(menu);
         if (artwork.pending_auction_sync) {
             const sync = document.createElement('p');
             sync.className = 'artsoul-card-creator';
@@ -749,13 +765,15 @@
 
         card.appendChild(createMediaElement(artwork, () => card.remove()));
         card.appendChild(body);
+        if (menu) card.appendChild(menu);
         const countdown = createCountdownElement(artwork);
         if (countdown) card.appendChild(countdown);
         if (href) {
             const link = document.createElement('a');
             link.className = 'artsoul-card-link';
             link.href = href;
-            link.setAttribute('aria-label', `Open ${artwork.title || 'artwork'}`);
+            link.title = cardDetailsText(artwork);
+            link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
             card.appendChild(link);
         }
         return card;
@@ -950,6 +968,8 @@
         const price = formatPrice(artwork);
         return h('div', {
             className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surface ? ` artsoul-artwork-card-${surface}` : ''}`,
+            title: onOpen && !href ? cardDetailsText(artwork) : undefined,
+            'aria-label': onOpen && !href ? `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` : undefined,
             onClick: onOpen || undefined,
             role: onOpen ? 'button' : undefined,
             tabIndex: onOpen ? 0 : undefined,
@@ -969,12 +989,13 @@
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
                 ),
-                href || onOpen ? h(ReactActionMenu, { artwork, onStartAuction }) : null,
                 artwork.pending_auction_sync ? h('p', { className: 'artsoul-card-creator', role: 'status' }, 'Transaction confirmed. Updating auction data.') : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             ),
+            href || onOpen ? h(ReactActionMenu, { artwork, onStartAuction }) : null,
             h(ReactCountdown, { artwork }),
-            href ? h('a', { className: 'artsoul-card-link', href, 'aria-label': `Open ${artwork.title || 'artwork'}` }) : null
+            href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
+                'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null
         );
     }
 

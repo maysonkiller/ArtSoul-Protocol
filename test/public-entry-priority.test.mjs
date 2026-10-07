@@ -5,7 +5,7 @@ import { prioritizePublicPageEntry } from '../vite.config.js';
 
 for (const name of ['gallery', 'profile', 'artwork']) {
     test(`${name} public entry precedes the legacy contract and service graph without duplication`, () => {
-        const classic = '<script src="/src/ui/components/artwork-card.js?v=17" defer></script>';
+        const classic = '<script src="/src/ui/components/artwork-card.js?v=18" defer></script>';
         const contract = '<script type="module" src="/contracts-integration.js?v=11"></script>';
         const service = '<script type="module" src="/src/index.js"></script>';
         const entry = `<script type="module" crossorigin src="/assets/${name}-fixture.js"></script>`;

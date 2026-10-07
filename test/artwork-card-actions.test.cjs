@@ -14,10 +14,10 @@ const enabled = { reportingEnabled: true, donations: { enabled: true, chainId: 8
 const labels = (...args) => Array.from(actions(...args), item => item.label);
 
 test('guest actions follow explicit live feature flags without offering owner controls', () => {
-    assert.deepEqual(labels(artwork), ['View artwork']);
-    assert.deepEqual(labels(artwork, enabled), ['View artwork', 'Donate', 'Report']);
-    assert.deepEqual(labels(artwork, { reportingEnabled: 'true', donations: { enabled: 'true', chainId: 84532 } }), ['View artwork']);
-    assert.deepEqual(labels(artwork, { donations: { enabled: true, chainId: 8453 } }), ['View artwork']);
+    assert.deepEqual(labels(artwork), []);
+    assert.deepEqual(labels(artwork, enabled), ['Donate', 'Report']);
+    assert.deepEqual(labels(artwork, { reportingEnabled: 'true', donations: { enabled: 'true', chainId: 84532 } }), []);
+    assert.deepEqual(labels(artwork, { donations: { enabled: true, chainId: 8453 } }), []);
 });
 
 test('auction retry follows exact creator, chain and lifecycle; current ownership never makes an unminted buyer the creator', () => {
@@ -32,7 +32,7 @@ test('auction retry follows exact creator, chain and lifecycle; current ownershi
         assert.ok(!labels({ ...artwork, id: 'legacy', chain_id }, enabled, creator).includes('Start auction'));
     }
     assert.ok(!labels({ ...artwork, minted: true, token_id: '7' }, enabled, creator).includes('Start auction'));
-    assert.deepEqual(labels({ ...artwork, minted: true, current_owner_address: owner }, {}, owner), ['View artwork', 'Manage artwork']);
+    assert.deepEqual(labels({ ...artwork, minted: true, current_owner_address: owner }, {}, owner), ['Manage artwork']);
 });
 
 test('menu links preserve artwork identity across short and legacy URLs and never use auction IDs', () => {
@@ -43,7 +43,7 @@ test('menu links preserve artwork identity across short and legacy URLs and neve
     assert.equal(legacy.find(item => item.label === 'Report').href, '/artwork?id=v41%3A11155111%3A7&action=report');
     assert.ok(!legacy.some(item => ['Donate', 'Start auction', 'Manage artwork'].includes(item.label)));
     assert.deepEqual(labels({ id: 'pending:local' }, enabled, creator), []);
-    assert.deepEqual(labels({ id: 'unknown' }, enabled, creator), ['View artwork']);
+    assert.deepEqual(labels({ id: 'unknown' }, enabled, creator), []);
 });
 
 test('a report deeplink only opens the existing form after artwork and live config are ready', () => {
@@ -81,7 +81,7 @@ test('shared menu preserves native modified links, focus and navigation boundari
         constructor(tag) { this.tagName = tag; this.children = []; this.dataset = {}; this.listeners = {}; this.isConnected = true; }
         appendChild(child) { this.children.push(child); return child; }
         append(...children) { this.children.push(...children); }
-        replaceChildren() { this.children = []; document.activeElement = null; }
+        replaceChildren() { if (this.contains(document.activeElement)) document.activeElement = null; this.children = []; }
         setAttribute(key, value) { this[key] = value; }
         addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); }
         contains(node) { return this === node || this.children.some(child => child.contains(node)); }
@@ -99,12 +99,21 @@ test('shared menu preserves native modified links, focus and navigation boundari
         ArtSoulPublicConfig: { load: () => { reads++; return new Promise(resolve => { resolveConfig = resolve; }); } },
         addEventListener: (name, callback) => { listeners[name] = callback; } };
     for (const file of ['src/ui/artwork-url.js', 'src/ui/components/artwork-card.js']) vm.runInNewContext(fs.readFileSync(file, 'utf8'), { window: local, document });
-    const card = local.ArtSoulArtworkCard.createCardElement({ ...artwork, file_url: 'fixture.png' }, { onStartAuction: () => starts++ });
+    const fullTitle = 'A complete artwork title that does not fit in a compact card';
+    const fullCreator = 'A complete creator name that also does not fit in a compact card';
+    const card = local.ArtSoulArtworkCard.createCardElement({ ...artwork, title: fullTitle, creator_name: fullCreator, start_price: '0.001', file_url: 'fixture.png' }, { onStartAuction: () => starts++ });
     assert.equal(reads, 0, 'rendering cards must not start per-card requests');
     assert.equal(card.tagName, 'div');
     assert.equal(card.children.at(-1).tagName, 'a');
     assert.equal(card.children.at(-1).href, '/artwork/34');
-    const menu = menus[0], summary = menu.children[0], list = menu.children[1];
+    assert.ok(card.children.at(-1).title.includes(fullTitle));
+    assert.ok(card.children.at(-1)['aria-label'].includes(fullCreator));
+    const menu = menus[0], summary = menu.children[0], list = menu.children[1].children[0];
+    assert.ok(card.children.includes(menu), 'the overlay belongs to the card, outside the metadata layout');
+    assert.ok(!card.children.find(child => child.className === 'artsoul-card-body').contains(menu));
+    const info = menu.children[1].children[1];
+    assert.equal(info.children[0].textContent, 'Artwork details');
+    assert.equal(info.children[1].textContent, `${fullTitle}\nCreator: ${fullCreator}\nStatus: Not yet minted\n0.001 ETH`);
     menu.open = true;
     const loading = menu.dispatch('toggle');
     const start = list.children.find(link => link.textContent === 'Start auction');
@@ -115,8 +124,21 @@ test('shared menu preserves native modified links, focus and navigation boundari
     menu.open = true;
     list.children[0].focus();
     resolveConfig(enabled); await loading;
-    assert.equal(document.activeElement.textContent, 'View artwork', 'late flags retain focused action');
-    assert.deepEqual(list.children.map(link => link.textContent), ['View artwork', 'Start auction', 'Donate', 'Report']);
+    assert.equal(document.activeElement.textContent, 'Start auction', 'late flags retain focused action');
+    assert.deepEqual(list.children.map(link => link.textContent), ['Start auction', 'Donate', 'Report']);
+    menu.open = true;
+    const secondLoading = menu.dispatch('toggle');
+    info.open = true; info.children[0].focus();
+    resolveConfig({}); await secondLoading;
+    assert.equal(info.open, true, 'delayed flags do not collapse readable metadata');
+    assert.equal(document.activeElement, info.children[0], 'delayed flags do not disturb metadata focus');
+    assert.deepEqual(list.children.map(link => link.textContent), ['Start auction']);
+    local.ArtSoulPublicConfigData = enabled;
+    menu.open = true;
+    const thirdLoading = menu.dispatch('toggle');
+    list.children.find(link => link.textContent === 'Report').focus();
+    resolveConfig({}); await thirdLoading;
+    assert.equal(document.activeElement, summary, 'a removed action returns keyboard focus to the menu control');
     assert.equal((await menu.dispatch('click')).stopped, true);
     await menu.dispatch('keydown', { key: 'Escape' });
     assert.equal(menu.open, false); assert.equal(document.activeElement, summary);

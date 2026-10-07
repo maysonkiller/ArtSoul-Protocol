@@ -15,6 +15,42 @@ order. A mock or virtual authenticator is not a completed founder enrollment.
 Touches Bible §11 and §17, backlog A8/A10, and the A8 rollout runbook. Mainnet
 remains outside this authorization.
 
+### First enrollment without manual code transfer
+
+The founder explicitly requested the assigned wallet's first setup to use the
+normal browser/device passkey prompt without copying an enrollment code.
+
+Previous rule: A8a runbook section 1a required possession of the raw one-time
+bearer code on both registration requests, including the bootstrap. A stolen
+wallet/session without that code could not consume an otherwise valid approval.
+
+New rule: explicit `approved-bootstrap` registration may resolve an existing
+live, unused, audited bootstrap for the authenticated active staff wallet on
+the server. It is allowed only before any own historical credential or globally
+established bootstrap. The exact grant and challenge remain bound and consumed
+by the existing atomic RPC; WebAuthn origin, RP ID and user verification remain
+required. The browser receives no enrollment token or stored hash. This path
+does not issue, renew or recover a grant, create a role, or issue a moderation
+session. Additional-device and Safe recovery retain the code-possession path.
+After verification, "Add another passkey" may explicitly call the existing
+step-up-protected self-grant route and pass its one-time token directly to the
+existing registration routes in the same browser. It displays or persists no
+token and does not weaken server authorization. Manual transfer remains under
+the advanced section for separate browsers/recovery. Available native device
+choices vary; a second credential alone is not proof of an independent backup.
+
+Trust change: during that preapproved bootstrap window, possession of the
+assigned wallet's authenticated session plus native passkey creation is
+sufficient; an independently transferred code is no longer another barrier.
+The grant window, prior operator approval, audit, two independent founder keys,
+Safe-only recovery and staged activation are retained. Generic staff onboarding
+after the one-time bootstrap is not authorized by this amendment.
+
+Touches Bible §11, canon 07 Moderator Access, and A8a runbook sections 1a and 4.
+Implementation and real-device acceptance remain separate. Reverting this flow
+means restoring token-only resolution and its UI from Git; already enrolled
+keys and immutable audit records must not be deleted as part of a rollback.
+
 ## Donation amounts
 
 Previous rule: an empty-message donation could be any non-zero amount, while a
