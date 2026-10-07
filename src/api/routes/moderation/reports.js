@@ -135,6 +135,8 @@ export default async function handler(req, res) {
     }
 
     const alreadySubmitted = report.already_submitted === true;
+    // The scheduled worker delivers mail from the durable REPORT_SUBMITTED
+    // event. Provider latency and retries never delay this intake response.
     return res.status(alreadySubmitted ? 200 : 201).json({
       success: true,
       alreadySubmitted,

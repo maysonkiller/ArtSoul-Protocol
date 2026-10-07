@@ -167,6 +167,7 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     'profile_email_verification.sql',
     'launch_service_quotas.sql',
     'artist_support_moderation.sql',
+    'moderation_report_email_delivery.sql',
     'artist_support.sql'
   ]);
 
@@ -186,6 +187,19 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   );
   const missing = [...createdTables].filter(table => !hardening.includes(`'${table}'`));
   assert.deepEqual(missing, []);
+});
+
+test('report email delivery self-hardens state and every delivery RPC', () => {
+  const sql = fs.readFileSync(path.join(REPO_ROOT, 'sql/migrations/moderation_report_email_delivery.sql'), 'utf8');
+  assert.match(sql, /ALTER TABLE public\.moderation_report_email_delivery ENABLE ROW LEVEL SECURITY/);
+  assert.match(sql, /ALTER TABLE public\.moderation_report_email_delivery FORCE ROW LEVEL SECURITY/);
+  assert.match(sql, /REVOKE ALL ON public\.moderation_report_email_delivery FROM PUBLIC, anon, authenticated/);
+  assert.match(sql, /GRANT ALL ON public\.moderation_report_email_delivery TO service_role/);
+  for (const signature of ['claim_moderation_report_email(UUID,TEXT)', 'finish_moderation_report_email(UUID,UUID,BOOLEAN,TEXT)', 'pending_moderation_report_emails()']) {
+    assert.ok(sql.includes(`REVOKE ALL ON FUNCTION public.${signature} FROM PUBLIC,anon,authenticated;`));
+    assert.ok(sql.includes(`GRANT EXECUTE ON FUNCTION public.${signature} TO service_role;`));
+  }
+  assert.doesNotMatch(sql, /CREATE POLICY|TO anon|TO authenticated/);
 });
 
 test('the unapplied collection service draft keeps all tables and quota RPC private', () => {

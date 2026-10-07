@@ -2551,6 +2551,7 @@ body.future .gallery-filter-panel {
     display: flex;
     flex: 1;
     min-height: 0;
+    min-width: 0;
     flex-direction: column;
     gap: 8px;
     padding: 14px;
@@ -3070,7 +3071,6 @@ body.future .resale-modal {
 
 .artsoul-card-title {
     margin: 0;
-    padding-right: 28px;
     color: var(--c-text);
     font-size: 16px;
     font-weight: 700;
@@ -3106,6 +3106,7 @@ body.future .resale-modal {
     text-align: center;
     padding-right: 0;
 }
+.artsoul-add-new-card .artsoul-card-title { white-space: normal; overflow-wrap: anywhere; }
 
 .artsoul-card-description {
     min-height: 36px;
@@ -3121,13 +3122,13 @@ body.future .resale-modal {
 }
 
 .artsoul-card-meta {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) fit-content(60%);
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
     margin-top: 0;
 }
+.artsoul-card-meta > :only-child { grid-column: 1 / -1; }
 
 .protocol-admin-dialog.protocol-admin-passkeys::backdrop { background: var(--c-modal-backdrop); }
 .protocol-admin-dialog.protocol-admin-passkeys {
@@ -3156,43 +3157,56 @@ body.future .resale-modal {
 .artsoul-card-actions { position: relative; z-index: 2; }
 .artsoul-card-menu {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    z-index: 3;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 5;
+    pointer-events: none;
 }
 
 .artsoul-card-menu-toggle {
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    box-sizing: border-box;
+    width: 44px;
+    height: 44px;
+    margin-left: auto;
     border-radius: 6px;
+    border: 1px solid var(--c-border-soft);
+    background: color-mix(in srgb, var(--c-surface) 90%, transparent);
     color: var(--c-text);
     cursor: pointer;
     list-style: none;
     font: 700 24px/1 sans-serif;
+    pointer-events: auto;
 }
 
 .artsoul-card-menu-toggle::-webkit-details-marker { display: none; }
 .artsoul-card-menu-toggle:hover,
 .artsoul-card-menu-toggle:focus-visible { background: var(--c-surface-muted); }
 .artsoul-artwork-card:has(.artsoul-card-menu[open]) { overflow: visible; z-index: 5; }
+.artsoul-artwork-card:has(.artsoul-card-menu) .artsoul-card-countdown { left: 10px; right: auto; }
+.artsoul-artwork-card:has(.artsoul-card-menu):has(.artsoul-card-countdown) .artsoul-card-media-badge,
+.artsoul-artwork-card:has(.artsoul-card-menu):has(.artsoul-card-countdown) .artsoul-card-audio-label { top: 42px; }
 .artsoul-artwork-card .artsoul-card-media { border-radius: 7px 7px 0 0; }
 .artsoul-card-menu-list {
     position: absolute;
-    top: 32px;
+    top: 48px;
     right: 0;
     width: max-content;
-    min-width: 150px;
-    max-width: 220px;
+    box-sizing: border-box;
+    min-width: min(150px, 100%);
+    max-width: min(220px, 100%);
     padding: 4px;
     border: 1px solid var(--c-border-soft);
     border-radius: 8px;
     background: var(--c-surface);
     box-shadow: 0 8px 24px rgba(var(--c-accent-rgb), 0.14);
+    pointer-events: auto;
 }
 
-.artsoul-card-menu-list a {
+.artsoul-card-menu-list a,
+.artsoul-card-info > summary {
     display: block;
     min-height: 40px;
     padding: 10px 12px;
@@ -3203,22 +3217,63 @@ body.future .resale-modal {
     line-height: 20px;
 }
 .artsoul-card-menu-list a:hover,
-.artsoul-card-menu-list a:focus-visible { background: var(--c-surface-muted); }
+.artsoul-card-menu-list a:focus-visible,
+.artsoul-card-info > summary:hover,
+.artsoul-card-info > summary:focus-visible { background: var(--c-surface-muted); }
+.artsoul-card-info > summary { cursor: pointer; list-style: none; }
+.artsoul-card-info > summary::-webkit-details-marker { display: none; }
+.artsoul-card-info > summary::after { content: ' +'; }
+.artsoul-card-info[open] > summary::after { content: ' −'; }
+.artsoul-card-info > p {
+    max-height: min(240px, 40vh);
+    margin: 0;
+    padding: 8px 12px;
+    overflow-y: auto;
+    color: var(--c-text);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 400px) {
+    .artsoul-card-menu { top: 4px; left: 4px; right: 4px; }
+    .artsoul-artwork-card:has(.artsoul-card-menu) .artsoul-card-countdown {
+        top: 4px;
+        left: 4px;
+        min-width: 0;
+        padding: 3px 4px;
+        font-size: 10px;
+    }
+    .artsoul-artwork-card:has(.artsoul-card-menu):has(.artsoul-card-countdown) .artsoul-card-media-badge,
+    .artsoul-artwork-card:has(.artsoul-card-menu):has(.artsoul-card-countdown) .artsoul-card-audio-label {
+        top: 30px;
+        left: 4px;
+        padding: 3px 4px;
+        font-size: 10px;
+        line-height: 1;
+    }
+}
 
 .artsoul-card-status,
 .artsoul-card-price {
-    display: inline-flex;
-    min-height: 24px;
-    align-items: center;
-    justify-content: center;
+    display: block;
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 28px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     border-radius: 6px;
     padding: 3px 8px;
     font-size: 12px;
     font-weight: 700;
-    line-height: 1;
+    line-height: 20px;
 }
 
 .artsoul-card-status {
+    justify-self: start;
     border: 1px solid var(--c-border-soft);
     background: rgba(var(--c-accent-rgb), 0.1);
     color: var(--c-accent);
@@ -3239,6 +3294,9 @@ body.future .resale-modal {
 }
 
 .artsoul-card-price {
+    justify-self: end;
+    padding-inline: 6px;
+    border: 1px solid transparent;
     color: var(--c-text);
     white-space: nowrap;
     background: rgba(var(--c-accent-rgb), 0.06);
@@ -5303,6 +5361,61 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     max-width: 100%;
 }
 
+@media (max-width: 360px) {
+    #artworkGallery,
+    .gallery-results-grid,
+    .profile-artwork-grid.grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.profile-social-links {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    width: 100%;
+    max-width: 40rem;
+}
+
+.profile-social-links > * {
+    min-height: 44px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.profile-connections { display: grid; gap: 0.75rem; }
+.profile-connections h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.profile-connection-help { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; line-height: 1.5; }
+.profile-connection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.profile-connection-provider { min-width: 0; }
+.profile-connections .profile-connection-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    min-height: 60px;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--c-border);
+    border-radius: 0.5rem;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+.profile-connection-identity { color: inherit; font: inherit; }
+.profile-connection-identity .truncate { white-space: normal; overflow-wrap: anywhere; }
+.profile-connection-remove { flex: 0 0 44px; width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--c-text-muted); font: inherit; }
+.profile-email-connection { display: grid; gap: 0.5rem; }
+.profile-email-summary { flex-wrap: wrap; }
+.profile-email-address { min-width: 0; overflow-wrap: anywhere; }
+.profile-email-summary button { margin-left: auto; }
+
 /* Desktop only: the social chips (X / Discord) and the Edit Profile button
    stack in block flow with no gap, so the Future gradient button sat flush
    against the chips and its skewed edge overlapped the X chip. Give the edit
@@ -5622,7 +5735,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         box-sizing: border-box;
         overflow: visible;
         padding: 0.35rem 0.45rem !important;
-        font-size: clamp(0.62rem, 2.8vw, 0.72rem);
+        font-size: 0.8125rem;
         white-space: normal;
         overflow-wrap: anywhere;
     }
@@ -5736,6 +5849,8 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     .profile-hero.is-editing .profile-identity-layout {
         grid-template-columns: 1fr;
     }
+
+    .profile-connection-grid { grid-template-columns: 1fr; }
 
     .profile-hero.is-editing .profile-avatar-column {
         justify-self: center;

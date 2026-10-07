@@ -1,8 +1,9 @@
 # A8a Moderation Passkey Foundation — Founder Runbook
 
-Status updated October 3: schema applied and verified September 30; the live
-feature remains disabled pending operator activation. Do not repeat the migration
-steps below. The founder now authorizes the real ceremony; follow
+Status updated October 3: schema applied and verified September 30; passkey setup
+is enabled on the configured apex, while review/reporting activation and real
+device acceptance remain separate gates. Do not repeat the migration steps
+below. The founder authorizes the real ceremony; follow
 `docs/RESOURCE_GATED_WORK.md` RG-03/RG-04 and the current A8 rollout order.
 
 Founder decisions preserved (2026-07-20): 15-minute step-up sessions, two
@@ -22,22 +23,48 @@ founder ceremony remain uncompleted until recorded in the current checkpoint.
 - Server routes under `/api/moderation/passkey-*` and `/api/moderation/passkeys`,
   inert (404) while the flag is off.
 - `getModerationAccess` step-up integration behind the flag.
-- Minimal staff passkey UI on the artwork page (WebAuthn browser helper is
+- Staff passkey dialog in the Admin panel (WebAuthn browser helper is
   lazy-loaded only for eligible staff, never in the visitor bundle).
 
-## 1a. One-time enrollment token transfer
+## 1a. First bootstrap and one-time enrollment codes
 
-Enrollment now proves **possession of a one-time bearer token**, not just
-wallet ownership. A stolen wallet without the token cannot enroll a device.
+Founder amendment, October 3: first setup no longer requires manually transferring
+a code when the server can resolve an existing approved bootstrap. The previous
+rule required a raw one-time bearer token for every enrollment, so an otherwise
+valid wallet/session without that token could not consume an approval. The new
+exception deliberately removes that separate possession barrier for the first
+approved bootstrap only.
+
+- The user explicitly selects "Set up passkey" in Admin. Both registration
+  requests use `mode: approved-bootstrap`; the server requires SIWE, an active
+  staff role, exactly one live unused bootstrap for that wallet and its matching
+  `grant_issued` audit. Any own historical credential or established bootstrap
+  denies this path. No HTTP route creates or renews a bootstrap approval.
+- The server binds the challenge to the exact grant and uses its stored hash
+  internally with the unchanged atomic registration RPC. Neither the token,
+  hash nor grant identifier is returned to the browser. Verification rechecks
+  approval; expiration, revocation, supersession and replay fail closed.
+- During that prior-approved grant window, the assigned wallet's authenticated
+  session plus native passkey creation is sufficient. This is not equivalent
+  to requiring independent bearer-code possession. Native user verification,
+  RP/origin checks, two independent founder keys and Safe-only recovery remain.
+- The legacy token path remains for additional-device and Safe recovery
+  enrollment, and still accepts an operator-transferred bootstrap code.
+- An already verified user can explicitly select "Add another passkey". This
+  calls the existing self-grant route, holds the token only for the current
+  browser operation, and passes it to registration without showing a code.
+  Closing, changing wallets or losing authentication prevents later requests;
+  cancellation does not automatically retry or revoke an already issued grant.
+  The native chooser determines available device options. Use the advanced
+  code-transfer method when enrolling from a separate browser instead.
 
 - A grant stores ONLY the SHA-256 hash of a 256-bit random token; the raw
   token is displayed exactly once to the authorized issuer and never
   persisted or logged.
-- Registration options AND registration verify both require the raw token.
+- In the token path, registration options AND verification require the raw token.
   The server re-derives the exact grant from the token hash, binds the
   WebAuthn challenge to that grant id, and (at verify) atomically consumes
   the grant + challenge and inserts the credential in one transaction.
-- Bootstrap and additional-device enrollment use the same possession rule.
 - The additional-device self-grant route returns its raw token once in the
   JSON response; the operator copies it to the second device.
 
@@ -87,7 +114,7 @@ With the flag `true` and ANY of the other four missing, every moderation
 request fails closed (503 `MODERATION_PASSKEY_MISCONFIGURED`) — there is no
 silent fallback to the legacy path.
 
-## 3. Migration application (founder-operated, NOT done yet)
+## 3. Migration application (historical procedure; already applied)
 
 1. Take and verify a Supabase backup (same procedure as phase 18.7b/014).
 2. Run `sql/migrations/a8a_moderation_passkey_foundation.sql` with the
@@ -119,25 +146,35 @@ self-skips when Docker is unavailable.
    `:founder_wallet` (lowercase) and `:ttl_minutes` (tunable window).
 3. Run it once with the service role. It calls `a8a_issue_enrollment_grant`
    (grant + `grant_issued` audit in one transaction) and DISPLAYS the raw
-   one-time token exactly once in the result — copy it immediately; only its
-   hash is stored.
+   one-time token exactly once in the result; only its hash is stored. Manual
+   transfer is unnecessary for approved first setup. Copy it only if the legacy
+   token path is deliberately used; never place it in logs or shared reports.
    - SAFE RETRY: if a previous bootstrap grant EXPIRED UNUSED, re-running
      supersedes it (auditable `grant_superseded`) and issues a fresh token,
      so an expired row never permanently locks the founder out. An ACTIVE
      unexpired bootstrap grant raises `A8A_ACTIVE_BOOTSTRAP_EXISTS`. Once any
      bootstrap grant is consumed or a bootstrap credential exists, it raises
      `A8A_BOOTSTRAP_ALREADY_ESTABLISHED` and no further bootstrap is possible.
-4. On the configured origin with the passkey flag enabled, open an artwork page with
-   the founder wallet, use "Enroll passkey (grant required)", paste the raw
-   token, then "Verify passkey". This consumes the bootstrap grant and writes
-   `grant_consumed` + `passkey_enrolled` audit events.
+4. On the configured origin with the passkey flag enabled, sign in with the
+   assigned founder wallet and open Admin from the account menu. Choose "Set up
+   passkey" and confirm native creation on the device, then "Verify passkey".
+   Setup consumes the existing bootstrap grant and writes `grant_consumed` +
+   `passkey_enrolled` audit events; it does not issue a moderation session.
+   If approval is absent or expired, an authorized operator must separately
+   follow the audited issuance/supersession procedure. Repeated setup clicks
+   cannot issue or renew approval. An intentionally transferred legacy code may
+   instead be entered under "Advanced: another device or recovery code".
    Use non-production credentials for the preliminary staging rehearsal. Final
    acceptance requires enrollment and verification on the approved apex RP ID
    and origin; a passkey enrolled for a preview domain is not evidence of this.
-5. Enroll the SECOND founder passkey from the new device: on the already
-   verified device issue a self-grant (`/api/moderation/passkey-grant`,
-   requires the active step-up), which returns a fresh raw token once; paste
-   it on the second device and enroll within the grant window.
+5. Enroll the SECOND independent founder passkey after verification. Select
+   "Add another passkey" and choose an independent device or security key if
+   offered by the native chooser. This uses the existing self-grant route and
+   token authorization internally. Alternatively, create a self-grant in the
+   advanced section, copy its once-displayed code to the second device's Admin
+   panel, and enroll within the grant window. Verify both independent keys.
+   A new credential count alone does not prove device independence. First setup
+   cannot replace this second-device gate.
 
 ## 5. Activation checklist (all required, separately reviewed)
 

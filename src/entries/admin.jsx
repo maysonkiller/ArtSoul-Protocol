@@ -190,21 +190,61 @@ function ProtocolAdminPage() {
     const [setupWallet, setSetupWallet] = useState('');
     const [passkeyOpen, setPasskeyOpen] = useState(false);
     const setupEpoch = useRef(0), openedSetupFor = useRef('');
+    const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
+    const checkAccessRef = useRef(null);
     const currentSetupWallet = () => window.artsoulWalletStateSettled === true
         ? String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase() : '';
+    const sessionIsCurrent = (epoch, wallet) => epoch === setupEpoch.current && wallet === currentSetupWallet();
+    const clearProtectedView = () => {
+        readySession.current = null;
+        queueRequest.current++;
+        setData({ reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
+        setDecision(null);
+    };
     useEffect(() => {
-        const clearSetup = () => { setupEpoch.current++; openedSetupFor.current = ''; setSetupWallet(''); setPasskeyOpen(false); };
-        const storage = event => { if (!event.key || ['artsoul_wallet', 'artsoul_authenticated_wallet'].includes(event.key)) clearSetup(); };
-        window.addEventListener('artsoul:wallet-state-changed', clearSetup);
-        window.addEventListener('artsoul:auth-state-changed', clearSetup);
+        let waitingForWallet = window.artsoulWalletStateSettled !== true;
+        let lastWallet = currentSetupWallet();
+        let lastAuthenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+        const clearSession = () => {
+            setupEpoch.current++;
+            accessRequest.current++;
+            openedSetupFor.current = '';
+            clearProtectedView();
+            setAccess(null);
+            setAccessState('unauthenticated');
+            setSetupWallet('');
+            setPasskeyOpen(false);
+            setBusy(false);
+            setMessage('');
+        };
+        const sessionChanged = (walletEvent = false) => {
+            const wallet = currentSetupWallet();
+            const authenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+            if (walletEvent && wallet === lastWallet && authenticated === lastAuthenticated &&
+                waitingForWallet === (window.artsoulWalletStateSettled !== true)) return;
+            clearSession();
+            const restored = waitingForWallet && window.artsoulWalletStateSettled === true;
+            const signedIn = authenticated === wallet && (lastAuthenticated !== authenticated || lastWallet !== wallet);
+            waitingForWallet = window.artsoulWalletStateSettled !== true;
+            lastWallet = wallet;
+            lastAuthenticated = authenticated;
+            if (/^0x[0-9a-f]{40}$/.test(wallet) && (restored || signedIn)) checkAccessRef.current?.();
+        };
+        const walletChanged = () => sessionChanged(true);
+        const authChanged = () => sessionChanged();
+        const storage = event => { if (!event.key || ['artsoul_wallet', 'artsoul_authenticated_wallet'].includes(event.key)) clearSession(); };
+        window.addEventListener('artsoul:wallet-state-changed', walletChanged);
+        window.addEventListener('artsoul:auth-state-changed', authChanged);
         window.addEventListener('storage', storage);
-        window.addEventListener('pagehide', clearSetup);
+        window.addEventListener('pagehide', clearSession);
+        if (!waitingForWallet) checkAccessRef.current?.();
         return () => {
             setupEpoch.current++;
-            window.removeEventListener('artsoul:wallet-state-changed', clearSetup);
-            window.removeEventListener('artsoul:auth-state-changed', clearSetup);
+            readySession.current = null;
+            window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
+            window.removeEventListener('artsoul:auth-state-changed', authChanged);
             window.removeEventListener('storage', storage);
-            window.removeEventListener('pagehide', clearSetup);
+            window.removeEventListener('pagehide', clearSession);
         };
     }, []);
 
@@ -213,24 +253,58 @@ function ProtocolAdminPage() {
     }, [queueStatus]);
 
     const loadQueue = useCallback(async status => {
-        const result = await api(`review-queue?status=${encodeURIComponent(status)}`);
+        const epoch = setupEpoch.current, wallet = currentSetupWallet(), request = ++queueRequest.current;
+        if (readySession.current?.epoch !== epoch || readySession.current.wallet !== wallet) return false;
+        let result;
+        try {
+            result = await api(`review-queue?status=${encodeURIComponent(status)}`);
+        } catch (error) {
+            if (!sessionIsCurrent(epoch, wallet) || request !== queueRequest.current) return false;
+            throw error;
+        }
+        if (!sessionIsCurrent(epoch, wallet) || request !== queueRequest.current) return false;
         setData(result.data || { reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
+        return true;
     }, []);
 
+    const accessFailed = error => {
+        clearProtectedView();
+        const stepUpRequired = ['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(error.code);
+        if (stepUpRequired) {
+            setAccess(current => current ? { ...current, stepUpActive: false } : null);
+            setAccessState('step_up');
+        } else {
+            setAccess(null);
+            setSetupWallet('');
+            setPasskeyOpen(false);
+            setAccessState('error');
+        }
+        setMessage(error.message);
+    };
+
     const checkAccess = useCallback(async () => {
+        const wallet = currentSetupWallet(), epoch = setupEpoch.current, request = ++accessRequest.current;
+        const isCurrent = () => sessionIsCurrent(epoch, wallet) && request === accessRequest.current;
+        if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
+            clearProtectedView();
+            setAccess(null);
+            setSetupWallet('');
+            setPasskeyOpen(false);
+            setAccessState('unauthenticated');
+            setBusy(false);
+            return;
+        }
         setBusy(true);
         setMessage('');
         try {
-            const wallet = currentSetupWallet(), epoch = setupEpoch.current;
-            const result = await api(`access${wallet ? `?expectedWallet=${encodeURIComponent(wallet)}` : ''}`);
-            const canSetup = result.setupEnabled === true && result.authenticated === true && result.eligible === true &&
-                /^0x[0-9a-f]{40}$/.test(wallet) && wallet === currentSetupWallet() && epoch === setupEpoch.current;
-            if (epoch === setupEpoch.current) {
-                setSetupWallet(canSetup ? wallet : '');
-                if (!canSetup) setPasskeyOpen(false);
-                else if (!result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
-            }
+            const result = await api(`access?expectedWallet=${encodeURIComponent(wallet)}`);
+            if (!isCurrent()) return;
+            const canSetup = result.setupEnabled === true && result.authenticated === true && result.eligible === true;
+            setSetupWallet(canSetup ? wallet : '');
+            if (!canSetup) setPasskeyOpen(false);
+            else if (!result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
             setAccess(result.access || null);
+            clearProtectedView();
             if (!result.enabled && !result.setupEnabled) {
                 setAccessState('disabled');
             } else if (!result.authenticated) {
@@ -242,36 +316,29 @@ function ProtocolAdminPage() {
             } else if (!result.access?.stepUpActive) {
                 setAccessState('step_up');
             } else {
+                readySession.current = { epoch, wallet };
                 setAccessState('ready');
                 await loadQueue(queueStatusRef.current);
             }
         } catch (error) {
-            setMessage(error.message);
-            setAccessState(error.code === 'STEP_UP_REQUIRED' ? 'step_up' : 'error');
+            if (isCurrent()) accessFailed(error);
         } finally {
-            setBusy(false);
+            if (isCurrent()) setBusy(false);
         }
     }, [loadQueue]);
-
-    useEffect(() => {
-        if (window.artsoulWalletStateSettled === true) { checkAccess(); return undefined; }
-        const ready = () => {
-            if (window.artsoulWalletStateSettled !== true) return;
-            window.removeEventListener('artsoul:wallet-state-changed', ready);
-            checkAccess();
-        };
-        window.addEventListener('artsoul:wallet-state-changed', ready);
-        return () => window.removeEventListener('artsoul:wallet-state-changed', ready);
-    }, [checkAccess]);
+    checkAccessRef.current = checkAccess;
 
     const authenticate = async () => {
+        const epoch = setupEpoch.current, wallet = currentSetupWallet();
         setBusy(true);
         setMessage('');
         try {
             if (typeof window.ensureAuthenticated !== 'function') throw new Error('Wallet authentication is not ready.');
             await window.ensureAuthenticated();
+            if (!sessionIsCurrent(epoch, wallet)) return;
             await checkAccess();
         } catch (error) {
+            if (!sessionIsCurrent(epoch, wallet)) return;
             setMessage(error.message || 'Wallet verification failed.');
             setAccessState('error');
             setBusy(false);
@@ -281,21 +348,25 @@ function ProtocolAdminPage() {
     const stepUp = () => { if (setupWallet) setPasskeyOpen(true); };
 
     const changeQueueStatus = async status => {
+        const epoch = setupEpoch.current, wallet = currentSetupWallet();
+        if (readySession.current?.epoch !== epoch || readySession.current.wallet !== wallet) return;
         setQueueStatus(status);
+        queueStatusRef.current = status;
         setBusy(true);
         setMessage('');
+        const request = queueRequest.current + 1;
         try {
             await loadQueue(status);
         } catch (error) {
-            if (error.code === 'STEP_UP_REQUIRED') setAccessState('step_up');
-            setMessage(error.message);
+            if (sessionIsCurrent(epoch, wallet) && request === queueRequest.current) accessFailed(error);
         } finally {
-            setBusy(false);
+            if (sessionIsCurrent(epoch, wallet) && (request === queueRequest.current || readySession.current === null)) setBusy(false);
         }
     };
 
     const submitDecision = async reason => {
-        if (!decision) return;
+        const epoch = setupEpoch.current, wallet = currentSetupWallet();
+        if (!decision || readySession.current?.epoch !== epoch || readySession.current.wallet !== wallet) return;
         setBusy(true);
         setMessage('');
         try {
@@ -309,27 +380,33 @@ function ProtocolAdminPage() {
                     reason
                 })
             });
+            if (!sessionIsCurrent(epoch, wallet)) return;
             setDecision(null);
-            await loadQueue(queueStatus);
+            if (!await loadQueue(queueStatusRef.current) || !sessionIsCurrent(epoch, wallet)) return;
             setMessage(
                 decision.action === 'restore' && (result.report?.artwork_hidden || result.report?.message_hidden)
                     ? `Report resolved. ${result.report?.message_hidden ? 'Message' : 'Artwork'} remains hidden because another actioned report is active.`
                     : 'Review decision recorded.'
             );
         } catch (error) {
-            if (error.code === 'STEP_UP_REQUIRED') setAccessState('step_up');
-            setMessage(error.message);
-            if (error.code === 'REPORT_REVIEW_CONFLICT') await loadQueue(queueStatus);
+            if (!sessionIsCurrent(epoch, wallet)) return;
+            if (error.code === 'REPORT_REVIEW_CONFLICT') {
+                setDecision(null);
+                setMessage(error.message);
+                try { await loadQueue(queueStatusRef.current); }
+                catch (refreshError) { if (sessionIsCurrent(epoch, wallet)) accessFailed(refreshError); }
+            } else accessFailed(error);
         } finally {
-            setBusy(false);
+            if (sessionIsCurrent(epoch, wallet)) setBusy(false);
         }
     };
 
     const verification = setupWallet && <section className="protocol-admin-setup" aria-label="Admin verification">
         {accessState !== 'step_up' && <button type="button" className="protocol-admin-primary" disabled={busy} onClick={stepUp}>{access?.stepUpActive ? 'Manage passkeys' : 'Verify admin access'}</button>}
-        <p>Only your device can approve a passkey request. Enrollment codes stay on this page and are cleared when you close verification.</p>
+        <p>Use your device's passkey prompt to verify admin access. Additional-device and recovery options are available in the verification window.</p>
         {passkeyOpen && <StaffPasskeyDialog key={setupWallet} walletAddress={setupWallet} sessionActive={access?.stepUpActive === true}
             api={api} onClose={() => setPasskeyOpen(false)} onAccessChanged={checkAccess} onStepUpRequired={() => {
+                clearProtectedView();
                 setAccess(current => current ? { ...current, stepUpActive: false } : null);
                 setAccessState('step_up');
             }} />}

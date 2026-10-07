@@ -181,6 +181,45 @@ export async function findGrantByToken(rawToken, wallet) {
   return rows?.[0] || null;
 }
 
+// Founder amendment 2026-10-03: the first, already approved bootstrap may
+// be consumed by its SIWE staff wallet without transferring a bearer code.
+// This resolver never creates/renews a grant or selects an additional grant.
+// Historical credentials also deny this path: it is not lost-key recovery.
+export async function resolveRegistrationGrant(body, wallet) {
+  const mode = body?.mode === undefined ? 'token' : body.mode;
+  if (mode === 'token') {
+    const grant = await findGrantByToken(body?.token, wallet);
+    return grant ? { ...grant, token_hash: hashGrantToken(body?.token) } : null;
+  }
+  if (mode !== 'approved-bootstrap' || body?.token !== undefined) {
+    throw accessError('Choose a valid passkey registration method.', 'INVALID_REGISTRATION_MODE', 400);
+  }
+
+  const [credentials, established, bootstrapCredentials] = await Promise.all([
+    supabaseRest(`artsoul_staff_passkeys?wallet_address=eq.${encodeURIComponent(wallet)}&select=id&limit=1`),
+    supabaseRest('artsoul_staff_enrollment_grants?purpose=eq.bootstrap&consumed_at=not.is.null&select=id&limit=1'),
+    supabaseRest('artsoul_staff_passkeys?enrolled_via=eq.bootstrap&select=id&limit=1')
+  ]);
+  if (![credentials, established, bootstrapCredentials].every(rows => Array.isArray(rows) && rows.length === 0)) return null;
+
+  const rows = await supabaseRest(
+    `artsoul_staff_enrollment_grants?target_wallet=eq.${encodeURIComponent(wallet)}` +
+    '&purpose=eq.bootstrap&consumed_at=is.null&revoked_at=is.null' +
+    `&expires_at=gt.${encodeURIComponent(new Date().toISOString())}` +
+    '&select=id,target_wallet,purpose,token_hash,expires_at&limit=2'
+  );
+  const grant = Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
+  if (!grant || grant.target_wallet !== wallet || grant.purpose !== 'bootstrap' ||
+      !/^[1-9][0-9]*$/.test(String(grant.id)) || !/^[a-f0-9]{64}$/.test(grant.token_hash || '') ||
+      !(Date.parse(grant.expires_at) > Date.now())) return null;
+
+  const audit = await supabaseRest(
+    `artsoul_staff_auth_events?wallet_address=eq.${encodeURIComponent(wallet)}&event_type=eq.grant_issued` +
+    `&details->>grant_id=eq.${encodeURIComponent(grant.id)}&details->>purpose=eq.bootstrap&select=id&limit=1`
+  );
+  return Array.isArray(audit) && audit.length === 1 ? grant : null;
+}
+
 export async function storeRegistrationChallenge(challenge, wallet, grantId) {
   await supabaseRest('artsoul_webauthn_challenges', {
     method: 'POST',

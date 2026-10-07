@@ -1,7 +1,7 @@
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 import { allowMethods, readJson, sendError } from '../../backend.js';
 import {
-  findGrantByToken,
+  resolveRegistrationGrant,
   findWalletCredentials,
   parseStoredTransports,
   requirePasskeyRouteContext,
@@ -14,14 +14,14 @@ export default async function handler(req, res) {
   try {
     const { config, wallet } = await requirePasskeyRouteContext(req);
 
-    // Enrollment requires the SIWE wallet AND possession of the one-time
-    // bearer token. A stolen wallet without the token resolves no grant.
+    // Both modes consume a pre-existing approved grant. Only the first
+    // bootstrap supports code-free setup; additional/recovery needs its token.
     const body = await readJson(req);
-    const grant = await findGrantByToken(body?.token, wallet);
+    const grant = await resolveRegistrationGrant(body, wallet);
     if (!grant) {
       return res.status(403).json({
-        error: 'ENROLLMENT_GRANT_REQUIRED',
-        message: 'A valid one-time enrollment token is required to register a passkey.'
+        error: body?.mode === 'approved-bootstrap' ? 'FIRST_ENROLLMENT_UNAVAILABLE' : 'ENROLLMENT_GRANT_REQUIRED',
+        message: 'An active enrollment approval is required to register this passkey.'
       });
     }
 

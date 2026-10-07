@@ -13,9 +13,15 @@ function deferred() {
 }
 function harness() {
   const reads = [];
+  const effects = [], cleanups = [], listeners = new Map();
   const state = { items: [], gallery: 'created' };
   const scope = {
-    window: { artsoulWalletStateSettled: true }, console,
+    window: { artsoulWalletStateSettled: true, location: { hash: '' },
+      addEventListener: (name, listener) => listeners.set(name, listener),
+      removeEventListener: (name, listener) => { if (listeners.get(name) === listener) listeners.delete(name); }
+    }, console, URLSearchParams,
+    useEffect: effect => effects.push(effect),
+    emailVerificationEnabled: true, isOwnProfile: false, walletStateSettled: true, connectedWalletAddress: '',
     selectedGallery: 'created', profile: null,
     profileRequestRef: { current: 0 }, artworksRequestRef: { current: 0 },
     loadedProfileAddressRef: { current: null }, loadingProfileAddressRef: { current: null },
@@ -39,13 +45,20 @@ function harness() {
     setDiscoveryProfile() {}, setIsOwnProfile() {}, setEditMode() {}, setProfileLoadError() {}
   };
   vm.runInNewContext(loadProfile + '\n' + loadTab + '\nthis.api = { loadProfile, loadMyArtworks };', scope);
-  return { scope, reads, state, ...scope.api };
+  for (const effect of effects) cleanups.push(effect());
+  assert.equal(listeners.has('hashchange'), true, 'the confirmation effect mounts without changing gallery state');
+  const unmount = () => {
+    for (const cleanup of cleanups) cleanup?.();
+    assert.equal(listeners.size, 0, 'confirmation listeners are removed on unmount');
+  };
+  return { scope, reads, state, unmount, ...scope.api };
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const result = id => ({ items: [{ id }], corpus: [{ id }] });
 
-test('a slow initial gallery cannot overwrite a newer tab result', async () => {
+test('a slow initial gallery cannot overwrite a newer tab result', async t => {
   const h = harness();
+  t.after(h.unmount);
   const initial = h.loadProfile('0xalice');
   await tick();
   assert.equal(h.scope.profile.wallet_address, '0xalice', 'identity is not held behind the gallery');
@@ -60,8 +73,9 @@ test('a slow initial gallery cannot overwrite a newer tab result', async () => {
   assert.equal(h.state.loading, false);
 });
 
-test('a tab response from the previous profile cannot overwrite the new identity', async () => {
+test('a tab response from the previous profile cannot overwrite the new identity', async t => {
   const h = harness();
+  t.after(h.unmount);
   const initial = h.loadProfile('0xalice');
   await tick();
   h.reads[0].resolve(result('alice-created'));
@@ -79,8 +93,9 @@ test('a tab response from the previous profile cannot overwrite the new identity
   assert.equal(h.state.gallery, 'created');
 });
 
-test('the first gallery settles and seeds its own per-profile tab cache', async () => {
+test('the first gallery settles and seeds its own per-profile tab cache', async t => {
   const h = harness();
+  t.after(h.unmount);
   const initial = h.loadProfile('0xalice');
   await tick();
   h.reads[0].resolve(result('alice-created'));

@@ -1,13 +1,120 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-03. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-07. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 3 admin-access placement correction (current, local verification):
+October 7 continuation (local work; publication pending):
+
+- HEAD remains `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched
+  at the fresh read. Existing October 3 source and checkpoint changes were
+  preserved in `output/recovery/phase-a-resume-2026-10-07/before.patch`, with
+  separate copies of seven untracked implementation/test files. No worktree,
+  overlay, reset or cleanup was performed.
+- Local changes unify X/Discord/private email management in Edit Profile,
+  move preview actions onto media, preserve one status/price row, expose full
+  metadata and remove the redundant View artwork menu action. Card runtime
+  uses v18 on all four consuming pages. Report/Donate still respect server
+  rollout gates and open the existing targeted dialogs when enabled.
+- Native first-passkey setup uses an existing audited bootstrap approval
+  without manual code transfer. Additional setup reuses the existing protected
+  grant. No approval is issued by ordinary wallet login. The narrower admin
+  wallet/logout fix was explicitly confirmed by the founder and applied;
+  it clears browser memory only and rejects stale responses. It does not delete
+  complaints. The formerly rejected broad candidate remains a recovery artifact,
+  not a copied implementation. Seventeen regressions reproduced 13 failures
+  against HEAD and passed on the repaired source.
+- Built-browser testing found and fixed a real first-render temporal-dead-zone
+  error introduced by the email-editor effect. Whole-component React rendering
+  now covers guest, restoring, connected and public-profile cases. Do not
+  substitute the earlier function-slice tests for this evidence.
+- Full local suite after that correction: **1,613 passed, zero failed/skipped**,
+  including real disposable PostgreSQL tests. Log:
+  `output/audit/phase-a-ux-full-unit-v2-2026-10-07.log`. Build passes 11 routes /
+  175 CSS utilities. Final v5 build passed after card-only sizing refinements;
+  their focused Node checks passed 46/46 and built-browser checks passed 629/629
+  across 24 viewport/theme/surface combinations. At 320/360px the shared grids
+  use one column so ordinary prices remain fully readable; 390px is unchanged.
+- Native-UI fixtures passed 187 assertions across 1280/390/320px and both
+  themes; profile passed 21 scenario groups and staff notices 26 cases. There
+  were zero uncaught page errors and zero external writes. These use synthetic
+  credentials and local HTTP fixtures, not physical authenticator acceptance.
+  Source/artifact hashes and screenshots are in the corresponding October 7
+  `output/audit/` and `output/playwright/` records, including
+  `card-overlay-built-browser-2026-10-07-v5-final.json`. These fixtures do not
+  establish physical iOS/Android authenticator or wallet acceptance.
+- Complaint email delivery is implemented locally with a separate flag,
+  service-only claims, idempotent bounded retries and no complaint content in
+  email. Its migration is unapplied; scheduler, configuration and real inbox
+  delivery remain unverified. See `docs/runbooks/MODERATION_REPORT_EMAIL.md`.
+  Staff profile notices use existing protected APIs, store only reference/count
+  information and never turn ordinary users into staff. Email runs only in the
+  scheduled worker; report intake never waits for the provider. The actual
+  intake/email focused regressions passed 31/31 after that correction.
+- Read-only live check at October 7 07:52 UTC found one active administrator,
+  zero passkeys, one unused expired bootstrap approval and no recovery ceremony.
+  No role/credential mutation or transaction was performed by that check.
+  The original bootstrap/auction/Donate journals must never be replayed.
+- Founder approved mandatory BOTH-wallet authority for roles/critical changes,
+  normal moderator report decisions, an authenticator-app alternative, and
+  reviewed collection-origin badges without a sales threshold or Trust effect.
+  See `CHANGELOG_2026-10-07_ADMIN_AUTHORITY.md`; these are approved direction,
+  not completed implementations. The existing 2-of-3 Safe does not satisfy the
+  new mandatory-pair rule. Exact 0.002 test ETH funding to the new founder wallet
+  in Base Sepolia completed in transaction
+  `0xafbbfe605ad1ed0efd229d29430962d3d853da99eadb4a3c2c94c38a5f75eca9`.
+  The recipient remains excluded as an automated signer. A transient initial
+  receipt verification failure was reconciled without resending; both RPCs
+  confirmed the transaction and exact recipient balance. Fourteen legacy, one
+  Donate deployment and one funding record reconcile to 0.025315172029030397
+  test ETH total campaign cost. A write-once recovered receipt is recorded;
+  the operator lock stays until funding is included in future runner budgets.
+- After the owner reset the forgotten Linux password, SSH access succeeded.
+  Read-only inspection found `/opt/artsoul`, main
+  `93ad98a9b9dee9863a9e1828e096444abfbec615`, clean tracked files and two untracked
+  launcher scripts to preserve. Base Sepolia is healthy with zero event errors;
+  legacy Ethereum Sepolia is stopped. The running revision has no Donate
+  indexer module or address configuration. No host update was performed yet.
+  Native key/app setup remains unverified. Phase A remains open.
+- Exactly next step: publish the verified UX/session correction through CI and
+  preview/apex checks, then update the preserved host and verify Donate indexing.
+
+October 3 admin-access placement correction (published and browser-verified):
 
 - Workspace remains `C:\Projects\ArtSoul`, `codex/takeover-audit`, based on
   `a47d57847c047a30ca68ace077433ef9599dd4ea`. The previous checkpoint diff is
   preserved in `output/recovery/admin-passkey-modal-2026-10-03/before.patch`.
+- Placement [PR #290](https://github.com/maysonkiller/ArtSoul-Protocol/pull/290)
+  merged as `a17af5313c3706895328dc647353a09cb6d3be10`; candidate CI
+  `37083385789` and post-merge CI `37083886999` passed all jobs. Production
+  deployment `6821279027` succeeded at 00:53:21 UTC. Both preview and apex
+  matched all 51 JS/CSS assets across five pages to candidate `5f61e0e`.
+  Evidence: `output/audit/admin-modal-{preview,apex}-artifact-2026-10-03.json`.
+  The actual connected Chrome session confirmed artwork has no passkey panel,
+  the account menu exposes Admin panel after server discovery, and `/admin`
+  opens the verification dialog with its dark backdrop. No native ceremony ran.
+- Live visual inspection also found browser-default serif typography and an
+  8px body margin on the admin page. Layout-only candidate `0290132` in
+  [PR #291](https://github.com/maysonkiller/ArtSoul-Protocol/pull/291) adds a
+  scoped body font/reset, border-box sizing and inherited input font; it does
+  not change authentication handlers. The new build passed 11 routes/177 CSS
+  utilities and **145/145** browser assertions at 1280/390/320px in both themes,
+  including page/dialog overflow and input font size. Evidence:
+  `output/audit/admin-passkey-relocation-ui-only-browser-summary-layout-2026-10-03.json`.
+  Preview deployment `6821336060` matched all 51 assets; the production CSS is
+  content-hashed, so the new file cannot reuse the previous browser cache key.
+- PR #291 passed all hosted checks in `37084301402` and merged as
+  `838f54b71881c4e5199dd0828793c2053aeb48eb` (current workspace HEAD).
+  Production deployment `6821378071` succeeded at 01:03:17 UTC; immutable host
+  `artsoul-fmmldt6sn-maysonkiller-be9112b5.vercel.app`. Final apex verification
+  matched all 51 assets; evidence is
+  `output/audit/admin-modal-apex-artifact-2026-10-03-layout.json`.
+  Actual connected Chrome on `/admin` now confirms zero body margin, the shared
+  sans-serif font, 560px border-box dialog, and equal document/client widths
+  (1521px). Screenshot: `output/audit/admin-modal-apex-final-2026-10-03.png`.
+  Enrollment input remained empty and no native ceremony or grant issuance was
+  triggered. The `/admin` and existing Hetzner login tabs are retained for handoff.
+  Only this post-release checkpoint is a new tracked local change; `.codex/`,
+  `output/` and private journals remain unstaged. Feature gates are unchanged.
 - Founder correction: remove the Staff passkey panel from artwork pages and
   put enrollment/verification in an Admin panel dialog with clear steps and
   a dark backdrop. Scope is UI/access continuity (canon 05/07/16), with no
@@ -50,9 +157,11 @@ October 3 admin-access placement correction (current, local verification):
   restart that process merely to replace its old artwork-page instructions.
   After release, direct the human to `/admin`; the same wallet/RP/grant rules
   apply. The helper's future display text now names that route.
-- Exactly next step: publish through required hosted checks and verify the apex
-  before handing the new `/admin` entry to
-  the founder; retain real ceremonies and the requested session follow-up as open.
+- Exactly next step: have the founder complete the native passkey ceremony in
+  the retained `/admin` dialog using the existing audited renewal handoff, then
+  read the credential/grant audit state before the second independent device.
+  Do not replay bootstrap/renewal operations. The separate admin host-session
+  candidate still awaits the explicit authorization answer; Phase A remains open.
 
 October 3 card release and native handoff (completed):
 

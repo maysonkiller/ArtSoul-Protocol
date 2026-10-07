@@ -9,9 +9,10 @@
 --   * stores ONLY its SHA-256 hash in the grant row;
 --   * writes the grant_issued audit event;
 --   * DISPLAYS THE RAW TOKEN EXACTLY ONCE in the query result.
--- The raw token is never persisted or logged. Copy it from the result,
--- transfer it out-of-band to the enrolling device, and enroll the first
--- passkey. After enrollment the grant is consumed and can never be reused.
+-- The raw token is never persisted or logged. The October 3 approved-first
+-- setup flow resolves this existing audited grant server-side, without code
+-- transfer. For the legacy token path only, copy it once and transfer it
+-- out-of-band to the enrolling device. Enrollment consumes the grant forever.
 --
 -- SAFE RETRY: if a previous bootstrap grant EXPIRED UNUSED, the issue RPC
 -- supersedes it (auditable) and issues a fresh one, so an expired row can

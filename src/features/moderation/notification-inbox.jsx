@@ -42,12 +42,27 @@ export function NotificationInbox({ wallet }) {
       }}>Notifications</button>
       {open && <div id="profile-notifications" className="mt-3" aria-busy={state.status === 'loading'}>
         <p className="text-sm opacity-70 mb-3">Moderation updates about your reports and artworks. Visible only to your signed-in wallet.</p>
+        {state.staffReview && <section className="mb-3" aria-label="Staff review notices">
+          <h3 className="font-semibold">Reports awaiting review</h3>
+          {state.staffReview.status === 'disabled' && <p>The review workspace is not active yet.</p>}
+          {state.staffReview.status === 'verify' && <p><a className="underline" href="/admin">Verify admin access</a> to check reports awaiting review.</p>}
+          {state.staffReview.status === 'unavailable' && <p>Review notices are temporarily unavailable. <a className="underline" href="/admin">Open Admin panel</a></p>}
+          {state.staffReview.status === 'ready' && <>
+            <p>{state.staffReview.count}{state.staffReview.capped ? '+' : ''} {state.staffReview.count === 1 ? 'report awaits' : 'reports await'} review. <a className="underline" href="/admin">Open Admin panel</a></p>
+            {state.staffReview.reports.length > 0 && <ul className="mt-2 space-y-2">
+              {state.staffReview.reports.map(report => <li key={report.reference}>
+                <a className="underline" href="/admin">Report {report.reference.slice(0, 8)}</a>{' · '}
+                <time dateTime={report.createdAt}>{new Date(report.createdAt).toLocaleString()}</time>
+              </li>)}
+            </ul>}
+          </>}
+        </section>}
         <div role="status" aria-live="polite">
           {state.status === 'loading' && <p>Loading notifications…</p>}
           {state.status === 'auth' && <p>Sign in with your connected wallet to view notifications.</p>}
           {state.status === 'unavailable' && <p>Notifications are not available right now. Please try again later.</p>}
           {state.status === 'error' && <p>Notifications could not be loaded. Please try again.</p>}
-          {state.status === 'ready' && state.items.length === 0 && <p>No notifications yet.</p>}
+          {state.status === 'ready' && state.items.length === 0 && <p>{state.staffReview ? 'No personal updates yet.' : 'No notifications yet.'}</p>}
         </div>
         {state.items.length > 0 && <ul className="space-y-3 mt-3">
           {state.items.map(item => <li key={item.id}>

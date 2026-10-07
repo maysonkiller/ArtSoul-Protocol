@@ -121,16 +121,16 @@ export function EmailConnection({walletAddress}) {
   }
 
   return (
-    <section className="profile-email-connection mt-4" aria-label="Private email">
-      <p className="text-sm mb-2">Email stays private. Your wallet signs you in.</p>
+    <section className="profile-email-connection" aria-label="Private email">
+      <p className="profile-connection-help">Email stays private. Your wallet signs you in.</p>
       {connection?.verified === true ? (
-        <div className="flex items-center gap-3 flex-wrap text-sm">
-          <span className="break-all">{connection.email}</span>
+        <div className="profile-connection-row profile-email-summary">
+          <span className="profile-email-address">{connection.email}</span>
           <span>Verified email</span>
           <button type="button" className="btn-secondary" data-allow-rapid="true" disabled={busy} onClick={() => manage('disconnect')}>Disconnect email</button>
         </div>
       ) : connection?.available === false ? <p className="text-sm opacity-70">Email verification is not available yet.</p> : (
-        <button type="button" className="btn-secondary" data-allow-rapid="true" disabled={busy || !connection} onClick={() => manage('open')}>Connect email</button>
+        <button type="button" className="profile-connection-row" data-allow-rapid="true" disabled={busy || !connection} onClick={() => manage('open')}>Connect email</button>
       )}
       {editing && (
         <form className="flex gap-3 flex-wrap mt-3" onSubmit={event => { event.preventDefault(); void manage('request'); }}>

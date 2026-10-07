@@ -16,6 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { parse } = require('acorn');
 const { Interface, hashMessage, isAddress, isHexString } = require('ethers');
 
 const root = path.join(__dirname, '..');
@@ -37,6 +38,12 @@ const ROUTE_SOURCES = {
   recovery: read(path.join('src', 'api', 'routes', 'moderation', 'passkey-recovery.js')),
   artworkVisibility: artworkVisibilitySource
 };
+
+test('passkey server modules parse before the VM harness removes module syntax', () => {
+  for (const source of [passkeySource, ...Object.values(ROUTE_SOURCES)]) {
+    assert.doesNotThrow(() => parse(source, { ecmaVersion: 'latest', sourceType: 'module' }));
+  }
+});
 
 const STAFF = '0x1111111111111111111111111111111111111111';
 const OTHER = '0x2222222222222222222222222222222222222222';
@@ -88,12 +95,16 @@ function createDb(seed = {}) {
   function matches(row, params) {
     for (const [key, raw] of params) {
       if (['select', 'limit', 'order', 'on_conflict'].includes(key)) continue;
+      const [column, jsonKey] = key.split('->>');
+      const value = jsonKey ? row[column]?.[jsonKey] : row[column];
       if (raw === 'is.null') {
-        if (row[key] !== null && row[key] !== undefined) return false;
+        if (value !== null && value !== undefined) return false;
+      } else if (raw === 'not.is.null') {
+        if (value === null || value === undefined) return false;
       } else if (raw.startsWith('eq.')) {
-        if (String(row[key]) !== raw.slice(3)) return false;
+        if (String(value) !== raw.slice(3)) return false;
       } else if (raw.startsWith('gt.')) {
-        if (!(new Date(row[key]) > new Date(raw.slice(3)))) return false;
+        if (!(new Date(value) > new Date(raw.slice(3)))) return false;
       } else {
         throw new Error(`Unsupported filter ${key}=${raw}`);
       }
@@ -497,6 +508,155 @@ test('enrollment requires the one-time token: wallet-only access fails', async (
   await envir.loadRoute('registerOptions')(fakeReq({ cookie: envir.siweCookie(STAFF), body: {} }), res);
   assert.equal(res.statusCode, 403);
   assert.equal(res.body.error, 'ENROLLMENT_GRANT_REQUIRED');
+});
+
+function approvedBootstrapSeed(overrides = {}) {
+  return staffSeed({
+    grants: [grantRow({ purpose: 'bootstrap' })],
+    events: [{ id: 1, wallet_address: STAFF, event_type: 'grant_issued', details: { grant_id: 1, purpose: 'bootstrap' } }],
+    ...overrides
+  });
+}
+
+async function approvedOptions(envir, body = { mode: 'approved-bootstrap' }, wallet = STAFF) {
+  const res = fakeRes();
+  await envir.loadRoute('registerOptions')(fakeReq({ cookie: wallet ? envir.siweCookie(wallet) : '', body }), res);
+  return res;
+}
+
+async function approvedVerify(envir, response = { id: 'first-key', __challenge: 'reg-challenge-1' }) {
+  const res = fakeRes();
+  await envir.loadRoute('registerVerify')(fakeReq({ cookie: envir.siweCookie(STAFF), body: { mode: 'approved-bootstrap', response } }), res);
+  return res;
+}
+
+test('approved first enrollment uses an existing audited bootstrap without returning a token or issuing authority', async () => {
+  const db = createDb(approvedBootstrapSeed());
+  const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
+  const options = await approvedOptions(envir);
+  assert.equal(options.statusCode, 200);
+  assert.equal(db.tables.artsoul_webauthn_challenges[0].grant_id, 1);
+  const result = await approvedVerify(envir);
+  assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+  assert.equal(db.tables.artsoul_staff_passkeys[0].enrolled_via, 'bootstrap');
+  assert.ok(db.tables.artsoul_staff_enrollment_grants[0].consumed_at);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants.length, 1);
+  assert.equal(db.tables.artsoul_staff_roles.length, 1);
+  assert.equal(db.log.some(call => call.path === 'rpc/a8a_issue_enrollment_grant'), false);
+  assert.deepEqual(db.tables.artsoul_staff_auth_events.map(row => row.event_type), ['grant_issued', 'grant_consumed', 'passkey_enrolled']);
+  for (const res of [options, result]) {
+    assert.doesNotMatch(JSON.stringify(res.body), /token|grant_id|expires_at/);
+    assert.equal(res.headers['set-cookie'], undefined, 'registration does not create a moderation session');
+    assert.ok(!JSON.stringify(res.body).includes(hashToken(RAW_TOKEN)));
+  }
+  assert.equal(envir.calls.registrationOptions[0].authenticatorSelection.userVerification, 'required');
+  assert.equal(envir.calls.registrationVerify[0].expectedOrigin, CONFIGURED_ENV.ARTSOUL_WEBAUTHN_ALLOWED_ORIGIN);
+  assert.equal(envir.calls.registrationVerify[0].requireUserVerification, true);
+  assert.equal((await approvedVerify(envir)).statusCode, 403, 'completed setup cannot be replayed');
+});
+
+test('approved first enrollment denies absent, stale, foreign, additional, ambiguous or unaudited grants', async () => {
+  const cases = [
+    { grants: [] }, { events: [] },
+    { grants: [grantRow()] },
+    { grants: [grantRow({ purpose: 'bootstrap', target_wallet: OTHER })] },
+    { grants: [grantRow({ purpose: 'bootstrap', expires_at: new Date(Date.now() - 1000).toISOString() })] },
+    { grants: [grantRow({ purpose: 'bootstrap', revoked_at: new Date().toISOString() })] },
+    { grants: [grantRow({ purpose: 'bootstrap', consumed_at: new Date().toISOString() })] },
+    { grants: [grantRow({ purpose: 'bootstrap' }), grantRow({ id: 2, purpose: 'bootstrap' })] },
+    { events: [{ id: 1, wallet_address: OTHER, event_type: 'grant_issued', details: { grant_id: 1, purpose: 'bootstrap' } }] },
+    { events: [{ id: 1, wallet_address: STAFF, event_type: 'grant_issued', details: { grant_id: 9, purpose: 'bootstrap' } }] },
+    { grants: [grantRow({ purpose: 'bootstrap', token_hash: 'invalid' })] }
+  ];
+  for (const seed of cases) {
+    const db = createDb(approvedBootstrapSeed(seed));
+    const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
+    const result = await approvedOptions(envir);
+    assert.equal(result.statusCode, 403, JSON.stringify(seed));
+    assert.equal(result.body.error, 'FIRST_ENROLLMENT_UNAVAILABLE');
+    assert.equal(db.tables.artsoul_webauthn_challenges.length, 0);
+    assert.equal(db.tables.artsoul_staff_passkeys.length, 0);
+    assert.equal(db.log.some(call => call.method !== 'GET'), false, 'denial cannot renew or mutate a grant');
+  }
+});
+
+test('approved first enrollment is unavailable after any own key or established bootstrap, including revoked history', async () => {
+  for (const seed of [
+    { passkeys: [activePasskey({ enrolled_via: 'additional' })] },
+    { passkeys: [activePasskey({ enrolled_via: 'additional', revoked_at: new Date().toISOString() })] },
+    { passkeys: [activePasskey({ wallet_address: OTHER, revoked_at: new Date().toISOString() })] },
+    { grants: [grantRow({ purpose: 'bootstrap' }), grantRow({ id: 2, target_wallet: OTHER, purpose: 'bootstrap', consumed_at: new Date().toISOString() })] }
+  ]) {
+    const envir = loadEnvironment({ env: CONFIGURED_ENV, db: createDb(approvedBootstrapSeed(seed)) });
+    assert.equal((await approvedOptions(envir)).statusCode, 403);
+    assert.equal(envir.calls.registrationOptions.length, 0);
+  }
+});
+
+test('approved first enrollment still requires an authenticated active staff wallet', async () => {
+  for (const [roles, wallet, status] of [
+    [[], STAFF, 403], [[{ wallet_address: STAFF, role: 'admin', active: false }], STAFF, 403],
+    [[{ wallet_address: STAFF, role: 'owner', active: true }], STAFF, 403],
+    [[{ wallet_address: STAFF, role: 'admin', active: true }], OTHER, 403],
+    [[{ wallet_address: STAFF, role: 'admin', active: true }], '', 401]
+  ]) {
+    const envir = loadEnvironment({ env: CONFIGURED_ENV, db: createDb(approvedBootstrapSeed({ roles })) });
+    assert.equal((await approvedOptions(envir, undefined, wallet)).statusCode, status);
+    assert.equal(envir.calls.registrationOptions.length, 0);
+  }
+});
+
+test('registration modes reject ambiguous input and never fall back from a bad supplied token', async () => {
+  const envir = loadEnvironment({ env: CONFIGURED_ENV, db: createDb(approvedBootstrapSeed()) });
+  for (const body of [{ mode: null }, { mode: 'unknown' }, { mode: {} }, { mode: 'approved-bootstrap', token: '' }, { mode: 'approved-bootstrap', token: RAW_TOKEN }]) {
+    assert.equal((await approvedOptions(envir, body)).statusCode, 400, `Rejected mode: ${String(body.mode)}`);
+  }
+  assert.equal((await approvedOptions(envir, { token: 'wrong-token' })).statusCode, 403);
+  assert.equal((await approvedOptions(envir, {})).statusCode, 403);
+  assert.equal(envir.calls.registrationOptions.length, 0);
+});
+
+test('approved bootstrap verification rechecks expiration, revocation, credentials and role after options', async () => {
+  for (const mutate of [
+    db => { db.tables.artsoul_staff_enrollment_grants[0].expires_at = new Date(Date.now() - 1000).toISOString(); },
+    db => { db.tables.artsoul_staff_enrollment_grants[0].revoked_at = new Date().toISOString(); },
+    db => { db.tables.artsoul_staff_roles[0].active = false; },
+    db => { db.tables.artsoul_staff_passkeys.push(activePasskey({ enrolled_via: 'additional' })); }
+  ]) {
+    const db = createDb(approvedBootstrapSeed()), envir = loadEnvironment({ env: CONFIGURED_ENV, db });
+    assert.equal((await approvedOptions(envir)).statusCode, 200);
+    mutate(db);
+    assert.equal((await approvedVerify(envir)).statusCode, 403);
+    assert.equal(envir.calls.registrationVerify.length, 0);
+    assert.equal(db.tables.artsoul_staff_enrollment_grants[0].consumed_at, null);
+  }
+});
+
+test('a superseding approved bootstrap cannot consume the earlier grant challenge', async () => {
+  const db = createDb(approvedBootstrapSeed()), envir = loadEnvironment({ env: CONFIGURED_ENV, db });
+  assert.equal((await approvedOptions(envir)).statusCode, 200);
+  db.tables.artsoul_staff_enrollment_grants[0].revoked_at = new Date().toISOString();
+  db.tables.artsoul_staff_enrollment_grants.push(grantRow({ id: 2, purpose: 'bootstrap' }));
+  db.tables.artsoul_staff_auth_events.push({ id: 2, wallet_address: STAFF, event_type: 'grant_issued', details: { grant_id: 2, purpose: 'bootstrap' } });
+  assert.equal((await approvedVerify(envir)).statusCode, 400);
+  assert.equal(db.tables.artsoul_staff_passkeys.length, 0);
+  assert.equal(db.tables.artsoul_staff_enrollment_grants[1].consumed_at, null);
+});
+
+test('approved bootstrap cannot enroll with an absent, expired, foreign or consumed challenge', async () => {
+  for (const mutate of [
+    db => { db.tables.artsoul_webauthn_challenges.length = 0; },
+    db => { db.tables.artsoul_webauthn_challenges[0].expires_at = new Date(Date.now() - 1000).toISOString(); },
+    db => { db.tables.artsoul_webauthn_challenges[0].wallet_address = OTHER; },
+    db => { db.tables.artsoul_webauthn_challenges[0].consumed_at = new Date().toISOString(); }
+  ]) {
+    const db = createDb(approvedBootstrapSeed()), envir = loadEnvironment({ env: CONFIGURED_ENV, db });
+    assert.equal((await approvedOptions(envir)).statusCode, 200);
+    mutate(db);
+    assert.equal((await approvedVerify(envir)).statusCode, 400);
+    assert.equal(db.tables.artsoul_staff_passkeys.length, 0);
+    assert.equal(db.tables.artsoul_staff_enrollment_grants[0].consumed_at, null);
+  }
 });
 
 test('a wrong token does not resolve any grant', async () => {

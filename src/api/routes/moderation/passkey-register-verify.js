@@ -2,8 +2,7 @@ import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import { allowMethods, readJson, sendError } from '../../backend.js';
 import {
   completeRegistrationRpc,
-  findGrantByToken,
-  hashGrantToken,
+  resolveRegistrationGrant,
   recordAuthEventBestEffort,
   requirePasskeyRouteContext,
   validateRegistrationChallenge
@@ -16,19 +15,18 @@ export default async function handler(req, res) {
     const { config, wallet } = await requirePasskeyRouteContext(req);
 
     const body = await readJson(req);
-    const rawToken = body?.token;
     const response = body?.response;
     if (!response || typeof response !== 'object') {
       return res.status(400).json({ error: 'INVALID_REGISTRATION_PAYLOAD' });
     }
 
-    // Possession of the one-time token is required BEFORE verification, and
-    // the exact grant id is re-derived from it.
-    const grant = await findGrantByToken(rawToken, wallet);
+    // Recheck the live approval before verification. The stored challenge
+    // must still bind this exact grant; a replacement grant cannot reuse it.
+    const grant = await resolveRegistrationGrant(body, wallet);
     if (!grant) {
       return res.status(403).json({
-        error: 'ENROLLMENT_GRANT_REQUIRED',
-        message: 'A valid one-time enrollment token is required to register a passkey.'
+        error: body?.mode === 'approved-bootstrap' ? 'FIRST_ENROLLMENT_UNAVAILABLE' : 'ENROLLMENT_GRANT_REQUIRED',
+        message: 'An active enrollment approval is required to register this passkey.'
       });
     }
 
@@ -73,7 +71,7 @@ export default async function handler(req, res) {
     // one-time (bootstrap) grant is never lost on a partial failure.
     const result = await completeRegistrationRpc({
       grantId: grant.id,
-      tokenHash: hashGrantToken(rawToken),
+      tokenHash: grant.token_hash,
       wallet,
       purpose: grant.purpose,
       challenge: verifiedChallenge,

@@ -95,8 +95,10 @@ test('pre-mint and minted cards keep identical compact body structure', () => {
   });
   // Same rows (title, creator, meta) in both states — no state-dependent
   // extra lines, so compact card dimensions stay consistent.
-  assert.equal(preMint.children[1].children.length, 4);
-  assert.equal(minted.children[1].children.length, 4);
+  assert.equal(preMint.children[1].children.length, 3);
+  assert.equal(minted.children[1].children.length, 3);
+  assert.equal(preMint.children[2].className, 'artsoul-card-menu');
+  assert.equal(minted.children[2].className, 'artsoul-card-menu');
   assert.deepEqual(
     preMint.children[1].children.map(child => child.className),
     minted.children[1].children.map(child => child.className)
