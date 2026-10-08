@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-03. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-08. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -39,16 +39,30 @@ notification delivery is implemented, tested and published. The four dormant A8
 schema migrations were applied and verified on September 30; real signed-in
 notification reads now return 200 instead of the reproduced 503. The historical
 database remains pre-ledger; no old migration entries were fabricated.
-Real operator acceptance remains outstanding. PR #288 is deployed at
-`1c55599bfabf848b41321a7452507dfec419c443`; candidate and post-merge CI passed.
+Real operator acceptance remains outstanding. PR #293 is deployed at
+`154d16f2fe18734a6766330c3aa7021eecf00702`; candidate Linux/Windows/static CI
+passed, and preview/apex matched all 53 checked assets across six pages.
+The connected Chrome gallery verified the requested media-overlay menu and
+indexed creation link. Profile/social/email layout and native admin setup from
+PR #292 are also published; real native-factor acceptance is still open.
 Apex runtime checks confirm the passkey and email flags are enabled. Reporting,
 Protocol Admin and Donate remain disabled. The October 2, 23:40 UTC read records
 one authorized founder role and one unused bootstrap grant, but zero passkeys;
 enabled routes and a grant do not prove enrollment or recovery. The corrected
 email hosting route accepted one real verification request, and Resend reports
 Delivered to the designated mailbox. Email-link confirmation remains unverified.
-The separate Donate contract is deployed and verified on Base Sepolia; payments
-and public activation still await indexer registration. See the
+The separate Donate contract and its updated indexer are running on Base Sepolia.
+Both authorized 1-wei payments completed on October 7, with and without a message;
+both exact projections and the real read handler passed October 8 acceptance.
+Public activation still requires the operational donation-message moderation
+path specified in the October 3 amendment. Do not replay these payments.
+Complaint-email schema was backed up, applied and verified October 8; actual
+worker credentials/scheduling and inbox delivery are pending Resend access.
+The approved two-wallet gasless role/authority mechanism and authenticator-app
+alternative have tested local foundations, not a deployed end-to-end flow.
+No new Safe is requested for application roles. The exact first-enrollment and
+recovery amendment is awaiting the owner's October 8 decision; existing operator
+gates are not waived by that unfinished implementation. See the
 [current checkpoint](audits/STABILIZATION_CHECKPOINT.md) and
 [schema evidence](audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
 
@@ -78,7 +92,7 @@ operationally safe reporting/moderation path before a beta GO.
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
 | **RG-03** → **A-39** moderation activation | Dormant schema and verification are complete; two founder passkeys, the one-time audited bootstrap grant and live workflow acceptance remain open | Credentials and a multisig-authorised ceremony; canon rule 12 forbids a single operator deciding it |
-| **A8d** Safe recovery rehearsal | The successful ceremony plus all eleven denial cases in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md) section 6 | Signing keys held by three people |
+| **A8d / replacement recovery policy** | Historical Safe recovery acceptance is retained in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md); reconcile the requested two-wallet application authority with factor recovery before replacing that path | The founder must select the recovery rule and perform the real wallet/device approvals; automated fixtures are not that ceremony |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
 against **C14**, and RG-03's own completion clause does not mention it, so a

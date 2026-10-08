@@ -56,7 +56,9 @@ const SHARED_HEADER_PAGES = [
   'docs-protocol.html'
 ];
 
-const readPage = page => fs.readFileSync(path.join(ROOT, page), 'utf8');
+// Git may materialize unchanged documents with different Windows line endings;
+// browsers normalize these before parsing the shared boot markup.
+const readPage = page => fs.readFileSync(path.join(ROOT, page), 'utf8').replace(/\r\n/g, '\n');
 
 /** The static account-button markup a product page paints before any script. */
 function staticShellOf(page) {

@@ -6,7 +6,7 @@ Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 October 7 continuation (UX published; Donate indexer updated):
 
 - Recovery started at `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched
-  at that read. Current local HEAD is `5529973e41b29ca6ed62662c2e8fae17242bda2f`.
+  at that read. Current local HEAD is `154d16f2fe18734a6766330c3aa7021eecf00702`.
   Existing October 3 source and checkpoint changes were
   preserved in `output/recovery/phase-a-resume-2026-10-07/before.patch`, with
   separate copies of seven untracked implementation/test files. No worktree,
@@ -129,7 +129,7 @@ October 7 continuation (UX published; Donate indexer updated):
   persistence (22 real PostgreSQL checks) are preserved but not wired or live.
   Role epochs, dual-signature issuing/rotation, factor session integration and
   real setup/recovery ceremonies remain open. Native key/app setup is unverified.
-- Current requested card amendment is local: Donate, Report, Creation transaction
+- Current requested card amendment is published: Donate, Report, Creation transaction
   only, in that order; no management/details actions. Valid indexed registration
   hashes only; owner auction management remains on artwork detail. Shared cache
   v19 covers all four consumers. All 32 card regressions and the 11-route build pass. Built-browser acceptance
@@ -137,12 +137,68 @@ October 7 continuation (UX published; Donate indexer updated):
   rendering with the real sanitized API read response passed 27 checks. Both
   suites performed zero writes and had zero page exceptions. Evidence is in
   `output/audit/{shared-card-menu,donation-real-read}-built-2026-10-08.json`.
-  Publication is pending; these fixtures do not prove public activation.
+  PR #293 merged as `154d16f2fe18734a6766330c3aa7021eecf00702` after Linux,
+  Windows, static and Vercel checks passed (CI run `37743580044`). Initial CI
+  `37743100607` found an outdated card cache pin and obsolete upload guidance;
+  both were corrected and their 43 focused checks passed before the green run.
+  Production deployment `6929874943` succeeded. Preview and apex matched all
+  53 JS/CSS assets across six pages; Base indexer was healthy with zero lag.
+  The actual connected Chrome gallery loaded v19, rendered 25 cards, kept the
+  menu over media and exposed only the correctly labelled creation transaction
+  while public Donate/Report remain off. Screenshot:
+  `output/audit/phase-a-menu-apex-gallery-2026-10-08.png`. Artifact evidence:
+  `output/audit/phase-a-menu-{preview,apex}-artifact-2026-10-08.json`.
+  Browser fixtures do not prove public feature activation or physical phones.
+- October 8 dual-wallet message verification is local and unwired (29/29 checks):
+  both current EOAs sign the exact domain/action/target/role/version/nonce/expiry;
+  one signer, duplicates, changed fields, expired requests and replacement-pair
+  approval are denied. A8f now adds local-only durable proposals, atomic role
+  grants/revocation/rotation and immutable runtime audit evidence. Its unregistered
+  API handler loads the stored proposal and recovers both signatures itself.
+  SQL rechecks authority and target versions after locks, consumes the request
+  once and commits the role change with its audit. Direct runtime role writes
+  are denied. The final focused run passed 47 checks, including real disposable
+  PostgreSQL, real ephemeral EOA signatures and the actual handler/session code
+  over a fixture PostgREST transport. Evidence:
+  `output/audit/a8f-authority-handler-2026-10-08.log`. No project keys or external
+  transactions were used. The migration is unapplied, the policy registry is
+  unseeded, the handler is not routed, and no role-management UI is wired.
+  Factor/session integration and real approvals remain unfinished.
+- A real disposable PostgreSQL regression reproduced two TOTP role-regrant gaps:
+  an old matched login and an old enrollment approval could both return OK after
+  revocation/recreation. The local unapplied migration now binds grants/attempts
+  to a monotonic role authorization version. All 28 PostgreSQL checks passed,
+  including concurrent revoke/regrant, deletion/recreation, fresh replacement
+  setup and denial of sequence rewinds. Evidence:
+  `output/audit/a8e-role-regrant-after-2026-10-08.log`. No live schema or staff
+  authorization has changed. Retained failing evidence:
+  `output/audit/a8e-role-regrant-before-real-2026-10-08.log` (22 passing checks,
+  two failed subtests plus their parent, no skips). Docker startup caused an
+  earlier skipped run, which is not verification evidence.
+- Final October 8 working-tree regression: **1,756 passed, zero failed/skipped**.
+  Command: `npm run test:unit`; log:
+  `output/audit/phase-a-authority-full-unit-final-2026-10-08.log`. The first run
+  passed 1,753 and failed three integration guards: a missing migration-ledger
+  row, missing private-table classification and a CRLF/LF-only header comparison.
+  Those guards were corrected; 93 focused checks and the full rerun passed.
+  The table scanner now recognizes CREATE TABLE with or without IF NOT EXISTS.
+  No historical applied migration was rewritten. The retained unselected Safe
+  observer and its 29 tests remain outside the new authority change; no new Safe
+  is selected by their presence. Recovery snapshot:
+  `output/recovery/phase-a-authority-2026-10-08/`. Only this root agent is active;
+  the completed isolated browser and preview server were closed.
 - Report, Protocol Admin and public Donate flags remain disabled. Phase A is open.
-- Exactly next step: publish the tested menu amendment through CI, then complete
-  email worker configuration and the approved gasless dual-wallet authority.
+- Exactly next step: reconcile the pending first-factor/recovery decision with
+  role-version-aware factor/session enforcement before wiring the role route.
+  First-factor authorization and
+  dual-wallet recovery replacing the historical Safe path are awaiting the
+  explicit October 8 policy question; do not silently treat a role as enrollment
+  permission or apply unapproved TOTP throttle values.
   Vercel has the existing production mail key as a non-revealable Secret; no
   duplicate key or new credential has been created during this continuation.
+  Resend login is awaiting the owner in the retained Google account chooser.
+  Public Donate activation also requires working donation-message moderation
+  under the October 3 amendment; successful test payments do not waive it.
 
 October 3 admin-access placement correction (published and browser-verified):
 
