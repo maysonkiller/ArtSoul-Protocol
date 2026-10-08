@@ -55,6 +55,13 @@ October 8 current continuation (paired staff setup implemented, not activated):
   recipient/mail acceptance and gated Donate activation follow. Phase A is OPEN.
   Exact next step: commit the selected tested source and update existing PR #294,
   then verify its exact candidate CI and preview before release.
+- The continuation was committed/pushed as `4e17d23`. Its first CI run caught
+  two documentation assertions still requiring the superseded activation heading
+  and Safe-only wording. No application test failed. The runbooks now label the
+  historical procedure explicitly; tests check the approved paired setup/reset
+  and forbid rollback into the legacy model. Focused documentation/security
+  checks passed 34/34 in `factor-docs-supersession-2026-10-08.log`; fresh exact
+  candidate CI is required before release.
 
 October 8 continuation (UX published; Donate indexed; mail worker active):
 
