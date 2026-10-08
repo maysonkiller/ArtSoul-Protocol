@@ -96,7 +96,14 @@ addendum above first; do not repeat the completed production migrations.
    unchanged disabled flags and healthy public reads. An empty recipient inbox
    is not proof of notification delivery or completion of moderation acceptance.
 
-### Live activation
+### Historical foundation activation (superseded for paired authority)
+
+October 8: canon 07 replaces independent bootstrap/two-passkey/Safe-only staff
+recovery with both designated wallets approving setup and recovery. Use the
+current paired-authority procedure in `docs/security/MIGRATION_RUNBOOK.md` for
+A8e/A8f/A8g, policy, passkey OR authenticator app and real setup/reset acceptance.
+The steps below retain the historical foundation, not the current activation
+recipe. Complaint/review/notification acceptance remains required afterward.
 
 RG-03 remains required before activating the dependent authority. The October 3
 authorization to perform real passkey/Safe ceremonies does not permit a bypass.

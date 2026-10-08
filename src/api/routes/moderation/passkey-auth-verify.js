@@ -4,6 +4,7 @@ import {
   MODERATION_SESSION_TTL_SECONDS,
   completeAuthenticationRpc,
   consumeAuthenticationChallenge,
+  findActiveStaffAuthorization,
   recordAuthEventBestEffort,
   parseStoredTransports,
   requirePasskeyRouteContext,
@@ -14,7 +15,7 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
 
   try {
-    const { config, wallet } = await requirePasskeyRouteContext(req);
+    const { config, wallet, authorizationVersion } = await requirePasskeyRouteContext(req);
 
     const body = await readJson(req);
     const response = body?.response;
@@ -27,6 +28,7 @@ export default async function handler(req, res) {
     const rows = await supabaseRest(
       `artsoul_staff_passkeys?credential_id=eq.${encodeURIComponent(credentialId)}` +
         `&wallet_address=eq.${encodeURIComponent(wallet)}` +
+        (authorizationVersion === undefined ? '' : `&authorization_version=eq.${authorizationVersion}`) +
         '&revoked_at=is.null' +
         '&select=id,credential_id,public_key,sign_count,transports&limit=1'
     );
@@ -43,7 +45,7 @@ export default async function handler(req, res) {
     try {
       verification = await verifyAuthenticationResponse({
         response,
-        expectedChallenge: async (challenge) => consumeAuthenticationChallenge(challenge, wallet),
+        expectedChallenge: async (challenge) => consumeAuthenticationChallenge(challenge, wallet, authorizationVersion),
         expectedOrigin: config.origin,
         expectedRPID: config.rpId,
         requireUserVerification: true,
@@ -86,7 +88,19 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: result || 'AUTHENTICATION_COMMIT_FAILED' });
     }
 
-    setModerationSession(res, wallet, credentialId);
+    // Verification/RPC I/O may span a revoke/regrant. Capture the version at
+    // entry and compare again before issuing; never stamp a changed role onto
+    // authentication that started under the previous authorization.
+    if (authorizationVersion !== undefined) {
+      const current = await findActiveStaffAuthorization(wallet);
+      if (!current || current.authorizationVersion !== authorizationVersion) {
+        await recordAuthEventBestEffort(wallet, 'passkey_auth_failure', credentialId, {
+          phase: 'session_issue', reason: 'staff authorization changed'
+        });
+        return res.status(403).json({ error: 'STEP_UP_REQUIRED' });
+      }
+    }
+    setModerationSession(res, wallet, credentialId, authorizationVersion);
     res.status(200).json({
       success: true,
       expires_in_seconds: MODERATION_SESSION_TTL_SECONDS

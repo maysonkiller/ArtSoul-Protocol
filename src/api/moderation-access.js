@@ -96,6 +96,13 @@ export async function getModerationAccess(req, options = {}) {
     };
   }
 
+  // The new role authority must never fall back to the historical social
+  // path if the operator enables it without factor enforcement.
+  if (process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED === 'true' && !isModerationPasskeyEnabled()) {
+    if (strict) throw accessError('Moderation factor enforcement is unavailable', 'MODERATION_PASSKEY_MISCONFIGURED', 503);
+    return { wallet, role: null, canModerate: false, passkeyRequired: true, missingFactors: ['passkey_configuration'] };
+  }
+
   // Flag ON: passkey-only authorization; profiles are never queried.
   if (isModerationPasskeyEnabled()) {
     return await getPasskeyModerationAccess(req, wallet, strict);

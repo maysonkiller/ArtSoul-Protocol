@@ -3,10 +3,73 @@
 Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 7 continuation (UX published; Donate indexer updated):
+October 8 current continuation (paired staff setup implemented, not activated):
+
+- Started from `707d180438ad4d41f6b9c19ce7c21037ec1bc12f`; same canonical
+  workspace/branch. Snapshot: `output/recovery/factor-setup-2026-10-08/`.
+  No worktrees were created, combined or reset. The older untracked Safe policy
+  observer/test, `.codex/` and `output/` remain unselected recovery material.
+- Completed shared single-use setup permission, version-bound native passkey
+  registration and encrypted authenticator-app setup/login. Grant/reset consumes
+  both authority approvals, advances role version and issues 15-minute setup.
+  Successful enrollment consumes the permission once across both methods.
+  Legacy self-grant/recovery/key-removal paths are rejected under the paired
+  policy; replacement needs both current authorities. No complaint is deleted.
+- Added the gated authority and factor routes, the Admin verification dialog and
+  explicit two-wallet role/reset/rotation UI. Authority discovery is distinct
+  from staff eligibility; authority alone cannot read complaints. Signatures
+  survive a wallet switch only as the exact public proposal and approvals in
+  sessionStorage, then expire/clear. Codes and factor secrets stay out of storage.
+  Account-menu runtime is v55 on every consumer. Existing Safe/contracts/economics
+  are unchanged. This is application staff administration, not a complete console
+  for every future protocol operation.
+- `node scripts/run-unit-tests.mjs`: **1,802 passed, zero failed/skipped** in
+  `output/audit/factor-setup-full-unit-final-2026-10-08.log`. Includes actual
+  disposable PostgreSQL, real ephemeral EOA signatures, software P-256 WebAuthn
+  registration/authentication, TOTP replay/throttling, role changes and atomic
+  permission races. The retained unselected observer contributes 29 checks.
+  Earlier full-run failures were stale asset version/hash expectations, fixed
+  without weakening the cache checks; their failing log is retained.
+- Build: **11 routes, 175 CSS utilities**, passed in
+  `output/audit/factor-setup-build-final-2026-10-08.log`. Built Chrome test passed
+  **51 assertions**, both themes at 1280/390/320px, zero uncaught errors:
+  `output/audit/staff-factor-built-2026-10-08.json`. It covers wrong-code retry,
+  native cancellation/setup/verification, late response after logout, two actual
+  ephemeral signatures across account switch and rejection of tampered stored
+  approval. Screenshots are under `output/playwright/staff-factor-*` and
+  `staff-authority-*`. Synthetic local HTTP/provider boundaries do not prove
+  live deployment, physical passkeys or iPhone/Android wallet acceptance.
+- A bounded independent review found one historical-key revocation issue; the
+  paired-mode removal guard fixes it. Final UI review found no further concrete
+  bypass or wallet/session race. The sole reviewer is finished; no new team ran.
+- Read-only live preflight at 12:04 UTC found no A8e/A8f/A8g objects, one staff
+  role, zero passkeys/reports and one historical unused expired bootstrap.
+  Reporting/Admin/Donate remain off. Private preflight and operator aggregates
+  are timestamped under `docs/private/`; no live role/schema/config was changed.
+- Owner reported the earlier phone pass appeared good. Record that qualitative
+  observation without repeating the entire trip; it does not supply Android,
+  OAuth or native-factor evidence. The device sheet records the limit.
+- Unfinished: publish/review this continuation of PR #294; verify its preview,
+  safely install reviewed A8e/A8f/A8g and initial policy/config, then obtain real
+  owner two-wallet setup/reset and device verification. Full complaint/review/
+  recipient/mail acceptance and gated Donate activation follow. Phase A is OPEN.
+  Exact next step: commit the selected tested source and update existing PR #294,
+  then verify its exact candidate CI and preview before release.
+- The continuation was committed/pushed as `4e17d23`. Its first CI run caught
+  two documentation assertions still requiring the superseded activation heading
+  and Safe-only wording. No application test failed. The runbooks now label the
+  historical procedure explicitly; tests check the approved paired setup/reset
+  and forbid rollback into the legacy model. Focused documentation/security
+  checks passed 34/34 in `factor-docs-supersession-2026-10-08.log`; fresh exact
+  candidate CI is required before release.
+
+October 8 continuation (UX published; Donate indexed; mail worker active):
 
 - Recovery started at `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched
-  at that read. Current local HEAD is `5529973e41b29ca6ed62662c2e8fae17242bda2f`.
+  at that read. Production is `154d16f2fe18734a6766330c3aa7021eecf00702`;
+  the challenge-binding continuation started at committed HEAD
+  `a611d424b8cd8441aa1f3eed9821c31b939b83f9` on the same branch
+  (draft PR #294, not merged). Use `git log -1` for the saved continuation commit.
   Existing October 3 source and checkpoint changes were
   preserved in `output/recovery/phase-a-resume-2026-10-07/before.patch`, with
   separate copies of seven untracked implementation/test files. No worktree,
@@ -51,10 +114,11 @@ October 7 continuation (UX published; Donate indexer updated):
   apex browser loaded v18 and 26 real gallery cards; checked cards had media
   overlays and one-row status/prices. Screenshot:
   `output/audit/phase-a-ux-apex-gallery-2026-10-07.png`.
-- Complaint email delivery code is published with a separate disabled flag,
+- Complaint email delivery code is published with a separate worker flag,
   service-only claims, idempotent bounded retries and no complaint content in
-  email. Its migration was applied and verified on October 8 (see below); scheduler,
-  configuration and real inbox delivery remain unverified. See `docs/runbooks/MODERATION_REPORT_EMAIL.md`.
+  email. Its migration, protected configuration and scheduler were verified on
+  October 8, including actual transport delivery to the project inbox (see below).
+  Full complaint-flow acceptance remains open. See `docs/runbooks/MODERATION_REPORT_EMAIL.md`.
   Staff profile notices use existing protected APIs, store only reference/count
   information and never turn ordinary users into staff. Email runs only in the
   scheduled worker; report intake never waits for the provider. The actual
@@ -129,7 +193,7 @@ October 7 continuation (UX published; Donate indexer updated):
   persistence (22 real PostgreSQL checks) are preserved but not wired or live.
   Role epochs, dual-signature issuing/rotation, factor session integration and
   real setup/recovery ceremonies remain open. Native key/app setup is unverified.
-- Current requested card amendment is local: Donate, Report, Creation transaction
+- Current requested card amendment is published: Donate, Report, Creation transaction
   only, in that order; no management/details actions. Valid indexed registration
   hashes only; owner auction management remains on artwork detail. Shared cache
   v19 covers all four consumers. All 32 card regressions and the 11-route build pass. Built-browser acceptance
@@ -137,12 +201,151 @@ October 7 continuation (UX published; Donate indexer updated):
   rendering with the real sanitized API read response passed 27 checks. Both
   suites performed zero writes and had zero page exceptions. Evidence is in
   `output/audit/{shared-card-menu,donation-real-read}-built-2026-10-08.json`.
-  Publication is pending; these fixtures do not prove public activation.
+  PR #293 merged as `154d16f2fe18734a6766330c3aa7021eecf00702` after Linux,
+  Windows, static and Vercel checks passed (CI run `37743580044`). Initial CI
+  `37743100607` found an outdated card cache pin and obsolete upload guidance;
+  both were corrected and their 43 focused checks passed before the green run.
+  Production deployment `6929874943` succeeded. Preview and apex matched all
+  53 JS/CSS assets across six pages; Base indexer was healthy with zero lag.
+  The actual connected Chrome gallery loaded v19, rendered 25 cards, kept the
+  menu over media and exposed only the correctly labelled creation transaction
+  while public Donate/Report remain off. Screenshot:
+  `output/audit/phase-a-menu-apex-gallery-2026-10-08.png`. Artifact evidence:
+  `output/audit/phase-a-menu-{preview,apex}-artifact-2026-10-08.json`.
+  Browser fixtures do not prove public feature activation or physical phones.
+- October 8 dual-wallet message verification is local and unwired (29/29 checks):
+  both current EOAs sign the exact domain/action/target/role/version/nonce/expiry;
+  one signer, duplicates, changed fields, expired requests and replacement-pair
+  approval are denied. A8f now adds local-only durable proposals, atomic role
+  grants/revocation/rotation and immutable runtime audit evidence. Its unregistered
+  API handler loads the stored proposal and recovers both signatures itself.
+  SQL rechecks authority and target versions after locks, consumes the request
+  once and commits the role change with its audit. Direct runtime role writes
+  are denied. The final focused run passed 47 checks, including real disposable
+  PostgreSQL, real ephemeral EOA signatures and the actual handler/session code
+  over a fixture PostgREST transport. Evidence:
+  `output/audit/a8f-authority-handler-2026-10-08.log`. No project keys or external
+  transactions were used. The migration is unapplied, the policy registry is
+  unseeded, the handler is not routed, and no role-management UI is wired.
+  Factor/session integration and real approvals remain unfinished.
+- A real disposable PostgreSQL regression reproduced two TOTP role-regrant gaps:
+  an old matched login and an old enrollment approval could both return OK after
+  revocation/recreation. The local unapplied migration now binds grants/attempts
+  to a monotonic role authorization version. All 28 PostgreSQL checks passed,
+  including concurrent revoke/regrant, deletion/recreation, fresh replacement
+  setup and denial of sequence rewinds. Evidence:
+  `output/audit/a8e-role-regrant-after-2026-10-08.log`. No live schema or staff
+  authorization has changed. Retained failing evidence:
+  `output/audit/a8e-role-regrant-before-real-2026-10-08.log` (22 passing checks,
+  two failed subtests plus their parent, no skips). Docker startup caused an
+  earlier skipped run, which is not verification evidence.
+- Final October 8 working-tree regression: **1,756 passed, zero failed/skipped**.
+  Command: `npm run test:unit`; log:
+  `output/audit/phase-a-authority-full-unit-final-2026-10-08.log`. The first run
+  passed 1,753 and failed three integration guards: a missing migration-ledger
+  row, missing private-table classification and a CRLF/LF-only header comparison.
+  Those guards were corrected; 93 focused checks and the full rerun passed.
+  The table scanner now recognizes CREATE TABLE with or without IF NOT EXISTS.
+  No historical applied migration was rewritten. The retained unselected Safe
+  observer and its 29 tests remain outside the new authority change; no new Safe
+  is selected by their presence. Recovery snapshot:
+  `output/recovery/phase-a-authority-2026-10-08/`. Only this root agent is active;
+  the completed isolated browser and preview server were closed.
+- The tested source is preserved in [draft PR #294](https://github.com/maysonkiller/ArtSoul-Protocol/pull/294)
+  at `917d084da74a93f747777b2c21c3f3516288b772`. CI run `37747560963` passed
+  Linux, Windows and static checks; the Vercel preview also passed. No draft
+  migration or route is activated by publishing it.
+  Remaining untracked files are `.codex/`, `output/`, the previously preserved
+  `src/api/moderation-authority-policy.js` Safe observer and its test. They were
+  deliberately not folded into the selected gasless application authority.
+  The subsequent session-binding changes were pushed as `a611d42`; CI run
+  `37765791029` passed Linux, Windows, static and Vercel checks for that exact
+  commit. The newer challenge-binding diff below is not covered by that old CI.
+- October 8 factor policy is now explicitly approved: both current authority
+  wallets approve initial setup and replacement setup/recovery, with one-time
+  15-minute permission. TOTP allows five reservations per rolling five minutes,
+  counting abandoned attempts; each lasts two minutes. Sessions remain 15
+  minutes. Canon 07, its dated amendment and the migration/runbook notes record
+  the replacement of historical bootstrap/Safe application recovery. No live
+  policy or factor configuration was changed.
+- A reproduced API regression allowed an old step-up cookie to become valid
+  after role revocation/regrant. The local repair signs the current role version,
+  rechecks it for every protected session, rejects legacy cookies when the new
+  authority flag is on, and rejects authorization changes during passkey
+  verification before issuing a cookie. Mixed dual-wallet/no-factor flags now
+  fail closed instead of falling back to social profiles. Complaints are never
+  deleted. Snapshot: `output/recovery/phase-a-session-binding-2026-10-08/`.
+  Failing evidence: `output/audit/passkey-session-regrant-before-2026-10-08.log`.
+  Focused regressions passed 139/139; the full working-tree suite passed
+  **1,776/1,776, zero failures/skips**, including isolated PostgreSQL. Logs:
+  `output/audit/passkey-session-binding-{focused-final,full-unit}-2026-10-08.log`.
+  Build passed 11 routes / 175 utilities, recorded in the matching `build` log.
+  A subsequent real SQL grant -> cookie -> revoke -> regrant regression and
+  policy guards passed **74/74, no skips** in
+  `output/audit/passkey-session-binding-real-2026-10-08.log`. Its credential is
+  synthetic; this does not prove physical passkey acceptance. Earlier sandbox
+  Docker skips and missing-process fixture failures are not acceptance evidence.
+  Enrollment grants and factors still need full role-version integration;
+  current checks alone do not authorize feature activation.
+- Resend transfer: the owner explicitly approved temporary inspection through
+  the personal account and then an Admin invitation to the project mailbox.
+  The invitation was sent and accepted on October 8. A fresh project-mailbox
+  login shows active Admin membership in the existing team and both existing
+  verified domains. The existing four API keys were retained; no DNS/domain
+  transfer, subscription or key rotation occurred. After separate explicit
+  confirmation, the personal membership was removed; the project mailbox is
+  now the sole Admin. Both domains and all five current keys were retained.
+  Removal evidence: `output/audit/resend-personal-access-removed-2026-10-08.png`.
+  Initial acceptance evidence:
+  `output/audit/resend-project-admin-accepted-2026-10-08.png`.
+  After separate owner authorization, the sending-only key
+  `ArtSoul Protocol moderation mail`, restricted to `notify.artsoulprotocol.com`,
+  was created and installed through encrypted transport. The existing website
+  key was retained. The owner also explicitly approved placing the existing
+  Supabase service-role key on the host for the delivery worker.
+- October 8 mail worker is live: `/etc/artsoul/report-email.env` is root-owned
+  mode 0600; only `artsoulprotocol@gmail.com` receives these alerts. The separate
+  systemd oneshot/timer runs at most three records per invocation, 60 seconds
+  after completion, with a 120-second timeout. Three observed runs exited zero
+  with an empty queue. The real transport test reached the project Gmail inbox;
+  one exact-key retry produced no second delivered message in Resend. The owner
+  explicitly approved this permanent schedule; the prior automatic-review
+  blocks on secret placement/scheduling are resolved, not outstanding gates.
+  Private evidence: `docs/private/moderation-mail-worker-acceptance-2026-10-08.json`;
+  screenshot: `output/audit/moderation-mail-real-inbox-2026-10-08.png`.
+  Host source remains `5529973`, Base healthy (observed lag five, failed/dead zero),
+  legacy Ethereum stopped. No indexer restart or synthetic complaint was made.
+  Actual complaint submission, moderator decision and notification acceptance
+  remain open; transport evidence does not close those gates.
+- The challenge-binding continuation reproduced a separate gap: a WebAuthn
+  response created before role regrant could obtain a new version-bound cookie
+  if the verify request itself started after regrant. The candidate now stores
+  the role version on authentication challenges and includes it in the atomic
+  consume predicate. Missing/old versions fail closed under the dual-wallet
+  flag, without rewriting old rows. The A8e migration is still unapplied.
+  Snapshot: `output/recovery/passkey-challenge-binding-2026-10-08/`;
+  failing evidence: `output/audit/passkey-challenge-binding-before-2026-10-08.log`.
+  API and actual disposable PostgreSQL checks passed **128/128, no skips**,
+  including signed revoke/regrant and concurrent one-time consumption:
+  `output/audit/passkey-challenge-binding-real-final-2026-10-08.log`.
+  An earlier TOTP fixture aged out its previous-step setup code at a 30-second
+  boundary. Fixture preparation now uses database execution time; production
+  code/window rules were not relaxed. Initial failure and sandbox Docker skips
+  are retained and are not passing evidence. The build passed 11 routes and
+  175 utilities: `output/audit/passkey-challenge-binding-build-2026-10-08.log`.
+  The final complete working-tree Node run passed **1,787/1,787, no failures or
+  skips**, including actual disposable PostgreSQL. Command:
+  `node scripts/run-unit-tests.mjs`; log:
+  `output/audit/passkey-challenge-binding-full-unit-2026-10-08.log`.
+  The count includes 29 preserved unselected Safe-observer tests outside PR #294.
+  Registration/factor setup and real device acceptance remain incomplete; these
+  checks do not establish those flows or change any live authority flag.
 - Report, Protocol Admin and public Donate flags remain disabled. Phase A is open.
-- Exactly next step: publish the tested menu amendment through CI, then complete
-  email worker configuration and the approved gasless dual-wallet authority.
-  Vercel has the existing production mail key as a non-revealable Secret; no
-  duplicate key or new credential has been created during this continuation.
+- Exactly next step: complete the approved two-wallet factor-setup permission
+  consumer and bind passkey enrollment grants/factors to its role version before wiring
+  the role route. The policy decision is resolved; real integration is not.
+  Public Donate activation also requires working donation-message moderation
+  under the October 3 amendment; successful test payments do not waive it.
 
 October 3 admin-access placement correction (published and browser-verified):
 

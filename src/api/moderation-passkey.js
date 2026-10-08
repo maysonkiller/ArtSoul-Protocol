@@ -84,10 +84,28 @@ function signModerationPayload(payload) {
     .digest('base64url');
 }
 
-export function setModerationSession(res, wallet, credentialId) {
+export function roleBoundSessionsEnabled() {
+  return process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED === 'true';
+}
+
+function parseAuthorizationVersion(value) {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value))) return null;
+  const version = Number(value);
+  return Number.isSafeInteger(version) && version > 0 ? version : null;
+}
+
+export function setModerationSession(res, wallet, credentialId, authorizationVersion, factorType = 'passkey') {
+  const version = parseAuthorizationVersion(authorizationVersion);
+  if (roleBoundSessionsEnabled() && !version) {
+    throw configError('A current staff authorization version is required to issue this session.');
+  }
+  if (!['passkey', 'totp'].includes(factorType) || (factorType === 'totp' && !roleBoundSessionsEnabled())) {
+    throw configError('A configured staff factor type is required.');
+  }
   const payload = Buffer.from(JSON.stringify({
     wallet,
     credential_id: credentialId,
+    ...(roleBoundSessionsEnabled() ? { authorization_version: version, factor_type: factorType } : {}),
     exp: Math.floor(Date.now() / 1000) + MODERATION_SESSION_TTL_SECONDS
   })).toString('base64url');
   const signature = signModerationPayload(payload);
@@ -125,18 +143,35 @@ export function readModerationSession(req) {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     if (!data.wallet || !data.credential_id || !data.exp) return null;
     if (data.exp < Math.floor(Date.now() / 1000)) return null;
-    return { wallet: String(data.wallet).toLowerCase(), credentialId: String(data.credential_id) };
+    const version = parseAuthorizationVersion(data.authorization_version);
+    if (roleBoundSessionsEnabled() && !version) return null;
+    const factorType = data.factor_type || 'passkey';
+    if (!['passkey', 'totp'].includes(factorType) || (factorType === 'totp' && !roleBoundSessionsEnabled())) return null;
+    return {
+      wallet: String(data.wallet).toLowerCase(), credentialId: String(data.credential_id),
+      ...(roleBoundSessionsEnabled() ? { authorizationVersion: version, factorType } : {})
+    };
   } catch {
     return null;
   }
 }
 
-export async function findActiveStaffRole(wallet) {
+export async function findActiveStaffAuthorization(wallet) {
+  const columns = roleBoundSessionsEnabled() ? 'role,authorization_version' : 'role';
   const rows = await supabaseRest(
-    `artsoul_staff_roles?wallet_address=eq.${encodeURIComponent(wallet)}&active=eq.true&select=role&limit=1`
+    `artsoul_staff_roles?wallet_address=eq.${encodeURIComponent(wallet)}&active=eq.true&select=${columns}&limit=1`
   );
   const role = String(rows?.[0]?.role || '').toLowerCase();
-  return STAFF_MODERATION_ROLES.has(role) ? role : null;
+  if (!STAFF_MODERATION_ROLES.has(role)) return null;
+  const authorizationVersion = parseAuthorizationVersion(rows[0].authorization_version);
+  if (roleBoundSessionsEnabled() && !authorizationVersion) {
+    throw configError('The staff authorization registry must support role-bound sessions.');
+  }
+  return { role, ...(roleBoundSessionsEnabled() ? { authorizationVersion } : {}) };
+}
+
+export async function findActiveStaffRole(wallet) {
+  return (await findActiveStaffAuthorization(wallet))?.role || null;
 }
 
 export function requireActiveStaffRole(role) {
@@ -146,10 +181,13 @@ export function requireActiveStaffRole(role) {
   return role;
 }
 
-export async function findWalletCredentials(wallet, { includeRevoked = false } = {}) {
+export async function findWalletCredentials(wallet, { includeRevoked = false, authorizationVersion } = {}) {
   const revokedFilter = includeRevoked ? '' : '&revoked_at=is.null';
+  const version = roleBoundSessionsEnabled() ? authorizationVersion ?? (await findActiveStaffAuthorization(wallet))?.authorizationVersion : null;
+  if (roleBoundSessionsEnabled() && !parseAuthorizationVersion(version)) return [];
   return await supabaseRest(
     `artsoul_staff_passkeys?wallet_address=eq.${encodeURIComponent(wallet)}${revokedFilter}` +
+      (roleBoundSessionsEnabled() ? `&authorization_version=eq.${version}` : '') +
       '&select=id,credential_id,public_key,sign_count,transports,label,enrolled_via,created_at,last_used_at,revoked_at' +
       '&order=created_at.asc'
   ) || [];
@@ -233,13 +271,18 @@ export async function storeRegistrationChallenge(challenge, wallet, grantId) {
   });
 }
 
-export async function storeAuthenticationChallenge(challenge, wallet) {
+export async function storeAuthenticationChallenge(challenge, wallet, authorizationVersion) {
+  const version = parseAuthorizationVersion(authorizationVersion);
+  if (roleBoundSessionsEnabled() && !version) {
+    throw configError('A current staff authorization version is required to start authentication.');
+  }
   await supabaseRest('artsoul_webauthn_challenges', {
     method: 'POST',
     body: [{
       challenge,
       wallet_address: wallet,
       purpose: 'authentication',
+      ...(roleBoundSessionsEnabled() ? { authorization_version: version } : {}),
       expires_at: new Date(Date.now() + WEBAUTHN_CHALLENGE_TTL_MS).toISOString()
     }]
   });
@@ -265,12 +308,16 @@ export async function validateRegistrationChallenge(challenge, wallet, grantId) 
 
 // One-time consume for AUTHENTICATION challenges only (registration
 // challenges are consumed atomically in the RPC). Mirrors the single-use
-// SIWE nonce PATCH pattern.
-export async function consumeAuthenticationChallenge(challenge, wallet) {
+// SIWE nonce PATCH pattern. Bind to the authorization at challenge creation,
+// so a response prepared before role replacement cannot start a new session.
+export async function consumeAuthenticationChallenge(challenge, wallet, authorizationVersion) {
+  const version = parseAuthorizationVersion(authorizationVersion);
+  if (roleBoundSessionsEnabled() && !version) return false;
   const rows = await supabaseRest(
     `artsoul_webauthn_challenges?challenge=eq.${encodeURIComponent(challenge)}` +
       `&wallet_address=eq.${encodeURIComponent(wallet)}` +
       '&purpose=eq.authentication' +
+      (roleBoundSessionsEnabled() ? `&authorization_version=eq.${version}` : '') +
       '&consumed_at=is.null' +
       `&expires_at=gt.${encodeURIComponent(new Date().toISOString())}`,
     {
@@ -373,8 +420,9 @@ export async function requirePasskeyRouteContext(req) {
   }
   const config = getWebAuthnConfig();
   const wallet = requireWallet(req);
-  const role = requireActiveStaffRole(await findActiveStaffRole(wallet));
-  return { config, wallet, role };
+  const authorization = await findActiveStaffAuthorization(wallet);
+  const role = requireActiveStaffRole(authorization?.role);
+  return { config, wallet, role, authorizationVersion: authorization.authorizationVersion };
 }
 
 // Verifies the 15-minute step-up for the ALREADY SIWE-authenticated wallet.
@@ -391,9 +439,34 @@ export async function verifyModerationStepUp(req, sessionWallet) {
     return { valid: false, code: 'STEP_UP_WALLET_MISMATCH' };
   }
 
+  // A later grant is a different authorization, even for the same role and
+  // wallet. Never revive a pre-revocation session when staff access returns.
+  if (roleBoundSessionsEnabled()) {
+    const current = await findActiveStaffAuthorization(stepUp.wallet);
+    if (!current || current.authorizationVersion !== stepUp.authorizationVersion) {
+      return { valid: false, code: 'STEP_UP_REQUIRED' };
+    }
+  }
+
+  if (stepUp.factorType === 'totp') {
+    const permissions = await supabaseRest(
+      `artsoul_staff_setup_permissions?target_wallet=eq.${encodeURIComponent(stepUp.wallet)}` +
+      `&role_version=eq.${stepUp.authorizationVersion}&factor_type=eq.totp` +
+      `&factor_reference=eq.${encodeURIComponent(stepUp.credentialId)}&consumed_at=not.is.null&select=id&limit=1`
+    );
+    if (!permissions || permissions.length !== 1) return { valid: false, code: 'CREDENTIAL_REVOKED' };
+    const factors = await supabaseRest(
+      `artsoul_staff_totp_factors?id=eq.${encodeURIComponent(stepUp.credentialId)}` +
+      `&wallet_address=eq.${encodeURIComponent(stepUp.wallet)}&activated_at=not.is.null&revoked_at=is.null&select=id&limit=1`
+    );
+    return factors?.length === 1 ? { valid: true, credentialId: stepUp.credentialId, factorType: 'totp' }
+      : { valid: false, code: 'CREDENTIAL_REVOKED' };
+  }
+
   const rows = await supabaseRest(
     `artsoul_staff_passkeys?credential_id=eq.${encodeURIComponent(stepUp.credentialId)}` +
       `&wallet_address=eq.${encodeURIComponent(stepUp.wallet)}` +
+      (roleBoundSessionsEnabled() ? `&authorization_version=eq.${stepUp.authorizationVersion}` : '') +
       '&revoked_at=is.null&select=credential_id&limit=1'
   );
   if (!rows || rows.length !== 1) {

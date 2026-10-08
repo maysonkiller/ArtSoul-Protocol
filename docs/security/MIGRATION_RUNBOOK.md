@@ -43,7 +43,9 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
 | `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
 | `sql/migrations/a8d_moderation_safe_recovery.sql` | A8 schema step 4. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. The passkey/recovery gates in `runbooks/A8D_SAFE_RECOVERY.md` remain open. |
-| `sql/migrations/a8e_moderation_totp_persistence.sql` | **LOCAL ONLY, NOT APPLIED.** Encrypted TOTP factors, typed grants, atomic step consumption and persistent throttling passed 22 disposable PostgreSQL checks. No live policy row, grant issuer, API/session integration or authenticator ceremony exists. Authority integration and an explicit throttle policy remain required. |
+| `sql/migrations/a8e_moderation_totp_persistence.sql` | **LOCAL ONLY, NOT APPLIED.** Encrypted TOTP factors, typed grants, atomic step consumption, persistent throttling and monotonic role-version fencing. It also adds nullable authorization versions to WebAuthn challenges: legacy rows are retained, but the inactive dual-wallet API rejects them. No live policy row, grant issuer or authenticator ceremony exists. The October 8 founder approval defines five attempts per rolling five minutes, including abandoned attempts, with a two-minute reservation; installing this policy and completing authority/factor integration remain required. Evidence and remaining gates are in the stabilization checkpoint. |
+| `sql/migrations/a8f_moderation_dual_wallet_authority.sql` | **LOCAL ONLY, NOT APPLIED.** Follows A8e. Empty application-authority registry, one-time proposals and atomic role grants/revocation/rotation/reset with an audit record. Removes direct runtime role writes. Grants/resets issue a shared 15-minute setup permission atomically. Earlier 47-check evidence covered the prior draft only; consult the current checkpoint for updated verification. Do not apply before role-version-aware factor/session enforcement and reviewed initial policy; it does not change the existing Safe or contracts. |
+| `sql/migrations/a8g_staff_factor_setup.sql` | **LOCAL ONLY, NOT APPLIED.** Follows A8f. Atomic passkey setup or encrypted TOTP preparation using the shared permission added by the current unapplied A8e draft. Competing factors share the wallet lock. Creates no policy, staff, permission or session. Requires reviewed policy values, server-only encryption configuration and real setup/recovery acceptance before public moderation activation. |
 | `sql/migrations/phase18_7a_supabase_security_hardening.sql` | Prior partial classification. Superseded by 18.7b. |
 | `sql/migrations/phase18_7b_supabase_security_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
 | `sql/migrations/phase18_7c_supabase_storage_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
@@ -62,7 +64,7 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/launch_service_quotas.sql` | **Applied 2026-10-03.** Quota-only prerequisite for private email; no Collection Launch tables or services were activated. |
 | `sql/migrations/artist_support.sql` | **Applied 2026-10-03.** Event-only donation projection and independent message visibility. Live catalog reverified October 7; Donate indexer source connected October 7. Public Donate activation remains separate. |
 | `sql/migrations/artist_support_moderation.sql` | **Applied 2026-10-03; moderation dormant.** Existing complaint/review extensions target donation-message text only. No review or visibility decision was made by schema preparation. |
-| `sql/migrations/moderation_report_email_delivery.sql` | **Applied and verified 2026-10-08; delivery disabled.** One additive service-only table and three RPCs. Fresh protected backup, catalog preflight, exact function bodies/signatures, forced RLS and privileges were checked; unchanged report counts and the empty service batch were verified before commit. Scheduler, credentials and real inbox acceptance remain open. See `../runbooks/MODERATION_REPORT_EMAIL.md`. |
+| `sql/migrations/moderation_report_email_delivery.sql` | **Applied and verified 2026-10-08; separate worker enabled.** One additive service-only table and three RPCs. Fresh protected backup, catalog preflight, exact function bodies/signatures, forced RLS and privileges were checked; report counts were unchanged. Subsequent explicit approvals enabled the restricted host configuration and systemd timer. A real transport test reached the project inbox once despite an exact-key retry; actual complaint-flow acceptance is still open. See `../runbooks/MODERATION_REPORT_EMAIL.md`. |
 | `migrations/001_ai_integration.sql` | Historical/manual, third tree. Its `001` prefix does **not** belong to the indexer sequence; the numbering collision with `sql/migrations/001_core_indexer_schema.sql` is real. Verify schema before any use. |
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.
@@ -256,6 +258,13 @@ Rollback, if required, is a database restore or a new reviewed forward migration
 
 ## A8 Moderation Activation
 
+October 8 policy supersession: canon 07 replaces the previous independent
+bootstrap/Safe-only staff recovery gate with current-pair gasless authorization
+for initial factor setup and recovery. The old activation steps below document
+the deployed foundation, not instructions to bypass the new policy. Do not
+activate the dual-wallet route until the version-bound setup/challenge/factor
+and session paths are integrated and the replacement real-device flow passes.
+
 Schema preparation and live moderation activation are separate stages. Under
 explicit founder authorization, the reviewed additive A8 schema may be prepared
 while RG-03 activation remains blocked. The September 29 founder deferral of
@@ -319,7 +328,7 @@ above before using this procedure; do not repeat already completed migrations.
    existing public reads remain healthy. An available empty recipient inbox
    proves schema availability, not notification delivery or A8 acceptance.
 
-### Live activation
+### Historical foundation activation (superseded for paired authority)
 
 1. Satisfy the activation preconditions in `RESOURCE_GATED_WORK.md` RG-03,
    including final apex-origin acceptance recorded through
@@ -342,6 +351,46 @@ above before using this procedure; do not repeat already completed migrations.
 
 Stop at the first unexpected verification result. Applying a later A8 migration
 over an unverified earlier one is the failure this ordering exists to prevent.
+
+### Current paired-authority activation (October 8)
+
+1. Deploy only the reviewed, tested factor/session integration. Before database
+   writes, compare current catalogs and migration hashes, create and verify a
+   protected full backup, and retain the existing role/factor/audit counts.
+   The current A8e/A8f/A8g drafts are unapplied; do not infer installation from
+   the four historical A8 migrations. Do not replay bootstrap or Safe journals.
+2. Apply A8e, A8f and A8g in that order, verifying each transaction before the
+   next. These files already contain transaction wrappers. Check forced RLS,
+   service-only RPC execution, fixed search paths and removal of direct runtime
+   role writes. Preserve all old credentials and audit records; the new version
+   checks reject obsolete factors without deleting them.
+3. Seed only the founder-approved current authority pair, apex origin and Base
+   Sepolia chain ID in the protected policy. Record the initial policy and exact
+   authorized source privately. Seed TOTP policy as 5 attempts / 300 seconds /
+   120-second reservation. Generate the server-only 32-byte TOTP encryption key
+   and positive key version, retaining a protected recovery copy. Never include
+   plaintext keys, factor secrets or authority signatures in public evidence.
+4. Keep public reporting, the review workspace and Donate disabled. Retain the
+   apex RP/origin and session-secret configuration; enable the dual-wallet and
+   passkey foundation gates together only after schema/config verification.
+   Confirm unauthenticated and ordinary wallets cannot see authority controls;
+   an authority wallet alone cannot read complaints or apply a role change.
+5. The owner uses both wallets to approve the exact staff role/setup request.
+   Within 15 minutes the selected staff wallet enrolls one chosen method, then
+   verifies it. Rehearse a two-signature sign-in reset and replacement, proving
+   that the former factor/session cannot return. A software authenticator in
+   tests does not substitute for this physical-device/app ceremony.
+6. Record real review-workspace acceptance, then enable reporting for the
+   authorized end-to-end complaint/review/notification test. Verify inbox
+   delivery through the existing idempotent worker. Include donation-message
+   moderation before public Donate activation; do not repeat completed payment
+   transactions. Complete the beta review only after the remaining actual gates.
+
+Rollback after paired-policy activation must disable staff setup/review/reporting
+and preserve evidence while a forward repair is prepared. Do not simply disable
+the dual-wallet gate while leaving legacy factor or Safe-recovery routes active:
+that would reinstate the superseded authority model. No destructive down migration
+or deletion of complaints is part of this procedure.
 
 ## Clean Mainnet Database Cutover
 

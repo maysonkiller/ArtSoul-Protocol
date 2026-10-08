@@ -11,9 +11,9 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
 
   try {
-    const { config, wallet } = await requirePasskeyRouteContext(req);
+    const { config, wallet, authorizationVersion } = await requirePasskeyRouteContext(req);
 
-    const credentials = await findWalletCredentials(wallet);
+    const credentials = await findWalletCredentials(wallet, { authorizationVersion });
     if (!credentials.length) {
       return res.status(403).json({
         error: 'NO_CREDENTIALS',
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       }))
     });
 
-    await storeAuthenticationChallenge(options.challenge, wallet);
+    await storeAuthenticationChallenge(options.challenge, wallet, authorizationVersion);
     res.status(200).json({ success: true, options });
   } catch (error) {
     sendError(res, error);

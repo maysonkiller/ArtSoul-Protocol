@@ -4,7 +4,8 @@ import {
   generateGrantToken,
   hashGrantToken,
   recordAuthEventBestEffort,
-  requirePasskeyRouteContext
+  requirePasskeyRouteContext,
+  roleBoundSessionsEnabled
 } from '../../moderation-passkey.js';
 import {
   buildModerationSafeRecoveryMessage,
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
 
   let wallet = null;
   try {
+    if (roleBoundSessionsEnabled()) return res.status(403).json({ error: 'BOTH_AUTHORITY_SIGNATURES_REQUIRED' });
     const context = await requirePasskeyRouteContext(req);
     wallet = context.wallet;
     const safeConfig = getModerationSafeRecoveryConfig();

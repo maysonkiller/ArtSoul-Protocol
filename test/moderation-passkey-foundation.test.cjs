@@ -363,6 +363,7 @@ function loadEnvironment({ env = {}, db = createDb(), webauthn = {}, recoveryRpc
   context.exported.__mockSupabase = db.supabaseRest;
   vm.runInContext('supabaseRest = exported.__mockSupabase;', context);
   vm.runInContext(stripModule(passkeySource), context, { filename: 'moderation-passkey.js (stripped)' });
+  vm.runInContext(stripModule(read('src/api/moderation-factor-setup.js')), context, { filename: 'moderation-factor-setup.js (stripped)' });
   vm.runInContext(stripModule(safeRecoverySource), context, { filename: 'moderation-safe-recovery.js (stripped)' });
   vm.runInContext(stripModule(accessSource), context, { filename: 'moderation-access.js (stripped)' });
   vm.runInContext([
@@ -816,6 +817,74 @@ async function runAuthentication(envir, { credentialId = 'cred-1' } = {}) {
   return { optionsRes, verifyRes };
 }
 
+test('a passkey challenge issued before role regrant cannot create a fresh session', async () => {
+  const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+  db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 41;
+  const envir = loadEnvironment({ env: {...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'}, db });
+  const cookie = envir.siweCookie(STAFF), options = fakeRes();
+  await envir.loadRoute('authOptions')(fakeReq({cookie}), options);
+  assert.equal(options.statusCode, 200);
+  // The same wallet returns with a previously signed browser response after
+  // a new role grant. Request-entry version checks alone cannot distinguish it.
+  db.tables.artsoul_staff_roles[0].authorization_version = 43;
+  // A newly approved credential still cannot consume the old challenge.
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 43;
+  const response = fakeRes();
+  await envir.loadRoute('authVerify')(fakeReq({cookie,
+    body:{response:{id:'cred-1',__challenge:'auth-challenge-1'}}}), response);
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.error, 'AUTHENTICATION_NOT_VERIFIED');
+  assert.equal(response.headers['set-cookie'], undefined);
+  assert.equal(db.log.some(entry => entry.path === 'rpc/a8a_complete_authentication'), false);
+});
+
+test('role-bound authentication consumes a current challenge only once', async () => {
+  const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+  db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 41;
+  const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+  const { optionsRes, verifyRes } = await runAuthentication(envir);
+  assert.equal(optionsRes.statusCode, 200);
+  assert.equal(verifyRes.statusCode, 200);
+  const stored = db.tables.artsoul_webauthn_challenges[0];
+  assert.equal(stored.authorization_version, 41);
+  assert.ok(stored.consumed_at);
+  const replay = fakeRes();
+  await envir.loadRoute('authVerify')(fakeReq({ cookie: envir.siweCookie(STAFF),
+    body: { response: { id: 'cred-1', __challenge: stored.challenge } } }), replay);
+  assert.equal(replay.statusCode, 401);
+  assert.equal(replay.headers['set-cookie'], undefined);
+  assert.equal(db.log.filter(entry => entry.path === 'rpc/a8a_complete_authentication').length, 1);
+});
+
+test('role-bound authentication rejects legacy, foreign, expired and registration challenges', async t => {
+  for (const [name, patch] of [
+    ['legacy', { authorization_version: null }],
+    ['foreign role version', { authorization_version: 42 }],
+    ['foreign wallet', { wallet_address: '0x' + 'aa'.repeat(20) }],
+    ['expired', { expires_at: new Date(Date.now() - 60_000).toISOString() }],
+    ['registration', { purpose: 'registration' }]
+  ]) await t.test(name, async () => {
+    const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+    db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 41;
+    const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+    const cookie = envir.siweCookie(STAFF), options = fakeRes();
+    await envir.loadRoute('authOptions')(fakeReq({ cookie }), options);
+    assert.equal(options.statusCode, 200);
+    Object.assign(db.tables.artsoul_webauthn_challenges[0], patch);
+    const result = fakeRes();
+    await envir.loadRoute('authVerify')(fakeReq({ cookie,
+      body: { response: { id: 'cred-1', __challenge: 'auth-challenge-1' } } }), result);
+    assert.equal(result.statusCode, 401);
+    assert.equal(result.body.error, 'AUTHENTICATION_NOT_VERIFIED');
+    assert.equal(result.headers['set-cookie'], undefined);
+    assert.equal(db.log.some(entry => entry.path === 'rpc/a8a_complete_authentication'), false);
+    assert.ok(!db.tables.artsoul_webauthn_challenges[0].consumed_at);
+  });
+});
+
 test('a valid authentication issues the exact 15-minute moderation session and advances the counter', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
@@ -923,6 +992,120 @@ test('an expired 15-minute session fails closed', async () => {
   const cookie = `${envir.siweCookie(STAFF)}; artsoul_mod_session=${payload}.${signature}`;
   await assert.rejects(envir.exported.getModerationAccess(fakeReq({ cookie }), { strict: true }),
     (e) => e.code === 'STEP_UP_REQUIRED');
+});
+
+test('dual-wallet role regrant must not revive the previous moderation session', async () => {
+  const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+  db.tables.artsoul_staff_roles[0].authorization_version = 101;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 101;
+  const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+  const { verifyRes } = await runAuthentication(envir);
+  assert.equal(verifyRes.statusCode, 200, JSON.stringify(verifyRes.body));
+  const cookie = `${envir.siweCookie(STAFF)}; ${cookieValueFromHeader(verifyRes.headers['set-cookie'])}`;
+  assert.equal((await envir.exported.getModerationAccess(fakeReq({ cookie }), { strict: true })).canModerate, true);
+  Object.assign(db.tables.artsoul_staff_roles[0], { active: false, authorization_version: 102 });
+  await assert.rejects(envir.exported.getModerationAccess(fakeReq({ cookie }), { strict: true }),
+    e => e.code === 'ADMIN_REQUIRED');
+  Object.assign(db.tables.artsoul_staff_roles[0], { active: true, authorization_version: 103 });
+  await assert.rejects(envir.exported.getModerationAccess(fakeReq({ cookie }), { strict: true }),
+    e => e.code === 'STEP_UP_REQUIRED');
+  envir.control.newCounter = 8;
+  const obsolete = await runAuthentication(envir);
+  assert.equal(obsolete.verifyRes.statusCode, 403);
+  assert.equal(obsolete.verifyRes.body.error, 'CREDENTIAL_NOT_ELIGIBLE');
+  // Simulate separately approved replacement enrollment, not key revival.
+  db.tables.artsoul_staff_passkeys[0] = activePasskey({authorization_version: 103});
+  const fresh = await runAuthentication(envir);
+  assert.equal(fresh.verifyRes.statusCode, 200);
+  const freshCookie = cookieValueFromHeader(fresh.verifyRes.headers['set-cookie']);
+  const payload = JSON.parse(Buffer.from(freshCookie.split('=')[1].split('.')[0], 'base64url').toString());
+  assert.equal(payload.authorization_version, 103);
+  assert.equal((await envir.exported.getModerationAccess(fakeReq({ cookie: `${envir.siweCookie(STAFF)}; ${freshCookie}` }), { strict: true })).canModerate, true);
+});
+
+test('dual-wallet role replacement and promotion invalidate an existing session', async t => {
+  for (const replacement of [
+    { wallet_address: STAFF, role: 'moderator', active: true, authorization_version: 201 },
+    { wallet_address: STAFF, role: 'admin', active: true, authorization_version: 202 }
+  ]) {
+    await t.test(`new ${replacement.role} authorization`, async () => {
+      const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+      db.tables.artsoul_staff_roles[0].authorization_version = '101';
+  db.tables.artsoul_staff_passkeys[0].authorization_version = '101';
+      const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+      const { verifyRes } = await runAuthentication(envir);
+      assert.equal(verifyRes.statusCode, 200);
+      db.tables.artsoul_staff_roles.splice(0, 1, replacement);
+      const req = fakeReq({ cookie: `${envir.siweCookie(STAFF)}; ${cookieValueFromHeader(verifyRes.headers['set-cookie'])}` });
+      await assert.rejects(envir.exported.getModerationAccess(req, { strict: true }), e => e.code === 'STEP_UP_REQUIRED');
+      const access = await envir.exported.getModerationAccess(req);
+      assert.equal(access.canModerate, false);
+      assert.equal(access.stepUpActive, false);
+    });
+  }
+});
+
+test('dual-wallet activation rejects legacy unbound cookies and missing issuance versions', async () => {
+  const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+  db.tables.artsoul_staff_roles[0].authorization_version = 101;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 101;
+  const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
+  const cookie = `${envir.siweCookie(STAFF)}; ${envir.moderationCookie(STAFF, 'cred-1')}`;
+  envir.context.process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = 'true';
+  await assert.rejects(envir.exported.getModerationAccess(fakeReq({ cookie }), { strict: true }), e => e.code === 'STEP_UP_REQUIRED');
+  assert.throws(() => envir.exported.setModerationSession(fakeRes(), STAFF, 'cred-1'), e => e.code === 'MODERATION_PASSKEY_MISCONFIGURED');
+});
+
+test('dual-wallet login fails closed until the role-version schema is ready', async t => {
+  for (const version of [undefined, null, 0, -1, true, 1.1, '01', '1e2', Number.MAX_SAFE_INTEGER + 1]) {
+    await t.test(`invalid version ${String(version)}`, async () => {
+      const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+      db.tables.artsoul_staff_roles[0].authorization_version = version;
+      const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+      const { optionsRes, verifyRes } = await runAuthentication(envir);
+      assert.equal(optionsRes.statusCode, 503);
+      assert.equal(verifyRes.statusCode, 503);
+      assert.equal(verifyRes.body.error, 'MODERATION_PASSKEY_MISCONFIGURED');
+      assert.equal(verifyRes.headers['set-cookie'], undefined);
+      assert.equal(db.log.some(row => row.path.startsWith('rpc/')), false);
+    });
+  }
+});
+
+test('dual-wallet role changes during authentication never issue a session for the new grant', async t => {
+  for (const replacement of [null,
+    { wallet_address: STAFF, role: 'moderator', active: false, authorization_version: 102 },
+    { wallet_address: STAFF, role: 'admin', active: true, authorization_version: 103 }
+  ]) {
+    await t.test(replacement ? `${replacement.role} active ${replacement.active}` : 'removed role', async () => {
+      const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+      db.tables.artsoul_staff_roles[0].authorization_version = 101;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 101;
+      const original = db.supabaseRest;
+      db.supabaseRest = async (route, options) => {
+        const result = await original(route, options);
+        if (route === 'rpc/a8a_complete_authentication') {
+          db.tables.artsoul_staff_roles.splice(0, 1, ...(replacement ? [replacement] : []));
+        }
+        return result;
+      };
+      const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+      const { verifyRes } = await runAuthentication(envir);
+      assert.equal(verifyRes.statusCode, 403);
+      assert.equal(verifyRes.body.error, 'STEP_UP_REQUIRED');
+      assert.equal(verifyRes.headers['set-cookie'], undefined);
+      assert.equal(db.tables.artsoul_staff_auth_events.at(-1).details.reason, 'staff authorization changed');
+    });
+  }
+});
+
+test('dual-wallet authority cannot fall back to social-profile access when factor enforcement is off', async () => {
+  const db = createDb(staffSeed({ profiles: [{ wallet_address: STAFF, twitter_id: 'x', discord_id: 'd' }] }));
+  const envir = loadEnvironment({ env: { SESSION_SECRET: 'test-siwe-secret', ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+  const req = fakeReq({ cookie: envir.siweCookie(STAFF) });
+  await assert.rejects(envir.exported.getModerationAccess(req, { strict: true }), e => e.code === 'MODERATION_PASSKEY_MISCONFIGURED' && e.statusCode === 503);
+  assert.equal((await envir.exported.getModerationAccess(req)).canModerate, false);
+  assert.equal(db.log.length, 0);
 });
 
 test('a revoked credential invalidates an otherwise valid session immediately', async () => {

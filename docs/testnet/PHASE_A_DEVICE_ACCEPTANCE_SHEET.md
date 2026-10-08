@@ -9,6 +9,14 @@ This sheet is organised by trip. Each trip says what to do, what to watch, and
 which rows its answers close. Record the result here, dated, per device — a
 conversation saying it looked fine closes nothing.
 
+October 8 owner follow-up: asked about the previous iPhone gallery/detail/Back,
+wallet/profile reload, tab switching and lock/resume run, the owner reported
+that it had already been done and appeared to work well. Record this as a
+qualitative owner observation; do not ask for the same entire trip again without
+a specific unresolved symptom. The reply did not identify an Android run,
+timestamps, individual OAuth outcomes or a native staff-factor ceremony, so it
+does not supply those missing evidence fields.
+
 **Where.** `https://artsoulprotocol.com` — the apex origin, not a preview and not
 a `vercel.app` address. Wallet sessions and SIWE are origin-scoped, so evidence
 from any other origin proves nothing about production.

@@ -694,7 +694,7 @@
                     this.protocolAdminEligible = response.ok
                         && (result.enabled === true || result.setupEnabled === true)
                         && result.authenticated === true
-                        && result.eligible === true;
+                        && (result.eligible === true || result.authorityEligible === true);
                     this.updateProtocolAdminSlot();
                     return this.protocolAdminEligible;
                 })

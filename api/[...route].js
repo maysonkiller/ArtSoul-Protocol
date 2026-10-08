@@ -20,6 +20,8 @@ import passkeyAuthVerifyHandler from '../src/api/routes/moderation/passkey-auth-
 import passkeysHandler from '../src/api/routes/moderation/passkeys.js';
 import passkeyGrantHandler from '../src/api/routes/moderation/passkey-grant.js';
 import passkeyRecoveryHandler from '../src/api/routes/moderation/passkey-recovery.js';
+import staffAuthorityHandler from '../src/api/routes/moderation/authority.js';
+import staffFactorSetupHandler from '../src/api/routes/moderation/factor-setup.js';
 import {
   createOAuthCallbackHandler,
   oauthStartHandler,
@@ -69,6 +71,8 @@ const ROUTES = new Map([
   ['moderation/passkeys', passkeysHandler],
   ['moderation/passkey-grant', passkeyGrantHandler],
   ['moderation/passkey-recovery', passkeyRecoveryHandler],
+  ['moderation/authority', staffAuthorityHandler],
+  ['moderation/factor-setup', staffFactorSetupHandler],
   ['oauth/start', oauthStartHandler],
   ['oauth/callback/discord', createOAuthCallbackHandler('discord')],
   ['oauth/callback/twitter', createOAuthCallbackHandler('twitter')],

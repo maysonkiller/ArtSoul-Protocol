@@ -61,7 +61,8 @@ test('dormant A8 schema preparation does not waive live activation gates', () =>
   const rollout = fs.readFileSync('docs/runbooks/A8_MODERATION_ROLLOUT.md', 'utf8');
   for (const document of [runbook, rollout]) {
     const preparationAt = document.indexOf('### Dormant schema preparation');
-    const activationAt = document.indexOf('### Live activation');
+    const historicalAt = document.indexOf('### Historical foundation activation');
+    const activationAt = historicalAt >= 0 ? historicalAt : document.indexOf('### Live activation');
     assert.ok(preparationAt >= 0 && activationAt > preparationAt);
     const preparation = document.slice(preparationAt, activationAt);
     const activation = document.slice(activationAt);
@@ -76,6 +77,15 @@ test('dormant A8 schema preparation does not waive live activation gates', () =>
     assert.match(activation, /two independent founder passkeys/);
     assert.match(activation, /all 11 mandatory denials/);
   }
+});
+
+test('current paired authority replaces historical activation without skipping the real ceremony', () => {
+  const current = runbook.slice(runbook.indexOf('### Current paired-authority activation'));
+  assert.match(current, /Apply A8e, A8f and A8g in that order/);
+  assert.match(current, /owner uses both wallets/);
+  assert.match(current, /Rehearse a two-signature sign-in reset/);
+  assert.match(current, /Do not simply disable/);
+  assert.match(current, /would reinstate the superseded authority model/);
 });
 
 test('the numbering collision between the two 001 files stays documented', () => {

@@ -5,10 +5,12 @@ import {
   readModerationSession,
   requirePasskeyRouteContext,
   revokeCredentialRpc,
+  roleBoundSessionsEnabled,
   verifyModerationStepUp
 } from '../../moderation-passkey.js';
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
 
   try {
@@ -29,7 +31,11 @@ export default async function handler(req, res) {
       });
     }
 
-    // POST: self-revocation, only after a valid step-up.
+    // Current setup allows one factor. Historical keys do not count as usable
+    // alternatives; replacing it requires a fresh approval from both wallets.
+    if (roleBoundSessionsEnabled()) return res.status(403).json({ error: 'BOTH_AUTHORITY_SIGNATURES_REQUIRED' });
+
+    // Legacy POST: self-revocation, only after a valid step-up.
     const stepUp = await verifyModerationStepUp(req, wallet);
     if (!stepUp.valid) {
       return res.status(403).json({

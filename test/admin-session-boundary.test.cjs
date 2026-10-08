@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('src/entries/admin.jsx', 'utf8').replace(/\r\n/g, '\n');
 const start = source.indexOf('function ProtocolAdminPage()');
-const end = source.indexOf('    const verification =', start) >= 0 ? source.indexOf('    const verification =', start) : source.indexOf('    const groups =', start);
+const end = source.indexOf('    const SignInDialog =', start);
 const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision,
     closeSetup: () => { if (typeof setPasskeyOpen === 'function') setPasskeyOpen(false); },
     snapshot: {accessState, access, data, busy, message, decision,

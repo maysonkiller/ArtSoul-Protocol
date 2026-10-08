@@ -43,6 +43,19 @@ deferral. RG-03 retains its activation criteria; authorization to prepare is not
 a passed ceremony or authorization bypass. See
 [`the amendment`](canon/CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md).
 
+**2026-10-08 policy supersession for RG-03/RG-04:** canon 07 now requires the
+current two designated wallets together for application role/setup/recovery
+approval, using gasless signatures. A staff member chooses one passkey or
+authenticator app within the shared 15-minute permission. Recovery repeats the
+two-wallet approval and invalidates earlier sign-in access. This replaces the
+older independent two-passkey/bootstrap/Safe-only criteria in the historical
+rows above; it does not alter contract custody or accept a software fixture as
+a real ceremony. A8e/A8f/A8g, initial policy, native/app setup and the complete
+report/review/notification flow remain activation gates. The project complaint
+mail worker and actual inbox transport were verified October 8; that alone is
+not RG-03 acceptance. Follow the current paired-authority procedure in
+`security/MIGRATION_RUNBOOK.md` and `audits/STABILIZATION_CHECKPOINT.md`.
+
 The founder approved the following implementation constraints on 2026-07-20:
 
 - moderation step-up sessions last 15 minutes;

@@ -524,6 +524,7 @@ test('every contract write entry point calls the shared Base Sepolia guard first
 function loadModerationAccess({ sessionWallet, roleRows, profileRows, registryDown = false }) {
   const sandbox = vm.createContext({
     exported: {},
+    process: { env: {} },
     readWalletSession: () => sessionWallet,
     requireWallet: () => {
       if (!sessionWallet) {
