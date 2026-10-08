@@ -3,7 +3,7 @@
 Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 8 release and activation continuation (owner ceremony still open):
+October 8 release and activation continuation (initial owner entry verified):
 
 - This release continuation started at local HEAD
   `80d38a5db17a3dcbc1a48313a30104354837047e` in the same workspace/branch; use
@@ -47,8 +47,20 @@ October 8 release and activation continuation (owner ceremony still open):
   `docs/private/staff-live-denials-2026-10-08.json`. It does not prove the owner
   ceremony. Release-document checks passed 29/29 with no skips in
   `output/audit/staff-factor-release-docs-final-2026-10-08.log`.
-- Exact next step: the owner approves that request with both designated wallets
-  and completes a physical factor setup, then sign-in/reset acceptance is verified.
+- The owner confirmed completing both signatures and entry. Read-only verification
+  at 12:33 UTC independently recovered both approved authority signers from the
+  saved request. It was consumed once at 12:29:08 UTC; the old founder remained
+  Administrator and authorization version advanced from 1 to 2. A real passkey
+  consumed the shared setup permission at 12:31:33 UTC, followed by successful
+  authentications at 12:31:50 and 12:32:09 UTC. Evidence:
+  `docs/private/owner-staff-ceremony-2026-10-08T12-33-55-482Z.json`.
+  This accepts initial paired setup and passkey entry, not replacement recovery
+  or authenticator-app acceptance. The first read-only verifier used current
+  time for the historical signature and stopped on expiry; it was corrected to
+  use the recorded consumption instant. No approval was replayed or fabricated.
+- Exact next step: the owner performs the agreed two-wallet reset of the now
+  existing sign-in method; verify old-factor/session invalidation before enrolling
+  its replacement, then proceed to protected queue and complaint acceptance.
   Public reporting/review/Donate remain off. Phase A is OPEN.
 
 October 8 current continuation (paired staff setup implemented, not activated):

@@ -66,8 +66,10 @@ five TOTP reservations per rolling five minutes with two-minute expiry. Backend/
 integration passed 1,802 local checks and exact-candidate CI. A8e/A8f/A8g, the
 initial policy and server-only encryption configuration are installed and verified;
 paired access is live after the same-source configuration redeploy. No new Safe
-is needed for application roles. Real two-wallet approval,
-factor setup and replacement still require the owner's wallet/device actions.
+is needed for application roles. The owner completed real two-wallet setup and
+passkey entry on October 8: stored signatures, consumed permission, registration
+and two successful authentications were independently verified. Replacing that
+existing method and accepting the complaint workflow remain open.
 The old two-passkey/bootstrap/Safe-only criteria below are superseded by canon
 07's October 8 amendment, not silently waived. See the
 [current checkpoint](audits/STABILIZATION_CHECKPOINT.md) and
@@ -98,7 +100,7 @@ operationally safe reporting/moderation path before a beta GO.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
-| **RG-03** → **A-39** moderation activation | Paired-authority/factor schema, policy and configuration are installed. Real setup/reset and complaint workflow acceptance remain open | Both designated wallets approve staff setup; the staff member completes the actual passkey or authenticator-app verification |
+| **RG-03** → **A-39** moderation activation | Paired-authority/factor schema, policy and configuration are installed. Real initial paired setup/passkey entry passed. Replacement and complaint workflow acceptance remain open | Both designated wallets approve replacement; the staff member completes the new factor verification |
 | **Replacement recovery acceptance** | Policy approved October 8: both current authority wallets approve a new 15-minute setup permission and invalidate previous sign-in access. Historical Safe evidence is retained, not replayed | The owner performs the real two-wallet approval and factor replacement; automated fixtures are not that ceremony |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
