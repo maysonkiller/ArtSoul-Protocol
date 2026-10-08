@@ -6,7 +6,9 @@ Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 October 7 continuation (UX published; Donate indexer updated):
 
 - Recovery started at `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched
-  at that read. Current local HEAD is `154d16f2fe18734a6766330c3aa7021eecf00702`.
+  at that read. Production is `154d16f2fe18734a6766330c3aa7021eecf00702`;
+  the current implementation HEAD is `917d084da74a93f747777b2c21c3f3516288b772`
+  on the same branch (draft PR #294, not merged).
   Existing October 3 source and checkpoint changes were
   preserved in `output/recovery/phase-a-resume-2026-10-07/before.patch`, with
   separate copies of seven untracked implementation/test files. No worktree,
@@ -187,16 +189,57 @@ October 7 continuation (UX published; Donate indexer updated):
   is selected by their presence. Recovery snapshot:
   `output/recovery/phase-a-authority-2026-10-08/`. Only this root agent is active;
   the completed isolated browser and preview server were closed.
+- The tested source is preserved in [draft PR #294](https://github.com/maysonkiller/ArtSoul-Protocol/pull/294)
+  at `917d084da74a93f747777b2c21c3f3516288b772`. CI run `37747560963` passed
+  Linux, Windows and static checks; the Vercel preview also passed. No draft
+  migration or route is activated by publishing it.
+  Remaining untracked files are `.codex/`, `output/`, the previously preserved
+  `src/api/moderation-authority-policy.js` Safe observer and its test. They were
+  deliberately not folded into the selected gasless application authority.
+  The subsequent session-binding source/test changes below are a newer local
+  candidate; the earlier CI run does not validate that candidate.
+- October 8 factor policy is now explicitly approved: both current authority
+  wallets approve initial setup and replacement setup/recovery, with one-time
+  15-minute permission. TOTP allows five reservations per rolling five minutes,
+  counting abandoned attempts; each lasts two minutes. Sessions remain 15
+  minutes. Canon 07, its dated amendment and the migration/runbook notes record
+  the replacement of historical bootstrap/Safe application recovery. No live
+  policy or factor configuration was changed.
+- A reproduced API regression allowed an old step-up cookie to become valid
+  after role revocation/regrant. The local repair signs the current role version,
+  rechecks it for every protected session, rejects legacy cookies when the new
+  authority flag is on, and rejects authorization changes during passkey
+  verification before issuing a cookie. Mixed dual-wallet/no-factor flags now
+  fail closed instead of falling back to social profiles. Complaints are never
+  deleted. Snapshot: `output/recovery/phase-a-session-binding-2026-10-08/`.
+  Failing evidence: `output/audit/passkey-session-regrant-before-2026-10-08.log`.
+  Focused regressions passed 139/139; the full working-tree suite passed
+  **1,776/1,776, zero failures/skips**, including isolated PostgreSQL. Logs:
+  `output/audit/passkey-session-binding-{focused-final,full-unit}-2026-10-08.log`.
+  Build passed 11 routes / 175 utilities, recorded in the matching `build` log.
+  A subsequent real SQL grant -> cookie -> revoke -> regrant regression and
+  policy guards passed **74/74, no skips** in
+  `output/audit/passkey-session-binding-real-2026-10-08.log`. Its credential is
+  synthetic; this does not prove physical passkey acceptance. Earlier sandbox
+  Docker skips and missing-process fixture failures are not acceptance evidence.
+  Challenges, enrollment grants and factors still need full role-version
+  integration; current checks alone do not authorize feature activation.
+- Resend transfer: the owner explicitly approved temporary inspection through
+  the personal account and then an Admin invitation to the project mailbox.
+  The invitation was sent and accepted on October 8. A fresh project-mailbox
+  login shows active Admin membership in the existing team and both existing
+  verified domains. The existing four API keys were retained; no DNS/domain
+  transfer, subscription or key rotation occurred. The personal membership
+  remains until its separately prepared removal is confirmed. Evidence:
+  `output/audit/resend-project-admin-accepted-2026-10-08.png`.
+  A sending-only key draft named `ArtSoul Protocol moderation mail`, restricted
+  to `notify.artsoulprotocol.com`, awaits owner confirmation for the host worker.
+  The existing Vercel key cannot be revealed/reused on that worker. No duplicate
+  worker key has been created. Real complaint email delivery remains unverified.
 - Report, Protocol Admin and public Donate flags remain disabled. Phase A is open.
-- Exactly next step: reconcile the pending first-factor/recovery decision with
-  role-version-aware factor/session enforcement before wiring the role route.
-  First-factor authorization and
-  dual-wallet recovery replacing the historical Safe path are awaiting the
-  explicit October 8 policy question; do not silently treat a role as enrollment
-  permission or apply unapproved TOTP throttle values.
-  Vercel has the existing production mail key as a non-revealable Secret; no
-  duplicate key or new credential has been created during this continuation.
-  Resend login is awaiting the owner in the retained Google account chooser.
+- Exactly next step: complete the approved two-wallet factor-setup permission
+  consumer and bind passkey challenges/grants to its role version before wiring
+  the role route. The policy decision is resolved; real integration is not.
   Public Donate activation also requires working donation-message moderation
   under the October 3 amendment; successful test payments do not waive it.
 

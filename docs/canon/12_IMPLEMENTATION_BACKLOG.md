@@ -54,6 +54,14 @@ enabled; they are not marked complete or replaced by a test-only bypass. See
   notification delivery, RG-03 activation or the real passkey/recovery
   gates. A8 and A10 are not marked accepted by this addendum.
 
+  **Authority amendment, 2026-10-08:** the founder selected both current authority
+  wallets' gasless approvals for role changes and initial-factor/recovery setup,
+  replacing the previous separate bootstrap and Safe-only staff recovery gate.
+  Setup lasts 15 minutes; login accepts a passkey or authenticator app. TOTP limits
+  are five reserved attempts per rolling five minutes and a two-minute reservation.
+  Canon 07 records the exact approved scope. Draft implementation, local tests and
+  historical Safe ceremonies do not close A8's real replacement-flow acceptance.
+
 - [x] **A9 — Infrastructure cost and alerting.** Accepted 2026-07-28. Repository health-check tooling, fail-closed event-failure handling, no-cost plan constraints, thresholds, restart checks, and the Tuesday/Friday manual cadence are defined in `docs/runbooks/A9_INFRA_COST_MONITORING.md`. A-15, A-40, A-41, A-42, and A-43 retain their production acceptance evidence there. The consecutive 2026-07-22 through 2026-07-28 provider-dashboard window recorded 14.1K Alchemy CUs, a 22.9M month-end forecast against the 30M hard limit, ArtSoul-only Supabase uncached egress of 41.0–59.4 MB/day, current-cycle uncached/cached totals of 0.246/0.764 GB, and an enabled Supabase Spend Cap. Native custom Alchemy alerts remain unavailable on the current plan and Supabase has no fine-grained budget-threshold notifications, so hard limits plus the documented manual review are the accepted no-cost controls.
 - [ ] **A10 — Controlled beta entry.** Publish the tester checklist, support path, issue template, known prototype deviations, and go/no-go review. Exit requires no open P1 issue. Entry materials are prepared in PR #157 and `docs/testnet/CONTROLLED_BETA_ENTRY.md`; acceptance remains open until every Phase A gate is evidenced and the recorded decision is GO.
 - [x] **A11 — Base product commitments.** Accepted 2026-07-28 through PR #160 and the production evidence in `docs/runbooks/A11_PUBLIC_METRICS_ROLLOUT.md`. The first screen states that collector demand comes before minting, presents the compact Publish → build collector demand → settle and mint path, and positions ArtSoul as a curation layer. Artists onboarded, Auctions completed, Unique collectors, and Settled volume come from the idempotent, reorg-safe Base Sepolia projection introduced by migration 015. The public API reads one precomputed chain row inside the existing server/CDN cache; the homepage reuses that response and adds no browser request, chain RPC fan-out, full-table runtime aggregation, or per-card recomputation.

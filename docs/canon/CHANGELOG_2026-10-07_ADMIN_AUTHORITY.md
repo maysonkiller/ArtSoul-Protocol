@@ -23,6 +23,15 @@ or autonomous AI role issuance has been approved. On-chain contract/fund control
 and the existing Safe remain separate. The unwired Safe-policy observation helper
 is not an implementation of this selected application authority.
 
+October 8 follow-up approval: the same current pair also authorizes initial
+factor setup with a role grant, and renews setup after expiry or loss of all
+factors. The one-time permission lasts 15 minutes. This replaces the old
+independent-bootstrap/Safe-only application recovery path; the existing Safe
+is unchanged. The founder also approved five TOTP attempts per rolling five
+minutes, counting abandoned reservations; each reservation lasts two minutes.
+Successful moderation sessions remain 15 minutes. See canon 07's dated amendment.
+Implementation and real acceptance are still pending; no policy was activated.
+
 October 8 preview amendment: only Donate, Report and an indexed creation
 transaction link belong in the media-overlay menu, in that order. Management
 stays on artwork detail; full title/metadata remain available through the card's

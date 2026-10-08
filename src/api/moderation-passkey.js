@@ -84,10 +84,25 @@ function signModerationPayload(payload) {
     .digest('base64url');
 }
 
-export function setModerationSession(res, wallet, credentialId) {
+function roleBoundSessionsEnabled() {
+  return process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED === 'true';
+}
+
+function parseAuthorizationVersion(value) {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value))) return null;
+  const version = Number(value);
+  return Number.isSafeInteger(version) && version > 0 ? version : null;
+}
+
+export function setModerationSession(res, wallet, credentialId, authorizationVersion) {
+  const version = parseAuthorizationVersion(authorizationVersion);
+  if (roleBoundSessionsEnabled() && !version) {
+    throw configError('A current staff authorization version is required to issue this session.');
+  }
   const payload = Buffer.from(JSON.stringify({
     wallet,
     credential_id: credentialId,
+    ...(roleBoundSessionsEnabled() ? { authorization_version: version } : {}),
     exp: Math.floor(Date.now() / 1000) + MODERATION_SESSION_TTL_SECONDS
   })).toString('base64url');
   const signature = signModerationPayload(payload);
@@ -125,18 +140,33 @@ export function readModerationSession(req) {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     if (!data.wallet || !data.credential_id || !data.exp) return null;
     if (data.exp < Math.floor(Date.now() / 1000)) return null;
-    return { wallet: String(data.wallet).toLowerCase(), credentialId: String(data.credential_id) };
+    const version = parseAuthorizationVersion(data.authorization_version);
+    if (roleBoundSessionsEnabled() && !version) return null;
+    return {
+      wallet: String(data.wallet).toLowerCase(), credentialId: String(data.credential_id),
+      ...(roleBoundSessionsEnabled() ? { authorizationVersion: version } : {})
+    };
   } catch {
     return null;
   }
 }
 
-export async function findActiveStaffRole(wallet) {
+export async function findActiveStaffAuthorization(wallet) {
+  const columns = roleBoundSessionsEnabled() ? 'role,authorization_version' : 'role';
   const rows = await supabaseRest(
-    `artsoul_staff_roles?wallet_address=eq.${encodeURIComponent(wallet)}&active=eq.true&select=role&limit=1`
+    `artsoul_staff_roles?wallet_address=eq.${encodeURIComponent(wallet)}&active=eq.true&select=${columns}&limit=1`
   );
   const role = String(rows?.[0]?.role || '').toLowerCase();
-  return STAFF_MODERATION_ROLES.has(role) ? role : null;
+  if (!STAFF_MODERATION_ROLES.has(role)) return null;
+  const authorizationVersion = parseAuthorizationVersion(rows[0].authorization_version);
+  if (roleBoundSessionsEnabled() && !authorizationVersion) {
+    throw configError('The staff authorization registry must support role-bound sessions.');
+  }
+  return { role, ...(roleBoundSessionsEnabled() ? { authorizationVersion } : {}) };
+}
+
+export async function findActiveStaffRole(wallet) {
+  return (await findActiveStaffAuthorization(wallet))?.role || null;
 }
 
 export function requireActiveStaffRole(role) {
@@ -373,8 +403,9 @@ export async function requirePasskeyRouteContext(req) {
   }
   const config = getWebAuthnConfig();
   const wallet = requireWallet(req);
-  const role = requireActiveStaffRole(await findActiveStaffRole(wallet));
-  return { config, wallet, role };
+  const authorization = await findActiveStaffAuthorization(wallet);
+  const role = requireActiveStaffRole(authorization?.role);
+  return { config, wallet, role, authorizationVersion: authorization.authorizationVersion };
 }
 
 // Verifies the 15-minute step-up for the ALREADY SIWE-authenticated wallet.
@@ -389,6 +420,15 @@ export async function verifyModerationStepUp(req, sessionWallet) {
   }
   if (!sessionWallet || stepUp.wallet !== String(sessionWallet).toLowerCase()) {
     return { valid: false, code: 'STEP_UP_WALLET_MISMATCH' };
+  }
+
+  // A later grant is a different authorization, even for the same role and
+  // wallet. Never revive a pre-revocation session when staff access returns.
+  if (roleBoundSessionsEnabled()) {
+    const current = await findActiveStaffAuthorization(stepUp.wallet);
+    if (!current || current.authorizationVersion !== stepUp.authorizationVersion) {
+      return { valid: false, code: 'STEP_UP_REQUIRED' };
+    }
   }
 
   const rows = await supabaseRest(

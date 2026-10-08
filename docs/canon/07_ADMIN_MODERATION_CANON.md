@@ -96,6 +96,31 @@ profile text, collection metadata or a creator's own claim cannot grant it.
 The verification registry and its approved administration are not implemented
 by this documentation change.
 
+## October 8 factor setup and recovery amendment
+
+The founder explicitly approved the following replacement for the earlier
+separate-bootstrap/Safe-only staff recovery requirement:
+
+- Both current authority wallets approve a role grant and its one-time first
+  factor setup permission together. Setup permission expires after 15 minutes
+  and is bound to that wallet and the resulting staff authorization version.
+- The staff member chooses a passkey/security key or an authenticator app.
+  Wallet login alone never creates or renews setup permission.
+- Expired setup permission or loss of all usable factors requires fresh approval
+  by both current authority wallets. This application recovery does not use Safe,
+  issue a moderation session by itself, or change contract ownership.
+- TOTP permits at most five reserved attempts per wallet in a rolling five-minute
+  window, including abandoned attempts. A reservation expires after two minutes.
+  Successful factor verification retains the existing 15-minute moderation session.
+- Role removal, replacement or regrant must not revive an earlier session or
+  incomplete setup. Existing records remain auditable; no complaints are deleted.
+
+These are approved policy, not live acceptance. Earlier Safe recovery and two-key
+ceremony records remain historical evidence, not proof of this replacement flow.
+Activation requires real setup, sign-in and recovery under the selected policy.
+The independent BOTH-wallet authority remains mandatory; losing one authority
+wallet cannot be repaired by the other wallet alone.
+
 ## Public Repository Boundary
 
 Operational abuse heuristics, private anti-sybil checks, and escalation playbooks should not be published in this repository.

@@ -165,7 +165,7 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
   // HTTP transport is a fixture translating the allowlisted calls into psql.
   const {default:handler}=await import('../src/api/routes/moderation/authority.js');
   const {setWalletSession}=await import('../src/api/backend.js');
-  const env={ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true',SESSION_SECRET:crypto.randomBytes(32).toString('hex'),
+  const env={ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true',ARTSOUL_MODERATION_PASSKEY_ENABLED:'true',SESSION_SECRET:crypto.randomBytes(32).toString('hex'),
     ARTSOUL_WEBAUTHN_RP_ID:'artsoulprotocol.com',ARTSOUL_WEBAUTHN_ALLOWED_ORIGIN:'https://artsoulprotocol.com',
     ARTSOUL_WEBAUTHN_RP_NAME:'ArtSoul',ARTSOUL_MODERATION_SESSION_SECRET:crypto.randomBytes(32).toString('hex'),
     SUPABASE_URL:'https://authority-fixture.invalid',SUPABASE_SERVICE_ROLE_KEY:'isolated-fixture-not-a-key'};
@@ -180,6 +180,12 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     else if(route==='artsoul_staff_authority_requests') {
       const id=parsed.searchParams.get('id').slice(3);
       data=JSON.parse(sql(`SELECT COALESCE(json_agg(r),'[]'::JSON) FROM artsoul_staff_authority_requests r WHERE id=${q(id)} AND consumed_at IS NULL`));
+    } else if(route==='artsoul_staff_roles') {
+      const wallet=parsed.searchParams.get('wallet_address').slice(3);
+      data=JSON.parse(sql(`SELECT COALESCE(json_agg(r),'[]'::JSON) FROM artsoul_staff_roles r WHERE wallet_address=${q(wallet)} AND active`));
+    } else if(route==='artsoul_staff_passkeys') {
+      const wallet=parsed.searchParams.get('wallet_address').slice(3),credential=parsed.searchParams.get('credential_id').slice(3);
+      data=JSON.parse(sql(`SELECT COALESCE(json_agg(k),'[]'::JSON) FROM artsoul_staff_passkeys k WHERE wallet_address=${q(wallet)} AND credential_id=${q(credential)} AND revoked_at IS NULL`));
     } else if(route==='rpc/a8f_create_authority_request') {
       data=JSON.parse(sql(`SET ROLE service_role;SELECT a8f_create_authority_request(${[body.p_wallet,body.p_action,body.p_target,body.p_role,body.p_next_wallet_a,body.p_next_wallet_b].map(q).join(',')})`));
     } else if(route==='rpc/a8f_complete_authority_request') {
@@ -232,5 +238,25 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     calls=[];assert.equal((await invoke(null,{wallet:target,method:'GET',query:{expectedWallet:target,requestId:p.requestId}})).statusCode,403);
     assert.equal(calls.some(c=>c.route==='artsoul_staff_authority_requests'),false);
     assert.equal(roleState(),null);
+  });
+
+  await t.test('real authority revoke and regrant cannot revive a previously issued session',async()=>{
+    const {setModerationSession}=await import('../src/api/moderation-passkey.js');
+    const {getModerationAccess}=await import('../src/api/moderation-access.js');
+    reset();assert.equal(await apply(request()),'OK');
+    const initial=roleState();
+    sql(`INSERT INTO artsoul_staff_passkeys(wallet_address,credential_id,public_key,enrolled_via)
+      VALUES(${q(target)},'session-fixture-key','fixture-public-key','additional')`);
+    const base=response(),elevated=response();setWalletSession(base,target);
+    setModerationSession(elevated,target,'session-fixture-key',initial.authorization_version);
+    const req={headers:{cookie:[base,elevated].map(r=>r.headers['Set-Cookie'].split(';')[0]).join('; ')}};
+    assert.equal((await getModerationAccess(req,{strict:true})).canModerate,true);
+    assert.equal(await apply(request('revoke_role')),'OK');
+    await assert.rejects(getModerationAccess(req,{strict:true}),e=>e.code==='ADMIN_REQUIRED');
+    assert.equal(await apply(request()),'OK');
+    assert(roleState().authorization_version>initial.authorization_version);
+    await assert.rejects(getModerationAccess(req,{strict:true}),e=>e.code==='STEP_UP_REQUIRED');
+    assert.equal((await getModerationAccess(req)).canModerate,false);
+    assert.equal(sql('SELECT count(*) FROM artsoul_staff_authority_events'),'3');
   });
 });

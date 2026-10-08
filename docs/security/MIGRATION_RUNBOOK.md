@@ -43,7 +43,7 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
 | `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
 | `sql/migrations/a8d_moderation_safe_recovery.sql` | A8 schema step 4. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. The passkey/recovery gates in `runbooks/A8D_SAFE_RECOVERY.md` remain open. |
-| `sql/migrations/a8e_moderation_totp_persistence.sql` | **LOCAL ONLY, NOT APPLIED.** Encrypted TOTP factors, typed grants, atomic step consumption, persistent throttling and monotonic role-version fencing passed 28 disposable PostgreSQL checks. No live policy row, grant issuer, API/session integration or authenticator ceremony exists. Authority integration and an explicit throttle policy remain required. |
+| `sql/migrations/a8e_moderation_totp_persistence.sql` | **LOCAL ONLY, NOT APPLIED.** Encrypted TOTP factors, typed grants, atomic step consumption, persistent throttling and monotonic role-version fencing passed 28 disposable PostgreSQL checks. No live policy row, grant issuer, API/session integration or authenticator ceremony exists. The October 8 founder approval defines five attempts per rolling five minutes, including abandoned attempts, with a two-minute reservation; installing this policy and completing authority/factor integration remain required. |
 | `sql/migrations/a8f_moderation_dual_wallet_authority.sql` | **LOCAL ONLY, NOT APPLIED.** Follows A8e. Empty application-authority registry, one-time proposals and atomic role grants/revocation/rotation with an audit record. Removes direct runtime role writes. Real PostgreSQL, ephemeral signatures and the unregistered handler passed 47 focused checks. Do not apply before role-version-aware factor/session enforcement, reviewed initial policy and operator acceptance; it does not change the existing Safe or contracts. |
 | `sql/migrations/phase18_7a_supabase_security_hardening.sql` | Prior partial classification. Superseded by 18.7b. |
 | `sql/migrations/phase18_7b_supabase_security_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
@@ -256,6 +256,13 @@ After this migration is merged and the operator has explicit approval to modify 
 Rollback, if required, is a database restore or a new reviewed forward migration. Do not restore the pre-014 function because it is incompatible with the observed production schema.
 
 ## A8 Moderation Activation
+
+October 8 policy supersession: canon 07 replaces the previous independent
+bootstrap/Safe-only staff recovery gate with current-pair gasless authorization
+for initial factor setup and recovery. The old activation steps below document
+the deployed foundation, not instructions to bypass the new policy. Do not
+activate the dual-wallet route until the version-bound setup/challenge/factor
+and session paths are integrated and the replacement real-device flow passes.
 
 Schema preparation and live moderation activation are separate stages. Under
 explicit founder authorization, the reviewed additive A8 schema may be prepared

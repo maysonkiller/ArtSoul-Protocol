@@ -1,5 +1,12 @@
 # A8a Moderation Passkey Foundation — Founder Runbook
 
+October 8 policy update: canon 07 now authorizes BOTH current authority wallets
+to issue initial-factor setup and recovery permissions, with a 15-minute lifetime.
+This replaces the historical bootstrap/Safe-only acceptance path described below.
+Do not run the old bootstrap/recovery procedure as acceptance of the new policy.
+The replacement grant issuer, factor integration and real ceremonies remain
+unfinished; existing live roles, credentials and audit evidence are preserved.
+
 Status updated October 3: schema applied and verified September 30; passkey setup
 is enabled on the configured apex, while review/reporting activation and real
 device acceptance remain separate gates. Do not repeat the migration steps
