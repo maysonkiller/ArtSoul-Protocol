@@ -291,7 +291,7 @@ let selectedFile = null;
                 metadata_upload: 'The artwork details could not be stored. Please try again.',
                 wallet_init: 'The connected wallet could not be prepared for publishing. Reconnect it and try again.',
                 register: 'The artwork could not be registered on Base Sepolia. Please try again.',
-                auction: 'The artwork was registered, but its auction could not be created. Open your profile and use Start auction on this artwork to finish it.'
+                auction: 'The artwork was registered, but its auction could not be created. Open the artwork from your profile, then select Create New Auction on its page.'
             };
             return stageMessages[currentPublishStage] || 'The publish flow could not be completed. Please try again.';
         }
@@ -347,7 +347,7 @@ let selectedFile = null;
                 return {
                     code: 'TRANSACTION_REVERTED',
                     message: currentPublishStage === 'auction'
-                        ? 'The artwork was registered, but the auction transaction failed on Base Sepolia. Open your profile and use Start auction on this artwork to finish it.'
+                        ? 'The artwork was registered, but the auction transaction failed on Base Sepolia. Open the artwork from your profile, then select Create New Auction on its page.'
                         : 'The artwork registration transaction failed on Base Sepolia. No artwork was published.'
                 };
             }
