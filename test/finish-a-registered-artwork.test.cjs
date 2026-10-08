@@ -15,10 +15,10 @@ test('an artwork whose auction failed can still be given one', () => {
   // did not exist: handleCreateAuction was declared and never called, and the
   // card was only a link. Confirmed on artwork 31, status "registered",
   // creator_value "0", no auction id.
-  assert.match(profile, /onStartAuction=\{\(\) => handleStartAuction\(artwork\)\}/);
-  assert.match(profile, /handleStartAuction\(artwork\)/);
-  assert.match(profile, /async function handleStartAuction\(artwork\)/);
-  assert.match(profile, /destination\.searchParams\.set\('action', 'create-auction'\)/);
+  // Owner controls live on artwork detail; the preview menu is Donate/Report.
+  assert.match(profile, /const href = getProfileArtworkHref\(artwork\);/);
+  assert.match(profile, /href=\{href\}/);
+  assert.match(artwork, /onClick=\{openNewAuctionModal\}/);
   assert.match(artwork, /get\('action'\) !== 'create-auction'/);
   assert.match(artwork, /void openNewAuctionModal\(\)/);
 });
@@ -31,9 +31,9 @@ test('the retry is offered only where it can work', () => {
   // `defaulted`, so the retry was refused in the one state it was most needed.
   // The lifecycle now decides; the auction id no longer does, because that is
   // the field the projection had wrong.
-  assert.match(cards, /chain === 84532 && registered && ownsRole/);
-  assert.match(cards, /address === creator && !isMinted\(artwork\)/);
-  assert.match(cards, /\['registered', 'defaulted'\]\.includes/);
+  assert.doesNotMatch(cards, /label: 'Start auction'|label: 'Manage artwork'/);
+  assert.match(artwork, /const canCreateNewAuction = artworkWriteEnabled &&/);
+  assert.match(artwork, /canCreateNewAuctionForWallet\(artwork, connectedWalletAddress\)/);
   // Which lifecycle states qualify, per wallet role, is proven behaviorally in
   // profile-lifecycle-action-gating.test.cjs rather than by matching source.
 });
@@ -66,6 +66,6 @@ test('the failure message names a control that exists', () => {
   // It used to say "Retry the auction from your profile" while nothing in the
   // profile could do that.
   assert.doesNotMatch(upload, /Retry the auction from your profile/);
-  assert.match(upload, /use Start auction on this artwork to finish it/);
-  assert.match(cards, /label: 'Start auction'/);
+  assert.match(upload, /Open the artwork from your profile, then select Create New Auction on its page/);
+  assert.match(artwork, /auctionCreationChecking \? 'Checking auction eligibility…' : 'Create New Auction'/);
 });

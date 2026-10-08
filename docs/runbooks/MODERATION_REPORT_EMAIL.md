@@ -1,6 +1,8 @@
 # Complaint email delivery
 
-Status: implemented locally, not activated or applied to the live database.
+Status: code published in PR #292; the exact delivery migration was applied and
+verified on October 8. Delivery remains disabled and unscheduled; actual complaint
+email acceptance has not passed. See the dated migration ledger and checkpoint.
 This extends A8 notifications without changing complaint decisions or access.
 
 The existing `REPORT_SUBMITTED` event is the durable source. The scheduled worker

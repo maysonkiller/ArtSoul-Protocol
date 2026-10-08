@@ -77,6 +77,16 @@ The earlier independent founder-key activation requirement remains in effect
 until the authenticator-app rollout explicitly reconciles its recovery policy.
 Losing either required authority key cannot be solved by unilateral approval.
 
+October 8 clarification: application role changes and authority rotation use
+gasless signatures from BOTH current designated wallets. Do not deploy a new
+Safe for application roles. Each signed request must bind the exact action,
+target, current authority version, domain, nonce and expiry, with atomic
+consumption and an audit record. The current pair approves its replacement.
+This does not transfer on-chain contract ownership, alter the existing Safe or
+grant AI permission to issue staff roles. Contract/fund operations retain their
+separately configured multisig controls. This is approved direction; the role
+workflow and authenticator-app rollout still require implementation and testing.
+
 Collection verification direction: a mark records a reviewed relationship
 between a creator and collection, with a durable decision and revocation path.
 There is no sales-volume threshold. It is not a guarantee of quality or value

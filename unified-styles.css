@@ -3205,8 +3205,7 @@ body.future .resale-modal {
     pointer-events: auto;
 }
 
-.artsoul-card-menu-list a,
-.artsoul-card-info > summary {
+.artsoul-card-menu-list a {
     display: block;
     min-height: 40px;
     padding: 10px 12px;
@@ -3217,24 +3216,7 @@ body.future .resale-modal {
     line-height: 20px;
 }
 .artsoul-card-menu-list a:hover,
-.artsoul-card-menu-list a:focus-visible,
-.artsoul-card-info > summary:hover,
-.artsoul-card-info > summary:focus-visible { background: var(--c-surface-muted); }
-.artsoul-card-info > summary { cursor: pointer; list-style: none; }
-.artsoul-card-info > summary::-webkit-details-marker { display: none; }
-.artsoul-card-info > summary::after { content: ' +'; }
-.artsoul-card-info[open] > summary::after { content: ' −'; }
-.artsoul-card-info > p {
-    max-height: min(240px, 40vh);
-    margin: 0;
-    padding: 8px 12px;
-    overflow-y: auto;
-    color: var(--c-text);
-    font-size: 12px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-}
+.artsoul-card-menu-list a:focus-visible { background: var(--c-surface-muted); }
 
 @media (max-width: 400px) {
     .artsoul-card-menu { top: 4px; left: 4px; right: 4px; }

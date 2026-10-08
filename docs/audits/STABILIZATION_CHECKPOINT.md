@@ -1,12 +1,13 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-07. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 7 continuation (local work; publication pending):
+October 7 continuation (UX published; Donate indexer updated):
 
-- HEAD remains `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched
-  at the fresh read. Existing October 3 source and checkpoint changes were
+- Recovery started at `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched
+  at that read. Current local HEAD is `5529973e41b29ca6ed62662c2e8fae17242bda2f`.
+  Existing October 3 source and checkpoint changes were
   preserved in `output/recovery/phase-a-resume-2026-10-07/before.patch`, with
   separate copies of seven untracked implementation/test files. No worktree,
   overlay, reset or cleanup was performed.
@@ -42,10 +43,18 @@ October 7 continuation (local work; publication pending):
   `output/audit/` and `output/playwright/` records, including
   `card-overlay-built-browser-2026-10-07-v5-final.json`. These fixtures do not
   establish physical iOS/Android authenticator or wallet acceptance.
-- Complaint email delivery is implemented locally with a separate flag,
+- [PR #292](https://github.com/maysonkiller/ArtSoul-Protocol/pull/292) merged as
+  `5529973e41b29ca6ed62662c2e8fae17242bda2f` after Linux, Windows and static CI
+  passed (run `37592870318`). Preview and apex each matched all 51 JS/CSS
+  assets across five pages. Production deployment `6905182667` succeeded.
+  Evidence: `phase-a-ux-{preview,apex}-artifact-2026-10-07.json`. The connected
+  apex browser loaded v18 and 26 real gallery cards; checked cards had media
+  overlays and one-row status/prices. Screenshot:
+  `output/audit/phase-a-ux-apex-gallery-2026-10-07.png`.
+- Complaint email delivery code is published with a separate disabled flag,
   service-only claims, idempotent bounded retries and no complaint content in
-  email. Its migration is unapplied; scheduler, configuration and real inbox
-  delivery remain unverified. See `docs/runbooks/MODERATION_REPORT_EMAIL.md`.
+  email. Its migration was applied and verified on October 8 (see below); scheduler,
+  configuration and real inbox delivery remain unverified. See `docs/runbooks/MODERATION_REPORT_EMAIL.md`.
   Staff profile notices use existing protected APIs, store only reference/count
   information and never turn ordinary users into staff. Email runs only in the
   scheduled worker; report intake never waits for the provider. The actual
@@ -67,16 +76,73 @@ October 7 continuation (local work; publication pending):
   confirmed the transaction and exact recipient balance. Fourteen legacy, one
   Donate deployment and one funding record reconcile to 0.025315172029030397
   test ETH total campaign cost. A write-once recovered receipt is recorded;
-  the operator lock stays until funding is included in future runner budgets.
+  funding is now included in the reviewed future runner's budget and nonce
+  checks (115 offline checks passed). The founder then explicitly authorized
+  release for exactly two 1-wei Donate checks. Both completed without replay:
+  message transaction `0x91f63b0d5796ee1c2f7248113210851ee8d558623d6947e5fb21fa18354c0c17`
+  and empty anonymous transaction `0x178309ae89d156c574f08bb10e456143bc72ea1e4706f7134bbd9e35f4e3cc7d`.
+  Each canonical receipt, block, creator transfer and unchanged Core/NFT state
+  was independently verified after an initial receipt-check mismatch. Neither
+  transaction was resent. Completed locks were released by receipt-only
+  finalizers. All 18 campaign operations total 0.025316087413030749 test ETH.
+  Do not rerun those completed plans or finalizers.
+- October 8 read-only acceptance found exactly one indexed row per donation,
+  completed processing records, healthy advancing Base cursor 47837333 and zero
+  failed/dead events. The actual public API handler against live data passed
+  exact amount/message and anonymous-address suppression checks using a
+  process-local enabled flag. Apex Donate remains disabled. Evidence:
+  `docs/private/donation-projection-acceptance-2026-10-08T07-02-51-151Z.json`.
 - After the owner reset the forgotten Linux password, SSH access succeeded.
   Read-only inspection found `/opt/artsoul`, main
   `93ad98a9b9dee9863a9e1828e096444abfbec615`, clean tracked files and two untracked
   launcher scripts to preserve. Base Sepolia is healthy with zero event errors;
-  legacy Ethereum Sepolia is stopped. The running revision has no Donate
-  indexer module or address configuration. No host update was performed yet.
-  Native key/app setup remains unverified. Phase A remains open.
-- Exactly next step: publish the verified UX/session correction through CI and
-  preview/apex checks, then update the preserved host and verify Donate indexing.
+  legacy Ethereum Sepolia is stopped. That older revision lacked Donate.
+- The host now runs the same reviewed `5529973` revision via a checked Git
+  fast-forward. A restricted source/runtime/configuration backup is retained
+  at `/var/backups/artsoul-phase-a-2026-10-07`; both archives were validated.
+  Base stopped at cursor 47796924. Two-RPC log coverage from deployment block
+  47607186 through that cursor found zero Donation events, so no backfill,
+  cursor reset or migration was performed. The shared launchers were preserved.
+  `npm ci --omit=dev --ignore-scripts --no-audit --no-fund`, runtime imports,
+  message-codec smoke and all 25 host event regressions passed. Only the
+  verified Donate address was appended to the Base configuration. Restarted
+  Base is healthy, depth 3, cursor advancing 47797013 -> 47797035, with zero
+  failed/dead/unresolved events. Seven source/package hashes match the reviewed
+  commit. PM2 state was saved; Ethereum remains stopped. Private evidence:
+  `hetzner-donation-runtime-2026-10-07.json` and the host backup's acceptance log.
+- October 8: a fresh restricted database backup was created and its archive
+  read-validated (not a restore rehearsal). The single published complaint
+  delivery migration `67435e2b396131bc5bffbccd54b22ff89fb8258ad73c58ec4488463835cab46e`
+  was applied in one transaction after fresh catalog preflight. Table shape,
+  forced RLS, browser privilege denial, service access, exact RPC bodies,
+  signatures and search paths passed before commit. Report counts stayed zero;
+  no email, scheduler or feature flag was enabled. Private journal:
+  `docs/private/report-email-schema-apply-2026-10-08.json`.
+- October 8 recovery snapshot is in `output/recovery/phase-a-resume-2026-10-08/`.
+  No other agents are running; continue solo per founder request. The approved
+  role authority uses BOTH designated wallets' gasless signatures; no new Safe
+  is wanted for application roles. Contract/fund authority remains separate.
+  Ordinary complaint decisions remain human moderator-confirmed; AI does not
+  autonomously grant roles. This clarification supersedes any proposed Safe
+  deployment for application authority, not historical recovery evidence.
+- Local TOTP crypto (38 checks), Safe observation helper (29 checks) and TOTP
+  persistence (22 real PostgreSQL checks) are preserved but not wired or live.
+  Role epochs, dual-signature issuing/rotation, factor session integration and
+  real setup/recovery ceremonies remain open. Native key/app setup is unverified.
+- Current requested card amendment is local: Donate, Report, Creation transaction
+  only, in that order; no management/details actions. Valid indexed registration
+  hashes only; owner auction management remains on artwork detail. Shared cache
+  v19 covers all four consumers. All 32 card regressions and the 11-route build pass. Built-browser acceptance
+  passed 629 checks across 24 viewport/theme/surface combinations; Donate
+  rendering with the real sanitized API read response passed 27 checks. Both
+  suites performed zero writes and had zero page exceptions. Evidence is in
+  `output/audit/{shared-card-menu,donation-real-read}-built-2026-10-08.json`.
+  Publication is pending; these fixtures do not prove public activation.
+- Report, Protocol Admin and public Donate flags remain disabled. Phase A is open.
+- Exactly next step: publish the tested menu amendment through CI, then complete
+  email worker configuration and the approved gasless dual-wallet authority.
+  Vercel has the existing production mail key as a non-revealable Secret; no
+  duplicate key or new credential has been created during this continuation.
 
 October 3 admin-access placement correction (published and browser-verified):
 

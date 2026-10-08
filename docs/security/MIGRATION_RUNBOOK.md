@@ -43,6 +43,7 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
 | `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
 | `sql/migrations/a8d_moderation_safe_recovery.sql` | A8 schema step 4. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. The passkey/recovery gates in `runbooks/A8D_SAFE_RECOVERY.md` remain open. |
+| `sql/migrations/a8e_moderation_totp_persistence.sql` | **LOCAL ONLY, NOT APPLIED.** Encrypted TOTP factors, typed grants, atomic step consumption and persistent throttling passed 22 disposable PostgreSQL checks. No live policy row, grant issuer, API/session integration or authenticator ceremony exists. Authority integration and an explicit throttle policy remain required. |
 | `sql/migrations/phase18_7a_supabase_security_hardening.sql` | Prior partial classification. Superseded by 18.7b. |
 | `sql/migrations/phase18_7b_supabase_security_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
 | `sql/migrations/phase18_7c_supabase_storage_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
@@ -57,11 +58,11 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/stabilization_layer.sql` | `not recorded`. Manual stabilization migration. |
 | `sql/migrations/indexer_dedup_setup.sql` | `not recorded`. Manual deduplication setup. |
 | `sql/migrations/collection_launch_services.sql` | **LOCAL DRAFT, DO NOT APPLY.** Added during the September takeover; not applied by this task. Services remain unwired/disabled. Inline RLS/service-role restrictions are statically checked; PostgreSQL execution and newsletter delivery consistency remain unverified. |
-| `sql/migrations/profile_email_verification.sql` | **LOCAL DRAFT, UNAPPLIED.** Private wallet-bound mailbox verification. Review atomic token consumption, forced RLS, quotas and provider delivery before activation; newsletter consent is separate. |
-| `sql/migrations/launch_service_quotas.sql` | **LOCAL DRAFT, UNAPPLIED.** Quota-only prerequisite for private email; no Collection Launch tables or services. Existing quota RPC behavior/state and later collection migration compatibility are exercised in isolated PostgreSQL. |
-| `sql/migrations/artist_support.sql` | **LOCAL DRAFT, UNAPPLIED.** Event-only donation projections and independent message visibility. Verify cascade rollback, idempotency, anonymous public responses and the reviewed deployment before activation. |
-| `sql/migrations/artist_support_moderation.sql` | **LOCAL DRAFT, UNAPPLIED.** Extends existing complaint/review workflow to donation-message text only, with target-specific audit and notifications. Depends on the reviewed A8 schema and artist support projection. |
-| `sql/migrations/moderation_report_email_delivery.sql` | **LOCAL DRAFT, UNAPPLIED.** Additive service-only delivery claims for existing report events. Isolated PostgreSQL concurrency and privilege tests exist; live backup/catalog checks, reviewed application, scheduler and real delivery acceptance remain required. See `../runbooks/MODERATION_REPORT_EMAIL.md`. |
+| `sql/migrations/profile_email_verification.sql` | **Applied 2026-10-03.** Private wallet-bound mailbox verification; email runtime is enabled. Newsletter consent is separate. See the dated feature-schema record below; do not reapply. |
+| `sql/migrations/launch_service_quotas.sql` | **Applied 2026-10-03.** Quota-only prerequisite for private email; no Collection Launch tables or services were activated. |
+| `sql/migrations/artist_support.sql` | **Applied 2026-10-03.** Event-only donation projection and independent message visibility. Live catalog reverified October 7; Donate indexer source connected October 7. Public Donate activation remains separate. |
+| `sql/migrations/artist_support_moderation.sql` | **Applied 2026-10-03; moderation dormant.** Existing complaint/review extensions target donation-message text only. No review or visibility decision was made by schema preparation. |
+| `sql/migrations/moderation_report_email_delivery.sql` | **Applied and verified 2026-10-08; delivery disabled.** One additive service-only table and three RPCs. Fresh protected backup, catalog preflight, exact function bodies/signatures, forced RLS and privileges were checked; unchanged report counts and the empty service batch were verified before commit. Scheduler, credentials and real inbox acceptance remain open. See `../runbooks/MODERATION_REPORT_EMAIL.md`. |
 | `migrations/001_ai_integration.sql` | Historical/manual, third tree. Its `001` prefix does **not** belong to the indexer sequence; the numbering collision with `sql/migrations/001_core_indexer_schema.sql` is real. Verify schema before any use. |
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.
@@ -111,6 +112,31 @@ See [the A8 schema evidence record](../audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
 Schema installation is not moderation activation, delivered-notification
 acceptance or a Phase A completion decision. Do not rerun these files based on
 the historical unapplied wording.
+
+## Feature Schema Application Record (2026-10-03; reconciled October 7)
+
+The private `phase-a-feature-apply-2026-10-03.json` journal records four
+committed stages: `launch_service_quotas`, `profile_email_verification`,
+`artist_support`, then `artist_support_moderation`. Each exact checksum was
+reviewed after protected backups and before its transaction. The operation
+finished at 2026-10-02 23:01:55 UTC (October 3 in Europe/Warsaw).
+
+This corrects stale "LOCAL DRAFT, UNAPPLIED" labels; it authorizes no replay.
+On October 7, the live Donate tables, constraints, indexes, forced RLS,
+client denial, service grants and chain-scoped rollback function were checked
+against that recorded source. The Base indexer was updated through Git after
+a separate host backup. No schema migration or cursor rewind accompanied
+that update. See `../audits/STABILIZATION_CHECKPOINT.md` for release and
+runtime evidence. Public feature flags and human acceptance remain separate.
+
+`moderation_report_email_delivery.sql` is a later addition, separately applied
+on October 8 with SHA-256
+`67435e2b396131bc5bffbccd54b22ff89fb8258ad73c58ec4488463835cab46e`.
+The private application journal is
+`docs/private/report-email-schema-apply-2026-10-08.json`; validated backup and
+manifest are in `docs/private/phase-a-db-backup-report-email-2026-10-08/`.
+It did not enable email, create reports, schedule a worker or alter roles.
+Do not replay this migration; reconcile the live catalog and journal first.
 
 ## Existing Production Database
 
