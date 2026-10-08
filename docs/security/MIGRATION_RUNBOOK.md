@@ -43,9 +43,9 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
 | `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
 | `sql/migrations/a8d_moderation_safe_recovery.sql` | A8 schema step 4. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. The passkey/recovery gates in `runbooks/A8D_SAFE_RECOVERY.md` remain open. |
-| `sql/migrations/a8e_moderation_totp_persistence.sql` | **LOCAL ONLY, NOT APPLIED.** Encrypted TOTP factors, typed grants, atomic step consumption, persistent throttling and monotonic role-version fencing. It also adds nullable authorization versions to WebAuthn challenges: legacy rows are retained, but the inactive dual-wallet API rejects them. No live policy row, grant issuer or authenticator ceremony exists. The October 8 founder approval defines five attempts per rolling five minutes, including abandoned attempts, with a two-minute reservation; installing this policy and completing authority/factor integration remain required. Evidence and remaining gates are in the stabilization checkpoint. |
-| `sql/migrations/a8f_moderation_dual_wallet_authority.sql` | **LOCAL ONLY, NOT APPLIED.** Follows A8e. Empty application-authority registry, one-time proposals and atomic role grants/revocation/rotation/reset with an audit record. Removes direct runtime role writes. Grants/resets issue a shared 15-minute setup permission atomically. Earlier 47-check evidence covered the prior draft only; consult the current checkpoint for updated verification. Do not apply before role-version-aware factor/session enforcement and reviewed initial policy; it does not change the existing Safe or contracts. |
-| `sql/migrations/a8g_staff_factor_setup.sql` | **LOCAL ONLY, NOT APPLIED.** Follows A8f. Atomic passkey setup or encrypted TOTP preparation using the shared permission added by the current unapplied A8e draft. Competing factors share the wallet lock. Creates no policy, staff, permission or session. Requires reviewed policy values, server-only encryption configuration and real setup/recovery acceptance before public moderation activation. |
+| `sql/migrations/a8e_moderation_totp_persistence.sql` | **Applied and verified 2026-10-08.** Encrypted TOTP factors, typed grants, atomic step consumption, persistent throttling and monotonic role-version fencing. Version-bound challenges retain historical rows. The approved 5/300/120 policy was installed separately; physical factor acceptance remains open. See the paired-authority application record below. |
+| `sql/migrations/a8f_moderation_dual_wallet_authority.sql` | **Applied and verified 2026-10-08.** Application-authority registry, one-time proposals and audited atomic grants/revocation/rotation/reset. Direct runtime role writes are denied. Grants/resets issue shared 15-minute setup permission. The approved initial pair was seeded separately without creating roles or permissions; no Safe or contract changed. Do not replay. |
+| `sql/migrations/a8g_staff_factor_setup.sql` | **Applied and verified 2026-10-08.** Atomic passkey or encrypted TOTP setup shares the same wallet lock and permission. Schema installation created no factor or session. Server encryption configuration and paired routes are deployed; physical setup/recovery and public moderation acceptance remain open. |
 | `sql/migrations/phase18_7a_supabase_security_hardening.sql` | Prior partial classification. Superseded by 18.7b. |
 | `sql/migrations/phase18_7b_supabase_security_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
 | `sql/migrations/phase18_7c_supabase_storage_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
@@ -354,11 +354,28 @@ over an unverified earlier one is the failure this ordering exists to prevent.
 
 ### Current paired-authority activation (October 8)
 
+Application record: A8e/A8f/A8g committed and passed transaction-local verification
+at 12:20 UTC on October 8 after a fresh protected full/schema backup. Private
+journal: `docs/private/staff-factor-schema-apply-2026-10-08.json`. Exact checksums:
+
+- A8e: `14b832a2370b591e0a68bb2f8e7a211cab29996f4cb10e5de410cb0889ed54fe`
+- A8f: `f3bf0d9882d4ad1e2610550fe06fa82f6c80c24b86d9ffdb6dd31e0a275f5757`
+- A8g: `60f56d21fd114b7d9c57eca78fdd1039bcb104493dc1615dfba9468b7c0aaee3`
+
+Forced RLS, exact function bodies/search paths, service-only execution, denial of
+direct role writes, unchanged existing roles and data counts were verified. The
+initial paired policy and 5/300/120 TOTP limits were installed in a separate
+transaction. No staff role, setup permission, credential or session was created
+by these operations. Protected encryption configuration is production-only.
+PR #294 and its same-source configuration redeploy are live at `17cfc3c`.
+The following procedure records the sequence; **do not repeat steps 1-4 in this
+environment**. Actual owner setup/reset and workflow acceptance remain open.
+
 1. Deploy only the reviewed, tested factor/session integration. Before database
    writes, compare current catalogs and migration hashes, create and verify a
    protected full backup, and retain the existing role/factor/audit counts.
-   The current A8e/A8f/A8g drafts are unapplied; do not infer installation from
-   the four historical A8 migrations. Do not replay bootstrap or Safe journals.
+   Verify the dated application journal for A8e/A8f/A8g; do not infer installation
+   from the four historical A8 migrations. Do not replay bootstrap or Safe journals.
 2. Apply A8e, A8f and A8g in that order, verifying each transaction before the
    next. These files already contain transaction wrappers. Check forced RLS,
    service-only RPC execution, fixed search paths and removal of direct runtime

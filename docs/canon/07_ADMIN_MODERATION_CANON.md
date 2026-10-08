@@ -127,8 +127,11 @@ passkey prompt or pending authenticator setup does not consume it. A grant or
 sign-in reset advances the authorization version and replaces previous staff
 sign-in access; it does not add a second independent self-issued factor. Legacy
 self-grants and Safe recovery cannot issue factors under the paired policy.
-Local code and isolated tests implement this interpretation; live configuration
-and the owner ceremony remain pending.
+PR #294 implements this interpretation and is deployed at `17cfc3c` with the
+reviewed schema and initial policy installed on October 8. The same-source
+configuration redeploy enables paired setup and the authenticator option.
+The owner ceremony and complaint workflow acceptance remain pending; public
+reporting, the review queue and Donate remain disabled at this checkpoint.
 
 ## Public Repository Boundary
 

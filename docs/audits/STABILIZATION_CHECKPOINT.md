@@ -3,6 +3,54 @@
 Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 8 release and activation continuation (owner ceremony still open):
+
+- This release continuation started at local HEAD
+  `80d38a5db17a3dcbc1a48313a30104354837047e` in the same workspace/branch; use
+  `git log -1` for the subsequent documentation checkpoint. No application code
+  changed after that tested candidate. The untracked recovery files remain untouched. The sole
+  bounded reviewer finished; no child agents are running.
+- Exact candidate CI passed on Linux, Windows and static checks (run
+  `37774913604`). Preview and apex each matched all 53 JS/CSS artifacts across
+  six pages. The founder explicitly approved PR #294 production release after
+  the automatic reviewer requested that exact approval. It merged at 12:16 UTC
+  as `17cfc3cb2b2ac005366c56097e3f9b35a28dbcc1`; production deployment
+  `dpl_CWnkynPzpy61pJvTxS3wGW4F3XKv` succeeded. Apex evidence:
+  `output/audit/staff-factor-apex-artifact-2026-10-08.json`. Indexer was healthy
+  with zero observed lag; guest private APIs denied access as expected.
+- A fresh protected full/schema backup was hash-checked and archive-read before
+  writes (no restore drill). Reviewed A8e/A8f/A8g installed at 12:20 UTC, each
+  transaction verified before commit: forced RLS, RPC bodies/privileges, no
+  direct runtime role writes, unchanged role assignments and existing counts.
+  Journal: `docs/private/staff-factor-schema-apply-2026-10-08.json`. Do not replay.
+- The approved initial authority pair, apex origin, Base Sepolia and TOTP policy
+  5/300/120 were installed separately. No role, setup permission, factor, session
+  or report was created. The private policy journal records the exact values.
+- The existing Vercel CLI login was refreshed. Three production-only settings
+  were added: server-only TOTP encryption key, key version 1, dual-wallet gate.
+  Protected local key recovery material is outside Git. Provider type naming
+  (`secret` in CLI, `sensitive` in API) stopped the first verification; the
+  successful first add was reconciled without replacement, then the two remaining
+  settings completed. Unrelated variable metadata was unchanged. Configuration
+  was activated by same-source production redeploy
+  `dpl_C9LzezTwTeYR6LdEXUutgG3556QE`, READY on the apex at 12:26 UTC. The connected
+  owner browser showed the new verification dialog and Staff access controls.
+  The prepared form targets the existing old-founder Administrator role using
+  Reset sign-in method; no request or signature was created automatically.
+- Post-activation apex verification again matched all 53 assets across six pages
+  and confirmed paired mode, guest denial, disabled public gates and healthy
+  indexer: `output/audit/staff-factor-apex-artifact-2026-10-08-activation.json`.
+  A fresh real SIWE login with the existing disposable creator account passed
+  13 HTTP steps: guest denial, non-staff authority/factor denial, expected-wallet
+  mismatch, rejected legacy self-grant, closed queue and logout. No transactions,
+  roles, permissions or credentials were created by that check. Private evidence:
+  `docs/private/staff-live-denials-2026-10-08.json`. It does not prove the owner
+  ceremony. Release-document checks passed 29/29 with no skips in
+  `output/audit/staff-factor-release-docs-final-2026-10-08.log`.
+- Exact next step: the owner approves that request with both designated wallets
+  and completes a physical factor setup, then sign-in/reset acceptance is verified.
+  Public reporting/review/Donate remain off. Phase A is OPEN.
+
 October 8 current continuation (paired staff setup implemented, not activated):
 
 - Started from `707d180438ad4d41f6b9c19ce7c21037ec1bc12f`; same canonical
