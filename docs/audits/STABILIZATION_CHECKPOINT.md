@@ -3,12 +3,13 @@
 Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 7 continuation (UX published; Donate indexer updated):
+October 8 continuation (UX published; Donate indexed; mail worker active):
 
 - Recovery started at `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched
   at that read. Production is `154d16f2fe18734a6766330c3aa7021eecf00702`;
-  the current implementation HEAD is `917d084da74a93f747777b2c21c3f3516288b772`
-  on the same branch (draft PR #294, not merged).
+  the challenge-binding continuation started at committed HEAD
+  `a611d424b8cd8441aa1f3eed9821c31b939b83f9` on the same branch
+  (draft PR #294, not merged). Use `git log -1` for the saved continuation commit.
   Existing October 3 source and checkpoint changes were
   preserved in `output/recovery/phase-a-resume-2026-10-07/before.patch`, with
   separate copies of seven untracked implementation/test files. No worktree,
@@ -53,10 +54,11 @@ October 7 continuation (UX published; Donate indexer updated):
   apex browser loaded v18 and 26 real gallery cards; checked cards had media
   overlays and one-row status/prices. Screenshot:
   `output/audit/phase-a-ux-apex-gallery-2026-10-07.png`.
-- Complaint email delivery code is published with a separate disabled flag,
+- Complaint email delivery code is published with a separate worker flag,
   service-only claims, idempotent bounded retries and no complaint content in
-  email. Its migration was applied and verified on October 8 (see below); scheduler,
-  configuration and real inbox delivery remain unverified. See `docs/runbooks/MODERATION_REPORT_EMAIL.md`.
+  email. Its migration, protected configuration and scheduler were verified on
+  October 8, including actual transport delivery to the project inbox (see below).
+  Full complaint-flow acceptance remains open. See `docs/runbooks/MODERATION_REPORT_EMAIL.md`.
   Staff profile notices use existing protected APIs, store only reference/count
   information and never turn ordinary users into staff. Email runs only in the
   scheduled worker; report intake never waits for the provider. The actual
@@ -196,8 +198,9 @@ October 7 continuation (UX published; Donate indexer updated):
   Remaining untracked files are `.codex/`, `output/`, the previously preserved
   `src/api/moderation-authority-policy.js` Safe observer and its test. They were
   deliberately not folded into the selected gasless application authority.
-  The subsequent session-binding source/test changes below are a newer local
-  candidate; the earlier CI run does not validate that candidate.
+  The subsequent session-binding changes were pushed as `a611d42`; CI run
+  `37765791029` passed Linux, Windows, static and Vercel checks for that exact
+  commit. The newer challenge-binding diff below is not covered by that old CI.
 - October 8 factor policy is now explicitly approved: both current authority
   wallets approve initial setup and replacement setup/recovery, with one-time
   15-minute permission. TOTP allows five reservations per rolling five minutes,
@@ -222,23 +225,64 @@ October 7 continuation (UX published; Donate indexer updated):
   `output/audit/passkey-session-binding-real-2026-10-08.log`. Its credential is
   synthetic; this does not prove physical passkey acceptance. Earlier sandbox
   Docker skips and missing-process fixture failures are not acceptance evidence.
-  Challenges, enrollment grants and factors still need full role-version
-  integration; current checks alone do not authorize feature activation.
+  Enrollment grants and factors still need full role-version integration;
+  current checks alone do not authorize feature activation.
 - Resend transfer: the owner explicitly approved temporary inspection through
   the personal account and then an Admin invitation to the project mailbox.
   The invitation was sent and accepted on October 8. A fresh project-mailbox
   login shows active Admin membership in the existing team and both existing
   verified domains. The existing four API keys were retained; no DNS/domain
-  transfer, subscription or key rotation occurred. The personal membership
-  remains until its separately prepared removal is confirmed. Evidence:
+  transfer, subscription or key rotation occurred. After separate explicit
+  confirmation, the personal membership was removed; the project mailbox is
+  now the sole Admin. Both domains and all five current keys were retained.
+  Removal evidence: `output/audit/resend-personal-access-removed-2026-10-08.png`.
+  Initial acceptance evidence:
   `output/audit/resend-project-admin-accepted-2026-10-08.png`.
-  A sending-only key draft named `ArtSoul Protocol moderation mail`, restricted
-  to `notify.artsoulprotocol.com`, awaits owner confirmation for the host worker.
-  The existing Vercel key cannot be revealed/reused on that worker. No duplicate
-  worker key has been created. Real complaint email delivery remains unverified.
+  After separate owner authorization, the sending-only key
+  `ArtSoul Protocol moderation mail`, restricted to `notify.artsoulprotocol.com`,
+  was created and installed through encrypted transport. The existing website
+  key was retained. The owner also explicitly approved placing the existing
+  Supabase service-role key on the host for the delivery worker.
+- October 8 mail worker is live: `/etc/artsoul/report-email.env` is root-owned
+  mode 0600; only `artsoulprotocol@gmail.com` receives these alerts. The separate
+  systemd oneshot/timer runs at most three records per invocation, 60 seconds
+  after completion, with a 120-second timeout. Three observed runs exited zero
+  with an empty queue. The real transport test reached the project Gmail inbox;
+  one exact-key retry produced no second delivered message in Resend. The owner
+  explicitly approved this permanent schedule; the prior automatic-review
+  blocks on secret placement/scheduling are resolved, not outstanding gates.
+  Private evidence: `docs/private/moderation-mail-worker-acceptance-2026-10-08.json`;
+  screenshot: `output/audit/moderation-mail-real-inbox-2026-10-08.png`.
+  Host source remains `5529973`, Base healthy (observed lag five, failed/dead zero),
+  legacy Ethereum stopped. No indexer restart or synthetic complaint was made.
+  Actual complaint submission, moderator decision and notification acceptance
+  remain open; transport evidence does not close those gates.
+- The challenge-binding continuation reproduced a separate gap: a WebAuthn
+  response created before role regrant could obtain a new version-bound cookie
+  if the verify request itself started after regrant. The candidate now stores
+  the role version on authentication challenges and includes it in the atomic
+  consume predicate. Missing/old versions fail closed under the dual-wallet
+  flag, without rewriting old rows. The A8e migration is still unapplied.
+  Snapshot: `output/recovery/passkey-challenge-binding-2026-10-08/`;
+  failing evidence: `output/audit/passkey-challenge-binding-before-2026-10-08.log`.
+  API and actual disposable PostgreSQL checks passed **128/128, no skips**,
+  including signed revoke/regrant and concurrent one-time consumption:
+  `output/audit/passkey-challenge-binding-real-final-2026-10-08.log`.
+  An earlier TOTP fixture aged out its previous-step setup code at a 30-second
+  boundary. Fixture preparation now uses database execution time; production
+  code/window rules were not relaxed. Initial failure and sandbox Docker skips
+  are retained and are not passing evidence. The build passed 11 routes and
+  175 utilities: `output/audit/passkey-challenge-binding-build-2026-10-08.log`.
+  The final complete working-tree Node run passed **1,787/1,787, no failures or
+  skips**, including actual disposable PostgreSQL. Command:
+  `node scripts/run-unit-tests.mjs`; log:
+  `output/audit/passkey-challenge-binding-full-unit-2026-10-08.log`.
+  The count includes 29 preserved unselected Safe-observer tests outside PR #294.
+  Registration/factor setup and real device acceptance remain incomplete; these
+  checks do not establish those flows or change any live authority flag.
 - Report, Protocol Admin and public Donate flags remain disabled. Phase A is open.
 - Exactly next step: complete the approved two-wallet factor-setup permission
-  consumer and bind passkey challenges/grants to its role version before wiring
+  consumer and bind passkey enrollment grants/factors to its role version before wiring
   the role route. The policy decision is resolved; real integration is not.
   Public Donate activation also requires working donation-message moderation
   under the October 3 amendment; successful test payments do not waive it.

@@ -7,6 +7,13 @@ Do not run the old bootstrap/recovery procedure as acceptance of the new policy.
 The replacement grant issuer, factor integration and real ceremonies remain
 unfinished; existing live roles, credentials and audit evidence are preserved.
 
+The inactive dual-wallet candidate binds sessions and authentication challenges
+to the role's monotonic authorization version. Changing/regranting the role
+invalidates earlier challenges, and enabling that policy rejects old unbound
+challenges rather than upgrading them. This requires the additive, unapplied
+A8e schema. It does not complete registration-grant/factor integration or
+authorize activation by itself.
+
 Status updated October 3: schema applied and verified September 30; passkey setup
 is enabled on the configured apex, while review/reporting activation and real
 device acceptance remain separate gates. Do not repeat the migration steps

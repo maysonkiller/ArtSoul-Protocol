@@ -186,6 +186,27 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     } else if(route==='artsoul_staff_passkeys') {
       const wallet=parsed.searchParams.get('wallet_address').slice(3),credential=parsed.searchParams.get('credential_id').slice(3);
       data=JSON.parse(sql(`SELECT COALESCE(json_agg(k),'[]'::JSON) FROM artsoul_staff_passkeys k WHERE wallet_address=${q(wallet)} AND credential_id=${q(credential)} AND revoked_at IS NULL`));
+    } else if(route==='artsoul_webauthn_challenges') {
+      // Exercise the real module's PostgREST predicates against PostgreSQL,
+      // including concurrent PATCHes. No WebAuthn verification is simulated here.
+      const fields=['challenge','wallet_address','purpose','authorization_version','expires_at'];
+      if(options.method==='POST') {
+        const row=body[0];assert.equal(body.length,1);
+        assert(Object.keys(row).every(key=>fields.includes(key)));
+        sql(`INSERT INTO artsoul_webauthn_challenges(${fields.join(',')}) VALUES(${fields.map(key=>q(row[key])).join(',')})`);
+        data=[];
+      } else {
+        assert.equal(options.method,'PATCH');
+        assert.deepEqual(Object.keys(body),['consumed_at']);
+        const conditions=[...parsed.searchParams].map(([field,value])=>{
+          assert([...fields,'consumed_at'].includes(field));
+          if(value==='is.null')return `${field} IS NULL`;
+          assert(/^(eq|gt)\./.test(value));
+          return `${field}${value.startsWith('eq.')?'=':'>'}${q(value.slice(3))}`;
+        });
+        data=JSON.parse(await parallel(`WITH changed AS (UPDATE artsoul_webauthn_challenges SET consumed_at=${q(body.consumed_at)}
+          WHERE ${conditions.join(' AND ')} RETURNING *) SELECT COALESCE(json_agg(changed),'[]'::JSON) FROM changed`));
+      }
     } else if(route==='rpc/a8f_create_authority_request') {
       data=JSON.parse(sql(`SET ROLE service_role;SELECT a8f_create_authority_request(${[body.p_wallet,body.p_action,body.p_target,body.p_role,body.p_next_wallet_a,body.p_next_wallet_b].map(q).join(',')})`));
     } else if(route==='rpc/a8f_complete_authority_request') {
@@ -258,5 +279,38 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     await assert.rejects(getModerationAccess(req,{strict:true}),e=>e.code==='STEP_UP_REQUIRED');
     assert.equal((await getModerationAccess(req)).canModerate,false);
     assert.equal(sql('SELECT count(*) FROM artsoul_staff_authority_events'),'3');
+  });
+
+  await t.test('real authority regrant rejects old challenges and concurrent consumers accept a fresh one only once',async()=>{
+    const {storeAuthenticationChallenge,consumeAuthenticationChallenge}=await import('../src/api/moderation-passkey.js');
+    reset();assert.equal(await apply(request()),'OK');const before=roleState().authorization_version;
+    const challenge=crypto.randomBytes(32).toString('base64url');
+    await storeAuthenticationChallenge(challenge,target,before);
+    assert.equal(await apply(request('revoke_role')),'OK');assert.equal(await apply(request()),'OK');
+    const current=roleState().authorization_version;
+    assert(current>before);
+    assert.equal(await consumeAuthenticationChallenge(challenge,target,current),false);
+    assert.equal(sql(`SELECT consumed_at IS NULL FROM artsoul_webauthn_challenges WHERE challenge=${q(challenge)}`),'t');
+    const fresh=crypto.randomBytes(32).toString('base64url');
+    await storeAuthenticationChallenge(fresh,target,current);
+    const results=await Promise.all([consumeAuthenticationChallenge(fresh,target,current),consumeAuthenticationChallenge(fresh,target,current)]);
+    assert.deepEqual(results.sort(),[false,true]);
+    assert.equal(await consumeAuthenticationChallenge(fresh,target,current),false);
+  });
+  await t.test('activation rejects legacy challenges without rewriting them and invalid versions make no database calls',async()=>{
+    const {storeAuthenticationChallenge,consumeAuthenticationChallenge}=await import('../src/api/moderation-passkey.js');
+    reset();assert.equal(await apply(request()),'OK');const version=roleState().authorization_version;
+    const legacy=crypto.randomBytes(32).toString('base64url');
+    process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED='false';
+    try {await storeAuthenticationChallenge(legacy,target);}finally{process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED='true';}
+    assert.equal(await consumeAuthenticationChallenge(legacy,target,version),false);
+    assert.equal(sql(`SELECT authorization_version IS NULL AND consumed_at IS NULL FROM artsoul_webauthn_challenges WHERE challenge=${q(legacy)}`),'t');
+    calls=[];
+    for(const invalid of [undefined,null,0,-1,1.5,Number.MAX_SAFE_INTEGER+1,'01',true]) {
+      await assert.rejects(storeAuthenticationChallenge('unused',target,invalid),e=>e.statusCode===503);
+      assert.equal(await consumeAuthenticationChallenge(legacy,target,invalid),false);
+    }
+    assert.equal(calls.length,0);
+    assert.throws(()=>sql(`UPDATE artsoul_webauthn_challenges SET authorization_version=0 WHERE challenge=${q(legacy)}`),/check constraint/);
   });
 });

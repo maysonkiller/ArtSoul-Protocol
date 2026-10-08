@@ -816,6 +816,69 @@ async function runAuthentication(envir, { credentialId = 'cred-1' } = {}) {
   return { optionsRes, verifyRes };
 }
 
+test('a passkey challenge issued before role regrant cannot create a fresh session', async () => {
+  const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+  db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  const envir = loadEnvironment({ env: {...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'}, db });
+  const cookie = envir.siweCookie(STAFF), options = fakeRes();
+  await envir.loadRoute('authOptions')(fakeReq({cookie}), options);
+  assert.equal(options.statusCode, 200);
+  // The same wallet returns with a previously signed browser response after
+  // a new role grant. Request-entry version checks alone cannot distinguish it.
+  db.tables.artsoul_staff_roles[0].authorization_version = 43;
+  const response = fakeRes();
+  await envir.loadRoute('authVerify')(fakeReq({cookie,
+    body:{response:{id:'cred-1',__challenge:'auth-challenge-1'}}}), response);
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.error, 'AUTHENTICATION_NOT_VERIFIED');
+  assert.equal(response.headers['set-cookie'], undefined);
+  assert.equal(db.log.some(entry => entry.path === 'rpc/a8a_complete_authentication'), false);
+});
+
+test('role-bound authentication consumes a current challenge only once', async () => {
+  const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+  db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+  const { optionsRes, verifyRes } = await runAuthentication(envir);
+  assert.equal(optionsRes.statusCode, 200);
+  assert.equal(verifyRes.statusCode, 200);
+  const stored = db.tables.artsoul_webauthn_challenges[0];
+  assert.equal(stored.authorization_version, 41);
+  assert.ok(stored.consumed_at);
+  const replay = fakeRes();
+  await envir.loadRoute('authVerify')(fakeReq({ cookie: envir.siweCookie(STAFF),
+    body: { response: { id: 'cred-1', __challenge: stored.challenge } } }), replay);
+  assert.equal(replay.statusCode, 401);
+  assert.equal(replay.headers['set-cookie'], undefined);
+  assert.equal(db.log.filter(entry => entry.path === 'rpc/a8a_complete_authentication').length, 1);
+});
+
+test('role-bound authentication rejects legacy, foreign, expired and registration challenges', async t => {
+  for (const [name, patch] of [
+    ['legacy', { authorization_version: null }],
+    ['foreign role version', { authorization_version: 42 }],
+    ['foreign wallet', { wallet_address: '0x' + 'aa'.repeat(20) }],
+    ['expired', { expires_at: new Date(Date.now() - 60_000).toISOString() }],
+    ['registration', { purpose: 'registration' }]
+  ]) await t.test(name, async () => {
+    const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
+    db.tables.artsoul_staff_roles[0].authorization_version = 41;
+    const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
+    const cookie = envir.siweCookie(STAFF), options = fakeRes();
+    await envir.loadRoute('authOptions')(fakeReq({ cookie }), options);
+    assert.equal(options.statusCode, 200);
+    Object.assign(db.tables.artsoul_webauthn_challenges[0], patch);
+    const result = fakeRes();
+    await envir.loadRoute('authVerify')(fakeReq({ cookie,
+      body: { response: { id: 'cred-1', __challenge: 'auth-challenge-1' } } }), result);
+    assert.equal(result.statusCode, 401);
+    assert.equal(result.body.error, 'AUTHENTICATION_NOT_VERIFIED');
+    assert.equal(result.headers['set-cookie'], undefined);
+    assert.equal(db.log.some(entry => entry.path === 'rpc/a8a_complete_authentication'), false);
+    assert.ok(!db.tables.artsoul_webauthn_challenges[0].consumed_at);
+  });
+});
+
 test('a valid authentication issues the exact 15-minute moderation session and advances the counter', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   const envir = loadEnvironment({ env: CONFIGURED_ENV, db });

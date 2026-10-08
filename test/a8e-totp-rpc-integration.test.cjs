@@ -61,7 +61,14 @@ test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available
   const claimSql = (factor,purpose='authentication') => `SELECT result,attempt_id FROM a8e_begin_totp_attempt('${factor.wallet}','${factor.id}','${purpose}')`;
   function claim(factor,purpose='authentication') {const [result,id]=sql(claimSql(factor,purpose)).split('|');assert.equal(result,'OK');assert.match(id,/^[a-f0-9-]{36}$/);return id;}
   const completeSql = (factor,attempt,step) => `SELECT a8e_complete_totp_attempt('${factor.wallet}','${attempt}',${step==null?'NULL':step})`;
-  function active(target=wallet) {const factor=pending(target);assert.equal(sql(completeSql(factor,claim(factor,'enrollment'),match(factor,-1))),'OK');return factor;}
+  function active(target=wallet) {
+    const factor=pending(target),attempt=claim(factor,'enrollment');
+    // Set up the active SQL fixture at database execution time. A previous-step
+    // code calculated before a Docker round trip can age out at the 30s edge.
+    // Actual encryption/code matching is exercised by the completion tests.
+    assert.equal(sql(completeSql(factor,attempt,'(floor(extract(epoch FROM clock_timestamp())/30)::BIGINT-1)')),'OK');
+    return factor;
+  }
   async function holdWrite(query,name,seconds=1) {
     const finished=parallel(`SET application_name='${name}'; BEGIN; ${query}; SELECT pg_sleep(${seconds}); COMMIT;`);
     for(let i=0;i<40;i++) {
@@ -116,7 +123,7 @@ test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available
   });
   await t.test('wrong codes and out-of-window steps consume reservations without advancing the factor',async()=>{
     await reset();const factor=active(),before=sql(`SELECT last_consumed_step FROM artsoul_staff_totp_factors WHERE id='${factor.id}'`);
-    for(const step of [null,-1,currentStep()+2]) {
+    for(const step of [null,-1,'(floor(extract(epoch FROM clock_timestamp())/30)::BIGINT+2)']) {
       const attempt=claim(factor);assert.equal(sql(completeSql(factor,attempt,step)),'CODE_NOT_VERIFIED');
       assert.equal(sql(completeSql(factor,attempt,currentStep())),'ATTEMPT_INVALID');
     }

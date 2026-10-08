@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     try {
       verification = await verifyAuthenticationResponse({
         response,
-        expectedChallenge: async (challenge) => consumeAuthenticationChallenge(challenge, wallet),
+        expectedChallenge: async (challenge) => consumeAuthenticationChallenge(challenge, wallet, authorizationVersion),
         expectedOrigin: config.origin,
         expectedRPID: config.rpId,
         requireUserVerification: true,

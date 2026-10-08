@@ -263,13 +263,18 @@ export async function storeRegistrationChallenge(challenge, wallet, grantId) {
   });
 }
 
-export async function storeAuthenticationChallenge(challenge, wallet) {
+export async function storeAuthenticationChallenge(challenge, wallet, authorizationVersion) {
+  const version = parseAuthorizationVersion(authorizationVersion);
+  if (roleBoundSessionsEnabled() && !version) {
+    throw configError('A current staff authorization version is required to start authentication.');
+  }
   await supabaseRest('artsoul_webauthn_challenges', {
     method: 'POST',
     body: [{
       challenge,
       wallet_address: wallet,
       purpose: 'authentication',
+      ...(roleBoundSessionsEnabled() ? { authorization_version: version } : {}),
       expires_at: new Date(Date.now() + WEBAUTHN_CHALLENGE_TTL_MS).toISOString()
     }]
   });
@@ -295,12 +300,16 @@ export async function validateRegistrationChallenge(challenge, wallet, grantId) 
 
 // One-time consume for AUTHENTICATION challenges only (registration
 // challenges are consumed atomically in the RPC). Mirrors the single-use
-// SIWE nonce PATCH pattern.
-export async function consumeAuthenticationChallenge(challenge, wallet) {
+// SIWE nonce PATCH pattern. Bind to the authorization at challenge creation,
+// so a response prepared before role replacement cannot start a new session.
+export async function consumeAuthenticationChallenge(challenge, wallet, authorizationVersion) {
+  const version = parseAuthorizationVersion(authorizationVersion);
+  if (roleBoundSessionsEnabled() && !version) return false;
   const rows = await supabaseRest(
     `artsoul_webauthn_challenges?challenge=eq.${encodeURIComponent(challenge)}` +
       `&wallet_address=eq.${encodeURIComponent(wallet)}` +
       '&purpose=eq.authentication' +
+      (roleBoundSessionsEnabled() ? `&authorization_version=eq.${version}` : '') +
       '&consumed_at=is.null' +
       `&expires_at=gt.${encodeURIComponent(new Date().toISOString())}`,
     {

@@ -32,13 +32,19 @@ CREATE TRIGGER a8e_staff_authorization_version
 REVOKE ALL ON SEQUENCE public.artsoul_staff_authorization_version_seq FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.a8e_advance_staff_authorization_version() FROM PUBLIC,anon,authenticated,service_role;
 
+-- Keep legacy rows for audit/flag-off compatibility. Once dual-wallet authority
+-- is enabled, the API accepts only authentication challenges with the current
+-- authorization version; activation never upgrades old challenges in place.
+ALTER TABLE public.artsoul_webauthn_challenges ADD COLUMN authorization_version BIGINT
+    CHECK (authorization_version BETWEEN 1 AND 9007199254740991);
+
 CREATE TABLE IF NOT EXISTS public.artsoul_staff_totp_policy (
     singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
     max_attempts INTEGER NOT NULL CHECK (max_attempts > 0),
     window_seconds INTEGER NOT NULL CHECK (window_seconds > 0),
     attempt_lifetime_seconds INTEGER NOT NULL CHECK (attempt_lifetime_seconds > 0 AND attempt_lifetime_seconds <= window_seconds)
 );
--- Intentionally empty: no production throttle values have been approved.
+-- Intentionally empty: approved 5/300/120 values require a reviewed activation.
 
 CREATE TABLE IF NOT EXISTS public.artsoul_staff_totp_grants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
