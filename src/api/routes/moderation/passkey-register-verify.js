@@ -5,14 +5,18 @@ import {
   resolveRegistrationGrant,
   recordAuthEventBestEffort,
   requirePasskeyRouteContext,
+  roleBoundSessionsEnabled,
   validateRegistrationChallenge
 } from '../../moderation-passkey.js';
+import { requireFactorRequest, requireSetupPermission, validateSetupChallenge, completePasskeySetup, factorError } from '../../moderation-factor-setup.js';
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (!allowMethods(req, res, ['POST'])) return;
 
   try {
-    const { config, wallet } = await requirePasskeyRouteContext(req);
+    const context = await requirePasskeyRouteContext(req);
+    const { config, wallet, authorizationVersion } = context;
 
     const body = await readJson(req);
     const response = body?.response;
@@ -22,7 +26,12 @@ export default async function handler(req, res) {
 
     // Recheck the live approval before verification. The stored challenge
     // must still bind this exact grant; a replacement grant cannot reuse it.
-    const grant = await resolveRegistrationGrant(body, wallet);
+    const paired = roleBoundSessionsEnabled();
+    if (paired) {
+      requireFactorRequest(req, body, context);
+      if (body?.mode !== 'authority-setup' || body?.token !== undefined) throw factorError('INVALID_REGISTRATION_MODE', 400);
+    }
+    const grant = paired ? await requireSetupPermission(wallet, authorizationVersion, body.permissionId) : await resolveRegistrationGrant(body, wallet);
     if (!grant) {
       return res.status(403).json({
         error: body?.mode === 'approved-bootstrap' ? 'FIRST_ENROLLMENT_UNAVAILABLE' : 'ENROLLMENT_GRANT_REQUIRED',
@@ -38,7 +47,7 @@ export default async function handler(req, res) {
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge: async (challenge) => {
-          const ok = await validateRegistrationChallenge(challenge, wallet, grant.id);
+          const ok = paired ? await validateSetupChallenge(challenge, context, grant.id) : await validateRegistrationChallenge(challenge, wallet, grant.id);
           if (ok) verifiedChallenge = challenge;
           return ok;
         },
@@ -69,7 +78,8 @@ export default async function handler(req, res) {
     // the credential, and write grant_consumed + passkey_enrolled. Any
     // failure inside the transaction rolls the whole thing back, so the
     // one-time (bootstrap) grant is never lost on a partial failure.
-    const result = await completeRegistrationRpc({
+    const result = await (paired ? completePasskeySetup : completeRegistrationRpc)({
+      permissionId: grant.id,
       grantId: grant.id,
       tokenHash: grant.token_hash,
       wallet,

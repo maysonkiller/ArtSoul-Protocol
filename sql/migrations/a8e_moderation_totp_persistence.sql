@@ -38,6 +38,30 @@ REVOKE ALL ON FUNCTION public.a8e_advance_staff_authorization_version() FROM PUB
 ALTER TABLE public.artsoul_webauthn_challenges ADD COLUMN authorization_version BIGINT
     CHECK (authorization_version BETWEEN 1 AND 9007199254740991);
 
+-- A8f issues this shared, method-independent permission only after both current
+-- authority signatures. Successful passkey OR TOTP enrollment consumes it once.
+CREATE TABLE public.artsoul_staff_setup_permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    target_wallet TEXT NOT NULL CHECK (target_wallet ~ '^0x[0-9a-f]{40}$'),
+    role_version BIGINT NOT NULL CHECK (role_version BETWEEN 1 AND 9007199254740991),
+    authority_request_id UUID NOT NULL UNIQUE,
+    issued_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL CHECK (expires_at>issued_at AND expires_at<=issued_at+INTERVAL '15 minutes'),
+    consumed_at TIMESTAMPTZ,
+    factor_type TEXT,
+    factor_reference TEXT,
+    CHECK ((consumed_at IS NULL AND factor_type IS NULL AND factor_reference IS NULL) OR
+        (consumed_at IS NOT NULL AND factor_type IN ('passkey','totp') AND factor_reference IS NOT NULL))
+);
+ALTER TABLE public.artsoul_staff_setup_permissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artsoul_staff_setup_permissions FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON public.artsoul_staff_setup_permissions FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT ON public.artsoul_staff_setup_permissions TO service_role;
+ALTER TABLE public.artsoul_webauthn_challenges ADD COLUMN setup_permission_id UUID REFERENCES public.artsoul_staff_setup_permissions(id);
+ALTER TABLE public.artsoul_staff_passkeys ADD COLUMN authorization_version BIGINT
+    CHECK (authorization_version BETWEEN 1 AND 9007199254740991);
+ALTER TABLE public.artsoul_staff_passkeys ADD COLUMN setup_permission_id UUID UNIQUE REFERENCES public.artsoul_staff_setup_permissions(id);
+
 CREATE TABLE IF NOT EXISTS public.artsoul_staff_totp_policy (
     singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
     max_attempts INTEGER NOT NULL CHECK (max_attempts > 0),
@@ -48,6 +72,7 @@ CREATE TABLE IF NOT EXISTS public.artsoul_staff_totp_policy (
 
 CREATE TABLE IF NOT EXISTS public.artsoul_staff_totp_grants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    setup_permission_id UUID UNIQUE REFERENCES public.artsoul_staff_setup_permissions(id),
     factor_type TEXT NOT NULL DEFAULT 'totp' CHECK (factor_type = 'totp'),
     factor_id UUID NOT NULL UNIQUE CHECK (factor_id::TEXT ~ '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
     target_wallet TEXT NOT NULL CHECK (target_wallet ~ '^0x[0-9a-f]{40}$' AND target_wallet <> '0x0000000000000000000000000000000000000000'),
@@ -198,6 +223,7 @@ CREATE OR REPLACE FUNCTION public.a8e_complete_totp_attempt(p_wallet TEXT, p_att
 RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_wallet TEXT := lower(p_wallet); v_factor public.artsoul_staff_totp_factors%ROWTYPE;
     v_attempt public.artsoul_staff_totp_attempts%ROWTYPE; v_grant public.artsoul_staff_totp_grants%ROWTYPE;
+    v_permission public.artsoul_staff_setup_permissions%ROWTYPE;
     v_now TIMESTAMPTZ; v_step BIGINT; v_result TEXT := 'OK'; v_role_version BIGINT;
 BEGIN
     IF v_wallet IS NULL OR v_wallet !~ '^0x[0-9a-f]{40}$' OR p_attempt_id IS NULL THEN RETURN 'INVALID_INPUT'; END IF;
@@ -215,7 +241,10 @@ BEGIN
     ELSE
         SELECT * INTO v_grant FROM public.artsoul_staff_totp_grants WHERE id=v_factor.grant_id FOR SHARE;
     END IF;
-    -- Use the time AFTER every potentially blocking lock, including the grant.
+    IF v_attempt.purpose='enrollment' AND v_grant.setup_permission_id IS NOT NULL THEN
+        SELECT * INTO v_permission FROM public.artsoul_staff_setup_permissions WHERE id=v_grant.setup_permission_id FOR UPDATE;
+    END IF;
+    -- Use the time AFTER every potentially blocking lock, including permission.
     v_now := clock_timestamp();
     v_step := floor(extract(epoch FROM v_now)/30)::BIGINT;
     IF v_attempt.expires_at<=v_now THEN v_result:='ATTEMPT_EXPIRED';
@@ -230,6 +259,11 @@ BEGIN
             OR v_grant.consumed_at IS NOT NULL OR v_grant.revoked_at IS NOT NULL OR v_grant.issued_at>v_now OR v_grant.expires_at<=v_now THEN
             v_result:='GRANT_INVALID';
         END IF;
+        IF v_grant.setup_permission_id IS NOT NULL AND (v_permission.id IS NULL
+            OR v_permission.target_wallet IS DISTINCT FROM v_wallet OR v_permission.role_version IS DISTINCT FROM v_role_version
+            OR v_permission.consumed_at IS NOT NULL OR v_permission.issued_at>v_now OR v_permission.expires_at<=v_now) THEN
+            v_result:='SETUP_PERMISSION_INVALID';
+        END IF;
     END IF;
     UPDATE public.artsoul_staff_totp_attempts SET consumed_at=v_now WHERE id=v_attempt.id;
     IF v_result<>'OK' THEN
@@ -238,6 +272,9 @@ BEGIN
         RETURN v_result;
     END IF;
     IF v_attempt.purpose='enrollment' THEN
+        IF v_grant.setup_permission_id IS NOT NULL THEN
+            UPDATE public.artsoul_staff_setup_permissions SET consumed_at=v_now,factor_type='totp',factor_reference=v_factor.id::TEXT WHERE id=v_permission.id;
+        END IF;
         UPDATE public.artsoul_staff_totp_grants SET consumed_at=v_now WHERE id=v_grant.id;
         INSERT INTO public.artsoul_staff_auth_events(wallet_address,event_type,details)
         VALUES(v_wallet,'grant_consumed',jsonb_build_object('factor_type','totp','factor_id',v_factor.id,'grant_id',v_grant.id,'authorization_digest',v_grant.authorization_digest));

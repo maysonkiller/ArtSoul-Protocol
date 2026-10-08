@@ -363,6 +363,7 @@ function loadEnvironment({ env = {}, db = createDb(), webauthn = {}, recoveryRpc
   context.exported.__mockSupabase = db.supabaseRest;
   vm.runInContext('supabaseRest = exported.__mockSupabase;', context);
   vm.runInContext(stripModule(passkeySource), context, { filename: 'moderation-passkey.js (stripped)' });
+  vm.runInContext(stripModule(read('src/api/moderation-factor-setup.js')), context, { filename: 'moderation-factor-setup.js (stripped)' });
   vm.runInContext(stripModule(safeRecoverySource), context, { filename: 'moderation-safe-recovery.js (stripped)' });
   vm.runInContext(stripModule(accessSource), context, { filename: 'moderation-access.js (stripped)' });
   vm.runInContext([
@@ -819,6 +820,7 @@ async function runAuthentication(envir, { credentialId = 'cred-1' } = {}) {
 test('a passkey challenge issued before role regrant cannot create a fresh session', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 41;
   const envir = loadEnvironment({ env: {...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED:'true'}, db });
   const cookie = envir.siweCookie(STAFF), options = fakeRes();
   await envir.loadRoute('authOptions')(fakeReq({cookie}), options);
@@ -826,6 +828,8 @@ test('a passkey challenge issued before role regrant cannot create a fresh sessi
   // The same wallet returns with a previously signed browser response after
   // a new role grant. Request-entry version checks alone cannot distinguish it.
   db.tables.artsoul_staff_roles[0].authorization_version = 43;
+  // A newly approved credential still cannot consume the old challenge.
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 43;
   const response = fakeRes();
   await envir.loadRoute('authVerify')(fakeReq({cookie,
     body:{response:{id:'cred-1',__challenge:'auth-challenge-1'}}}), response);
@@ -838,6 +842,7 @@ test('a passkey challenge issued before role regrant cannot create a fresh sessi
 test('role-bound authentication consumes a current challenge only once', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 41;
   const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
   const { optionsRes, verifyRes } = await runAuthentication(envir);
   assert.equal(optionsRes.statusCode, 200);
@@ -863,6 +868,7 @@ test('role-bound authentication rejects legacy, foreign, expired and registratio
   ]) await t.test(name, async () => {
     const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
     db.tables.artsoul_staff_roles[0].authorization_version = 41;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 41;
     const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
     const cookie = envir.siweCookie(STAFF), options = fakeRes();
     await envir.loadRoute('authOptions')(fakeReq({ cookie }), options);
@@ -991,6 +997,7 @@ test('an expired 15-minute session fails closed', async () => {
 test('dual-wallet role regrant must not revive the previous moderation session', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   db.tables.artsoul_staff_roles[0].authorization_version = 101;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 101;
   const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
   const { verifyRes } = await runAuthentication(envir);
   assert.equal(verifyRes.statusCode, 200, JSON.stringify(verifyRes.body));
@@ -1003,6 +1010,11 @@ test('dual-wallet role regrant must not revive the previous moderation session',
   await assert.rejects(envir.exported.getModerationAccess(fakeReq({ cookie }), { strict: true }),
     e => e.code === 'STEP_UP_REQUIRED');
   envir.control.newCounter = 8;
+  const obsolete = await runAuthentication(envir);
+  assert.equal(obsolete.verifyRes.statusCode, 403);
+  assert.equal(obsolete.verifyRes.body.error, 'CREDENTIAL_NOT_ELIGIBLE');
+  // Simulate separately approved replacement enrollment, not key revival.
+  db.tables.artsoul_staff_passkeys[0] = activePasskey({authorization_version: 103});
   const fresh = await runAuthentication(envir);
   assert.equal(fresh.verifyRes.statusCode, 200);
   const freshCookie = cookieValueFromHeader(fresh.verifyRes.headers['set-cookie']);
@@ -1019,6 +1031,7 @@ test('dual-wallet role replacement and promotion invalidate an existing session'
     await t.test(`new ${replacement.role} authorization`, async () => {
       const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
       db.tables.artsoul_staff_roles[0].authorization_version = '101';
+  db.tables.artsoul_staff_passkeys[0].authorization_version = '101';
       const envir = loadEnvironment({ env: { ...CONFIGURED_ENV, ARTSOUL_MODERATION_DUAL_WALLET_ENABLED: 'true' }, db });
       const { verifyRes } = await runAuthentication(envir);
       assert.equal(verifyRes.statusCode, 200);
@@ -1035,6 +1048,7 @@ test('dual-wallet role replacement and promotion invalidate an existing session'
 test('dual-wallet activation rejects legacy unbound cookies and missing issuance versions', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   db.tables.artsoul_staff_roles[0].authorization_version = 101;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 101;
   const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
   const cookie = `${envir.siweCookie(STAFF)}; ${envir.moderationCookie(STAFF, 'cred-1')}`;
   envir.context.process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = 'true';
@@ -1066,6 +1080,7 @@ test('dual-wallet role changes during authentication never issue a session for t
     await t.test(replacement ? `${replacement.role} active ${replacement.active}` : 'removed role', async () => {
       const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
       db.tables.artsoul_staff_roles[0].authorization_version = 101;
+  db.tables.artsoul_staff_passkeys[0].authorization_version = 101;
       const original = db.supabaseRest;
       db.supabaseRest = async (route, options) => {
         const result = await original(route, options);

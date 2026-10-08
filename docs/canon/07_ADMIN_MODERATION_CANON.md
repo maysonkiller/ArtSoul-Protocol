@@ -121,6 +121,15 @@ Activation requires real setup, sign-in and recovery under the selected policy.
 The independent BOTH-wallet authority remains mandatory; losing one authority
 wallet cannot be repaired by the other wallet alone.
 
+Implementation interpretation, October 8: the permission is shared by both
+factor methods and is consumed only by successful factor enrollment. An abandoned
+passkey prompt or pending authenticator setup does not consume it. A grant or
+sign-in reset advances the authorization version and replaces previous staff
+sign-in access; it does not add a second independent self-issued factor. Legacy
+self-grants and Safe recovery cannot issue factors under the paired policy.
+Local code and isolated tests implement this interpretation; live configuration
+and the owner ceremony remain pending.
+
 ## Public Repository Boundary
 
 Operational abuse heuristics, private anti-sybil checks, and escalation playbooks should not be published in this repository.

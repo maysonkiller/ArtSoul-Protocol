@@ -56,13 +56,18 @@ Both authorized 1-wei payments completed on October 7, with and without a messag
 both exact projections and the real read handler passed October 8 acceptance.
 Public activation still requires the operational donation-message moderation
 path specified in the October 3 amendment. Do not replay these payments.
-Complaint-email schema was backed up, applied and verified October 8; actual
-worker credentials/scheduling and inbox delivery are pending Resend access.
-The approved two-wallet gasless role/authority mechanism and authenticator-app
-alternative have tested local foundations, not a deployed end-to-end flow.
-No new Safe is requested for application roles. The exact first-enrollment and
-recovery amendment is awaiting the owner's October 8 decision; existing operator
-gates are not waived by that unfinished implementation. See the
+Complaint-email schema and the protected host worker/timer were verified on
+October 8. One idempotent transport smoke was delivered to the project inbox;
+Resend team access was transferred to the project mailbox as authorized. The
+full complaint-to-decision notification journey remains unverified.
+The owner approved two gasless authority signatures for role grants and recovery,
+a shared single-use 15-minute setup permission, passkey OR authenticator app, and
+five TOTP reservations per rolling five minutes with two-minute expiry. Local
+backend/UI integration is under final regression; A8e/A8f/A8g and the policy are
+not live. No new Safe is needed for application roles. Real two-wallet approval,
+factor setup and replacement still require the owner's wallet/device actions.
+The old two-passkey/bootstrap/Safe-only criteria below are superseded by canon
+07's October 8 amendment, not silently waived. See the
 [current checkpoint](audits/STABILIZATION_CHECKPOINT.md) and
 [schema evidence](audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
 
@@ -91,8 +96,8 @@ operationally safe reporting/moderation path before a beta GO.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
-| **RG-03** → **A-39** moderation activation | Dormant schema and verification are complete; two founder passkeys, the one-time audited bootstrap grant and live workflow acceptance remain open | Credentials and a multisig-authorised ceremony; canon rule 12 forbids a single operator deciding it |
-| **A8d / replacement recovery policy** | Historical Safe recovery acceptance is retained in [`runbooks/A8D_SAFE_RECOVERY.md`](runbooks/A8D_SAFE_RECOVERY.md); reconcile the requested two-wallet application authority with factor recovery before replacing that path | The founder must select the recovery rule and perform the real wallet/device approvals; automated fixtures are not that ceremony |
+| **RG-03** → **A-39** moderation activation | Historical A8 schema is complete; current paired-authority/factor migrations, policy, real setup and workflow acceptance remain open | Both designated wallets approve staff setup; the staff member completes the actual passkey or authenticator-app verification |
+| **Replacement recovery acceptance** | Policy approved October 8: both current authority wallets approve a new 15-minute setup permission and invalidate previous sign-in access. Historical Safe evidence is retained, not replayed | The owner performs the real two-wallet approval and factor replacement; automated fixtures are not that ceremony |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
 against **C14**, and RG-03's own completion clause does not mention it, so a

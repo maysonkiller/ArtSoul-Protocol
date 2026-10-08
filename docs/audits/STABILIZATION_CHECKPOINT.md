@@ -3,6 +3,59 @@
 Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 8 current continuation (paired staff setup implemented, not activated):
+
+- Started from `707d180438ad4d41f6b9c19ce7c21037ec1bc12f`; same canonical
+  workspace/branch. Snapshot: `output/recovery/factor-setup-2026-10-08/`.
+  No worktrees were created, combined or reset. The older untracked Safe policy
+  observer/test, `.codex/` and `output/` remain unselected recovery material.
+- Completed shared single-use setup permission, version-bound native passkey
+  registration and encrypted authenticator-app setup/login. Grant/reset consumes
+  both authority approvals, advances role version and issues 15-minute setup.
+  Successful enrollment consumes the permission once across both methods.
+  Legacy self-grant/recovery/key-removal paths are rejected under the paired
+  policy; replacement needs both current authorities. No complaint is deleted.
+- Added the gated authority and factor routes, the Admin verification dialog and
+  explicit two-wallet role/reset/rotation UI. Authority discovery is distinct
+  from staff eligibility; authority alone cannot read complaints. Signatures
+  survive a wallet switch only as the exact public proposal and approvals in
+  sessionStorage, then expire/clear. Codes and factor secrets stay out of storage.
+  Account-menu runtime is v55 on every consumer. Existing Safe/contracts/economics
+  are unchanged. This is application staff administration, not a complete console
+  for every future protocol operation.
+- `node scripts/run-unit-tests.mjs`: **1,802 passed, zero failed/skipped** in
+  `output/audit/factor-setup-full-unit-final-2026-10-08.log`. Includes actual
+  disposable PostgreSQL, real ephemeral EOA signatures, software P-256 WebAuthn
+  registration/authentication, TOTP replay/throttling, role changes and atomic
+  permission races. The retained unselected observer contributes 29 checks.
+  Earlier full-run failures were stale asset version/hash expectations, fixed
+  without weakening the cache checks; their failing log is retained.
+- Build: **11 routes, 175 CSS utilities**, passed in
+  `output/audit/factor-setup-build-final-2026-10-08.log`. Built Chrome test passed
+  **51 assertions**, both themes at 1280/390/320px, zero uncaught errors:
+  `output/audit/staff-factor-built-2026-10-08.json`. It covers wrong-code retry,
+  native cancellation/setup/verification, late response after logout, two actual
+  ephemeral signatures across account switch and rejection of tampered stored
+  approval. Screenshots are under `output/playwright/staff-factor-*` and
+  `staff-authority-*`. Synthetic local HTTP/provider boundaries do not prove
+  live deployment, physical passkeys or iPhone/Android wallet acceptance.
+- A bounded independent review found one historical-key revocation issue; the
+  paired-mode removal guard fixes it. Final UI review found no further concrete
+  bypass or wallet/session race. The sole reviewer is finished; no new team ran.
+- Read-only live preflight at 12:04 UTC found no A8e/A8f/A8g objects, one staff
+  role, zero passkeys/reports and one historical unused expired bootstrap.
+  Reporting/Admin/Donate remain off. Private preflight and operator aggregates
+  are timestamped under `docs/private/`; no live role/schema/config was changed.
+- Owner reported the earlier phone pass appeared good. Record that qualitative
+  observation without repeating the entire trip; it does not supply Android,
+  OAuth or native-factor evidence. The device sheet records the limit.
+- Unfinished: publish/review this continuation of PR #294; verify its preview,
+  safely install reviewed A8e/A8f/A8g and initial policy/config, then obtain real
+  owner two-wallet setup/reset and device verification. Full complaint/review/
+  recipient/mail acceptance and gated Donate activation follow. Phase A is OPEN.
+  Exact next step: commit the selected tested source and update existing PR #294,
+  then verify its exact candidate CI and preview before release.
+
 October 8 continuation (UX published; Donate indexed; mail worker active):
 
 - Recovery started at `838f54b71881c4e5199dd0828793c2053aeb48eb`; remote main matched

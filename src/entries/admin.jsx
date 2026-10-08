@@ -1,5 +1,7 @@
 import { React, createRoot } from './react-runtime.js';
 import { StaffPasskeyDialog } from '../features/admin/staff-passkeys.jsx';
+import { StaffFactorDialog } from '../features/admin/staff-factor-dialog.jsx';
+import { StaffAuthority } from '../features/admin/staff-authority.jsx';
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
@@ -160,9 +162,10 @@ function AccessGate({ state, busy, message, onAuthenticate, onStepUp, onRetry, s
         disabled: ['Protocol Admin is disabled', 'The review workspace is not active in this environment.'],
         unauthenticated: ['Wallet verification required', 'Verify the connected wallet before the server checks staff access.'],
         ineligible: ['Access unavailable', 'This wallet does not have an active staff role.'],
-        step_up: ['Admin panel', 'Open verification below to use a saved passkey or add your first one.'],
-        setup: ['Admin panel', 'Set up your passkeys here. The review workspace is not active yet.'],
-        setup_verified: ['Admin access confirmed', 'Your passkey is verified. The review workspace is not active yet.'],
+        step_up: ['Admin panel', 'Verify your sign-in method to continue.'],
+        setup: ['Admin panel', 'Set up your sign-in method here. The review workspace is not active yet.'],
+        setup_verified: ['Admin access confirmed', 'Your sign-in method is verified. The review workspace is not active yet.'],
+        authority: ['Staff access', 'This authority wallet can approve staff access. Reviewing complaints requires a separate staff role and verification.'],
         error: ['Protocol Admin unavailable', message || 'The access check could not be completed.']
     }[state] || ['Protocol Admin', message || 'Access is not ready.'];
 
@@ -188,6 +191,7 @@ function ProtocolAdminPage() {
     const [decision, setDecision] = useState(null);
     const queueStatusRef = useRef(queueStatus);
     const [setupWallet, setSetupWallet] = useState('');
+    const [authorityWallet, setAuthorityWallet] = useState('');
     const [passkeyOpen, setPasskeyOpen] = useState(false);
     const setupEpoch = useRef(0), openedSetupFor = useRef('');
     const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
@@ -213,6 +217,7 @@ function ProtocolAdminPage() {
             setAccess(null);
             setAccessState('unauthenticated');
             setSetupWallet('');
+            setAuthorityWallet('');
             setPasskeyOpen(false);
             setBusy(false);
             setMessage('');
@@ -276,6 +281,7 @@ function ProtocolAdminPage() {
         } else {
             setAccess(null);
             setSetupWallet('');
+            setAuthorityWallet('');
             setPasskeyOpen(false);
             setAccessState('error');
         }
@@ -289,6 +295,7 @@ function ProtocolAdminPage() {
             clearProtectedView();
             setAccess(null);
             setSetupWallet('');
+            setAuthorityWallet('');
             setPasskeyOpen(false);
             setAccessState('unauthenticated');
             setBusy(false);
@@ -300,6 +307,8 @@ function ProtocolAdminPage() {
             const result = await api(`access?expectedWallet=${encodeURIComponent(wallet)}`);
             if (!isCurrent()) return;
             const canSetup = result.setupEnabled === true && result.authenticated === true && result.eligible === true;
+            const canApprove = result.setupEnabled === true && result.authenticated === true && result.authorityEligible === true;
+            setAuthorityWallet(canApprove ? wallet : '');
             setSetupWallet(canSetup ? wallet : '');
             if (!canSetup) setPasskeyOpen(false);
             else if (!result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
@@ -310,7 +319,7 @@ function ProtocolAdminPage() {
             } else if (!result.authenticated) {
                 setAccessState('unauthenticated');
             } else if (!result.eligible) {
-                setAccessState('ineligible');
+                setAccessState(canApprove ? 'authority' : 'ineligible');
             } else if (!result.enabled) {
                 setAccessState(result.access?.stepUpActive ? 'setup_verified' : 'setup');
             } else if (!result.access?.stepUpActive) {
@@ -401,10 +410,12 @@ function ProtocolAdminPage() {
         }
     };
 
+    const SignInDialog = access?.dualWallet ? StaffFactorDialog : StaffPasskeyDialog;
+    const authorityControls = authorityWallet && <StaffAuthority key={authorityWallet} walletAddress={authorityWallet} api={api} onAccessChanged={checkAccess} />;
     const verification = setupWallet && <section className="protocol-admin-setup" aria-label="Admin verification">
-        {accessState !== 'step_up' && <button type="button" className="protocol-admin-primary" disabled={busy} onClick={stepUp}>{access?.stepUpActive ? 'Manage passkeys' : 'Verify admin access'}</button>}
-        <p>Use your device's passkey prompt to verify admin access. Additional-device and recovery options are available in the verification window.</p>
-        {passkeyOpen && <StaffPasskeyDialog key={setupWallet} walletAddress={setupWallet} sessionActive={access?.stepUpActive === true}
+        {accessState !== 'step_up' && <button type="button" className="protocol-admin-primary" disabled={busy} onClick={stepUp}>{access?.stepUpActive ? 'Sign-in settings' : 'Verify admin access'}</button>}
+        <p>{access?.dualWallet ? 'Use a passkey or your authenticator app. New setup and recovery require approval from both authority wallets.' : "Use your device's passkey prompt to verify admin access. Additional-device and recovery options are available in the verification window."}</p>
+        {passkeyOpen && <SignInDialog key={setupWallet} walletAddress={setupWallet} sessionActive={access?.stepUpActive === true}
             api={api} onClose={() => setPasskeyOpen(false)} onAccessChanged={checkAccess} onStepUpRequired={() => {
                 clearProtectedView();
                 setAccess(current => current ? { ...current, stepUpActive: false } : null);
@@ -427,6 +438,7 @@ function ProtocolAdminPage() {
                     onRetry={checkAccess}
                 />
                 {verification}
+                {authorityControls}
             </div>
         );
     }
@@ -437,10 +449,12 @@ function ProtocolAdminPage() {
                 <div>
                     <p className="protocol-admin-kicker">Protected workspace</p>
                     <h1>Admin panel</h1>
-                    <p>Role: {access?.role || 'staff'} · passkey session active for up to 15 minutes</p>
+                    <p>Role: {access?.role || 'staff'} · verified session active for up to 15 minutes</p>
                 </div>
                 <button type="button" onClick={() => changeQueueStatus(queueStatus)} disabled={busy}>Refresh</button>
             </header>
+
+            {authorityControls}
 
             <nav className="protocol-admin-tabs" aria-label="Protocol Admin sections">
                 {['queue', 'hidden', 'audit', 'notifications'].map(value => (

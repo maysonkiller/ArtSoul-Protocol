@@ -3150,6 +3150,12 @@ body.future .resale-modal {
 .protocol-admin-passkey-content li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .protocol-admin-setup { margin-top: 24px; }
 .protocol-admin-setup > p { color: var(--c-text-muted); line-height: 1.5; }
+.protocol-admin-authority { margin-top: 24px; overflow-wrap: anywhere; }
+.protocol-admin-authority form { display: grid; gap: 12px; }
+.protocol-admin-authority input,
+.protocol-admin-authority select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 12px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); font: inherit; }
+.protocol-admin-authority button { min-height: 44px; margin: 8px 8px 0 0; }
+.protocol-admin-approval-message { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; padding: 16px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); }
 
 .artsoul-card-menu-host { display: contents; }
 .artsoul-card-link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }

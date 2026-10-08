@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   try {
     const { config, wallet, authorizationVersion } = await requirePasskeyRouteContext(req);
 
-    const credentials = await findWalletCredentials(wallet);
+    const credentials = await findWalletCredentials(wallet, { authorizationVersion });
     if (!credentials.length) {
       return res.status(403).json({
         error: 'NO_CREDENTIALS',

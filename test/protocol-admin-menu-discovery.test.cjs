@@ -231,3 +231,14 @@ test('cross-tab logout immediately removes the admin link and rejects pending el
   assert.equal(harness.dropdown.protocolAdminEligible, false);
   assert.equal(harness.dropdown.protocolAdminWallet, null);
 });
+
+test('authority-only discovery requires an authenticated gated server response', async () => {
+  const harness = createHarness();
+  harness.context.window.currentWalletAddress = WALLET_A;
+  for (const [authenticated, setupEnabled, expected] of [[true, true, true], [false, true, false], [true, false, false]]) {
+    authChanged(harness);
+    harness.setAccessResponse(() => accessResponse({ enabled: false, setupEnabled, authenticated, eligible: false, authorityEligible: true, access: null }));
+    await harness.dropdown.requestProtocolAdminAccessOnce();
+    assert.equal(harness.dropdown.protocolAdminEligible, expected);
+  }
+});

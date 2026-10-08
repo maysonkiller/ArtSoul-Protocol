@@ -84,7 +84,7 @@ function signModerationPayload(payload) {
     .digest('base64url');
 }
 
-function roleBoundSessionsEnabled() {
+export function roleBoundSessionsEnabled() {
   return process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED === 'true';
 }
 
@@ -94,15 +94,18 @@ function parseAuthorizationVersion(value) {
   return Number.isSafeInteger(version) && version > 0 ? version : null;
 }
 
-export function setModerationSession(res, wallet, credentialId, authorizationVersion) {
+export function setModerationSession(res, wallet, credentialId, authorizationVersion, factorType = 'passkey') {
   const version = parseAuthorizationVersion(authorizationVersion);
   if (roleBoundSessionsEnabled() && !version) {
     throw configError('A current staff authorization version is required to issue this session.');
   }
+  if (!['passkey', 'totp'].includes(factorType) || (factorType === 'totp' && !roleBoundSessionsEnabled())) {
+    throw configError('A configured staff factor type is required.');
+  }
   const payload = Buffer.from(JSON.stringify({
     wallet,
     credential_id: credentialId,
-    ...(roleBoundSessionsEnabled() ? { authorization_version: version } : {}),
+    ...(roleBoundSessionsEnabled() ? { authorization_version: version, factor_type: factorType } : {}),
     exp: Math.floor(Date.now() / 1000) + MODERATION_SESSION_TTL_SECONDS
   })).toString('base64url');
   const signature = signModerationPayload(payload);
@@ -142,9 +145,11 @@ export function readModerationSession(req) {
     if (data.exp < Math.floor(Date.now() / 1000)) return null;
     const version = parseAuthorizationVersion(data.authorization_version);
     if (roleBoundSessionsEnabled() && !version) return null;
+    const factorType = data.factor_type || 'passkey';
+    if (!['passkey', 'totp'].includes(factorType) || (factorType === 'totp' && !roleBoundSessionsEnabled())) return null;
     return {
       wallet: String(data.wallet).toLowerCase(), credentialId: String(data.credential_id),
-      ...(roleBoundSessionsEnabled() ? { authorizationVersion: version } : {})
+      ...(roleBoundSessionsEnabled() ? { authorizationVersion: version, factorType } : {})
     };
   } catch {
     return null;
@@ -176,10 +181,13 @@ export function requireActiveStaffRole(role) {
   return role;
 }
 
-export async function findWalletCredentials(wallet, { includeRevoked = false } = {}) {
+export async function findWalletCredentials(wallet, { includeRevoked = false, authorizationVersion } = {}) {
   const revokedFilter = includeRevoked ? '' : '&revoked_at=is.null';
+  const version = roleBoundSessionsEnabled() ? authorizationVersion ?? (await findActiveStaffAuthorization(wallet))?.authorizationVersion : null;
+  if (roleBoundSessionsEnabled() && !parseAuthorizationVersion(version)) return [];
   return await supabaseRest(
     `artsoul_staff_passkeys?wallet_address=eq.${encodeURIComponent(wallet)}${revokedFilter}` +
+      (roleBoundSessionsEnabled() ? `&authorization_version=eq.${version}` : '') +
       '&select=id,credential_id,public_key,sign_count,transports,label,enrolled_via,created_at,last_used_at,revoked_at' +
       '&order=created_at.asc'
   ) || [];
@@ -440,9 +448,25 @@ export async function verifyModerationStepUp(req, sessionWallet) {
     }
   }
 
+  if (stepUp.factorType === 'totp') {
+    const permissions = await supabaseRest(
+      `artsoul_staff_setup_permissions?target_wallet=eq.${encodeURIComponent(stepUp.wallet)}` +
+      `&role_version=eq.${stepUp.authorizationVersion}&factor_type=eq.totp` +
+      `&factor_reference=eq.${encodeURIComponent(stepUp.credentialId)}&consumed_at=not.is.null&select=id&limit=1`
+    );
+    if (!permissions || permissions.length !== 1) return { valid: false, code: 'CREDENTIAL_REVOKED' };
+    const factors = await supabaseRest(
+      `artsoul_staff_totp_factors?id=eq.${encodeURIComponent(stepUp.credentialId)}` +
+      `&wallet_address=eq.${encodeURIComponent(stepUp.wallet)}&activated_at=not.is.null&revoked_at=is.null&select=id&limit=1`
+    );
+    return factors?.length === 1 ? { valid: true, credentialId: stepUp.credentialId, factorType: 'totp' }
+      : { valid: false, code: 'CREDENTIAL_REVOKED' };
+  }
+
   const rows = await supabaseRest(
     `artsoul_staff_passkeys?credential_id=eq.${encodeURIComponent(stepUp.credentialId)}` +
       `&wallet_address=eq.${encodeURIComponent(stepUp.wallet)}` +
+      (roleBoundSessionsEnabled() ? `&authorization_version=eq.${stepUp.authorizationVersion}` : '') +
       '&revoked_at=is.null&select=credential_id&limit=1'
   );
   if (!rows || rows.length !== 1) {

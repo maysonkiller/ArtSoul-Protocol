@@ -28,6 +28,7 @@ export default async function handler(req, res) {
     const rows = await supabaseRest(
       `artsoul_staff_passkeys?credential_id=eq.${encodeURIComponent(credentialId)}` +
         `&wallet_address=eq.${encodeURIComponent(wallet)}` +
+        (authorizationVersion === undefined ? '' : `&authorization_version=eq.${authorizationVersion}`) +
         '&revoked_at=is.null' +
         '&select=id,credential_id,public_key,sign_count,transports&limit=1'
     );

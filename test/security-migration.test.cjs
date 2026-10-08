@@ -163,6 +163,7 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     'a8c_protocol_admin_review.sql',
     'a8d_moderation_safe_recovery.sql',
     'a8e_moderation_totp_persistence.sql',
+    'a8g_staff_factor_setup.sql',
     'a8f_moderation_dual_wallet_authority.sql',
     '015_public_metrics_projection.sql',
     'collection_launch_services.sql',
@@ -276,6 +277,7 @@ test('read-only security verification classifies every A8 table as internal', ()
     'a8c_protocol_admin_review.sql',
     'a8d_moderation_safe_recovery.sql',
     'a8e_moderation_totp_persistence.sql',
+    'a8g_staff_factor_setup.sql',
     'a8f_moderation_dual_wallet_authority.sql'
   ]) {
     const sql = fs.readFileSync(path.join(REPO_ROOT, 'sql/migrations', file), 'utf8');
@@ -283,7 +285,7 @@ test('read-only security verification classifies every A8 table as internal', ()
       tables.add(match[1]);
     }
   }
-  assert.equal(tables.size, 15, 'review any change to the A8 table inventory');
+  assert.equal(tables.size, 16, 'review any change to the A8 table inventory');
   for (const cte of ['classified', 'internal']) {
     const values = verification.match(new RegExp(`WITH ${cte}\\([a-z_]+\\) AS \\(\\s*VALUES([\\s\\S]*?)\\n\\)`));
     assert.ok(values, `${cte} classification must exist`);

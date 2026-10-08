@@ -8,7 +8,7 @@ import { WEBAUTHN_CHALLENGE_TTL_MS } from './moderation-passkey.js';
 const ROLES = new Set(['admin', 'moderator', 'team']);
 const FIELDS = ['requestId', 'origin', 'chainId', 'policyVersion', 'authorities',
   'action', 'targetWallet', 'role', 'roleVersion', 'nextAuthorities', 'issuedAt', 'expiresAt'];
-const ACTIONS = new Set(['grant_role', 'revoke_role', 'rotate_authority']);
+const ACTIONS = new Set(['grant_role', 'revoke_role', 'rotate_authority', 'renew_setup']);
 const ZERO = '0x' + '0'.repeat(40);
 
 function requireCondition(ok) {
@@ -52,9 +52,9 @@ export function buildAuthorityApprovalMessage(proposal) {
   } else {
     address(proposal.targetWallet);
     requireCondition(ROLES.has(proposal.role) && Array.isArray(proposal.nextAuthorities) && proposal.nextAuthorities.length === 0);
-    if (proposal.action === 'revoke_role') requireCondition(proposal.roleVersion !== '0');
+    if (['revoke_role', 'renew_setup'].includes(proposal.action)) requireCondition(proposal.roleVersion !== '0');
   }
-  const action = {grant_role:'Grant staff role',revoke_role:'Revoke staff role',rotate_authority:'Replace administration authority'}[proposal.action];
+  const action = {grant_role:'Grant staff role',revoke_role:'Revoke staff role',rotate_authority:'Replace administration authority',renew_setup:'Reset staff sign-in methods'}[proposal.action];
   return [
     'ArtSoul administration approval',
     'Application administration only. This does not authorize a payment or change contract ownership.',
@@ -63,6 +63,9 @@ export function buildAuthorityApprovalMessage(proposal) {
     `Current authorities: ${authorities.join(', ')}`, `Action: ${action}`,
     `Target wallet: ${proposal.targetWallet || 'not applicable'}`, `Staff role: ${proposal.role || 'not applicable'}`,
     `Current role version: ${proposal.roleVersion}`,
+    ...(['grant_role','renew_setup'].includes(proposal.action) ? [
+      'This replaces earlier staff sign-in access and permits one new passkey or authenticator app within 15 minutes of approval.'
+    ] : []),
     `Replacement authorities: ${proposal.nextAuthorities.join(', ') || 'not applicable'}`,
     `Issued at: ${proposal.issuedAt}`, `Expires at: ${proposal.expiresAt}`,
     'Both current authorities must sign this exact request. Each request can be applied once.'

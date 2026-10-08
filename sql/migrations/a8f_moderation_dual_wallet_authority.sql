@@ -40,6 +40,9 @@ CREATE TABLE public.artsoul_staff_authority_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
+ALTER TABLE public.artsoul_staff_setup_permissions ADD CONSTRAINT staff_setup_authority_request
+    FOREIGN KEY (authority_request_id) REFERENCES public.artsoul_staff_authority_requests(id);
+
 ALTER TABLE public.artsoul_staff_authority_policy ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artsoul_staff_authority_policy FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.artsoul_staff_authority_requests ENABLE ROW LEVEL SECURITY;
@@ -61,7 +64,7 @@ BEGIN
     SELECT * INTO v_policy FROM public.artsoul_staff_authority_policy WHERE singleton FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'AUTHORITY_POLICY_REQUIRED'; END IF;
     IF p_wallet IS NULL OR p_wallet NOT IN (v_policy.wallet_a,v_policy.wallet_b) THEN RAISE EXCEPTION 'AUTHORITY_REQUIRED'; END IF;
-    IF p_action IS NULL OR p_action NOT IN ('grant_role','revoke_role','rotate_authority') THEN RAISE EXCEPTION 'INVALID_AUTHORITY_ACTION'; END IF;
+    IF p_action IS NULL OR p_action NOT IN ('grant_role','revoke_role','rotate_authority','renew_setup') THEN RAISE EXCEPTION 'INVALID_AUTHORITY_ACTION'; END IF;
     IF p_action='rotate_authority' THEN
         IF p_target IS DISTINCT FROM '' OR p_role IS DISTINCT FROM ''
             OR p_next_wallet_a IS NULL OR p_next_wallet_b IS NULL
@@ -74,7 +77,7 @@ BEGIN
             OR p_role IS NULL OR p_role NOT IN ('admin','moderator','team')
             OR p_next_wallet_a IS DISTINCT FROM '' OR p_next_wallet_b IS DISTINCT FROM '' THEN RAISE EXCEPTION 'INVALID_ROLE_TARGET'; END IF;
         SELECT * INTO v_role FROM public.artsoul_staff_roles WHERE wallet_address=p_target FOR SHARE;
-        IF p_action='revoke_role' AND (v_role.wallet_address IS NULL OR NOT v_role.active OR v_role.role<>p_role) THEN RAISE EXCEPTION 'ROLE_CHANGED'; END IF;
+        IF p_action IN ('revoke_role','renew_setup') AND (v_role.wallet_address IS NULL OR NOT v_role.active OR v_role.role<>p_role) THEN RAISE EXCEPTION 'ROLE_CHANGED'; END IF;
         IF p_action='grant_role' AND v_role.active AND v_role.role=p_role THEN RAISE EXCEPTION 'ROLE_UNCHANGED'; END IF;
     END IF;
     v_now:=date_trunc('milliseconds',clock_timestamp());v_expiry:=v_now+INTERVAL '5 minutes';v_id:=gen_random_uuid();
@@ -114,7 +117,7 @@ BEGIN
     IF v_action<>'rotate_authority' THEN
         SELECT * INTO v_role FROM public.artsoul_staff_roles WHERE wallet_address=v_target FOR UPDATE;
         IF COALESCE(v_role.authorization_version,0)<>v_expected_version THEN RETURN 'ROLE_CHANGED'; END IF;
-        IF v_action='revoke_role' AND (v_role.wallet_address IS NULL OR NOT v_role.active OR v_role.role<>v_request.proposal->>'role') THEN RETURN 'ROLE_CHANGED'; END IF;
+        IF v_action IN ('revoke_role','renew_setup') AND (v_role.wallet_address IS NULL OR NOT v_role.active OR v_role.role<>v_request.proposal->>'role') THEN RETURN 'ROLE_CHANGED'; END IF;
     END IF;
     -- Read time after all blocking locks; a signature cannot outlive its request.
     v_now:=clock_timestamp();
@@ -132,7 +135,7 @@ BEGIN
             ON CONFLICT (wallet_address) DO NOTHING RETURNING to_jsonb(artsoul_staff_roles.*) INTO v_after;
             IF NOT FOUND THEN RETURN 'ROLE_CHANGED'; END IF;
         ELSE
-            UPDATE public.artsoul_staff_roles SET role=v_request.proposal->>'role',active=v_action='grant_role',
+            UPDATE public.artsoul_staff_roles SET role=v_request.proposal->>'role',active=v_action IN ('grant_role','renew_setup'),
                 granted_by=CASE WHEN v_action='grant_role' THEN p_wallet ELSE granted_by END,
                 granted_at=CASE WHEN v_action='grant_role' THEN v_now ELSE granted_at END,updated_at=v_now
                 WHERE wallet_address=v_target AND authorization_version=v_expected_version
@@ -143,6 +146,12 @@ BEGIN
     UPDATE public.artsoul_staff_authority_requests SET consumed_at=v_now WHERE id=v_request.id;
     INSERT INTO public.artsoul_staff_authority_events(request_id,message_digest,signers,signatures,before_state,after_state,applied_by,created_at)
     VALUES(v_request.id,p_message_digest,p_verified_signers,p_signatures,v_before,v_after,p_wallet,v_now);
+    IF v_action IN ('grant_role','renew_setup') THEN
+        INSERT INTO public.artsoul_staff_setup_permissions(target_wallet,role_version,authority_request_id,issued_at,expires_at)
+        VALUES(v_target,(v_after->>'authorization_version')::BIGINT,v_request.id,v_now,v_now+INTERVAL '15 minutes');
+        INSERT INTO public.artsoul_staff_auth_events(wallet_address,event_type,details)
+        VALUES(v_target,'grant_issued',jsonb_build_object('authority_request_id',v_request.id,'role_version',v_after->'authorization_version','purpose','factor_setup'));
+    END IF;
     RETURN 'OK';
 END;
 $$;

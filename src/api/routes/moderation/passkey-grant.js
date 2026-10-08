@@ -5,6 +5,7 @@ import {
   hashGrantToken,
   issueEnrollmentGrantRpc,
   requirePasskeyRouteContext,
+  roleBoundSessionsEnabled,
   verifyModerationStepUp
 } from '../../moderation-passkey.js';
 
@@ -19,6 +20,7 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
 
   try {
+    if (roleBoundSessionsEnabled()) return res.status(403).json({ error: 'BOTH_AUTHORITY_SIGNATURES_REQUIRED' });
     const { wallet } = await requirePasskeyRouteContext(req);
 
     const stepUp = await verifyModerationStepUp(req, wallet);

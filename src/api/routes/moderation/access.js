@@ -1,6 +1,8 @@
 import { allowMethods, normalizeWallet, readWalletSession, sendError } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
 import { readProtocolAdminConfig } from '../../protocol-admin-config.js';
+import { getWebAuthnConfig, roleBoundSessionsEnabled } from '../../moderation-passkey.js';
+import { readAuthorityPolicy } from './authority.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
@@ -44,13 +46,18 @@ export default async function handler(req, res) {
     // protected queue data and never substitutes for passkey step-up. Setup
     // can be available while the separate review queue remains disabled.
     const access = await getModerationAccess(req);
+    const paired = roleBoundSessionsEnabled();
+    const authority = paired && access?.wallet
+      ? (await readAuthorityPolicy(getWebAuthnConfig().origin)).authorities.includes(access.wallet) : false;
     return res.status(200).json({
       success: true,
       enabled: config.enabled,
       setupEnabled: true,
       authenticated: Boolean(access?.wallet),
       eligible: Boolean(access?.role),
+      ...(paired ? { authorityEligible: authority } : {}),
       access: {
+        ...(paired ? { dualWallet: true } : {}),
         role: access?.role || null,
         stepUpActive: access?.stepUpActive === true,
         passkeyRequired: access?.passkeyRequired === true
