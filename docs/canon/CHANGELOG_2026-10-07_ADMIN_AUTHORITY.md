@@ -15,11 +15,20 @@ change Base auction economics, contract storage, settlement, Genesis rights or
 mainnet authorization. The full Bible's October 7 note points to this amendment.
 
 Authority wallets are an operator policy, not a new hardcoded role in frontend
-source. A configured two-owner threshold of two must be proved; an arbitrary
-threshold-valid Safe signature is insufficient if its owner policy permits a
-different signer combination. A future transfer needs approval from the current
-pair, not from the proposed replacement. No single-key recovery exception has
-been approved.
+source. October 8 clarification: application role grants/revocations and authority
+rotation use gasless signatures from BOTH current designated wallets; no new Safe
+is required for these application actions. A future transfer needs approval from
+the current pair, not the proposed replacement. No single-key recovery exception
+or autonomous AI role issuance has been approved. On-chain contract/fund control
+and the existing Safe remain separate. The unwired Safe-policy observation helper
+is not an implementation of this selected application authority.
+
+October 8 preview amendment: only Donate, Report and an indexed creation
+transaction link belong in the media-overlay menu, in that order. Management
+stays on artwork detail; full title/metadata remain available through the card's
+accessible label, tooltip and detail page. This replaces the earlier owner-action
+and nested-details menu. Creation links must use the indexed registration hash
+and matching known-chain explorer, never a pending or auction transaction.
 
 The new authority and authenticator-app work does not make the current Admin
 page a complete protocol-control console. Exact permitted critical operations
