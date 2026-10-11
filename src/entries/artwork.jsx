@@ -2033,7 +2033,14 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         setLoading(false);
                         return false;
                     }
-                    if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
+                    if (error?.code === 'ARTWORK_UNAVAILABLE') {
+                        loadedArtworkIdRef.current = null;
+                        setArtwork(null);
+                        setAuction(null);
+                        setBidActivity([]);
+                        setRefreshError('');
+                        setError({ code: 'ARTWORK_UNAVAILABLE', message: 'This artwork is currently unavailable.' });
+                    } else if (error?.code === 'V41_ARTWORK_NOT_INDEXED') {
                         setError({
                             code: 'V41_ARTWORK_NOT_INDEXED',
                             artworkId: error.artwork_id || artworkId
@@ -2833,8 +2840,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     <div className="min-h-screen">
                         <main className="min-h-[60vh] flex items-center justify-center">
                             <div className="text-center max-w-md mx-auto px-4">
-                                <div className="text-2xl mb-4 text-red-400">Error Loading Artwork</div>
-                                <div className="text-base mb-6 opacity-75">{error}</div>
+                                <div className={`text-2xl mb-4 ${error?.code === 'ARTWORK_UNAVAILABLE' ? '' : 'text-red-400'}`}>{error?.code === 'ARTWORK_UNAVAILABLE' ? 'Artwork unavailable' : 'Error Loading Artwork'}</div>
+                                <div className="text-base mb-6 opacity-75">{typeof error === 'string' ? error : error.message}</div>
                                 <div className="flex gap-4 justify-center">
                                     <a href="/gallery" className="btn-main">Explore Art</a>
                                     <button onClick={() => window.location.reload()} className="btn-secondary">Retry</button>

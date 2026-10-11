@@ -242,3 +242,50 @@ test('initial read failures and a successful unavailable projection never preten
   assert.equal(state.error.code, 'V41_ARTWORK_NOT_INDEXED');
   assert.equal(state.refreshError, '');
 });
+
+test('a suppressed artwork exits the pending loader and renders neutral unavailable actions', async () => {
+  let available = true;
+  const { page: api, state } = page({ getArtwork: async () => {
+    if (available) return projection();
+    throw Object.assign(new Error('This artwork is currently unavailable.'), { code: 'ARTWORK_UNAVAILABLE' });
+  } });
+  await api.loadArtwork();
+  assert(state.artwork && state.auction, 'start with an already visible auction');
+  available = false;
+  assert.equal(await api.loadArtwork(), false);
+  assert.equal(state.loading, false);
+  assert.equal(state.error.code, 'ARTWORK_UNAVAILABLE');
+  assert.equal(state.artwork, null);
+  assert.equal(state.auction, null, 'hidden artwork stops the live auction poll');
+  assert.equal(api.loadedArtworkIdRef.current, null);
+
+  const retryGuard = source.indexOf("if (error?.code !== 'V41_ARTWORK_NOT_INDEXED'");
+  const retryStart = source.lastIndexOf('useEffect(() => {', retryGuard);
+  const retryEnd = source.indexOf('}, [artworkId, error?.code, isV41CompositeId, projectionRetryCount]);', retryStart);
+  assert(retryStart >= 0 && retryEnd > retryStart);
+  const timers = [];
+  vm.runInNewContext(source.slice(retryStart, retryEnd + '}, [artworkId, error?.code, isV41CompositeId, projectionRetryCount]);'.length), {
+    useEffect: effect => effect(), error: state.error, artworkId: api.artworkId, isV41CompositeId: true,
+    projectionRetryCount: 0, PROJECTION_RETRY_DELAYS_MS: [400], setTimeout: (...args) => timers.push(args),
+    document: { visibilityState: 'visible' }
+  });
+  assert.equal(timers.length, 0, 'unavailable artwork schedules no indexer retry');
+
+  const start = source.indexOf("            if (loading || error?.code === 'V41_ARTWORK_NOT_INDEXED') {");
+  const end = source.indexOf('            if (!artwork) {', start);
+  const { transformWithOxc } = await import('vite');
+  const compiled = await transformWithOxc(`function view() {${source.slice(start, end)}}`, 'unavailable-view.jsx', { jsx: { runtime: 'classic' } });
+  const React = require('react'), { renderToStaticMarkup } = require('react-dom/server');
+  const context = vm.createContext({ React, loading: state.loading, error: state.error });
+  vm.runInContext(compiled.code, context);
+  const markup = renderToStaticMarkup(React.createElement(context.view));
+  assert.match(markup, /Artwork unavailable/);
+  assert.match(markup, /This artwork is currently unavailable\./);
+  assert.match(markup, /href="\/gallery"/);
+  assert.match(markup, /Retry/);
+  assert.doesNotMatch(markup, /Loading artwork|indexer|projection|hidden|moderation|aria-busy/);
+  available = true;
+  assert.equal(await api.loadArtwork(), true);
+  assert.equal(state.error, null);
+  assert.equal(state.artwork.id, 'v41:84532:28');
+});
