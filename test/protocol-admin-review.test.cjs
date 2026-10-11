@@ -59,7 +59,7 @@ async function authCookie({ stepUp = false } = {}) {
   const cookies = [String(walletResponse.headers['Set-Cookie']).split(';')[0]];
   if (stepUp) {
     const stepUpResponse = responseHarness();
-    passkeys.setModerationSession(stepUpResponse, STAFF, 'credential-1');
+    passkeys.setModerationSession(stepUpResponse, STAFF, 'credential-1', undefined, 'passkey', request('GET','/'));
     cookies.push(String(stepUpResponse.headers['Set-Cookie']).split(';')[0]);
   }
   return cookies.join('; ');
@@ -71,7 +71,7 @@ function request(method, url, { body, cookie = '', query = {} } = {}) {
     url,
     query,
     body,
-    headers: { cookie }
+    headers: { cookie, 'user-agent': 'local-staff-test' }, socket: {remoteAddress:'127.0.0.1'}
   };
 }
 

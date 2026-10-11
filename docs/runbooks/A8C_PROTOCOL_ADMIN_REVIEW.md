@@ -52,7 +52,10 @@ Every protected read and action re-checks all three server-side factors:
 
 1. valid SIWE wallet session;
 2. active `artsoul_staff_roles` role;
-3. valid 15-minute passkey step-up for the same wallet.
+3. valid context-bound factor step-up for the same wallet, with a fixed maximum
+   of 24 hours under canon 07's October 11 amendment. A new browser/device or a
+   change in the trusted client IP requires verification again. The separate
+   factor setup permission still expires after 15 minutes.
 
 Complaint text is rendered as untrusted React text. Each report remains an
 independent row and event chain even when the UI groups reports by artwork.

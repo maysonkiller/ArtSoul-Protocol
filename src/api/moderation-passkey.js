@@ -1,14 +1,14 @@
 import crypto from 'node:crypto';
+import { isIP } from 'node:net';
 import { parseCookies, requireWallet, serializeCookie, supabaseRest } from './backend.js';
 
 // A8a moderation passkey step-up foundation.
 //
-// Founder decisions 2026-07-20:
-// - the moderation step-up session lasts EXACTLY 15 minutes;
+// Founder session amendment 2026-10-11:
+// - moderation verification lasts at most 24 hours in the same browser/network;
 // - X/Discord handles and IDs are profile/eligibility data only and never
 //   participate in authentication;
-// - founder recovery is Safe-only and fails closed until that integration
-//   exists;
+// - the current paired-authority policy controls setup and recovery;
 // - no wallet-only enrollment: every enrollment consumes a one-time grant.
 //
 // Everything here is inert while ARTSOUL_MODERATION_PASSKEY_ENABLED is not
@@ -17,11 +17,11 @@ import { parseCookies, requireWallet, serializeCookie, supabaseRest } from './ba
 // header, and the moderation-session secret is separate from SESSION_SECRET.
 
 export const MODERATION_SESSION_COOKIE = 'artsoul_mod_session';
-export const MODERATION_SESSION_TTL_SECONDS = 15 * 60;
+export const MODERATION_SESSION_TTL_SECONDS = 24 * 60 * 60;
 // Challenge lifetime mirrors the existing SIWE nonce TTL (tunable).
 export const WEBAUTHN_CHALLENGE_TTL_MS = 5 * 60 * 1000;
-// Additional-device and Safe-recovery grants expire with the step-up window.
-export const ENROLLMENT_GRANT_TTL_MS = MODERATION_SESSION_TTL_SECONDS * 1000;
+// Setup/grant permission remains short-lived, independently of verified access.
+export const ENROLLMENT_GRANT_TTL_MS = 15 * 60 * 1000;
 
 const STAFF_MODERATION_ROLES = new Set(['admin', 'moderator', 'team']);
 
@@ -94,7 +94,23 @@ function parseAuthorizationVersion(value) {
   return Number.isSafeInteger(version) && version > 0 ? version : null;
 }
 
-export function setModerationSession(res, wallet, credentialId, authorizationVersion, factorType = 'passkey') {
+function moderationRequestContext(req) {
+  // Vercel overwrites this edge header. Never trust caller-supplied forwarding
+  // headers on direct/local hosts. Missing trusted context must fail closed.
+  // https://vercel.com/docs/headers/request-headers#x-vercel-forwarded-for
+  const address = process.env.VERCEL === '1'
+    ? req?.headers?.['x-vercel-forwarded-for'] : req?.socket?.remoteAddress;
+  const agent = req?.headers?.['user-agent'];
+  if (typeof address !== 'string' || !isIP(address.trim()) || typeof agent !== 'string'
+      || !agent.trim() || agent.length > 1024) return null;
+  const ip = address.trim();
+  // Normalize equivalent IPv6 spellings without broadening to an IP subnet.
+  const normalizedIp = isIP(ip) === 6 ? new URL(`http://[${ip}]/`).hostname : ip;
+  return crypto.createHmac('sha256', moderationSessionSecret())
+    .update(JSON.stringify(['moderation-context-v1', normalizedIp, agent])).digest('base64url');
+}
+
+export function setModerationSession(res, wallet, credentialId, authorizationVersion, factorType = 'passkey', req) {
   const version = parseAuthorizationVersion(authorizationVersion);
   if (roleBoundSessionsEnabled() && !version) {
     throw configError('A current staff authorization version is required to issue this session.');
@@ -102,11 +118,15 @@ export function setModerationSession(res, wallet, credentialId, authorizationVer
   if (!['passkey', 'totp'].includes(factorType) || (factorType === 'totp' && !roleBoundSessionsEnabled())) {
     throw configError('A configured staff factor type is required.');
   }
+  const requestContext = moderationRequestContext(req);
+  if (!requestContext) throw configError('A trusted browser and network context is required to verify admin access.');
+  const issuedAt = Math.floor(Date.now() / 1000);
   const payload = Buffer.from(JSON.stringify({
     wallet,
     credential_id: credentialId,
     ...(roleBoundSessionsEnabled() ? { authorization_version: version, factor_type: factorType } : {}),
-    exp: Math.floor(Date.now() / 1000) + MODERATION_SESSION_TTL_SECONDS
+    context_version: 1, request_context: requestContext, iat: issuedAt,
+    exp: issuedAt + MODERATION_SESSION_TTL_SECONDS
   })).toString('base64url');
   const signature = signModerationPayload(payload);
   res.setHeader('Set-Cookie', serializeCookie(MODERATION_SESSION_COOKIE, `${payload}.${signature}`, {
@@ -133,16 +153,23 @@ export function readModerationSession(req) {
   const token = cookies[MODERATION_SESSION_COOKIE];
   if (!token) return null;
 
-  const [payload, signature] = token.split('.');
-  if (!payload || !signature) return null;
+  const [payload, signature, extra] = token.split('.');
+  if (!payload || !signature || extra !== undefined) return null;
   const expected = signModerationPayload(payload);
   if (Buffer.byteLength(signature) !== Buffer.byteLength(expected)) return null;
   if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
 
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    if (!data.wallet || !data.credential_id || !data.exp) return null;
-    if (data.exp < Math.floor(Date.now() / 1000)) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (!data.wallet || !data.credential_id || !Number.isSafeInteger(data.exp)
+        || !Number.isSafeInteger(data.iat) || data.iat > now || data.exp <= now
+        || data.exp - data.iat !== MODERATION_SESSION_TTL_SECONDS) return null;
+    // Previous short sessions have no binding and require one fresh verification.
+    const context = moderationRequestContext(req);
+    if (data.context_version !== 1 || !context || typeof data.request_context !== 'string'
+        || Buffer.byteLength(context) !== Buffer.byteLength(data.request_context)
+        || !crypto.timingSafeEqual(Buffer.from(context), Buffer.from(data.request_context))) return null;
     const version = parseAuthorizationVersion(data.authorization_version);
     if (roleBoundSessionsEnabled() && !version) return null;
     const factorType = data.factor_type || 'passkey';
@@ -425,7 +452,7 @@ export async function requirePasskeyRouteContext(req) {
   return { config, wallet, role, authorizationVersion: authorization.authorizationVersion };
 }
 
-// Verifies the 15-minute step-up for the ALREADY SIWE-authenticated wallet.
+// Verifies the bounded 24-hour step-up for the ALREADY SIWE-authenticated wallet.
 // Fails closed on: missing/expired/mismatched cookie, revoked or foreign
 // credential, or missing configuration (throws).
 export async function verifyModerationStepUp(req, sessionWallet) {

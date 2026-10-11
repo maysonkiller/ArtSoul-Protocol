@@ -1,5 +1,12 @@
 # A8a Moderation Passkey Foundation — Founder Runbook
 
+October 11 session amendment: verified admin access has an approved fixed maximum
+of 24 hours, requiring re-verification in another browser/device or after a
+trusted client-IP change. This supersedes the historical 15-minute session below;
+the 15-minute setup permission is unchanged. See
+[canon 07](../canon/07_ADMIN_MODERATION_CANON.md#october-11-verified-session-duration-amendment).
+Earlier ceremonies do not constitute acceptance of the changed session policy.
+
 October 8 policy update: canon 07 now authorizes BOTH current authority wallets
 to issue initial-factor setup and recovery permissions, with a 15-minute lifetime.
 This replaces the historical bootstrap/Safe-only acceptance path described below.
@@ -118,7 +125,7 @@ not weaken this normal-operation safeguard.
 | `ARTSOUL_WEBAUTHN_RP_ID` | Final production domain (RP ID). Never inferred from request headers. |
 | `ARTSOUL_WEBAUTHN_ALLOWED_ORIGIN` | Exact allowed origin, e.g. `https://<final-domain>`. |
 | `ARTSOUL_WEBAUTHN_RP_NAME` | Human-readable RP display name. |
-| `ARTSOUL_MODERATION_SESSION_SECRET` | Dedicated HMAC secret for the 15-minute moderation cookie. Separate from `SESSION_SECRET`. |
+| `ARTSOUL_MODERATION_SESSION_SECRET` | Dedicated HMAC secret for the context-bound moderation cookie, with a fixed maximum of 24 hours. Separate from `SESSION_SECRET`. |
 
 Safe recovery adds three more variables and a separate reviewed ceremony.
 See `docs/runbooks/A8D_SAFE_RECOVERY.md`; leave them unset until A8d has been

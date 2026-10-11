@@ -1,5 +1,12 @@
 # Phase A device acceptance — one sheet, five trips
 
+**October 11 founder scope amendment:** Android is **OWNER-WAIVED / NOT TESTED**
+for the current Phase A close-out. No further Android run is required. This
+supersedes the Android portions of the earlier checklist below without changing
+its historical evidence. It is not an Android PASS or a compatibility claim.
+Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
+iPhone trip without a specific unresolved outcome.
+
 Fifteen backlog rows remain for device and connected-flow acceptance after
 A-79 closed on September 27. Their implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
@@ -21,7 +28,8 @@ does not supply those missing evidence fields.
 a `vercel.app` address. Wallet sessions and SIWE are origin-scoped, so evidence
 from any other origin proves nothing about production.
 
-**Devices.** Desktop Chrome, iPhone (Safari), Android (Chrome). The iOS run
+**Current devices.** Desktop Chrome and iPhone (Safari). Android is owner-waived /
+not tested under the amendment above. The iOS run
 matters most: WebKit's rules differ from Chrome's and it reproduced several of
 these first.
 
@@ -62,8 +70,9 @@ Run the probe in [`A48_BACK_NAVIGATION_PROBE.md`](A48_BACK_NAVIGATION_PROBE.md)
 — a page-restoration marker — and paste Chrome's own list of blocking reasons rather
 than guessing.
 
-The desktop portion passed on September 27. Complete the real iOS and Android
-portions; a navigation timing type alone does not prove or disprove BFCache.
+The desktop portion passed on September 27. Complete the outstanding real iOS
+portion; Android is owner-waived / not tested. A navigation timing type alone
+does not prove or disprove BFCache.
 
 ---
 
@@ -196,12 +205,14 @@ Record which wallet produced which, since this was reported on more than one.
 ## Recording the result
 
 Add a dated section below per device, naming the trip and the row. A row closes
-only when its own criterion is met on the devices its criterion names — several
-of these say iOS *and* Android, and desktop alone does not satisfy them.
+only when its own criterion is met on the required devices. Older criteria that
+name iOS *and* Android are subject to the October 11 Android waiver; desktop
+alone does not establish iOS acceptance.
 
 | Date | Device | Browser | Trip | Rows answered | Result |
 | --- | --- | --- | --- | --- | --- |
 | 2026-09-27 | Windows desktop, Chrome 153.0.8010.53 | Ordinary installed Chrome; headed window for BFCache | Trip 1, partial | A-79; desktop portion of A-48 | Apex at release `81627ab`: opening creator read limit 24, identity before cards and full corpus, no settled-content reset. A-79 accepted. Headed Back restored the same marker with `pageshow.persisted=true`; A-48 phones remain open. See [release evidence](../audits/STABILIZATION_RELEASE_2026-09-27.md). |
+| 2026-10-11 | Android | Not exercised for current close-out | All Android portions | Android portions of Phase A device gates | OWNER-WAIVED / NOT TESTED by explicit founder instruction. No Android PASS is inferred from iOS, desktop or automated layout checks. |
 
 The same read-only run checked A-33's public provenance cases: five of 34 public
 records were minted, but none had three different Creator / First Collector /
@@ -231,6 +242,19 @@ links), and TA-06 (no-bid end, re-auction, shared modal, decimal comma, empty-pr
 rejection, cross-page freshness and address-based creator-bid protection).
 Do not present existing fixture checks as new live-provider acceptance.
 
-RG-03 moderation activation, the A8d Safe recovery rehearsal, and A-23's go/no-go
-are ceremonies, not browsing. They are in
+RG-03 access setup/replacement is accepted under the October 8 paired-wallet
+policy; historical Safe-only application recovery is superseded. Remaining live
+moderation edges and A-23's go/no-go are separate from device browsing. They are in
 [`PHASE_A_CLOSE_OUT.md`](../PHASE_A_CLOSE_OUT.md) with what each needs.
+
+October 11 stopping instruction: the owner is unavailable and requested all
+independent work followed by a stop. The unanswered Android and native-factor
+questions stay pending; no repeated request or inferred PASS is recorded. Retain
+the satisfactory iPhone observation above and ask only for missing outcomes when
+the owner returns. Automated layout/SQL checks are saved in the dated moderation
+acceptance record and do not fill phone rows.
+
+Later October 11 amendment: the founder explicitly removed Android testing from
+the remaining work. The earlier unanswered Android question above is therefore
+superseded by OWNER-WAIVED / NOT TESTED, not by a test result. Other unresolved
+device or factor outcomes remain separate.

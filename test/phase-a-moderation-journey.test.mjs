@@ -51,7 +51,7 @@ function cookie(wallet, stepUp = false) {
   const parts = [];
   const res = {setHeader(_name, value) { parts.push(String(value).split(';')[0]); }};
   setWalletSession(res, wallet);
-  if (stepUp) setModerationSession(res, wallet, 'local-virtual-credential');
+  if (stepUp) setModerationSession(res, wallet, 'local-virtual-credential', undefined, 'passkey', {headers:{'user-agent':'local-staff-test'},socket:{remoteAddress:'127.0.0.1'}});
   return parts.join('; ');
 }
 function expiredStepUp(walletCookie) {
@@ -212,7 +212,7 @@ test('Phase A local moderation route journey and captured email (virtual credent
   };
   async function call(path, {wallet, stepUp, auth, body} = {}) {
     const response = await originalFetch(`${origin}${path}`, {method: body ? 'POST' : 'GET',
-      headers: {'Content-Type': 'application/json', cookie: auth ?? (wallet ? cookie(wallet, stepUp) : '')},
+      headers: {'Content-Type': 'application/json', 'user-agent':'local-staff-test', cookie: auth ?? (wallet ? cookie(wallet, stepUp) : '')},
       ...(body ? {body: JSON.stringify(body)} : {})});
     return {status: response.status, body: await response.json()};
   }
@@ -351,13 +351,36 @@ test('Phase A local moderation route journey and captured email (virtual credent
     assert.equal(captured.length, 2, 'two local HTTP captures, zero external email deliveries');
   });
   await t.test('disabled flags still fail closed with valid virtual credentials and retain the ledger', async () => {
-    const count = (await pool.query('SELECT count(*)::int AS n FROM artwork_report_notifications')).rows[0].n;
+    const pending = (await call('/queue', {wallet: STAFF, stepUp: true})).body.data.reports.find(row => String(row.artwork_id) === '104');
+    assert.ok(pending, 'a valid pending decision exists before pausing review');
+    const ledger = () => Promise.all(['artwork_reports', 'artwork_report_events', 'artwork_moderation_visibility',
+      'artwork_moderation_log', 'artwork_report_notifications'].map(async table =>
+      (await pool.query(`SELECT row_to_json(r)::text AS value FROM ${identifier(table)} r ORDER BY row_to_json(r)::text`)).rows));
+    const before = await ledger();
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'false';
     assert.equal((await call('/queue', {wallet: STAFF, stepUp: true})).status, 503);
+    const pausedReview = await act(pending, 'hide');
+    assert.equal(pausedReview.status, 503);
+    assert.equal(pausedReview.body.error, 'PROTOCOL_ADMIN_DISABLED');
+    assert.deepEqual(await ledger(), before, 'paused review preserves reports, visibility, audit and notification contents');
+
+    process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'true';
+    process.env.ARTSOUL_MODERATION_PASSKEY_ENABLED = 'false';
+    const missingFactor = await act(pending, 'hide');
+    assert.equal(missingFactor.status, 503);
+    assert.equal(missingFactor.body.error, 'PROTOCOL_ADMIN_PASSKEY_REQUIRED');
+    assert.deepEqual(await ledger(), before, 'disabling factor verification cannot apply an existing valid review request');
+
+    process.env.ARTSOUL_MODERATION_PASSKEY_ENABLED = 'true';
     process.env.ARTSOUL_REPORTING_ENABLED = 'false';
-    assert.equal((await submit(REPORTER_B, 112)).status, 503);
+    const pausedIntake = await submit(REPORTER_B, 112);
+    assert.equal(pausedIntake.status, 503);
+    assert.equal(pausedIntake.body.error, 'REPORTING_DISABLED');
+    assert.equal((await visibleReport(pending.id, 'pending_review')).updated_at, pending.updated_at,
+      'existing review work remains available when only intake is paused');
     const history = await call('/notifications', {wallet: REPORTER_A});
     assert.equal(history.status, 200); assert.ok(history.body.items.length > 0, 'pausing write workflows does not revoke recipient history');
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM artwork_report_notifications')).rows[0].n, count);
+    assert.deepEqual(await ledger(), before, 'flag changes and denied writes neither delete nor rewrite the ledger');
+    process.env.ARTSOUL_REPORTING_ENABLED = 'true';
   });
 });

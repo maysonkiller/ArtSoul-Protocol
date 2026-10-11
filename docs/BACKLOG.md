@@ -52,8 +52,8 @@ full audit. Delivery evidence is tracked in the stabilization checkpoint.
 
 | ID | Task | Status | Boundary |
 | --- | --- | --- | --- |
-| TA-10 | Simplify linked social profiles and remove the manual X editor | in progress | Preserve OAuth proof and stored historical links; make the verified Discord identity navigable. |
-| TA-11 | Add private wallet-bound email verification | in progress | Reuse existing mail delivery; a typed address, newsletter consent or provider acceptance is not ownership proof. No public email disclosure. |
+| TA-10 | Simplify linked social profiles and remove the manual X editor | done | Published profile editing groups social/email connections consistently, preserves OAuth proof and historical public links, and makes verified Discord/X navigable. Actual October 11 profile shows one verified link per provider. Further cross-device OAuth return evidence stays in RG-01. |
+| TA-11 | Add private wallet-bound email verification | done | Published wallet-bound verification and private profile control. The owner-provided screenshot showed Verified email; a read-only October 11 check confirmed verified_email is present with verified_at October 3, 06:56:12 UTC, without disclosing the address or token. Profile email is distinct from the project moderation-mail destination. |
 | TA-12 | Measure and reduce page-loading delays | in progress | Fix measured blocking work; do not remove wallet authorization or alter AI valuation. |
 | TA-13 | Deliver the approved artist-support implementation earlier | done | The separate Base Sepolia contract, two actual 1-wei payments, indexed public UI and reversible message-only moderation are verified and activated. Donate shows the canonical creator address; all value goes to that creator, with any positive amount and optional message. No mainnet claim. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md). |
 

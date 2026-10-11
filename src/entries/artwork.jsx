@@ -1443,7 +1443,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
                     if (!response.ok) {
                         // A8a: a staff wallet with the passkey flag enabled but no
-                        // active 15-minute step-up gets a machine-readable code.
+                        // active, context-bound step-up gets a machine-readable code.
                         // The API serializes machine codes as { error, message },
                         // so the code lives in result.error (not result.code).
                         if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.error)) {

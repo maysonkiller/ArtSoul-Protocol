@@ -449,7 +449,7 @@ function ProtocolAdminPage() {
                 <div>
                     <p className="protocol-admin-kicker">Protected workspace</p>
                     <h1>Admin panel</h1>
-                    <p>Role: {access?.role || 'staff'} · verified session active for up to 15 minutes</p>
+                    <p>Role: {access?.role || 'staff'} · verified session active for up to 24 hours. Verify again on a new browser or network.</p>
                 </div>
                 <button type="button" onClick={() => changeQueueStatus(queueStatus)} disabled={busy}>Refresh</button>
             </header>

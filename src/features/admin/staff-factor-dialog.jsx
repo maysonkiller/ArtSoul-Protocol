@@ -78,7 +78,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         setSetup(null); setCode('');
         await refresh(current);
         if (!current()) return;
-        setMessage(enrolling ? 'Passkey saved. Select Verify passkey to enter the admin panel.' : 'Verified. Admin access lasts up to 15 minutes.');
+        setMessage(enrolling ? 'Passkey saved. Select Verify passkey to enter the admin panel.' : 'Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
         await onAccessChanged();
     });
     const prepareApp = () => run(async current => {
@@ -94,7 +94,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
             if (!current()) return;
             await factor('totp-verify', { attemptId: attempt.attemptId, code: entered });
             if (!current()) return;
-            setSetup(null); setMessage('Verified. Admin access lasts up to 15 minutes.');
+            setSetup(null); setMessage('Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
             await refresh(current);
             if (current()) await onAccessChanged();
         });
@@ -104,7 +104,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         <div className="protocol-admin-passkey-content">
             <header><h2 id="staffFactorTitle">Verify admin access</h2><button ref={closeButton} type="button" onClick={close}>Close</button></header>
             <p>Use your authenticator app or a saved passkey. Your wallet identifies your staff account.</p>
-            {sessionActive && <p role="status">Admin verification is active for up to 15 minutes.</p>}
+            {sessionActive && <p role="status">Admin verification is active for up to 24 hours. Verify again on a new browser or network.</p>}
             {status?.passkeyAvailable && <button type="button" disabled={busy} onClick={() => passkey(false)}>Verify passkey</button>}
             {status?.setup && <section aria-label="Approved sign-in setup">
                 <h3>Choose your sign-in method</h3>

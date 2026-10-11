@@ -33,6 +33,15 @@ the bounded settlement rehearsal, not the remaining device/operator gates. See
 
 ## The shape of what is left
 
+**October 11 founder scope amendment:** Android acceptance is **OWNER-WAIVED /
+NOT TESTED** for this Phase A close-out. Do not request another Android run or
+treat desktop emulation or iPhone evidence as an Android PASS. This supersedes
+the Android portions of older device requirements only; the remaining iOS,
+desktop, OAuth and moderation criteria keep their own evidence requirements.
+The new 24-hour, browser/network-bound admin session policy is approved in
+[canon 07](canon/07_ADMIN_MODERATION_CANON.md#october-11-verified-session-duration-amendment);
+earlier 15-minute expiry acceptance does not prove the changed policy.
+
 Phase A remains **NO-GO** until the remaining A8/A10 and connected-device
 acceptance is evidenced. A-39 is now accepted: real paired setup/replacement,
 passkey entry, expiry/reverification and protected queue access passed. Both
@@ -53,8 +62,17 @@ The remaining A8 live edge cases are the sixth-report limit, stale/concurrent
 decisions, prohibited reopen and flag-off preservation. Local SQL/API coverage
 is green but is not relabeled as production execution. A newly reproduced
 hidden-artwork loading defect is fixed locally, built and regression-tested;
-its release is pending. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
+it was released through PR #296 at `c7dcef6` after green candidate CI. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
 and the [checkpoint](audits/STABILIZATION_CHECKPOINT.md).
+
+October 11 independent continuation: the six scoped moderation suites passed
+67 checks, including strengthened full-ledger preservation when Admin or second
+factor verification is disabled. Nine deployed HTTP checks confirmed disabled
+preview and guest boundaries without changing production flags or data. Read-only
+checks matched 16 production RPC bodies and verified 13 protected tables; the
+three reports remain resolved, due mail backlog is zero and indexer lag is zero.
+The owner is away; remaining real passkey/device steps are deferred, not failed
+or waived. No further confirmation is requested until the owner returns.
 
 The initial September 29 PostgreSQL baseline passed 46 checks across seven
 integration suites. The final application run includes the additional 11-check
@@ -80,7 +98,7 @@ operationally safe reporting/moderation path before a beta GO.
 
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
-| **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
+| **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; Android is owner-waived / not tested under the October 11 amendment |
 | **RG-03** access acceptance | Accepted for A-39 under the October 8 amendment; remaining complaint edge cases belong to A-21/A-22 | Both designated wallets approve staff setup and replacement; the staff member completes native verification |
 | **Replacement recovery acceptance** | Owner reset, replacement enrollment and entry observed October 8; old-factor/version rejection verified in SQL/API tests. Historical Safe evidence is retained, not replayed | The actual owner approval and replacement are recorded separately; automated fixtures are not that ceremony |
 
@@ -108,13 +126,13 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-64** | Accept deferred wallet runtime on connected devices | The deferred loader and hidden-tab timer fallback are implemented in the current source. The old static-SDK diagnosis is historical, not the current implementation. Connect, sign in, switch network and publish still need a real connected run on Android and iOS |
-| **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. A later cold-import audit isolated the exact public projection from the shared all-routes serverless graph without changing live-state caching, and the exact response now carries Creator identity before the first content frame instead of briefly showing a generated avatar. Preview proof plus production desktop, iOS, Android and legacy-video timing remain open evidence |
+| **A-64** | Accept deferred wallet runtime on connected devices | The deferred loader and hidden-tab timer fallback are implemented in the current source. The old static-SDK diagnosis is historical, not the current implementation. Connect, sign in, switch network and publish still need a real connected iOS run; Android is owner-waived / not tested |
+| **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. A later cold-import audit isolated the exact public projection from the shared all-routes serverless graph without changing live-state caching, and the exact response now carries Creator identity before the first content frame instead of briefly showing a generated avatar. Preview proof plus production desktop, iOS and legacy-video timing remain open evidence; Android is owner-waived / not tested |
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
-| **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS and Android acceptance remain open; navigation timing or desktop viewport emulation cannot replace them |
-| **A-53** | The identity settle gap between header and profile | Reproduced in founder desktop and Android captures in August; the repair still needs production iOS/Android reload and navigation acceptance |
+| **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS acceptance remains open; navigation timing or desktop viewport emulation cannot replace it. Android is owner-waived / not tested |
+| **A-53** | The identity settle gap between header and profile | Reproduced in founder desktop and Android captures in August; the repair still needs production iOS reload and navigation acceptance. Current Android acceptance is owner-waived / not tested |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
 | **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
 

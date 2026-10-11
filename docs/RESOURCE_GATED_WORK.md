@@ -65,6 +65,19 @@ Donate's existing-message hide/restore path also passed and is enabled. See
 Historical disabled/unenrolled statements above no longer describe live state.
 RG-01 device/OAuth and the final A10 GO decision remain independent.
 
+**2026-10-11 founder scope and session amendment:** Android portions of Phase A
+device acceptance are **OWNER-WAIVED / NOT TESTED** and no longer block that
+close-out; no Android PASS or compatibility claim is recorded. Desktop, iOS and
+OAuth evidence remain separate. For RG-04, the verified moderation session now
+has an approved fixed maximum of 24 hours, with factor verification required
+again in another browser/device or after a trusted client-IP change. This
+supersedes the historical 15-minute session wording in the register and July
+decisions below, not the unchanged 15-minute factor setup permission. Both-wallet
+authority, setup/recovery, role checks and contract custody remain unchanged.
+See [canon 07](canon/07_ADMIN_MODERATION_CANON.md#october-11-verified-session-duration-amendment).
+This records the policy change; deployment and real-context acceptance require
+their own evidence.
+
 The founder approved the following implementation constraints on 2026-07-20:
 
 - moderation step-up sessions last 15 minutes;
