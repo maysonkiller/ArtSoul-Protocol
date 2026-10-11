@@ -56,6 +56,20 @@ test('queue requires enabled, authenticated, eligible and active step-up indepen
     assert.equal(h.render().passkeyOpen,false,'an already verified admin does not see another verification dialog');
 });
 
+test('closing verification for an authority wallet never unlocks reports or decision callbacks', async()=>{
+    const h=harness(access({authorityEligible:true,access:{role:'admin',stepUpActive:false,dualWallet:true}}));await tick();
+    assert.equal(h.render().passkeyOpen,true);
+    h.actions.closeSetup();const closed=h.render();
+    assert.equal(closed.accessState,'step_up');assert.equal(closed.passkeyOpen,false);
+    assert.equal(closed.access.stepUpActive,false);assert.equal(closed.data.reports.length,0);
+    h.actions.setDecision({report:{id:'private-report',updated_at:'version'},action:'hide'});h.render();
+    await h.actions.changeQueueStatus('resolved');await h.actions.submitDecision('must not submit');
+    await h.actions.checkAccess();const refreshed=h.render();
+    assert.equal(refreshed.accessState,'step_up');assert.equal(refreshed.passkeyOpen,false);
+    assert.equal(refreshed.data.reports.length,0);assert.equal(refreshed.decision,null);
+    assert.ok(h.state.calls.every(call=>call.path.startsWith('access')));
+});
+
 test('same-wallet logout clears protected queue, decision and open setup immediately', async()=>{
     const h=harness();await tick();h.render();h.actions.setDecision({report:{id:'secret'},action:'hide'});h.render();
     h.state.auth='';h.event('artsoul:auth-state-changed');

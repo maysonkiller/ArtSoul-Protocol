@@ -1,7 +1,86 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-12. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 12 iPhone verification-window clarification (Warsaw date):
+
+- Starting HEAD `2ce3f4d`, same workspace and branch. The owner clarified that
+  closing the passkey window on iPhone showed only Staff access / the team and
+  Verify admin access, not complaints. This is the approved authority workspace,
+  not an observed factor bypass: canon 07 permits the authenticated authority
+  roster independently of the protected complaint queue. Paired signatures are
+  still required for role changes. No factor was reset or enrolled.
+- The ambiguous locked heading said "Admin panel". The local patch changes it
+  to "Admin verification required" and explicitly states that closing the window
+  does not unlock complaints. There is no authorization or policy change.
+- The added cancel regression keeps an authority wallet locked after dismissal,
+  refresh and retained queue/decision callbacks. Expanded handler checks deny
+  four queue statuses and all four actions for both target types before factor
+  verification, in paired and legacy modes, without accessing report storage.
+  Focused checks passed 64/64. Build passed. Compiled Chrome passed 158 assertions
+  across both themes, 1280/390/320px, ordinary staff and authority wallets, and
+  Close/Escape/backdrop dismissal. No external requests or page exceptions.
+  Evidence: `output/audit/admin-locked-gate-*2026-10-12*` and the corresponding
+  `output/playwright/admin-locked-gate-2026-10-12.mjs` and screenshots.
+- Initial full-suite execution inside the sandbox could not reach local HTTP /
+  Docker and could not create DPAPI self-test files. That run is not a baseline;
+  its log is retained. The normal-host rerun passed 1827/1827, zero skips:
+  `output/audit/admin-locked-gate-unit-host-2026-10-12.log`.
+- The phone observation is owner-reported, not a captured iOS API response or a
+  successful phone factor ceremony. The QR symptom alone does not establish a
+  code defect or require a replacement credential. Android remains waived.
+  The owner subsequently found the existing ArtSoul passkey in Chrome's iPhone
+  password manager. Using that provider on iPhone was handed to the owner;
+  no successful authentication is inferred until the actual result is reported.
+- This patch is local and not published. Application production remains PR #298
+  / `a51c16f`. Historical untracked files are preserved; no agent was started.
+  Exactly next step: prepare this tested copy/test change for release and record
+  the owner's pending iPhone verification outcome without replaying completed
+  live rehearsals.
+
+October 11 decision UI release and live acceptance (21:08 UTC):
+
+- PR #298 merged at 21:05:52 UTC as `a51c16ff907c1b192df989aec984d0c9a3b72fe7`.
+  Production deployment 7001780457 succeeded at 21:06:18 UTC. Candidate
+  `798e6f4ddda584b087da5a9fa238add9385800f5` passed Linux/Windows/static CI
+  (38174677863). Reconciliation commit 798e6f4 is tree-identical to tested
+  application/evidence commit d2d0a2c; only duplicate squash-history docs needed
+  reconciliation. All historical untracked files are untouched.
+  Post-merge Linux/Windows/static CI also passed (38174943182); the final
+  documentation checks passed 18/18, with zero skips.
+- Preview and apex both matched 53 checked assets across six pages; guest
+  private APIs fail closed, the anonymous logout clears both secure cookies,
+  Report/queue/Donate remain enabled and the indexer is healthy with lag 0.
+  Evidence: `output/audit/moderation-decision-{preview,apex}-artifact-2026-10-11.json`.
+- Actual apex UI after release: cancelled and successful decisions leave the
+  next reason empty, confirmation requires fresh text, and a real duplicate
+  reopen refusal (409) keeps the queue usable without another passkey. The
+  bounded follow-up only reopened/dismissed the already-created create-3 report
+  and attempted the denied create-2 reopen. Three responses were 200/409/200.
+  All six reports are closed. Ledger now has 30 events (the expected four extra
+  reopen/dismiss/notification events); other reports, visibility, mail records,
+  artwork and donations are unchanged. No new intake or transaction occurred.
+  Private `moderation-decision-live-{before,after,reopen,refusal,dismiss}-2026-10-11.json`
+  and the saved plan establish the scope. Never replay this completed follow-up.
+- The native factor-use timestamp was 20:46:35 UTC; protected queue HTTP 200 at
+  21:03:17 UTC proves continued access beyond the old 15-minute limit. No cookie,
+  credential or IP value was exported. Exact 24-hour expiry and changed-IP native
+  entry remain separately unobserved. No additional owner action is pending now.
+- Screenshots: `output/audit/moderation-decision-{empty-reason,conflict,complete}-live-2026-10-11.png`.
+  Local full suite 1826/1826, focused 51/51, compiled UI 65 and build passed;
+  documentation follow-up checks are recorded with the release evidence.
+- Same workspace/branch; use git log -1 for the documentation-only follow-up
+  HEAD. No active subagent, financial operation or new automation remains.
+  RG-01 reconciliation reused the September 30 saved analysis and October 8
+  owner iPhone report without reanalysing video. The device sheet now explicitly
+  records that report and narrows missing outcomes; the historical blank RG-01
+  template no longer implies repeated Android or staff-setup ceremonies.
+  Exactly next step when the owner is available: record only the missing native
+  iOS SIWE/disconnect and Discord-return outcomes, retaining their wallet/device
+  context. Do not replay completed moderation, funding, donation or setup/reset.
+  Other listed device criteria and the controlled-beta operator/cohort/window GO
+  inputs remain open; no fresh acceptance is invented from the saved video.
 
 October 11 live moderation edges and decision UI (21:00 UTC):
 

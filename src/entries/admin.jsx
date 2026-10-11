@@ -162,7 +162,7 @@ function AccessGate({ state, busy, message, onAuthenticate, onStepUp, onRetry, s
         disabled: ['Protocol Admin is disabled', 'The review workspace is not active in this environment.'],
         unauthenticated: ['Wallet verification required', 'Verify the connected wallet before the server checks staff access.'],
         ineligible: ['Access unavailable', 'This wallet does not have an active staff role.'],
-        step_up: ['Admin panel', 'Verify your sign-in method to continue.'],
+        step_up: ['Admin verification required', 'The review queue and complaint actions are locked. Verify admin access to continue. Closing the verification window does not unlock them.'],
         setup: ['Admin panel', 'Set up your sign-in method here. The review workspace is not active yet.'],
         setup_verified: ['Admin access confirmed', 'Your sign-in method is verified. The review workspace is not active yet.'],
         authority: ['Staff access', 'This authority wallet can approve staff access. Reviewing complaints requires a separate staff role and verification.'],

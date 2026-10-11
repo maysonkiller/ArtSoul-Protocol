@@ -257,3 +257,48 @@ entry, provider failure isolation and production flag-toggle evidence retain
 their own limits; local tests or disabled preview are not relabeled as those
 ceremonies. No new canon mechanics or interpretation was introduced: this is
 the existing complaint/review UX under Bible §11 / canon 07.
+
+## Decision UI release and native recheck, 21:08 UTC
+
+PR #298 merged at 21:05:52 UTC as `a51c16ff907c1b192df989aec984d0c9a3b72fe7`.
+Production deployment 7001780457 succeeded at 21:06:18 UTC. Exact candidate
+`798e6f4ddda584b087da5a9fa238add9385800f5` passed Linux/Windows/static CI in run
+38174677863; its tree equals tested commit d2d0a2c. The history reconciliation
+preserved the patch and documentation rather than copying another worktree.
+Preview and apex matched all 53 checked assets on six pages. Guest private
+routes remained protected, feature flags stayed enabled and indexer lag was zero.
+
+The actual owner browser retained its verified session across the release.
+Cancelling a filled reason, then opening another report, produced an empty field
+and disabled confirmation. After a successful decision and after an expected
+refusal the next reason was also empty. A bounded saved plan reopened only the
+third new technical report, attempted an older closed duplicate and dismissed
+the reopened report. Real responses were 200/409 `REPORT_ALREADY_PENDING`/200;
+the refusal left the protected queue available, without the previous unavailable
+screen or another passkey prompt. This is real UI/API evidence, not a fixture.
+
+The final read-only check passed: all six reports closed, exactly four additional
+reopen/dismiss/notification events (30 total), exactly two corresponding recipient
+notifications, and no change to other reports, visibility, delivery records,
+artwork/donation hashes or the rolling intake count of five. No new report or
+payment was created. Evidence: private `moderation-decision-live-*` plan,
+before/after and response journals; public-output screenshots
+`moderation-decision-{empty-reason,conflict,complete}-live-2026-10-11.png`.
+
+The active passkey's last-use timestamp was 20:46:35 UTC. A protected queue
+request at 21:03:17 UTC returned 200 after the previous 15-minute threshold;
+the read-only timestamp check itself measured 981 elapsed seconds. No session
+cookie or credential was exported. This confirms the old timeout no longer
+interrupts this actual session; it does not claim observation of full 24-hour
+wall-clock expiry or native verification on a different IP.
+
+Release evidence: `output/audit/moderation-decision-ci-2026-10-11.json` and
+`moderation-decision-{preview,apex}-artifact-2026-10-11.json`. No active child
+agent or new unattended follow-up was left running. The owner has no pending
+action for these completed complaint tests. Remaining RG-01 and beta-entry
+evidence must be reconciled separately; this release does not declare Phase A
+complete or reopen the owner's Android waiver.
+
+Post-merge Linux/Windows/static CI passed in run 38174943182 for exact main
+`a51c16f`; saved evidence is `moderation-decision-main-ci-2026-10-11.json`.
+The documentation-only release follow-up passed 18 checks with zero skips.

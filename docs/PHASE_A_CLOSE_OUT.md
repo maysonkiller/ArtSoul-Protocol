@@ -69,9 +69,13 @@ The October 11 evening live checks passed the sixth-report limit, stale and
 concurrent decisions, both prohibited reopen cases and the actual hidden/restored
 artwork UI. All three new technical reports are closed; earlier reports and
 artwork/payment records are preserved. Expected refusal handling and retained
-decision text exposed two small Admin UI defects; the local correction passed
-1826 full tests, build and 65 compiled browser assertions and awaits its release
-record. Flag-off preservation has SQL/API and disabled-preview evidence; this
+decision text exposed two small Admin UI defects; the correction passed
+1826 full tests, build and 65 compiled browser assertions. PR #298 is published
+at `a51c16f`; exact-candidate CI and preview/apex asset verification passed.
+Actual post-release Admin checks confirmed empty reasons and recovery from a
+duplicate-refusal without losing access. All six test reports are closed and
+the bounded reopen/dismiss audit is retained. Native access also continued beyond
+the old 15-minute threshold. Flag-off preservation has SQL/API and disabled-preview evidence; this
 is not a production flag-toggle ceremony. The hidden-artwork loading defect
 was released through PR #296 at `c7dcef6`. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
 and the [checkpoint](audits/STABILIZATION_CHECKPOINT.md).

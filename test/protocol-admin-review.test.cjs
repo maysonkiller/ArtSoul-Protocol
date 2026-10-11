@@ -224,26 +224,41 @@ test('discovery compares the connected wallet with SIWE without looking up calle
   } finally { global.fetch = previousFetch; }
 });
 
-test('protected queue data is denied before passkey step-up', async () => {
-  const [, { default: queueHandler }] = await modules;
+test('queue reads and all complaint actions are denied before factor verification', async () => {
+  const [, { default: queueHandler }, { default: actionHandler }] = await modules;
   const cookie = await authCookie();
   const previousFetch = global.fetch;
+  const previousDualWallet = process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
   const calls = [];
   global.fetch = async url => {
     calls.push(String(url));
-    return supabaseResponse([{ role: 'admin' }]);
+    assert.match(String(url), /artsoul_staff_roles\?/);
+    return supabaseResponse([{ role: 'admin', authorization_version: 1 }]);
   };
   try {
-    const res = responseHarness();
-    await queueHandler(request('GET', '/api/moderation/review-queue', {
-      cookie,
-      query: { status: 'pending_review' }
-    }), res);
-    assert.equal(res.statusCode, 403);
-    assert.equal(res.body.error, 'STEP_UP_REQUIRED');
-    assert.equal(calls.some(url => /artwork_reports\?status/.test(url)), false);
+    for (const paired of ['false', 'true']) {
+      process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = paired;
+      for (const status of ['pending_review', 'actioned', 'dismissed', 'resolved']) {
+        const res = responseHarness();
+        await queueHandler(request('GET', '/api/moderation/review-queue', { cookie, query: { status } }), res);
+        assert.equal(res.statusCode, 403);assert.equal(res.body.error, 'STEP_UP_REQUIRED');
+        assert.equal(res.body.data, undefined);
+      }
+      for (const target_type of ['artwork', 'donation_message']) for (const action of ['hide', 'dismiss', 'reopen', 'restore']) {
+        const res = responseHarness();
+        await actionHandler(request('POST', '/api/moderation/review-action', { cookie, body: {
+          report_id: '11111111-1111-4111-8111-111111111111', action, target_type,
+          reason: 'No factor verification', expected_updated_at: '2026-10-12T00:00:00Z'
+        } }), res);
+        assert.equal(res.statusCode, 403);assert.equal(res.body.error, 'STEP_UP_REQUIRED');
+      }
+    }
+    assert.equal(calls.length, 24);
+    assert.ok(calls.every(url => /artsoul_staff_roles\?/.test(url)), 'no report data or decision RPC is accessed');
   } finally {
     global.fetch = previousFetch;
+    if (previousDualWallet === undefined) delete process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
+    else process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = previousDualWallet;
   }
 });
 

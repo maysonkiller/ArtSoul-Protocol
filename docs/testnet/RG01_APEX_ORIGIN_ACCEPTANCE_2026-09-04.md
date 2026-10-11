@@ -1,7 +1,18 @@
 # RG-01 Apex-Origin Acceptance Run - 2026-09-04
 
+October 11 reconciliation: the blank form below is the historical run template,
+not evidence that later work never happened. The owner has reported a satisfactory
+real iPhone gallery/Back, wallet/profile reload, tab-switch and lock/resume run;
+reuse the dated entry in `PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`. Native OAuth return,
+explicit disconnect and unrecorded wallet/device details are not implied by it.
+Android block D is OWNER-WAIVED / NOT TESTED by the founder and must not be asked
+again or counted as PASS. RG-03's paired setup/replacement and passkey acceptance
+and the live moderation journeys are separately completed in the October 11
+moderation evidence record; the remaining RG-01 evidence is not a reason to
+repeat those ceremonies or disable the already-authorized features.
+
 Fill this file in as the run happens. It is the evidence RG-01 closes on, and it
-is an explicit precondition of RG-03 and therefore of the whole A8 activation.
+retains its own device/OAuth acceptance requirements for Phase A close-out.
 
 **Record `PASS` or `FAIL` in every Result cell, never a blank and never "ok".**
 On a `FAIL`, stop that block, write what you saw, and report it. A partial run is
