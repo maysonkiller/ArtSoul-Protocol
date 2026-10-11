@@ -11,6 +11,47 @@ and the live moderation journeys are separately completed in the October 11
 moderation evidence record; the remaining RG-01 evidence is not a reason to
 repeat those ceremonies or disable the already-authorized features.
 
+October 12 owner-reported supplement (Warsaw date; October 11 UTC): the founder
+completed the requested Safari/iPhone logout and reconnect/sign-in with the old
+wallet ending 989b, then relinked Discord from Edit Profile and returned to the
+apex. Both returns retained the correct nickname, avatar and Discord identity.
+The native Admin passkey flow also succeeded using the existing Chrome/Google
+provider; server last-use metadata corroborates the owner report. No factor was
+replaced. See the dated row in `PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`.
+
+| Later acceptance item | Result | Evidence boundary |
+| --- | --- | --- |
+| C7: iPhone Discord return and displayed linked identity | PASS — owner reported | Actual Safari/apex flow; not a provider fixture |
+| iPhone site logout/reconnect/sign-in and resulting profile identity | PASS — owner reported for the requested flow | Wallet suffix 989b; exact wallet/OS versions and the signature dialog were not captured |
+| Native staff verification on iPhone | PASS — owner reported, server last use corroborated | Existing credential; no full 24-hour expiry or specific changed-IP claim |
+
+October 12 desktop continuation (October 11, approximately 22:35–22:40 UTC):
+ordinary installed Chrome, apex release `acf9e01`, existing owner wallet suffix
+989b. This is an agent-operated UI flow in the owner's existing browser session,
+not a second independent wallet or an OAuth fixture. Discord was disconnected,
+the editor immediately showed "Discord account removed" and Link Discord, then
+the existing identity-only authorization returned to the apex with the same
+verified Discord profile, nickname and avatar. X disconnection also updated the
+editor immediately. The owner then pressed Authorize app in X's existing-account
+screen. The callback returned to the apex with "X account linked successfully",
+the original verified X profile, Discord, nickname and avatar. Both original
+links are restored. No other profile fields, email, roles or factors changed.
+Final screenshot: `output/audit/rg01-providers-restored-2026-10-12.png`. The
+account menu subsequently showed a numeric Base Sepolia balance (desktop-only
+A-73 evidence). OAuth state, codes and session cookies were not exported.
+
+| Desktop item | Result | Evidence boundary |
+| --- | --- | --- |
+| C1 / C2: Discord apex return and linked handle | PASS | Actual provider consent and callback, correct existing profile restored |
+| C3: Discord unlink | PASS | Removed state and reconnect control appeared without saving other profile fields |
+| C6: X unlink | PASS | Removed state and reconnect control appeared; original link restored afterwards |
+| C4 / C5: X apex return and linked handle | PASS | Owner confirmed the provider screen; agent observed the apex callback and original verified profile |
+
+This supplements the historical template, rather than marking every block as
+passed. All block C outcomes are now recorded. Guest persistence after
+reload before reconnecting, and any other unasked device criteria need their own
+evidence. Do not ask the owner to repeat the newly passed flows wholesale.
+
 Fill this file in as the run happens. It is the evidence RG-01 closes on, and it
 retains its own device/OAuth acceptance requirements for Phase A close-out.
 
