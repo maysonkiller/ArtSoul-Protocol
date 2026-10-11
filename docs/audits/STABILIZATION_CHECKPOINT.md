@@ -3,6 +3,44 @@
 Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 11 decision UI release and live acceptance (21:08 UTC):
+
+- PR #298 merged at 21:05:52 UTC as `a51c16ff907c1b192df989aec984d0c9a3b72fe7`.
+  Production deployment 7001780457 succeeded at 21:06:18 UTC. Candidate
+  `798e6f4ddda584b087da5a9fa238add9385800f5` passed Linux/Windows/static CI
+  (38174677863). Reconciliation commit 798e6f4 is tree-identical to tested
+  application/evidence commit d2d0a2c; only duplicate squash-history docs needed
+  reconciliation. All historical untracked files are untouched.
+  Post-merge Linux/Windows/static CI also passed (38174943182); the final
+  documentation checks passed 18/18, with zero skips.
+- Preview and apex both matched 53 checked assets across six pages; guest
+  private APIs fail closed, the anonymous logout clears both secure cookies,
+  Report/queue/Donate remain enabled and the indexer is healthy with lag 0.
+  Evidence: `output/audit/moderation-decision-{preview,apex}-artifact-2026-10-11.json`.
+- Actual apex UI after release: cancelled and successful decisions leave the
+  next reason empty, confirmation requires fresh text, and a real duplicate
+  reopen refusal (409) keeps the queue usable without another passkey. The
+  bounded follow-up only reopened/dismissed the already-created create-3 report
+  and attempted the denied create-2 reopen. Three responses were 200/409/200.
+  All six reports are closed. Ledger now has 30 events (the expected four extra
+  reopen/dismiss/notification events); other reports, visibility, mail records,
+  artwork and donations are unchanged. No new intake or transaction occurred.
+  Private `moderation-decision-live-{before,after,reopen,refusal,dismiss}-2026-10-11.json`
+  and the saved plan establish the scope. Never replay this completed follow-up.
+- The native factor-use timestamp was 20:46:35 UTC; protected queue HTTP 200 at
+  21:03:17 UTC proves continued access beyond the old 15-minute limit. No cookie,
+  credential or IP value was exported. Exact 24-hour expiry and changed-IP native
+  entry remain separately unobserved. No additional owner action is pending now.
+- Screenshots: `output/audit/moderation-decision-{empty-reason,conflict,complete}-live-2026-10-11.png`.
+  Local full suite 1826/1826, focused 51/51, compiled UI 65 and build passed;
+  documentation follow-up checks are recorded with the release evidence.
+- Same workspace/branch; use git log -1 for the documentation-only follow-up
+  HEAD. No active subagent, financial operation or new automation remains.
+  Exactly next step: reconcile remaining RG-01 device/OAuth rows against already
+  saved evidence and the owner's iPhone acceptance, without replaying completed
+  moderation, funding, donation, setup/reset or Android testing. Phase A remains
+  open for its explicitly unevidenced acceptance and controlled-beta GO inputs.
+
 October 11 live moderation edges and decision UI (21:00 UTC):
 
 - Same workspace/branch; starting HEAD `0f54d9c`. Owner confirmed the existing
