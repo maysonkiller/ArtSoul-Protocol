@@ -8,7 +8,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **64 done, 19 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **65 done, 18 in progress, 0 planned** across A-01 to A-83.
 
 **Founder scheduling decision, October 3:** perform real passkey enrollment and
 its operator recovery ceremony now. This supersedes the September 29 deferral;
@@ -33,53 +33,28 @@ the bounded settlement rehearsal, not the remaining device/operator gates. See
 
 ## The shape of what is left
 
-Phase A remains **NO-GO** until A8/A10 acceptance is evidenced. The moderation
-chain - A-39, A-21, A-22, A-23 - has merged foundations. A-22 recipient-facing
-notification delivery is implemented, tested and published. The four dormant A8
-schema migrations were applied and verified on September 30; real signed-in
-notification reads now return 200 instead of the reproduced 503. The historical
-database remains pre-ledger; no old migration entries were fabricated.
-Real operator acceptance remains outstanding. PR #294 is deployed at
-`17cfc3cb2b2ac005366c56097e3f9b35a28dbcc1`; candidate Linux/Windows/static CI
-passed, and preview/apex matched all 53 checked assets across six pages.
-The connected Chrome gallery verified the requested media-overlay menu and
-indexed creation link. Profile/social/email layout and native admin setup from
-PR #292 are also published. Real owner passkey setup, replacement and subsequent
-entry were verified on October 8. On October 11 the protected Protocol Admin
-queue was enabled on the same accepted source; owner browser access passed and
-real guest/non-staff requests were denied. Reporting and Donate remain disabled
-at this checkpoint. The historical October 2, 23:40 UTC read records
-one authorized founder role and one unused bootstrap grant, but zero passkeys;
-enabled routes and a grant do not prove enrollment or recovery. The corrected
-email hosting route accepted one real verification request, and Resend reports
-Delivered to the designated mailbox. Email-link confirmation remains unverified.
-The separate Donate contract and its updated indexer are running on Base Sepolia.
-Both authorized 1-wei payments completed on October 7, with and without a message;
-both exact projections and the real read handler passed October 8 acceptance.
-Public activation still requires the operational donation-message moderation
-path specified in the October 3 amendment. Do not replay these payments.
-Complaint-email schema and the protected host worker/timer were verified on
-October 8. One idempotent transport smoke was delivered to the project inbox;
-Resend team access was transferred to the project mailbox as authorized. The
-full complaint-to-decision notification journey remains unverified.
-The owner approved two gasless authority signatures for role grants and recovery,
-a shared single-use 15-minute setup permission, passkey OR authenticator app, and
-five TOTP reservations per rolling five minutes with two-minute expiry. Backend/UI
-integration passed 1,802 local checks and exact-candidate CI. A8e/A8f/A8g, the
-initial policy and server-only encryption configuration are installed and verified;
-paired access is live after the same-source configuration redeploy. No new Safe
-is needed for application roles. The owner completed real two-wallet setup and
-passkey entry on October 8: stored signatures, consumed permission, registration
-and two successful authentications were independently verified. A subsequent
-paired reset replaced that factor under a new authorization version, followed by
-successful native entry. Old factor/session rejection is covered by actual SQL
-and API integration; a captured pre-reset production cookie was not replayed.
-The full complaint workflow remains open. Local team roster changes are tested
-separately and have not yet been released.
-The old two-passkey/bootstrap/Safe-only criteria below are superseded by canon
-07's October 8 amendment, not silently waived. See the
-[current checkpoint](audits/STABILIZATION_CHECKPOINT.md) and
-[schema evidence](audits/PHASE_A_A8_SCHEMA_2026-09-30.md).
+Phase A remains **NO-GO** until the remaining A8/A10 and connected-device
+acceptance is evidenced. A-39 is now accepted: real paired setup/replacement,
+passkey entry, expiry/reverification and protected queue access passed. Both
+designated wallets approve staff setup; automated fixtures are not that ceremony.
+The historical two-passkey/bootstrap/Safe-only application policy is superseded
+by canon 07's October 8 amendment. Contract custody is unchanged.
+
+PR #295 is published at `2ba480bed7328ff01ce43995e1f107f6f0e93399` with green
+Linux/Windows/static CI and exact apex asset verification. Its private roster
+shows the current authority pair and staff roles. Report and the protected queue
+are now enabled. Actual browser/API acceptance passed independent complaints,
+deduplication, partial/final restoration, project inbox receipt and recipient-facing
+notification delivery. Donate is also enabled after real message-only moderation
+and before/after contract/projection verification; both original payments were
+reused, not repeated. All test restrictions were restored.
+
+The remaining A8 live edge cases are the sixth-report limit, stale/concurrent
+decisions, prohibited reopen and flag-off preservation. Local SQL/API coverage
+is green but is not relabeled as production execution. A newly reproduced
+hidden-artwork loading defect is fixed locally, built and regression-tested;
+its release is pending. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
+and the [checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 The initial September 29 PostgreSQL baseline passed 46 checks across seven
 integration suites. The final application run includes the additional 11-check
@@ -106,7 +81,7 @@ operationally safe reporting/moderation path before a beta GO.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
-| **RG-03** → **A-39** moderation activation | Real paired setup, replacement/passkey entry and protected queue access passed. Public complaint, review decision, mail and recipient workflow acceptance remain open | Both designated wallets approve staff setup and replacement; the staff member completes native verification |
+| **RG-03** access acceptance | Accepted for A-39 under the October 8 amendment; remaining complaint edge cases belong to A-21/A-22 | Both designated wallets approve staff setup and replacement; the staff member completes native verification |
 | **Replacement recovery acceptance** | Owner reset, replacement enrollment and entry observed October 8; old-factor/version rejection verified in SQL/API tests. Historical Safe evidence is retained, not replayed | The actual owner approval and replacement are recorded separately; automated fixtures are not that ceremony |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02

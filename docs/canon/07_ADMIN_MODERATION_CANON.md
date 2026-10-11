@@ -144,8 +144,10 @@ role from an authority wallet does not remove its approval power, and authority
 alone never grants complaint access. Replacing a staff wallet uses two separately
 paired approvals: revoke the old role, then grant the new wallet. Replacing an
 approval wallet is a separate rotation approved by the current pair. No single-key
-recovery exception is introduced. This roster is implemented locally; its release
-and browser acceptance are recorded separately.
+recovery exception is introduced. This roster was released in PR #295 and verified in the actual owner browser
+on October 11. Report, queue and Donate are now enabled after the bounded real
+journeys recorded in `../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md`;
+remaining A8 edge-case and device acceptance is listed separately.
 
 ## Public Repository Boundary
 

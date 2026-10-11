@@ -105,11 +105,26 @@ test('a confirmed re-auction replaces the stale previous round without changing 
   assert.equal(original.auction_id, '62', 'the cached response is not mutated');
 });
 
-test('an exact artwork read distinguishes network failure from a successful empty projection', async () => {
+test('an exact artwork read distinguishes network failure, suppression and a pending projection', async () => {
   const offline = client({ reply: () => new Error('Network failure') });
   await assert.rejects(offline.db.getArtwork('v41:84532:28'), { code: 'ARTWORK_READ_UNAVAILABLE' });
   const hidden = client({ reply: () => ({ data: [], suppressed_artwork_ids: ['v41:84532:28'] }) });
-  await assert.rejects(hidden.db.getArtwork('v41:84532:28'), { code: 'V41_ARTWORK_NOT_INDEXED' });
+  await assert.rejects(hidden.db.getArtwork('v41:84532:28'), { code: 'ARTWORK_UNAVAILABLE' });
+  await assert.rejects(client().db.getArtwork('v41:84532:28'), { code: 'V41_ARTWORK_NOT_INDEXED' });
+});
+
+test('suppressed exact reads stop pending recovery but a later restored projection loads normally', async () => {
+  let visible = false;
+  const { db, requests } = client({ reply: () => visible
+    ? { data: [row()], suppressed_artwork_ids: [] }
+    : { data: [], suppressed_artwork_ids: ['v41:84532:28'] } });
+  db.recordConfirmedAuction(confirmed());
+  await assert.rejects(db.getArtwork('v41:84532:28'), { code: 'ARTWORK_UNAVAILABLE', message: 'This artwork is currently unavailable.' });
+  assert.equal(requests.length, 1, 'a receipt must not retry a suppressed artwork');
+  visible = true;
+  assert.equal((await db.getArtwork('v41:84532:28')).id, 'v41:84532:28');
+  const otherHidden = client({ reply: () => ({ data: [], suppressed_artwork_ids: ['v41:11155111:28'] }) });
+  await assert.rejects(otherHidden.db.getArtwork('v41:84532:28'), { code: 'V41_ARTWORK_NOT_INDEXED' });
 });
 
 test('confirmed no-bid end remains terminal while the indexer still returns the expired active round', () => {

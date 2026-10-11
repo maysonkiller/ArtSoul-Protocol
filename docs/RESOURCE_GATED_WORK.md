@@ -56,6 +56,15 @@ mail worker and actual inbox transport were verified October 8; that alone is
 not RG-03 acceptance. Follow the current paired-authority procedure in
 `security/MIGRATION_RUNBOOK.md` and `audits/STABILIZATION_CHECKPOINT.md`.
 
+**2026-10-11 evidence update:** RG-03 / A-39 access acceptance is recorded under
+the replacement policy: real paired setup, reset/replacement, native passkey
+entry, expiry/reverification and protected queue, with real guest/nonstaff
+denials. Report, decision, mail and recipient notification journeys passed;
+Donate's existing-message hide/restore path also passed and is enabled. See
+[audited results and remaining A8 edges](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md).
+Historical disabled/unenrolled statements above no longer describe live state.
+RG-01 device/OAuth and the final A10 GO decision remain independent.
+
 The founder approved the following implementation constraints on 2026-07-20:
 
 - moderation step-up sessions last 15 minutes;

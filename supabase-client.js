@@ -384,6 +384,14 @@ async function getPublicProjectionArtwork(idOrOptions) {
         ? { id: idOrOptions, limit: 1 }
         : { ...(idOrOptions || {}), limit: 1 };
     const rows = await getPublicProjectionArtworks(options, true);
+    const exactId = options.id || `v41:${options.chain_id}:${options.artwork_id}`;
+    if (!rows.length && rows.suppressed_artwork_ids?.includes(exactId)) {
+        // A successful moderation-filtered read is not an indexer delay. Keep
+        // the existing public suppression boundary and disclose no reason.
+        const error = new Error('This artwork is currently unavailable.');
+        error.code = 'ARTWORK_UNAVAILABLE';
+        throw error;
+    }
     return rows[0] || null;
 }
 

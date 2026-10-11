@@ -3,6 +3,40 @@
 Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 11 live acceptance continuation (08:51 UTC):
+
+- Current local HEAD `eccc7e1`, branch `codex/takeover-audit`, same workspace.
+  PR #295 merged at 08:42 UTC as `2ba480bed7328ff01ce43995e1f107f6f0e93399`.
+  All exact-candidate Linux/Windows/static CI checks passed (run 38124785727).
+  Apex matched 53 assets on six pages; live roster shows both approval wallets
+  and staff roles. Evidence: `output/audit/staff-roster-apex-artifact-2026-10-11.json`
+  and `staff-roster-live-2026-10-11.png`. New role writes were not replayed.
+- Reporting is ON with the approved daily limit 5. The actual browser submitted
+  technical report `3f8984e2-7a01-4490-93b5-f374cd7eeaa3` on artwork 34; a distinct
+  old test account submitted `b1790bea-a4be-44a6-b014-af834f4daa03`. Its exact
+  duplicate returned the same reference. Both emails were accepted once; the
+  owner confirmed receipt of the first in the project mailbox.
+- Actual owner Admin UI hid both, resolved the first while visibility stayed
+  hidden, then resolved the second at 08:47:33 UTC and restored visibility.
+  Read-only snapshots at 08:46:38, 08:47:04 and 08:47:58 preserve states/events.
+  Both reports are resolved; no unrelated artwork or payment was touched.
+  Actual recipient SIWE notification read passed and mismatched wallet was denied:
+  `docs/private/recipient-notification-2026-10-11.json`. Same author/reporter uses
+  one REPORT_RESOLVED notice under existing SQL deduplication, not a duplicate
+  ARTWORK_RESTORED notice. Ownership, auction 66, token 6 and floor are unchanged.
+- Found a real hidden-artwork UI defect: suppression became an indexer-pending
+  spinner. Four-file local fix distinguishes ARTWORK_UNAVAILABLE and clears stale
+  artwork/auction state. Three reproduced failures became 64 passing focused
+  regressions, zero skips. Not built/published yet; reviewer finished.
+- Donate configuration was added after both RPCs matched the pinned deployed
+  code and the artwork was restored. Read `docs/private/donate-activation-2026-10-11.json`
+  before retrying. Same-source deployment `dpl_5sxAyDwpgLtUofbjcadC4WGYezdm`
+  (`artsoul-2pl1501te-maysonkiller-be9112b5.vercel.app`) was requested; verify READY.
+  Only the two existing 1-wei donations may be used; never replay payments.
+- Exactly next step: verify Donate deployment, exercise message-only complaint /
+  hide / restore on existing tx 0x91f63b0d...c17 log 15, then validate and release
+  the hidden-artwork fix. Phase A remains open for remaining acceptance evidence.
+
 October 11 continuation (team roster and remaining moderation acceptance):
 
 - Started at `71c7ae3` in the same workspace/branch. Preserved the prior agent's
