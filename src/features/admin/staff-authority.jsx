@@ -4,6 +4,7 @@ import { verifyMessage } from 'ethers';
 const { useEffect, useRef, useState } = React;
 const STORAGE_KEY = 'artsoul_staff_authority_request';
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const ROLE_NAMES = {admin:'Administrator',moderator:'Moderator',team:'Team'};
 
 // Only the short-lived public proposal ID and its approval signatures survive
 // an account switch. No session, code, secret or complaint is stored here.
@@ -35,7 +36,30 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
     const [action, setAction] = useState('grant_role'), [target, setTarget] = useState(wallet), [role, setRole] = useState('moderator');
     const [nextA, setNextA] = useState(''), [nextB, setNextB] = useState('');
     const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+    const [roster, setRoster] = useState(null), [rosterError, setRosterError] = useState('');
+    const [rosterBusy, setRosterBusy] = useState(false), rosterEpoch = useRef(0), formRef = useRef(null);
     const post = body => api('authority', { method: 'POST', body: JSON.stringify({ ...body, expectedWallet: wallet }) });
+    async function loadRoster(after = '') {
+        if (currentWallet() !== wallet) return;
+        const token = ++rosterEpoch.current, current = () => token === rosterEpoch.current && currentWallet() === wallet;
+        setRoster(null); setRosterBusy(true); setRosterError('');
+        try {
+            const result = await api(`authority?view=staff&expectedWallet=${encodeURIComponent(wallet)}${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+            if (current()) setRoster({...result, after});
+        } catch {
+            if (current()) setRosterError('The team list could not be loaded. Refresh it after checking your wallet sign-in.');
+        } finally { if (current()) setRosterBusy(false); }
+    }
+    function choose(nextAction, member) {
+        if (busy || request) return;
+        setAction(nextAction); setMessage('');
+        if (member) {setTarget(member.wallet); setRole(member.role);}
+        if (nextAction === 'rotate_authority') {
+            setNextA(roster.policy.authorities[0]); setNextB(roster.policy.authorities[1]);
+        }
+        formRef.current?.scrollIntoView({block:'center'});
+        formRef.current?.querySelector('select')?.focus({preventScroll:true});
+    }
     function discard() {
         epoch.current++; busyRef.current = false; setBusy(false); setRequest(null); setSignatures([]);
         try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* Storage may be unavailable. */ }
@@ -62,17 +86,21 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
         } finally { if (current()) { busyRef.current = false; setBusy(false); } }
     }
     useEffect(() => {
+        loadRoster();
         const saved = savedApproval();
         if (saved) run(async current => {
             const result = await api(`authority?expectedWallet=${encodeURIComponent(wallet)}&requestId=${encodeURIComponent(saved.id)}`);
             if (current()) save(result.request, [...matchingSignatures(result.request, saved.signatures).values()]);
         });
-        const invalidate = () => { epoch.current++; busyRef.current = false; setRequest(null); setSignatures([]); setBusy(false); };
+        const invalidate = () => {
+            epoch.current++; rosterEpoch.current++; busyRef.current = false;
+            setRequest(null); setSignatures([]); setBusy(false); setRoster(null); setRosterBusy(false); setRosterError('');
+        };
         window.addEventListener('artsoul:wallet-state-changed', invalidate);
         window.addEventListener('artsoul:auth-state-changed', invalidate);
         window.addEventListener('pagehide', invalidate);
         return () => {
-            epoch.current++;
+            epoch.current++; rosterEpoch.current++;
             window.removeEventListener('artsoul:wallet-state-changed', invalidate);
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
             window.removeEventListener('pagehide', invalidate);
@@ -113,13 +141,41 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
         await post({ operation: 'complete', requestId: request.proposal.requestId, signatures });
         if (!current()) return;
         discard(); setMessage('Staff access updated. Approved sign-in setup is available for 15 minutes after a grant or reset.');
+        loadRoster();
         await onAccessChanged();
     });
     const signed = request ? matchingSignatures(request, signatures) : new Map();
     return <section className="protocol-admin-gate protocol-admin-authority" aria-label="Staff access">
         <h2>Staff access</h2>
         <p>Both authority wallets approve role changes and sign-in resets. These signatures cost no gas and do not change contract ownership.</p>
-        {!request ? <form onSubmit={create}>
+        <section aria-label="Team and authorities" className="protocol-admin-team">
+            <h3>Team and authorities</h3>
+            <p>Authority wallets manage staff access even without a staff role. Reading complaints requires a staff role and verified sign-in.</p>
+            <button type="button" onClick={() => loadRoster()} disabled={rosterBusy}>Refresh team</button>
+            {rosterBusy && <p role="status">Loading team...</p>}
+            {rosterError && <p role="status">{rosterError}</p>}
+            {roster && <>
+                <h4>Both approval wallets</h4>
+                <ul>{roster.policy.authorities.map(address => <li key={address}>{address}</li>)}</ul>
+                <button type="button" disabled={busy || !!request} onClick={() => choose('rotate_authority')}>Change approval wallets</button>
+                <p>The current pair must approve its replacement. If either key is completely lost, the other key alone cannot recover access.</p>
+                <h4>Staff roles</h4>
+                <p>To replace a staff wallet, remove its role, then assign the role to the new wallet. Both steps need both approvals. Removing a staff role does not remove an approval wallet.</p>
+                {roster.staff.length === 0 && <p>No staff roles on this page.</p>}
+                <ul className="protocol-admin-team-list">{roster.staff.map(member => <li key={member.wallet}>
+                    <strong>{ROLE_NAMES[member.role]}</strong> — {member.active ? 'Active' : 'Removed'}
+                    <div>{member.wallet}</div>
+                    {member.active ? <>
+                        <button type="button" disabled={busy || !!request} onClick={() => choose('grant_role',member)}>Change role</button>
+                        <button type="button" disabled={busy || !!request} onClick={() => choose('revoke_role',member)}>Remove role</button>
+                        <button type="button" disabled={busy || !!request} onClick={() => choose('renew_setup',member)}>Reset sign-in</button>
+                    </> : <button type="button" disabled={busy || !!request} onClick={() => choose('grant_role',member)}>Restore role</button>}
+                </li>)}</ul>
+                {roster.after && <button type="button" disabled={rosterBusy} onClick={() => loadRoster()}>First page</button>}
+                {roster.nextCursor && <button type="button" disabled={rosterBusy} onClick={() => loadRoster(roster.nextCursor)}>Next staff page</button>}
+            </>}
+        </section>
+        {!request ? <form ref={formRef} onSubmit={create}>
             <label htmlFor="staffAuthorityAction">Action</label>
             <select id="staffAuthorityAction" value={action} onChange={event => setAction(event.target.value)} disabled={busy}>
                 <option value="grant_role">Assign a staff role</option><option value="revoke_role">Remove a staff role</option>
