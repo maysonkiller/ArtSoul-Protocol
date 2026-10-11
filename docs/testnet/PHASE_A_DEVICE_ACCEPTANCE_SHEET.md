@@ -25,6 +25,17 @@ a specific unresolved symptom. The reply did not identify an Android run,
 timestamps, individual OAuth outcomes or a native staff-factor ceremony, so it
 does not supply those missing evidence fields.
 
+October 12 owner clarification (iPhone Admin): after cancelling Verify passkey,
+only Staff access / the team and Verify admin access were visible, not complaint
+contents. Record the protected workspace as locked in this owner observation.
+The authority roster is intentionally independent under canon 07; this is not an
+observed authentication bypass. The ambiguous locked-page heading was clarified
+locally and cancel paths were regression-tested. Do not infer successful native
+iPhone passkey verification, actual network-context expiry or a captured protected
+API response from this report, and do not reset an existing factor just because
+the device displayed a cross-device QR choice. See the current checkpoint for
+test and publication status.
+
 **Where.** `https://artsoulprotocol.com` — the apex origin, not a preview and not
 a `vercel.app` address. Wallet sessions and SIWE are origin-scoped, so evidence
 from any other origin proves nothing about production.

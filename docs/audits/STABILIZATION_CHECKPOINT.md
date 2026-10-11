@@ -1,7 +1,43 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-12. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 12 iPhone verification-window clarification (Warsaw date):
+
+- Starting HEAD `2ce3f4d`, same workspace and branch. The owner clarified that
+  closing the passkey window on iPhone showed only Staff access / the team and
+  Verify admin access, not complaints. This is the approved authority workspace,
+  not an observed factor bypass: canon 07 permits the authenticated authority
+  roster independently of the protected complaint queue. Paired signatures are
+  still required for role changes. No factor was reset or enrolled.
+- The ambiguous locked heading said "Admin panel". The local patch changes it
+  to "Admin verification required" and explicitly states that closing the window
+  does not unlock complaints. There is no authorization or policy change.
+- The added cancel regression keeps an authority wallet locked after dismissal,
+  refresh and retained queue/decision callbacks. Expanded handler checks deny
+  four queue statuses and all four actions for both target types before factor
+  verification, in paired and legacy modes, without accessing report storage.
+  Focused checks passed 64/64. Build passed. Compiled Chrome passed 158 assertions
+  across both themes, 1280/390/320px, ordinary staff and authority wallets, and
+  Close/Escape/backdrop dismissal. No external requests or page exceptions.
+  Evidence: `output/audit/admin-locked-gate-*2026-10-12*` and the corresponding
+  `output/playwright/admin-locked-gate-2026-10-12.mjs` and screenshots.
+- Initial full-suite execution inside the sandbox could not reach local HTTP /
+  Docker and could not create DPAPI self-test files. That run is not a baseline;
+  its log is retained. The normal-host rerun passed 1827/1827, zero skips:
+  `output/audit/admin-locked-gate-unit-host-2026-10-12.log`.
+- The phone observation is owner-reported, not a captured iOS API response or a
+  successful phone factor ceremony. The QR symptom alone does not establish a
+  code defect or require a replacement credential. Android remains waived.
+  The owner subsequently found the existing ArtSoul passkey in Chrome's iPhone
+  password manager. Using that provider on iPhone was handed to the owner;
+  no successful authentication is inferred until the actual result is reported.
+- This patch is local and not published. Application production remains PR #298
+  / `a51c16f`. Historical untracked files are preserved; no agent was started.
+  Exactly next step: prepare this tested copy/test change for release and record
+  the owner's pending iPhone verification outcome without replaying completed
+  live rehearsals.
 
 October 11 decision UI release and live acceptance (21:08 UTC):
 
