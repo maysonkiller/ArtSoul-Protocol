@@ -3,6 +3,28 @@
 Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 11 staff-session release (20:29 UTC):
+
+- PR #297 merged as `ba61d5c94c661d1e68615bd8f7c4b95203146e99` at 20:28:13 UTC.
+  Production deployment 7001332984 succeeded at 20:28:36 UTC. Exact candidate
+  `ab5be99c588853ad0d4a363674a9746cae7e68e3` passed Linux/Windows/static CI
+  (run 38172119770), local 1823-check suite, build and 68 compiled UI assertions.
+  Application commit `3aa02f2` and reconciliation `ab5be99` have identical trees.
+- Preview and apex matched all 53 checked assets across six pages. The new
+  anonymous logout clears both secure session cookies; guest private API checks
+  pass. Report, queue and Donate remain enabled on apex. Indexer healthy/lag 0.
+  Evidence: `output/audit/staff-session-{preview,apex}-artifact-2026-10-11.json`
+  and `staff-session-ci-2026-10-11.json`. No hosting setting or data was changed.
+- Actual owner Admin tab was refreshed and correctly requested normal passkey
+  verification. Screenshot: `output/audit/staff-session-live-handoff-2026-10-11.png`.
+  The owner was asked once to confirm the existing key. No reset, enrollment or
+  paired approval is needed. Do not substitute a fixture for native verification.
+- Exactly next step: after the owner confirms, observe the real active session
+  under the new policy and continue the bounded remaining moderation acceptance.
+  Android is owner-waived / not tested. Phase A is not marked complete.
+- This release evidence is a documentation-only follow-up; use git log -1 for
+  its saved HEAD. No active child agent or unattended transaction remains.
+
 October 11 resumed owner amendment (24-hour staff verification):
 
 - Owner explicitly waives Android testing for this Phase A close-out. Record

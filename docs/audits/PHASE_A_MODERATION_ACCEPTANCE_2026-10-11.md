@@ -186,3 +186,13 @@ identification is enabled, the domain uses correctly configured A records, and
 the API is served by Vercel. The CLI renewed an expired local token normally;
 no hosting setting was changed. This supports trusted-edge selection but does
 not replace an authenticated production test from another IP.
+
+PR #297 merged as `ba61d5c94c661d1e68615bd8f7c4b95203146e99` at 20:28:13 UTC,
+after exact-candidate Linux/Windows/static CI passed in run 38172119770.
+Production deployment 7001332984 succeeded at 20:28:36 UTC. Preview and apex
+matched all 53 checked assets on six pages. Real anonymous logout clears both
+secure cookies; private APIs deny guests. Apex Report/queue/Donate stay enabled,
+and the indexer is healthy with zero observed lag. The actual owner Admin tab
+now requests normal passkey verification, as intended for the old session.
+One owner verification is pending; no renewed passkey or changed-IP production
+ceremony is claimed here. No contract, role, data or feature-flag change occurred.

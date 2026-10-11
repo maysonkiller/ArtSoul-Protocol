@@ -42,6 +42,13 @@ The new 24-hour, browser/network-bound admin session policy is approved in
 [canon 07](canon/07_ADMIN_MODERATION_CANON.md#october-11-verified-session-duration-amendment);
 earlier 15-minute expiry acceptance does not prove the changed policy.
 
+The replacement is now published through PR #297 at `ba61d5c` (October 11,
+20:28 UTC), with 1823 passing local checks, build, 68 compiled UI assertions,
+green exact-candidate CI and preview/apex asset verification. The owner Admin
+tab requests one normal verification with the existing passkey after release;
+no reset or paired approvals are required. Real renewed-session/context-change
+acceptance remains separate from the automated expiry/binding tests.
+
 Phase A remains **NO-GO** until the remaining A8/A10 and connected-device
 acceptance is evidenced. A-39 is now accepted: real paired setup/replacement,
 passkey entry, expiry/reverification and protected queue access passed. Both
