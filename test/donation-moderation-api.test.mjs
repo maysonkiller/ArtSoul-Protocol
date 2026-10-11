@@ -22,7 +22,7 @@ function response() { return {headers: {}, statusCode: 200, setHeader(k,v) { thi
 function cookie(stepUp = false) {
   const res = response(); backend.setWalletSession(res, WALLET);
   let result = res.headers['Set-Cookie'].split(';')[0];
-  if (stepUp) { const elevated = response(); passkeys.setModerationSession(elevated, WALLET, 'local-credential');
+  if (stepUp) { const elevated = response(); passkeys.setModerationSession(elevated, WALLET, 'local-credential', undefined, 'passkey', {headers:{'user-agent':'local-staff-test'},socket:{remoteAddress:'127.0.0.1'}});
     result += `; ${elevated.headers['Set-Cookie'].split(';')[0]}`; }
   return result;
 }
@@ -31,7 +31,7 @@ const complaint = {target_type: 'donation_message', chain_id: 84532, artwork_id:
 const decision = {report_id: REPORT, target_type: 'donation_message', expected_updated_at: VERSION, action: 'hide', reason: 'Verified evidence.'};
 const context = {report_id: REPORT, message: '<script>untrusted indexed text</script>', available: true, hidden: true};
 async function call(handler, body, session = cookie(), method = 'POST') {
-  const res = response(); await handler({method, headers: {cookie: session}, body, query: {}}, res); return res;
+  const res = response(); await handler({method, headers: {cookie: session,'user-agent':'local-staff-test'},socket:{remoteAddress:'127.0.0.1'}, body, query: {}}, res); return res;
 }
 function authResponse(input) {
   if (String(input).includes('/artsoul_staff_roles?')) return Response.json([{role: 'moderator'}]);

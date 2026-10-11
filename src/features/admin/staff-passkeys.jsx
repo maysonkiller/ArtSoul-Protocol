@@ -171,7 +171,7 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
                 await post(enrolling ? 'passkey-register-verify' : 'passkey-auth-verify', enrolling ? { ...approval, response } : { response });
                 if (!current()) return;
                 setEnrollmentCode(''); setCredentials(null);
-                setMessage(enrolling ? 'Passkey saved. Select Verify passkey to continue.' : 'Verified. Your admin session is active for up to 15 minutes.');
+                setMessage(enrolling ? 'Passkey saved. Select Verify passkey to continue.' : 'Verified. Your admin session is active for up to 24 hours. Verify again on a new browser or network.');
                 await onAccessChanged();
             }
         } catch (error) {
@@ -205,7 +205,7 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
                     <h3 id="existingPasskeyTitle">Already have a passkey?</h3>
                     <p>Select Verify passkey, then follow your device's instructions.</p>
                     <button type="button" className="protocol-admin-primary" disabled={busy} onClick={() => perform('verify')}>{busy ? 'Please wait...' : 'Verify passkey'}</button>
-                    {sessionActive && <p role="status">Admin verification is active for up to 15 minutes.</p>}
+                    {sessionActive && <p role="status">Admin verification is active for up to 24 hours. Verify again on a new browser or network.</p>}
                 </section>
                 {sessionActive && <section aria-labelledby="additionalPasskeyTitle">
                     <h3 id="additionalPasskeyTitle">Add a backup passkey</h3>

@@ -3,6 +3,33 @@
 Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 11 resumed owner amendment (24-hour staff verification):
+
+- Owner explicitly waives Android testing for this Phase A close-out. Record
+  OWNER-WAIVED / NOT TESTED, never PASS. Do not repeat the Android question.
+- Owner replaces the 15-minute verified session with a fixed 24-hour maximum,
+  requiring factor verification again in a new browser context or client IP.
+  Canon 07 records the amendment and cookie/IP/User-Agent binding limitations.
+  Setup permission stays 15 minutes; paired approvals and contract custody stay
+  unchanged. Logout now clears wallet and staff cookies together.
+- Same workspace/branch, starting HEAD `8966b8e`; application source/tests/docs
+  are being prepared for release. The currently published version is still
+  `c7dcef6` until a later deployment entry confirms otherwise.
+- Current focused backend checks 112/112; frontend/document checks 52/52;
+  full application suite 1823/1823, zero skips; build and route/style checks pass.
+  Logs: `output/audit/staff-session-{focused,unit,build}-2026-10-11.log` and
+  `admin-session-copy-docs-2026-10-11.log`. Compiled Chrome passed 68 assertions
+  in both themes at 1280/390/320px, with zero page errors/external requests:
+  `output/audit/staff-session-built-2026-10-11.json`. Host checks confirm Vercel
+  runtime identification and correctly configured direct A-record routing:
+  `output/audit/staff-session-host-2026-10-11.json`. No live factor is simulated.
+- Exactly next step: finish compiled UI and exact-candidate CI/deployment checks,
+  then request one normal verification with the existing passkey. Existing
+  unbound cookies deliberately require re-verification; no reset or paired
+  signatures are needed. A real changed-IP ceremony is not claimed by unit tests.
+- Preserve historical untracked observer files, .codex and output. One bounded
+  reviewer handles only compiled local UI; no new audit agents or worktrees.
+
 October 11 owner-unavailable checkpoint (09:10 UTC):
 
 - Owner requests all independent work, then stop. Do not wait for or repeat the

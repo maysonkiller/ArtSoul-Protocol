@@ -419,7 +419,7 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
   const response=()=>({statusCode:200,headers:{},setHeader(name,value){this.headers[name]=value;},status(code){this.statusCode=code;return this;},json(body){this.body=body;return this;},end(){return this;}});
   async function invoke(body,{wallet=addresses[0],origin=env.ARTSOUL_WEBAUTHN_ALLOWED_ORIGIN,method='POST',query={},routeHandler=handler}={}) {
     const session=response();if(wallet)setWalletSession(session,wallet);
-    const req={method,query,body,headers:{cookie:session.headers['Set-Cookie']?.split(';')[0]||'',origin}};
+    const req={method,query,body,headers:{cookie:session.headers['Set-Cookie']?.split(';')[0]||'',origin,'user-agent':'local-staff-test'},socket:{remoteAddress:'127.0.0.1'}};
     const res=response();await routeHandler(req,res);if(routeHandler===handler)assert.equal(res.headers['Cache-Control'],'private, no-store');return res;
   }
   const requestBody=()=>({operation:'request',expectedWallet:addresses[0],action:'grant_role',targetWallet:target,role:'moderator',nextAuthorities:[]});
@@ -471,8 +471,9 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     sql(`INSERT INTO artsoul_staff_passkeys(wallet_address,credential_id,public_key,enrolled_via,authorization_version)
       VALUES(${q(target)},'session-fixture-key','fixture-public-key','additional',${initial.authorization_version})`);
     const base=response(),elevated=response();setWalletSession(base,target);
-    setModerationSession(elevated,target,'session-fixture-key',initial.authorization_version);
-    const req={headers:{cookie:[base,elevated].map(r=>r.headers['Set-Cookie'].split(';')[0]).join('; ')}};
+    const context={headers:{'user-agent':'local-staff-test'},socket:{remoteAddress:'127.0.0.1'}};
+    setModerationSession(elevated,target,'session-fixture-key',initial.authorization_version,'passkey',context);
+    const req={...context,headers:{...context.headers,cookie:[base,elevated].map(r=>r.headers['Set-Cookie'].split(';')[0]).join('; ')}};
     assert.equal((await getModerationAccess(req,{strict:true})).canModerate,true);
     assert.equal(await apply(request('revoke_role')),'OK');
     await assert.rejects(getModerationAccess(req,{strict:true}),e=>e.code==='ADMIN_REQUIRED');
@@ -531,7 +532,7 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
   const ok=res=>{assert.equal(res.statusCode,200,JSON.stringify(res.body));return res.body;};
   const privilegedRequest=res=>{
     const base=response();setWalletSession(base,target);
-    return {headers:{cookie:[base,res].map(r=>r.headers['Set-Cookie']?.split(';')[0]).filter(Boolean).join('; ')}};
+    return {headers:{cookie:[base,res].map(r=>r.headers['Set-Cookie']?.split(';')[0]).filter(Boolean).join('; '),'user-agent':'local-staff-test'},socket:{remoteAddress:'127.0.0.1'}};
   };
   // Real P-256/WebAuthn cryptography from an ephemeral software authenticator.
   // This proves API validation; it is not physical device/user-presence evidence.
@@ -628,7 +629,7 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     assert.equal(sql('SELECT activated_at IS NULL FROM artsoul_staff_totp_factors'),'t');
     const attempt=ok(await factorCall('totp-begin',{factorId:prepared.factorId,purpose:'enrollment'}));
     const verified=await factorCall('totp-verify',{attemptId:attempt.attemptId,code:calculateTotp(prepared.secret,Math.floor(Date.now()/1000))});
-    assert.equal(ok(verified).expires_in_seconds,900);
+    assert.equal(ok(verified).expires_in_seconds,86400);
     const elevated=privilegedRequest(verified);
     assert.equal((await getModerationAccess(elevated,{strict:true})).canModerate,true);
     const status=ok(await factorStatus());assert.equal(status.setup,null);assert.equal(status.totpFactorId,prepared.factorId);

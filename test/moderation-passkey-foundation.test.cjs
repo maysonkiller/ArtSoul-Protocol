@@ -1,6 +1,6 @@
 // A8a moderation passkey foundation: behavioral coverage of the feature
 // flag, fail-closed configuration, one-time bearer-token enrollment grants,
-// challenge/grant binding, the 15-minute step-up session, last-key
+// challenge/grant binding, the context-bound staff session, last-key
 // protection, revocation, audit events, and the rule that X/Discord text
 // never authorizes moderation. The REAL backend/session/passkey/access/route
 // sources run inside vm with an in-memory Supabase mock that also implements
@@ -12,6 +12,7 @@
 // test/a8a-passkey-rpc-integration.test.cjs.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const { isIP } = require('node:net');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -284,7 +285,7 @@ function fakeRes() {
 }
 
 function fakeReq({ method = 'POST', cookie = '', body = {}, host = 'artsoul.test', query = {} } = {}) {
-  return { method, url: '/api/test', headers: { cookie, host }, body, query };
+  return { method, url: '/api/test', headers: { cookie, host, 'user-agent': 'local-staff-test' }, socket: {remoteAddress:'127.0.0.1'}, body, query };
 }
 
 function cookieValueFromHeader(header) {
@@ -327,7 +328,7 @@ function loadEnvironment({ env = {}, db = createDb(), webauthn = {}, recoveryRpc
   const context = vm.createContext({
     process: { env: { NODE_ENV: 'test', ...env } },
     console: { log() {}, warn() {}, error() {} },
-    crypto, Buffer, URL, URLSearchParams, FetchRequest: MockFetchRequest, Interface, JsonRpcProvider: MockJsonRpcProvider,
+    crypto, isIP, Buffer, URL, URLSearchParams, FetchRequest: MockFetchRequest, Interface, JsonRpcProvider: MockJsonRpcProvider,
     hashMessage, isAddress, isHexString, exported: {},
     generateRegistrationOptions: async (options) => {
       calls.registrationOptions.push(options);
@@ -393,7 +394,7 @@ function loadEnvironment({ env = {}, db = createDb(), webauthn = {}, recoveryRpc
   }
   function moderationCookie(wallet, credentialId) {
     const res = fakeRes();
-    context.exported.setModerationSession(res, wallet, credentialId);
+    context.exported.setModerationSession(res, wallet, credentialId, undefined, 'passkey', fakeReq());
     return cookieValueFromHeader(res.headers['set-cookie']);
   }
 
@@ -885,15 +886,15 @@ test('role-bound authentication rejects legacy, foreign, expired and registratio
   });
 });
 
-test('a valid authentication issues the exact 15-minute moderation session and advances the counter', async () => {
+test('a valid authentication issues the bounded 24-hour moderation session and advances the counter', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
   const { verifyRes } = await runAuthentication(envir);
   assert.equal(verifyRes.statusCode, 200, JSON.stringify(verifyRes.body));
-  assert.equal(verifyRes.body.expires_in_seconds, 900);
-  assert.equal(envir.exported.MODERATION_SESSION_TTL_SECONDS, 900);
+  assert.equal(verifyRes.body.expires_in_seconds, 86400);
+  assert.equal(envir.exported.MODERATION_SESSION_TTL_SECONDS, 86400);
   assert.match(verifyRes.headers['set-cookie'], /artsoul_mod_session=/);
-  assert.match(verifyRes.headers['set-cookie'], /Max-Age=900/);
+  assert.match(verifyRes.headers['set-cookie'], /Max-Age=86400/);
   assert.match(verifyRes.headers['set-cookie'], /HttpOnly/);
   const stored = db.tables.artsoul_staff_passkeys[0];
   assert.equal(stored.sign_count, 7);
@@ -984,7 +985,7 @@ test('a step-up for a different wallet than the SIWE session is rejected', async
     (e) => e.code === 'STEP_UP_WALLET_MISMATCH');
 });
 
-test('an expired 15-minute session fails closed', async () => {
+test('an expired session fails closed', async () => {
   const db = createDb(staffSeed({ passkeys: [activePasskey()] }));
   const envir = loadEnvironment({ env: CONFIGURED_ENV, db });
   const payload = Buffer.from(JSON.stringify({ wallet: STAFF, credential_id: 'cred-1', exp: Math.floor(Date.now() / 1000) - 1 })).toString('base64url');

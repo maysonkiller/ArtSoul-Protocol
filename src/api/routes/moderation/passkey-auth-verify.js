@@ -100,7 +100,7 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'STEP_UP_REQUIRED' });
       }
     }
-    setModerationSession(res, wallet, credentialId, authorizationVersion);
+    setModerationSession(res, wallet, credentialId, authorizationVersion, 'passkey', req);
     res.status(200).json({
       success: true,
       expires_in_seconds: MODERATION_SESSION_TTL_SECONDS

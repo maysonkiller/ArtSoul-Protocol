@@ -51,7 +51,7 @@ function cookie(wallet, stepUp = false) {
   const parts = [];
   const res = {setHeader(_name, value) { parts.push(String(value).split(';')[0]); }};
   setWalletSession(res, wallet);
-  if (stepUp) setModerationSession(res, wallet, 'local-virtual-credential');
+  if (stepUp) setModerationSession(res, wallet, 'local-virtual-credential', undefined, 'passkey', {headers:{'user-agent':'local-staff-test'},socket:{remoteAddress:'127.0.0.1'}});
   return parts.join('; ');
 }
 function expiredStepUp(walletCookie) {
@@ -212,7 +212,7 @@ test('Phase A local moderation route journey and captured email (virtual credent
   };
   async function call(path, {wallet, stepUp, auth, body} = {}) {
     const response = await originalFetch(`${origin}${path}`, {method: body ? 'POST' : 'GET',
-      headers: {'Content-Type': 'application/json', cookie: auth ?? (wallet ? cookie(wallet, stepUp) : '')},
+      headers: {'Content-Type': 'application/json', 'user-agent':'local-staff-test', cookie: auth ?? (wallet ? cookie(wallet, stepUp) : '')},
       ...(body ? {body: JSON.stringify(body)} : {})});
     return {status: response.status, body: await response.json()};
   }

@@ -30,7 +30,7 @@ async function fetchActiveRole(wallet) {
 
 // A8a (founder decision 2026-07-20): with the passkey flag enabled,
 // moderation requires ONLY an active staff role + a valid SIWE session + a
-// valid 15-minute passkey step-up. The profiles table is NOT queried at all,
+// valid context-bound factor session. The profiles table is NOT queried at all,
 // so X/Discord data can never participate and a profiles outage can never
 // deny an otherwise valid passkey-protected moderator.
 async function getPasskeyModerationAccess(req, wallet, strict) {

@@ -4,6 +4,13 @@ Status: implementation and activation plan. This runbook coordinates the
 A8a/A8b/A8c foundations and the disabled A8d Safe recovery foundation.
 It does not amend protocol architecture or economics.
 
+October 11 session amendment: the founder approved a fixed maximum of 24 hours
+after factor verification, with renewed verification in another browser/device
+or after a trusted client-IP change. Earlier 15-minute acceptance is historical;
+the new expiry and context checks need their own evidence. The 15-minute factor
+setup permission and five-minute paired approval window remain unchanged. See
+[canon 07](../canon/07_ADMIN_MODERATION_CANON.md#october-11-verified-session-duration-amendment).
+
 ## Application addendum — 2026-09-30
 
 The exact reviewed A8a, A8b, A8c and A8d migrations have committed in order,
@@ -34,7 +41,8 @@ Complete A-22 without exposing production authority:
 2. Add a `Protocol Admin` item to the shared account dropdown only after the
    server confirms an active staff role for the current SIWE wallet.
 3. Require the A8a passkey step-up before the page returns protected data or
-   accepts a moderation action. The step-up session remains 15 minutes.
+   accepts a moderation action. The verified session has a fixed maximum of
+   24 hours and requires re-verification in a new browser/device or network context.
 4. Re-check SIWE, active staff role and passkey step-up on every protected API
    request. A hidden link, route name or client-side flag is never an
    authorization boundary.
@@ -138,7 +146,10 @@ Verify all of the following before declaring A8 complete:
 - manually adding the entry in browser tools grants no access;
 - an eligible staff wallet sees the entry only after server role confirmation;
 - the admin page exposes no protected data before passkey step-up;
-- the 15-minute step-up expires and requires re-verification;
+- the fixed 24-hour step-up expires and requires re-verification without sliding
+  renewal from ordinary activity;
+- another browser/device or a changed trusted client IP requires fresh factor
+  verification, without bypass through caller-controlled forwarding headers;
 - the same wallet/artwork/category pending complaint deduplicates to one report
   and one event;
 - two different reporter wallets create two independent reports and events;

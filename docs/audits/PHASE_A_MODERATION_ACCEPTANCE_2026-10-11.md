@@ -146,3 +146,43 @@ owner's satisfactory iPhone report. Authenticator-app entry is not claimed by a
 passkey ceremony. The controlled-beta GO record still needs its remaining gates,
 reviewed P1 result, named operator/support/pause ownership and cohort/window.
 No new economics or canon ambiguity was introduced by these tests or UI fix.
+
+## Resumed owner session amendment
+
+The owner subsequently excluded Android from this Phase A close-out and replaced
+the 15-minute staff verification with a fixed 24-hour maximum. Android is
+OWNER-WAIVED / NOT TESTED. No successful Android run is inferred. Canon 07's
+October 11 amendment supersedes the earlier session-duration requirement.
+
+The patch binds the signed HttpOnly session to a keyed digest of trusted client
+IP and browser User-Agent; missing cookies or a changed context require another
+factor verification. It preserves active-role, wallet, authorization-version and
+factor-revocation checks. Both passkey and TOTP issuance use the request context.
+Logout clears both wallet and staff cookies. Fifteen-minute setup permissions,
+five-minute paired approvals and TOTP limits remain unchanged.
+
+Regression evidence: 112 focused backend checks, 52 frontend/document checks,
+and the full application suite's 1823 checks passed with zero skips. Build,
+11 HTML route checks and 174 compiled style checks passed. Exact expiry, activity
+after the old 15-minute limit, trusted-edge selection, spoofed forwarding headers,
+IPv6 normalization, context changes, old/tampered cookies, unchanged setup TTL,
+TOTP parity and logout are covered. Local files are under output/audit using the
+staff-session and admin-session-copy-docs prefixes for October 11.
+
+Interpretation: this is browser-session binding, not hardware attestation. A
+copied cookie with the same IP and User-Agent cannot be distinguished. Mobile,
+VPN or browser-context changes may prompt again. Simulated time is local test
+evidence only; no chain clock or production time was changed. Deployment and
+real-context acceptance are recorded separately when observed. The existing
+passkey can be reverified after release; setup/reset is unnecessary.
+
+Compiled local Chrome passed 68 assertions in Classic/Future at 1280/390/320px,
+including the 24-hour copy, TOTP and both passkey dialog paths, and unchanged
+15-minute setup expiry. No page errors or external requests occurred. HTTP,
+wallet and WebAuthn are local doubles; this is UI evidence, not a native ceremony.
+The initial fixture-only initialization error was corrected and its failed log
+retained. Read-only Vercel project/domain/DNS checks confirm system environment
+identification is enabled, the domain uses correctly configured A records, and
+the API is served by Vercel. The CLI renewed an expired local token normally;
+no hosting setting was changed. This supports trusted-edge selection but does
+not replace an authenticated production test from another IP.

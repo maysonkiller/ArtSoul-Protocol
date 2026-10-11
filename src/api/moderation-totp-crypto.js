@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 // Unwired cryptographic primitives only. A matching step is NOT authorization.
-// Before issuing the existing 15-minute staff session, integration must enforce
+// Before issuing a context-bound staff session, integration must enforce
 // the active wallet/role/factor, rate limits and atomic one-time step consumption.
 // Enrollment, replacement and recovery require the approved two-wallet policy.
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';

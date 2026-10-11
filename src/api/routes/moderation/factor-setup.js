@@ -124,7 +124,7 @@ export default async function handler(req, res) {
     requireResult(result);
     await sameAuthorization(context);
     if (await activeTotp(context) !== factor.id) throw factorError('FACTOR_INELIGIBLE');
-    setModerationSession(res, wallet, factor.id, authorizationVersion, 'totp');
+    setModerationSession(res, wallet, factor.id, authorizationVersion, 'totp', req);
     return res.status(200).json({ success: true, expires_in_seconds: MODERATION_SESSION_TTL_SECONDS });
   } catch (error) { sendError(res, error); }
 }

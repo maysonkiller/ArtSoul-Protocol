@@ -149,6 +149,36 @@ on October 11. Report, queue and Donate are now enabled after the bounded real
 journeys recorded in `../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md`;
 remaining A8 edge-case and device acceptance is listed separately.
 
+## October 11 verified-session duration amendment
+
+The founder explicitly replaces the previous 15-minute moderation session with
+a fixed maximum of 24 hours after successful passkey or authenticator-app
+verification. Ordinary activity does not extend that expiry. A different browser
+or device, or a change in the client IP established by the trusted server edge,
+requires factor verification again; wallet connection alone cannot carry the
+verified session into a new context. Caller-supplied IP claims are not authority.
+
+This amendment changes the verified-session lifetime and context checks only.
+The active staff role, authenticated wallet, current authorization version and
+factor revocation checks still apply to every protected request. Both current
+authority wallets remain necessary for role changes, authority rotation and
+factor setup/recovery. The 15-minute setup permission, five-minute paired
+approval window, TOTP attempt limits and two-minute reservation are unchanged.
+Contract custody, complaint decisions and economics are unchanged.
+
+This is the approved replacement policy. Earlier 15-minute session and ceremony
+records remain historical evidence, not acceptance of the new 24-hour policy.
+Implementation tests and deployment/real-context acceptance must be recorded
+separately before claiming the changed behavior is live.
+
+Implementation interpretation: the server binds its signed, HttpOnly session to
+the trusted client IP and browser User-Agent using a keyed digest. A browser
+without that session must verify again. This is browser-session binding, not
+physical-device attestation: a copied session with identical network/browser
+claims is not distinguishable. Network changes, including VPN or mobile-network
+changes, can require another verification. Raw IP and User-Agent values are not
+stored in the session payload. Logout clears both wallet and staff sessions.
+
 ## Public Repository Boundary
 
 Operational abuse heuristics, private anti-sybil checks, and escalation playbooks should not be published in this repository.
