@@ -3,6 +3,38 @@
 Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 11 live moderation edges and decision UI (21:00 UTC):
+
+- Same workspace/branch; starting HEAD `0f54d9c`. Owner confirmed the existing
+  passkey and the actual apex Admin showed the new active 24-hour session.
+  No reset, enrollment, role, flag, payment or contract change was needed.
+- Three explicitly technical reports on the existing Base Sepolia artwork 34
+  completed the live sixth-intake limit, duplicate-pending/actioned reopen,
+  stale decision and concurrent restore checks. The race returned one 200 and
+  one 409 with one restoration event. The sixth intake returned 429 without a
+  new row. All three new reports are closed, all six mail records accepted once,
+  and the three earlier reports plus artwork/donation records are unchanged.
+  Private journals use `moderation-edge-*` and `moderation-edges-*` for this date;
+  their final offline verification passed 26 assertions. Never replay them.
+- Actual hidden and restored artwork browser checks passed; the unavailable
+  state no longer spins. The existing owner session supplied the real review
+  authority, never a fixture. Screenshots use `moderation-{hidden,restored}-live`.
+- Live tests found two frontend defects: expected state refusals replaced the
+  entire Admin view, and a decision reason leaked into the next report dialog.
+  The minimal patch reuses conflict refresh and unmounts closed dialogs. The
+  backend, authorization, report states and notification rules are unchanged.
+  Reproductions failed before the patch; focused checks 51/51, full suite
+  1826/1826 (zero skips), build and compiled Chrome 65 assertions passed.
+  Both themes at 1280/390/320px have zero page errors/external fixture requests.
+  Logs/evidence: `output/audit/moderation-decision-*` for October 11.
+- Exactly next step: release this bounded UI patch after exact-candidate CI,
+  then recheck actual Admin behavior and record the release. Current production
+  remains `ba61d5c` until that later entry. Preserved untracked files are unchanged.
+  No child agent is running. Android remains owner-waived / not tested.
+- Remaining limits: exact 24-hour wall-clock expiry and changed-IP native entry
+  are not inferred from local clock/context tests; disabled-preview preservation
+  is not a production flag-toggle ceremony. Phase A is not declared complete.
+
 October 11 staff-session release (20:29 UTC):
 
 - PR #297 merged as `ba61d5c94c661d1e68615bd8f7c4b95203146e99` at 20:28:13 UTC.

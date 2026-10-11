@@ -194,5 +194,66 @@ matched all 53 checked assets on six pages. Real anonymous logout clears both
 secure cookies; private APIs deny guests. Apex Report/queue/Donate stay enabled,
 and the indexer is healthy with zero observed lag. The actual owner Admin tab
 now requests normal passkey verification, as intended for the old session.
-One owner verification is pending; no renewed passkey or changed-IP production
-ceremony is claimed here. No contract, role, data or feature-flag change occurred.
+At that release checkpoint owner verification was pending. The later live block
+below supersedes that pending status, not the changed-IP evidence boundary.
+No contract, role, data or feature-flag change occurred during the release.
+
+## Renewed live session and remaining complaint edges, 20:49–21:00 UTC
+
+The owner confirmed the existing passkey. The real apex Admin showed active
+access with the new 24-hour copy and served the protected queue. This is a native
+verification, not a simulated WebAuthn result. No paired reset or enrollment was
+repeated. All writes below were bounded technical tests against the project's
+existing Base Sepolia artwork 34; their text explicitly alleges no misconduct.
+
+| Scenario | Actual production result |
+| --- | --- |
+| Reopen a closed report while its reporter/category has a newer pending report | HTTP 409 `REPORT_ALREADY_PENDING`; no transition |
+| Reopen an actioned report | HTTP 409 `REPORT_ACTION_NOT_ALLOWED`; no transition |
+| Two simultaneous restores of the same report version | One HTTP 200, one 409 `REPORT_REVIEW_CONFLICT`; exactly one committed restoration |
+| Hide with the pre-restoration report version | HTTP 409 `REPORT_REVIEW_CONFLICT`; artwork remains visible |
+| Sixth new report from the old test creator inside 24 hours | HTTP 429 `REPORT_DAILY_LIMIT_REACHED`; no sixth row |
+| Real hidden/restored artwork UI after PR #296 | Neutral unavailable state with no endless indexing spinner; original artwork and provenance return after restore |
+
+The three new technical reports ended resolved/dismissed/dismissed. All three
+earlier reports are unchanged. Six report mails have provider acceptance with
+one attempt each; this records provider delivery status, not an invented inbox
+receipt for the three new messages. The owner's earlier project inbox receipt
+remains separately confirmed. The final ledger has 26 events versus 15 before
+this block: exactly the expected intake, hide/restore, dismiss and notification
+events. Artwork/donation record counts and content hashes are unchanged, and
+the artwork is visible. No financial transaction, economy, role or flag changed.
+
+Private evidence: `moderation-edges-{before,first-pending,first-hidden,first-restored,second-dismissed,third-dismissed,final}-2026-10-11.json`,
+the `moderation-edge-intake-*`, `moderation-edge-reopen-*`,
+`moderation-edge-restore-race-*` and `moderation-edge-stale-*` intent/results.
+`node docs/private/verify-moderation-edges-2026-10-11.mjs` passed 26 saved-evidence
+assertions; it makes no external writes. Completed operations must not replay.
+Screenshots: `output/audit/staff-session-active-live-2026-10-11.png` and
+`moderation-{hidden,restored}-live-2026-10-11.png`.
+
+Two real UI defects were reproduced during these checks. A legitimate state
+refusal incorrectly replaced the entire Admin with an unavailable screen, even
+though the verified session was still valid. Separately, the mounted decision
+dialog retained its reason after cancellation or success and inserted it into
+the next report. The narrow patch treats the existing four state-conflict codes
+as queue-refresh outcomes and mounts the dialog only while a decision is open.
+Denied refresh and wallet/logout changes still clear protected data. It does
+not change server authorization, report states, allowed actions or mail rules.
+
+Before the patch, the focused unit reproduction failed twice and the compiled
+browser reproduction showed the copied reason. After it: 51 focused checks,
+1826 full application checks (zero skips), build and 65 compiled Chrome
+assertions passed. The browser fixture covers both themes at 1280/390/320px,
+fresh reasons after cancellation/success, all four recoverable refusals,
+denied access and no horizontal overflow; it produced six screenshots, no page
+errors and no external requests. Logs and JSON use
+`output/audit/moderation-decision-*` for October 11. This proves the compiled
+patch with local HTTP doubles; a subsequent release entry records live rollout.
+
+These results supersede the earlier pending live rate-limit/concurrency/reopen
+and hidden-state checks. Exact new 24-hour wall-clock expiry, another-IP native
+entry, provider failure isolation and production flag-toggle evidence retain
+their own limits; local tests or disabled preview are not relabeled as those
+ceremonies. No new canon mechanics or interpretation was introduced: this is
+the existing complaint/review UX under Bible §11 / canon 07.
