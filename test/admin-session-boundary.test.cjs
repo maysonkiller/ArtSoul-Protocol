@@ -173,3 +173,43 @@ test('a repeated settled-wallet event preserves the current admin view', async()
     h.event('artsoul:wallet-state-changed');const view=h.render();
     assert.equal(view.accessState,'ready');assert.equal(view.data.reports[0].id,'private-report');assert.equal(h.state.calls.length,count);
 });
+
+test('expected review conflicts refresh the queue without revoking valid admin access', async()=>{
+    for(const code of ['REPORT_REVIEW_CONFLICT','REPORT_ALREADY_PENDING','REPORT_ACTION_NOT_ALLOWED','REPORT_TARGET_MISMATCH']) {
+        const h=harness();await tick();h.render();
+        h.actions.setDecision({report:{id:'report',updated_at:'version'},action:'reopen'});h.render();
+        h.state.api=async path=>{
+            if(path==='review-action')throw Object.assign(new Error('Review the latest report.'),{code,status:409});
+            return {data:{...empty(),reports:[{id:'refreshed-report'}]}};
+        };
+        await h.actions.submitDecision('review reason');const view=h.render();
+        assert.equal(view.accessState,'ready',code);assert.equal(view.access.stepUpActive,true);
+        assert.equal(view.decision,null);assert.equal(view.message,'Review the latest report.');
+        assert.equal(view.data.reports[0].id,'refreshed-report');assert.equal(view.busy,false);
+    }
+});
+
+test('a review conflict cannot preserve access when its queue refresh is denied',async()=>{
+    const h=harness();await tick();h.render();
+    h.actions.setDecision({report:{id:'report',updated_at:'version'},action:'reopen'});h.render();
+    h.state.api=async path=>{
+        throw Object.assign(new Error('Denied.'),{code:path==='review-action'?'REPORT_ALREADY_PENDING':'STEP_UP_REQUIRED',status:path==='review-action'?409:403});
+    };
+    await h.actions.submitDecision('review reason');const view=h.render();
+    assert.equal(view.accessState,'step_up');assert.equal(view.data.reports.length,0);
+    assert.equal(view.decision,null);assert.equal(view.access.stepUpActive,false);
+});
+
+test('logout during a rejected decision refresh cannot restore private report data',async()=>{
+    const h=harness();await tick();h.render();
+    h.actions.setDecision({report:{id:'report',updated_at:'version'},action:'reopen'});h.render();
+    const pending=deferred();h.state.api=async path=>{
+        if(path==='review-action')throw Object.assign(new Error('Review conflict.'),{code:'REPORT_ALREADY_PENDING',status:409});
+        return pending.promise;
+    };
+    const old=h.actions.submitDecision('review reason');await tick();
+    h.state.auth='';h.event('artsoul:auth-state-changed');
+    pending.resolve({data:secret()});await old;const view=h.render();
+    assert.equal(view.accessState,'unauthenticated');assert.equal(view.data.reports.length,0);
+    assert.equal(view.decision,null);assert.equal(view.message,'');
+});

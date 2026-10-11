@@ -399,7 +399,7 @@ function ProtocolAdminPage() {
             );
         } catch (error) {
             if (!sessionIsCurrent(epoch, wallet)) return;
-            if (error.code === 'REPORT_REVIEW_CONFLICT') {
+            if (['REPORT_REVIEW_CONFLICT', 'REPORT_ALREADY_PENDING', 'REPORT_ACTION_NOT_ALLOWED', 'REPORT_TARGET_MISMATCH'].includes(error.code)) {
                 setDecision(null);
                 setMessage(error.message);
                 try { await loadQueue(queueStatusRef.current); }
@@ -570,7 +570,7 @@ function ProtocolAdminPage() {
                 </section>
             )}
 
-            <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} />
+            {decision && <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} />}
             {verification}
         </div>
     );

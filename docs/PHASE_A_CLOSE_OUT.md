@@ -42,6 +42,13 @@ The new 24-hour, browser/network-bound admin session policy is approved in
 [canon 07](canon/07_ADMIN_MODERATION_CANON.md#october-11-verified-session-duration-amendment);
 earlier 15-minute expiry acceptance does not prove the changed policy.
 
+The replacement is now published through PR #297 at `ba61d5c` (October 11,
+20:28 UTC), with 1823 passing local checks, build, 68 compiled UI assertions,
+green exact-candidate CI and preview/apex asset verification. The owner Admin
+tab subsequently accepted the owner's existing passkey and served the protected
+queue. No reset or paired approvals were repeated. Exact 24-hour wall-clock
+expiry and changed-IP native acceptance remain separate from automated tests.
+
 Phase A remains **NO-GO** until the remaining A8/A10 and connected-device
 acceptance is evidenced. A-39 is now accepted: real paired setup/replacement,
 passkey entry, expiry/reverification and protected queue access passed. Both
@@ -58,11 +65,15 @@ notification delivery. Donate is also enabled after real message-only moderation
 and before/after contract/projection verification; both original payments were
 reused, not repeated. All test restrictions were restored.
 
-The remaining A8 live edge cases are the sixth-report limit, stale/concurrent
-decisions, prohibited reopen and flag-off preservation. Local SQL/API coverage
-is green but is not relabeled as production execution. A newly reproduced
-hidden-artwork loading defect is fixed locally, built and regression-tested;
-it was released through PR #296 at `c7dcef6` after green candidate CI. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
+The October 11 evening live checks passed the sixth-report limit, stale and
+concurrent decisions, both prohibited reopen cases and the actual hidden/restored
+artwork UI. All three new technical reports are closed; earlier reports and
+artwork/payment records are preserved. Expected refusal handling and retained
+decision text exposed two small Admin UI defects; the local correction passed
+1826 full tests, build and 65 compiled browser assertions and awaits its release
+record. Flag-off preservation has SQL/API and disabled-preview evidence; this
+is not a production flag-toggle ceremony. The hidden-artwork loading defect
+was released through PR #296 at `c7dcef6`. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
 and the [checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 October 11 independent continuation: the six scoped moderation suites passed
