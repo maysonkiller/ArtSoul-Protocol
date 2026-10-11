@@ -53,7 +53,7 @@ The remaining A8 live edge cases are the sixth-report limit, stale/concurrent
 decisions, prohibited reopen and flag-off preservation. Local SQL/API coverage
 is green but is not relabeled as production execution. A newly reproduced
 hidden-artwork loading defect is fixed locally, built and regression-tested;
-its release is pending. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
+it was released through PR #296 at `c7dcef6` after green candidate CI. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
 and the [checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 The initial September 29 PostgreSQL baseline passed 46 checks across seven

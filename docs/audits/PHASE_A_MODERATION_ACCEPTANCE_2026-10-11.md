@@ -58,7 +58,7 @@ Screenshots: `output/audit/staff-roster-live-2026-10-11.png`,
 `donation-message-{hidden,restored}-live-2026-10-11.png`,
 `donate-live-form-2026-10-11.png`.
 
-## Found and corrected locally
+## Hidden-artwork correction and release
 
 A moderated artwork was incorrectly classified as not yet indexed. The public
 API already supplied exact suppression metadata; the client discarded it.
@@ -67,7 +67,19 @@ artwork/auction content and stops indexer retries. Three failing reproductions
 became 64 passing targeted checks. Build and the full 1,814-check application
 suite passed with zero failures/skips. An initial sandboxed run could not access
 local HTTP/Docker fixtures; the unrestricted local rerun supplied that evidence.
-Publication and actual post-release UI verification are still pending.
+Compiled Chrome added 68 passing assertions across both themes at 1280/390/320px,
+including 35 seconds without retries and recovery after restoration. PR #296
+merged at 09:02:31 UTC as `c7dcef6a511046ed94a406377b6093f8851b30f7` after
+Linux/Windows/static CI passed (run 38126729232). Production deployment 6993341447
+succeeded. Both preview and apex matched all 53 checked assets across six pages.
+Apex evidence: `output/audit/hidden-artwork-apex-artifact-2026-10-11.json`.
+Report/Donate remain enabled, private API denials passed and the indexer was healthy. The actual production hidden-state recheck still needs
+an owner-verified session; compiled-fixture evidence is not that live ceremony.
+
+The owner's profile-email screenshot and a read-only server check confirm
+email ownership verification at October 3, 06:56:12 UTC. No address/token was
+disclosed. TA-10 social-link presentation and TA-11 email delivery are accepted;
+separate cross-device OAuth return evidence is not implied.
 
 ## Remaining boundaries
 

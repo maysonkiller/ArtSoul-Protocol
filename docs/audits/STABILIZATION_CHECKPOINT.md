@@ -3,6 +3,43 @@
 Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 11 closing checkpoint (09:04 UTC):
+
+- Workspace unchanged; local tested application HEAD `38c9e71`. PR #296 merged
+  as `c7dcef6a511046ed94a406377b6093f8851b30f7` at 09:02:31 UTC; production
+  deployment 6993341447 succeeded. Source changes: only suppression handling in
+  supabase-client/artwork page and their two regression files. Docs record facts.
+- Full local application suite passed 1814/1814, zero skips; focused 64/64;
+  build passed; isolated compiled Chrome 68 checks across two themes/three widths
+  passed; post-document consistency 6/6. CI run 38126729232 passed Linux/Windows/
+  static. Preview and apex both matched all 53 checked assets across six pages. Guest Admin and
+  notification APIs remain private; Report and Donate are enabled. Indexer was
+  healthy with zero observed lag. Evidence: hidden-artwork-apex-artifact-2026-10-11.json.
+- Real artwork and donation-message moderation journeys completed. All three
+  reports are resolved; artwork 34 and original donation text are visible.
+  No payment was repeated. Both RPC snapshots, payment records and public lists
+  unchanged apart from temporary message masking. Final private report snapshot:
+  `moderation-acceptance-2026-10-11T09-02-56-107Z.json`; message verification:
+  `donation-message-acceptance-restored-2026-10-11.json`. Both creator and donor
+  SIWE notification reads passed; actual profile showed reporter notifications.
+- Report, protected queue and Donate are ON. Current Donate deployment address
+  remains 0xa36bd0da05fa5aa113834ad355363c66cd42a22b on 84532. The owner confirms
+  first complaint mail reached project inbox; all 3 provider submissions accepted
+  once. Donate modal and gallery menu order/auto-open passed actual browser.
+- Real passkey session expired and cleared complaint data again at 08:59. Owner
+  was asked for Verify admin access > Verify passkey for remaining live edges;
+  no reset/two signatures needed. Android availability question also pending.
+  Do not impersonate native verification or mark unobserved device tests passed.
+- A-39 accepted; Phase A counts: 65 done / 18 in progress. TA-10/TA-11/TA-13 accepted.
+  Owner email verification is server-confirmed at October 3 06:56:12 UTC without
+  reading/disclosing the email. Separate OAuth/device and A10 GO remain open.
+- This documentation follow-up is saved separately after the tested application
+  commit; use git log -1 for its HEAD. Preserve historical
+  untracked observer files, .codex and output. The one bounded reviewer finished.
+- Exactly next step: once owner passkey is renewed, run bounded stale/concurrent
+  decision, reopen and sixth-report-limit cases on project artwork 34, with fresh
+  journals and final restoration. Do not repeat existing transactions/reports.
+
 October 11 live acceptance continuation (08:51 UTC):
 
 - Current local HEAD `eccc7e1`, branch `codex/takeover-audit`, same workspace.
