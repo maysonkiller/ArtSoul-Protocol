@@ -36,10 +36,15 @@ October 11 decision UI release and live acceptance (21:08 UTC):
   documentation follow-up checks are recorded with the release evidence.
 - Same workspace/branch; use git log -1 for the documentation-only follow-up
   HEAD. No active subagent, financial operation or new automation remains.
-  Exactly next step: reconcile remaining RG-01 device/OAuth rows against already
-  saved evidence and the owner's iPhone acceptance, without replaying completed
-  moderation, funding, donation, setup/reset or Android testing. Phase A remains
-  open for its explicitly unevidenced acceptance and controlled-beta GO inputs.
+  RG-01 reconciliation reused the September 30 saved analysis and October 8
+  owner iPhone report without reanalysing video. The device sheet now explicitly
+  records that report and narrows missing outcomes; the historical blank RG-01
+  template no longer implies repeated Android or staff-setup ceremonies.
+  Exactly next step when the owner is available: record only the missing native
+  iOS SIWE/disconnect and Discord-return outcomes, retaining their wallet/device
+  context. Do not replay completed moderation, funding, donation or setup/reset.
+  Other listed device criteria and the controlled-beta operator/cohort/window GO
+  inputs remain open; no fresh acceptance is invented from the saved video.
 
 October 11 live moderation edges and decision UI (21:00 UTC):
 

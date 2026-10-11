@@ -13,8 +13,9 @@ acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
 
 This sheet is organised by trip. Each trip says what to do, what to watch, and
-which rows its answers close. Record the result here, dated, per device — a
-conversation saying it looked fine closes nothing.
+which rows its answers close. Record the result here, dated, per device. An
+owner-reported run is evidence of the outcomes actually asked about; label it
+as owner-reported and do not infer unasked OAuth, transaction or device results.
 
 October 8 owner follow-up: asked about the previous iPhone gallery/detail/Back,
 wallet/profile reload, tab switching and lock/resume run, the owner reported
@@ -212,6 +213,7 @@ alone does not establish iOS acceptance.
 | Date | Device | Browser | Trip | Rows answered | Result |
 | --- | --- | --- | --- | --- | --- |
 | 2026-09-27 | Windows desktop, Chrome 153.0.8010.53 | Ordinary installed Chrome; headed window for BFCache | Trip 1, partial | A-79; desktop portion of A-48 | Apex at release `81627ab`: opening creator read limit 24, identity before cards and full corpus, no settled-content reset. A-79 accepted. Headed Back restored the same marker with `pageshow.persisted=true`; A-48 phones remain open. See [release evidence](../audits/STABILIZATION_RELEASE_2026-09-27.md). |
+| 2026-10-08 | Owner's actual iPhone | Safari was specified in the question; version not recorded | Gallery/detail/Back, wallet/profile reload, profile tabs, lock/resume | Owner-reported browsing/restore subset of trips 1–2 | Owner answered that the requested run had already been done and appeared to work well. Reuse this result; do not demand the whole trip again. This does not identify the wallet suffix, native OAuth returns, explicit disconnect, account-menu balance, a publish confirmation delay or BFCache instrumentation. |
 | 2026-10-11 | Android | Not exercised for current close-out | All Android portions | Android portions of Phase A device gates | OWNER-WAIVED / NOT TESTED by explicit founder instruction. No Android PASS is inferred from iOS, desktop or automated layout checks. |
 
 The same read-only run checked A-33's public provenance cases: five of 34 public
@@ -258,3 +260,17 @@ Later October 11 amendment: the founder explicitly removed Android testing from
 the remaining work. The earlier unanswered Android question above is therefore
 superseded by OWNER-WAIVED / NOT TESTED, not by a test result. Other unresolved
 device or factor outcomes remain separate.
+
+October 11 evening reconciliation: the existing owner passkey was reverified,
+live complaint edges completed, and the two reproduced Admin UI defects were
+released and accepted on the apex through PR #298. Those are completed work,
+not new phone prerequisites. The source recordings' saved September 30 analysis
+documents pre-fix symptoms; it cannot certify the later repair on a real phone.
+No video was reanalysed for this reconciliation.
+
+The next phone follow-up must ask only for an unresolved outcome: native SIWE
+and explicit disconnect/reload, Discord returning to the apex, wallet identity
+suffix/version, balance display, connected publish/pending feedback and the two
+wallet capability/account-switch cases where applicable. Existing gallery/Back,
+reload, tab and lock/resume observations must not be discarded or re-requested
+as a complete trip. Do not invent missing timestamps or an Android result.
