@@ -1,5 +1,12 @@
 # October 7: administration and verified collections
 
+October 8 implementation status: PR #294 is deployed at `17cfc3c`. The reviewed
+paired-authority/factor schema, initial policy and server configuration are
+installed. Local tests, exact-candidate CI and real non-staff access-denial checks
+passed. Owner two-wallet setup/reset and physical factor acceptance remain open;
+public reporting, review and Donate remain off. This supersedes the implementation
+status in the historical direction table below, without changing its decisions.
+
 The founder approved the following direction while continuing Phase A:
 
 | Area | Previous accepted implementation | Approved next behavior | Implementation status |

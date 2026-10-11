@@ -127,8 +127,25 @@ passkey prompt or pending authenticator setup does not consume it. A grant or
 sign-in reset advances the authorization version and replaces previous staff
 sign-in access; it does not add a second independent self-issued factor. Legacy
 self-grants and Safe recovery cannot issue factors under the paired policy.
-Local code and isolated tests implement this interpretation; live configuration
-and the owner ceremony remain pending.
+PR #294 implements this interpretation and is deployed at `17cfc3c` with the
+reviewed schema and initial policy installed on October 8. The same-source
+configuration redeploy enables paired setup and the authenticator option.
+Initial owner setup and a subsequent paired reset/replacement were independently
+observed on October 8: both signed approvals were consumed, the replacement
+passkey was enrolled against the new authorization version, and authentication
+succeeded. Earlier factors remain in the audit history but cannot satisfy the
+new version. This is not authenticator-app or complaint-workflow acceptance;
+public reporting, the review queue and Donate remain disabled at this checkpoint.
+
+October 11 team-management clarification (founder request): authority membership
+is independent of a staff role. Either authenticated current authority can read
+the private, paginated staff roster, including removed roles. Removing a staff
+role from an authority wallet does not remove its approval power, and authority
+alone never grants complaint access. Replacing a staff wallet uses two separately
+paired approvals: revoke the old role, then grant the new wallet. Replacing an
+approval wallet is a separate rotation approved by the current pair. No single-key
+recovery exception is introduced. This roster is implemented locally; its release
+and browser acceptance are recorded separately.
 
 ## Public Repository Boundary
 

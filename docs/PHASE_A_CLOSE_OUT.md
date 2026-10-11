@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-08. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-11. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -39,14 +39,16 @@ notification delivery is implemented, tested and published. The four dormant A8
 schema migrations were applied and verified on September 30; real signed-in
 notification reads now return 200 instead of the reproduced 503. The historical
 database remains pre-ledger; no old migration entries were fabricated.
-Real operator acceptance remains outstanding. PR #293 is deployed at
-`154d16f2fe18734a6766330c3aa7021eecf00702`; candidate Linux/Windows/static CI
+Real operator acceptance remains outstanding. PR #294 is deployed at
+`17cfc3cb2b2ac005366c56097e3f9b35a28dbcc1`; candidate Linux/Windows/static CI
 passed, and preview/apex matched all 53 checked assets across six pages.
 The connected Chrome gallery verified the requested media-overlay menu and
 indexed creation link. Profile/social/email layout and native admin setup from
-PR #292 are also published; real native-factor acceptance is still open.
-Apex runtime checks confirm the passkey and email flags are enabled. Reporting,
-Protocol Admin and Donate remain disabled. The October 2, 23:40 UTC read records
+PR #292 are also published. Real owner passkey setup, replacement and subsequent
+entry were verified on October 8. On October 11 the protected Protocol Admin
+queue was enabled on the same accepted source; owner browser access passed and
+real guest/non-staff requests were denied. Reporting and Donate remain disabled
+at this checkpoint. The historical October 2, 23:40 UTC read records
 one authorized founder role and one unused bootstrap grant, but zero passkeys;
 enabled routes and a grant do not prove enrollment or recovery. The corrected
 email hosting route accepted one real verification request, and Resend reports
@@ -62,10 +64,18 @@ Resend team access was transferred to the project mailbox as authorized. The
 full complaint-to-decision notification journey remains unverified.
 The owner approved two gasless authority signatures for role grants and recovery,
 a shared single-use 15-minute setup permission, passkey OR authenticator app, and
-five TOTP reservations per rolling five minutes with two-minute expiry. Local
-backend/UI integration is under final regression; A8e/A8f/A8g and the policy are
-not live. No new Safe is needed for application roles. Real two-wallet approval,
-factor setup and replacement still require the owner's wallet/device actions.
+five TOTP reservations per rolling five minutes with two-minute expiry. Backend/UI
+integration passed 1,802 local checks and exact-candidate CI. A8e/A8f/A8g, the
+initial policy and server-only encryption configuration are installed and verified;
+paired access is live after the same-source configuration redeploy. No new Safe
+is needed for application roles. The owner completed real two-wallet setup and
+passkey entry on October 8: stored signatures, consumed permission, registration
+and two successful authentications were independently verified. A subsequent
+paired reset replaced that factor under a new authorization version, followed by
+successful native entry. Old factor/session rejection is covered by actual SQL
+and API integration; a captured pre-reset production cookie was not replayed.
+The full complaint workflow remains open. Local team roster changes are tested
+separately and have not yet been released.
 The old two-passkey/bootstrap/Safe-only criteria below are superseded by canon
 07's October 8 amendment, not silently waived. See the
 [current checkpoint](audits/STABILIZATION_CHECKPOINT.md) and
@@ -96,8 +106,8 @@ operationally safe reporting/moderation path before a beta GO.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; separate Android rows still require Android |
-| **RG-03** → **A-39** moderation activation | Historical A8 schema is complete; current paired-authority/factor migrations, policy, real setup and workflow acceptance remain open | Both designated wallets approve staff setup; the staff member completes the actual passkey or authenticator-app verification |
-| **Replacement recovery acceptance** | Policy approved October 8: both current authority wallets approve a new 15-minute setup permission and invalidate previous sign-in access. Historical Safe evidence is retained, not replayed | The owner performs the real two-wallet approval and factor replacement; automated fixtures are not that ceremony |
+| **RG-03** → **A-39** moderation activation | Real paired setup, replacement/passkey entry and protected queue access passed. Public complaint, review decision, mail and recipient workflow acceptance remain open | Both designated wallets approve staff setup and replacement; the staff member completes native verification |
+| **Replacement recovery acceptance** | Owner reset, replacement enrollment and entry observed October 8; old-factor/version rejection verified in SQL/API tests. Historical Safe evidence is retained, not replayed | The actual owner approval and replacement are recorded separately; automated fixtures are not that ceremony |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
 against **C14**, and RG-03's own completion clause does not mention it, so a

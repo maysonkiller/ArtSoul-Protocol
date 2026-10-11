@@ -108,6 +108,72 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     assert.equal(sql('SELECT count(*) FROM artsoul_staff_authority_events'),'3');
     assert.throws(()=>request(),/ROLE_UNCHANGED/);
   });
+  await t.test('either authority can lose its staff role and still require both approvals to grant or restore staff access',async()=>{
+    for(let index=0;index<addresses.length;index++) {
+      reset();
+      for(const wallet of addresses) assert.equal(await apply(request('grant_role',addresses[0],'admin',wallet)),'OK');
+      const removed=addresses[index];
+      const previousVersion=Number(sql(`SELECT authorization_version FROM artsoul_staff_roles WHERE wallet_address=${q(removed)}`));
+      const revoke=request('revoke_role',removed,'admin',removed);
+      assert.equal(sql(completeSql(revoke,await proof(revoke),removed)),'OK');
+      assert.equal(sql(`SELECT active FROM artsoul_staff_roles WHERE wallet_address=${q(removed)}`),'f');
+      assert.equal(sql('SELECT count(*) FROM artsoul_staff_roles WHERE active'),'1');
+      assert.deepEqual(readPolicy().authorities,addresses);
+
+      const grant=request('grant_role',removed),approval=await proof(grant);
+      await assert.rejects(()=>proof(grant,[signers[index]]),/INVALID_AUTHORITY_PROPOSAL/);
+      await assert.rejects(()=>proof(grant,[signers[index],signers[index]]),/INVALID_AUTHORITY_PROPOSAL/);
+      assert.equal(sql(completeSql(grant,{...approval,signers:[removed],signatures:[approval.signatures[index]]},removed)),'BOTH_APPROVALS_REQUIRED');
+      assert.equal(roleState(),null);
+      assert.equal(sql(`SELECT consumed_at IS NULL FROM artsoul_staff_authority_requests WHERE id=${q(grant.requestId)}`),'t');
+      assert.equal(sql(completeSql(grant,approval,removed)),'OK');
+      assert.equal(roleState().active,true);
+
+      const restore=request('grant_role',removed,'admin',removed),restoration=await proof(restore);
+      await assert.rejects(()=>proof(restore,[signers[index]]),/INVALID_AUTHORITY_PROPOSAL/);
+      assert.equal(sql(completeSql(restore,restoration,removed)),'OK');
+      const restored=JSON.parse(sql(`SELECT row_to_json(r) FROM artsoul_staff_roles r WHERE wallet_address=${q(removed)}`));
+      assert.equal(restored.active,true);assert.equal(restored.role,'admin');assert(restored.authorization_version>previousVersion);
+      assert.deepEqual(readPolicy().authorities,addresses);
+      assert.equal(sql('SELECT count(*) FROM artsoul_staff_authority_events'),'5');
+    }
+  });
+  await t.test('both authorities without staff roles can jointly rotate, while removed authorities cannot propose or apply even after staff restoration',async()=>{
+    reset();
+    for(const wallet of addresses) assert.equal(await apply(request('grant_role',addresses[0],'admin',wallet)),'OK');
+    for(const wallet of addresses) assert.equal(await apply(request('revoke_role',addresses[0],'admin',wallet)),'OK');
+    assert.equal(sql('SELECT count(*) FROM artsoul_staff_roles WHERE active'),'0');
+    assert.deepEqual(readPolicy().authorities,addresses);
+
+    const pending=request('grant_role',addresses[1],'admin',addresses[0]),pendingProof=await proof(pending);
+    const rotate=request('rotate_authority',addresses[1],'','',next),rotationProof=await proof(rotate);
+    for(let index=0;index<addresses.length;index++) {
+      await assert.rejects(()=>proof(rotate,[signers[index]]),/INVALID_AUTHORITY_PROPOSAL/);
+      assert.equal(sql(completeSql(rotate,{...rotationProof,signers:[addresses[index]],signatures:[rotationProof.signatures[index]]},addresses[index])),'BOTH_APPROVALS_REQUIRED');
+    }
+    assert.deepEqual(readPolicy().authorities,addresses);
+    assert.equal(sql(completeSql(rotate,rotationProof,addresses[1])),'OK');
+    assert.deepEqual(readPolicy().authorities,next);assert.equal(readPolicy().version,'2');
+    assert.equal(sql('SELECT count(*) FROM artsoul_staff_roles WHERE active'),'0');
+    for(const wallet of addresses) {
+      assert.throws(()=>request('grant_role',wallet),/AUTHORITY_REQUIRED/);
+      assert.equal(sql(completeSql(pending,pendingProof,wallet)),'AUTHORITY_REQUIRED');
+    }
+    assert.equal(sql(completeSql(pending,pendingProof,next[0])),'POLICY_CHANGED');
+
+    const restore=request('grant_role',next[0],'admin',addresses[0]);
+    await assert.rejects(()=>proof(restore,signers),/INVALID_AUTHORITY_PROPOSAL/);
+    assert.equal(sql(completeSql(restore,await proof(restore,replacement),next[0])),'OK');
+    assert.equal(sql(`SELECT active FROM artsoul_staff_roles WHERE wallet_address=${q(addresses[0])}`),'t');
+    const grant=request('grant_role',next[1]),approval=await proof(grant,replacement);
+    for(const wallet of addresses) {
+      assert.throws(()=>request('grant_role',wallet),/AUTHORITY_REQUIRED/);
+      assert.equal(sql(completeSql(grant,approval,wallet)),'AUTHORITY_REQUIRED');
+    }
+    assert.equal(roleState(),null);
+    assert.equal(sql(completeSql(grant,approval,next[1])),'OK');
+    assert.equal(roleState().active,true);
+  });
   await t.test('a changed target invalidates an outstanding signed request',async()=>{
     reset();assert.equal(await apply(request()),'OK');const p=request('revoke_role'),approval=await proof(p);
     sql(`UPDATE artsoul_staff_roles SET role='admin' WHERE wallet_address=${q(target)}`);

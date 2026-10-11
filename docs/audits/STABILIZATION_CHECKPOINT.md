@@ -1,7 +1,109 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-08. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 11 continuation (team roster and remaining moderation acceptance):
+
+- Started at `71c7ae3` in the same workspace/branch. Preserved the prior agent's
+  66-line authority regression diff in `output/recovery/staff-roster-2026-10-11/`.
+  Historical untracked observer source/test, `.codex/` and `output/` are unselected.
+- The October 8 read-only evidence at 12:45 UTC confirmed the second paired reset
+  at 12:40:20 UTC, version 2 to 4, replacement passkey enrollment at 12:40:50 and
+  successful authentication at 12:40:57/12:41:05. Both approval signatures were
+  cryptographically checked against their recorded consumption time. Prior
+  factors have obsolete versions; they are retained, not deleted. Evidence:
+  `docs/private/owner-staff-ceremony-2026-10-08T12-45-17-415Z.json`.
+  This closes observed owner replacement/entry; old-session rejection is covered
+  by integration tests, not an actual captured pre-reset browser session.
+- Local roster endpoint reads only wallet/role/active, requires a current
+  authority SIWE session, limits each page to 50, and rechecks policy after read.
+  Staff access shows the pair, active/removed staff and exact role/reset actions;
+  all mutations still use the existing two-signature workflow. Wallet/auth changes
+  clear displayed roster and invalidate late responses. No migration is needed.
+- API checks passed 7/7; actual PostgreSQL/signature checks 37/37; build passed
+  (11 routes / 175 CSS utilities). Compiled Chrome checks passed 101 assertions
+  across both themes and 1280/390/320px, including late roster after logout.
+  The full run passed 1811/1812 with zero skips; its sole failure was an outdated
+  close-out sentence, corrected with all 5 close-out checks passing. Logs:
+  `output/audit/staff-roster-{api,build,browser,unit,closeout}-2026-10-11.log`
+  and `staff-authority-roles-2026-10-11.log`. Bounded independent review found
+  no actionable issue; reviewer finished. New roster changes are NOT published.
+- Owner refreshed SIWE and the existing passkey. The protected queue was enabled
+  by adding only `ARTSOUL_PROTOCOL_ADMIN_ENABLED=true` and redeploying accepted
+  `17cfc3c` as `dpl_GhvhgajY2nhUfDU2uutYeSuiTZXm`. Actual owner browser queue
+  access passed; 14 real SIWE/HTTP checks confirmed guest/nonstaff rejection
+  and logout, with no transaction/role/factor mutation. Private evidence:
+  `staff-queue-denials-2026-10-11.json`; screenshot:
+  `output/audit/admin-queue-active-2026-10-11.png`. Initial Vercel 403 cleared
+  after existing CLI authentication refresh; no config write was replayed.
+- Report activation is in progress using its approved daily limit 5; read
+  `docs/private/moderation-report-activation-2026-10-11.json` before any retry.
+  Donate remains off. Do not claim the empty queue as complaint acceptance.
+- Exactly next step: finish changed-tree verification, release the reviewed roster,
+  then enable the protected queue and run the existing bounded complaint acceptance
+  plan in `docs/private/PHASE_A_MODERATION_ACCEPTANCE_2026-10-08.md`.
+  Phase A remains OPEN until actual complaint/notification/decision gates pass.
+
+October 8 release and activation continuation (historical initial owner entry):
+
+- This release continuation started at local HEAD
+  `80d38a5db17a3dcbc1a48313a30104354837047e` in the same workspace/branch; use
+  `git log -1` for the subsequent documentation checkpoint. No application code
+  changed after that tested candidate. The untracked recovery files remain untouched. The sole
+  bounded reviewer finished; no child agents are running.
+- Exact candidate CI passed on Linux, Windows and static checks (run
+  `37774913604`). Preview and apex each matched all 53 JS/CSS artifacts across
+  six pages. The founder explicitly approved PR #294 production release after
+  the automatic reviewer requested that exact approval. It merged at 12:16 UTC
+  as `17cfc3cb2b2ac005366c56097e3f9b35a28dbcc1`; production deployment
+  `dpl_CWnkynPzpy61pJvTxS3wGW4F3XKv` succeeded. Apex evidence:
+  `output/audit/staff-factor-apex-artifact-2026-10-08.json`. Indexer was healthy
+  with zero observed lag; guest private APIs denied access as expected.
+- A fresh protected full/schema backup was hash-checked and archive-read before
+  writes (no restore drill). Reviewed A8e/A8f/A8g installed at 12:20 UTC, each
+  transaction verified before commit: forced RLS, RPC bodies/privileges, no
+  direct runtime role writes, unchanged role assignments and existing counts.
+  Journal: `docs/private/staff-factor-schema-apply-2026-10-08.json`. Do not replay.
+- The approved initial authority pair, apex origin, Base Sepolia and TOTP policy
+  5/300/120 were installed separately. No role, setup permission, factor, session
+  or report was created. The private policy journal records the exact values.
+- The existing Vercel CLI login was refreshed. Three production-only settings
+  were added: server-only TOTP encryption key, key version 1, dual-wallet gate.
+  Protected local key recovery material is outside Git. Provider type naming
+  (`secret` in CLI, `sensitive` in API) stopped the first verification; the
+  successful first add was reconciled without replacement, then the two remaining
+  settings completed. Unrelated variable metadata was unchanged. Configuration
+  was activated by same-source production redeploy
+  `dpl_C9LzezTwTeYR6LdEXUutgG3556QE`, READY on the apex at 12:26 UTC. The connected
+  owner browser showed the new verification dialog and Staff access controls.
+  The prepared form targets the existing old-founder Administrator role using
+  Reset sign-in method; no request or signature was created automatically.
+- Post-activation apex verification again matched all 53 assets across six pages
+  and confirmed paired mode, guest denial, disabled public gates and healthy
+  indexer: `output/audit/staff-factor-apex-artifact-2026-10-08-activation.json`.
+  A fresh real SIWE login with the existing disposable creator account passed
+  13 HTTP steps: guest denial, non-staff authority/factor denial, expected-wallet
+  mismatch, rejected legacy self-grant, closed queue and logout. No transactions,
+  roles, permissions or credentials were created by that check. Private evidence:
+  `docs/private/staff-live-denials-2026-10-08.json`. It does not prove the owner
+  ceremony. Release-document checks passed 29/29 with no skips in
+  `output/audit/staff-factor-release-docs-final-2026-10-08.log`.
+- The owner confirmed completing both signatures and entry. Read-only verification
+  at 12:33 UTC independently recovered both approved authority signers from the
+  saved request. It was consumed once at 12:29:08 UTC; the old founder remained
+  Administrator and authorization version advanced from 1 to 2. A real passkey
+  consumed the shared setup permission at 12:31:33 UTC, followed by successful
+  authentications at 12:31:50 and 12:32:09 UTC. Evidence:
+  `docs/private/owner-staff-ceremony-2026-10-08T12-33-55-482Z.json`.
+  This accepts initial paired setup and passkey entry, not replacement recovery
+  or authenticator-app acceptance. The first read-only verifier used current
+  time for the historical signature and stopped on expiry; it was corrected to
+  use the recorded consumption instant. No approval was replayed or fabricated.
+- Exact next step: the owner performs the agreed two-wallet reset of the now
+  existing sign-in method; verify old-factor/session invalidation before enrolling
+  its replacement, then proceed to protected queue and complaint acceptance.
+  Public reporting/review/Donate remain off. Phase A is OPEN.
 
 October 8 current continuation (paired staff setup implemented, not activated):
 

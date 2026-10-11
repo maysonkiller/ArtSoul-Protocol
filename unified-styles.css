@@ -3155,6 +3155,9 @@ body.future .resale-modal {
 .protocol-admin-authority input,
 .protocol-admin-authority select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 12px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); font: inherit; }
 .protocol-admin-authority button { min-height: 44px; margin: 8px 8px 0 0; }
+.protocol-admin-team { margin-bottom: 24px; }
+.protocol-admin-team-list { padding: 0; list-style: none; }
+.protocol-admin-team-list > li { padding: 16px 0; border-bottom: 1px solid var(--c-border-soft); }
 .protocol-admin-approval-message { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; padding: 16px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); }
 
 .artsoul-card-menu-host { display: contents; }

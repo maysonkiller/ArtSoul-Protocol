@@ -56,6 +56,18 @@ export default async function handler(req,res) {
     if (process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED !== 'true') fail('AUTHORITY_DISABLED',404);
     if (req.method === 'GET') {
       const {policy} = await context(req,req.query?.expectedWallet);
+      if (req.query?.view === 'staff') {
+        const after = req.query.after;
+        if (after !== undefined && (typeof after !== 'string' || !/^0x[0-9a-f]{40}$/.test(after))) fail('INVALID_STAFF_CURSOR');
+        const rows = await supabaseRest('artsoul_staff_roles?select=wallet_address,role,active&order=wallet_address.asc&limit=51' +
+          (after ? `&wallet_address=gt.${after}` : ''));
+        // A rotation during this read must not disclose the roster to a former
+        // authority. No factor, profile, complaint or signing material is read.
+        const latest = await readAuthorityPolicy(policy.origin);
+        if (latest.version !== policy.version || latest.authorities.join('|') !== policy.authorities.join('|')) fail('AUTHORITY_POLICY_CHANGED',409);
+        const staff = rows.slice(0,50).map(row => ({wallet:row.wallet_address,role:row.role,active:row.active}));
+        return res.status(200).json({success:true,policy,staff,nextCursor:rows.length>50 ? staff.at(-1).wallet : null});
+      }
       const request = req.query?.requestId ? publicRequest(await storedRequest(req.query.requestId),policy) : null;
       return res.status(200).json({success:true,policy,request});
     }
