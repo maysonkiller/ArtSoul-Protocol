@@ -39,10 +39,12 @@ Exit: stable beta, feedback processed, moderation proven, Snapshot A verified, a
 
 Goal: build, test, and audit the product-grade contract and operations topology.
 
-The founder's 2026-09-29 scheduling amendment places real founder passkey setup
-and its operator recovery ceremony here, before dependent live activation and
-mainnet launch. See `CHANGELOG_2026-09-29_TESTNET_ACCEPTANCE.md`. Isolated testnet
-checks continue earlier; they never count as real enrollment or phone acceptance.
+The September 29 deferral of founder passkey setup was superseded by
+`CHANGELOG_2026-10-03_PHASE_A_ACTIVATION.md` and canon 07's October 8 paired-wallet
+setup/recovery amendment. Real owner setup, replacement and entry are accepted
+in Phase A; contract custody remains separate. See the October 11 moderation
+acceptance record. Isolated checks never count as native enrollment or phone
+acceptance. This status correction does not introduce a new recovery policy.
 
 Complete the Core, ArtworkNFT, ArtSoulGenesis, Partner Collections, Ecosystem Pool, indexer/database, admin/eligibility, and aura/badge work defined in the backlog and `CONTRACT_REWORK_PLAN.md`. Consolidate the existing promoted-banner planning delta into the full Bible before implementing that feature. Rehearse the final topology on fresh Base Sepolia contracts and hand privileged roles to rehearsal Safes.
 

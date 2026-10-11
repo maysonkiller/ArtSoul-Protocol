@@ -231,6 +231,14 @@ links), and TA-06 (no-bid end, re-auction, shared modal, decimal comma, empty-pr
 rejection, cross-page freshness and address-based creator-bid protection).
 Do not present existing fixture checks as new live-provider acceptance.
 
-RG-03 moderation activation, the A8d Safe recovery rehearsal, and A-23's go/no-go
-are ceremonies, not browsing. They are in
+RG-03 access setup/replacement is accepted under the October 8 paired-wallet
+policy; historical Safe-only application recovery is superseded. Remaining live
+moderation edges and A-23's go/no-go are separate from device browsing. They are in
 [`PHASE_A_CLOSE_OUT.md`](../PHASE_A_CLOSE_OUT.md) with what each needs.
+
+October 11 stopping instruction: the owner is unavailable and requested all
+independent work followed by a stop. The unanswered Android and native-factor
+questions stay pending; no repeated request or inferred PASS is recorded. Retain
+the satisfactory iPhone observation above and ask only for missing outcomes when
+the owner returns. Automated layout/SQL checks are saved in the dated moderation
+acceptance record and do not fill phone rows.

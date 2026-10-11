@@ -3,6 +3,39 @@
 Updated: 2026-10-11. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 11 owner-unavailable checkpoint (09:10 UTC):
+
+- Owner requests all independent work, then stop. Do not wait for or repeat the
+  pending passkey/Android questions; owner is away. No new automation is needed.
+- Same workspace/branch; starting HEAD `7a27fcd`. Application remains published
+  as `c7dcef6` (PR #296); this follow-up changes only one existing regression test
+  and evidence/status documents. Use git log -1 for the saved follow-up HEAD.
+- Scoped moderation checks 67/67, zero skips. The added flag-off assertions prove
+  a valid decision is denied and all five ledger/visibility tables preserved.
+  `output/audit/moderation-edges-2026-10-11.log`. Existing full 1814-check and
+  compiled 68-check baselines are reused only for the unchanged application.
+- Read-only current evidence: 9 live HTTP checks; disabled preview shares the
+  apex public database, denies its disabled routes, and leaves rehearsal ledger
+  hashes unchanged. 16 deployed RPC bodies match source; 13 protected tables
+  retain forced RLS; runtime direct staff writes are denied. All 3 reports remain
+  resolved, due mail backlog 0, Base Sepolia indexer healthy/lag 0. Evidence:
+  `docs/private/phase-a-unattended-2026-10-11T09-10-07-529Z.json`.
+- GitHub open issue query returned 0 and candidate CI remains green. These facts
+  do not substitute for remaining real device/OAuth or live A8 acceptance.
+  The existing SSH key could not open a read-only service check; no access change
+  was attempted. Database mail/health evidence remains current.
+- Exactly next step after the owner returns: existing passkey re-verification,
+  then bounded stale/concurrent/reopen/rolling-limit moderation acceptance plus
+  actual post-release hidden-state UI. No setup reset or financial replay.
+- Phase A remains 65 done / 18 in progress, NO-GO. Named beta operator/window,
+  connected-device/OAuth evidence and remaining live moderation edges are still
+  required. Detailed results: PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md.
+- Preserve historical untracked observer files, .codex and output. One bounded
+  reviewer finished; no agent work or unattended signing remains active.
+- Final documentation/count/entry checks passed 19/19, zero skips; git diff
+  whitespace checks passed. Only tests and documentation need the local follow-up
+  commit. No application rebuild/deployment is required for this continuation.
+
 October 11 closing checkpoint (09:04 UTC):
 
 - Workspace unchanged; local tested application HEAD `38c9e71`. PR #296 merged

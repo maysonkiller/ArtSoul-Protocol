@@ -1,6 +1,6 @@
 # ArtSoul Controlled Beta Entry
 
-Last reviewed: 2026-07-28
+Last reviewed: 2026-10-11
 
 Status: **NO-GO — entry materials are prepared, but invitations must wait until
 the remaining Phase A acceptance gates pass.**
@@ -121,8 +121,8 @@ prototype. It is not acceptance of these deviations for mainnet:
 | Marketplace approvals | Standard ERC-721 approvals | Restricted to approved marketplaces |
 | Project NFT | Transferable 100-supply prototype | Retired; it is not Genesis and is never migrated |
 | No-bid lifecycle | Automatic no-bid transition is not implemented | Permissionless, automation-compatible mainnet transition |
-| Moderation step-up | Implementation and migrations may remain disabled behind resource gates | Final domain, reviewed WebAuthn RP ID, founder passkeys and Safe recovery before activation |
-| Domain and support email | Permanent `artsoulprotocol.com` apex is live; `www` redirects to the apex. Sending-domain configuration exists, but real delivery and the monitored operational receive/reply path are not accepted by that setup alone | Verified monitored copyright/security contact and retention procedure before mainnet readiness |
+| Moderation step-up | Paired application authority, owner passkey setup/replacement, protected queue and complaint/notification journeys are accepted; remaining live edge cases are tracked separately | Retain both-wallet application setup/recovery policy and independent contract custody; complete remaining acceptance rather than replaying historical Safe-only application recovery |
+| Domain and support email | Permanent apex is live. Project complaint mail delivery and receipt in artsoulprotocol@gmail.com are confirmed; this does not establish every general/security/copyright receive/reply and retention obligation | Verified monitored copyright/security contact and retention procedure before mainnet readiness |
 | Historical chain | Ethereum Sepolia data can remain readable | No active writes, selection, or migration of testnet ownership into mainnet |
 
 Frozen primary and resale economics are not changed by this document.
@@ -174,6 +174,24 @@ invitation window, communicate the stop to testers, preserve evidence, and use
 the relevant runbook for the affected service.
 
 ## 8. Go / no-go decision record
+
+### October 11 preparation record — NO-GO
+
+- Production main: `c7dcef6a511046ed94a406377b6093f8851b30f7` (PR #296),
+  deployment 6993341447. Candidate `38c9e71` passed Linux/Windows/static CI;
+  production matched all 53 checked assets on six pages. [Acceptance](../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md).
+- At 09:10 UTC the GitHub open-issue query returned zero. This is issue-tracker
+  evidence, not acceptance of all backlog rows. The indexer was healthy with zero
+  observed lag. No new payment or report was submitted during the independent
+  continuation; all rehearsal restrictions remain restored.
+- Independent verification is saved: 67 scoped moderation checks with real
+  isolated PostgreSQL and nine real deployed HTTP boundary checks; current
+  production RPC/table privacy checks passed. Remaining live moderator cases
+  require the owner's native factor. Phone/OAuth outcomes remain separate.
+- Operator, cohort, window start/end, support availability and pause ownership:
+  **not assigned for a beta window**. The owner is away and asked to stop after
+  independent work. No invitations or background acceptance run are authorized
+  by this record. Return to the remaining checklist when the owner is available.
 
 Copy this section for each proposed window:
 

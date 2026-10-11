@@ -83,6 +83,57 @@ separate cross-device OAuth return evidence is not implied.
 
 ## Remaining boundaries
 
+### Owner-unavailable continuation, 09:10 UTC
+
+The owner requested all independent work followed by a stop, with no further
+device or signature participation in this session. No new report, payment,
+role/factor change, deployment or feature-flag change was performed.
+
+- The scoped moderation suite passed **67/67, zero skips**. The strengthened
+  existing route-to-PostgreSQL test denies a valid review request when Admin is
+  disabled and separately when its second-factor gate is disabled. It compares
+  all report, visibility, audit and notification contents before/after. Pausing
+  intake still permits existing reviews and recipient history. Existing tests
+  also passed the sixth-report limit, shared artwork/message quota, concurrent
+  stale decisions, prohibited reopen and atomic audit/notification rollback.
+  Command: `node --test --test-concurrency=1 test/phase-a-moderation-journey.test.mjs test/protocol-admin-rpc-integration.test.cjs test/donation-moderation-rpc-integration.test.cjs test/protocol-admin-review.test.cjs test/artwork-report-intake.test.cjs test/donation-moderation-api.test.mjs`.
+  Log: `output/audit/moderation-edges-2026-10-11.log`.
+- Nine real HTTP checks covered the already-disabled preview and apex guest
+  denials. The preview returned explicit disabled errors for intake/review and
+  passkey routes; it uses the same public database as the apex. The three
+  rehearsal reports, events, notifications, mail delivery and visibility hashes
+  were unchanged. This proves that deployed disabled-preview requests preserve
+  those records; it is not an authenticated production flag-toggle ceremony.
+- Read-only production catalog checks matched **16 RPC bodies** to current
+  migration sources and verified **13 protected tables** retain forced RLS and
+  no anonymous/authenticated direct access. Runtime service-role direct staff
+  writes remain denied. All three reports remain resolved, mail backlog is zero,
+  and the Base Sepolia indexer reports healthy with zero observed lag.
+  Private evidence: `phase-a-unattended-2026-10-11T09-10-07-529Z.json`.
+  A preceding read-only checker used artwork_id on the message-visibility table;
+  it failed without writes and was corrected to the transaction/log identity.
+- GitHub returned no open issues at 09:10 UTC; candidate CI remains successful
+  on `38c9e71` and main remains `c7dcef6`. Evidence:
+  `output/audit/phase-a-unattended-github-2026-10-11.json`. An empty issue query
+  does not close unaccepted backlog rows or certify that no latent defect exists.
+- The previous full **1,814-check** application baseline and compiled **68-check**
+  UI evidence remain applicable: this continuation changes tests/documentation,
+  not application source. They were not rerun or relabeled as new results.
+  No new canon mechanics or dependency was introduced.
+- Close-out, backlog counts, beta-entry and issue-intake documentation checks
+  passed **19/19**, zero skips. Updated the roadmap/device/beta instructions to
+  stop presenting the superseded Phase C deferral or Safe-only application
+  recovery as a current prerequisite. The approved policy itself is unchanged.
+
+Direct SSH service inspection was unavailable with the installed key. No password
+was requested and no key/access setting was changed. Current database delivery
+evidence is valid; a fresh systemd-process observation is not claimed.
+
+Exactly next owner-assisted step: renew the existing Admin passkey session, then
+run the bounded remaining moderation cases and post-release hidden-state browser
+check. Do not repeat paired reset, enrollment, funding, settlement or donations.
+No follow-up or background test run is scheduled by this continuation.
+
 This closes A-39's real access setup/replacement gate and the bounded Donate
 activation journey. It does not declare all of A8 or Phase A complete. The A8
 runbook additionally calls for production evidence of the sixth-report limit,

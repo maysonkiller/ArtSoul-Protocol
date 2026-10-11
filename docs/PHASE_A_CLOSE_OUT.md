@@ -56,6 +56,15 @@ hidden-artwork loading defect is fixed locally, built and regression-tested;
 it was released through PR #296 at `c7dcef6` after green candidate CI. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
 and the [checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
+October 11 independent continuation: the six scoped moderation suites passed
+67 checks, including strengthened full-ledger preservation when Admin or second
+factor verification is disabled. Nine deployed HTTP checks confirmed disabled
+preview and guest boundaries without changing production flags or data. Read-only
+checks matched 16 production RPC bodies and verified 13 protected tables; the
+three reports remain resolved, due mail backlog is zero and indexer lag is zero.
+The owner is away; remaining real passkey/device steps are deferred, not failed
+or waived. No further confirmation is requested until the owner returns.
+
 The initial September 29 PostgreSQL baseline passed 46 checks across seven
 integration suites. The final application run includes the additional 11-check
 moderation journey: 57 checks across eight groups, with no Docker skips.
