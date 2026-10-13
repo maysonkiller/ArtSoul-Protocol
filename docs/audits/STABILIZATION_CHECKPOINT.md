@@ -31,9 +31,91 @@ October 14 profile session isolation (A7 / RG-01 / A-53):
   Independent bounded code review found no actionable issue. The prepared
   private live verifier signs only SIWE using the two old disposable accounts,
   rejects writes using deliberately invalid input and never sends transactions.
-- Not published at this checkpoint. Exactly next step: release this reviewed
-  patch through candidate CI/preview, then verify the apex with both signed test
-  sessions and record the precise RG-01 boundary without repeating phone/OAuth.
+- Implementation `4469f8e` and candidate `3950ca7` have identical trees. The two
+  inspected conflicts with the previous squash merge contained only older docs;
+  reconciliation retained the newer release evidence. PR #301 passed candidate
+  Linux/Windows/static CI (38479994926), preview and build verification. It merged
+  at 22:49:54 UTC October 13 / October 14 Warsaw as
+  `12f3e38183d29a27600af16a9a976cb8bfe5008c`. Production deployment 7052017907
+  succeeded at 22:50:37 UTC. Preview/apex matched 53 assets across six pages,
+  guest boundaries stayed closed, enabled features were retained and Base Sepolia
+  indexer lag was zero. Post-merge CI passed (38480386643). Evidence prefix:
+  `output/audit/profile-isolation-{ci,postmerge-ci,preview-artifact,apex-artifact}-2026-10-14.json`.
+- Real SIWE/API acceptance passed for old disposable wallet suffixes 8383/1819:
+  wrong/missing intended wallet rejected before save validation; matching wallet
+  reached intentionally invalid input validation; private email/notification
+  reads matched the correct wallet. No profile write, transaction or new founder
+  key was used; both isolated HTTP sessions ended. Both public profiles were
+  absent and stayed absent. The initial verifier stopped before signing because
+  it incorrectly required existing profile rows; retain that stopped record and
+  `docs/private/profile-isolation-live-recheck-2026-10-14.json`. Do not claim
+  successful production profile saves or two populated native profiles.
+- Actual owner Chrome on the prior release passed own-profile reload, stable
+  header across Profile/Gallery/artwork navigation, and a distinct public profile
+  with no edit controls. The owner tab changed to Admin setup during this work,
+  so no disconnect was performed over that workflow. Evidence and remaining
+  limits are recorded in RG-01's dated supplement. No other browser was signed in.
+- Separate evidence reconciliation closes A-21 intake from the completed October
+  11 actual submissions, deduplication, independent reporters, sixth-report denial
+  and review/delivery path. A bounded independent review found no missing intake
+  criterion; no complaint or payment was replayed. A-22/A8 retain 24-hour/context,
+  provider-failure and flag-preservation boundaries. Counts are now 66 done / 17
+  in progress / 0 planned. Documentation checks pass 6/6. This follow-up updates
+  evidence only; it is not another application deployment or full Phase A closure.
+- Continuation from local documentation HEAD `a0bf17a`: the owner confirmed Admin
+  setup complete. Actual desktop Chrome on `12f3e38` then passed RG-01 A7/A8:
+  account-menu Disconnect removed identity, roster and authority controls; Admin
+  reload settled at Wallet verification required; Profile navigation/reload
+  remained guest with no Edit Profile. No factor, role or stored profile changed.
+  The queue was already factor-locked before logout. The browser client blocked
+  direct session-JSON navigation, so this records UI acceptance only. Evidence:
+  `output/audit/rg01-desktop-logout-2026-10-14.json` and two logged-out screenshots.
+  Historical untracked files remain untouched. No new source patch or deployment.
+  `node scripts/sync-phase-a-counts.mjs --check` retains 66/17/0;
+  `node --test test/phase-a-status-summary.test.cjs test/phase-a-close-out.test.cjs`
+  passed 6/6 and `git diff --check` passed. No application rebuild is claimed
+  for this documentation-only continuation. No subagent is running.
+- Continuation from `c68c4c2`: the owner performed the requested switch using the
+  personal/founder pair. The actual Chrome buffer records Rabby `accountsChanged`
+  989b -> 1ccd at 23:01:01 UTC October 13, then accepted runtime/provider identity
+  1ccd. Header, own-profile navigation and reload show 1ccd without the former
+  profile's avatar/name/works. No agent signature, transaction, factor or profile
+  mutation. Saved suffix-only events and screenshot use the prefix
+  `output/audit/a59-rabby-*-2026-10-14`. This closes the Rabby desktop observation.
+  No mobile or other-provider result is inferred. Do not request this switch
+  again. No source change is warranted by the passing event flow.
+- One bounded read-only review reconciled A-53: existing iPhone reload/navigation,
+  sign-in and correct-profile outcomes already pass. Its remaining unrecorded
+  criterion is the transient restoration menu/header-to-profile timing, not
+  another full phone/OAuth trip. The reviewer completed; no subagent remains active.
+  A follow-up scope review found no explicit mobile requirement in A-59. Its
+  older probe says one wallet does not close other reported wallets, but does not
+  name them. A focused evidence search found no other native switch event record;
+  videos and fixtures were not replayed or counted as new native acceptance.
+  Original backlog introduction `9ca5ff8` (August 21) and probe `3419115`
+  (September 14) likewise supply no provider name beyond the MetaMask exclusion.
+  Do not turn that ambiguity into an invented list of mandatory wallet tests.
+  Counts remain 66/17/0; documentation checks passed 6/6 and whitespace checks
+  passed. This continuation changes evidence only, with no new build/deployment.
+- Continuation from `d037fb9`: the owner confirmed no other currently used wallet
+  still exhibits the stale-address problem. A-59 is now accepted from the actual
+  Rabby event/profile/reload proof and that explicit original-scope clarification.
+  Do not claim universal wallet or native-mobile coverage. No source change or
+  repeated switch is needed. Counts become 67 done / 16 in progress / 0 planned,
+  including fourteen remaining device/connected-flow rows.
+- A8 / A-22 independent continuation: extended the existing moderation journey
+  with the unchanged delivery migration and actual worker. Local HTTP 503 and
+  lost-response attempts both leave committed report/visibility/audit/recipient
+  records unchanged; immediate retry is denied, a due retry preserves payload/key,
+  and a recorded acceptance suppresses another send. Creator inbox stays intact.
+  Disposable PostgreSQL and loopback capture only; no external message, live
+  fault injection, production flag, migration or contract change.
+  Focused worker/adversarial/SQL/journey run passed 28/28, zero skips
+  (`output/audit/report-email-journey-2026-10-14.log`). Documentation checks pass
+  6/6; counts are synchronized. Bounded independent review found no actionable
+  issue. No application code changed; no fresh app build is claimed.
+- Exactly next step: save the test/evidence change for CI review, keeping the
+  24-hour/context and other native-device acceptance boundaries explicit.
 
 October 13 staff-wallet privacy (A8 / A-22):
 

@@ -302,3 +302,29 @@ complete or reopen the owner's Android waiver.
 Post-merge Linux/Windows/static CI passed in run 38174943182 for exact main
 `a51c16f`; saved evidence is `moderation-decision-main-ci-2026-10-11.json`.
 The documentation-only release follow-up passed 18 checks with zero skips.
+
+## October 14 isolated email-failure continuation
+
+The existing `test/phase-a-moderation-journey.test.mjs` now runs the unchanged
+report-email worker and delivery migration against its disposable PostgreSQL 17
+database and loopback HTTP sink. After a real local handler commits a hide
+decision, the sink returns HTTP 503 or loses its response. Both cases retain the
+complete report, visibility, event, audit and recipient-notification ledger.
+The creator's actual notification route returns the same inbox before/after.
+The delivery row records a pending, delayed retry; an immediate retry sends
+nothing. Once due in this isolated database, the retry uses the identical
+payload and provider key, records acceptance, and suppresses any further send.
+
+These are initial staff alerts sourced from `REPORT_SUBMITTED`, deliberately
+delayed until after review. They are not emails carrying moderation decisions;
+recipient decision notifications remain durable in-app rows. The test advances
+only a disposable delivery schedule, never protocol time or an operating worker.
+
+Focused worker/adversarial/SQL/journey checks: 28 passed, zero failed/skipped.
+Evidence: `output/audit/report-email-journey-2026-10-14.log`. Independent bounded
+review found no actionable issue. No runtime/dependency/schema change, external
+email or production operation occurred. This closes the combined automated
+decision-to-worker failure-isolation coverage gap. It does not claim observation
+of a real Resend outage, scheduled host recovery or another actual inbox message;
+reuse the separately recorded live delivery evidence. The distinct 24-hour,
+changed-context, flag and device evidence boundaries remain as recorded.

@@ -4,8 +4,17 @@ Status: code published in PR #292; the exact delivery migration was applied and
 verified on October 8. The separately authorized host worker is now configured,
 enabled and scheduled. A real transport test reached the project inbox; repeating
 its exact idempotency key produced only one delivered message. Actual complaint
-UI-to-queue-to-inbox acceptance remains open. See the dated ledger and checkpoint.
+UI-to-queue-to-inbox acceptance subsequently passed on October 11; see
+`../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md` and the checkpoint.
 This extends A8 notifications without changing complaint decisions or access.
+
+October 14 isolated acceptance joins the actual worker and delivery SQL to the
+local moderation route journey. HTTP 503 and a lost response preserve already
+committed decisions, visibility, audit records and recipient inboxes. Due retries
+reuse the exact payload/key, and a durable accepted receipt prevents another
+send. The focused suites passed 28/28 with no skips. This is failure isolation
+with PostgreSQL and a loopback provider sink, not an operating-provider outage
+or a new message to the project mailbox.
 
 The existing `REPORT_SUBMITTED` event is the durable source. The scheduled worker
 is the only email delivery path. Intake returns immediately after the atomic
