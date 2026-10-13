@@ -1,5 +1,31 @@
 # RG-01 Apex-Origin Acceptance Run - 2026-09-04
 
+October 14 distinct-identity continuation:
+
+- Existing owner Chrome (wallet suffix 989b), release `0ae7c31`: own profile and
+  header agree after navigation/reload; Profile -> Gallery -> artwork 33 retains
+  that connected identity. The creator link opens public profile suffix 1824
+  with its own name/biography and no Edit Profile. This is public-profile browsing,
+  not a second native signed wallet. The owner's tab subsequently changed to
+  Admin setup; disconnect/reload was not performed over that ongoing workflow.
+- PR #301 / `12f3e38` fixes profile saves following a different tab's shared
+  session cookie. Three failing reproductions became five passing regressions;
+  49 compiled Chrome assertions use the actual handler with isolated storage.
+  Draft retention/retry and stale-response cache isolation pass. This is fixture
+  coverage, not a real iPhone or successful production profile-save claim.
+- Two old test wallets (suffixes 8383/1819) completed actual apex SIWE at
+  22:52:53-22:53:00 UTC October 13 / October 14 Warsaw. Both reject mismatched
+  and absent save intent, accept matching identity up to deliberately invalid
+  input validation, and enforce wallet-scoped email/notification reads. Both
+  public profile rows are absent and remain absent; do not call these two populated
+  profiles. The first verifier stopped before signing because it incorrectly
+  required an existing row; that evidence is retained. Corrected acceptance
+  made no profile write or transaction and ended both isolated HTTP sessions.
+- Evidence: `output/audit/rg01-desktop-profile-2026-10-14.json`, compiled/asset
+  records with `profile-isolation-*`, and the private live-session record. All
+  existing phone/provider PASS results below are retained. The remaining native
+  disconnect/reload, account-switch and exact device criteria are not inferred.
+
 October 11 reconciliation: the blank form below is the historical run template,
 not evidence that later work never happened. The owner has reported a satisfactory
 real iPhone gallery/Back, wallet/profile reload, tab-switch and lock/resume run;

@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-13. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-14. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -8,7 +8,21 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **65 done, 18 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **66 done, 17 in progress, 0 planned** across A-01 to A-83.
+
+October 14 continuation: the profile session-cookie isolation fix is published
+through PR #301 / `12f3e38`, with green candidate CI, build, 49 compiled browser
+assertions and preview/apex artifact verification. Two old test wallets completed
+real SIWE, wrong-wallet/missing-intent save denials and scoped email/notification
+reads without changing their empty public profiles. This does not substitute for
+native account switching or successful production profile edits. The checkpoint
+retains the initial local PostgreSQL startup failure and its passing rerun.
+
+A-21 is accepted from the existing October 11 intake evidence: actual Report
+submission, independent reporters, deduplication, the sixth-report denial, no
+submission-triggered hiding and an operational review/notification path. No
+complaint was replayed to close this stale row. A-22/A8 still retain the separate
+session-expiry, changed-context, provider-failure and flag-preservation boundaries.
 
 October 13 staff privacy: the owner-approved Team/current-authority visibility
 rule is published through PR #300 / `0ae7c31`. Other administrators/moderators
@@ -140,7 +154,7 @@ operationally safe reporting/moderation path before a beta GO.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; Android is owner-waived / not tested under the October 11 amendment |
-| **RG-03** access acceptance | Accepted for A-39 under the October 8 amendment; remaining complaint edge cases belong to A-21/A-22 | Both designated wallets approve staff setup and replacement; the staff member completes native verification |
+| **RG-03** access acceptance | Accepted for A-39 under the October 8 amendment; remaining operational acceptance belongs to A-22/A8 | Both designated wallets approve staff setup and replacement; the staff member completes native verification |
 | **Replacement recovery acceptance** | Owner reset, replacement enrollment and entry observed October 8; old-factor/version rejection verified in SQL/API tests. Historical Safe evidence is retained, not replayed | The actual owner approval and replacement are recorded separately; automated fixtures are not that ceremony |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
@@ -156,9 +170,10 @@ migration steps and their backup discipline are in
 Moderation Activation**, and the surrounding rollout in
 [`runbooks/A8_MODERATION_ROLLOUT.md`](runbooks/A8_MODERATION_ROLLOUT.md).
 
-**A-21, A-22 and A-23 do not close from merged foundations alone.** A-22 also
-needs real recipient-facing notification delivery acceptance following a staff decision; A-21 needs intake acceptance and
-A-23 needs the recorded beta review. A-23 remains NO-GO while its required safe
+**A-21, A-22 and A-23 do not close from merged foundations alone.** A-21 now has
+real intake acceptance. A-22 has real recipient-facing notification delivery
+following staff decisions, but its remaining A8 operational boundaries stay open.
+A-23 needs the recorded beta review and remains NO-GO while its required safe
 operating path or evidence is missing, or a P1 issue remains open.
 
 ## 2. Implementation and acceptance still open

@@ -31,9 +31,40 @@ October 14 profile session isolation (A7 / RG-01 / A-53):
   Independent bounded code review found no actionable issue. The prepared
   private live verifier signs only SIWE using the two old disposable accounts,
   rejects writes using deliberately invalid input and never sends transactions.
-- Not published at this checkpoint. Exactly next step: release this reviewed
-  patch through candidate CI/preview, then verify the apex with both signed test
-  sessions and record the precise RG-01 boundary without repeating phone/OAuth.
+- Implementation `4469f8e` and candidate `3950ca7` have identical trees. The two
+  inspected conflicts with the previous squash merge contained only older docs;
+  reconciliation retained the newer release evidence. PR #301 passed candidate
+  Linux/Windows/static CI (38479994926), preview and build verification. It merged
+  at 22:49:54 UTC October 13 / October 14 Warsaw as
+  `12f3e38183d29a27600af16a9a976cb8bfe5008c`. Production deployment 7052017907
+  succeeded at 22:50:37 UTC. Preview/apex matched 53 assets across six pages,
+  guest boundaries stayed closed, enabled features were retained and Base Sepolia
+  indexer lag was zero. Post-merge CI passed (38480386643). Evidence prefix:
+  `output/audit/profile-isolation-{ci,postmerge-ci,preview-artifact,apex-artifact}-2026-10-14.json`.
+- Real SIWE/API acceptance passed for old disposable wallet suffixes 8383/1819:
+  wrong/missing intended wallet rejected before save validation; matching wallet
+  reached intentionally invalid input validation; private email/notification
+  reads matched the correct wallet. No profile write, transaction or new founder
+  key was used; both isolated HTTP sessions ended. Both public profiles were
+  absent and stayed absent. The initial verifier stopped before signing because
+  it incorrectly required existing profile rows; retain that stopped record and
+  `docs/private/profile-isolation-live-recheck-2026-10-14.json`. Do not claim
+  successful production profile saves or two populated native profiles.
+- Actual owner Chrome on the prior release passed own-profile reload, stable
+  header across Profile/Gallery/artwork navigation, and a distinct public profile
+  with no edit controls. The owner tab changed to Admin setup during this work,
+  so no disconnect was performed over that workflow. Evidence and remaining
+  limits are recorded in RG-01's dated supplement. No other browser was signed in.
+- Separate evidence reconciliation closes A-21 intake from the completed October
+  11 actual submissions, deduplication, independent reporters, sixth-report denial
+  and review/delivery path. A bounded independent review found no missing intake
+  criterion; no complaint or payment was replayed. A-22/A8 retain 24-hour/context,
+  provider-failure and flag-preservation boundaries. Counts are now 66 done / 17
+  in progress / 0 planned. Documentation checks pass 6/6. This follow-up updates
+  evidence only; it is not another application deployment or full Phase A closure.
+- Exactly next step: after the owner's active Admin setup is finished, complete
+  RG-01's outstanding desktop Disconnect -> reload observation in the actual
+  browser; reuse the passed profile/phone/provider results and do not reset factors.
 
 October 13 staff-wallet privacy (A8 / A-22):
 
