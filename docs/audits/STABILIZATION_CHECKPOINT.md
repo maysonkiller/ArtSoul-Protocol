@@ -1,7 +1,39 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-13. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-14. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 14 profile session isolation (A7 / RG-01 / A-53):
+
+- Starting HEAD `c44257e`; published main `0ae7c31` / PR #300. No other checkout
+  was used. Historical `.codex/`, `output/` and the untracked moderation-authority
+  policy pair remain untouched and excluded from the release.
+- Three regression tests first reproduced a shared-cookie race: a draft for A
+  could be written to B after another tab signed in as B, and the B response
+  could be cached under A. Profile PUT now requires the intended wallet header
+  to match the signed cookie before validation/storage. The shared create/update
+  client sends that wallet and validates the returned identity before caching.
+  Existing public reads and OAuth-owned identity fields keep their boundaries.
+  Old open clients without the new header fail closed and need a page reload.
+- Five isolation regressions pass, including retry without lost confirmed data
+  and an old public read arriving after save. The earlier focused profile suite
+  passed 56 checks before the two additional cache tests. Build passed. Compiled
+  Chrome passed 49 assertions at 1280/390 in Classic/Future against the actual
+  profile handler with fixture storage/cookies. This is not native mobile proof.
+- Full unit run: 1843 checks, 1837 pass / 6 fail / 0 skipped. All six failures
+  belong to A8d PostgreSQL startup (`database system is shutting down`); its
+  separate unchanged rerun passed 6/6. Keep both logs; do not call the original
+  run entirely green. No runtime dependency, schema, role, contract or economic
+  change. No canon interpretation/amendment is needed for this identity fix.
+- Local evidence: `output/audit/profile-isolation-{reproduction,unit,build,
+  full-unit,recovery-retry}-2026-10-14.log` and
+  `profile-isolation-browser-2026-10-14.json`; recovery diff saved before release.
+  Independent bounded code review found no actionable issue. The prepared
+  private live verifier signs only SIWE using the two old disposable accounts,
+  rejects writes using deliberately invalid input and never sends transactions.
+- Not published at this checkpoint. Exactly next step: release this reviewed
+  patch through candidate CI/preview, then verify the apex with both signed test
+  sessions and record the precise RG-01 boundary without repeating phone/OAuth.
 
 October 13 staff-wallet privacy (A8 / A-22):
 

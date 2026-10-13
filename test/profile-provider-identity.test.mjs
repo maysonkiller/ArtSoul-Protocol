@@ -41,7 +41,7 @@ test('profile edits cannot forge, erase or overwrite linked provider identity', 
       return Response.json([written]);
     };
     const result = response();
-    await handler({method: 'PUT', headers: {cookie}, body: {
+    await handler({method: 'PUT', headers: {cookie, 'x-artsoul-wallet': wallet}, body: {
       bio: '  Artist biography  ', avatar_url: 'https://media.example/avatar.png',
       discord_username: providerValue, discord_id: '123456789',
       twitter_handle: providerValue, twitter_username: providerValue, twitter_id: '987654321',
