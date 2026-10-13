@@ -62,9 +62,26 @@ October 14 profile session isolation (A7 / RG-01 / A-53):
   provider-failure and flag-preservation boundaries. Counts are now 66 done / 17
   in progress / 0 planned. Documentation checks pass 6/6. This follow-up updates
   evidence only; it is not another application deployment or full Phase A closure.
-- Exactly next step: after the owner's active Admin setup is finished, complete
-  RG-01's outstanding desktop Disconnect -> reload observation in the actual
-  browser; reuse the passed profile/phone/provider results and do not reset factors.
+- Continuation from local documentation HEAD `a0bf17a`: the owner confirmed Admin
+  setup complete. Actual desktop Chrome on `12f3e38` then passed RG-01 A7/A8:
+  account-menu Disconnect removed identity, roster and authority controls; Admin
+  reload settled at Wallet verification required; Profile navigation/reload
+  remained guest with no Edit Profile. No factor, role or stored profile changed.
+  The queue was already factor-locked before logout. The browser client blocked
+  direct session-JSON navigation, so this records UI acceptance only. Evidence:
+  `output/audit/rg01-desktop-logout-2026-10-14.json` and two logged-out screenshots.
+  Historical untracked files remain untouched. No new source patch or deployment.
+  `node scripts/sync-phase-a-counts.mjs --check` retains 66/17/0;
+  `node --test test/phase-a-status-summary.test.cjs test/phase-a-close-out.test.cjs`
+  passed 6/6 and `git diff --check` passed. No application rebuild is claimed
+  for this documentation-only continuation. No subagent is running.
+- Exactly next step: capture the A-59 native in-wallet account-switch signal with
+  the existing masked diagnostic path, then reconcile RG-01 distinct-identity
+  evidence. Reuse passed phone/provider/logout results; do not reset factors.
+  The existing Chrome now has an agent-created `/?walletdebug=1` tab ready for
+  the owner to connect one old test account and switch to another inside the
+  wallet without disconnecting/reloading the site. Capture its masked console
+  events after the owner confirms; do not fabricate provider behavior from mocks.
 
 October 13 staff-wallet privacy (A8 / A-22):
 

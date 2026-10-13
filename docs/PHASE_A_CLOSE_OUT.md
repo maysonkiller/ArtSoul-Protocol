@@ -18,6 +18,12 @@ reads without changing their empty public profiles. This does not substitute for
 native account switching or successful production profile edits. The checkpoint
 retains the initial local PostgreSQL startup failure and its passing rerun.
 
+After the owner finished Admin setup, actual desktop Chrome also passed RG-01
+A7/A8 on `12f3e38`: explicit Disconnect removed the connected identity and staff
+directory; Admin and Profile stayed guest after reload. This closes the deferred
+desktop logout check, not native wallet switching or the remaining iOS criteria.
+The dated RG-01 record preserves the exact UI-only evidence boundary.
+
 A-21 is accepted from the existing October 11 intake evidence: actual Report
 submission, independent reporters, deduplication, the sixth-report denial, no
 submission-triggered hiding and an operational review/notification path. No

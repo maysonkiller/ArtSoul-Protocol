@@ -7,7 +7,7 @@ October 14 distinct-identity continuation:
   that connected identity. The creator link opens public profile suffix 1824
   with its own name/biography and no Edit Profile. This is public-profile browsing,
   not a second native signed wallet. The owner's tab subsequently changed to
-  Admin setup; disconnect/reload was not performed over that ongoing workflow.
+  Admin setup; disconnect/reload was deferred until the owner confirmed completion.
 - PR #301 / `12f3e38` fixes profile saves following a different tab's shared
   session cookie. Three failing reproductions became five passing regressions;
   49 compiled Chrome assertions use the actual handler with isolated storage.
@@ -24,7 +24,22 @@ October 14 distinct-identity continuation:
 - Evidence: `output/audit/rg01-desktop-profile-2026-10-14.json`, compiled/asset
   records with `profile-isolation-*`, and the private live-session record. All
   existing phone/provider PASS results below are retained. The remaining native
-  disconnect/reload, account-switch and exact device criteria are not inferred.
+  account-switch and exact device criteria are not inferred.
+
+October 14 desktop logout continuation (before 22:58:27 UTC October 13): after
+the owner explicitly confirmed Admin setup was finished, the agent selected
+Disconnect in the actual desktop Chrome account menu on release `12f3e38`.
+The header became ArtSoul Guest, Connect Wallet replaced Disconnect, and Staff
+access, its directory and authority form disappeared. Reloading Admin settled
+at Wallet verification required with no directory or complaint data. Following
+the Profile menu link and reloading again both showed the guest connection page,
+without Edit Profile. A7 and A8 pass. No factor, role or stored profile was reset.
+The queue was already factor-locked before logout, so this does not establish
+revocation of a currently verified queue. Direct navigation to the session JSON
+endpoint was blocked by the browser client; no native server-response claim is
+made. Evidence: `output/audit/rg01-desktop-logout-2026-10-14.json` and the two
+`rg01-desktop-*-logged-out-2026-10-14.png` screenshots. Native account switching
+and the unasked iOS guest-after-reload result remain separate.
 
 October 11 reconciliation: the blank form below is the historical run template,
 not evidence that later work never happened. The owner has reported a satisfactory
@@ -136,8 +151,8 @@ than leaking between sessions.
 | A4 | Navigate to Gallery, then an artwork, then Profile | Identity stays the same on every page. No guest flicker | |
 | A5 | Sign in with Ethereum when prompted | Signature request appears and is accepted; the session is established | |
 | A6 | Open Profile and confirm the address shown | Matches the connected wallet | |
-| A7 | Disconnect explicitly from the account menu | Returns to guest cleanly. No stale avatar or name remains | |
-| A8 | Reload after disconnect | Still guest. The session did not resurrect itself | |
+| A7 | Disconnect explicitly from the account menu | Returns to guest cleanly. No stale avatar or name remains | PASS — actual desktop Chrome, October 14 supplement, release `12f3e38` |
+| A8 | Reload after disconnect | Still guest. The session did not resurrect itself | PASS — Admin and Profile reloads, October 14 supplement, release `12f3e38` |
 
 ## Block B - iOS (Operator A)
 
