@@ -20,6 +20,7 @@ import newsletter from '../src/api/routes/newsletter.js';
 import {setWalletSession} from '../src/api/backend.js';
 import {setModerationSession} from '../src/api/moderation-passkey.js';
 import {digest} from '../src/api/launch-services.js';
+import {deliverReportEmail} from '../src/api/moderation-report-email.js';
 
 const STAFF = `0x${'1'.repeat(40)}`;
 const REPORTER_A = `0x${'2'.repeat(40)}`;
@@ -73,11 +74,14 @@ test('Phase A local moderation route journey and captured email (virtual credent
     ARTSOUL_WEBAUTHN_RP_ID: 'local-test.invalid', ARTSOUL_WEBAUTHN_ALLOWED_ORIGIN: 'https://local-test.invalid',
     ARTSOUL_WEBAUTHN_RP_NAME: 'Local test only', ARTSOUL_MODERATION_SESSION_SECRET: modSecret,
     ARTSOUL_NEWSLETTER_ENABLED: 'true', ARTSOUL_EMAIL_API_KEY: emailKey,
+    ARTSOUL_MODERATION_EMAIL_ENABLED: 'true', ARTSOUL_MODERATION_ALERT_EMAIL: 'review@example.test',
     ARTSOUL_EMAIL_FROM: 'ArtSoul test <capture@example.test>', ARTSOUL_PUBLIC_ORIGIN: 'https://local-test.invalid'
   };
   const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   const captured = [];
+  const reportEmails = [];
   let captureStatus = 200;
+  let reportEmailMode = 'accepted';
   t.after(async () => {
     globalThis.fetch = originalFetch;
     if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
@@ -106,7 +110,8 @@ test('Phase A local moderation route journey and captured email (virtual credent
     CREATE ROLE service_role NOLOGIN BYPASSRLS;
     CREATE TABLE public.v41_artworks (chain_id NUMERIC(78,0), artwork_id NUMERIC(78,0), creator VARCHAR(42), PRIMARY KEY(chain_id,artwork_id));`);
   for (const name of ['phase18_artwork_moderation_visibility.sql', 'a8a_moderation_passkey_foundation.sql',
-    'a8b_artwork_report_intake.sql', 'a8c_protocol_admin_review.sql', 'collection_launch_services.sql']) {
+    'a8b_artwork_report_intake.sql', 'a8c_protocol_admin_review.sql', 'collection_launch_services.sql',
+    'moderation_report_email_delivery.sql']) {
     await pool.query(fs.readFileSync(new URL(`../sql/migrations/${name}`, import.meta.url), 'utf8'));
   }
   await pool.query('INSERT INTO v41_artworks SELECT 84532, n, $1 FROM generate_series(101,112) n', [CREATOR]);
@@ -116,7 +121,8 @@ test('Phase A local moderation route journey and captured email (virtual credent
 
   const tables = new Set(['artsoul_staff_roles', 'artsoul_staff_passkeys', 'artwork_reports', 'artwork_report_events',
     'artwork_moderation_visibility', 'artwork_moderation_log', 'artwork_report_notifications', 'email_subscriptions']);
-  const rpcNames = new Set(['submit_artwork_report', 'review_artwork_report', 'consume_launch_service_quota']);
+  const rpcNames = new Set(['submit_artwork_report', 'review_artwork_report', 'consume_launch_service_quota',
+    'claim_moderation_report_email', 'finish_moderation_report_email']);
   function filter(params, values) {
     return [...params].filter(([name]) => !['select', 'order', 'limit', 'on_conflict'].includes(name)).map(([name, raw]) => {
       const column = identifier(name);
@@ -142,7 +148,7 @@ test('Phase A local moderation route journey and captured email (virtual credent
       const fn = name.slice(4); assert.ok(rpcNames.has(fn));
       const body = await jsonBody(req);
       const args = Object.entries(body).map(([key, value]) => { values.push(value); return `${identifier(key)} => $${values.length}`; });
-      scalar = fn === 'consume_launch_service_quota';
+      scalar = ['consume_launch_service_quota', 'finish_moderation_report_email'].includes(fn);
       sql = `SELECT ${scalar ? '' : '* FROM '}public.${identifier(fn)}(${args.join(',')})${scalar ? ' AS value' : ''}`;
     } else {
       assert.ok(tables.has(name), `unexpected local table ${name}`);
@@ -189,6 +195,15 @@ test('Phase A local moderation route journey and captured email (virtual credent
         assert.equal(req.headers.authorization, `Bearer ${emailKey}`);
         const body = await jsonBody(req);
         assert.ok(body.to.every(email => email.endsWith('@example.test')));
+        if (req.headers['idempotency-key']?.startsWith('artsoul-report-')) {
+          assert.deepEqual(body.to, ['review@example.test']);
+          const id = req.headers['idempotency-key'].slice('artsoul-report-'.length);
+          const report = (await pool.query('SELECT status FROM artwork_reports WHERE id=$1', [id])).rows[0];
+          assert.equal(report.status, 'actioned', 'the review decision committed before this worker send');
+          reportEmails.push({body, idempotencyKey: req.headers['idempotency-key']});
+          if (reportEmailMode === 'lost-response') return res.destroy();
+          return send(res, reportEmailMode === 'unavailable' ? 503 : 200, {id: 'local-report-capture'});
+        }
         const row = (await pool.query('SELECT * FROM email_subscriptions WHERE email=$1', [body.to[0]])).rows[0];
         assert.equal(row.status, 'subscribed', 'consent is committed before provider request');
         captured.push({body, idempotencyKey: req.headers['idempotency-key']});
@@ -226,6 +241,9 @@ test('Phase A local moderation route journey and captured email (virtual credent
   const act = (row, action, options = {}) => call('/review', {wallet: STAFF, stepUp: true, ...options,
     body: {report_id: row.id, expected_updated_at: row.updated_at, action, reason: 'Local fixture review decision.'}});
   let first, second, concurrent;
+  const ledger = () => Promise.all(['artwork_reports', 'artwork_report_events', 'artwork_moderation_visibility',
+    'artwork_moderation_log', 'artwork_report_notifications'].map(async table =>
+    (await pool.query(`SELECT row_to_json(r)::text AS value FROM ${identifier(table)} r ORDER BY row_to_json(r)::text`)).rows));
 
   await t.test('real intake commits one duplicate record, independent reporters and no automatic hide', async () => {
     assert.equal((await submit(undefined)).status, 401);
@@ -353,9 +371,6 @@ test('Phase A local moderation route journey and captured email (virtual credent
   await t.test('disabled flags still fail closed with valid virtual credentials and retain the ledger', async () => {
     const pending = (await call('/queue', {wallet: STAFF, stepUp: true})).body.data.reports.find(row => String(row.artwork_id) === '104');
     assert.ok(pending, 'a valid pending decision exists before pausing review');
-    const ledger = () => Promise.all(['artwork_reports', 'artwork_report_events', 'artwork_moderation_visibility',
-      'artwork_moderation_log', 'artwork_report_notifications'].map(async table =>
-      (await pool.query(`SELECT row_to_json(r)::text AS value FROM ${identifier(table)} r ORDER BY row_to_json(r)::text`)).rows));
     const before = await ledger();
     process.env.ARTSOUL_PROTOCOL_ADMIN_ENABLED = 'false';
     assert.equal((await call('/queue', {wallet: STAFF, stepUp: true})).status, 503);
@@ -382,5 +397,44 @@ test('Phase A local moderation route journey and captured email (virtual credent
     assert.equal(history.status, 200); assert.ok(history.body.items.length > 0, 'pausing write workflows does not revoke recipient history');
     assert.deepEqual(await ledger(), before, 'flag changes and denied writes neither delete nor rewrite the ledger');
     process.env.ARTSOUL_REPORTING_ENABLED = 'true';
+  });
+  await t.test('failed staff alert delivery and due retries preserve committed decisions and recipient obligations', async () => {
+    // Staff alerts originate from REPORT_SUBMITTED; decision notifications stay
+    // in-app. Delay these alerts until after review to prove the worker cannot
+    // undo an already committed decision, visibility, audit or recipient record.
+    const pending = (await call('/queue', {wallet: STAFF, stepUp: true})).body.data.reports.find(row => String(row.artwork_id) === '105');
+    assert.equal((await act(pending, 'hide')).status, 200);
+    for (const [artwork, failure] of [[103, 'unavailable'], [105, 'lost-response']]) {
+      const row = (await pool.query('SELECT id,status FROM artwork_reports WHERE artwork_id=$1', [artwork])).rows[0];
+      assert.equal(row.status, 'actioned');
+      assert.ok((await pool.query('SELECT count(*)::int AS n FROM artwork_report_notifications WHERE report_id=$1', [row.id])).rows[0].n > 0);
+      const before = await ledger(), start = reportEmails.length;
+      const inbox = await call('/notifications', {wallet: CREATOR});
+      assert.equal(inbox.status, 200);
+      reportEmailMode = failure;
+      assert.deepEqual(await deliverReportEmail(row.id), {status: 'pending'});
+      assert.equal(reportEmails.length, start + 1, 'failed HTTP attempt reached only the local capture sink');
+      assert.deepEqual(await ledger(), before);
+      const delivery = async () => (await pool.query(`SELECT state,attempt_count,attempt_token,lease_until,accepted_at,last_error_code,
+        next_attempt_at>now() AS retry_delayed FROM moderation_report_email_delivery WHERE report_id=$1`, [row.id])).rows[0];
+      assert.deepEqual(await delivery(), {state: 'pending', attempt_count: 1, attempt_token: null,
+        lease_until: null, accepted_at: null, last_error_code: 'DELIVERY_UNCONFIRMED', retry_delayed: true});
+      assert.deepEqual(await deliverReportEmail(row.id), {status: 'not_claimed'});
+      assert.equal(reportEmails.length, start + 1, 'an immediate retry must not send');
+      // Only this disposable database's delivery schedule is changed. Neither
+      // process time nor a real report/worker is accelerated.
+      await pool.query("UPDATE moderation_report_email_delivery SET next_attempt_at=now()-interval '1 second' WHERE report_id=$1", [row.id]);
+      reportEmailMode = 'accepted';
+      assert.deepEqual(await deliverReportEmail(row.id), {status: 'accepted'});
+      assert.equal(reportEmails.length, start + 2);
+      assert.deepEqual(reportEmails[start + 1], reportEmails[start], 'retry uses the identical payload and provider key');
+      const accepted = await delivery();
+      assert.equal(accepted.state, 'accepted'); assert.equal(accepted.attempt_count, 2);
+      assert.ok(accepted.accepted_at); assert.equal(accepted.last_error_code, null);
+      assert.deepEqual(await deliverReportEmail(row.id), {status: 'not_claimed'});
+      assert.equal(reportEmails.length, start + 2, 'the durable receipt suppresses another send');
+      assert.deepEqual(await ledger(), before, 'the complete moderation ledger survives failure and retry unchanged');
+      assert.deepEqual(await call('/notifications', {wallet: CREATOR}), inbox, 'recipient-facing decision notifications remain available');
+    }
   });
 });

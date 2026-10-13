@@ -2,6 +2,13 @@
 
 ## Recorded desktop result — October 14, 2026
 
+**A-59 accepted.** After the captured pass below, the owner confirmed that no
+other currently used wallet still shows the reported stale-address behavior.
+That resolves the earlier unnamed-other-wallet scope. This closes the reported
+issue with the stated evidence limits; it does not certify every wallet or
+claim an unobserved native-mobile flow. Keep the historical probe for a future
+specific reproduction, not as an outstanding request to repeat this pass.
+
 PASS for the owner's actual Rabby Wallet in ordinary desktop Chrome on the apex,
 release `12f3e38`. The owner switched from personal wallet suffix 989b to founder
 wallet suffix 1ccd inside the wallet. The same page's existing diagnostic buffer
@@ -24,8 +31,8 @@ profile save or factor change. Do not repeat this passed Rabby desktop flow.
 This is the injected-provider path, not a WalletConnect session namespace update
 or native phone capture. The historical issue below is not reproduced on this
 tested path. The older scope sentence below refers to other reported wallets,
-but the backlog does not name them. Identify any such original affected provider
-before requesting more captures; do not invent a native-mobile or all-wallet gate.
+but the backlog did not name them. The owner's subsequent no-remaining-problem
+confirmation reconciles that scope; do not invent a native-mobile or all-wallet gate.
 No polling or handler rewrite is justified by this result. Protected server-session isolation is covered separately by the
 profile isolation acceptance; no new SIWE or verified staff session is claimed.
 

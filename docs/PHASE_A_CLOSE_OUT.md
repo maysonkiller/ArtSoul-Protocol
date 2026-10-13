@@ -8,7 +8,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **66 done, 17 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **67 done, 16 in progress, 0 planned** across A-01 to A-83.
 
 October 14 continuation: the profile session-cookie isolation fix is published
 through PR #301 / `12f3e38`, with green candidate CI, build, 49 compiled browser
@@ -26,11 +26,18 @@ The dated RG-01 record preserves the exact UI-only evidence boundary.
 
 The owner's subsequent Rabby desktop account switch also passed with captured
 `accountsChanged` events and the new wallet's correct profile before/after reload.
-This supplies distinct-wallet desktop UI continuity. A-59's older reference to
-other reported wallets needs a named original provider before another capture;
-it is not an explicit native-mobile or all-wallet gate. A-53's successful iPhone reload/navigation and reconnect
+This supplies distinct-wallet desktop UI continuity. The owner then confirmed
+that no other currently used wallet retains the stale-address problem; A-59 is
+accepted with that scope reconciliation and the recorded Rabby evidence, without
+claiming universal wallet or native-mobile coverage. A-53's successful iPhone reload/navigation and reconnect
 results are retained; only its unrecorded visual restoration transition remains
 unaccepted, not the already-passed sign-in outcomes.
+
+A8's combined email-failure isolation is now verified locally: real handlers,
+worker and PostgreSQL preserve the moderation ledger and recipient inbox across
+HTTP 503, lost response and due retry; recorded acceptance prevents another
+send. The focused suites pass 28/28 without skips. This adds no production outage
+or delivery claim and does not close A-22's other operational boundaries.
 
 A-21 is accepted from the existing October 11 intake evidence: actual Report
 submission, independent reporters, deduplication, the sixth-report denial, no
@@ -205,11 +212,10 @@ Ordered by what the founder can feel, not by row number.
 | **A-53** | The identity settle gap between header and profile | Reproduced in founder desktop and Android captures in August; the repair still needs production iOS reload and navigation acceptance. Current Android acceptance is owner-waived / not tested |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
 | **A-57** | Wallet capability limits | Needs masked device evidence; may end as a documented wallet limitation rather than a defect |
-| **A-59** | In-wallet account switch | Actual owner Chrome/Rabby switch passed on October 14 with masked events and correct profile/reload. The older probe's reference to other reported wallets does not name them; reconcile that original scope before requesting another test. No blanket mobile or all-wallet requirement is inferred |
 
 ## 2a. All the device acceptance, in five trips
 
-Fifteen rows remain for device and connected-flow acceptance after A-79 closed.
+Fourteen rows remain for device and connected-flow acceptance after A-79 and A-59 closed.
 The underlying repairs, including the September 29 portrait/profile
 corrections, are published. A failed acceptance may require another fix.
 [`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)

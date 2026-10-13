@@ -7,8 +7,8 @@ its historical evidence. It is not an Android PASS or a compatibility claim.
 Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
 iPhone trip without a specific unresolved outcome.
 
-Fifteen backlog rows remain for device and connected-flow acceptance after
-A-79 closed on September 27. Their implementation is published; failed
+Fourteen backlog rows remain for device and connected-flow acceptance after
+A-79 closed on September 27 and A-59 on October 14. Their implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
 
@@ -223,6 +223,11 @@ you see on the account menu should now name one of four distinct causes rather
 than telling you to reconnect. Record the wallet name and which message appeared.
 
 ### 5b — An account switched inside the wallet (A-59)
+
+Accepted October 14: the actual owner Chrome/Rabby switch, correct profile and
+reload passed with masked events; the owner confirmed no remaining stale-address
+case in another currently used wallet. Do not repeat this acceptance. The probe
+below is retained only for a specifically reproduced future regression.
 
 Follow [`A59_ACCOUNT_SWITCH_PROBE.md`](A59_ACCOUNT_SWITCH_PROBE.md): connect,
 switch account inside the wallet application, come back to the tab, read the

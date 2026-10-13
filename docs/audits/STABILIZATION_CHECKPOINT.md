@@ -97,9 +97,25 @@ October 14 profile session isolation (A7 / RG-01 / A-53):
   Do not turn that ambiguity into an invented list of mandatory wallet tests.
   Counts remain 66/17/0; documentation checks passed 6/6 and whitespace checks
   passed. This continuation changes evidence only, with no new build/deployment.
-- Exactly next step: clarify only whether another originally affected wallet
-  remains relevant to A-59; current files/history do not identify one.
-  Retain the completed Rabby and phone/OAuth results and do not reset factors.
+- Continuation from `d037fb9`: the owner confirmed no other currently used wallet
+  still exhibits the stale-address problem. A-59 is now accepted from the actual
+  Rabby event/profile/reload proof and that explicit original-scope clarification.
+  Do not claim universal wallet or native-mobile coverage. No source change or
+  repeated switch is needed. Counts become 67 done / 16 in progress / 0 planned,
+  including fourteen remaining device/connected-flow rows.
+- A8 / A-22 independent continuation: extended the existing moderation journey
+  with the unchanged delivery migration and actual worker. Local HTTP 503 and
+  lost-response attempts both leave committed report/visibility/audit/recipient
+  records unchanged; immediate retry is denied, a due retry preserves payload/key,
+  and a recorded acceptance suppresses another send. Creator inbox stays intact.
+  Disposable PostgreSQL and loopback capture only; no external message, live
+  fault injection, production flag, migration or contract change.
+  Focused worker/adversarial/SQL/journey run passed 28/28, zero skips
+  (`output/audit/report-email-journey-2026-10-14.log`). Documentation checks pass
+  6/6; counts are synchronized. Bounded independent review found no actionable
+  issue. No application code changed; no fresh app build is claimed.
+- Exactly next step: save the test/evidence change for CI review, keeping the
+  24-hour/context and other native-device acceptance boundaries explicit.
 
 October 13 staff-wallet privacy (A8 / A-22):
 
