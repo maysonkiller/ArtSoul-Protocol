@@ -1,5 +1,36 @@
 # A-59 — how to find out whether an in-wallet account switch reaches the site
 
+## Recorded desktop result — October 14, 2026
+
+PASS for the owner's actual Rabby Wallet in ordinary desktop Chrome on the apex,
+release `12f3e38`. The owner switched from personal wallet suffix 989b to founder
+wallet suffix 1ccd inside the wallet. The same page's existing diagnostic buffer
+retained both accounts; no reload was needed for the transition:
+
+- 23:00:45.291 UTC October 13: injected `accountsChanged` announced 989b;
+  runtime accepted that account at 23:00:46.202.
+- 23:01:01.072 / .073: AppKit and injected providers announced 1ccd through
+  `accountsChanged`; runtime accepted it at .315 / .640. The connector was
+  `io.rabby` / Rabby Wallet on chain 84532.
+- At 23:01:04.340, provider, AppKit and runtime all held 1ccd. The observed
+  header showed the new account and a numeric Base Sepolia balance. Opening
+  Profile showed 1ccd, no avatar/bio and no created artworks, without the former
+  account's identity or works. A subsequent profile reload retained this result.
+
+Evidence: `output/audit/a59-rabby-native-events-2026-10-14.json` (allowlisted,
+suffix-only event record) and `a59-rabby-founder-profile-2026-10-14.png`.
+The owner performed the switch. The agent made no signature, transaction,
+profile save or factor change. Do not repeat this passed Rabby desktop flow.
+This is the injected-provider path, not a WalletConnect session namespace update
+or native phone capture. The historical issue below is not reproduced on this
+tested path. The older scope sentence below refers to other reported wallets,
+but the backlog does not name them. Identify any such original affected provider
+before requesting more captures; do not invent a native-mobile or all-wallet gate.
+No polling or handler rewrite is justified by this result. Protected server-session isolation is covered separately by the
+profile isolation acceptance; no new SIWE or verified staff session is claimed.
+
+## Historical report and remaining WalletConnect probe
+
 Switching to a different account inside the wallet application is not noticed:
 the site keeps browsing as the previously approved address, and asks for no
 reconnect, re-approval or fresh signature. Each account is a separate identity,

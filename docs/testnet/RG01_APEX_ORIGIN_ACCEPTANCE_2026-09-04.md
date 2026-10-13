@@ -41,6 +41,17 @@ made. Evidence: `output/audit/rg01-desktop-logout-2026-10-14.json` and the two
 `rg01-desktop-*-logged-out-2026-10-14.png` screenshots. Native account switching
 and the unasked iOS guest-after-reload result remain separate.
 
+October 14 native account-switch continuation: the owner switched the actual
+Rabby account from suffix 989b to 1ccd in the prepared Chrome tab. Its retained
+diagnostic buffer captured `accountsChanged` from both injected/AppKit providers
+at 23:01:01 UTC October 13, followed by acceptance of 1ccd and agreement between
+provider, AppKit and runtime. The header, subsequent own-profile navigation and
+profile reload all showed 1ccd without the former profile's avatar/name/works.
+This supplies the previously missing distinct-wallet desktop switch observation;
+it is not another SIWE signature or mobile WalletConnect test. The new founder
+key was never used by the agent. Exact masked events and limits are in
+`A59_ACCOUNT_SWITCH_PROBE.md`. This Rabby desktop check must not be requested again.
+
 October 11 reconciliation: the blank form below is the historical run template,
 not evidence that later work never happened. The owner has reported a satisfactory
 real iPhone gallery/Back, wallet/profile reload, tab-switch and lock/resume run;

@@ -75,13 +75,31 @@ October 14 profile session isolation (A7 / RG-01 / A-53):
   `node --test test/phase-a-status-summary.test.cjs test/phase-a-close-out.test.cjs`
   passed 6/6 and `git diff --check` passed. No application rebuild is claimed
   for this documentation-only continuation. No subagent is running.
-- Exactly next step: capture the A-59 native in-wallet account-switch signal with
-  the existing masked diagnostic path, then reconcile RG-01 distinct-identity
-  evidence. Reuse passed phone/provider/logout results; do not reset factors.
-  The existing Chrome now has an agent-created `/?walletdebug=1` tab ready for
-  the owner to connect one old test account and switch to another inside the
-  wallet without disconnecting/reloading the site. Capture its masked console
-  events after the owner confirms; do not fabricate provider behavior from mocks.
+- Continuation from `c68c4c2`: the owner performed the requested switch using the
+  personal/founder pair. The actual Chrome buffer records Rabby `accountsChanged`
+  989b -> 1ccd at 23:01:01 UTC October 13, then accepted runtime/provider identity
+  1ccd. Header, own-profile navigation and reload show 1ccd without the former
+  profile's avatar/name/works. No agent signature, transaction, factor or profile
+  mutation. Saved suffix-only events and screenshot use the prefix
+  `output/audit/a59-rabby-*-2026-10-14`. This closes the Rabby desktop observation.
+  No mobile or other-provider result is inferred. Do not request this switch
+  again. No source change is warranted by the passing event flow.
+- One bounded read-only review reconciled A-53: existing iPhone reload/navigation,
+  sign-in and correct-profile outcomes already pass. Its remaining unrecorded
+  criterion is the transient restoration menu/header-to-profile timing, not
+  another full phone/OAuth trip. The reviewer completed; no subagent remains active.
+  A follow-up scope review found no explicit mobile requirement in A-59. Its
+  older probe says one wallet does not close other reported wallets, but does not
+  name them. A focused evidence search found no other native switch event record;
+  videos and fixtures were not replayed or counted as new native acceptance.
+  Original backlog introduction `9ca5ff8` (August 21) and probe `3419115`
+  (September 14) likewise supply no provider name beyond the MetaMask exclusion.
+  Do not turn that ambiguity into an invented list of mandatory wallet tests.
+  Counts remain 66/17/0; documentation checks passed 6/6 and whitespace checks
+  passed. This continuation changes evidence only, with no new build/deployment.
+- Exactly next step: clarify only whether another originally affected wallet
+  remains relevant to A-59; current files/history do not identify one.
+  Retain the completed Rabby and phone/OAuth results and do not reset factors.
 
 October 13 staff-wallet privacy (A8 / A-22):
 

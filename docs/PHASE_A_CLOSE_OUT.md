@@ -24,6 +24,14 @@ directory; Admin and Profile stayed guest after reload. This closes the deferred
 desktop logout check, not native wallet switching or the remaining iOS criteria.
 The dated RG-01 record preserves the exact UI-only evidence boundary.
 
+The owner's subsequent Rabby desktop account switch also passed with captured
+`accountsChanged` events and the new wallet's correct profile before/after reload.
+This supplies distinct-wallet desktop UI continuity. A-59's older reference to
+other reported wallets needs a named original provider before another capture;
+it is not an explicit native-mobile or all-wallet gate. A-53's successful iPhone reload/navigation and reconnect
+results are retained; only its unrecorded visual restoration transition remains
+unaccepted, not the already-passed sign-in outcomes.
+
 A-21 is accepted from the existing October 11 intake evidence: actual Report
 submission, independent reporters, deduplication, the sixth-report denial, no
 submission-triggered hiding and an operational review/notification path. No
@@ -196,7 +204,8 @@ Ordered by what the founder can feel, not by row number.
 | **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS acceptance remains open; navigation timing or desktop viewport emulation cannot replace it. Android is owner-waived / not tested |
 | **A-53** | The identity settle gap between header and profile | Reproduced in founder desktop and Android captures in August; the repair still needs production iOS reload and navigation acceptance. Current Android acceptance is owner-waived / not tested |
 | **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
-| **A-57**, **A-59** | Wallet capability limits; in-wallet account switch | Both need masked device evidence first, and both may end as documented wallet limitations rather than defects |
+| **A-57** | Wallet capability limits | Needs masked device evidence; may end as a documented wallet limitation rather than a defect |
+| **A-59** | In-wallet account switch | Actual owner Chrome/Rabby switch passed on October 14 with masked events and correct profile/reload. The older probe's reference to other reported wallets does not name them; reconcile that original scope before requesting another test. No blanket mobile or all-wallet requirement is inferred |
 
 ## 2a. All the device acceptance, in five trips
 
