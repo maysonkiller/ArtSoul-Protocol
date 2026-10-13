@@ -70,7 +70,7 @@ async function getPasskeyModerationAccess(req, wallet, strict) {
         503
       );
     }
-    return { wallet, role: null, canModerate: false, passkeyRequired: true, missingFactors: ['role_registry'] };
+    return { wallet, role: null, canModerate: false, passkeyRequired: true, stepUpExpiresAt: null, missingFactors: ['role_registry'] };
   }
 
   let stepUp;
@@ -83,6 +83,7 @@ async function getPasskeyModerationAccess(req, wallet, strict) {
       role: MODERATION_ROLES.has(role) ? role : null,
       canModerate: false,
       passkeyRequired: true,
+      stepUpExpiresAt: null,
       missingFactors: ['passkey_configuration']
     };
   }
@@ -104,6 +105,7 @@ async function getPasskeyModerationAccess(req, wallet, strict) {
     canModerate: MODERATION_ROLES.has(role) && stepUp.valid,
     passkeyRequired: true,
     stepUpActive: stepUp.valid,
+    stepUpExpiresAt: stepUp.valid ? stepUp.expiresAt : null,
     missingFactors: stepUp.valid ? [] : ['passkey_step_up']
   };
 }
@@ -117,6 +119,7 @@ export async function getModerationAccess(req, options = {}) {
       wallet: null,
       role: null,
       canModerate: false,
+      stepUpExpiresAt: null,
       missingFactors: ['wallet']
     };
   }
@@ -125,7 +128,7 @@ export async function getModerationAccess(req, options = {}) {
   // path if the operator enables it without factor enforcement.
   if (process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED === 'true' && !isModerationPasskeyEnabled()) {
     if (strict) throw accessError('Moderation factor enforcement is unavailable', 'MODERATION_PASSKEY_MISCONFIGURED', 503);
-    return { wallet, role: null, canModerate: false, passkeyRequired: true, missingFactors: ['passkey_configuration'] };
+    return { wallet, role: null, canModerate: false, passkeyRequired: true, stepUpExpiresAt: null, missingFactors: ['passkey_configuration'] };
   }
 
   // Flag ON: passkey-only authorization; profiles are never queried.
@@ -157,6 +160,7 @@ export async function getModerationAccess(req, options = {}) {
       wallet,
       role: null,
       canModerate: false,
+      stepUpExpiresAt: null,
       missingFactors: ['role_registry']
     };
   }
@@ -196,6 +200,7 @@ export async function getModerationAccess(req, options = {}) {
     wallet,
     role: MODERATION_ROLES.has(role) ? role : null,
     canModerate,
+    stepUpExpiresAt: null,
     missingFactors
   };
 }

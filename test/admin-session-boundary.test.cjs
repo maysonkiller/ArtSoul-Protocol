@@ -12,21 +12,29 @@ const logic = source.slice(start, end) + `return {checkAccess, authenticate, cha
         setupAllowed: Boolean(setupWallet),
         passkeyOpen: typeof passkeyOpen === 'undefined' ? false : passkeyOpen}}; }`;
 const WALLET = '0x'+'11'.repeat(20), OTHER = '0x'+'22'.repeat(20);
-const access = (fields={}) => ({enabled:true,setupEnabled:true,authenticated:true,eligible:true,access:{role:'admin',stepUpActive:true},...fields});
+const access = (fields={}) => ({enabled:true,setupEnabled:true,authenticated:true,eligible:true,serverTime:1_800_000_000_000,
+    access:{role:'admin',stepUpActive:true,stepUpExpiresAt:1_800_003_600_000},...fields});
 const empty = () => ({reports:[],events:[],hidden:[],moderationLog:[],notifications:[]});
 const secret = () => ({...empty(), reports:[{id:'private-report',details:'private complaint'}]});
 const tick = () => new Promise(resolve=>setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((done, fail)=>{resolve=done;reject=fail;}); return {promise,resolve,reject}; };
 
 function harness(response=access()) {
-    const state = {wallet:WALLET,auth:WALLET,calls:[],access:response,queue:secret(),ensureAuthenticated:async()=>true};
+    const state = {wallet:WALLET,auth:WALLET,calls:[],access:response,queue:secret(),now:0,visibility:'visible',ensureAuthenticated:async()=>true};
     const values=[],refs=[],effects=[],callbacks=[],listeners=new Map();
+    const timers=new Map();let timerId=0;
     let si,ri,ei,ci,pending;
     const scope = {
         window:{artsoulWalletStateSettled:true,getCurrentWalletAddress:()=>state.wallet,
             SupabaseAuth:{getAuthenticatedWallet:()=>state.auth},ensureAuthenticated:()=>state.ensureAuthenticated(),
             addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},
             removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
+        document:{get visibilityState(){return state.visibility;},
+            addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},
+            removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
+        performance:{now:()=>state.now},
+        setTimeout:(fn,delay)=>{const id=++timerId;timers.set(id,{fn,at:state.now+delay});return id;},
+        clearTimeout:id=>timers.delete(id),
         encodeURIComponent,
         api:async(path,options)=>{state.calls.push({path,options});if(state.api)return state.api(path,options);return path.startsWith('access')?state.access:{data:state.queue};},
         useState:initial=>{const i=si++;if(!(i in values))values[i]=typeof initial==='function'?initial():initial;return [values[i],value=>{values[i]=typeof value==='function'?value(values[i]):value;}];},
@@ -36,7 +44,9 @@ function harness(response=access()) {
     };
     const run=vm.runInNewContext(logic+'\nProtocolAdminPage;',scope);
     const h={state,scope,values,render(){si=ri=ei=ci=0;pending=[];h.actions=run();pending.forEach(fn=>fn());return h.actions.snapshot;},
-        event:(name,event={})=>[...(listeners.get(name)||[])].forEach(fn=>fn(event)),unmount:()=>effects.forEach(effect=>effect.cleanup?.())};
+        event:(name,event={})=>[...(listeners.get(name)||[])].forEach(fn=>fn(event)),
+        advance:async ms=>{state.now+=ms;for(const [id,timer] of [...timers])if(timer.at<=state.now){timers.delete(id);timer.fn();}await tick();},
+        timerCount:()=>timers.size,unmount:()=>effects.forEach(effect=>effect.cleanup?.())};
     h.render();return h;
 }
 
@@ -226,4 +236,48 @@ test('logout during a rejected decision refresh cannot restore private report da
     pending.resolve({data:secret()});await old;const view=h.render();
     assert.equal(view.accessState,'unauthenticated');assert.equal(view.data.reports.length,0);
     assert.equal(view.decision,null);assert.equal(view.message,'');
+});
+
+test('the open workspace locks at the server deadline without a request or local clock dependency',async()=>{
+    const h=harness(access({access:{role:'admin',stepUpActive:true,stepUpExpiresAt:1_800_000_060_000}}));await tick();h.render();
+    h.actions.setDecision({report:{id:'private-report'},action:'hide'});h.render();
+    const old=h.actions,count=h.state.calls.length;
+    await h.advance(59999);assert.equal(h.render().accessState,'ready');
+    await h.advance(1);const view=h.render();
+    assert.equal(view.accessState,'step_up');assert.equal(view.data.reports.length,0);
+    assert.equal(view.decision,null);assert.equal(view.access.stepUpActive,false);
+    assert.equal(view.setupAllowed,true,'existing factor can be verified without setup/reset');
+    await old.changeQueueStatus('resolved');await old.submitDecision('expired callback');
+    assert.equal(h.state.calls.length,count,'deadline locks locally without polling or stale callbacks');
+});
+
+test('expired or missing server deadline cannot open a protected workspace',async()=>{
+    for(const fields of [{serverTime:undefined},{access:{role:'admin',stepUpActive:true}},
+        {access:{role:'admin',stepUpActive:true,stepUpExpiresAt:1_800_000_000_000}}]) {
+        const h=harness(access(fields));await tick();const view=h.render();
+        assert.equal(view.accessState,'step_up');assert.equal(view.data.reports.length,0);
+        assert.equal(h.state.calls.some(call=>call.path.startsWith('review-queue')),false);
+    }
+});
+
+test('foreground and online revalidation conceal old data and fence late queue responses',async()=>{
+    for(const event of ['focus','visibilitychange','online']) {
+        const h=harness();await tick();h.render();const oldQueue=deferred(),newAccess=deferred();
+        h.state.api=path=>path.startsWith('access')?newAccess.promise:oldQueue.promise;
+        const old=h.actions.changeQueueStatus('resolved');h.event(event);
+        const waiting=h.render();assert.equal(waiting.data.reports.length,0);assert.notEqual(waiting.accessState,'ready');
+        oldQueue.resolve({data:secret()});await old;assert.equal(h.render().data.reports.length,0);
+        newAccess.resolve(access({access:{role:'admin',stepUpActive:false}}));await tick();
+        assert.equal(h.render().accessState,'step_up');assert.equal(h.render().data.reports.length,0);
+    }
+});
+
+test('a delayed access response cannot extend the server deadline and timers clean up on logout',async()=>{
+    const h=harness();await tick();h.render();const pending=deferred();h.state.api=()=>pending.promise;
+    const read=h.actions.checkAccess();await h.advance(30000);
+    pending.resolve(access({access:{role:'admin',stepUpActive:true,stepUpExpiresAt:1_800_000_020_000}}));await read;
+    assert.equal(h.render().accessState,'step_up');assert.equal(h.render().data.reports.length,0);
+    h.state.api=null;await h.actions.checkAccess();h.render();assert.equal(h.timerCount(),1);
+    h.state.auth='';h.event('artsoul:auth-state-changed');h.render();assert.equal(h.timerCount(),0);
+    h.unmount();assert.equal(h.timerCount(),0);
 });

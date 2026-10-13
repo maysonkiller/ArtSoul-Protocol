@@ -33,8 +33,10 @@ test('verified access lasts exactly 24 hours without extending the setup permiss
   const cookie=issue();const payload=decode(cookie);
   assert.equal(MODERATION_SESSION_TTL_SECONDS,86400);assert.equal(ENROLLMENT_GRANT_TTL_MS,900000);
   assert.equal(payload.exp-payload.iat,86400);
+  assert.equal(readModerationSession(withCookie(req(),cookie)).expiresAt,payload.exp*1000);
   assert.match(cookie,/Max-Age=86400; Path=\/; HttpOnly; SameSite=Lax/);
   now+=16*60*1000;assert.equal(readModerationSession(withCookie(req(),cookie)).wallet,WALLET);
+  assert.equal(readModerationSession(withCookie(req(),cookie)).expiresAt,payload.exp*1000);
   now=payload.exp*1000-1000;assert(readModerationSession(withCookie(req(),cookie)));
   now+=1000;assert.equal(readModerationSession(withCookie(req(),cookie)),null);
   assert.equal(decode(cookie).exp,payload.exp,'reads do not renew expiry');
@@ -102,6 +104,7 @@ test('old unbound sessions, malformed timestamps and tampered cookies cannot ext
 test('authenticator sessions receive the same context and expiry policy',()=>{
   const cookie=issue(req(),'totp');
   assert.equal(readModerationSession(withCookie(req(),cookie)).factorType,'totp');
+  assert.equal(readModerationSession(withCookie(req(),cookie)).expiresAt,decode(cookie).exp*1000);
   assert.equal(decode(cookie).exp-decode(cookie).iat,86400);
   assert.equal(readModerationSession(withCookie(req('192.0.2.3'),cookie)),null);
 });

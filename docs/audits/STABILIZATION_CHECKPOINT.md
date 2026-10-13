@@ -114,8 +114,45 @@ October 14 profile session isolation (A7 / RG-01 / A-53):
   (`output/audit/report-email-journey-2026-10-14.log`). Documentation checks pass
   6/6; counts are synchronized. Bounded independent review found no actionable
   issue. No application code changed; no fresh app build is claimed.
-- Exactly next step: save the test/evidence change for CI review, keeping the
-  24-hour/context and other native-device acceptance boundaries explicit.
+- Saved the test/evidence change as `fa34506`; the inspected reconciliation with
+  published `origin/main` (`12f3e38`) produced candidate `03927bb` with the identical
+  tree. PR #302 is open and attached, with eleven test/documentation files only.
+  Exact-candidate CI 38483378726 passed Linux, Windows and static checks; Vercel's
+  preview status is successful. Linux reports 1813 passed / 2 Windows-only skips;
+  Windows reports 1658 passed / 14 Docker-dependent skips. Both contract runs
+  passed 46 tests. The changed PostgreSQL journey ran successfully on Linux and
+  in the local 28/28 focused run. No full-suite zero-skip claim is made.
+  Logs and candidate status use `output/audit/phase-a-acceptance-*2026-10-14`.
+  PR #302 subsequently merged as `d0c6c618d87759984961e6d9f4ff49c92fa9f250`
+  at 23:29:04 UTC October 13. Deployment 7052633568 succeeded at 23:29:48 UTC;
+  post-merge CI 38484516637 passed. Preview matched 53 assets on six pages.
+  This was a test/documentation release, not an application behavior change.
+- A8 expiry continuation starts from local `03927bb` in the same workspace and
+  branch. Four failing regression cases confirmed that an open Admin could keep
+  showing cached complaint data after its server session expired. The protected
+  APIs already rejected expired sessions; this was stale UI, not an API bypass.
+  The access response now exposes the validated deadline and server time. Admin
+  uses a bounded timer and rechecks on foreground/online events, concealing old
+  data before the request. Slow responses and client wall-clock skew cannot
+  extend access. The approved 24-hour lifetime and all server checks are unchanged.
+- Compiled review reproduced a related dialog remount during a pending passkey
+  result; a stable verification-section key preserves that flow. The before/after
+  request journals and screenshots are retained. Chrome with local HTTP/identity
+  doubles passes deadline lock, context denial, pending passkey return, Team
+  directory removal and the authority-pair directory exception. Both themes and
+  390px layout were checked. The eight-second fixture deadline is not a real
+  24-hour wait; no native passkey or trusted-IP transition is claimed.
+- Build passed. Focused backend checks passed 101/101; client checks passed 29/29.
+  The first full run had 1845 passes and four legacy VM harness failures from
+  missing browser primitives. After that harness update the full rerun passed
+  1849/1849 with zero skips; both logs are retained separately. Bounded final
+  review found no further issue.
+  Evidence prefix: `output/audit/admin-expiry-*2026-10-14*`; UI screenshots are
+  in `output/playwright/`. No contract, schema, dependency, role or economics
+  changed. Canon 07 / Bible section 11 policy is unchanged, with no new mechanic
+  or ambiguous policy interpretation. Historical untracked files remain excluded.
+- Exactly next step: release and verify this bounded Admin patch before the
+  remaining native-context acceptance.
 
 October 13 staff-wallet privacy (A8 / A-22):
 

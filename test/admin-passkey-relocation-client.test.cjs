@@ -12,7 +12,8 @@ const logic = source.slice(start, end) + `return {checkAccess, authenticate, cha
         setupAllowed: typeof setupAllowed === 'undefined' ? Boolean(setupWallet) : setupAllowed,
         passkeyOpen: typeof passkeyOpen === 'undefined' ? false : passkeyOpen}}; }`;
 const WALLET = '0x'+'11'.repeat(20), OTHER = '0x'+'22'.repeat(20);
-const access = (fields={}) => ({enabled:true,setupEnabled:true,authenticated:true,eligible:true,access:{role:'admin',stepUpActive:true},...fields});
+const access = (fields={}) => ({enabled:true,setupEnabled:true,authenticated:true,eligible:true,serverTime:1_800_000_000_000,
+    access:{role:'admin',stepUpActive:true,stepUpExpiresAt:1_800_003_600_000},...fields});
 const empty = () => ({reports:[],events:[],hidden:[],moderationLog:[],notifications:[]});
 const secret = () => ({...empty(), reports:[{id:'private-report',details:'private complaint'}]});
 const tick = () => new Promise(resolve=>setImmediate(resolve));
@@ -26,6 +27,11 @@ function harness(response=access(), settled=true) {
         window:{artsoulWalletStateSettled:settled,getCurrentWalletAddress:()=>state.wallet,
             SupabaseAuth:{getAuthenticatedWallet:()=>state.auth},ensureAuthenticated:()=>state.ensureAuthenticated(),
             addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
+        document:{visibilityState:'visible',
+            addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},
+            removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
+        performance:{now:()=>0},
+        setTimeout:()=>1,clearTimeout:()=>{},
         currentAdminWallet:()=>scope.window.artsoulWalletStateSettled ? state.wallet : '', emptyAdminData:empty, encodeURIComponent,
         api:async(path,options)=>{state.calls.push({path,options});if(state.api)return state.api(path,options);return path.startsWith('access')?state.access:{data:state.queue};},
         useState:initial=>{const i=si++;if(!(i in values))values[i]=typeof initial==='function'?initial():initial;return [values[i],value=>{values[i]=typeof value==='function'?value(values[i]):value;}];},
