@@ -165,12 +165,13 @@ function currentChainId() {
     return Number(chainId) || 84532;
 }
 
-async function backendWrite(path, body, method = 'POST') {
+async function backendWrite(path, body, method = 'POST', headers = {}) {
     const response = await fetch(path, {
         method,
         credentials: 'include',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...headers
         },
         body: JSON.stringify(body || {})
     });
@@ -439,14 +440,18 @@ async function getProfile(walletAddress) {
 }
 
 async function updateProfile(walletAddress, updates) {
-    if (!walletAddress) {
+    if (typeof walletAddress !== 'string' || !/^0x[0-9a-f]{40}$/i.test(walletAddress)) {
         throw new Error('Connect wallet before saving profile');
     }
 
-    const result = await backendWrite('/api/profile', updates, 'PUT');
-    invalidateProfileCache(walletAddress);
-    profileReadCache.set(walletAddress.toLowerCase(), {
-        data: result.profile || null,
+    const intendedWallet = walletAddress.toLowerCase();
+    const result = await backendWrite('/api/profile', updates, 'PUT', { 'X-ArtSoul-Wallet': intendedWallet });
+    if (typeof result?.profile?.wallet_address !== 'string' || result.profile.wallet_address.toLowerCase() !== intendedWallet) {
+        throw new Error('The saved profile does not match this wallet. Reload your profile before trying again.');
+    }
+    invalidateProfileCache(intendedWallet);
+    profileReadCache.set(intendedWallet, {
+        data: result.profile,
         timestamp: Date.now()
     });
     return result.profile;

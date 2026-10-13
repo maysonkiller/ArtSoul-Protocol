@@ -8,10 +8,19 @@ import {
 import { cleanProfile, publicProfile } from '../profile-fields.js';
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (!allowMethods(req, res, ['PUT'])) return;
 
   try {
     const wallet = requireWallet(req);
+    // Another tab can replace the shared session cookie while this draft is open.
+    const intendedWallet = req.headers?.['x-artsoul-wallet'];
+    if (typeof intendedWallet !== 'string' || intendedWallet.toLowerCase() !== wallet) {
+      return res.status(401).json({
+        error: 'SESSION_WALLET_MISMATCH',
+        message: 'Sign in with the wallet for this profile, then save again.'
+      });
+    }
     const body = await readJson(req);
     const profile = cleanProfile(body);
 

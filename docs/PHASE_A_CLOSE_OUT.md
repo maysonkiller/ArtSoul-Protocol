@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-12. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-13. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -9,6 +9,18 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 they disagree with this file, they win and this file is stale.
 
 Phase A stands at **65 done, 18 in progress, 0 planned** across A-01 to A-83.
+
+October 13 staff privacy: the owner-approved Team/current-authority visibility
+rule is published through PR #300 / `0ae7c31`. Other administrators/moderators
+cannot enumerate staff or read foreign staff attribution from moderation APIs;
+complete audit identities remain in storage. Team gets read-only access after
+factor verification, while the current authority pair retains its existing
+directory exception. Final local checks passed 1838/1838, compiled UI 127, build,
+candidate CI and preview/apex artifact/guest-boundary verification. Actual owner
+Chrome retained the authority directory while complaints stayed factor-locked.
+The [checkpoint](audits/STABILIZATION_CHECKPOINT.md) records exact evidence and
+remaining limits. No role or factor changed; this bounded release does not mark
+the remaining Phase A operating/device gates complete.
 
 October 12 continuation: native Safari/iPhone staff verification now passed with
 the existing Chrome/Google passkey, corroborated by server last-use metadata.
