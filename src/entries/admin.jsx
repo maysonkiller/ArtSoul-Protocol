@@ -196,14 +196,26 @@ function ProtocolAdminPage() {
     const setupEpoch = useRef(0), openedSetupFor = useRef('');
     const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
     const checkAccessRef = useRef(null);
+    const expiryTimer = useRef(null);
     const currentSetupWallet = () => window.artsoulWalletStateSettled === true
         ? String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase() : '';
     const sessionIsCurrent = (epoch, wallet) => epoch === setupEpoch.current && wallet === currentSetupWallet();
     const clearProtectedView = () => {
+        clearTimeout(expiryTimer.current);
+        expiryTimer.current = null;
         readySession.current = null;
         queueRequest.current++;
         setData({ reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
         setDecision(null);
+    };
+    const expireView = () => {
+        setupEpoch.current++;
+        accessRequest.current++;
+        clearProtectedView();
+        setAccess(current => current ? { ...current, stepUpActive: false } : null);
+        setAccessState('step_up');
+        setBusy(false);
+        setPasskeyOpen(false);
     };
     useEffect(() => {
         let waitingForWallet = window.artsoulWalletStateSettled !== true;
@@ -238,18 +250,37 @@ function ProtocolAdminPage() {
         const walletChanged = () => sessionChanged(true);
         const authChanged = () => sessionChanged();
         const storage = event => { if (!event.key || ['artsoul_wallet', 'artsoul_authenticated_wallet'].includes(event.key)) clearSession(); };
+        const resume = () => {
+            if (document.visibilityState === 'hidden' || !currentSetupWallet()) return;
+            // Conceal cached private data before the server checks this context.
+            setupEpoch.current++;
+            accessRequest.current++;
+            clearProtectedView();
+            setAccess(current => current ? { ...current, stepUpActive: false } : null);
+            setAccessState('loading');
+            checkAccessRef.current?.();
+        };
         window.addEventListener('artsoul:wallet-state-changed', walletChanged);
         window.addEventListener('artsoul:auth-state-changed', authChanged);
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', clearSession);
+        window.addEventListener('focus', resume);
+        window.addEventListener('online', resume);
+        window.addEventListener('pageshow', resume);
+        document.addEventListener('visibilitychange', resume);
         if (!waitingForWallet) checkAccessRef.current?.();
         return () => {
             setupEpoch.current++;
             readySession.current = null;
+            clearTimeout(expiryTimer.current);
             window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
             window.removeEventListener('artsoul:auth-state-changed', authChanged);
             window.removeEventListener('storage', storage);
             window.removeEventListener('pagehide', clearSession);
+            window.removeEventListener('focus', resume);
+            window.removeEventListener('online', resume);
+            window.removeEventListener('pageshow', resume);
+            document.removeEventListener('visibilitychange', resume);
         };
     }, []);
 
@@ -290,6 +321,7 @@ function ProtocolAdminPage() {
 
     const checkAccess = useCallback(async () => {
         const wallet = currentSetupWallet(), epoch = setupEpoch.current, request = ++accessRequest.current;
+        const startedAt = performance.now();
         const isCurrent = () => sessionIsCurrent(epoch, wallet) && request === accessRequest.current;
         if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
             clearProtectedView();
@@ -306,6 +338,11 @@ function ProtocolAdminPage() {
         try {
             const result = await api(`access?expectedWallet=${encodeURIComponent(wallet)}`);
             if (!isCurrent()) return;
+            // Use the server's remaining lifetime and subtract the whole request
+            // duration. Client wall-clock skew and slow responses cannot extend it.
+            const remaining = Number.isSafeInteger(result.access?.stepUpExpiresAt) && Number.isSafeInteger(result.serverTime)
+                ? Math.min(86400000, result.access.stepUpExpiresAt - result.serverTime) - (performance.now() - startedAt) : 0;
+            if (result.access?.stepUpActive && remaining <= 0) result.access = { ...result.access, stepUpActive: false };
             const canSetup = result.setupEnabled === true && result.authenticated === true && result.eligible === true;
             const canApprove = result.setupEnabled === true && result.authenticated === true && result.authorityEligible === true;
             setAuthorityWallet(canApprove ? wallet : '');
@@ -314,6 +351,7 @@ function ProtocolAdminPage() {
             else if (!result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
             setAccess(result.access || null);
             clearProtectedView();
+            if (canSetup && result.access?.stepUpActive) expiryTimer.current = setTimeout(expireView, remaining);
             if (!result.enabled && !result.setupEnabled) {
                 setAccessState('disabled');
             } else if (!result.authenticated) {
@@ -413,7 +451,7 @@ function ProtocolAdminPage() {
     const SignInDialog = access?.dualWallet ? StaffFactorDialog : StaffPasskeyDialog;
     const rosterWallet = authorityWallet || (access?.dualWallet && access?.role === 'team' && access?.stepUpActive ? setupWallet : '');
     const authorityControls = rosterWallet && <StaffAuthority key={`${rosterWallet}:${Boolean(authorityWallet)}`} walletAddress={rosterWallet} readOnly={!authorityWallet} api={api} onAccessChanged={checkAccess} />;
-    const verification = setupWallet && <section className="protocol-admin-setup" aria-label="Admin verification">
+    const verification = setupWallet && <section key="verification" className="protocol-admin-setup" aria-label="Admin verification">
         {accessState !== 'step_up' && <button type="button" className="protocol-admin-primary" disabled={busy} onClick={stepUp}>{access?.stepUpActive ? 'Sign-in settings' : 'Verify admin access'}</button>}
         <p>{access?.dualWallet ? 'Use a passkey or your authenticator app. New setup and recovery require approval from both authority wallets.' : "Use your device's passkey prompt to verify admin access. Additional-device and recovery options are available in the verification window."}</p>
         {passkeyOpen && <SignInDialog key={setupWallet} walletAddress={setupWallet} sessionActive={access?.stepUpActive === true}

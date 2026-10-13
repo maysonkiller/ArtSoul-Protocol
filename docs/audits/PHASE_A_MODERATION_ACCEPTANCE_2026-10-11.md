@@ -328,3 +328,35 @@ decision-to-worker failure-isolation coverage gap. It does not claim observation
 of a real Resend outage, scheduled host recovery or another actual inbox message;
 reuse the separately recorded live delivery evidence. The distinct 24-hour,
 changed-context, flag and device evidence boundaries remain as recorded.
+
+## October 14 acceptance reconciliation and open-view expiry repair
+
+The rollout checklist requires notification-failure isolation and fail-closed
+feature flags with evidence preservation. The real local handler/worker/SQL
+journey above establishes those failure properties; the earlier actual mail
+receipt establishes delivery. The existing flag-denial journey preserves the
+complete ledger across all three flags, and the deployed disabled preview
+separately proves route gating. These complementary checks satisfy those two
+properties without intentionally disrupting the operating site or Resend.
+No real provider outage or production flag toggle is claimed or newly required.
+
+The owner's recorded iPhone entry already establishes a different browser/device
+starting locked and requiring its own native factor verification. Do not repeat
+that ceremony. Natural 24-hour expiry and an actual changed trusted-IP request
+remain unobserved and separate from controlled-clock tests.
+
+Investigation found a narrower real defect: the server rejected expired access,
+but cached complaint data could remain in an idle open Admin. Four client
+regressions reproduced missing deadline/foreground enforcement. The access API
+now returns the existing validated expiry and server time; the client hides
+protected content at the deadline and before foreground/online revalidation.
+An independent review also caught a verification dialog remount during a pending
+passkey result. The built-page reproduction failed before a stable section key
+and succeeded afterward. No authentication policy, roles or stored records change.
+
+Focused checks pass (101 backend and 29 client); build passes. Compiled Chrome
+with loopback HTTP and credential doubles confirms timer expiry, context denial,
+passkey-result survival, Team directory removal and the authority exception.
+The fixture uses eight seconds, not a natural 24-hour session. No native passkey,
+IP transition or new production acceptance is inferred. Release/full-suite
+results belong to the current stabilization checkpoint. A-22 remains open.

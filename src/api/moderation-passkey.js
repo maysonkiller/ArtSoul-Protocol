@@ -176,6 +176,7 @@ export function readModerationSession(req) {
     if (!['passkey', 'totp'].includes(factorType) || (factorType === 'totp' && !roleBoundSessionsEnabled())) return null;
     return {
       wallet: String(data.wallet).toLowerCase(), credentialId: String(data.credential_id),
+      expiresAt: data.exp * 1000,
       ...(roleBoundSessionsEnabled() ? { authorizationVersion: version, factorType } : {})
     };
   } catch {
@@ -486,7 +487,7 @@ export async function verifyModerationStepUp(req, sessionWallet) {
       `artsoul_staff_totp_factors?id=eq.${encodeURIComponent(stepUp.credentialId)}` +
       `&wallet_address=eq.${encodeURIComponent(stepUp.wallet)}&activated_at=not.is.null&revoked_at=is.null&select=id&limit=1`
     );
-    return factors?.length === 1 ? { valid: true, credentialId: stepUp.credentialId, factorType: 'totp' }
+    return factors?.length === 1 ? { valid: true, credentialId: stepUp.credentialId, factorType: 'totp', expiresAt: stepUp.expiresAt }
       : { valid: false, code: 'CREDENTIAL_REVOKED' };
   }
 
@@ -500,5 +501,5 @@ export async function verifyModerationStepUp(req, sessionWallet) {
     return { valid: false, code: 'CREDENTIAL_REVOKED' };
   }
 
-  return { valid: true, credentialId: stepUp.credentialId };
+  return { valid: true, credentialId: stepUp.credentialId, expiresAt: stepUp.expiresAt };
 }

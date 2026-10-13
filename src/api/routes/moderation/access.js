@@ -12,6 +12,7 @@ export default async function handler(req, res) {
     if (!config.requested && !config.passkeyEnabled) {
       return res.status(200).json({
         success: true,
+        serverTime: Date.now(),
         enabled: false,
         setupEnabled: false,
         authenticated: false,
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
       if (normalized !== readWalletSession(req)) {
         return res.status(200).json({
           success: true, enabled: config.enabled, setupEnabled: true,
+          serverTime: Date.now(),
           authenticated: false, eligible: false, access: null
         });
       }
@@ -50,6 +52,7 @@ export default async function handler(req, res) {
       ? (await readAuthorityPolicy(getWebAuthnConfig().origin)).authorities.includes(access.wallet) : false;
     return res.status(200).json({
       success: true,
+      serverTime: Date.now(),
       enabled: config.enabled,
       setupEnabled: true,
       authenticated: Boolean(access?.wallet),
@@ -59,6 +62,7 @@ export default async function handler(req, res) {
         ...(paired ? { dualWallet: true } : {}),
         role: access?.role || null,
         stepUpActive: access?.stepUpActive === true,
+        stepUpExpiresAt: access?.stepUpActive === true ? access.stepUpExpiresAt : null,
         passkeyRequired: access?.passkeyRequired === true
       }
     });

@@ -52,14 +52,14 @@ function responseHarness() {
   };
 }
 
-async function authCookie({ stepUp = false } = {}) {
+async function authCookie({ stepUp = false, factorType = 'passkey', authorizationVersion } = {}) {
   const [, , , backend, passkeys] = await modules;
   const walletResponse = responseHarness();
   backend.setWalletSession(walletResponse, STAFF);
   const cookies = [String(walletResponse.headers['Set-Cookie']).split(';')[0]];
   if (stepUp) {
     const stepUpResponse = responseHarness();
-    passkeys.setModerationSession(stepUpResponse, STAFF, 'credential-1', undefined, 'passkey', request('GET','/'));
+    passkeys.setModerationSession(stepUpResponse, STAFF, 'credential-1', authorizationVersion, factorType, request('GET','/'));
     cookies.push(String(stepUpResponse.headers['Set-Cookie']).split(';')[0]);
   }
   return cookies.join('; ');
@@ -104,6 +104,7 @@ test('Protocol Admin and passkey flags fail closed independently', async () => {
     assert.equal(disabled.body.enabled, false);
     assert.equal(disabled.body.setupEnabled, false);
     assert.equal(disabled.body.eligible, false);
+    assert.equal(Number.isSafeInteger(disabled.body.serverTime), true);
     // With both flags off there is no setup or role discovery.
     assert.equal(disabledCalls.length, 0);
 
@@ -139,6 +140,7 @@ test('passkey setup discovers only the signed-in staff role while the review que
     assert.equal(guest.body.authenticated, false);
     assert.equal(guest.body.eligible, false);
     assert.equal(guest.body.access.role, null);
+    assert.equal(guest.body.access.stepUpExpiresAt, null);
     assert.equal(calls.length, 0);
 
     const cookie = await authCookie({ stepUp: true });
@@ -182,12 +184,72 @@ test('menu discovery exposes eligibility but no wallet or protected complaint da
     assert.equal(res.body.eligible, true);
     assert.equal(res.body.access.role, 'moderator');
     assert.equal(res.body.access.stepUpActive, false);
+    assert.equal(res.body.access.stepUpExpiresAt, null);
     assert.equal(JSON.stringify(res.body).includes(STAFF), false);
     assert.equal(JSON.stringify(res.body).includes('details'), false);
     assert.equal(calls.length, 1);
     assert.match(calls[0], /artsoul_staff_roles/);
   } finally {
     global.fetch = previousFetch;
+  }
+});
+
+test('discovery returns the fixed verified expiry and server time for passkey and authenticator sessions', async t => {
+  const [{ default: accessHandler }, , , , passkeys] = await modules;
+  const previousDualWallet = process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
+  process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = 'true';
+  let now = 1_790_000_000_123, revoked = false, authorizationVersion = 7;
+  t.mock.method(Date, 'now', () => now);
+  t.mock.method(global, 'fetch', async url => {
+    const table = new URL(url).pathname.split('/').pop();
+    if (table === 'artsoul_staff_roles') return supabaseResponse([{ role: 'admin', authorization_version: authorizationVersion }]);
+    if (table === 'artsoul_staff_authority_policy') return supabaseResponse([{
+      version: 1, origin: 'https://example.com', chain_id: 84532,
+      wallet_a: STAFF, wallet_b: '0x2222222222222222222222222222222222222222'
+    }]);
+    if (table === 'artsoul_staff_passkeys') return supabaseResponse(revoked ? [] : [{ credential_id: 'credential-1' }]);
+    if (table === 'artsoul_staff_setup_permissions') return supabaseResponse([{ id: 'permission-1' }]);
+    if (table === 'artsoul_staff_totp_factors') return supabaseResponse(revoked ? [] : [{ id: 'credential-1' }]);
+    throw new Error(`Unexpected fixture route: ${table}`);
+  });
+  try {
+    for (const factorType of ['passkey', 'totp']) {
+      const issuedAt = now, expiresAt = Math.floor(issuedAt / 1000) * 1000 + 86_400_000;
+      const cookie = await authCookie({ stepUp: true, factorType, authorizationVersion });
+      const req = request('GET', '/api/moderation/access', { cookie });
+      assert.equal((await passkeys.verifyModerationStepUp(req, STAFF)).expiresAt, expiresAt);
+      for (const checkedAt of [issuedAt, issuedAt + 16 * 60_000, expiresAt - 1]) {
+        now = checkedAt;
+        const res = responseHarness();
+        await accessHandler(req, res);
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.serverTime, checkedAt);
+        assert.deepEqual(res.body.access, {
+          dualWallet: true, role: 'admin', stepUpActive: true, stepUpExpiresAt: expiresAt, passkeyRequired: true
+        });
+        assert.equal(res.headers['Set-Cookie'], undefined, 'discovery never renews the session');
+        assert.doesNotMatch(JSON.stringify(res.body), /credential-1|permission-1|request_context/);
+        assert.equal(JSON.stringify(res.body).includes(STAFF), false);
+      }
+      now = issuedAt + 60_000;
+      for (const invalidation of ['revoked', 'role-version', 'context', 'expired']) {
+        const invalidReq = request('GET', '/api/moderation/access', { cookie });
+        if (invalidation === 'revoked') revoked = true;
+        if (invalidation === 'role-version') authorizationVersion = 8;
+        if (invalidation === 'context') invalidReq.socket.remoteAddress = '127.0.0.2';
+        if (invalidation === 'expired') now = expiresAt;
+        const res = responseHarness();
+        await accessHandler(invalidReq, res);
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.serverTime, now);
+        assert.equal(res.body.access.stepUpActive, false, `${factorType}: ${invalidation}`);
+        assert.equal(res.body.access.stepUpExpiresAt, null, `${factorType}: ${invalidation}`);
+        revoked = false; authorizationVersion = 7;
+      }
+    }
+  } finally {
+    if (previousDualWallet === undefined) delete process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED;
+    else process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED = previousDualWallet;
   }
 });
 
@@ -205,6 +267,7 @@ test('discovery compares the connected wallet with SIWE without looking up calle
       assert.equal(res.body.authenticated, false);
       assert.equal(res.body.eligible, false);
       assert.equal(res.body.access, null);
+      assert.equal(Number.isSafeInteger(res.body.serverTime), true);
       assert.equal(calls.length, 0);
     }
     for (const expectedWallet of ['', 'not-a-wallet', [STAFF, STAFF]]) {
