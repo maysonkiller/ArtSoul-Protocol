@@ -1,9 +1,72 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-12. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-13. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 13 staff-wallet privacy (A8 / A-22):
+
+- Starting HEAD `e4564f2`; the latest verified main is `acf9e01` / PR #299.
+  The owner explicitly approved Team plus either current authority wallet as
+  the directory readers. The authority exception survives removal of its staff
+  role; Team requires a live factor and receives no proposal/signing controls.
+- Existing authority metadata reads are reused. Server responses remove foreign
+  staff attribution from queue decisions, events and visibility results for
+  ordinary administrators/moderators. Own attribution and complaint-participant
+  identities remain available. Stored audit identities are unchanged. Role,
+  factor and authority changes are rechecked after data reads; private responses
+  are non-cacheable. Pending UI results cannot restore a removed Team directory.
+- Canon 07 and the canonical backlog record the exact scope/interpretations.
+  No new role, schema, dependency, factor, contract or economic change. Historical
+  untracked `.codex/`, `output/`, authority-policy source and its test remain
+  untouched and excluded from staging. One bounded read-only reviewer completed;
+  no other agents were started. Its two findings (submission actor attribution
+  and legacy Team factor enforcement) are fixed and covered by handler tests.
+- Local evidence: focused final handlers passed 62/62; build passed; compiled
+  Chrome UI passed 127 assertions across both themes and 1280/390/320px, including
+  readonly Team, ordinary staff, authority-without-role, factor expiry and
+  downgrade during a pending roster response. No external fixture requests or
+  page exceptions. Screenshots were inspected. Evidence is under
+  `output/audit/staff-privacy-*2026-10-13*` and
+  `output/playwright/staff-privacy-2026-10-13*`.
+- The first full run found a legacy VM test loader that stripped only one export,
+  plus a build/read overlap. The loader now strips exported declarations and
+  build/tests run sequentially. Its 98 focused checks passed; the next full run
+  passed 1837/1837. The final run including the two review corrections is pending
+  (`staff-privacy-unit-reviewed-2026-10-13.log`); do not equate the earlier count
+  with final-source evidence. No release is claimed yet.
+- The previously preserved Admin browser tab is no longer open. Do not infer
+  natural 24-hour session-expiry acceptance from its absence or create a new
+  session as substitute evidence. Prior phone/OAuth acceptance remains valid.
+  Exactly next step: finish final-source checks, then publish the bounded
+  staff-privacy PR and verify its deployment before moving to remaining gates.
+
 October 12 iPhone verification-window clarification (Warsaw date):
+
+- Follow-up at 22:28:36 UTC, October 11 / October 12 Warsaw: the owner reported
+  successful Safari Admin verification using the existing Chrome/Google passkey
+  provider; the review queue appeared. Read-only server metadata confirms one
+  unchanged current credential with last use 22:28:04 UTC, versus 20:46:35 before
+  this phone flow. No enrollment/reset or role change occurred. Private evidence:
+  `phone-passkey-metadata-2026-10-12{,-after-login}.json`. This is corroborated
+  owner-reported phone acceptance, not an agent-captured Safari request or full
+  24-hour expiry. The owner then confirmed the requested site logout, old-wallet
+  reconnect/sign-in and Discord relink/return, with the correct profile retained.
+  Do not repeat these successful phone flows. See the dated device/RG-01 records
+  for the precise scope; unasked wallet-version and transaction observations are
+  not inferred.
+  PR #299 candidate `461946c` is tree-identical to tested `a0f9e14`; conflicts
+  with already-squashed PR #298 were limited to retaining newer release evidence.
+  Preview `artsoul-kymxutatk-maysonkiller-be9112b5.vercel.app` matches all 53 checked
+  assets across six pages; disabled APIs remain closed and indexer lag is zero.
+  Linux/Windows/static CI passed (38180475223). PR #299 merged at 22:30:52 UTC as
+  `acf9e014ab6df719e0296e414a91a1124ec9a9e9`; production deployment 7002756552
+  succeeded at 22:31:17 UTC. The apex also matches all 53 checked assets on six
+  pages, denies guest queue/notification access, retains enabled Report/Donate,
+  and reports healthy Base Sepolia indexing with lag zero. Evidence:
+  `output/audit/admin-locked-gate-{ci,preview-artifact,apex-artifact}-2026-10-12.json`.
+  Post-merge Linux/Windows/static CI also passed (38180727029); evidence is saved
+  as `output/audit/admin-locked-gate-postmerge-ci-2026-10-12.json`. This
+  documentation follow-up is not included in the tested/released candidate.
 
 - Starting HEAD `2ce3f4d`, same workspace and branch. The owner clarified that
   closing the passkey window on iPhone showed only Staff access / the team and
@@ -11,7 +74,7 @@ October 12 iPhone verification-window clarification (Warsaw date):
   not an observed factor bypass: canon 07 permits the authenticated authority
   roster independently of the protected complaint queue. Paired signatures are
   still required for role changes. No factor was reset or enrolled.
-- The ambiguous locked heading said "Admin panel". The local patch changes it
+- The ambiguous locked heading said "Admin panel". The released patch changes it
   to "Admin verification required" and explicitly states that closing the window
   does not unlock complaints. There is no authorization or policy change.
 - The added cancel regression keeps an authority wallet locked after dismissal,
@@ -27,17 +90,31 @@ October 12 iPhone verification-window clarification (Warsaw date):
   Docker and could not create DPAPI self-test files. That run is not a baseline;
   its log is retained. The normal-host rerun passed 1827/1827, zero skips:
   `output/audit/admin-locked-gate-unit-host-2026-10-12.log`.
-- The phone observation is owner-reported, not a captured iOS API response or a
-  successful phone factor ceremony. The QR symptom alone does not establish a
-  code defect or require a replacement credential. Android remains waived.
-  The owner subsequently found the existing ArtSoul passkey in Chrome's iPhone
-  password manager. Using that provider on iPhone was handed to the owner;
-  no successful authentication is inferred until the actual result is reported.
-- This patch is local and not published. Application production remains PR #298
-  / `a51c16f`. Historical untracked files are preserved; no agent was started.
-  Exactly next step: prepare this tested copy/test change for release and record
-  the owner's pending iPhone verification outcome without replaying completed
-  live rehearsals.
+- The initial locked phone observation and the subsequent successful native
+  entry are distinct. No iOS API capture or 24-hour wall-clock expiry is claimed.
+  The provider-selection issue needed no credential reset. Android remains
+  waived. Historical untracked files are preserved; no agent was started.
+- Desktop continuation at approximately 22:35–22:40 UTC completed RG-01 C1–C6 in
+  the owner's installed Chrome, existing wallet suffix 989b. Unlink immediately
+  updated the editor for each provider. Discord's identity-only consent returned
+  correctly; the owner confirmed X's provider screen and its callback restored
+  the original X link. The final apex profile retained both verified identities,
+  nickname and avatar. No other profile data, email, role or factor changed.
+  Together with the phone C7 report, block C is complete. This is the same
+  owner's wallet on both devices, not proof of distinct-wallet isolation.
+  The account menu also displayed a numeric Base Sepolia balance on desktop.
+  Evidence: `output/audit/rg01-provider-acceptance-2026-10-12.json` and
+  `output/audit/rg01-providers-restored-2026-10-12.png`.
+  Final documentation checks passed 12/12; `git diff --check` passed. Their log
+  is `output/audit/admin-locked-gate-docs-final-2026-10-12.log`. Only the four
+  evidence documents changed after the released candidate; historical untracked
+  source/output files remain preserved.
+  Exactly next step: after 20:47 UTC on October 12, verify natural expiry of
+  the preserved desktop staff session before a new passkey verification, without
+  changing time or refreshing its factor. No background follow-up was scheduled.
+  Remaining wallet/device observations, production failure-isolation boundaries
+  and the founder-owned beta operating record remain listed in the close-out;
+  do not repeat native entry, social relinks or completed transactions.
 
 October 11 decision UI release and live acceptance (21:08 UTC):
 

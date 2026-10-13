@@ -5,7 +5,7 @@ import {
   sendError,
   supabaseRest
 } from '../../backend.js';
-import { getModerationAccess } from '../../moderation-access.js';
+import { getModerationAccess, canReadStaffWallets, redactOtherStaffWallets } from '../../moderation-access.js';
 
 function protocolId(value) {
   const text = String(value || '').trim();
@@ -24,6 +24,7 @@ function badRequest(message, code) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
 
   try {
@@ -41,7 +42,9 @@ export default async function handler(req, res) {
       const rows = await supabaseRest(
         'artwork_moderation_visibility?hidden=eq.true&select=chain_id,artwork_id,hidden,hidden_reason,hidden_by,hidden_at,updated_at&order=updated_at.desc&limit=200'
       );
-      return res.status(200).json({ success: true, access, data: rows || [] });
+      const current = await getModerationAccess(req, {strict: true});
+      return res.status(200).json({ success: true, access: current,
+        data: redactOtherStaffWallets(rows, 'hidden_by', current, await canReadStaffWallets(current)) });
     }
 
     if (req.method === 'GET') {
@@ -50,10 +53,12 @@ export default async function handler(req, res) {
       if (!artworkId) throw badRequest('Valid artwork_id is required', 'INVALID_ARTWORK_ID');
 
       const rows = await supabaseRest(visibilityQuery(chainId, artworkId));
+      const current = await getModerationAccess(req, {strict: true});
+      const visible = redactOtherStaffWallets(rows, 'hidden_by', current, await canReadStaffWallets(current));
       return res.status(200).json({
         success: true,
-        access,
-        data: rows?.[0] || {
+        access: current,
+        data: visible[0] || {
           chain_id: chainId,
           artwork_id: artworkId,
           hidden: false,
@@ -90,7 +95,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       access,
-      data: rows?.[0] || {
+      data: redactOtherStaffWallets(rows, 'hidden_by', access, false)[0] || {
         chain_id: chainId,
         artwork_id: artworkId,
         hidden,

@@ -36,6 +36,23 @@ API response from this report, and do not reset an existing factor just because
 the device displayed a cross-device QR choice. See the current checkpoint for
 test and publication status.
 
+The owner subsequently found the existing ArtSoul passkey in Chrome on iPhone,
+enabled Chrome as a passkey provider and reported successful Safari Admin entry:
+the review queue appeared after verification. A read-only server observation at
+22:28:36 UTC on October 11 (October 12 Warsaw) confirms the same single active
+credential, created October 8, with last use advanced from 20:46:35 to 22:28:04 UTC.
+No factor reset, enrollment or role change occurred. This corroborates the
+owner-reported native phone entry; the agent did not capture Safari traffic or
+the biometric prompt. Provider metadata is a usability hint, not an additional
+authorization factor. The earlier locked roster and subsequent successful
+verification are distinct states. Full 24-hour expiry and a specific changed-IP
+ceremony are not inferred. Remaining SIWE/disconnect and Discord-return outcomes
+were requested separately, without repeating gallery, purchase or passkey tests.
+The owner then confirmed both requested steps passed: site logout and old-wallet
+reconnect/sign-in, followed by Discord relink and return to the apex, with the
+correct nickname, avatar and Discord connection preserved. These phone flows
+are no longer pending. Record the remaining unasked criteria separately.
+
 **Where.** `https://artsoulprotocol.com` — the apex origin, not a preview and not
 a `vercel.app` address. Wallet sessions and SIWE are origin-scoped, so evidence
 from any other origin proves nothing about production.
@@ -226,6 +243,8 @@ alone does not establish iOS acceptance.
 | 2026-09-27 | Windows desktop, Chrome 153.0.8010.53 | Ordinary installed Chrome; headed window for BFCache | Trip 1, partial | A-79; desktop portion of A-48 | Apex at release `81627ab`: opening creator read limit 24, identity before cards and full corpus, no settled-content reset. A-79 accepted. Headed Back restored the same marker with `pageshow.persisted=true`; A-48 phones remain open. See [release evidence](../audits/STABILIZATION_RELEASE_2026-09-27.md). |
 | 2026-10-08 | Owner's actual iPhone | Safari was specified in the question; version not recorded | Gallery/detail/Back, wallet/profile reload, profile tabs, lock/resume | Owner-reported browsing/restore subset of trips 1–2 | Owner answered that the requested run had already been done and appeared to work well. Reuse this result; do not demand the whole trip again. This does not identify the wallet suffix, native OAuth returns, explicit disconnect, account-menu balance, a publish confirmation delay or BFCache instrumentation. |
 | 2026-10-11 | Android | Not exercised for current close-out | All Android portions | Android portions of Phase A device gates | OWNER-WAIVED / NOT TESTED by explicit founder instruction. No Android PASS is inferred from iOS, desktop or automated layout checks. |
+| 2026-10-12 (Warsaw; October 11 UTC) | Owner's actual iPhone; wallet suffix 989b | Safari with Chrome/Google passkey provider; exact OS/wallet-app versions not supplied | Staff verification; site logout/reconnect/sign-in; Discord relink/return | RG-01 mobile sign-in/profile continuity and C7; native staff entry | OWNER-REPORTED PASS for the requested flows. Locked team view did not expose complaints; the existing passkey then opened the queue. Server last use advanced to 22:28:04 UTC without new enrollment. Subsequent wallet and Discord returns retained the correct profile. No inferred publish, unsupported-network, account-switch or full 24-hour expiry result. |
+| 2026-10-12 (Warsaw; October 11 UTC) | Windows desktop; existing owner wallet suffix 989b | Ordinary installed Chrome | Disconnect/reconnect Discord and X; account menu | RG-01 C1–C6; desktop portion of A-73 | PASS: both disconnect states updated immediately; both real provider callbacks returned to the apex with the original profile and verified handles. Owner confirmed X's authorization screen; the agent verified its return. Both original links restored, other profile fields unchanged. Account menu showed a numeric Base Sepolia balance. Same wallet as the phone, so this does not establish distinct-wallet isolation or mobile balance acceptance. Screenshot: `output/audit/rg01-providers-restored-2026-10-12.png`. |
 
 The same read-only run checked A-33's public provenance cases: five of 34 public
 records were minted, but none had three different Creator / First Collector /
@@ -279,9 +298,10 @@ not new phone prerequisites. The source recordings' saved September 30 analysis
 documents pre-fix symptoms; it cannot certify the later repair on a real phone.
 No video was reanalysed for this reconciliation.
 
-The next phone follow-up must ask only for an unresolved outcome: native SIWE
-and explicit disconnect/reload, Discord returning to the apex, wallet identity
-suffix/version, balance display, connected publish/pending feedback and the two
-wallet capability/account-switch cases where applicable. Existing gallery/Back,
-reload, tab and lock/resume observations must not be discarded or re-requested
-as a complete trip. Do not invent missing timestamps or an Android result.
+October 12 superseding follow-up: the requested site logout/reconnect/sign-in,
+Discord apex return and native staff entry now have owner-reported passes above.
+Do not request them again as an entire trip. Unasked criteria remain separate:
+guest persistence after a reload before reconnecting, balance display, connected
+publish/pending feedback and applicable wallet capability/account-switch cases.
+Existing gallery/Back, profile reload, tab and lock/resume observations remain
+valid. Do not invent wallet-app versions, missing timestamps or an Android result.

@@ -545,7 +545,7 @@ function loadModerationAccess({ sessionWallet, roleRows, profileRows, registryDo
   });
   const source = moderationAccessSource
     .slice(moderationAccessSource.indexOf('const MODERATION_ROLES'))
-    .replace('export async function getModerationAccess', 'async function getModerationAccess')
+    .replace(/^export /gm, '')
     + '\nexported.getModerationAccess = getModerationAccess;';
   vm.runInContext(source, sandbox, { filename: 'moderation-access.js (stripped ESM)' });
   return sandbox.exported.getModerationAccess;

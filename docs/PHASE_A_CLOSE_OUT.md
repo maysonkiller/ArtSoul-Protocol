@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-11. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-12. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -9,6 +9,20 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 they disagree with this file, they win and this file is stale.
 
 Phase A stands at **65 done, 18 in progress, 0 planned** across A-01 to A-83.
+
+October 12 continuation: native Safari/iPhone staff verification now passed with
+the existing Chrome/Google passkey, corroborated by server last-use metadata.
+The owner also passed site logout/reconnect/sign-in and Discord apex return,
+retaining the correct profile. These specific phone flows are complete; reuse
+the dated device/RG-01 supplements rather than asking for the whole trip again.
+The locked Admin heading clarification is published through PR #299 / `acf9e01`,
+with 1827 local application checks, build, 158 compiled UI assertions, green
+candidate/post-merge CI and preview/apex asset verification. Closing the verification window
+never grants complaint access. Desktop unlink/relink through both real providers
+also passed and restored the original profile; RG-01 block C is now complete.
+The desktop account menu showed a numeric Base Sepolia balance. These results
+do not establish distinct-wallet isolation, full 24-hour wall-clock expiry,
+unasked mobile/transaction criteria or the founder's beta operating decision.
 
 **Founder scheduling decision, October 3:** perform real passkey enrollment and
 its operator recovery ceremony now. This supersedes the September 29 deferral;
