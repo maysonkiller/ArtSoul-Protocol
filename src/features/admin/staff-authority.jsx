@@ -29,7 +29,7 @@ function matchingSignatures(request, signatures) {
     return byWallet;
 }
 
-export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
+export function StaffAuthority({ walletAddress, api, onAccessChanged, readOnly = false }) {
     const wallet = walletAddress.toLowerCase(), epoch = useRef(0), busyRef = useRef(false);
     const currentWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
     const [request, setRequest] = useState(null), [signatures, setSignatures] = useState([]);
@@ -46,12 +46,15 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
         try {
             const result = await api(`authority?view=staff&expectedWallet=${encodeURIComponent(wallet)}${after ? `&after=${encodeURIComponent(after)}` : ''}`);
             if (current()) setRoster({...result, after});
-        } catch {
-            if (current()) setRosterError('The team list could not be loaded. Refresh it after checking your wallet sign-in.');
+        } catch (error) {
+            if (current()) {
+                setRosterError('The team list could not be loaded. Refresh it after checking your wallet sign-in.');
+                if ([401,403,409].includes(error.status)) await onAccessChanged();
+            }
         } finally { if (current()) setRosterBusy(false); }
     }
     function choose(nextAction, member) {
-        if (busy || request) return;
+        if (readOnly || busy || request) return;
         setAction(nextAction); setMessage('');
         if (member) {setTarget(member.wallet); setRole(member.role);}
         if (nextAction === 'rotate_authority') {
@@ -72,7 +75,7 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
         setRequest(next); setSignatures(approvals);
     }
     async function run(work) {
-        if (busyRef.current || currentWallet() !== wallet) return;
+        if (readOnly || busyRef.current || currentWallet() !== wallet) return;
         const token = ++epoch.current, current = () => token === epoch.current && currentWallet() === wallet;
         busyRef.current = true; setBusy(true); setMessage('');
         try { await work(current); }
@@ -87,7 +90,7 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
     }
     useEffect(() => {
         loadRoster();
-        const saved = savedApproval();
+        const saved = readOnly ? null : savedApproval();
         if (saved) run(async current => {
             const result = await api(`authority?expectedWallet=${encodeURIComponent(wallet)}&requestId=${encodeURIComponent(saved.id)}`);
             if (current()) save(result.request, [...matchingSignatures(result.request, saved.signatures).values()]);
@@ -105,7 +108,7 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
             window.removeEventListener('pagehide', invalidate);
         };
-    }, [wallet]);
+    }, [wallet, readOnly]);
     useEffect(() => {
         if (!request) return;
         const timer = setTimeout(() => { discard(); setMessage('Approval expired. Prepare a new request.'); }, Math.max(0, Date.parse(request.proposal.expiresAt) - Date.now()));
@@ -145,9 +148,9 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
         await onAccessChanged();
     });
     const signed = request ? matchingSignatures(request, signatures) : new Map();
-    return <section className="protocol-admin-gate protocol-admin-authority" aria-label="Staff access">
-        <h2>Staff access</h2>
-        <p>Both authority wallets approve role changes and sign-in resets. These signatures cost no gas and do not change contract ownership.</p>
+    return <section className="protocol-admin-gate protocol-admin-authority" aria-label={readOnly ? 'Team directory' : 'Staff access'}>
+        <h2>{readOnly ? 'Team directory' : 'Staff access'}</h2>
+        <p>{readOnly ? 'Your Team role allows you to view staff wallets. Only the two authority wallets can approve changes.' : 'Both authority wallets approve role changes and sign-in resets. These signatures cost no gas and do not change contract ownership.'}</p>
         <section aria-label="Team and authorities" className="protocol-admin-team">
             <h3>Team and authorities</h3>
             <p>Authority wallets manage staff access even without a staff role. Reading complaints requires a staff role and verified sign-in.</p>
@@ -157,25 +160,27 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
             {roster && <>
                 <h4>Both approval wallets</h4>
                 <ul>{roster.policy.authorities.map(address => <li key={address}>{address}</li>)}</ul>
-                <button type="button" disabled={busy || !!request} onClick={() => choose('rotate_authority')}>Change approval wallets</button>
-                <p>The current pair must approve its replacement. If either key is completely lost, the other key alone cannot recover access.</p>
+                {!readOnly && <>
+                    <button type="button" disabled={busy || !!request} onClick={() => choose('rotate_authority')}>Change approval wallets</button>
+                    <p>The current pair must approve its replacement. If either key is completely lost, the other key alone cannot recover access.</p>
+                </>}
                 <h4>Staff roles</h4>
                 <p>To replace a staff wallet, remove its role, then assign the role to the new wallet. Both steps need both approvals. Removing a staff role does not remove an approval wallet.</p>
                 {roster.staff.length === 0 && <p>No staff roles on this page.</p>}
                 <ul className="protocol-admin-team-list">{roster.staff.map(member => <li key={member.wallet}>
                     <strong>{ROLE_NAMES[member.role]}</strong> — {member.active ? 'Active' : 'Removed'}
                     <div>{member.wallet}</div>
-                    {member.active ? <>
+                    {!readOnly && (member.active ? <>
                         <button type="button" disabled={busy || !!request} onClick={() => choose('grant_role',member)}>Change role</button>
                         <button type="button" disabled={busy || !!request} onClick={() => choose('revoke_role',member)}>Remove role</button>
                         <button type="button" disabled={busy || !!request} onClick={() => choose('renew_setup',member)}>Reset sign-in</button>
-                    </> : <button type="button" disabled={busy || !!request} onClick={() => choose('grant_role',member)}>Restore role</button>}
+                    </> : <button type="button" disabled={busy || !!request} onClick={() => choose('grant_role',member)}>Restore role</button>)}
                 </li>)}</ul>
                 {roster.after && <button type="button" disabled={rosterBusy} onClick={() => loadRoster()}>First page</button>}
                 {roster.nextCursor && <button type="button" disabled={rosterBusy} onClick={() => loadRoster(roster.nextCursor)}>Next staff page</button>}
             </>}
         </section>
-        {!request ? <form ref={formRef} onSubmit={create}>
+        {!readOnly && (!request ? <form ref={formRef} onSubmit={create}>
             <label htmlFor="staffAuthorityAction">Action</label>
             <select id="staffAuthorityAction" value={action} onChange={event => setAction(event.target.value)} disabled={busy}>
                 <option value="grant_role">Assign a staff role</option><option value="revoke_role">Remove a staff role</option>
@@ -196,7 +201,7 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged }) {
             <button type="button" onClick={sign} disabled={busy || signed.has(wallet)}>Sign with connected wallet</button>
             <button type="button" onClick={apply} disabled={busy || signed.size !== 2}>Apply approved request</button>
             <button type="button" onClick={discard} disabled={busy}>Discard request</button>
-        </>}
+        </>)}
         {message && <p role="status" className="protocol-admin-message">{message}</p>}
     </section>;
 }

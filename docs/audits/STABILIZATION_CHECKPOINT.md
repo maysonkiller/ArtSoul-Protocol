@@ -1,7 +1,44 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-12. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-13. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 13 staff-wallet privacy (A8 / A-22):
+
+- Starting HEAD `e4564f2`; the latest verified main is `acf9e01` / PR #299.
+  The owner explicitly approved Team plus either current authority wallet as
+  the directory readers. The authority exception survives removal of its staff
+  role; Team requires a live factor and receives no proposal/signing controls.
+- Existing authority metadata reads are reused. Server responses remove foreign
+  staff attribution from queue decisions, events and visibility results for
+  ordinary administrators/moderators. Own attribution and complaint-participant
+  identities remain available. Stored audit identities are unchanged. Role,
+  factor and authority changes are rechecked after data reads; private responses
+  are non-cacheable. Pending UI results cannot restore a removed Team directory.
+- Canon 07 and the canonical backlog record the exact scope/interpretations.
+  No new role, schema, dependency, factor, contract or economic change. Historical
+  untracked `.codex/`, `output/`, authority-policy source and its test remain
+  untouched and excluded from staging. One bounded read-only reviewer completed;
+  no other agents were started. Its two findings (submission actor attribution
+  and legacy Team factor enforcement) are fixed and covered by handler tests.
+- Local evidence: focused final handlers passed 62/62; build passed; compiled
+  Chrome UI passed 127 assertions across both themes and 1280/390/320px, including
+  readonly Team, ordinary staff, authority-without-role, factor expiry and
+  downgrade during a pending roster response. No external fixture requests or
+  page exceptions. Screenshots were inspected. Evidence is under
+  `output/audit/staff-privacy-*2026-10-13*` and
+  `output/playwright/staff-privacy-2026-10-13*`.
+- The first full run found a legacy VM test loader that stripped only one export,
+  plus a build/read overlap. The loader now strips exported declarations and
+  build/tests run sequentially. Its 98 focused checks passed; the next full run
+  passed 1837/1837. The final run including the two review corrections is pending
+  (`staff-privacy-unit-reviewed-2026-10-13.log`); do not equate the earlier count
+  with final-source evidence. No release is claimed yet.
+- The previously preserved Admin browser tab is no longer open. Do not infer
+  natural 24-hour session-expiry acceptance from its absence or create a new
+  session as substitute evidence. Prior phone/OAuth acceptance remains valid.
+  Exactly next step: finish final-source checks, then publish the bounded
+  staff-privacy PR and verify its deployment before moving to remaining gates.
 
 October 12 iPhone verification-window clarification (Warsaw date):
 

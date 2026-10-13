@@ -1,8 +1,7 @@
 import { allowMethods, normalizeWallet, readWalletSession, sendError } from '../../backend.js';
-import { getModerationAccess } from '../../moderation-access.js';
+import { getModerationAccess, readAuthorityPolicy } from '../../moderation-access.js';
 import { readProtocolAdminConfig } from '../../protocol-admin-config.js';
 import { getWebAuthnConfig, roleBoundSessionsEnabled } from '../../moderation-passkey.js';
-import { readAuthorityPolicy } from './authority.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;

@@ -411,7 +411,8 @@ function ProtocolAdminPage() {
     };
 
     const SignInDialog = access?.dualWallet ? StaffFactorDialog : StaffPasskeyDialog;
-    const authorityControls = authorityWallet && <StaffAuthority key={authorityWallet} walletAddress={authorityWallet} api={api} onAccessChanged={checkAccess} />;
+    const rosterWallet = authorityWallet || (access?.dualWallet && access?.role === 'team' && access?.stepUpActive ? setupWallet : '');
+    const authorityControls = rosterWallet && <StaffAuthority key={`${rosterWallet}:${Boolean(authorityWallet)}`} walletAddress={rosterWallet} readOnly={!authorityWallet} api={api} onAccessChanged={checkAccess} />;
     const verification = setupWallet && <section className="protocol-admin-setup" aria-label="Admin verification">
         {accessState !== 'step_up' && <button type="button" className="protocol-admin-primary" disabled={busy} onClick={stepUp}>{access?.stepUpActive ? 'Sign-in settings' : 'Verify admin access'}</button>}
         <p>{access?.dualWallet ? 'Use a passkey or your authenticator app. New setup and recovery require approval from both authority wallets.' : "Use your device's passkey prompt to verify admin access. Additional-device and recovery options are available in the verification window."}</p>
@@ -451,7 +452,7 @@ function ProtocolAdminPage() {
                     <h1>Admin panel</h1>
                     <p>Role: {access?.role || 'staff'} · verified session active for up to 24 hours. Verify again on a new browser or network.</p>
                 </div>
-                <button type="button" onClick={() => changeQueueStatus(queueStatus)} disabled={busy}>Refresh</button>
+                <button type="button" onClick={checkAccess} disabled={busy}>Refresh</button>
             </header>
 
             {authorityControls}
@@ -547,7 +548,7 @@ function ProtocolAdminPage() {
                                 <div key={`${item.action || item.event_type}:${item.id}`}>
                                     <strong>{item.action || item.event_type}</strong>
                                     <span>{item.report_id ? `Report ${item.report_id}` : `Artwork ${item.artwork_id}`}</span>
-                                    <span>{new Date(item.created_at).toLocaleString()} · {shortWallet(item.actor_wallet)}{item.reason ? ` · ${item.reason}` : ''}</span>
+                                    <span>{new Date(item.created_at).toLocaleString()} · {item.actor_wallet ? shortWallet(item.actor_wallet) : 'Identity private'}{item.reason ? ` · ${item.reason}` : ''}</span>
                                 </div>
                             ))}
                     </div>

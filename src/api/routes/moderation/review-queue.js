@@ -1,5 +1,5 @@
 import { allowMethods, sendError, supabaseRest } from '../../backend.js';
-import { getModerationAccess } from '../../moderation-access.js';
+import { getModerationAccess, canReadStaffWallets, redactOtherStaffWallets } from '../../moderation-access.js';
 import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
 import { readDonationConfig } from '../../donation-config.js';
 
@@ -43,11 +43,12 @@ function databaseError(error) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (!allowMethods(req, res, ['GET'])) return;
 
   try {
     requireProtocolAdminEnabled();
-    const access = await getModerationAccess(req, { strict: true });
+    await getModerationAccess(req, { strict: true });
     const requestedStatus = String(req.query?.status || 'pending_review').toLowerCase();
     if (!QUEUE_STATUSES.has(requestedStatus)) throw invalidStatus();
     const status = requestedStatus;
@@ -108,15 +109,21 @@ export default async function handler(req, res) {
       }
     }
 
+    // Permissions can change while the queue is loading. Do not disclose staff
+    // identities using the role/session that was valid only before those reads.
+    const access = await getModerationAccess(req, { strict: true });
+    const canReadAll = await canReadStaffWallets(access);
     return res.status(200).json({
       success: true,
       access: { role: access.role },
       data: {
         status,
-        reports: reports || [],
-        events: events || [],
-        hidden: hidden || [],
-        moderationLog: moderationLog || [],
+        reports: redactOtherStaffWallets(reports, 'reviewed_by', access, canReadAll),
+        // Intake events identify complaint participants, not staff decisions.
+        events: events.map(event => event.event_type === 'REPORT_SUBMITTED' ? {...event}
+          : redactOtherStaffWallets([event], 'actor_wallet', access, canReadAll)[0]),
+        hidden: redactOtherStaffWallets(hidden, 'hidden_by', access, canReadAll),
+        moderationLog: redactOtherStaffWallets(moderationLog, 'actor_wallet', access, canReadAll),
         notifications: notifications || []
       }
     });

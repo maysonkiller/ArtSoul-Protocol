@@ -179,6 +179,32 @@ claims is not distinguishable. Network changes, including VPN or mobile-network
 changes, can require another verification. Raw IP and User-Agent values are not
 stored in the session payload. Logout clears both wallet and staff sessions.
 
+## October 13 staff identity visibility amendment
+
+The founder approved visibility for the existing Team role and either current
+authority wallet. An ordinary administrator or moderator outside that pair must
+not enumerate staff wallets or receive other staff members' attribution wallets
+from the review queue, moderation event log or artwork visibility API.
+
+- Team reads the private, paginated directory after wallet and factor verification.
+  This is read-only access: proposal retrieval, preparation and execution remain
+  restricted to the authority pair and existing paired approval rules.
+- Either current authority retains directory access independently of its staff
+  role, as approved on October 11. Complaint access still requires an active staff
+  role and verified factor. Removing Team access or rotating an authority must
+  invalidate a pending directory response.
+- Ordinary staff may see their own attribution wallet. Other staff attribution
+  is omitted from their response, while complete identities remain in the stored
+  audit records. No historical records are deleted or anonymized in storage.
+
+Scope interpretation: this rule concerns structured staff identity fields and
+the staff directory. Public creator/owner provenance and complaint participants
+remain available where required by their existing workflows; it does not promise
+blockchain anonymity or redact addresses that a person writes into free text.
+No role is newly assigned, no factor ceremony changes, and no contract or economy
+changes. Implementation, tests and release evidence are recorded separately in
+`../audits/STABILIZATION_CHECKPOINT.md`.
+
 ## Public Repository Boundary
 
 Operational abuse heuristics, private anti-sybil checks, and escalation playbooks should not be published in this repository.

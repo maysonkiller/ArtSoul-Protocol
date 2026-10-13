@@ -1,6 +1,7 @@
 import { allowMethods, normalizeWallet, readJson, requireWallet, sendError, supabaseRest } from '../../backend.js';
 import { getWebAuthnConfig } from '../../moderation-passkey.js';
 import { buildAuthorityApprovalMessage, verifyAuthorityApprovals } from '../../moderation-dual-wallet.js';
+import { getModerationAccess, readAuthorityPolicy } from '../../moderation-access.js';
 
 // Routed behind the dual-wallet rollout gate and role-version-aware factor/session
 // enforcement. This manages application roles, never contracts.
@@ -13,22 +14,19 @@ function fail(code, statusCode = 400) {
 function exactFields(body, fields) {
   if (!body || Array.isArray(body) || Object.keys(body).sort().join('|') !== [...fields].sort().join('|')) fail('INVALID_AUTHORITY_PAYLOAD');
 }
-async function context(req, expectedWallet) {
+async function context(req, expectedWallet, allowTeam = false) {
   if (process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED !== 'true') fail('AUTHORITY_DISABLED', 404);
   const {origin} = getWebAuthnConfig();
   const wallet = requireWallet(req);
   if (typeof expectedWallet !== 'string' || normalizeWallet(expectedWallet) !== wallet) fail('AUTHORITY_WALLET_MISMATCH', 403);
   if (req.method === 'POST' && req.headers?.origin !== origin) fail('AUTHORITY_ORIGIN_MISMATCH', 403);
   const policy = await readAuthorityPolicy(origin);
-  if (!policy.authorities.includes(wallet)) fail('AUTHORITY_REQUIRED', 403);
+  if (!policy.authorities.includes(wallet)) {
+    if (!allowTeam) fail('AUTHORITY_REQUIRED', 403);
+    const access = await getModerationAccess(req, {strict: true});
+    if (access.role !== 'team') fail('AUTHORITY_REQUIRED', 403);
+  }
   return {wallet,policy};
-}
-export async function readAuthorityPolicy(origin) {
-  const rows = await supabaseRest('artsoul_staff_authority_policy?singleton=eq.true&select=version,origin,chain_id,wallet_a,wallet_b&limit=1');
-  const row = rows?.[0];
-  if (!row || rows.length !== 1 || row.origin !== origin || row.chain_id !== 84532 ||
-      !Number.isSafeInteger(Number(row.version)) || Number(row.version) < 1) fail('AUTHORITY_POLICY_REQUIRED', 503);
-  return {origin,chainId:row.chain_id,version:String(row.version),authorities:[row.wallet_a,row.wallet_b]};
 }
 async function storedRequest(requestId) {
   if (typeof requestId !== 'string' || !REQUEST_ID.test(requestId)) fail('INVALID_AUTHORITY_REQUEST');
@@ -55,16 +53,20 @@ export default async function handler(req,res) {
     // Disabled routes do not parse body, inspect sessions or access storage.
     if (process.env.ARTSOUL_MODERATION_DUAL_WALLET_ENABLED !== 'true') fail('AUTHORITY_DISABLED',404);
     if (req.method === 'GET') {
-      const {policy} = await context(req,req.query?.expectedWallet);
+      const {policy} = await context(req,req.query?.expectedWallet,req.query?.view === 'staff');
       if (req.query?.view === 'staff') {
         const after = req.query.after;
         if (after !== undefined && (typeof after !== 'string' || !/^0x[0-9a-f]{40}$/.test(after))) fail('INVALID_STAFF_CURSOR');
         const rows = await supabaseRest('artsoul_staff_roles?select=wallet_address,role,active&order=wallet_address.asc&limit=51' +
           (after ? `&wallet_address=gt.${after}` : ''));
-        // A rotation during this read must not disclose the roster to a former
-        // authority. No factor, profile, complaint or signing material is read.
+        // Recheck authority rotation, Team role and factor revocation before
+        // returning addresses. Role visibility never grants approval rights.
         const latest = await readAuthorityPolicy(policy.origin);
         if (latest.version !== policy.version || latest.authorities.join('|') !== policy.authorities.join('|')) fail('AUTHORITY_POLICY_CHANGED',409);
+        if (!latest.authorities.includes(requireWallet(req))) {
+          const access = await getModerationAccess(req, {strict: true});
+          if (access.role !== 'team') fail('AUTHORITY_REQUIRED',403);
+        }
         const staff = rows.slice(0,50).map(row => ({wallet:row.wallet_address,role:row.role,active:row.active}));
         return res.status(200).json({success:true,policy,staff,nextCursor:rows.length>50 ? staff.at(-1).wallet : null});
       }

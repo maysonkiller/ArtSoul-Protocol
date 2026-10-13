@@ -27,6 +27,7 @@ test('staff roster discloses only bounded role metadata to the authenticated cur
                 wallet_a:changed?outsider:pair[0],wallet_b:pair[1]}]);
         }
         assert.equal(parsed.pathname,'/rest/v1/artsoul_staff_roles');
+        if (parsed.searchParams.has('active')) return Response.json([]);
         assert.equal(parsed.searchParams.get('select'),'wallet_address,role,active');
         assert.equal(parsed.searchParams.get('order'),'wallet_address.asc');assert.equal(parsed.searchParams.get('limit'),'51');
         const after=parsed.searchParams.get('wallet_address')?.slice(3)||'';
@@ -41,7 +42,7 @@ test('staff roster discloses only bounded role metadata to the authenticated cur
     await t.test('guest, stale wallet and ordinary staff cannot read the list',async()=>{
         assert.equal((await invoke({wallet:null,expected:pair[0]})).statusCode,401);assert.equal(calls.length,0);
         assert.equal((await invoke({expected:pair[1]})).statusCode,403);assert.equal(calls.length,0);
-        assert.equal((await invoke({wallet:outsider})).statusCode,403);assert.equal(calls.length,1);
+        assert.equal((await invoke({wallet:outsider})).statusCode,403);assert.equal(calls.length,2);
     });
     await t.test('either authority sees active and removed roles without holding a staff role',async()=>{
         for(const wallet of pair) {

@@ -5,10 +5,35 @@ import {
 } from './backend.js';
 import {
   isModerationPasskeyEnabled,
-  verifyModerationStepUp
+  verifyModerationStepUp,
+  getWebAuthnConfig,
+  roleBoundSessionsEnabled
 } from './moderation-passkey.js';
 
 const MODERATION_ROLES = new Set(['admin', 'moderator', 'team']);
+
+export async function readAuthorityPolicy(origin) {
+  const rows = await supabaseRest('artsoul_staff_authority_policy?singleton=eq.true&select=version,origin,chain_id,wallet_a,wallet_b&limit=1');
+  const row = rows?.[0];
+  if (!row || rows.length !== 1 || row.origin !== origin || row.chain_id !== 84532 ||
+      !Number.isSafeInteger(Number(row.version)) || Number(row.version) < 1) {
+    throw accessError('AUTHORITY_POLICY_REQUIRED', 'AUTHORITY_POLICY_REQUIRED', 503);
+  }
+  return {origin,chainId:row.chain_id,version:String(row.version),authorities:[row.wallet_a,row.wallet_b]};
+}
+
+export async function canReadStaffWallets(access) {
+  if (access?.role === 'team' && access.canModerate && access.stepUpActive === true) return true;
+  if (!access?.wallet || !roleBoundSessionsEnabled()) return false;
+  return (await readAuthorityPolicy(getWebAuthnConfig().origin)).authorities.includes(access.wallet);
+}
+
+// Filter response copies only. The complete identities remain in the audit log.
+export function redactOtherStaffWallets(rows, field, access, canReadAll) {
+  return (rows || []).map(row => ({...row, [field]: canReadAll ||
+    (typeof row[field] === 'string' && row[field].toLowerCase() === access.wallet)
+    ? row[field] : null}));
+}
 
 function hasText(value) {
   return Boolean(String(value || '').trim());
