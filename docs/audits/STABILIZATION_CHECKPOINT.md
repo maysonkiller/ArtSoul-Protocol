@@ -31,14 +31,35 @@ October 13 staff-wallet privacy (A8 / A-22):
 - The first full run found a legacy VM test loader that stripped only one export,
   plus a build/read overlap. The loader now strips exported declarations and
   build/tests run sequentially. Its 98 focused checks passed; the next full run
-  passed 1837/1837. The final run including the two review corrections is pending
-  (`staff-privacy-unit-reviewed-2026-10-13.log`); do not equate the earlier count
-  with final-source evidence. No release is claimed yet.
+  passed 1837/1837. The final run including the two review corrections passed
+  1838/1838, zero skips (`staff-privacy-unit-reviewed-2026-10-13.log`). The final
+  focused handler count is 62; documentation checks passed 12/12.
+- Saved implementation `3a4955e` and candidate `1b24e41` are tree-identical.
+  Reconciliation with PR #299 retained the newer phone/OAuth evidence in three
+  inspected documentation conflicts; no source-tree copy or other worktree was
+  used. PR #300 passed Linux/Windows/static CI (38364478080), including contract
+  tests. Preview matched 53 checked assets across six pages and denied protected
+  guest reads. It merged at 07:47:01 UTC as
+  `0ae7c31334dfb00507dfc88a6b983b7bc79148d9`; production deployment 7032991025
+  succeeded at 07:47:26 UTC. Apex matched the same 53 assets, denied guest queue,
+  directory and notification reads, kept Report/Donate/email enabled and returned
+  healthy Base Sepolia indexing with lag zero. Evidence:
+  `staff-privacy-{ci,preview-artifact,apex-artifact}-2026-10-13.json`.
+- Actual owner Chrome after deployment: wallet suffix 989b retains the directory
+  as a current authority; dismissing the factor dialog leaves the queue locked.
+  No signatures, factor verification, role change or complaint write occurred.
+  Team outside the pair and ordinary staff privacy were tested through real route
+  handlers with isolated storage/session fixtures and the compiled UI, not by
+  granting new production roles. The bounded observation is recorded in
+  `staff-privacy-owner-ui-2026-10-13.json`. Post-merge Linux/Windows/static CI
+  passed (38364885214); evidence is `staff-privacy-postmerge-ci-2026-10-13.json`.
+  Final documentation checks passed 12/12 and `git diff --check` passed. This
+  release-evidence follow-up changes documents only and is not a new deployment.
 - The previously preserved Admin browser tab is no longer open. Do not infer
   natural 24-hour session-expiry acceptance from its absence or create a new
   session as substitute evidence. Prior phone/OAuth acceptance remains valid.
-  Exactly next step: finish final-source checks, then publish the bounded
-  staff-privacy PR and verify its deployment before moving to remaining gates.
+  Exactly next step: resume RG-01 distinct-wallet/profile isolation acceptance,
+  reusing the completed phone/provider outcomes and existing transaction journals.
 
 October 12 iPhone verification-window clarification (Warsaw date):
 
