@@ -6,9 +6,9 @@ const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
 
 test('the profile hero commits an avatar only after an off-DOM decode', () => {
   assert.match(profile, /const \[decodedProfileAvatarUrl, setDecodedProfileAvatarUrl\] = useState\(''\)/);
-  assert.match(profile, /const preloader = typeof Image === 'function'[\s\S]*?new Image\(\)/);
-  assert.match(profile, /preloader\.onload = \(\) => \{[\s\S]*?preloader\.decode\(\)\.then\(commit/);
-  assert.match(profile, /setDecodedProfileAvatarUrl\(resolvedAvatarUrl\)/);
+  assert.match(profile, /import \{ decodeAvatar \} from/);
+  assert.match(profile, /decodeAvatar\(resolvedAvatarUrl\)\.then\(commit, fail\)/);
+  assert.match(profile, /setDecodedProfileAvatarUrl\(url\)/);
   assert.match(profile, /<img src=\{decodedProfileAvatarUrl\}/);
   assert.doesNotMatch(profile, /<img src=\{resolvedAvatarUrl\}/);
 });
@@ -24,6 +24,6 @@ test('the profile hero keeps a stable shell while its avatar is pending', () => 
   assert.match(profile, /\) : resolvedAvatarUrl \? \(\s*<div className="w-full h-full" aria-hidden="true"><\/div>/);
   // An unavailable image is not an endless pending decode. Keep its dimensions
   // but finish the pending state with a truthful label, never a broken <img>.
-  assert.match(profile, /preloader\.onerror = fail;/);
+  assert.match(profile, /decodeAvatar\(resolvedAvatarUrl\)\.then\(commit, fail\)/);
   assert.match(profile, /profileAvatarFailed \? \([\s\S]*?Avatar unavailable/);
 });

@@ -21,3 +21,15 @@ export function decodeImage(source, createImage = () => new Image()) {
         image.src = source;
     });
 }
+
+// The saved URL stays original. Reuse one display size across profile and
+// provenance so their visits share the browser cache without reframing portraits.
+export async function decodeAvatar(source, createImage, resize = globalThis.window?.ArtSoulStorageImage?.contained) {
+    const display = resize?.(source, 384) || source;
+    try {
+        return await decodeImage(display, createImage);
+    } catch (error) {
+        if (display === source) throw error;
+        return decodeImage(source, createImage);
+    }
+}

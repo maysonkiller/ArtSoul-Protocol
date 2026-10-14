@@ -7,8 +7,8 @@ its historical evidence. It is not an Android PASS or a compatibility claim.
 Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
 iPhone trip without a specific unresolved outcome.
 
-Fourteen backlog rows remain for device and connected-flow acceptance after
-A-79 closed on September 27 and A-59 on October 14. Their implementation is published; failed
+Thirteen backlog rows remain for device and connected-flow acceptance after
+A-79 closed on September 27 and A-59/A-73 on October 14. Their implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
 
@@ -245,6 +245,7 @@ alone does not establish iOS acceptance.
 
 | Date | Device | Browser | Trip | Rows answered | Result |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-14 | Owner's actual iPhone | Existing phone browser; no newly supplied version | Account menu and network selection | A-73; current network-switch observation | OWNER-REPORTED PASS: numeric Base Sepolia balance is visible and switching works. Combined with the October 12 desktop balance, A-73 is accepted. No new phone run, wallet brand, masked provider error or historical Robinhood diagnosis is inferred. |
 | 2026-10-14 (Warsaw; October 13 UTC) | Owner desktop; Rabby Wallet, suffixes 989b -> 1ccd | Ordinary installed Chrome | Native in-wallet switch; own-profile navigation/reload | Desktop A-59; distinct-wallet UI continuity | PASS: actual `accountsChanged` from both injected/AppKit providers; runtime and displayed profile became 1ccd without retaining the previous identity or works. Subsequent reload retained 1ccd. No agent signature, transaction or profile save. The mobile WalletConnect namespace path remains unobserved. See `A59_ACCOUNT_SWITCH_PROBE.md`; do not repeat the passed desktop switch. |
 | 2026-10-14 (Warsaw; October 13 UTC) | Windows desktop; owner wallet suffix 989b before logout | Ordinary installed Chrome | Explicit site disconnect, Admin reload, Profile navigation/reload | RG-01 A7/A8 | PASS on `12f3e38`: guest header, no stale identity, directory or Edit Profile; Admin requires wallet verification. Owner confirmed setup complete before logout. No factor or role reset. Queue was already factor-locked, so active-factor revocation is not inferred. Evidence: `output/audit/rg01-desktop-logout-2026-10-14.json`. |
 | 2026-09-27 | Windows desktop, Chrome 153.0.8010.53 | Ordinary installed Chrome; headed window for BFCache | Trip 1, partial | A-79; desktop portion of A-48 | Apex at release `81627ab`: opening creator read limit 24, identity before cards and full corpus, no settled-content reset. A-79 accepted. Headed Back restored the same marker with `pageshow.persisted=true`; A-48 phones remain open. See [release evidence](../audits/STABILIZATION_RELEASE_2026-09-27.md). |
@@ -312,3 +313,9 @@ guest persistence after a reload before reconnecting, balance display, connected
 publish/pending feedback and applicable wallet capability/account-switch cases.
 Existing gallery/Back, profile reload, tab and lock/resume observations remain
 valid. Do not invent wallet-app versions, missing timestamps or an Android result.
+
+October 14 visual follow-up: the owner reports slow profile avatars and occasional
+artwork-page flashing today on both iPhone and desktop. This is new symptom
+evidence, not a confirmed cause or acceptance of the remaining transient visual
+criteria. Investigate the current source and requests before another phone trip;
+do not convert the earlier qualitative satisfactory run into a blanket pass.

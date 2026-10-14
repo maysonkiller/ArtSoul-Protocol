@@ -28,7 +28,7 @@ const RUNTIME = {
   'header-prepaint.js': { version: 4, sha256: '8b23a80e58fb9ad2' },
   'data-prefetch.js': { version: 6, sha256: '339cad21ebc03f47' },
   'base-network.js': { version: 2, sha256: 'bc527f32ea3df5f9' },
-  'storage-image.js': { version: 2, sha256: '07216bbe6946e7e5' }
+  'storage-image.js': { version: 3, sha256: '99078de8e41f962d' }
 };
 
 const PAGES = fs.readdirSync('.').filter((n) => n.endsWith('.html'));

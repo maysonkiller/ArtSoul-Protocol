@@ -14,6 +14,24 @@ function loadStorageRenderUrl() {
   return (url, width, quality) => win.ArtSoulStorageImage.sized(url, width, quality);
 }
 
+test('contained avatar copies preserve crop policy, source query and unsupported formats', () => {
+  const win = {};
+  new Function('window', 'URL', fs.readFileSync('storage-image.js', 'utf8'))(win, URL);
+  const base = 'https://bexigvqrunomwtjsxlej.supabase.co/storage/v1/object/public/artworks/';
+  const original = base + 'portrait.png?version=2';
+  const display = new URL(win.ArtSoulStorageImage.contained(original, 384));
+  assert.equal(display.pathname, '/storage/v1/render/image/public/artworks/portrait.png');
+  assert.equal(display.searchParams.get('resize'), 'contain');
+  assert.equal(display.searchParams.get('width'), '384');
+  assert.equal(display.searchParams.get('height'), '384');
+  assert.equal(display.searchParams.get('version'), '2');
+  assert.equal(new URL(win.ArtSoulStorageImage.sized(original, 600)).searchParams.get('resize'), 'cover');
+  for (const url of [base+'motion.gif',base+'vector.svg',base+'extensionless','https://other.test/portrait.png','blob:local-upload','data:image/png;base64,test','']) {
+    assert.equal(win.ArtSoulStorageImage.contained(url,384),url);
+  }
+  assert.equal(win.ArtSoulStorageImage.contained(original,0),original);
+});
+
 function loadCard() {
   const win = {
     ArtSoulStorageImage: { sized: loadStorageRenderUrl() },
@@ -126,11 +144,9 @@ function functionBody(source, definitionLine) {
   return lines.slice(start).join('\n');
 }
 
-test('the surfaces large enough to reframe an avatar show the upload itself', () => {
-  // Live uploads are 400x400, 832x1248, 1254x1254 and 4032x3024. At 112px and
-  // above, forcing them all through one render width visibly reframes the
-  // non-square ones and upscales the small ones, which is what made the profile
-  // wrong. These two keep the upload.
+test('profile facts retain the original avatar independently of its decoded display copy', () => {
+  // Display copies preserve proportions through contain; profile facts and
+  // edit drafts must continue to resolve the original source URL.
   const definitions = {
     'src/entries/profile.jsx': 'function getProfileAvatarUrl(profileData) {',
     'src/entries/artwork.jsx': 'function getProfileAvatarUrl(profileData, address'

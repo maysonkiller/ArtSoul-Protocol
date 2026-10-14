@@ -1,6 +1,6 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
-import { decodeImage } from '../features/artwork/decoded-image.js';
+import { decodeAvatar, decodeImage } from '../features/artwork/decoded-image.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
@@ -14,24 +14,24 @@ import '../../supabase-auth.js';
 const { useState, useEffect, useRef } = React;
 
 
-function useDecodedImage(source, fallback = '') {
+function useDecodedImage(source, fallback = '', prepare = decodeImage) {
     const [prepared, setPrepared] = useState({ source: '', url: '', failed: false });
     useEffect(() => {
         let active = true;
         if (!source) return () => { active = false; };
-        decodeImage(source).then(
+        prepare(source).then(
             url => { if (active) setPrepared({ source, url, failed: false }); },
             () => {
                 if (active) setPrepared({ source, url: fallback, failed: !fallback });
             }
         );
         return () => { active = false; };
-    }, [source, fallback]);
+    }, [source, fallback, prepare]);
     return prepared.source === source ? prepared : { url: '', failed: false };
 }
 
 function OwnershipIdentity({ source, label, name, className, style, nameStyle, isClassic }) {
-    const image = useDecodedImage(source, '/default-avatar.png');
+    const image = useDecodedImage(source, '/default-avatar.png', decodeAvatar);
     return (
         <>
             {image.url ? <img src={image.url} alt={label} className={className} style={style} /> : (
@@ -987,6 +987,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
                 const avatarStyle = {
                     display: 'block',
+                    objectFit: 'cover',
                     ...(!isClassic ? {
                         boxShadow: '0 0 10px rgba(var(--c-accent-rgb), 0.5)',
                         animation: 'colorShift 8s ease-in-out infinite'
