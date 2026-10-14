@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeImage } from '../src/features/artwork/decoded-image.js';
+import { decodeAvatar, decodeImage } from '../src/features/artwork/decoded-image.js';
 
 test('an image is not committed when bytes arrive but decoding is still pending', async () => {
     let finishDecode;
@@ -33,4 +33,53 @@ test('browsers without decode still commit only after image load', async () => {
     const result = decodeImage('legacy.png', () => image);
     await image.onload();
     assert.equal(await result, 'legacy.png');
+});
+
+test('an avatar prepares the contained display copy without downloading the original', async () => {
+    const images = [];
+    const result = decodeAvatar('original.png', () => {
+        const image = { decode: async () => {} }; images.push(image); return image;
+    }, (source, size) => { assert.equal(source, 'original.png'); assert.equal(size, 384); return 'contained.webp'; });
+    assert.equal(images.length, 1);
+    assert.equal(images[0].src, 'contained.webp');
+    await images[0].onload();
+    assert.equal(await result, 'contained.webp');
+    assert.equal(images.length, 1);
+});
+
+test('a failed avatar transformation retries the original once, including decode failure', async () => {
+    for (const failure of ['load', 'decode']) {
+        const images = [];
+        const result = decodeAvatar('original.png', () => {
+            const image = { decode: async () => { if (failure === 'decode' && images.length === 1) throw new Error('bad transform'); } };
+            images.push(image); return image;
+        }, () => 'contained.webp');
+        if (failure === 'load') images[0].onerror(); else await images[0].onload();
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(images.length, 2);
+        assert.equal(images[1].src, 'original.png');
+        await images[1].onload();
+        assert.equal(await result, 'original.png');
+    }
+});
+
+test('an unchanged avatar source is not retried after failure', async () => {
+    let count = 0, image;
+    const result = decodeAvatar('animated.gif', () => { count++; return image = {}; }, source => source);
+    image.onerror();
+    await assert.rejects(result, /could not be loaded/);
+    assert.equal(count, 1);
+});
+
+test('an unavailable transformation and original terminate after two requests', async () => {
+    const images = [];
+    const result = decodeAvatar('original.png', () => {
+        const image = {}; images.push(image); return image;
+    }, () => 'contained.webp');
+    const rejected = assert.rejects(result, /could not be loaded/);
+    images[0].onerror();
+    await new Promise(resolve => setImmediate(resolve));
+    images[1].onerror();
+    await rejected;
+    assert.equal(images.length, 2);
 });

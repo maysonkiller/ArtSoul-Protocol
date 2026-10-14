@@ -3,6 +3,48 @@
 Updated: 2026-10-14. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 14 avatar display and resumed Admin acceptance:
+
+- Continuing from `543ae7c` in the same workspace. PR #303 merged as
+  `c63536f1996187f201b20d7dcd17eb7204e74da6`; deployment 7052872764 succeeded
+  at 23:45:38 UTC October 13. Candidate CI 38485813275 and post-merge CI
+  38486144847 passed. Preview and apex matched 53 assets across six pages;
+  guest private APIs remained closed and the Base Sepolia indexer had zero lag.
+  Actual Chrome loaded `admin-C9bJVeRy.js`. The expiry fix is published; native
+  renewed access is not yet accepted.
+- The owner explicitly accepted numeric iPhone Base Sepolia balance and working
+  switching, closing A-73. Counts: 68 done / 15 in progress / 0 planned. Android
+  remains OWNER-WAIVED / NOT TESTED. The owner also reported slow avatars on both
+  desktop and iPhone today and occasional artwork flashing; do not treat an
+  earlier qualitative satisfactory trip as acceptance of these current symptoms.
+- The live 48px creator avatar downloaded a 1254x1254 original (about 2.37 MB).
+  Public source and profile hydration URLs matched. Verified contained 384px
+  copies cost 23,066 bytes for that square and 17,910 bytes for an 832x1248
+  portrait, returning 256x384 without distortion. First transform latency can
+  still vary. Profile and provenance now share the existing decoder with a
+  contained display URL and one original fallback. Stored URLs, artwork media,
+  GIF/SVG and unsupported hosts remain untouched. Provenance also used default
+  `object-fit: fill` in live Chrome; it now uses cover like the profile circle.
+- Final focused tests pass 39/39; build passes. Full run passes 1855/1855 with
+  zero skips; the later cover-only correction has its focused rerun and rebuilt
+  browser proof. Compiled Chrome verifies contained portraits in both themes at
+  390px and original fallback on profile/artwork. The initial isolated artwork
+  fixture omitted its URL helper; the corrected fixture uses the real helper.
+  This is not native iPhone acceptance or proof that unspecified flashing ended.
+  Evidence: `output/audit/avatar-*2026-10-14*` and `output/playwright/avatar-*`.
+- Canon 05/16 presentation only; no dependency, schema, role policy, contract or
+  economics change. Bounded independent review found no runtime issue and its
+  additional stale-fallback regression is included. Historical untracked files
+  remain excluded from the release.
+- The owner reports passkey/setup failure after changing their role to Team.
+  Existing role-version policy invalidates old factors and grants 15-minute
+  re-enrollment. Live browser request metadata shows registration-options 200
+  without registration-verify, and two factor-setup 500 responses. The current
+  generic cancellation text does not distinguish device refusal/timeout. This
+  is open; no successful renewed access or wrong user code is inferred.
+- Exactly next step: capture the masked error code from the owner's next
+  authenticator-setup attempt while finishing the bounded avatar release.
+
 October 14 profile session isolation (A7 / RG-01 / A-53):
 
 - Starting HEAD `c44257e`; published main `0ae7c31` / PR #300. No other checkout
@@ -151,8 +193,8 @@ October 14 profile session isolation (A7 / RG-01 / A-53):
   in `output/playwright/`. No contract, schema, dependency, role or economics
   changed. Canon 07 / Bible section 11 policy is unchanged, with no new mechanic
   or ambiguous policy interpretation. Historical untracked files remain excluded.
-- Exactly next step: release and verify this bounded Admin patch before the
-  remaining native-context acceptance.
+- Completed release: PR #303 and its deployment are recorded in the latest
+  entry above. Remaining native-context acceptance stays open.
 
 October 13 staff-wallet privacy (A8 / A-22):
 

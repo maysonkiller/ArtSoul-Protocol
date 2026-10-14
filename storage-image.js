@@ -72,5 +72,14 @@
         }
     }
 
-    window.ArtSoulStorageImage = Object.freeze({ sized, isValidStorageUrl });
+    // Preserve the full portrait proportions; the existing UI owns its crop.
+    function contained(url, size, quality = 80) {
+        const display = sized(url, size, quality);
+        if (display === url) return url;
+        const rendered = new URL(display);
+        rendered.searchParams.set('resize', 'contain');
+        return rendered.toString();
+    }
+
+    window.ArtSoulStorageImage = Object.freeze({ sized, contained, isValidStorageUrl });
 })();

@@ -8,7 +8,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **67 done, 16 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
 
 October 14 continuation: the profile session-cookie isolation fix is published
 through PR #301 / `12f3e38`, with green candidate CI, build, 49 compiled browser
@@ -215,7 +215,7 @@ Ordered by what the founder can feel, not by row number.
 
 ## 2a. All the device acceptance, in five trips
 
-Fourteen rows remain for device and connected-flow acceptance after A-79 and A-59 closed.
+Thirteen rows remain for device and connected-flow acceptance after A-79, A-59 and A-73 closed.
 The underlying repairs, including the September 29 portrait/profile
 corrections, are published. A failed acceptance may require another fix.
 [`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)
@@ -240,7 +240,10 @@ Merged and measured, needing the device coverage specified in each backlog row:
 
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
 - **A-72** quick loads showing no placeholder at all
-- **A-73** the balance in the account menu showing a number
+
+**A-73 accepted October 14:** the owner explicitly confirms the actual iPhone
+account menu shows a numeric Base Sepolia balance. The recorded desktop check
+already passed. Android remains owner-waived / not tested.
 
 **A-78 reopened on 2026-09-06.** The active-first heuristic can target another
 artwork's auction when two counters collide. The same ambiguity affects token

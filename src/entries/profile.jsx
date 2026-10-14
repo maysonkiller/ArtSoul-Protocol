@@ -1,4 +1,5 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
+import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { EmailConnection } from '../features/profile/email-connection.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
@@ -272,35 +273,20 @@ const { useState, useEffect, useRef } = React;
                 setProfileAvatarFailed(false);
                 if (!resolvedAvatarUrl || resolvedAvatarUrl === 'uploading...') return undefined;
 
-                const preloader = typeof Image === 'function'
-                    ? new Image()
-                    : document.createElement('img');
-                const commit = () => {
+                const commit = url => {
                     if (token !== profileAvatarDecodeTokenRef.current) return;
-                    setDecodedProfileAvatarUrl(resolvedAvatarUrl);
+                    setDecodedProfileAvatarUrl(url);
                 };
                 const fail = () => {
                     if (token !== profileAvatarDecodeTokenRef.current) return;
                     setProfileAvatarFailed(true);
                 };
-                preloader.onerror = fail;
-                preloader.onload = () => {
-                    if (token !== profileAvatarDecodeTokenRef.current) return;
-                    if (typeof preloader.decode !== 'function') {
-                        commit();
-                        return;
-                    }
-                    preloader.decode().then(commit, fail);
-                };
-                preloader.decoding = 'async';
-                preloader.src = resolvedAvatarUrl;
+                decodeAvatar(resolvedAvatarUrl).then(commit, fail);
 
                 return () => {
                     if (token === profileAvatarDecodeTokenRef.current) {
                         profileAvatarDecodeTokenRef.current += 1;
                     }
-                    preloader.onload = null;
-                    preloader.onerror = null;
                 };
             }, [resolvedAvatarUrl]);
 

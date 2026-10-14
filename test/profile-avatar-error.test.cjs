@@ -6,8 +6,10 @@ const vm = require('node:vm');
 const profile = fs.readFileSync('src/entries/profile.jsx', 'utf8');
 const effect = profile.slice(profile.indexOf('const resolvedAvatarUrl ='), profile.indexOf('function getExplorerAddressUrl('));
 
-function loadAvatar() {
+async function loadAvatar(resize) {
+  const { decodeAvatar } = await import('../src/features/artwork/decoded-image.js');
   let image, cleanup;
+  const images = [];
   const state = { url: '', failed: false };
   const scope = {
     profile: {}, profileDraft: null, editMode: false, getProfileAvatarUrl: () => 'https://example.test/avatar.png',
@@ -15,21 +17,22 @@ function loadAvatar() {
     setDecodedProfileAvatarUrl: value => { state.url = value; },
     setProfileAvatarFailed: value => { state.failed = value; },
     useEffect: fn => { cleanup = fn(); },
-    Image: function () { image = this; }
+    decodeAvatar: source => decodeAvatar(source, () => { image = {}; images.push(image); return image; }, resize)
   };
   vm.runInNewContext(effect, scope);
-  return { state, image, dispose: () => cleanup() };
+  return { state, image, images, dispose: () => cleanup() };
 }
 
-test('a failed profile avatar load ends its pending state', () => {
-  const h = loadAvatar();
+test('a failed profile avatar load ends its pending state', async () => {
+  const h = await loadAvatar();
   h.image.onerror();
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.state.failed, true);
   assert.equal(h.state.url, '');
 });
 
 test('a failed profile avatar decode ends its pending state', async () => {
-  const h = loadAvatar();
+  const h = await loadAvatar();
   h.image.decode = async () => { throw new Error('Undecodable image'); };
   h.image.onload();
   await new Promise(resolve => setImmediate(resolve));
@@ -37,11 +40,25 @@ test('a failed profile avatar decode ends its pending state', async () => {
   assert.equal(h.state.url, '');
 });
 
-test('a disposed profile cannot receive a late avatar failure', () => {
-  const h = loadAvatar();
+test('a disposed profile cannot receive a late avatar failure', async () => {
+  const h = await loadAvatar();
   const staleError = h.image.onerror;
   h.dispose();
   staleError();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.failed, false);
+});
+
+test('a changed identity cannot receive a late original after transformation failure', async () => {
+  const h = await loadAvatar(() => 'https://example.test/contained.webp');
+  h.image.onerror();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.images.length, 2);
+  assert.equal(h.images[1].src, 'https://example.test/avatar.png');
+  h.dispose();
+  await h.images[1].onload();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.url, '');
   assert.equal(h.state.failed, false);
 });
 

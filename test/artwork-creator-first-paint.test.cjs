@@ -34,10 +34,11 @@ test('the exact projection seeds creator identity before the first content frame
 
 test('ownership decodes the avatar without hiding the known name or painting a second background image', () => {
   const ownership = detail.slice(detail.indexOf('function OwnershipIdentity'), detail.indexOf('const ZERO_ADDRESS'));
-  assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png'\)/);
+  assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png', decodeAvatar\)/);
   assert.match(ownership, /image\.url \? <img/);
   assert.match(ownership, /style=\{nameStyle\}>\{name\}/);
   assert.doesNotMatch(ownership, /backgroundImage/);
+  assert.match(detail, /const avatarStyle = \{\s*display: 'block',\s*objectFit: 'cover'/);
   assert.match(detail, /identityResolved \? getProfileAvatarUrl\(resolvedProfile, address\) : ''/);
   assert.match(detail, /key=\{address\.toLowerCase\(\)\}/);
 });
