@@ -167,12 +167,14 @@ Verify all of the following before declaring A8 complete:
 - `REPORT_RESTORED` and the creator's `ARTWORK_RESTORED` notification appear
   only when a resolution actually returned the artwork to public visibility.
 
-Accepted October 15, 2026 through the property-by-property reconciliation in
+Operational properties accepted October 15, 2026 through the reconciliation in
 [`PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md`](../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md).
 Fixed expiry is checked with exact controlled clock boundaries and the compiled
 client deadline; device/network binding also has real owner acceptance. A
 natural 24-hour observation remains unperformed and is not a separately required
 ceremony. This does not authorize beta entry or close unrelated device criteria.
+The subsequently reported successful-verification dialog regression keeps A8's
+UI acceptance open until its bounded repair is released and verified.
 
 ## 5. After controlled-beta observation
 

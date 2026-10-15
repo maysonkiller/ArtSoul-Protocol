@@ -56,7 +56,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
         setFeed(null); setFeedError(false); setList(false); setSort('newest'); setOffset(0);
     }, [artworkId, creator, deployment?.address]);
     useEffect(() => {
-        if (!enabled) return;
+        if (!enabled || !list) return;
         const abort = new AbortController();
         setFeed(null); setFeedError(false);
         fetch(`/api/public/donations?chain_id=84532&artwork_id=${encodeURIComponent(artworkId)}&sort=${sort}&offset=${offset}`,
@@ -69,7 +69,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             if (!abort.signal.aborted) setFeed(data);
         }).catch(() => { if (!abort.signal.aborted) setFeedError(true); });
         return () => abort.abort();
-    }, [enabled, artworkId, creator, deployment?.address, sort, offset, refresh]);
+    }, [enabled, list, artworkId, creator, deployment?.address, sort, offset, refresh]);
     useEffect(() => {
         if (open) {
             setWalletBalance(document.querySelector('[data-network-balance]')?.textContent || '');
@@ -141,11 +141,12 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
     return <section className="artist-support" aria-label="Support the artist">
         <button type="button" data-allow-rapid="true" ref={trigger} className="btn-secondary artwork-page-compact-action"
             onClick={() => { setOpen(true); setError(''); }}>Donate</button>
-        <button type="button" data-allow-rapid="true" className="btn-secondary artwork-page-compact-action" onClick={() => setList(value => !value)}>
-            {list ? 'Close history' : 'View all support'}</button>
-        {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
-        {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
-        {list && <div className="artist-support-history">
+        <button type="button" data-allow-rapid="true" className="btn-secondary artwork-page-compact-action"
+            aria-expanded={list} aria-controls="artistSupportHistory" onClick={() => setList(value => !value)}>
+            {list ? 'Close history' : 'Donation history'}</button>
+        {list && <div id="artistSupportHistory" className="artist-support-history">
+            {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
+            {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
             <label>Order <select value={sort} onChange={event => { setSort(event.target.value); setOffset(0); }}>
                 <option value="newest">Newest first</option><option value="amount">Largest first</option>
             </select></label>

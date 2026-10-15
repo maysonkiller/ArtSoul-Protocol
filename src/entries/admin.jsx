@@ -192,6 +192,7 @@ function ProtocolAdminPage() {
     const [setupWallet, setSetupWallet] = useState('');
     const [authorityWallet, setAuthorityWallet] = useState('');
     const [passkeyOpen, setPasskeyOpen] = useState(false);
+    const signInIntent = useRef('login'), completedSignIn = useRef('');
     const setupEpoch = useRef(0), openedSetupFor = useRef('');
     const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
     const checkAccessRef = useRef(null);
@@ -209,6 +210,7 @@ function ProtocolAdminPage() {
         setDecision(null);
     };
     const expireView = () => {
+        completedSignIn.current = '';
         setupEpoch.current++;
         accessRequest.current++;
         clearProtectedView();
@@ -222,6 +224,7 @@ function ProtocolAdminPage() {
         let lastWallet = currentSetupWallet();
         let lastAuthenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
         const clearSession = () => {
+            completedSignIn.current = '';
             setupEpoch.current++;
             accessRequest.current++;
             openedSetupFor.current = '';
@@ -336,8 +339,9 @@ function ProtocolAdminPage() {
         setMessage(error.message);
     };
 
-    const checkAccess = useCallback(async () => {
+    const checkAccess = useCallback(async ({ verified = false } = {}) => {
         const wallet = currentSetupWallet(), epoch = setupEpoch.current, request = ++accessRequest.current;
+        if (verified && signInIntent.current === 'login') completedSignIn.current = wallet;
         const startedAt = performance.now();
         const isCurrent = () => sessionIsCurrent(epoch, wallet) && request === accessRequest.current;
         if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
@@ -364,8 +368,15 @@ function ProtocolAdminPage() {
             const canApprove = result.setupEnabled === true && result.authenticated === true && result.authorityEligible === true;
             setAuthorityWallet(canApprove ? wallet : '');
             setSetupWallet(canSetup ? wallet : '');
-            if (!canSetup) setPasskeyOpen(false);
-            else if (!canApprove && !result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
+            if (!canSetup) { completedSignIn.current = ''; setPasskeyOpen(false); }
+            else if (result.access?.stepUpActive && completedSignIn.current === wallet) {
+                // A completed factor still needs a current server access check.
+                // A newer focus/network read may supply it; queue loading need not.
+                completedSignIn.current = '';
+                setPasskeyOpen(false);
+            } else if (!canApprove && !result.access?.stepUpActive && openedSetupFor.current !== wallet) {
+                signInIntent.current = 'login'; openedSetupFor.current = wallet; setPasskeyOpen(true);
+            }
             setAccess(result.access || null);
             clearProtectedView();
             if (canSetup && result.access?.stepUpActive) expiryTimer.current = setTimeout(expireView, remaining);
@@ -409,7 +420,12 @@ function ProtocolAdminPage() {
         }
     };
 
-    const stepUp = () => { if (setupWallet) setPasskeyOpen(true); };
+    const stepUp = () => {
+        if (!setupWallet) return;
+        completedSignIn.current = '';
+        signInIntent.current = access?.stepUpActive ? 'settings' : 'login';
+        setPasskeyOpen(true);
+    };
 
     const changeQueueStatus = async status => {
         const epoch = setupEpoch.current, wallet = currentSetupWallet();
@@ -470,7 +486,7 @@ function ProtocolAdminPage() {
     const authorityControls = rosterWallet && <StaffAuthority key={`${rosterWallet}:${Boolean(authorityWallet)}`} walletAddress={rosterWallet} readOnly={!authorityWallet} api={api} onAccessChanged={checkAccess} />;
     const verification = setupWallet && <section key="verification" className="protocol-admin-setup" aria-label="Admin verification">
         {passkeyOpen && <SignInDialog key={setupWallet} walletAddress={setupWallet} sessionActive={access?.stepUpActive === true}
-            api={api} onClose={() => setPasskeyOpen(false)} onAccessChanged={checkAccess} onStepUpRequired={() => {
+            api={api} onClose={() => { completedSignIn.current = ''; setPasskeyOpen(false); }} onAccessChanged={checkAccess} onStepUpRequired={() => {
                 clearProtectedView();
                 setAccess(current => current ? { ...current, stepUpActive: false } : null);
                 setAccessState('step_up');

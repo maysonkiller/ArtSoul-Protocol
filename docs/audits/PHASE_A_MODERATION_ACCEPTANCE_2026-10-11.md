@@ -2,7 +2,13 @@
 
 ## October 15 A-22 / A8 acceptance reconciliation
 
-**Accepted.** This supersedes the earlier remaining-A8 statements in this dated
+**Operational evidence accepted; newly reported UI regression open.** The owner
+subsequently reported that successful factor verification leaves the dialog open
+and appears to require repeated entry. The apex observation confirms a Verified
+header and accessible queue behind that dialog; rejection of the first two
+assertions is not established. A-22/A8 remain in progress until this bounded UI
+repair is released and verified. No factor reset or repeated network ceremony is
+required. The evidence reconciliation below supersedes earlier remaining-A8 statements in this dated
 record, without changing any historical observation or the Phase A beta decision.
 Published source is `ca77eb7d60f580e4f963027001d29404364b2d9a` / PR #308.
 
@@ -24,7 +30,8 @@ a mandatory blocking gate. The controlled deadline tests and actual context
 ceremonies satisfy distinct parts of the approved criterion. No policy or
 acceptance scope is waived, and an elapsed-day PASS is not fabricated.
 
-The bounded independent reconciliation found no remaining unmet A-22 property.
+The bounded independent reconciliation found no remaining unmet operational
+property before the subsequent UI report above.
 The three session/access/client suites passed 48/48 again on October 15;
 `output/audit/a22-closeout-session-checks-2026-10-15.log` retains the result.
 PR #308's exact candidate and post-merge Linux/Windows/static CI, 1875 local

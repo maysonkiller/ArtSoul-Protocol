@@ -9,8 +9,9 @@ This is the operating source of truth for entering the invite-only ArtSoul
 controlled beta. It does not approve a beta window by itself. The Canon Bible
 and the canonical Phase A backlog remain authoritative.
 
-A8 moderation is accepted October 15 through the dated operating/test evidence.
-It no longer blocks entry. Remaining connected-device/publishing acceptance and
+A8 operating/test evidence is accepted October 15, but the owner's subsequent
+successful-verification dialog regression reopens its UI acceptance until the
+repair is released and verified. Remaining connected-device/publishing acceptance and
 the final operator decision still do. The October 15 GitHub open-issue query
 returned zero issues; that does not by itself clear unrecorded device outcomes
 or constitute a beta GO. No invitations or beta window are opened by this review.

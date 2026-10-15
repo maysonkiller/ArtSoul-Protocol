@@ -33,7 +33,7 @@ function harness(sessionActive = false) {
     si = ri = ei = 0; pending = [];
     h.actions = run({walletAddress: WALLET, sessionActive,
       api: async (path, options) => {state.calls.push({path, options}); return state.api ? state.api(path, options) : {options: {challenge: 'fixture'}};},
-      onClose: () => {state.closed++;}, onAccessChanged: async () => {state.refreshed++;}, onStepUpRequired: () => {state.stepUp++;}});
+      onClose: () => {state.closed++;}, onAccessChanged: async result => {state.refreshed++;state.accessResult=result;}, onStepUpRequired: () => {state.stepUp++;}});
     refs[0].current = {showModal: () => {state.opened++;}, close() {}};
     refs[1].current = {focus() {}};
     pending.forEach(fn => fn()); return h.actions.snapshot;
@@ -56,6 +56,16 @@ test('explicit enrollment passes its code only to enrollment endpoints and clear
   assert.equal(JSON.parse(h.state.calls[1].options.body).token, CODE);
   assert.equal(h.state.native[0].type, 'register'); assert.equal(h.state.refreshed, 1);
   assert.equal(view.enrollmentCode, ''); assert.match(view.message, /Passkey saved/);
+  assert.equal(h.state.accessResult?.verified,false);
+});
+
+test('successful legacy authentication signals completed login only after server verification',async()=>{
+  const h=harness(), pending=deferred();
+  h.state.api=async path=>path==='passkey-auth-verify'?pending.promise:{options:{challenge:'fixture'}};
+  const operation=h.actions.perform('verify');await tick();
+  assert.equal(h.state.refreshed,0);
+  pending.resolve({verified:true});await operation;
+  assert.equal(h.state.refreshed,1);assert.equal(h.state.accessResult?.verified,true);
 });
 
 test('explicit first setup requests only approved-bootstrap mode without transferring a code', async () => {

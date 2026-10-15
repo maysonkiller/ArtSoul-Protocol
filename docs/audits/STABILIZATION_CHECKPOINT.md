@@ -3,6 +3,36 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 15 subsequent owner UI report (Canon 05/07/16, donation design):
+
+- Continue from `d78f3b9`, branch `codex/takeover-audit`; PR #309 is not merged.
+  Published application remains `ca77eb7` / PR #308. Four historical untracked
+  paths are preserved. One existing helper completed the bounded Admin repair
+  and review; no other agents remain active.
+- Actual apex artwork 18 reproduces the expanded Staff moderation section.
+  Source also places the largest donation outside the history disclosure and
+  fetches history on every initial artwork visit. Local patch moves tools into
+  an explicit staff-only dialog, retains server checks, and loads/shows donation
+  history only after opening it. No payment, complaint or role operation ran.
+- Avatar refresh replaced the same creator's hydrated profile with a sparse
+  projection. Local patch retains that identity during refresh, waits for a
+  resolved avatar, and keeps the same wallet's decoded image during replacement.
+- Earlier apex Admin evidence already shows Verified and the queue behind a
+  successful dialog. Both factor paths never closed that dialog. Local patch
+  closes login intent after current server-confirmed access, before slow queue
+  reads, preserves deliberately opened settings and guards focus/identity races.
+  This does not prove rejection of the owner's first two passkey assertions.
+- A-22/A8 UI acceptance is reopened for this repair. Operational evidence below
+  remains accepted; no full 24-hour wait, factor reset or repeated network test
+  is introduced. Other unaccepted iPhone/publishing rows remain open.
+- The UI interpretation is explicit: Report stays a user-invoked form; staff
+  visibility controls move behind a separate button; the largest-support line
+  moves inside history. `SUPPORT_THE_ARTIST_DESIGN.md` records the placement
+  amendment. No frozen architecture or economics changes.
+- Next step: finish regression/build review, publish this bounded candidate only
+  after green CI and preview verification, then verify the apex and one ordinary
+  Admin login without reenrollment.
+
 October 15 A-22 / A8 closure (Canon 07 / Bible 11 and 17):
 
 - Continue from `4321663`, published application `ca77eb7` / PR #308, in the

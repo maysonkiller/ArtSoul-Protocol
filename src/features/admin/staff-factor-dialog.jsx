@@ -102,10 +102,11 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         await post(enrolling ? 'passkey-register-verify' : 'passkey-auth-verify', { ...approval, response });
         if (!current()) return;
         setSetup(null); clearQr(); setCode('');
+        await onAccessChanged({ verified: !enrolling });
+        if (!current()) return;
         await refresh(current);
         if (!current()) return;
         setMessage(enrolling ? 'Passkey saved. Select Verify passkey to enter the admin panel.' : 'Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
-        await onAccessChanged();
     });
     const prepareApp = () => run(async current => {
         setSetup(null); clearQr();
@@ -121,9 +122,11 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
             if (!current()) return;
             await factor('totp-verify', { attemptId: attempt.attemptId, code: entered });
             if (!current()) return;
-            setSetup(null); clearQr(); setMessage('Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
+            setSetup(null); clearQr();
+            await onAccessChanged({ verified: true });
+            if (!current()) return;
             await refresh(current);
-            if (current()) await onAccessChanged();
+            if (current()) setMessage('Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
         });
     };
     return <dialog ref={dialog} className="protocol-admin-dialog protocol-admin-passkeys" aria-labelledby="staffFactorTitle"
