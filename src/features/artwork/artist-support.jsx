@@ -141,9 +141,9 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
     return <section className="artist-support" aria-label="Support the artist">
         <button type="button" data-allow-rapid="true" ref={trigger} className="btn-secondary artwork-page-compact-action"
             onClick={() => { setOpen(true); setError(''); }}>Donate</button>
-        {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
         <button type="button" data-allow-rapid="true" className="btn-secondary artwork-page-compact-action" onClick={() => setList(value => !value)}>
             {list ? 'Close history' : 'View all support'}</button>
+        {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
         {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
         {list && <div className="artist-support-history">
             <label>Order <select value={sort} onChange={event => { setSort(event.target.value); setOffset(0); }}>

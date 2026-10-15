@@ -151,6 +151,7 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged, readOnly =
     return <section className="protocol-admin-gate protocol-admin-authority" aria-label={readOnly ? 'Team directory' : 'Staff access'}>
         <h2>{readOnly ? 'Team directory' : 'Staff access'}</h2>
         <p>{readOnly ? 'Your Team role allows you to view staff wallets. Only the two authority wallets can approve changes.' : 'Both authority wallets approve role changes and sign-in resets. These signatures cost no gas and do not change contract ownership.'}</p>
+        {!readOnly && <p>Staff access approvals use wallet signatures. You do not need to verify an Admin passkey to sign a request. Sign the same request with each authority wallet, then apply it.</p>}
         <section aria-label="Team and authorities" className="protocol-admin-team">
             <h3>Team and authorities</h3>
             <p>Authority wallets manage staff access even without a staff role. Reading complaints requires a staff role and verified sign-in.</p>
