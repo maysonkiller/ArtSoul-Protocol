@@ -15,8 +15,9 @@ read-only records confirm an activated authenticator on the second authority and
 a newly enrolled/authenticated passkey on the primary authority, bound to their
 current Team versions. This closes the reported factor-setup failure, not the
 separate natural 24-hour/session-context or beta-entry gates. The requested local
-QR setup UI is being verified for release; no repeat enrollment is required to
-preserve the completed acceptance. See the current checkpoint.
+QR setup UI is published through PR #307 / `f84557be`; no repeat enrollment is
+required to preserve the completed acceptance. See the current checkpoint for
+the exact artifact and regression evidence.
 
 Earlier October 15 follow-up, superseded by factor acceptance above: the primary
 staff wallet had no current factor and its setup permission expired; no replacement
@@ -39,8 +40,9 @@ defect, not evidence of an incorrect user code. The bounded a8h SQL repair is
 applied and independently verified; roles, factor records and access restrictions
 are unchanged. The associated native-request cancellation UI is published in
 PR #305 / `90bf7cc`, with passing exact-candidate and post-merge CI on Linux and
-Windows, build, and preview/apex artifact checks. Real factor setup after the owner's role change remains
-unaccepted; old device acceptance does not close this new failure. See the
+Windows, build, and preview/apex artifact checks. Real factor setup after the
+owner's role change was still unaccepted at that checkpoint; the October 15
+completion above now supersedes that status. See the
 [checkpoint](audits/STABILIZATION_CHECKPOINT.md) for exact evidence and next step.
 The bounded desktop observation retained the correct profile and decoded avatar
 through all four tabs, with matching lists and immediate cached Created return.
@@ -239,15 +241,15 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-64** | Accept deferred wallet runtime on connected devices | The deferred loader and hidden-tab timer fallback are implemented in the current source. The old static-SDK diagnosis is historical, not the current implementation. Connect, sign in, switch network and publish still need a real connected iOS run; Android is owner-waived / not tested |
+| **A-64** | Accept deferred wallet runtime on connected devices | The deferred loader and hidden-tab timer fallback are implemented. iPhone reconnect/sign-in and wallet return passed on October 12; the owner confirmed working network switching on October 14. Do not repeat those flows. Connected iPhone publishing and usability before the deferred SDK is ready remain unrecorded. The old static-SDK diagnosis is historical; Android is owner-waived / not tested |
 | **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. A later cold-import audit isolated the exact public projection from the shared all-routes serverless graph without changing live-state caching, and the exact response now carries Creator identity before the first content frame instead of briefly showing a generated avatar. Preview proof plus production desktop, iOS and legacy-video timing remain open evidence; Android is owner-waived / not tested |
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
 | **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS acceptance remains open; navigation timing or desktop viewport emulation cannot replace it. Android is owner-waived / not tested |
-| **A-53** | The identity settle gap between header and profile | Reproduced in founder desktop and Android captures in August; the repair still needs production iOS reload and navigation acceptance. Current Android acceptance is owner-waived / not tested |
-| **A-33** | Artwork-page acceptance sweep | Verification work, doable in a browser |
-| **A-57** | Wallet capability limits | Needs masked device evidence; may end as a documented wallet limitation rather than a defect |
+| **A-53** | The identity settle gap between header and profile | Correct-profile iPhone reload/navigation and reconnect outcomes are accepted. The transient restoration menu and header-to-profile visual timing remain unrecorded; do not repeat the whole sign-in flow. Android is owner-waived / not tested |
+| **A-33** | Artwork-page acceptance sweep | Composition and the three-distinct-address provenance example are accepted. The remaining criterion is real-phone transaction feedback; desktop layout checks do not replace it |
+| **A-57** | Wallet capability limits | Current iPhone network switching is owner-confirmed working. The old Robinhood failure stage and masked provider error remain unknown; neither a confirmed ArtSoul defect nor a proven wallet limitation is established. Do not manufacture a failure or repeat the accepted Rabby account-switch flow |
 
 ## 2a. All the device acceptance, in five trips
 

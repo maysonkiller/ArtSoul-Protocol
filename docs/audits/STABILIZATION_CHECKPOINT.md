@@ -14,7 +14,7 @@ October 15 real factor completion and authenticator QR follow-up (Canon 07 / 16)
   primary passkey authenticated at 11:07:15 UTC. This accepts the previously
   failing real setup on the repaired server. No factor reset or role change
   was performed by the agent, and neither factor value was inspected.
-- The requested QR presentation is implemented locally in the existing factor
+- The requested QR presentation is implemented in the existing factor
   dialog. It encodes the existing server-provided otpauth URI entirely in the
   browser, renders a React SVG with a four-module quiet border, and retains
   manual-key and same-device setup. The existing locked qrcode 1.5.3 package is
@@ -36,10 +36,33 @@ October 15 real factor completion and authenticator QR follow-up (Canon 07 / 16)
 - UI interpretation: the machine-readable QR uses neutral black/white variables
   declared for both themes to preserve scan contrast; the surrounding dialog
   retains the active theme. No role, factor policy, economics or contract changes.
-- Exactly next step: finish current full checks, reconcile the bounded QR diff
-  with published main and release after candidate CI/artifact verification.
-  Then continue A8 operational acceptance using the completed factors; do not
-  ask the owner to repeat enrollment solely to demonstrate the QR.
+- Published through [PR #307](https://github.com/maysonkiller/ArtSoul-Protocol/pull/307):
+  candidate `e355239c22d8da61f3fa115c213ee34c9d54f24b`, merge
+  `f84557be9de95b63df708c9fbfe4608b3d585320` at 11:21:43 UTC. Production
+  deployment 7091167208 succeeded at 11:22:12 UTC. Local application checks pass
+  1866/1866, with no skips; candidate CI 38726261255 and post-merge CI
+  38726784656 pass all static, Linux and Windows jobs. Preview deployment
+  7091075750 and the apex each match 199 assets
+  across six pages, including the lazy QR encoder dependency graph. Donate,
+  Report and email remain enabled on the apex; guest private-data requests are
+  denied and Base Sepolia indexer lag is zero. The preview remains disabled.
+- Additional evidence: `output/audit/staff-qr-full-unit-2026-10-15.log`,
+  `staff-qr-{candidate,postmerge}-ci-2026-10-15.json`,
+  `staff-qr-{preview,apex}-artifact-2026-10-15.json`. Source and public docs are
+  committed through `e355239`; the release-evidence follow-up is documentation
+  only. The four historical untracked paths remain untouched. No agent remains
+  active after the bounded QR review.
+- Acceptance reconciliation: A-64 already has real iPhone reconnect/sign-in,
+  wallet-return and current network-switch passes. A-73's balance is accepted.
+  Do not ask for those again. The earlier Robinhood failure stage is unknown;
+  A-57 has current working-switch evidence, not a proven historical cause.
+  A-83 still requires a real browser post-broadcast delay and reconciliation;
+  the existing operator runner receipt is not browser pending-state evidence.
+- Exactly next step: finish the remaining A8 changed-network acceptance using
+  the owner's working factor. A bounded request asks for a real network change
+  in the same authenticated desktop tab; its outcome is pending, not a pass.
+  Preserve current enrollment. Natural 24-hour expiry, remaining connected-phone
+  visual/publish feedback and the beta review remain separate open evidence.
 
 October 15 authority setup navigation and supplied video (Canon 07 / 05 / 16):
 
