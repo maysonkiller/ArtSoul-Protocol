@@ -6,13 +6,15 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
     const wallet = String(walletAddress || '').toLowerCase();
     const currentWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
     const dialog = useRef(null), closeButton = useRef(null), epoch = useRef(0), busyRef = useRef(false);
-    const nativeCancel = useRef(null);
+    const nativeCancel = useRef(null), qrEpoch = useRef(0);
     const [status, setStatus] = useState(null), [setup, setSetup] = useState(null), [code, setCode] = useState('');
     const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+    const [qrCode, setQrCode] = useState(null);
     const post = (route, body) => api(route, { method: 'POST', body: JSON.stringify({ ...body, expectedWallet: wallet }) });
     const factor = (operation, body) => post('factor-setup', { operation, ...body });
+    function clearQr() { qrEpoch.current++; setQrCode(null); }
     function cancelNative() { const cancel = nativeCancel.current; nativeCancel.current = null; cancel?.(); }
-    function clear() { epoch.current++; cancelNative(); busyRef.current = false; setSetup(null); setCode(''); setStatus(null); setBusy(false); }
+    function clear() { epoch.current++; cancelNative(); busyRef.current = false; setSetup(null); clearQr(); setCode(''); setStatus(null); setBusy(false); }
     function close() { clear(); onClose(); }
     async function run(work) {
         if (busyRef.current || currentWallet() !== wallet) return;
@@ -33,7 +35,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
                 TOTP_NOT_CONFIGURED: 'Authenticator app setup is not available yet. You can use a passkey.'
             };
             setMessage(messages[error.code] || (error.name === 'NotAllowedError' ? 'The device did not complete the passkey request. It may have been cancelled or timed out. Try again and complete your device or password manager prompt.' : 'Verification could not be completed. Try again or ask an administrator to check access.'));
-            if (['SETUP_PERMISSION_REQUIRED', 'SETUP_PERMISSION_INVALID', 'STAFF_AUTHORIZATION_CHANGED'].includes(error.code)) { setSetup(null); setStatus(null); }
+            if (['SETUP_PERMISSION_REQUIRED', 'SETUP_PERMISSION_INVALID', 'STAFF_AUTHORIZATION_CHANGED'].includes(error.code)) { setSetup(null); clearQr(); setStatus(null); }
         } finally { if (current()) { busyRef.current = false; setBusy(false); } }
     }
     async function refresh(current) {
@@ -62,11 +64,28 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
     useEffect(() => {
         if (!status?.setup) return;
         const timer = setTimeout(() => {
-            epoch.current++; cancelNative(); busyRef.current = false; setBusy(false); setSetup(null); setCode(''); setStatus(null);
+            epoch.current++; cancelNative(); busyRef.current = false; setBusy(false); setSetup(null); clearQr(); setCode(''); setStatus(null);
             setMessage('Setup approval expired. Both authority wallets must approve a new setup.');
         }, Math.max(0, Date.parse(status.setup.expiresAt) - Date.now()));
         return () => clearTimeout(timer);
     }, [status?.setup]);
+    useEffect(() => {
+        let active = true;
+        clearQr();
+        const token = qrEpoch.current, current = () => active && token === qrEpoch.current && currentWallet() === wallet;
+        if (!setup?.uri) return;
+        // Encode locally: neither the key nor its QR is sent to an image service.
+        import('qrcode').then(({ default: encoder }) => {
+            if (!current()) return;
+            const { modules } = encoder.create(setup.uri, { errorCorrectionLevel: 'M' });
+            const cells = [];
+            for (let y = 0; y < modules.size; y++) for (let x = 0; x < modules.size; x++) {
+                if (modules.get(y, x)) cells.push(`M${x + 4} ${y + 4}h1v1h-1z`);
+            }
+            setQrCode({ setup, size: modules.size + 8, path: cells.join('') });
+        }).catch(() => { if (current()) setQrCode({ setup, failed: true }); });
+        return () => { active = false; };
+    }, [setup, wallet]);
     const passkey = enrolling => run(async current => {
         const approval = enrolling ? { mode: 'authority-setup', permissionId: status?.setup?.id } : {};
         const browser = await import('@simplewebauthn/browser');
@@ -82,13 +101,14 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         if (!current()) return;
         await post(enrolling ? 'passkey-register-verify' : 'passkey-auth-verify', { ...approval, response });
         if (!current()) return;
-        setSetup(null); setCode('');
+        setSetup(null); clearQr(); setCode('');
         await refresh(current);
         if (!current()) return;
         setMessage(enrolling ? 'Passkey saved. Select Verify passkey to enter the admin panel.' : 'Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
         await onAccessChanged();
     });
     const prepareApp = () => run(async current => {
+        setSetup(null); clearQr();
         const result = await factor('totp-setup', { permissionId: status.setup.id });
         if (current()) { setSetup(result); setCode(''); }
     });
@@ -101,7 +121,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
             if (!current()) return;
             await factor('totp-verify', { attemptId: attempt.attemptId, code: entered });
             if (!current()) return;
-            setSetup(null); setMessage('Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
+            setSetup(null); clearQr(); setMessage('Verified. Admin access lasts up to 24 hours. Verify again on a new browser or network.');
             await refresh(current);
             if (current()) await onAccessChanged();
         });
@@ -121,7 +141,13 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
             </section>}
             {setup && <section aria-label="Authenticator app setup">
                 <h3>Add ArtSoul to your authenticator app</h3>
-                <p>Choose “Add account” and “Enter setup key”. Name it ArtSoul, enter the key below and choose time-based codes. Keep this key private.</p>
+                <p>In Google Authenticator or another authenticator app, choose “Add account” then “Scan a QR code”. Scan the code below, then enter the six-digit code to finish.</p>
+                {qrCode?.setup === setup && qrCode.path ? <svg className="protocol-admin-setup-qr" role="img" aria-label="QR code for authenticator app setup"
+                    viewBox={`0 0 ${qrCode.size} ${qrCode.size}`} width="256" height="256" shapeRendering="crispEdges">
+                    <rect width="100%" height="100%" fill="var(--c-qr-background)" />
+                    <path d={qrCode.path} fill="var(--c-qr-foreground)" />
+                </svg> : <p role="status">{qrCode?.setup === setup && qrCode.failed ? 'QR code could not be displayed. Use the setup key below.' : 'Preparing QR code...'}</p>}
+                <p>On the same device, open your authenticator using the link below. Or choose “Enter setup key”, name the account ArtSoul and select time-based codes. Keep the QR code and key private.</p>
                 <label htmlFor="staffAuthenticatorSecret">Setup key</label>
                 <input id="staffAuthenticatorSecret" readOnly autoComplete="off" value={setup.secret} spellCheck={false} onFocus={event => event.target.select()} />
                 <a href={setup.uri}>Open authenticator app on this device</a>

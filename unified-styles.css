@@ -693,6 +693,8 @@ body.future .artwork-page-compact-action {
 }
 
 .classic {
+    --c-qr-background: #ffffff;
+    --c-qr-foreground: #000000;
     --c-modal-backdrop: rgba(10, 18, 24, 0.82);
     --c-bg: var(--bg-classic);
     --c-surface: #010101;
@@ -718,6 +720,8 @@ body.future .artwork-page-compact-action {
 }
 
 .future {
+    --c-qr-background: #ffffff;
+    --c-qr-foreground: #000000;
     --c-modal-backdrop: rgba(0, 0, 0, 0.86);
     --c-bg: #000000;
     --c-surface: #020611;
@@ -3146,6 +3150,7 @@ body.future .resale-modal {
 .protocol-admin-passkey-content p { margin: 0; line-height: 1.5; }
 .protocol-admin-passkey-content input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid var(--c-border-soft); border-radius: 8px; background: var(--c-surface-muted); color: var(--c-text); font: inherit; }
 .protocol-admin-passkey-content button { min-height: 44px; }
+.protocol-admin-setup-qr { display: block; width: min(256px, 100%); height: auto; aspect-ratio: 1; }
 .protocol-admin-passkey-content ul { padding: 0; list-style: none; }
 .protocol-admin-passkey-content li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .protocol-admin-setup { margin-top: 24px; }
