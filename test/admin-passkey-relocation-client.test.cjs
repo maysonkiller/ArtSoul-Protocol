@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(process.env.ADMIN_CANDIDATE_PATH || 'src/entries/admin.jsx', 'utf8').replace(/\r\n/g, '\n');
 const start = source.indexOf('function ProtocolAdminPage()');
 const end = source.indexOf('    const SignInDialog =', start);
-const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision,
+const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision, stepUp,
     closeSetup: () => { if (typeof setPasskeyOpen === 'function') setPasskeyOpen(false); },
     snapshot: {accessState, access, data, busy, message, decision,
         setupAllowed: typeof setupAllowed === 'undefined' ? Boolean(setupWallet) : setupAllowed,
@@ -59,6 +59,22 @@ test('queue requires enabled, authenticated, eligible and active step-up indepen
     }
     const h=harness();await tick();assert.equal(h.render().data.reports[0].id,'private-report');
     assert.equal(h.render().passkeyOpen,false,'an already verified admin does not see another verification dialog');
+});
+
+test('authority wallets can finish paired approvals without an automatic factor dialog', async()=>{
+    const locked=access({authorityEligible:true,access:{role:'team',dualWallet:true,stepUpActive:false}});
+    const h=harness(locked);await tick();
+    let view=h.render();
+    assert.equal(view.setupAllowed,true,'explicit staff verification remains available');
+    assert.equal(view.accessState,'step_up');
+    assert.equal(view.passkeyOpen,false,'authority controls are not covered by the sign-in dialog');
+    assert.equal(h.state.calls.some(call=>call.path.startsWith('review-queue')),false);
+    h.actions.stepUp();assert.equal(h.render().passkeyOpen,true,'explicit verification still opens the dialog');
+    h.actions.closeSetup();h.render();
+    h.state.wallet=OTHER;h.state.auth=OTHER;h.event('artsoul:wallet-state-changed');await tick();
+    view=h.render();assert.equal(view.passkeyOpen,false,'switching to the second signer leaves approval controls accessible');
+    assert.equal(view.accessState,'step_up');
+    assert.equal(h.state.calls.some(call=>call.path.startsWith('review-queue')),false);
 });
 
 test('unsettled wallet setup opens automatically after restoration without a page reload', async()=>{

@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync('src/entries/admin.jsx', 'utf8').replace(/\r\n/g, '\n');
 const start = source.indexOf('function ProtocolAdminPage()');
 const end = source.indexOf('    const SignInDialog =', start);
-const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision,
+const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision, stepUp,
     closeSetup: () => { if (typeof setPasskeyOpen === 'function') setPasskeyOpen(false); },
     snapshot: {accessState, access, data, busy, message, decision,
         setupAllowed: Boolean(setupWallet),
@@ -68,6 +68,8 @@ test('queue requires enabled, authenticated, eligible and active step-up indepen
 
 test('closing verification for an authority wallet never unlocks reports or decision callbacks', async()=>{
     const h=harness(access({authorityEligible:true,access:{role:'admin',stepUpActive:false,dualWallet:true}}));await tick();
+    assert.equal(h.render().passkeyOpen,false);
+    h.actions.stepUp();
     assert.equal(h.render().passkeyOpen,true);
     h.actions.closeSetup();const closed=h.render();
     assert.equal(closed.accessState,'step_up');assert.equal(closed.passkeyOpen,false);

@@ -348,7 +348,7 @@ function ProtocolAdminPage() {
             setAuthorityWallet(canApprove ? wallet : '');
             setSetupWallet(canSetup ? wallet : '');
             if (!canSetup) setPasskeyOpen(false);
-            else if (!result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
+            else if (!canApprove && !result.access?.stepUpActive && openedSetupFor.current !== wallet) { openedSetupFor.current = wallet; setPasskeyOpen(true); }
             setAccess(result.access || null);
             clearProtectedView();
             if (canSetup && result.access?.stepUpActive) expiryTimer.current = setTimeout(expireView, remaining);
