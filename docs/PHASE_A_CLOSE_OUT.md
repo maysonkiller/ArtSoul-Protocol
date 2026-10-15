@@ -10,14 +10,25 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
 
-October 15 latest owner follow-up: the primary staff wallet has no current
-factor and its setup permission expired; no replacement request was created
-today. A separate founder-wallet passkey prompt covered the authority workflow.
+October 15 factor acceptance update: the owner completed renewed setup. Current
+read-only records confirm an activated authenticator on the second authority and
+a newly enrolled/authenticated passkey on the primary authority, bound to their
+current Team versions. This closes the reported factor-setup failure, not the
+separate natural 24-hour/session-context or beta-entry gates. The requested local
+QR setup UI is being verified for release; no repeat enrollment is required to
+preserve the completed acceptance. See the current checkpoint.
+
+Earlier October 15 follow-up, superseded by factor acceptance above: the primary
+staff wallet had no current factor and its setup permission expired; no replacement
+request had been created that morning. A separate founder-wallet passkey prompt covered the authority workflow.
 The bounded UI fix keeps paired wallet approvals accessible without automatically
 opening complaint verification, while preserving its enforcement. The supplied
 desktop video also confirms a support-history button displacement, corrected
-locally by keeping both actions before the asynchronously loaded summary.
-Focused checks and build pass; release and real factor enrollment remain open.
+by keeping both actions before the asynchronously loaded summary. Both fixes are
+published through PR #306 / `0032e94f`, with 1861 passing local checks, green
+candidate/post-merge CI and matching preview/apex artifacts. Actual apex Chrome
+confirms accessible authority controls with the queue locked, and the support
+buttons together above the summary. Real renewed factor enrollment was still open at that checkpoint.
 The owner chose to omit the blocked local-browser fixture. The
 [checkpoint](audits/STABILIZATION_CHECKPOINT.md) records the exact evidence limits.
 

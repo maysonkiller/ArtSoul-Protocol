@@ -360,3 +360,22 @@ passkey-result survival, Team directory removal and the authority exception.
 The fixture uses eight seconds, not a natural 24-hour session. No native passkey,
 IP transition or new production acceptance is inferred. Release/full-suite
 results belong to the current stabilization checkpoint. A-22 remains open.
+
+## October 15 renewed real factor setup
+
+After the a8h pgcrypto repair and the PR #306 authority-navigation release,
+the owner completed paired approvals and reported successful Google Authenticator
+setup on the second/founder authority. Independent read-only metadata confirms
+the current TOTP factor is activated and its setup permission was consumed at
+11:06:08 UTC. The primary authority separately has a current passkey enrolled
+at 11:07:05 UTC and successfully used at 11:07:15 UTC. Both are active Team roles,
+with authorization versions 9 and 8 respectively. Actual Admin displays the
+administration panel after authentication. No setup key, six-digit code, session
+cookie or credential material was inspected or captured.
+
+This accepts real renewed enrollment/authentication under the existing paired
+policy and resolves the reported authenticator HTTP 500 journey. It does not
+claim native scanning of the newly requested QR presentation, a natural 24-hour
+expiry or an actual trusted-IP transition. The already-working methods must not
+be reset merely to test a presentation improvement. Private timestamped
+`staff-setup-progress-*` evidence contains only role/request/factor metadata.

@@ -3,6 +3,44 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 15 real factor completion and authenticator QR follow-up (Canon 07 / 16):
+
+- Continue from `4ad63d0`, published application `0032e94f` / PR #306, in the
+  same checkout. The owner completed real paired approvals and Google
+  Authenticator setup. Read-only metadata at 11:09 UTC confirms both wallets
+  remain active Team: the primary wallet has one current passkey (version 8),
+  and the second/founder wallet has one activated TOTP factor (version 9).
+  The TOTP setup permission was consumed at 11:06:08 UTC, and the current
+  primary passkey authenticated at 11:07:15 UTC. This accepts the previously
+  failing real setup on the repaired server. No factor reset or role change
+  was performed by the agent, and neither factor value was inspected.
+- The requested QR presentation is implemented locally in the existing factor
+  dialog. It encodes the existing server-provided otpauth URI entirely in the
+  browser, renders a React SVG with a four-module quiet border, and retains
+  manual-key and same-device setup. The existing locked qrcode 1.5.3 package is
+  now declared directly; no version or dependency-graph addition is introduced.
+  QR encoding is lazy, and there is no external image service or raw SVG HTML.
+- QR state is discarded on close, identity changes, permission expiry, rejected
+  setup authorization and successful enrollment. Late encoding cannot restore
+  it. Bounded review reproduced and corrected an initial coupling to ordinary
+  request epochs: a failed manual-code check must not strand a pending encoder.
+  Focused client/session checks pass 38/38; build passes. New QR cases first
+  failed on the earlier implementation. Independent jsQR 1.4.0 decoding of
+  actual component paths passes 6/6 for synthetic short/full-wallet labels at
+  256, 200 and 160 pixels. No real key or QR was captured for tests.
+- Evidence: `output/audit/staff-qr-{before,focused,build}-2026-10-15.log` and
+  `output/audit/staff-qr-independent-2026-10-15/result.json`. The decoder is an
+  ignored local verification tool, not an application dependency. No new local
+  browser fixture is requested after the owner's earlier waiver. No native
+  phone scan of the new QR is claimed, and the completed factors are retained.
+- UI interpretation: the machine-readable QR uses neutral black/white variables
+  declared for both themes to preserve scan contrast; the surrounding dialog
+  retains the active theme. No role, factor policy, economics or contract changes.
+- Exactly next step: finish current full checks, reconcile the bounded QR diff
+  with published main and release after candidate CI/artifact verification.
+  Then continue A8 operational acceptance using the completed factors; do not
+  ask the owner to repeat enrollment solely to demonstrate the QR.
+
 October 15 authority setup navigation and supplied video (Canon 07 / 05 / 16):
 
 - Continue from `6a34a38`, published application `90bf7cc` / PR #305, in the
@@ -37,16 +75,39 @@ October 15 authority setup navigation and supplied video (Canon 07 / 05 / 16):
 - The browser origin approval rejected the local fixture. The owner explicitly
   chose to continue without local browser testing; both fixture servers were
   stopped. No compiled-browser or native-device success is claimed for this
-  change. Current source is local, not yet released; release evidence follows
-  only after exact-candidate CI. Historical untracked files remain untouched.
+  change in that environment. Historical untracked files remain untouched.
+- Published through [PR #306](https://github.com/maysonkiller/ArtSoul-Protocol/pull/306):
+  candidate `a05bc8281aaaf60b2990326b08e979365276412d`, merge
+  `0032e94f4ff27bc6a9878b317fc8c1eb2b0cd67e` at 09:41:30 UTC. Production
+  deployment 7089179516 succeeded at 09:41:58 UTC. Local application checks
+  pass 1861/1861 without skips; candidate CI 38714382702 and post-merge CI
+  38714805861 pass Linux, Windows and static jobs. Preview 7089108308 and apex
+  each match 53 assets across six pages. Donate, Report and email remain enabled;
+  guest private reads remain denied and Base Sepolia indexer lag is zero.
+- Actual apex Chrome loads `admin-CDDDbe_P.js`. The primary authority's Staff
+  access is visible without an automatic dialog, while complaint access remains
+  locked. Its existing roster Reset sign-in action correctly prepares
+  `renew_setup` / Team / the primary wallet. The form was handed to the owner;
+  no request, signature or credential was submitted by the agent. On artwork 34,
+  both support buttons have y=568.39 and the summary follows at y=618.39, with
+  both avatars decoded and no horizontal overflow. This verifies final rendered
+  placement, not a new frame-by-frame loading or native-phone test. Only wallet
+  extension provider collisions appeared in the inspected error log.
+- Release evidence: `output/audit/authority-dialog-{ci,postmerge-ci}-2026-10-15.json`,
+  `authority-dialog-full-unit-2026-10-15.log`,
+  `staff-factor-{preview,apex}-artifact-2026-10-15-layout.json`,
+  `support-layout-apex-2026-10-15.json` and the owner-handoff/placement screenshots
+  under `output/playwright/`. Reviewed reconciliation with main retained the
+  newer checkpoint evidence; its only conflicts were these two evidence docs.
 - Interpretation: authority approval navigation stays available without a
   complaint-access factor, as already authorized; suppressing an automatic
   dialog changes no permission. The supplied video does not establish repeated
   avatar reload or an iPhone failure. Phase A remains 68 done / 15 in progress.
-- Exactly next step: finish the current suite and release the bounded UI fix,
-  then prepare Reset sign-in method for the primary wallet with its existing
-  Team role; the owner must sign the same request with both authority wallets
-  and complete native factor enrollment within the resulting setup permission.
+- Exactly next step: record the owner's result for the prepared Reset sign-in
+  method / Team request, signed by both authority wallets, followed by native
+  authenticator enrollment within the resulting setup permission. Reconcile
+  fresh read-only request/factor metadata before proposing another reset. The
+  renewed real enrollment remains unaccepted; Phase A is not closed by this release.
 
 October 15 authenticator setup repair (Canon 07 / Bible 11):
 
