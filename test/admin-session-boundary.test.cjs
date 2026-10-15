@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const source = fs.readFileSync('src/entries/admin.jsx', 'utf8').replace(/\r\n/g, '\n');
+const source = fs.readFileSync(process.env.ADMIN_CANDIDATE_PATH || 'src/entries/admin.jsx', 'utf8').replace(/\r\n/g, '\n');
 const start = source.indexOf('function ProtocolAdminPage()');
 const end = source.indexOf('    const SignInDialog =', start);
 const logic = source.slice(start, end) + `return {checkAccess, authenticate, changeQueueStatus, submitDecision, setDecision, stepUp,
@@ -26,6 +26,8 @@ function harness(response=access()) {
     let si,ri,ei,ci,pending;
     const scope = {
         window:{artsoulWalletStateSettled:true,getCurrentWalletAddress:()=>state.wallet,
+            navigator:{connection:{addEventListener:(name,fn)=>{listeners.set('connection:'+name,new Set([fn]));},
+                removeEventListener:(name,fn)=>listeners.get('connection:'+name)?.delete(fn)}},
             SupabaseAuth:{getAuthenticatedWallet:()=>state.auth},ensureAuthenticated:()=>state.ensureAuthenticated(),
             addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},
             removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)},
@@ -262,8 +264,8 @@ test('expired or missing server deadline cannot open a protected workspace',asyn
     }
 });
 
-test('foreground and online revalidation conceal old data and fence late queue responses',async()=>{
-    for(const event of ['focus','visibilitychange','online']) {
+test('foreground and network revalidation conceal old data and fence late queue responses',async()=>{
+    for(const event of ['focus','visibilitychange','online','connection:change']) {
         const h=harness();await tick();h.render();const oldQueue=deferred(),newAccess=deferred();
         h.state.api=path=>path.startsWith('access')?newAccess.promise:oldQueue.promise;
         const old=h.actions.changeQueueStatus('resolved');h.event(event);
@@ -272,6 +274,21 @@ test('foreground and online revalidation conceal old data and fence late queue r
         newAccess.resolve(access({access:{role:'admin',stepUpActive:false}}));await tick();
         assert.equal(h.render().accessState,'step_up');assert.equal(h.render().data.reports.length,0);
     }
+});
+
+test('going offline locks complaints immediately and reconnect checks the existing wallet without reload',async()=>{
+    const h=harness();await tick();h.render();
+    const count=h.state.calls.length;
+    h.event('offline');let view=h.render();
+    assert.equal(view.accessState,'error');assert.equal(view.data.reports.length,0);
+    assert.equal(view.access.stepUpActive,false);assert.match(view.message,/Connection lost/);
+    assert.equal(h.state.calls.length,count,'offline does not start another network request');
+    h.state.access=access({access:{role:'admin',stepUpActive:false}});
+    h.event('online');await tick();view=h.render();
+    assert.equal(view.accessState,'step_up');assert.equal(view.setupAllowed,true);
+    assert.equal(h.state.calls.length,count+1);assert.equal(view.data.reports.length,0);
+    h.unmount();const after=h.state.calls.length;h.event('connection:change');h.event('offline');h.event('online');
+    assert.equal(h.state.calls.length,after,'network listeners are removed on unmount');
 });
 
 test('a delayed access response cannot extend the server deadline and timers clean up on logout',async()=>{

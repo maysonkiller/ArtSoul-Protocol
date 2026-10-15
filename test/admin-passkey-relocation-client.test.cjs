@@ -83,7 +83,6 @@ test('unsettled wallet setup opens automatically after restoration without a pag
     h.scope.window.artsoulWalletStateSettled=true;h.event('artsoul:wallet-state-changed');
     await tick();const view=h.render();assert.equal(view.setupAllowed,true);assert.equal(view.passkeyOpen,true);
     assert.equal(h.state.calls.length,1);assert.match(h.state.calls[0].path,new RegExp('expectedWallet='+WALLET));
-    assert.match(source, /\['setup', 'setup_verified', 'step_up'\]\.includes\(state\)/);
 });
 
 test('setup clears on wallet and auth boundaries and ignores stale setup responses', async()=>{

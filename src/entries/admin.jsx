@@ -156,13 +156,15 @@ function ReportActions({ report, onChoose }) {
     return null;
 }
 
-function AccessGate({ state, busy, message, onAuthenticate, onStepUp, onRetry, setupAvailable }) {
+function AccessGate({ state, message, walletAddress }) {
     const copy = {
         loading: ['Checking access', 'Confirming the current server session.'],
         disabled: ['Protocol Admin is disabled', 'The review workspace is not active in this environment.'],
-        unauthenticated: ['Wallet verification required', 'Verify the connected wallet before the server checks staff access.'],
+        unauthenticated: walletAddress
+            ? ['Verify your staff wallet', 'Confirm this wallet to check its staff role. Switching accounts does not carry over the previous account\'s admin access.']
+            : ['Connect your staff wallet', 'Use the wallet assigned to your staff account. You can connect it using the button above.'],
         ineligible: ['Access unavailable', 'This wallet does not have an active staff role.'],
-        step_up: ['Admin verification required', 'The review queue and complaint actions are locked. Verify admin access to continue. Closing the verification window does not unlock them.'],
+        step_up: ['Verify your admin sign-in', 'Your wallet is connected. Use your passkey or authenticator app to unlock complaints. Verification is required again after access expires or your browser or network changes.'],
         setup: ['Admin panel', 'Set up your sign-in method here. The review workspace is not active yet.'],
         setup_verified: ['Admin access confirmed', 'Your sign-in method is verified. The review workspace is not active yet.'],
         authority: ['Staff access', 'This authority wallet can approve staff access. Reviewing complaints requires a separate staff role and verification.'],
@@ -170,12 +172,9 @@ function AccessGate({ state, busy, message, onAuthenticate, onStepUp, onRetry, s
     }[state] || ['Protocol Admin', message || 'Access is not ready.'];
 
     return (
-        <section className="protocol-admin-gate" aria-live="polite">
-            <h1>{copy[0]}</h1>
+        <section className="protocol-admin-gate protocol-admin-access-guide" aria-live="polite">
+            <h2>{copy[0]}</h2>
             <p>{copy[1]}</p>
-            {state === 'unauthenticated' && <button type="button" onClick={onAuthenticate} disabled={busy}>Verify wallet</button>}
-            {state === 'step_up' && setupAvailable && <button type="button" onClick={onStepUp} disabled={busy}>Verify admin access</button>}
-            {(state === 'error' || (!setupAvailable && ['setup', 'setup_verified', 'step_up'].includes(state))) && <button type="button" onClick={onRetry} disabled={busy}>Retry</button>}
         </section>
     );
 }
@@ -197,6 +196,7 @@ function ProtocolAdminPage() {
     const accessRequest = useRef(0), queueRequest = useRef(0), readySession = useRef(null);
     const checkAccessRef = useRef(null);
     const expiryTimer = useRef(null);
+    const accessHeading = useRef(null);
     const currentSetupWallet = () => window.artsoulWalletStateSettled === true
         ? String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase() : '';
     const sessionIsCurrent = (epoch, wallet) => epoch === setupEpoch.current && wallet === currentSetupWallet();
@@ -260,13 +260,21 @@ function ProtocolAdminPage() {
             setAccessState('loading');
             checkAccessRef.current?.();
         };
+        const offline = () => {
+            expireView();
+            setAccessState('error');
+            setMessage('Connection lost. Complaints are locked. Reconnect to check admin access automatically.');
+        };
         window.addEventListener('artsoul:wallet-state-changed', walletChanged);
         window.addEventListener('artsoul:auth-state-changed', authChanged);
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', clearSession);
         window.addEventListener('focus', resume);
         window.addEventListener('online', resume);
+        window.addEventListener('offline', offline);
         window.addEventListener('pageshow', resume);
+        const connection = window.navigator?.connection;
+        connection?.addEventListener('change', resume);
         document.addEventListener('visibilitychange', resume);
         if (!waitingForWallet) checkAccessRef.current?.();
         return () => {
@@ -279,10 +287,19 @@ function ProtocolAdminPage() {
             window.removeEventListener('pagehide', clearSession);
             window.removeEventListener('focus', resume);
             window.removeEventListener('online', resume);
+            window.removeEventListener('offline', offline);
             window.removeEventListener('pageshow', resume);
+            connection?.removeEventListener('change', resume);
             document.removeEventListener('visibilitychange', resume);
         };
     }, []);
+
+    useEffect(() => {
+        if (!passkeyOpen && ['unauthenticated', 'step_up', 'error'].includes(accessState)) {
+            accessHeading.current?.scrollIntoView({ block: 'start' });
+            accessHeading.current?.focus({ preventScroll: true });
+        }
+    }, [accessState, passkeyOpen]);
 
     useEffect(() => {
         queueStatusRef.current = queueStatus;
@@ -452,8 +469,6 @@ function ProtocolAdminPage() {
     const rosterWallet = authorityWallet || (access?.dualWallet && access?.role === 'team' && access?.stepUpActive ? setupWallet : '');
     const authorityControls = rosterWallet && <StaffAuthority key={`${rosterWallet}:${Boolean(authorityWallet)}`} walletAddress={rosterWallet} readOnly={!authorityWallet} api={api} onAccessChanged={checkAccess} />;
     const verification = setupWallet && <section key="verification" className="protocol-admin-setup" aria-label="Admin verification">
-        {accessState !== 'step_up' && <button type="button" className="protocol-admin-primary" disabled={busy} onClick={stepUp}>{access?.stepUpActive ? 'Sign-in settings' : 'Verify admin access'}</button>}
-        <p>{access?.dualWallet ? 'Use a passkey or your authenticator app. New setup and recovery require approval from both authority wallets.' : "Use your device's passkey prompt to verify admin access. Additional-device and recovery options are available in the verification window."}</p>
         {passkeyOpen && <SignInDialog key={setupWallet} walletAddress={setupWallet} sessionActive={access?.stepUpActive === true}
             api={api} onClose={() => setPasskeyOpen(false)} onAccessChanged={checkAccess} onStepUpRequired={() => {
                 clearProtectedView();
@@ -463,61 +478,58 @@ function ProtocolAdminPage() {
     </section>;
 
     const groups = useMemo(() => groupReports(data.reports), [data.reports]);
-
-    if (accessState !== 'ready') {
-        return (
-            <div className="protocol-admin-shell">
-                <AccessGate
-                    state={accessState}
-                    setupAvailable={Boolean(setupWallet)}
-                    busy={busy}
-                    message={message}
-                    onAuthenticate={authenticate}
-                    onStepUp={stepUp}
-                    onRetry={checkAccess}
-                />
-                {verification}
-                {authorityControls}
-            </div>
-        );
-    }
+    const connectedWallet = currentSetupWallet();
+    const roleLabel = { admin: 'Administrator', moderator: 'Moderator', team: 'Team' }[access?.role];
+    const ready = accessState === 'ready';
+    const activeSection = section === 'staff' && !rosterWallet ? 'queue' : section;
+    const statusLabel = { loading: 'Checking access', unauthenticated: 'Wallet sign-in required', step_up: 'Verification required',
+        ready: 'Verified', authority: 'Approval access', setup: 'Set up sign-in', setup_verified: 'Verified',
+        error: 'Access needs attention', ineligible: 'No staff role', disabled: 'Unavailable' }[accessState];
 
     return (
         <div className="protocol-admin-shell">
-            <header className="protocol-admin-heading">
+            <header className="protocol-admin-heading" ref={accessHeading} tabIndex={-1}>
                 <div>
                     <p className="protocol-admin-kicker">Protected workspace</p>
                     <h1>Admin panel</h1>
-                    <p>Role: {access?.role || 'staff'} · verified session active for up to 24 hours. Verify again on a new browser or network.</p>
+                    <p>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : 'No staff wallet connected'}{roleLabel ? ` · ${roleLabel}` : ''}</p>
+                    <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
                 </div>
-                <button type="button" onClick={checkAccess} disabled={busy}>Refresh</button>
+                <div className="protocol-admin-header-actions">
+                    {accessState === 'unauthenticated' && <button type="button" className="protocol-admin-primary" onClick={authenticate} disabled={busy}>{connectedWallet ? 'Verify wallet' : 'Connect staff wallet'}</button>}
+                    {setupWallet && <button type="button" className={ready ? '' : 'protocol-admin-primary'} disabled={busy} onClick={stepUp} aria-haspopup="dialog" aria-expanded={passkeyOpen}>{access?.stepUpActive ? 'Sign-in settings' : 'Verify admin access'}</button>}
+                    <button type="button" onClick={checkAccess} disabled={busy}>{busy ? 'Checking...' : accessState === 'error' ? 'Retry access check' : 'Refresh'}</button>
+                </div>
             </header>
 
-            {authorityControls}
+            {verification}
+            {!ready && <AccessGate state={accessState} message={message} walletAddress={connectedWallet} />}
 
-            <nav className="protocol-admin-tabs" aria-label="Protocol Admin sections">
-                {['queue', 'hidden', 'audit', 'notifications'].map(value => (
+            {ready && <nav className="protocol-admin-tabs" aria-label="Protocol Admin sections">
+                {(rosterWallet ? ['queue', 'hidden', 'audit', 'notifications', 'staff'] : ['queue', 'hidden', 'audit', 'notifications']).map(value => (
                     <button
                         key={value}
                         type="button"
-                        className={section === value ? 'is-active' : ''}
-                        aria-current={section === value ? 'page' : undefined}
+                        className={activeSection === value ? 'is-active' : ''}
+                        aria-current={activeSection === value ? 'page' : undefined}
                         onClick={() => setSection(value)}
                     >
-                        {value === 'queue' ? 'Review queue' : value === 'hidden' ? 'Hidden artwork' : value === 'audit' ? 'Audit log' : 'Notification ledger'}
+                        {value === 'queue' ? 'Review queue' : value === 'hidden' ? 'Hidden artwork' : value === 'audit' ? 'Audit log' : value === 'staff' ? authorityWallet ? 'Staff access' : 'Team directory' : 'Notification ledger'}
                     </button>
                 ))}
-            </nav>
+            </nav>}
 
-            {message && <p className="protocol-admin-message" role="status">{message}</p>}
+            {rosterWallet && <div key="staff" hidden={ready && activeSection !== 'staff'}>{authorityControls}</div>}
 
-            {section === 'queue' && (
+            {ready && message && <p className="protocol-admin-message" role="status">{message}</p>}
+
+            {ready && activeSection === 'queue' && (
                 <section aria-labelledby="reviewQueueTitle">
                     <div className="protocol-admin-section-heading">
                         <h2 id="reviewQueueTitle">Review queue</h2>
                         <div className="protocol-admin-status-filter">
                             {['pending_review', 'actioned', 'dismissed', 'resolved'].map(status => (
-                                <button key={status} type="button" className={queueStatus === status ? 'is-active' : ''} onClick={() => changeQueueStatus(status)}>
+                                <button key={status} type="button" className={queueStatus === status ? 'is-active' : ''} aria-pressed={queueStatus === status} onClick={() => changeQueueStatus(status)}>
                                     {status.replace('_', ' ')}
                                 </button>
                             ))}
@@ -561,7 +573,7 @@ function ProtocolAdminPage() {
                 </section>
             )}
 
-            {section === 'hidden' && (
+            {ready && activeSection === 'hidden' && (
                 <section aria-labelledby="hiddenTitle">
                     <h2 id="hiddenTitle">Hidden artwork</h2>
                     <div className="protocol-admin-ledger">
@@ -576,7 +588,7 @@ function ProtocolAdminPage() {
                 </section>
             )}
 
-            {section === 'audit' && (
+            {ready && activeSection === 'audit' && (
                 <section aria-labelledby="auditTitle">
                     <h2 id="auditTitle">Append-only audit evidence</h2>
                     <div className="protocol-admin-ledger">
@@ -593,7 +605,7 @@ function ProtocolAdminPage() {
                 </section>
             )}
 
-            {section === 'notifications' && (
+            {ready && activeSection === 'notifications' && (
                 <section aria-labelledby="notificationsTitle">
                     <h2 id="notificationsTitle">Notification ledger</h2>
                     <p className="protocol-admin-section-copy">Persisted delivery obligations. Delivery failures cannot roll back review decisions.</p>
@@ -609,8 +621,7 @@ function ProtocolAdminPage() {
                 </section>
             )}
 
-            {decision && <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} />}
-            {verification}
+            {ready && decision && <DecisionDialog decision={decision} onClose={() => !busy && setDecision(null)} onSubmit={submitDecision} busy={busy} />}
         </div>
     );
 }

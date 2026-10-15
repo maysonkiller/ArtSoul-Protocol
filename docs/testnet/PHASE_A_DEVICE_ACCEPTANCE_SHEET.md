@@ -308,9 +308,12 @@ No video was reanalysed for this reconciliation.
 
 October 12 superseding follow-up: the requested site logout/reconnect/sign-in,
 Discord apex return and native staff entry now have owner-reported passes above.
-Do not request them again as an entire trip. Unasked criteria remain separate:
-guest persistence after a reload before reconnecting, balance display, connected
-publish/pending feedback and applicable wallet capability/account-switch cases.
+Do not request them again as an entire trip. Subsequent October 14 evidence also
+accepts the iPhone balance and current network switching. Remaining unrecorded
+phone criteria include guest persistence after a reload before reconnecting,
+connected publish/pending feedback and the specific visual restoration transitions.
+The historical Robinhood failure stage remains unknown; the accepted desktop
+Rabby switch is not a reason to repeat that flow.
 Existing gallery/Back, profile reload, tab and lock/resume observations remain
 valid. Do not invent wallet-app versions, missing timestamps or an Android result.
 
