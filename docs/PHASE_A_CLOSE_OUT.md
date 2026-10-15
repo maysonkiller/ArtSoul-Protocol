@@ -10,6 +10,14 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
 
+October 15 factor acceptance update: the owner completed renewed setup. Current
+read-only records confirm an activated authenticator on the second authority and
+a newly enrolled/authenticated passkey on the primary authority, bound to their
+current Team versions. This closes the reported factor-setup failure, not the
+separate natural 24-hour/session-context or beta-entry gates. The requested local
+QR setup UI is being verified for release; no repeat enrollment is required to
+preserve the completed acceptance. See the current checkpoint.
+
 October 15 latest owner follow-up: the primary staff wallet has no current
 factor and its setup permission expired; no replacement request was created
 today. A separate founder-wallet passkey prompt covered the authority workflow.

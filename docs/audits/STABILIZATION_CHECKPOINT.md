@@ -3,6 +3,44 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 15 real factor completion and authenticator QR follow-up (Canon 07 / 16):
+
+- Continue from `4ad63d0`, published application `0032e94f` / PR #306, in the
+  same checkout. The owner completed real paired approvals and Google
+  Authenticator setup. Read-only metadata at 11:09 UTC confirms both wallets
+  remain active Team: the primary wallet has one current passkey (version 8),
+  and the second/founder wallet has one activated TOTP factor (version 9).
+  The TOTP setup permission was consumed at 11:06:08 UTC, and the current
+  primary passkey authenticated at 11:07:15 UTC. This accepts the previously
+  failing real setup on the repaired server. No factor reset or role change
+  was performed by the agent, and neither factor value was inspected.
+- The requested QR presentation is implemented locally in the existing factor
+  dialog. It encodes the existing server-provided otpauth URI entirely in the
+  browser, renders a React SVG with a four-module quiet border, and retains
+  manual-key and same-device setup. The existing locked qrcode 1.5.3 package is
+  now declared directly; no version or dependency-graph addition is introduced.
+  QR encoding is lazy, and there is no external image service or raw SVG HTML.
+- QR state is discarded on close, identity changes, permission expiry, rejected
+  setup authorization and successful enrollment. Late encoding cannot restore
+  it. Bounded review reproduced and corrected an initial coupling to ordinary
+  request epochs: a failed manual-code check must not strand a pending encoder.
+  Focused client/session checks pass 38/38; build passes. New QR cases first
+  failed on the earlier implementation. Independent jsQR 1.4.0 decoding of
+  actual component paths passes 6/6 for synthetic short/full-wallet labels at
+  256, 200 and 160 pixels. No real key or QR was captured for tests.
+- Evidence: `output/audit/staff-qr-{before,focused,build}-2026-10-15.log` and
+  `output/audit/staff-qr-independent-2026-10-15/result.json`. The decoder is an
+  ignored local verification tool, not an application dependency. No new local
+  browser fixture is requested after the owner's earlier waiver. No native
+  phone scan of the new QR is claimed, and the completed factors are retained.
+- UI interpretation: the machine-readable QR uses neutral black/white variables
+  declared for both themes to preserve scan contrast; the surrounding dialog
+  retains the active theme. No role, factor policy, economics or contract changes.
+- Exactly next step: finish current full checks, reconcile the bounded QR diff
+  with published main and release after candidate CI/artifact verification.
+  Then continue A8 operational acceptance using the completed factors; do not
+  ask the owner to repeat enrollment solely to demonstrate the QR.
+
 October 15 authority setup navigation and supplied video (Canon 07 / 05 / 16):
 
 - Continue from `6a34a38`, published application `90bf7cc` / PR #305, in the
