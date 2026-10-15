@@ -19,7 +19,7 @@ test('the exact projection seeds creator identity before the first content frame
     detail.indexOf('async function loadArtwork()'),
     detail.indexOf('function updateTimeLeft()')
   );
-  const seed = loadArtwork.indexOf('setCreatorProfile(projectedCreatorAddress ?');
+  const seed = loadArtwork.indexOf('setCreatorProfile(current =>');
   const release = loadArtwork.indexOf('setLoading(false);');
   const profileRequest = loadArtwork.indexOf('window.ArtSoulDB.getProfile(address)');
 
@@ -34,7 +34,7 @@ test('the exact projection seeds creator identity before the first content frame
 
 test('ownership decodes the avatar without hiding the known name or painting a second background image', () => {
   const ownership = detail.slice(detail.indexOf('function OwnershipIdentity'), detail.indexOf('const ZERO_ADDRESS'));
-  assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png', decodeAvatar\)/);
+  assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png', decodeAvatar, true\)/);
   assert.match(ownership, /image\.url \? <img/);
   assert.match(ownership, /style=\{nameStyle\}>\{name\}/);
   assert.doesNotMatch(ownership, /backgroundImage/);

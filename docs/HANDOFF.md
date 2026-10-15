@@ -1,9 +1,14 @@
 # ArtSoul Engineering Handoff
 
-Current continuation (2026-10-14): use `C:\Projects\ArtSoul`, branch
-`codex/takeover-audit`. Profile isolation is deployed through PR #301 at `12f3e38`.
+Current continuation (2026-10-15): use `C:\Projects\ArtSoul`, branch
+`codex/takeover-audit`. Admin navigation is deployed through PR #308 at `ca77eb7`.
 A-21 intake is accepted from the completed October 11 live cases; do not replay
-complaints or payments. A-22/A8's remaining operating boundaries are separate.
+complaints or payments. A-22/A8 operational evidence is accepted by the October 15
+mapping; the subsequent repeated-verification dialog report reopens its UI
+acceptance until the bounded repair is released and verified. Preserve the
+completed ceremonies. See the checkpoint for the current unpublished diff;
+the natural 24-hour waiting gate was an audit-only restriction, not a required
+ceremony. Remaining phone/publishing criteria and A-23 stay separate.
 The old Codex worktree is an archived recovery copy. Read
 [WORKSPACE.md](WORKSPACE.md) and [STABILIZATION_CHECKPOINT.md](audits/STABILIZATION_CHECKPOINT.md)
 for current work, verification and the next step. Historical snapshots below do

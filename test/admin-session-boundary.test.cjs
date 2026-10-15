@@ -68,6 +68,66 @@ test('queue requires enabled, authenticated, eligible and active step-up indepen
     assert.equal(h.render().passkeyOpen,false,'an already verified admin does not see another verification dialog');
 });
 
+test('completed login closes after server access succeeds without waiting for queue contents',async()=>{
+    const h=harness(access({access:{role:'admin',dualWallet:true,stepUpActive:false}}));await tick();
+    assert.equal(h.render().passkeyOpen,true);
+    const queue=deferred();h.state.api=path=>path.startsWith('access')?Promise.resolve(access()):queue.promise;
+    const operation=h.actions.checkAccess({verified:true});await tick();
+    const view=h.render();assert.equal(view.accessState,'ready');assert.equal(view.passkeyOpen,false);
+    assert.equal(view.data.reports.length,0,'private queue is still pending');
+    queue.resolve({data:secret()});await operation;
+    assert.equal(h.render().data.reports[0].id,'private-report');
+});
+
+test('access refresh preserves an unfinished login and intentionally opened sign-in settings',async()=>{
+    const login=harness(access({access:{role:'admin',dualWallet:true,stepUpActive:false}}));await tick();
+    assert.equal(login.render().passkeyOpen,true);
+    login.state.access=access();await login.actions.checkAccess();
+    assert.equal(login.render().passkeyOpen,true,'access refresh cannot interrupt the pending native result');
+    const settings=harness();await tick();settings.render();settings.actions.stepUp();settings.render();
+    await settings.actions.checkAccess({verified:true});
+    assert.equal(settings.render().passkeyOpen,true,'explicit sign-in settings remain available after verification');
+});
+
+test('a newer access refresh can finish a verified login without replaying the factor',async()=>{
+    const h=harness(access({access:{role:'admin',stepUpActive:false}}));await tick();h.render();
+    const older=deferred(),newer=deferred();let reads=0;
+    h.state.api=path=>path.startsWith('access')?(++reads===1?older.promise:newer.promise):Promise.resolve({data:secret()});
+    const verified=h.actions.checkAccess({verified:true});h.event('focus');
+    older.resolve(access({access:{role:'admin',stepUpActive:false}}));await verified;
+    assert.equal(h.render().passkeyOpen,true);
+    newer.resolve(access());await tick();
+    assert.equal(h.render().passkeyOpen,false);assert.equal(h.render().accessState,'ready');
+});
+
+test('a completed login cannot close another identity or an explicitly reopened dialog',async()=>{
+    for(const boundary of ['wallet','logout','reopen']){
+        const h=harness(access({access:{role:'admin',stepUpActive:false}}));await tick();h.render();
+        const old=deferred();h.state.api=()=>old.promise;
+        const verified=h.actions.checkAccess({verified:true});
+        if(boundary==='wallet'){
+            h.state.wallet=OTHER;h.state.auth=OTHER;h.event('artsoul:wallet-state-changed');
+        }else if(boundary==='logout'){
+            h.state.auth='';h.event('artsoul:auth-state-changed');
+        }else{h.actions.closeSetup();h.render();h.actions.stepUp();h.render();}
+        old.resolve(access());await verified;await tick();
+        if(boundary==='reopen')assert.equal(h.render().passkeyOpen,true);
+        else{
+            h.state.api=null;h.state.access=access({access:{role:'admin',stepUpActive:false}});
+            h.state.auth=h.state.wallet;h.event('artsoul:auth-state-changed');await h.actions.checkAccess();h.render();
+            h.actions.stepUp();h.render();h.state.access=access();await h.actions.checkAccess();
+            assert.equal(h.render().passkeyOpen,true,boundary+': prior completion must not close a new login');
+        }
+    }
+});
+
+test('factor success cannot close a login whose server access remains locked',async()=>{
+    const h=harness(access({access:{role:'admin',stepUpActive:false}}));await tick();h.render();
+    await h.actions.checkAccess({verified:true});const view=h.render();
+    assert.equal(view.accessState,'step_up');assert.equal(view.passkeyOpen,true);
+    assert.equal(view.data.reports.length,0);
+});
+
 test('closing verification for an authority wallet never unlocks reports or decision callbacks', async()=>{
     const h=harness(access({authorityEligible:true,access:{role:'admin',stepUpActive:false,dualWallet:true}}));await tick();
     assert.equal(h.render().passkeyOpen,false);

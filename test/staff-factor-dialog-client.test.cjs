@@ -36,7 +36,7 @@ function harness() {
       api:async(route,options)=>{state.calls.push(route);if(state.api)return state.api(route,options);
         if(options && JSON.parse(options.body).operation==='totp-setup')return {...SETUP};
         return options?{options:{challenge:'local'}}:{setup:{id:'permission',expiresAt:new Date(Date.now()+900000).toISOString()},passkeyAvailable:true,totpAvailable:true};},
-      onClose:()=>state.closed++,onAccessChanged:async()=>state.refreshed++});
+      onClose:()=>state.closed++,onAccessChanged:async result=>{state.refreshed++;state.accessResult=result;return state.onAccessChanged?.(result);}});
     refs[0].current={showModal(){},close(){}};refs[1].current={focus(){}};
     pending.forEach(fn=>fn());return h.actions.snapshot;
   },event:(name,value={})=>listeners.get(name)?.(value),unmount:()=>effects.forEach(e=>e.cleanup?.()),expire:()=>[...timers.values()].forEach(fn=>fn())};
@@ -63,6 +63,44 @@ test('closing after completed native verification does not cancel an unrelated l
   assert.equal(h.state.cancelled,0);
   assert.equal(h.state.refreshed,1);
   assert(h.state.calls.includes('passkey-auth-verify'));
+});
+
+test('successful factor login refreshes confirmed access before an optional factor-status reload',async()=>{
+  for(const method of ['passkey','totp']){
+    const h=harness();await tick();h.render();h.state.nativeResult=async()=>({id:'completed'});
+    h.state.api=async(route,options)=>{
+      if(!options)throw new Error('Status reload unavailable');
+      return {options:{challenge:'fixture'},attemptId:'attempt'};
+    };
+    h.state.onAccessChanged=()=>h.unmount();
+    if(method==='passkey')await h.actions.passkey(false);
+    else {h.actions.setCode('123456');h.render();h.actions.verifyCode({preventDefault(){}});await tick();}
+    assert.equal(h.state.refreshed,1,method);
+    assert.equal(h.state.accessResult?.verified,true,method);
+    assert.equal(h.state.cancelled,0,method);
+  }
+});
+
+test('passkey enrollment refreshes methods but never claims a completed login',async()=>{
+  const h=harness();await tick();h.render();h.state.nativeResult=async()=>({id:'enrolled'});
+  await h.actions.passkey(true);
+  assert.equal(h.state.accessResult?.verified,false);
+  assert.match(h.render().message,/Passkey saved/);
+});
+
+test('a rejected server factor verification never signals a completed login',async()=>{
+  for(const method of ['passkey','totp']){
+    const h=harness();await tick();h.render();h.state.nativeResult=async()=>({id:'completed'});
+    h.state.api=async(route,options)=>{
+      const body=options?JSON.parse(options.body):{};
+      if(route==='passkey-auth-verify'||body.operation==='totp-verify')throw Object.assign(new Error('private failure'),{code:'CODE_NOT_VERIFIED'});
+      return {options:{challenge:'fixture'},attemptId:'attempt'};
+    };
+    if(method==='passkey')await h.actions.passkey(false);
+    else{h.actions.setCode('123456');h.render();h.actions.verifyCode({preventDefault(){}});await tick();}
+    assert.equal(h.state.refreshed,0,method);assert.equal(h.state.closed,0,method);
+    assert.doesNotMatch(h.render().message,/Verified|private failure/);
+  }
 });
 
 test('a native refusal is described without assuming cancellation or displaying private error text',async()=>{

@@ -1,5 +1,44 @@
 # October 11 moderation and artist-support acceptance
 
+## October 15 A-22 / A8 acceptance reconciliation
+
+**Operational evidence accepted; newly reported UI regression open.** The owner
+subsequently reported that successful factor verification leaves the dialog open
+and appears to require repeated entry. The apex observation confirms a Verified
+header and accessible queue behind that dialog; rejection of the first two
+assertions is not established. A-22/A8 remain in progress until this bounded UI
+repair is released and verified. No factor reset or repeated network ceremony is
+required. The evidence reconciliation below supersedes earlier remaining-A8 statements in this dated
+record, without changing any historical observation or the Phase A beta decision.
+Published source is `ca77eb7d60f580e4f963027001d29404364b2d9a` / PR #308.
+
+| Required property | Evidence retained and its limits |
+| --- | --- |
+| Wallet, role, factor and private-data boundaries | Real guest/nonstaff denials, native setup/replacement and queue entry below; current role/version/revocation and Team-directory tests; guest denials on the published apex. Authority roster access remains the approved separate exception. |
+| Fixed 24-hour expiry, no sliding renewal, re-verification | `test/moderation-session-context.test.mjs` checks issuance at exactly 86400 seconds, validity before and denial at expiry without renewal. `test/protocol-admin-review.test.cjs` checks the same deadline for both factor types and loss of verified route access. `test/admin-session-boundary.test.cjs` checks removal of protected content and retained callbacks at the deadline; the compiled short-deadline browser run below checks the UI integration. These are controlled-clock checks, not a natural 24-hour observation. |
+| Real changed device and network | Owner's actual iPhone entry and October 15 desktop network-change acceptance, documented below. No repeated ceremony or invented raw-IP measurement. |
+| Intake, independent reports, deduplication and rate limit | Actual form/API journeys below; sixth-report denial and no submission-triggered hiding. A-21 is already accepted. |
+| Review, concurrent/stale decisions, multi-report restoration and audit | Recorded live October 11 journeys and immutable event/notification verification below, supplemented by PostgreSQL transition tests. |
+| Recipient and project-mail delivery | Actual recipient inboxes, once-accepted provider delivery and owner-confirmed project-mail receipt below. |
+| Failure isolation and feature-flag preservation | Real handlers, worker and disposable PostgreSQL across provider failure/lost response/retry; flag-denial ledger snapshots and deployed disabled-preview checks. No production outage or live flag toggle is claimed or required. |
+
+Canon 07's October 11 amendment and rollout section 4 require the expiry
+property, plus separately recorded deployment and real-context evidence. Neither
+requires an uninterrupted natural 24-hour observation. Earlier audit notes
+correctly called that observation unperformed, but incorrectly promoted it into
+a mandatory blocking gate. The controlled deadline tests and actual context
+ceremonies satisfy distinct parts of the approved criterion. No policy or
+acceptance scope is waived, and an elapsed-day PASS is not fabricated.
+
+The bounded independent reconciliation found no remaining unmet operational
+property before the subsequent UI report above.
+The three session/access/client suites passed 48/48 again on October 15;
+`output/audit/a22-closeout-session-checks-2026-10-15.log` retains the result.
+PR #308's exact candidate and post-merge Linux/Windows/static CI, 1875 local
+checks and actual apex navigation/artifact verification remain applicable:
+application code is unchanged by this reconciliation. A-23 and the outstanding
+device/publishing criteria remain open.
+
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Published roster: [PR #295](https://github.com/maysonkiller/ArtSoul-Protocol/pull/295),
 main `2ba480bed7328ff01ce43995e1f107f6f0e93399`.
@@ -392,9 +431,10 @@ after a changed network; it does not claim a measured edge-IP value or natural
 24-hour expiry.
 
 The owner separately reports unclear in-place navigation until refresh and
-verification controls below the main content. Those UX findings are being
-addressed without repeating the accepted factor or network ceremony. A bounded
+verification controls below the main content. Those UX findings were addressed
+in PR #308 without repeating the accepted factor or network ceremony. A bounded
 regression also reproduces the same-wallet notification clearing Staff access
 without reloading it. Source, release and navigation checks belong to the
-current stabilization checkpoint; this record does not imply the new UI is
-already deployed or that every Phase A gate is closed.
+current stabilization checkpoint. Production deployment 7091669545 and actual
+apex navigation/breakpoint checks passed on October 15; this does not close
+natural 24-hour expiry or every Phase A gate.

@@ -145,7 +145,7 @@ Verify all of the following before declaring A8 complete:
 - ordinary and disconnected users never see the Protocol Admin entry;
 - manually adding the entry in browser tools grants no access;
 - an eligible staff wallet sees the entry only after server role confirmation;
-- the admin page exposes no protected data before passkey step-up;
+- the admin page exposes no complaint data before current staff-factor verification;
 - the fixed 24-hour step-up expires and requires re-verification without sliding
   renewal from ordinary activity;
 - another browser/device or a changed trusted client IP requires fresh factor
@@ -166,6 +166,15 @@ Verify all of the following before declaring A8 complete:
   category exists;
 - `REPORT_RESTORED` and the creator's `ARTWORK_RESTORED` notification appear
   only when a resolution actually returned the artwork to public visibility.
+
+Operational properties accepted October 15, 2026 through the reconciliation in
+[`PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md`](../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md).
+Fixed expiry is checked with exact controlled clock boundaries and the compiled
+client deadline; device/network binding also has real owner acceptance. A
+natural 24-hour observation remains unperformed and is not a separately required
+ceremony. This does not authorize beta entry or close unrelated device criteria.
+The subsequently reported successful-verification dialog regression keeps A8's
+UI acceptance open until its bounded repair is released and verified.
 
 ## 5. After controlled-beta observation
 

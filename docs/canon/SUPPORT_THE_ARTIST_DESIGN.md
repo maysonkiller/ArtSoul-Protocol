@@ -39,7 +39,12 @@ A compact `Support the artist` button opens a modal containing:
 
 The anonymous notice must also state that the donor address remains publicly visible on-chain. The `anonymous` flag applies exclusively to the donor's public label inside ArtSoul: ArtSoul donation views must not expose that donor's profile name or address, while the artwork identity, creator identity, and verified recipient remain unchanged and explicit.
 
-Under the button, the artwork page shows one compact line for the largest successful donation:
+October 15 UI amendment (owner's explicit artwork feedback): the largest-support
+summary lives inside the explicitly opened donation-history panel, not as an
+asynchronously inserted line below the public action buttons. History is fetched
+when opened. This supersedes only the earlier inline placement; recipient,
+contract behavior, amounts, anonymity and ranking neutrality are unchanged.
+The history panel shows one compact line for the largest successful donation:
 
 - donor profile name when available, otherwise a shortened address linked to the donor profile;
 - `Anonymous` when the on-site anonymity flag was selected;

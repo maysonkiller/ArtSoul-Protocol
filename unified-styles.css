@@ -2773,6 +2773,16 @@ body.future .gallery-filter-panel {
     box-shadow: 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
 }
 
+.artwork-moderation-dialog {
+    margin: auto;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+}
+
+.artwork-moderation-dialog::backdrop {
+    background: color-mix(in srgb, var(--c-bg) 80%, transparent);
+}
+
 .future .reauction-modal {
     box-shadow: 0 0 28px var(--c-glow), 0 20px 70px color-mix(in srgb, var(--c-bg) 78%, transparent);
 }

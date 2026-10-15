@@ -179,7 +179,7 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
                 if (!current()) return;
                 setEnrollmentCode(''); setCredentials(null);
                 setMessage(enrolling ? 'Passkey saved. Select Verify passkey to continue.' : 'Verified. Your admin session is active for up to 24 hours. Verify again on a new browser or network.');
-                await onAccessChanged();
+                await onAccessChanged({ verified: !enrolling });
             }
         } catch (error) {
             if (!current()) return;

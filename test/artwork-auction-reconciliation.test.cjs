@@ -176,6 +176,18 @@ test('late profile and provenance hydration from an older load cannot overwrite 
   assert.deepEqual(plain(state.provenanceState.events), [{ kind: 'current' }]);
 });
 
+test('a same-artwork refresh retains the hydrated creator while the next profile read is pending', async () => {
+  const pending = deferred(); let reads = 0;
+  const profile = {wallet_address: CREATOR, username: 'Artist', avatar_url: '/artist.png'};
+  const {page: api, state} = page({getArtwork: async () => projection({creator_id: CREATOR}),
+    getProfile: async () => ++reads === 1 ? profile : pending.promise});
+  await api.loadArtwork();
+  assert.equal(state.creatorProfile, profile);
+  const refresh = api.loadArtwork(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.creatorProfile, profile, 'a sparse projection does not replace the resolved avatar');
+  pending.resolve(profile); await refresh;
+});
+
 test('a new auction resets its bid cursor and ignores a late live response from the previous auction', async () => {
   const delayed = deferred();
   const requests = [];

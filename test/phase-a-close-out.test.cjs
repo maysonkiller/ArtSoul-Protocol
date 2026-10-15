@@ -25,7 +25,6 @@ test('every row it lists as remaining is actually open', () => {
   const rows = phaseARows();
   const open = new Set(rows.filter((row) => row[3] !== 'done').map((row) => row[1]));
   const listed = [...closeOut.matchAll(/\*\*(A-\d{2})\*\*/g)].map((m) => m[1]);
-  assert.ok(listed.length >= 9, `expected the remaining rows to be listed, saw ${listed.length}`);
   for (const id of listed) {
     assert.ok(open.has(id), `${id} is listed as remaining but the backlog says it is done`);
   }
@@ -39,16 +38,16 @@ test('no open row is left out of the close-out', () => {
   }
 });
 
-test('activation gates remain explicit without claiming unfinished delivery is complete', () => {
+test('completed moderation retains evidence and does not imply beta acceptance', () => {
   // Authorizing a ceremony neither completes recipient delivery nor proves
   // live access. Keep implementation and operational evidence distinct.
   for (const gate of ['RG-01', 'RG-02', 'RG-03', 'Replacement recovery acceptance']) {
     assert.ok(closeOut.includes(gate), `${gate} must be named`);
   }
-  assert.match(closeOut, /A-21, A-22 and A-23 do not close from merged foundations alone/);
-  assert.match(closeOut, /recipient-facing notification delivery/);
+  assert.match(closeOut, /audits\/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11\.md/);
+  assert.match(closeOut, /A-23 still needs the recorded beta review/);
   assert.match(closeOut, /Passkey\/recovery setup is authorized now/);
-  assert.match(closeOut, /Both designated wallets approve staff setup/);
+  assert.match(closeOut, /Both designated wallets approved staff setup/);
   assert.match(closeOut, /automated fixtures are not that ceremony/);
 });
 

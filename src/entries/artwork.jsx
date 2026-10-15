@@ -14,7 +14,7 @@ import '../../supabase-auth.js';
 const { useState, useEffect, useRef } = React;
 
 
-function useDecodedImage(source, fallback = '', prepare = decodeImage) {
+function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevious = false) {
     const [prepared, setPrepared] = useState({ source: '', url: '', failed: false });
     useEffect(() => {
         let active = true;
@@ -27,11 +27,14 @@ function useDecodedImage(source, fallback = '', prepare = decodeImage) {
         );
         return () => { active = false; };
     }, [source, fallback, prepare]);
-    return prepared.source === source ? prepared : { url: '', failed: false };
+    return prepared.source === source || (keepPrevious && source && prepared.url)
+        ? prepared : { url: '', failed: false };
 }
 
 function OwnershipIdentity({ source, label, name, className, style, nameStyle, isClassic }) {
-    const image = useDecodedImage(source, '/default-avatar.png', decodeAvatar);
+    // This component is keyed by wallet: keep the same person's decoded avatar
+    // visible while a newer profile image is prepared, never across identities.
+    const image = useDecodedImage(source, '/default-avatar.png', decodeAvatar, true);
     return (
         <>
             {image.url ? <img src={image.url} alt={label} className={className} style={style} /> : (
@@ -335,6 +338,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [moderationReason, setModerationReason] = useState('');
             const [moderationBusy, setModerationBusy] = useState(false);
             const [moderationMessage, setModerationMessage] = useState('');
+            const moderationDialogRef = useRef(null);
+            const moderationTriggerRef = useRef(null);
+            const moderationSequenceRef = useRef(0);
             const [walletRenderState, setWalletRenderState] = useState(() => ({
                 settled: window.artsoulWalletStateSettled === true,
                 address: window.artsoulSettledWalletState?.address || window.currentWalletAddress || null,
@@ -616,6 +622,27 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 window.addEventListener('artsoul:wallet-state-changed', syncWalletRenderState);
                 return () => window.removeEventListener('artsoul:wallet-state-changed', syncWalletRenderState);
             }, []);
+
+            useEffect(() => {
+                const invalidate = () => {
+                    moderationSequenceRef.current++;
+                    moderationDialogRef.current?.close();
+                    setModerationAccess(null);
+                    setModerationReason('');
+                    setModerationMessage('');
+                    setModerationBusy(false);
+                };
+                const refresh = () => {
+                    invalidate();
+                    if (window.artsoulWalletStateSettled && window.getCurrentWalletAddress?.()) void loadModerationVisibility(artwork);
+                };
+                refresh();
+                window.addEventListener('artsoul:auth-state-changed', refresh);
+                return () => {
+                    invalidate();
+                    window.removeEventListener('artsoul:auth-state-changed', refresh);
+                };
+            }, [artwork?.chain_id, artwork?.artwork_id, walletRenderState.address, walletRenderState.settled]);
 
             useEffect(() => {
                 if (!isNewAuctionModalOpen) return undefined;
@@ -977,7 +1004,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 const resolvedProfile = profile || (
                     isSameAddress(address, artwork.creator_id || artwork.creator) ? creatorProfile : null
                 );
-                const identityResolved = resolvedProfile || resolvedProfileAddresses.has(address.toLowerCase());
+                const identityResolved = Boolean(resolvedProfile?.avatar_url) || resolvedProfileAddresses.has(address.toLowerCase());
 
                 const roleCardStyle = !isClassic ? {
                     boxShadow: '0 0 15px rgba(var(--c-accent-rgb), 0.2)',
@@ -1422,9 +1449,14 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             async function loadModerationVisibility(projection = artwork, options = {}) {
                 if (!projection?.chain_id || !projection?.artwork_id) return false;
+                const sequence = ++moderationSequenceRef.current;
+                const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
+                const isCurrent = () => sequence === moderationSequenceRef.current &&
+                    wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase();
 
                 if (options.interactive) {
                     const authenticated = await window.ensureAuthenticated?.();
+                    if (!isCurrent()) return false;
                     if (!authenticated) {
                         setModerationMessage('Sign in with your staff wallet to continue.');
                         return false;
@@ -1441,6 +1473,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         credentials: 'include'
                     });
                     const result = await response.json().catch(() => ({}));
+                    if (!isCurrent()) return false;
+                    if (result.access?.canModerate && String(result.access.wallet || '').toLowerCase() !== wallet) {
+                        setModerationAccess(null);
+                        return false;
+                    }
 
                     if (!response.ok) {
                         // A8a: a staff wallet with the passkey flag enabled but no
@@ -1449,6 +1486,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         // so the code lives in result.error (not result.code).
                         if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.error)) {
                             setModerationAccess(null);
+                            if (options.interactive) setModerationMessage('Verify your access in Admin to use moderation tools.');
                             return false;
                         }
                         if (options.interactive) {
@@ -1463,8 +1501,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     });
                     setModerationReason(result.data?.hidden_reason || '');
                     setModerationMessage('');
-                    return true;
+                    return result.access?.canModerate === true;
                 } catch (error) {
+                    if (!isCurrent()) return false;
                     console.warn('Could not load moderation visibility:', error);
                     if (options.interactive) {
                         setModerationMessage('Moderation controls are temporarily unavailable.');
@@ -1475,13 +1514,17 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             async function handleModerationVisibility(hidden) {
                 if (!artwork?.chain_id || !artwork?.artwork_id || moderationBusy) return;
+                const sequence = moderationSequenceRef.current;
+                const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
+                const isCurrent = () => sequence === moderationSequenceRef.current &&
+                    wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase();
                 if (hidden && !moderationReason.trim()) {
                     setModerationMessage('Add a reason before hiding this artwork.');
                     return;
                 }
 
                 const authenticated = await window.ensureAuthenticated?.();
-                if (!authenticated) return;
+                if (!authenticated || !isCurrent()) return;
 
                 setModerationBusy(true);
                 setModerationMessage('');
@@ -1498,6 +1541,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         })
                     });
                     const result = await response.json().catch(() => ({}));
+                    if (!isCurrent()) return;
                     if (!response.ok) {
                         throw new Error(result.message || 'Moderation update failed');
                     }
@@ -1513,10 +1557,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         ? 'Artwork is hidden from public surfaces.'
                         : 'Artwork is visible again where its auction state allows.');
                 } catch (error) {
+                    if (!isCurrent()) return;
                     console.error('Moderation visibility update failed:', error);
                     setModerationMessage(error.message || 'Moderation update failed.');
                 } finally {
-                    setModerationBusy(false);
+                    if (isCurrent()) setModerationBusy(false);
                 }
             }
 
@@ -1828,7 +1873,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         data.creator_value,
                         ''
                     )));
-                    loadModerationVisibility(data);
                     let bidderProfilesPromise = Promise.resolve();
                     if (isV41CompositeId) {
                         // The projection itself is applied synchronously before
@@ -1840,7 +1884,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         setBidActivity([]);
                     }
                     const projectedCreatorAddress = data.creator_id || data.creator || '';
-                    setCreatorProfile(projectedCreatorAddress ? {
+                    setCreatorProfile(current => isSameAddress(current?.wallet_address, projectedCreatorAddress) ? current : projectedCreatorAddress ? {
                         wallet_address: projectedCreatorAddress,
                         username: data.creator_name || '',
                         avatar_url: data.creator_avatar_url || ''
@@ -3471,7 +3515,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             {/* Artwork Info */}
                             <aside className="artwork-page-right">
                                 {moderationAccess?.canModerate && (
-                                    <section className="moderation-panel artwork-mobile-moderation rounded-xl p-5" aria-label="Staff moderation">
+                                    <dialog ref={moderationDialogRef} className="artwork-moderation-dialog reauction-modal"
+                                        aria-label="Staff moderation" onClose={() => moderationTriggerRef.current?.focus()}>
+                                    <section className="moderation-panel artwork-mobile-moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                             <div>
                                                 <h3 className="text-lg font-bold">Staff moderation</h3>
@@ -3480,6 +3526,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             <span className="moderation-state rounded-full px-3 py-1 text-xs font-bold">
                                                 {moderationAccess.hidden ? 'Hidden' : 'Visible'}
                                             </span>
+                                            <button type="button" data-allow-rapid="true" className="btn-secondary"
+                                                onClick={() => moderationDialogRef.current?.close()}>Close</button>
                                         </div>
 
                                         {moderationAccess.hidden ? (
@@ -3526,6 +3574,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             <p className="mt-3 text-sm" role="status">{moderationMessage}</p>
                                         )}
                                     </section>
+                                    </dialog>
                                 )}
 
                                 {/* Ownership Info - Three Roles */}
@@ -3597,7 +3646,19 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 Report
                                             </button>
                                         )}
+                                        {moderationAccess?.canModerate && (
+                                            <button type="button" ref={moderationTriggerRef} data-allow-rapid="true"
+                                                disabled={moderationBusy}
+                                                className="btn-secondary artwork-page-compact-action"
+                                                onClick={async () => {
+                                                    if (moderationBusy) return;
+                                                    if (await loadModerationVisibility(artwork, { interactive: true })) {
+                                                        moderationDialogRef.current?.showModal();
+                                                    }
+                                                }}>Moderation tools</button>
+                                        )}
                                     </div>
+                                    {moderationMessage && !moderationAccess?.canModerate && <p role="status">{moderationMessage} <a href="/admin">Open Admin</a></p>}
                                     {cardActionNotice && <p role="status">{cardActionNotice}</p>}
                                     {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
                                         <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
