@@ -16,8 +16,11 @@ today. A separate founder-wallet passkey prompt covered the authority workflow.
 The bounded UI fix keeps paired wallet approvals accessible without automatically
 opening complaint verification, while preserving its enforcement. The supplied
 desktop video also confirms a support-history button displacement, corrected
-locally by keeping both actions before the asynchronously loaded summary.
-Focused checks and build pass; release and real factor enrollment remain open.
+by keeping both actions before the asynchronously loaded summary. Both fixes are
+published through PR #306 / `0032e94f`, with 1861 passing local checks, green
+candidate/post-merge CI and matching preview/apex artifacts. Actual apex Chrome
+confirms accessible authority controls with the queue locked, and the support
+buttons together above the summary. Real renewed factor enrollment remains open.
 The owner chose to omit the blocked local-browser fixture. The
 [checkpoint](audits/STABILIZATION_CHECKPOINT.md) records the exact evidence limits.
 
