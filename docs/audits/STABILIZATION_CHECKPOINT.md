@@ -33,9 +33,36 @@ October 15 Admin navigation follow-up (A-22; Canon 07 / 16):
   passes 11 route and 174 utility checks. A bounded independent review found no permission or dialog
   lifetime regression. Local browser testing remains owner-waived; no native
   ceremony or new phone acceptance is inferred from rendered component tests.
-- Exactly next step: finish the full checks and publish the bounded navigation
-  fix after candidate CI and preview verification, then inspect the actual
-  apex navigation without changing roles or resetting the owner's factors.
+- Published through [PR #308](https://github.com/maysonkiller/ArtSoul-Protocol/pull/308):
+  candidate `41f2f393c57b6384eb3a5c471d57aeb36987bdbf`, merge
+  `ca77eb7d60f580e4f963027001d29404364b2d9a` at 11:46:38 UTC. Production
+  deployment 7091669545 succeeded at 11:47:05 UTC. Candidate CI 38729321352
+  and post-merge CI 38729753387 pass all static, Linux and Windows jobs,
+  including contract tests. Preview deployment 7091593421 and the apex each
+  match 199 assets across six pages. Anonymous complaints, staff directory and
+  notification requests remain denied; apex Donate/Report/email remain enabled
+  and Base Sepolia indexer lag is zero. No environment flags changed.
+- Actual apex observation at 11:49-11:50 UTC confirms the new Admin asset,
+  top wallet/role/status/actions, Staff access selection and return to Review
+  queue, and the authorized staff form remaining mounted while hidden. At
+  390x844 the top controls fit and no horizontal overflow occurs; the viewport
+  was restored afterward. This is desktop browser breakpoint evidence, not a
+  new native phone ceremony. No factor, role, complaint or approval was changed.
+  No setup secret or complaint content was captured. The existing owner Admin
+  tab remains open on Review queue.
+- Evidence: `output/audit/admin-navigation-{candidate,postmerge}-ci-2026-10-15.json`,
+  `admin-navigation-{preview,apex}-artifact-2026-10-15.json`, and the
+  `admin-navigation-{desktop,responsive}-2026-10-15` JSON/PNG pairs. The reviewed
+  published tree is integrated into this same branch at `e7ea814`; the release
+  evidence follow-up changes docs only. Four historical untracked paths remain
+  untouched. The bounded reviewer is completed; no child agent is active.
+- UI interpretation: highlight the current section, keep one top sign-in action,
+  and preserve the authorized Staff access form between navigation tabs. These
+  are Canon 07/16 presentation changes, not new permissions or mechanics.
+- Exactly next step: reconcile A-22's remaining natural 24-hour expiry criterion
+  against a genuinely elapsed session; do not accelerate time or repeat the
+  accepted network/factor setup. Remaining phone publishing/pending-state and
+  beta-entry evidence stays open in the close-out. Phase A is not declared done.
 
 October 15 real factor completion and authenticator QR follow-up (Canon 07 / 16):
 

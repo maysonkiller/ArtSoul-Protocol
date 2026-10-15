@@ -392,9 +392,10 @@ after a changed network; it does not claim a measured edge-IP value or natural
 24-hour expiry.
 
 The owner separately reports unclear in-place navigation until refresh and
-verification controls below the main content. Those UX findings are being
-addressed without repeating the accepted factor or network ceremony. A bounded
+verification controls below the main content. Those UX findings were addressed
+in PR #308 without repeating the accepted factor or network ceremony. A bounded
 regression also reproduces the same-wallet notification clearing Staff access
 without reloading it. Source, release and navigation checks belong to the
-current stabilization checkpoint; this record does not imply the new UI is
-already deployed or that every Phase A gate is closed.
+current stabilization checkpoint. Production deployment 7091669545 and actual
+apex navigation/breakpoint checks passed on October 15; this does not close
+natural 24-hour expiry or every Phase A gate.

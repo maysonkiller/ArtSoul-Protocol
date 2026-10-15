@@ -12,8 +12,10 @@ Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
 
 October 15 network follow-up: the owner confirms real changed-network access
 required verification. This closes that acceptance gap. The separate feedback
-about unclear guidance until refresh and misplaced sign-in controls is being
-fixed under A-22. Natural 24-hour expiry, remaining connected-phone criteria
+about unclear guidance until refresh and misplaced sign-in controls is addressed
+under A-22 in published PR #308. Top controls and Staff access navigation
+are verified on the actual apex, including a 390-pixel desktop breakpoint.
+Natural 24-hour expiry, remaining connected-phone criteria
 and the beta decision remain open; do not ask for the same network ceremony
 again merely to demonstrate the navigation update.
 
