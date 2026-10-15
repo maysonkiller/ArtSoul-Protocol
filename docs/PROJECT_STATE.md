@@ -1,11 +1,12 @@
 # ArtSoul Project State
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
-and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-14. Implementation
-uses `C:\Projects\ArtSoul`; profile isolation release `12f3e38` is deployed.
+and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-15. Implementation
+uses `C:\Projects\ArtSoul`; Admin navigation release `ca77eb7` is deployed.
 Report/Donate and the protected review queue are enabled; A-21 intake is accepted
-from the October 11 live evidence. A-22/A8 and the beta decision retain their
-separate remaining gates. Older dates and deployment SHAs below remain
+from the October 11 live evidence. A-22/A8 are accepted by the October 15
+evidence reconciliation. Remaining phone/publishing criteria and the beta
+decision stay separate. Older dates and deployment SHAs below remain
 historical evidence; they are not the current release.
 
 Audit date: 2026-07-15
@@ -118,7 +119,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 68 `done`, 15 `in progress`, 0 `planned` across A-01 to A-83
+current position is 69 `done`, 14 `in progress`, 0 `planned` across A-01 to A-83
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that

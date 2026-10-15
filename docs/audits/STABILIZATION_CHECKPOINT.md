@@ -3,6 +3,42 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 15 A-22 / A8 closure (Canon 07 / Bible 11 and 17):
+
+- Continue from `4321663`, published application `ca77eb7` / PR #308, in the
+  same checkout. Tracked source is unchanged; four historical untracked paths
+  remain untouched. Reuse the exact-source passing baseline and release evidence.
+- Independent bounded reconciliation found that a natural 24-hour wait is not
+  required by canon 07, the rollout or migration runbook. Earlier audit notes
+  promoted an unperformed observation into an extra gate. Fixed expiry and
+  non-renewal have exact-boundary backend/client and compiled-browser evidence;
+  real native setup/replacement, different-device entry and changed-network
+  verification are separately accepted. No natural wait is claimed or waived.
+- A-22 / canonical A8 are accepted by mapping the retained real complaint,
+  recipient/project-mail, concurrency, restoration, failure-isolation and
+  flag-preservation evidence. See the October 15 reconciliation at the top of
+  `PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md`. The full Bible's section 11 now
+  explicitly consolidates the already-approved October 8/11/13 policy so its
+  historical October 3 Safe/bootstrap paragraphs cannot be read as current.
+  This is a documentation correction, not a new role or authentication policy.
+- Recheck: `node --test test/moderation-session-context.test.mjs
+  test/protocol-admin-review.test.cjs test/admin-session-boundary.test.cjs`
+  passes 48/48 with no skips. Log:
+  `output/audit/a22-closeout-session-checks-2026-10-15.log`. No full-suite rerun
+  is needed for unchanged application code; exact-source CI from PR #308 remains
+  valid. The six document/count checks pass after updating their stale A-22
+  assertion and removing an arbitrary requirement to keep nine rows open.
+- GitHub has zero open issues at this observation. This does not prove absent
+  device defects or authorize beta entry. A-23 and unrecorded publishing/phone
+  criteria remain open. The owner reports a remaining iPhone visual problem
+  after the October 15 repair; its page/action/symptom clarification is pending.
+- A-78 comparison found adapter collision tests, deployed artifacts and real
+  operator transactions, but no recorded native browser wallet-call/receipt
+  pairing for the affected namespaces. Reuse an existing suitable token/auction
+  for that check; do not start a new 24-hour auction just to collect evidence.
+- Exactly next step: reproduce the owner's clarified iPhone symptom and repair
+  its cause, while retaining the existing independent acceptance results.
+
 October 15 Admin navigation follow-up (A-22; Canon 07 / 16):
 
 - Continue from `bafb4ec`, published application `f84557be` / PR #307, in the

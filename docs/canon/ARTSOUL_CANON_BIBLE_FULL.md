@@ -197,6 +197,25 @@ Moderation is complaint-driven and reviewable:
 - Critical or irreversible actions are gated by multisig.
 - Social logins alone are not sufficient for critical moderator actions.
 
+Current application authority (founder amendments October 8, 11 and 13, 2026;
+full rules in `07_ADMIN_MODERATION_CANON.md`): role changes, authority rotation
+and factor setup/recovery require gasless signatures from BOTH current authority
+wallets. The current pair approves its replacement. This application authority
+does not use a new Safe or change on-chain contract custody. Staff sign in with
+a passkey or authenticator app; wallet login alone does not grant complaint
+access. Verified access has a fixed maximum of 24 hours without sliding renewal,
+and a different browser session or trusted network context requires verification
+again. Setup permission remains 15 minutes. The verified Team role and either
+current authority may see the staff directory; other admins/moderators may not
+enumerate colleagues. Ordinary complaint decisions remain with assigned staff;
+AI may recommend a decision but does not autonomously grant roles.
+
+The October 3 paragraphs below retain the earlier policy history. Their
+two-passkey/separate-bootstrap/Safe-only application-recovery requirements are
+superseded by the explicit October 8 amendment above. A8's implementation and
+acceptance are recorded separately in the implementation backlog and dated
+moderation evidence; this consolidation introduces no new authority mechanism.
+
 Founder scheduling amendment, 2026-10-03: perform real founder passkey enrollment
 and the associated operator recovery ceremony now, superseding the September 29
 deferral. Preserve the two independent passkeys, audited bootstrap and ordered

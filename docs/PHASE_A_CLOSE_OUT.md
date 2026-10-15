@@ -8,7 +8,19 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
+
+**October 15 A-22 / A8 accepted:** the [dated evidence reconciliation](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
+maps every required moderation property to existing real journeys, exact-boundary
+session tests, compiled client checks and deployed artifacts. Waiting through a
+natural 24-hour session was an extra restriction introduced by earlier audit
+notes, not an approved ceremony. That observation remains unperformed; it is
+not falsely marked passed. Fixed expiry, non-renewal, re-verification and actual
+device/network acceptance are evidenced. No policy, role or data changed.
+The remaining work is the device/publishing criteria and A-23's beta review.
+
+The dated progress notes below preserve earlier observations. Their remaining
+A8/natural-wait statements are superseded by the acceptance above.
 
 October 15 network follow-up: the owner confirms real changed-network access
 required verification. This closes that acceptance gap. The separate feedback
@@ -157,7 +169,7 @@ tab subsequently accepted the owner's existing passkey and served the protected
 queue. No reset or paired approvals were repeated. Exact 24-hour wall-clock
 expiry and changed-IP native acceptance remain separate from automated tests.
 
-Phase A remains **NO-GO** until the remaining A8/A10 and connected-device
+Phase A remains **NO-GO** until the remaining A10 and connected-device
 acceptance is evidenced. A-39 is now accepted: real paired setup/replacement,
 passkey entry, expiry/reverification and protected queue access passed. Both
 designated wallets approve staff setup; automated fixtures are not that ceremony.
@@ -222,7 +234,7 @@ operationally safe reporting/moderation path before a beta GO.
 | Gate | What is missing | Why it cannot be delegated |
 | --- | --- | --- |
 | **RG-01** apex-origin acceptance | Desktop and real iOS runs with distinct wallets/profiles, including SIWE and OAuth. The [dated acceptance form](testnet/RG01_APEX_ORIGIN_ACCEPTANCE_2026-09-04.md) permits one person to complete all blocks and record that honestly | Wallet sessions and SIWE are origin-scoped and need real devices and real wallets; Android is owner-waived / not tested under the October 11 amendment |
-| **RG-03** access acceptance | Accepted for A-39 under the October 8 amendment; remaining operational acceptance belongs to A-22/A8 | Both designated wallets approve staff setup and replacement; the staff member completes native verification |
+| **RG-03** access acceptance | Accepted for A-39 under the October 8 amendment; A-22/A8 operational acceptance completed October 15 | Both designated wallets approved staff setup and replacement; the staff member completed native verification. Do not repeat completed ceremonies |
 | **Replacement recovery acceptance** | Owner reset, replacement enrollment and entry observed October 8; old-factor/version rejection verified in SQL/API tests. Historical Safe evidence is retained, not replayed | The actual owner approval and replacement are recorded separately; automated fixtures are not that ceremony |
 
 **RG-02 is not on this list, and was.** `RESOURCE_GATED_WORK.md` blocks RG-02
@@ -238,11 +250,10 @@ migration steps and their backup discipline are in
 Moderation Activation**, and the surrounding rollout in
 [`runbooks/A8_MODERATION_ROLLOUT.md`](runbooks/A8_MODERATION_ROLLOUT.md).
 
-**A-21, A-22 and A-23 do not close from merged foundations alone.** A-21 now has
-real intake acceptance. A-22 has real recipient-facing notification delivery
-following staff decisions, but its remaining A8 operational boundaries stay open.
-A-23 needs the recorded beta review and remains NO-GO while its required safe
-operating path or evidence is missing, or a P1 issue remains open.
+**A-21 and A-22 are accepted from implementation and operating evidence.**
+A-23 still needs the recorded beta review and remains NO-GO while a required
+device/publishing criterion lacks evidence or a P1 issue remains open. Existing
+operator and controlled-clock tests are labelled as such, not phone ceremonies.
 
 ## 2. Implementation and acceptance still open
 
