@@ -101,11 +101,13 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
     const wallet = String(walletAddress || '').toLowerCase();
     const activeWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
     const dialogRef = useRef(null), closeRef = useRef(null), generation = useRef(0), busyRef = useRef(false);
+    const nativeCancel = useRef(null);
     const [enrollmentCode, setEnrollmentCode] = useState('');
     const [credentials, setCredentials] = useState(null);
     const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+    function cancelNative() { const cancel = nativeCancel.current; nativeCancel.current = null; cancel?.(); }
     function clear() {
-        generation.current++; busyRef.current = false;
+        generation.current++; cancelNative(); busyRef.current = false;
         setEnrollmentCode(''); setCredentials(null); setMessage(''); setBusy(false);
     }
     function close() { clear(); onClose(); }
@@ -120,7 +122,7 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', invalidate);
         return () => {
-            generation.current++;
+            generation.current++; cancelNative();
             dialogRef.current?.close();
             window.removeEventListener('artsoul:wallet-state-changed', invalidate);
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
@@ -164,9 +166,14 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
                 }
                 const options = await post(enrolling ? 'passkey-register-options' : 'passkey-auth-options', enrolling ? approval : undefined);
                 if (!current()) return;
-                const response = enrolling
-                    ? await browser.startRegistration({ optionsJSON: options.options })
-                    : await browser.startAuthentication({ optionsJSON: options.options });
+                const cancel = () => browser.WebAuthnAbortService.cancelCeremony();
+                nativeCancel.current = cancel;
+                let response;
+                try {
+                    response = enrolling
+                        ? await browser.startRegistration({ optionsJSON: options.options })
+                        : await browser.startAuthentication({ optionsJSON: options.options });
+                } finally { if (nativeCancel.current === cancel) nativeCancel.current = null; }
                 if (!current()) return;
                 await post(enrolling ? 'passkey-register-verify' : 'passkey-auth-verify', enrolling ? { ...approval, response } : { response });
                 if (!current()) return;
@@ -183,7 +190,7 @@ export function StaffPasskeyDialog({ walletAddress, sessionActive, api, onClose,
                 ENROLLMENT_GRANT_REQUIRED: 'This enrollment code is invalid or expired. Use a new code.',
                 STEP_UP_REQUIRED: 'Verify your passkey before managing saved passkeys.'
             };
-            setMessage(messages[error.code] || (error.name === 'NotAllowedError' ? 'Verification was cancelled. You can try again.' : 'The passkey request could not be completed. Check your code or try again.'));
+            setMessage(messages[error.code] || (error.name === 'NotAllowedError' ? 'The device did not complete the passkey request. It may have been cancelled or timed out. Try again and complete your device or password manager prompt.' : 'The passkey request could not be completed. Check your code or try again.'));
             if (error.status === 401) await onAccessChanged();
             else if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(error.code)) onStepUpRequired();
         } finally {

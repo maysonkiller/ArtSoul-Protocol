@@ -26,6 +26,22 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     execFileSync('docker',['exec','-i',container,'psql','-U','postgres','-d','artsoul','-v','ON_ERROR_STOP=1','-f','-'],
       {input:fs.readFileSync(path.join(__dirname,'../sql/migrations',name)),stdio:['pipe','ignore','pipe'],timeout:30000});
   }
+  function repairCrypto(execute=sql,database='artsoul') {
+    const functions="FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname IN ('a8g_begin_totp_setup','a8e_begin_totp_attempt','a8e_complete_totp_attempt')";
+    const policy=()=>JSON.parse(execute("SELECT json_agg(json_build_object('oid',oid,'name',proname,'owner',proowner,'security_definer',prosecdef,'config',proconfig,'acl',proacl::TEXT) ORDER BY proname) "+functions));
+    const definitions=()=>execute('SELECT json_agg(pg_get_functiondef(oid) ORDER BY proname) '+functions);
+    const before=policy();
+    assert.equal(before.length,3);
+    const apply=()=>execFileSync('docker',['exec','-i',container,'psql','-U','postgres','-d',database,'-v','ON_ERROR_STOP=1','-f','-'],
+      {input:fs.readFileSync(path.join(__dirname,'../sql/migrations/a8h_staff_factor_pgcrypto_resolution.sql')),stdio:['pipe','ignore','pipe'],timeout:30000});
+    apply();
+    assert.deepEqual(policy(),before);
+    const repaired=definitions();
+    apply();
+    assert.deepEqual(policy(),before);
+    assert.equal(definitions(),repaired,'reapplying the repair leaves the same function bodies');
+  }
+  await t.test('public-schema crypto repair preserves function identity, search paths and privileges',()=>repairCrypto());
   const {Wallet}=await import('ethers');
   const {buildAuthorityApprovalMessage,verifyAuthorityApprovals}=await import('../src/api/moderation-dual-wallet.js');
   const signers=[Wallet.createRandom(),Wallet.createRandom()].sort((a,b)=>a.address.toLowerCase().localeCompare(b.address.toLowerCase()));
@@ -657,5 +673,56 @@ test('A8f atomically consumes reviewed two-wallet application approvals',{skip:a
     assert.equal(sql(`SELECT consumed_at IS NOT NULL FROM artsoul_staff_totp_attempts WHERE id=${q(attempts[0])}`),'t');
     assert.equal(setup().consumed_at,null);
     assert.equal((await factorCall('totp-verify',{attemptId:attempts[0],code:calculateTotp(prepared.secret,Math.floor(Date.now()/1000))})).statusCode,403);
+  });
+  await t.test('authenticator setup and login work when pgcrypto was installed in extensions before the migrations',async()=>{
+    const database='artsoul_extensions';
+    sql(`CREATE DATABASE ${database}`);
+    const extensionSql=query=>execFileSync('docker',
+      ['exec',container,'psql','-U','postgres','-d',database,'-v','ON_ERROR_STOP=1','-qAt','-c',query],
+      {encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:20000}).trim();
+    extensionSql('CREATE SCHEMA extensions;CREATE EXTENSION pgcrypto WITH SCHEMA extensions;');
+    for(const name of ['phase18_artwork_moderation_visibility.sql','a8a_moderation_passkey_foundation.sql','a8d_moderation_safe_recovery.sql','a8e_moderation_totp_persistence.sql','a8f_moderation_dual_wallet_authority.sql','a8g_staff_factor_setup.sql']) {
+      execFileSync('docker',['exec','-i',container,'psql','-U','postgres','-d',database,'-v','ON_ERROR_STOP=1','-f','-'],
+        {input:fs.readFileSync(path.join(__dirname,'../sql/migrations',name)),stdio:['pipe','ignore','pipe'],timeout:30000});
+    }
+    assert.equal(extensionSql("SELECT to_regprocedure('public.gen_random_bytes(integer)') IS NULL AND to_regprocedure('extensions.gen_random_bytes(integer)') IS NOT NULL"),'t');
+    extensionSql(`INSERT INTO artsoul_staff_authority_policy(version,origin,chain_id,wallet_a,wallet_b)
+      VALUES(1,'https://artsoulprotocol.com',84532,${q(addresses[0])},${q(addresses[1])});
+      INSERT INTO artsoul_staff_totp_policy(max_attempts,window_seconds,attempt_lifetime_seconds) VALUES(5,300,120);`);
+    const proposal=JSON.parse(extensionSql(requestSql('grant_role',addresses[0],'team')));
+    const signatures=await Promise.all(signers.map(wallet=>wallet.signMessage(buildAuthorityApprovalMessage(proposal))));
+    const approval=verifyAuthorityApprovals(proposal,signatures,{
+      origin:'https://artsoulprotocol.com',chainId:84532,version:'1',authorities:addresses
+    });
+    assert.equal(extensionSql(completeSql(proposal,approval)),'OK');
+    const permission=JSON.parse(extensionSql(`SELECT row_to_json(p) FROM artsoul_staff_setup_permissions p WHERE target_wallet=${q(target)}`));
+    const roleBefore=extensionSql(`SELECT row_to_json(r) FROM artsoul_staff_roles r WHERE wallet_address=${q(target)}`);
+    repairCrypto(extensionSql,database);
+    assert.equal(extensionSql(`SELECT row_to_json(r) FROM artsoul_staff_roles r WHERE wallet_address=${q(target)}`),roleBefore);
+    assert.deepEqual(JSON.parse(extensionSql(`SELECT row_to_json(p) FROM artsoul_staff_setup_permissions p WHERE target_wallet=${q(target)}`)),permission);
+    const factor=totpSetup(permission);
+    const prepared=JSON.parse(extensionSql('SET ROLE service_role;'+factor.query));
+    assert.equal(prepared.id,factor.id);
+    assert.equal(prepared.wallet_address,target);
+    assert.equal(prepared.activated_at,null);
+    assert.equal(totpCrypto.decryptTotpSecret(prepared.encrypted_secret,setupKey,{wallet:target,factorId:factor.id,keyVersion:1}),factor.secret);
+    const resumed=JSON.parse(extensionSql('SET ROLE service_role;'+totpSetup(permission).query));
+    assert.equal(resumed.id,factor.id);
+    assert.equal(extensionSql('SELECT count(*) FROM artsoul_staff_totp_factors'),'1');
+    assert.equal(extensionSql('SELECT consumed_at IS NULL FROM artsoul_staff_setup_permissions'),'t');
+    const begin=purpose=>{
+      const [result,id]=extensionSql(`SET ROLE service_role;SELECT result,attempt_id FROM a8e_begin_totp_attempt(${q(target)},${q(factor.id)},${q(purpose)})`).split('|');
+      assert.equal(result,'OK');
+      assert(id);
+      return id;
+    };
+    // Adjacent accepted steps exercise both RPC paths without a 30-second wait.
+    // The public-schema route case above also verifies actual six-digit codes.
+    const complete=(attempt,offset)=>extensionSql(`SET ROLE service_role;SELECT a8e_complete_totp_attempt(${q(target)},${q(attempt)},floor(extract(epoch FROM clock_timestamp())/30)::BIGINT+${offset})`);
+    assert.equal(complete(begin('enrollment'),0),'OK');
+    assert.equal(extensionSql('SELECT consumed_at IS NOT NULL AND factor_type=\'totp\' FROM artsoul_staff_setup_permissions'),'t');
+    assert.equal(complete(begin('authentication'),1),'OK');
+    assert.equal(extensionSql('SELECT count(*) FROM artsoul_staff_totp_attempts WHERE consumed_at IS NOT NULL'),'2');
+    assert.equal(extensionSql("SELECT count(*) FROM artsoul_staff_auth_events WHERE event_type IN ('totp_enrolled','totp_auth_success')"),'2');
   });
 });
