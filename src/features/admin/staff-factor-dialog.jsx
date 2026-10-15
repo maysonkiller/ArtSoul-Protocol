@@ -130,6 +130,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === event.currentTarget) close(); }}>
         <div className="protocol-admin-passkey-content">
             <header><h2 id="staffFactorTitle">Verify admin access</h2><button ref={closeButton} type="button" onClick={close}>Close</button></header>
+            <p>Staff wallet: {wallet.slice(0, 6)}...{wallet.slice(-4)}</p>
             <p>Use your authenticator app or a saved passkey. Your wallet identifies your staff account.</p>
             {sessionActive && <p role="status">Admin verification is active for up to 24 hours. Verify again on a new browser or network.</p>}
             {status?.passkeyAvailable && <button type="button" disabled={busy} onClick={() => passkey(false)}>Verify passkey</button>}

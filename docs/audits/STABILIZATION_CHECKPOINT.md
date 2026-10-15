@@ -3,6 +3,40 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 15 Admin navigation follow-up (A-22; Canon 07 / 16):
+
+- Continue from `bafb4ec`, published application `f84557be` / PR #307, in the
+  same checkout. The owner confirms that the real network-change verification
+  worked, but the next action was unclear until a page refresh. Record the
+  access requirement as owner-accepted; immediate in-place guidance is a
+  separate reproduced UI issue, not a new failed factor enrollment. Natural
+  24-hour expiry remains unobserved.
+- A same-wallet state event was ignored by Admin but unconditionally cleared
+  Staff access, including its roster and prepared approval. The child now
+  preserves an unchanged settled wallet/authentication pair. Actual identity,
+  auth, unsettled-state and lifetime boundaries still clear it and fence late
+  responses. No role, request, signature or factor is changed by this fix.
+- Admin now has one stable header with the connected wallet, readable role,
+  access state and sign-in/refresh controls. Verification stays in one keyed
+  position before the body. Staff access/Team directory has its own selected
+  navigation entry; its authorized form stays mounted across section switches.
+  Non-ready states never render the complaint sections. Access loss brings the
+  guidance into view; protected data is removed immediately, without fading.
+- Optional NetworkInformation changes reuse server revalidation; offline locks
+  complaints and online resumes checks. This adds no polling and cannot detect
+  every silent IP change without a browser event. Foreground and explicit
+  refresh remain available. Primary-button specificity is corrected; theme
+  variables and reduced-motion behavior are retained.
+- Regression evidence: old-source navigation/session tests fail 6 cases, and
+  old StaffAuthority fails 2 cases. The focused current suite passes 47/47;
+  the full application suite passes 1875/1875 with no skips. The final build
+  passes 11 route and 174 utility checks. A bounded independent review found no permission or dialog
+  lifetime regression. Local browser testing remains owner-waived; no native
+  ceremony or new phone acceptance is inferred from rendered component tests.
+- Exactly next step: finish the full checks and publish the bounded navigation
+  fix after candidate CI and preview verification, then inspect the actual
+  apex navigation without changing roles or resetting the owner's factors.
+
 October 15 real factor completion and authenticator QR follow-up (Canon 07 / 16):
 
 - Continue from `4ad63d0`, published application `0032e94f` / PR #306, in the

@@ -10,6 +10,13 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
 
+October 15 network follow-up: the owner confirms real changed-network access
+required verification. This closes that acceptance gap. The separate feedback
+about unclear guidance until refresh and misplaced sign-in controls is being
+fixed under A-22. Natural 24-hour expiry, remaining connected-phone criteria
+and the beta decision remain open; do not ask for the same network ceremony
+again merely to demonstrate the navigation update.
+
 October 15 factor acceptance update: the owner completed renewed setup. Current
 read-only records confirm an activated authenticator on the second authority and
 a newly enrolled/authenticated passkey on the primary authority, bound to their

@@ -89,6 +89,7 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged, readOnly =
         } finally { if (current()) { busyRef.current = false; setBusy(false); } }
     }
     useEffect(() => {
+        const authenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
         loadRoster();
         const saved = readOnly ? null : savedApproval();
         if (saved) run(async current => {
@@ -99,12 +100,17 @@ export function StaffAuthority({ walletAddress, api, onAccessChanged, readOnly =
             epoch.current++; rosterEpoch.current++; busyRef.current = false;
             setRequest(null); setSignatures([]); setBusy(false); setRoster(null); setRosterBusy(false); setRosterError('');
         };
-        window.addEventListener('artsoul:wallet-state-changed', invalidate);
+        const walletChanged = () => {
+            if (window.artsoulWalletStateSettled === true && currentWallet() === wallet &&
+                String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase() === authenticated) return;
+            invalidate();
+        };
+        window.addEventListener('artsoul:wallet-state-changed', walletChanged);
         window.addEventListener('artsoul:auth-state-changed', invalidate);
         window.addEventListener('pagehide', invalidate);
         return () => {
             epoch.current++; rosterEpoch.current++;
-            window.removeEventListener('artsoul:wallet-state-changed', invalidate);
+            window.removeEventListener('artsoul:wallet-state-changed', walletChanged);
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
             window.removeEventListener('pagehide', invalidate);
         };

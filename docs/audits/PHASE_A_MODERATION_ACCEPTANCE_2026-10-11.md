@@ -379,3 +379,22 @@ claim native scanning of the newly requested QR presentation, a natural 24-hour
 expiry or an actual trusted-IP transition. The already-working methods must not
 be reset merely to test a presentation improvement. Private timestamped
 `staff-setup-progress-*` evidence contains only role/request/factor metadata.
+
+## October 15 network-change acceptance and navigation feedback
+
+The owner confirms the requested real desktop network-change check worked.
+The agent's read-only observation at 11:27:18 UTC found no queue section,
+report cards or protected tabs, with verification open and no active-verification
+copy. No IP address, session cookie, complaint content or factor value was read.
+Evidence: `output/audit/staff-network-observation-2026-10-15.json`, supplemented
+by the owner's subsequent confirmation. This accepts the required verification
+after a changed network; it does not claim a measured edge-IP value or natural
+24-hour expiry.
+
+The owner separately reports unclear in-place navigation until refresh and
+verification controls below the main content. Those UX findings are being
+addressed without repeating the accepted factor or network ceremony. A bounded
+regression also reproduces the same-wallet notification clearing Staff access
+without reloading it. Source, release and navigation checks belong to the
+current stabilization checkpoint; this record does not imply the new UI is
+already deployed or that every Phase A gate is closed.
