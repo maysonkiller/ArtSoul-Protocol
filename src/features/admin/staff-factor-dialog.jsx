@@ -6,11 +6,13 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
     const wallet = String(walletAddress || '').toLowerCase();
     const currentWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
     const dialog = useRef(null), closeButton = useRef(null), epoch = useRef(0), busyRef = useRef(false);
+    const nativeCancel = useRef(null);
     const [status, setStatus] = useState(null), [setup, setSetup] = useState(null), [code, setCode] = useState('');
     const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
     const post = (route, body) => api(route, { method: 'POST', body: JSON.stringify({ ...body, expectedWallet: wallet }) });
     const factor = (operation, body) => post('factor-setup', { operation, ...body });
-    function clear() { epoch.current++; busyRef.current = false; setSetup(null); setCode(''); setStatus(null); setBusy(false); }
+    function cancelNative() { const cancel = nativeCancel.current; nativeCancel.current = null; cancel?.(); }
+    function clear() { epoch.current++; cancelNative(); busyRef.current = false; setSetup(null); setCode(''); setStatus(null); setBusy(false); }
     function close() { clear(); onClose(); }
     async function run(work) {
         if (busyRef.current || currentWallet() !== wallet) return;
@@ -30,7 +32,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
                 STAFF_AUTHORIZATION_CHANGED: 'Staff access changed. Close this window and check access again.',
                 TOTP_NOT_CONFIGURED: 'Authenticator app setup is not available yet. You can use a passkey.'
             };
-            setMessage(messages[error.code] || (error.name === 'NotAllowedError' ? 'Verification was cancelled. You can try again.' : 'Verification could not be completed. Try again or ask an administrator to check access.'));
+            setMessage(messages[error.code] || (error.name === 'NotAllowedError' ? 'The device did not complete the passkey request. It may have been cancelled or timed out. Try again and complete your device or password manager prompt.' : 'Verification could not be completed. Try again or ask an administrator to check access.'));
             if (['SETUP_PERMISSION_REQUIRED', 'SETUP_PERMISSION_INVALID', 'STAFF_AUTHORIZATION_CHANGED'].includes(error.code)) { setSetup(null); setStatus(null); }
         } finally { if (current()) { busyRef.current = false; setBusy(false); } }
     }
@@ -49,7 +51,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         window.addEventListener('storage', storage);
         window.addEventListener('pagehide', invalidate);
         return () => {
-            epoch.current++; dialog.current?.close();
+            epoch.current++; cancelNative(); dialog.current?.close();
             window.removeEventListener('artsoul:wallet-state-changed', invalidate);
             window.removeEventListener('artsoul:auth-state-changed', invalidate);
             window.removeEventListener('storage', storage);
@@ -60,7 +62,7 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
     useEffect(() => {
         if (!status?.setup) return;
         const timer = setTimeout(() => {
-            epoch.current++; busyRef.current = false; setBusy(false); setSetup(null); setCode(''); setStatus(null);
+            epoch.current++; cancelNative(); busyRef.current = false; setBusy(false); setSetup(null); setCode(''); setStatus(null);
             setMessage('Setup approval expired. Both authority wallets must approve a new setup.');
         }, Math.max(0, Date.parse(status.setup.expiresAt) - Date.now()));
         return () => clearTimeout(timer);
@@ -71,7 +73,12 @@ export function StaffFactorDialog({ walletAddress, api, onClose, onAccessChanged
         if (!current()) return;
         const options = await post(enrolling ? 'passkey-register-options' : 'passkey-auth-options', approval);
         if (!current()) return;
-        const response = enrolling ? await browser.startRegistration({ optionsJSON: options.options }) : await browser.startAuthentication({ optionsJSON: options.options });
+        const cancel = () => browser.WebAuthnAbortService.cancelCeremony();
+        nativeCancel.current = cancel;
+        let response;
+        try {
+            response = enrolling ? await browser.startRegistration({ optionsJSON: options.options }) : await browser.startAuthentication({ optionsJSON: options.options });
+        } finally { if (nativeCancel.current === cancel) nativeCancel.current = null; }
         if (!current()) return;
         await post(enrolling ? 'passkey-register-verify' : 'passkey-auth-verify', { ...approval, response });
         if (!current()) return;

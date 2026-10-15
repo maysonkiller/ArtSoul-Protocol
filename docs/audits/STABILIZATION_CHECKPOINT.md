@@ -1,7 +1,62 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-14. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 15 authenticator setup repair (Canon 07 / Bible 11):
+
+- Continued from `d05c7d5` in the same workspace. PR #304 is published as
+  `0de0fda1736a54840c026c3dee602bda96f5a131`: deployment 7053181007 succeeded
+  October 14 at 00:06:20 UTC, candidate CI 38487741580 and post-merge CI
+  38488177681 passed. Preview and apex matched 53 assets across six pages.
+  The avatar correction is published, not newly accepted on a native phone;
+  unspecified artwork flashing remains open.
+- The owner's actual authenticator setup returned HTTP 500 /
+  `SUPABASE_INSERT_FAILED`. Live catalog inspection confirmed pgcrypto lives in
+  `extensions`, while three SECURITY DEFINER functions searched only
+  `public, pg_temp` and used unqualified pgcrypto calls. The new regression first
+  failed with `function gen_random_bytes(integer) does not exist`; after a8h,
+  39 integration checks pass for both public and extensions installations,
+  including setup, enrollment, authentication, replay and unchanged access.
+- On October 15 at 09:01:50 UTC, the reviewed a8h repair committed successfully.
+  Its runner pinned the previous function bodies and exact rollback definitions;
+  an independent connection then verified all three definitions and unchanged
+  owner, ACL, SECURITY DEFINER search path, OIDs and staff roles. No factors,
+  grants, complaints or role records were rewritten. The earlier attempt never
+  executed because automatic permission review was unavailable; it is not a
+  rejected security decision or a second database application.
+- The pending UI correction cancels the owned native WebAuthn request on close,
+  account/auth changes, page exit and permission expiry. Existing stale-response
+  guards remain. Device refusal/timeout is no longer described as definite user
+  cancellation. Focused tests pass 110/110; build and compiled AbortSignal
+  fixture pass. This is not a real successful device ceremony. Bounded review
+  found no source issue; its private runner receipt-preservation finding was
+  fixed and verified without connecting to the database.
+- Evidence: `output/audit/a8g-extensions-regression-before-fix-2026-10-14.log`,
+  `a8h-extensions-regression-after-fix-2026-10-14.log`,
+  `staff-factor-repair-focused-2026-10-14.log`,
+  `staff-native-cancel-browser-2026-10-14.json`, and
+  `staff-factor-live-catalog-2026-10-15.json`. Private plan, rollback and committed
+  receipt remain in `docs/private/totp-extension-repair-2026-10-14-*`.
+- Unfinished diff: the two factor dialogs, their two client tests, the existing
+  authority integration test, a8h migration and this checkpoint. Historical
+  untracked `.codex/`, `output/` and the moderation-authority-policy pair stay
+  excluded. No new dependency or canon policy interpretation is introduced.
+  Role changes still invalidate factors by authorization version; new setup
+  still requires the two-wallet approval and its 15-minute permission.
+- Exactly next step: finish the exact-candidate full checks and release the
+  reviewed UI repair, then request the owner's real renewed factor setup.
+  Phase A remains 68 done / 15 in progress; Android stays OWNER-WAIVED / NOT TESTED.
+- Release preparation: implementation `bfe107e` was reconciled with published
+  main as `1c12dcc` with identical trees; only two older documentation conflicts
+  required retaining the new evidence. PR #305 contains the bounded repair.
+  Fresh build and six close-out checks pass. The initial full run in the sandbox
+  could not use Docker/local HTTP fixtures (13 failures, 14 skips); the normal
+  run executed 1860 checks, 1859 passed and one failed because this new migration
+  was absent from the per-file disposition ledger. Both initial CI jobs found
+  the same missing row. The runbook now records the applied repair; all 14 focused
+  ledger/close-out checks pass. Final-candidate CI is required before release. No runtime
+  code changed to resolve that bookkeeping failure.
 
 October 14 avatar display and resumed Admin acceptance:
 
@@ -42,8 +97,7 @@ October 14 avatar display and resumed Admin acceptance:
   without registration-verify, and two factor-setup 500 responses. The current
   generic cancellation text does not distinguish device refusal/timeout. This
   is open; no successful renewed access or wrong user code is inferred.
-- Exactly next step: capture the masked error code from the owner's next
-  authenticator-setup attempt while finishing the bounded avatar release.
+- That next step was completed; see the October 15 repair record above.
 
 October 14 profile session isolation (A7 / RG-01 / A-53):
 

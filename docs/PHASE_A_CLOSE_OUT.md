@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-14. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-15. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -9,6 +9,16 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 they disagree with this file, they win and this file is stale.
 
 Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
+
+October 15 continuation: the avatar correction is published through PR #304 /
+`0de0fda`, with green candidate/post-merge CI and preview/apex verification.
+The newly reproduced authenticator setup failure is a pgcrypto schema-resolution
+defect, not evidence of an incorrect user code. The bounded a8h SQL repair is
+applied and independently verified; roles, factor records and access restrictions
+are unchanged. The associated native-request cancellation UI is locally tested
+and awaiting release. Real factor setup after the owner's role change remains
+unaccepted; old device acceptance does not close this new failure. See the
+[checkpoint](audits/STABILIZATION_CHECKPOINT.md) for exact evidence and next step.
 
 October 14 continuation: the profile session-cookie isolation fix is published
 through PR #301 / `12f3e38`, with green candidate CI, build, 49 compiled browser

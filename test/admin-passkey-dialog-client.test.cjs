@@ -11,7 +11,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return {promise, resolve}; };
 
 function harness(sessionActive = false) {
-  const state = {wallet: WALLET, calls: [], native: [], closed: 0, refreshed: 0, stepUp: 0, opened: 0, focus: 0};
+  const state = {wallet: WALLET, calls: [], native: [], cancelled: 0, closed: 0, refreshed: 0, stepUp: 0, opened: 0, focus: 0};
   const values = [], refs = [], effects = [], listeners = new Map();
   let si, ri, ei, pending;
   const scope = {
@@ -20,6 +20,7 @@ function harness(sessionActive = false) {
       removeEventListener: (name, fn) => { if (listeners.get(name) === fn) listeners.delete(name); }},
     document: {activeElement: {isConnected: true, focus: () => {state.focus++;}}},
     loadWebAuthnBrowser: async () => ({
+      WebAuthnAbortService: {cancelCeremony: () => {state.cancelled++;}},
       startRegistration: async options => {state.native.push({type: 'register', options}); return state.nativeResult ? state.nativeResult() : {id: 'registration'};},
       startAuthentication: async options => {state.native.push({type: 'verify', options}); return state.nativeResult ? state.nativeResult() : {id: 'authentication'};}
     }),
@@ -177,6 +178,7 @@ test('closing or auth loss while the native prompt is pending prevents verify su
     const pending = h.actions.perform('verify'); await tick(); assert.equal(h.state.native.length, 1);
     if (event === 'close') h.actions.close(); else if (event === 'unmount') h.unmount();
     else h.event(event, {key: 'artsoul_authenticated_wallet'});
+    assert.equal(h.state.cancelled, 1, event + ': obsolete native request cancelled');
     result.resolve({id: 'late-authentication'}); await pending;
     assert.deepEqual(h.state.calls.map(x => x.path), ['passkey-auth-options'], event);
     assert.equal(h.state.refreshed, 0, event);
