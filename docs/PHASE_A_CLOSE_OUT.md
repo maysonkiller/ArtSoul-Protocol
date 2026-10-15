@@ -18,9 +18,9 @@ separate natural 24-hour/session-context or beta-entry gates. The requested loca
 QR setup UI is being verified for release; no repeat enrollment is required to
 preserve the completed acceptance. See the current checkpoint.
 
-October 15 latest owner follow-up: the primary staff wallet has no current
-factor and its setup permission expired; no replacement request was created
-today. A separate founder-wallet passkey prompt covered the authority workflow.
+Earlier October 15 follow-up, superseded by factor acceptance above: the primary
+staff wallet had no current factor and its setup permission expired; no replacement
+request had been created that morning. A separate founder-wallet passkey prompt covered the authority workflow.
 The bounded UI fix keeps paired wallet approvals accessible without automatically
 opening complaint verification, while preserving its enforcement. The supplied
 desktop video also confirms a support-history button displacement, corrected
@@ -28,7 +28,7 @@ by keeping both actions before the asynchronously loaded summary. Both fixes are
 published through PR #306 / `0032e94f`, with 1861 passing local checks, green
 candidate/post-merge CI and matching preview/apex artifacts. Actual apex Chrome
 confirms accessible authority controls with the queue locked, and the support
-buttons together above the summary. Real renewed factor enrollment remains open.
+buttons together above the summary. Real renewed factor enrollment was still open at that checkpoint.
 The owner chose to omit the blocked local-browser fixture. The
 [checkpoint](audits/STABILIZATION_CHECKPOINT.md) records the exact evidence limits.
 
