@@ -25,7 +25,7 @@ October 15 authenticator setup repair (Canon 07 / Bible 11):
   grants, complaints or role records were rewritten. The earlier attempt never
   executed because automatic permission review was unavailable; it is not a
   rejected security decision or a second database application.
-- The pending UI correction cancels the owned native WebAuthn request on close,
+- The published UI correction cancels the owned native WebAuthn request on close,
   account/auth changes, page exit and permission expiry. Existing stale-response
   guards remain. Device refusal/timeout is no longer described as definite user
   cancellation. Focused tests pass 110/110; build and compiled AbortSignal
@@ -38,15 +38,12 @@ October 15 authenticator setup repair (Canon 07 / Bible 11):
   `staff-native-cancel-browser-2026-10-14.json`, and
   `staff-factor-live-catalog-2026-10-15.json`. Private plan, rollback and committed
   receipt remain in `docs/private/totp-extension-repair-2026-10-14-*`.
-- Unfinished diff: the two factor dialogs, their two client tests, the existing
-  authority integration test, a8h migration and this checkpoint. Historical
-  untracked `.codex/`, `output/` and the moderation-authority-policy pair stay
-  excluded. No new dependency or canon policy interpretation is introduced.
+- The two factor dialogs, their client tests, the authority integration test,
+  a8h migration and runbook are committed and published in PR #305. Historical
+  untracked `.codex/`, `output/` and the moderation-authority-policy pair remain
+  excluded and untouched. No new dependency or canon policy interpretation is introduced.
   Role changes still invalidate factors by authorization version; new setup
   still requires the two-wallet approval and its 15-minute permission.
-- Exactly next step: finish the exact-candidate full checks and release the
-  reviewed UI repair, then request the owner's real renewed factor setup.
-  Phase A remains 68 done / 15 in progress; Android stays OWNER-WAIVED / NOT TESTED.
 - Release preparation: implementation `bfe107e` was reconciled with published
   main as `1c12dcc` with identical trees; only two older documentation conflicts
   required retaining the new evidence. PR #305 contains the bounded repair.
@@ -55,8 +52,37 @@ October 15 authenticator setup repair (Canon 07 / Bible 11):
   run executed 1860 checks, 1859 passed and one failed because this new migration
   was absent from the per-file disposition ledger. Both initial CI jobs found
   the same missing row. The runbook now records the applied repair; all 14 focused
-  ledger/close-out checks pass. Final-candidate CI is required before release. No runtime
+  ledger/close-out checks pass. No runtime
   code changed to resolve that bookkeeping failure.
+- Final candidate `73c9e7a681d01c39d129c308a9142db38eadade4` passed Windows,
+  Linux and static CI 38711339206. PR #305 merged at 09:18:32 UTC as
+  `90bf7cc549aa9917b724697eb545e5ee93b1da9c`. Production deployment 7088713701
+  succeeded at 09:18:57 UTC; post-merge CI 38711985974 passed. Preview and apex
+  matched 53 assets across six pages. Enabled Donate/Report/email flags stayed
+  enabled, private guest APIs stayed denied, and the Base Sepolia indexer had
+  zero lag. Actual Chrome loads `admin-Db9h8zB3.js`. Evidence prefix:
+  `output/audit/staff-factor-{ci,postmerge-ci,preview-artifact,apex-artifact}-2026-10-15.json`.
+- Actual desktop observation: a cold artwork 30 request showed the existing
+  branded loading state, then the correct work and contained creator avatar.
+  Exact artwork response took 914 ms and first contentful paint was 820 ms in
+  this single cache-disabled browser sample, not a new cold-server benchmark.
+  Profile identity appeared before the collection of cards. The avatar remained
+  loaded at 88x88 with cover through Created, Auctions, Sales and Owned; each
+  list matched its heading, and returning to Created immediately restored 27
+  cards. First visits showed text progress, not placeholder cards. The browser
+  cannot install a pre-document observer through the exposed CDP capability;
+  these snapshots do not prove absence of sub-frame flashing or iOS behavior.
+  Cache disabling was reverted. Evidence:
+  `output/audit/phase-a-desktop-observations-2026-10-15.json`.
+- Exactly next step: owner completes the prepared Admin `Reset sign-in method`
+  for their existing Team wallet with BOTH authority signatures, then completes
+  authenticator-app setup within the renewed 15-minute permission. The old
+  permission is expired; no grant was created or role reset by this repair.
+  The prepared page is left open and the owner was given exact steps. Record
+  successful real setup/verification or the masked failure; never capture the
+  setup secret or user code. Native TOTP acceptance is still open.
+  Phase A remains 68 done / 15 in progress; Android stays OWNER-WAIVED / NOT TESTED.
+  The one bounded reviewer finished; no subagent or local fixture server remains active.
 
 October 14 avatar display and resumed Admin acceptance:
 

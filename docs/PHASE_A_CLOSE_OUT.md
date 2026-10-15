@@ -15,10 +15,14 @@ October 15 continuation: the avatar correction is published through PR #304 /
 The newly reproduced authenticator setup failure is a pgcrypto schema-resolution
 defect, not evidence of an incorrect user code. The bounded a8h SQL repair is
 applied and independently verified; roles, factor records and access restrictions
-are unchanged. The associated native-request cancellation UI is locally tested
-and awaiting release. Real factor setup after the owner's role change remains
+are unchanged. The associated native-request cancellation UI is published in
+PR #305 / `90bf7cc`, with passing exact-candidate and post-merge CI on Linux and
+Windows, build, and preview/apex artifact checks. Real factor setup after the owner's role change remains
 unaccepted; old device acceptance does not close this new failure. See the
 [checkpoint](audits/STABILIZATION_CHECKPOINT.md) for exact evidence and next step.
+The bounded desktop observation retained the correct profile and decoded avatar
+through all four tabs, with matching lists and immediate cached Created return.
+It does not replace a first-frame recording or the remaining iPhone criteria.
 
 October 14 continuation: the profile session-cookie isolation fix is published
 through PR #301 / `12f3e38`, with green candidate CI, build, 49 compiled browser
