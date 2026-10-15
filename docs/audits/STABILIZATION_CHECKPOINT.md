@@ -3,6 +3,51 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 15 authority setup navigation and supplied video (Canon 07 / 05 / 16):
+
+- Continue from `6a34a38`, published application `90bf7cc` / PR #305, in the
+  same checkout. The owner reports a founder-wallet QR prompt and no setup
+  buttons on the primary wallet. Read-only metadata at 09:29 UTC confirms no
+  new reset request today: the primary wallet's current authorization version
+  has no passkey or authenticator and its October 13 setup permission expired.
+  The second authority has a separate current passkey. Its native QR prompt is
+  for complaint access, not an authority signature. No role, factor or grant
+  was changed during this diagnosis.
+- The UI automatically opened factor verification on either eligible staff
+  wallet, covering the paired-approval workflow. The local fix suppresses only
+  that automatic opening for a server-authenticated current authority. Explicit
+  verification remains available; ordinary staff still get the automatic
+  dialog. Added guidance distinguishes wallet approvals from complaint login.
+  Queue/decision, session-boundary and factor checks pass 71/71, with no skips;
+  build passes. The new regression failed on the prior implementation.
+- The supplied `Video Project 30.mp4` is 4.33 seconds / 130 desktop frames on
+  artwork 34. First content appears at 00:00.933; media and Creator follow at
+  00:01.033, First Collector at 00:01.333. No loaded-avatar disappearance is
+  visible afterward. The existing Future glow/hover effects continue. At
+  00:03.067 the asynchronous largest-support paragraph inserts between Donate
+  and View all support, moving the latter down. The local fix keeps both action
+  buttons before the optional paragraph. No AI valuation, donation economics,
+  avatar source or theme animation was changed; no audio was inferred.
+- Evidence: `output/audit/authority-dialog-before-2026-10-15.log`,
+  `authority-dialog-focused-2026-10-15.log`, `authority-dialog-build-2026-10-15.log`
+  and `output/audit/video-project-30-2026-10-15/observations.json` plus extracted
+  frames. A bounded independent review found no runtime issue and identified
+  one obsolete automatic-dialog expectation, now updated while retaining its
+  protected queue/decision assertions.
+- The browser origin approval rejected the local fixture. The owner explicitly
+  chose to continue without local browser testing; both fixture servers were
+  stopped. No compiled-browser or native-device success is claimed for this
+  change. Current source is local, not yet released; release evidence follows
+  only after exact-candidate CI. Historical untracked files remain untouched.
+- Interpretation: authority approval navigation stays available without a
+  complaint-access factor, as already authorized; suppressing an automatic
+  dialog changes no permission. The supplied video does not establish repeated
+  avatar reload or an iPhone failure. Phase A remains 68 done / 15 in progress.
+- Exactly next step: finish the current suite and release the bounded UI fix,
+  then prepare Reset sign-in method for the primary wallet with its existing
+  Team role; the owner must sign the same request with both authority wallets
+  and complete native factor enrollment within the resulting setup permission.
+
 October 15 authenticator setup repair (Canon 07 / Bible 11):
 
 - Continued from `d05c7d5` in the same workspace. PR #304 is published as

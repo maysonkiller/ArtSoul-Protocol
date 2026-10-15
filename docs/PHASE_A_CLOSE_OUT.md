@@ -10,6 +10,17 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
 
+October 15 latest owner follow-up: the primary staff wallet has no current
+factor and its setup permission expired; no replacement request was created
+today. A separate founder-wallet passkey prompt covered the authority workflow.
+The bounded UI fix keeps paired wallet approvals accessible without automatically
+opening complaint verification, while preserving its enforcement. The supplied
+desktop video also confirms a support-history button displacement, corrected
+locally by keeping both actions before the asynchronously loaded summary.
+Focused checks and build pass; release and real factor enrollment remain open.
+The owner chose to omit the blocked local-browser fixture. The
+[checkpoint](audits/STABILIZATION_CHECKPOINT.md) records the exact evidence limits.
+
 October 15 continuation: the avatar correction is published through PR #304 /
 `0de0fda`, with green candidate/post-merge CI and preview/apex verification.
 The newly reproduced authenticator setup failure is a pgcrypto schema-resolution
