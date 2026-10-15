@@ -337,6 +337,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [moderationAccess, setModerationAccess] = useState(null);
             const [moderationReason, setModerationReason] = useState('');
             const [moderationBusy, setModerationBusy] = useState(false);
+            const [moderationChecking, setModerationChecking] = useState(false);
             const [moderationMessage, setModerationMessage] = useState('');
             const moderationDialogRef = useRef(null);
             const moderationTriggerRef = useRef(null);
@@ -1454,15 +1455,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 const isCurrent = () => sequence === moderationSequenceRef.current &&
                     wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase();
 
-                if (options.interactive) {
-                    const authenticated = await window.ensureAuthenticated?.();
-                    if (!isCurrent()) return false;
-                    if (!authenticated) {
-                        setModerationMessage('Sign in with your staff wallet to continue.');
-                        return false;
-                    }
-                }
-
                 try {
                     const query = new URLSearchParams({
                         chain_id: String(projection.chain_id),
@@ -1516,6 +1508,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 if (!artwork?.chain_id || !artwork?.artwork_id || moderationBusy) return;
                 const sequence = moderationSequenceRef.current;
                 const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
+                if (!moderationAccess?.canModerate || !wallet || String(moderationAccess.wallet || '').toLowerCase() !== wallet) return;
                 const isCurrent = () => sequence === moderationSequenceRef.current &&
                     wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase();
                 if (hidden && !moderationReason.trim()) {
@@ -1523,9 +1516,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     return;
                 }
 
-                const authenticated = await window.ensureAuthenticated?.();
-                if (!authenticated || !isCurrent()) return;
-
+                // The visibility endpoints enforce the current wallet session,
+                // staff role and factor. Do not start another sign-in ceremony
+                // from this already verified, explicitly opened tool.
                 setModerationBusy(true);
                 setModerationMessage('');
                 try {
@@ -1543,6 +1536,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     const result = await response.json().catch(() => ({}));
                     if (!isCurrent()) return;
                     if (!response.ok) {
+                        if ([401, 403].includes(response.status)) {
+                            setModerationAccess(null);
+                            throw new Error('Verify your access in Admin to use moderation tools.');
+                        }
                         throw new Error(result.message || 'Moderation update failed');
                     }
 
@@ -3648,14 +3645,17 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         )}
                                         {moderationAccess?.canModerate && (
                                             <button type="button" ref={moderationTriggerRef} data-allow-rapid="true"
-                                                disabled={moderationBusy}
+                                                disabled={moderationBusy || moderationChecking}
                                                 className="btn-secondary artwork-page-compact-action"
                                                 onClick={async () => {
-                                                    if (moderationBusy) return;
-                                                    if (await loadModerationVisibility(artwork, { interactive: true })) {
-                                                        moderationDialogRef.current?.showModal();
-                                                    }
-                                                }}>Moderation tools</button>
+                                                    if (moderationBusy || moderationChecking) return;
+                                                    setModerationChecking(true);
+                                                    try {
+                                                        if (await loadModerationVisibility(artwork, { interactive: true })) {
+                                                            moderationDialogRef.current?.showModal();
+                                                        }
+                                                    } finally { setModerationChecking(false); }
+                                                }}>{moderationChecking ? 'Checking access…' : 'Moderation tools'}</button>
                                         )}
                                     </div>
                                     {moderationMessage && !moderationAccess?.canModerate && <p role="status">{moderationMessage} <a href="/admin">Open Admin</a></p>}

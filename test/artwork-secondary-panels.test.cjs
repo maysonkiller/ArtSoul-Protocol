@@ -99,8 +99,8 @@ test('moderation stays in a closed dialog until the staff button rechecks server
     assert.match(artwork, /moderationSequenceRef\.current\+\+;\s*moderationDialogRef\.current\?\.close\(\)/);
     assert.match(artwork, /const refresh = \(\) => \{\s*invalidate\(\);[\s\S]*?void loadModerationVisibility\(artwork\)/);
     assert.match(artwork, /addEventListener\('artsoul:auth-state-changed', refresh\)/);
-    assert.match(artwork, /ref=\{moderationTriggerRef\}[^>]+disabled=\{moderationBusy\}/);
-    assert.match(artwork, /if \(moderationBusy\) return;\s*if \(await loadModerationVisibility/);
+    assert.match(artwork, /ref=\{moderationTriggerRef\}[^>]+disabled=\{moderationBusy \|\| moderationChecking\}/);
+    assert.match(artwork, /if \(moderationBusy \|\| moderationChecking\) return;\s*setModerationChecking\(true\)/);
 });
 
 test('a current-wallet read cannot display the previous signed-in wallet staff data', async () => {
@@ -115,13 +115,29 @@ test('a current-wallet read cannot display the previous signed-in wallet staff d
     assert.deepEqual(writes, [null]);
 });
 
-test('a wallet change during moderation authentication prevents the write', async () => {
-    const auth = deferred(), state = {wallet: 'staff', writes: 0};
+test('moderation controls never invoke sign-in to open, and a changed wallet cannot submit', async () => {
+    const state = {wallet: 'other', writes: 0};
+    assert.doesNotMatch(pageFunction('loadModerationVisibility'), /ensureAuthenticated/);
     const submit = vm.runInNewContext(`(${pageFunction('handleModerationVisibility')})`, {
         artwork: {chain_id: 84532, artwork_id: '28'}, moderationSequenceRef: {current: 0}, moderationBusy: false,
-        moderationReason: 'reason', window: {getCurrentWalletAddress: () => state.wallet, ensureAuthenticated: () => auth.promise},
+        moderationAccess: {canModerate: true, wallet: 'staff'},
+        moderationReason: 'reason', window: {getCurrentWalletAddress: () => state.wallet},
         fetch: async () => {state.writes++;}, console
     });
-    const work = submit(true); state.wallet = 'other'; auth.resolve(true); await work;
+    await submit(true);
     assert.equal(state.writes, 0);
+});
+
+test('visibility mutation relies on current server access and expired access directs staff to Admin', async () => {
+    const state = {access: {canModerate: true, wallet: 'staff'}, busy: false, message: '', writes: 0};
+    const submit = vm.runInNewContext(`(${pageFunction('handleModerationVisibility')})`, {
+        artwork: {chain_id: 84532, artwork_id: '28'}, moderationSequenceRef: {current: 0}, moderationBusy: false,
+        moderationAccess: state.access, moderationReason: 'reason', window: {getCurrentWalletAddress: () => 'staff'},
+        setModerationAccess: value => {state.access = value;}, setModerationBusy: value => {state.busy = value;},
+        setModerationMessage: value => {state.message = value;}, console: {error() {}},
+        fetch: async () => {state.writes++; return {ok: false, status: 403, json: async () => ({error: 'STEP_UP_REQUIRED'})};}
+    });
+    await submit(true);
+    assert.equal(state.writes, 1); assert.equal(state.access, null); assert.equal(state.busy, false);
+    assert.match(state.message, /Verify your access in Admin/);
 });

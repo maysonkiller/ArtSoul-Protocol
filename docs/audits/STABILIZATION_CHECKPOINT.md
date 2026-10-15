@@ -3,7 +3,40 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 15 subsequent owner UI report (Canon 05/07/16, donation design):
+October 15 release and final artwork follow-up:
+
+- PR #309 is merged as `e8c70cf0bfa2f142ab31c3ef96a090dd957f969c` (15:53:50
+  UTC), production deployment `7097511209` succeeded at 15:54:17 UTC. Candidate
+  `2ab3d3d`, CI `38763840178`: Linux/Windows/static all passed. Exact local
+  application checks passed 1891/1891, no skips; build verifies 11 routes and
+  174 utilities. A first run had one stale document-status assertion; the
+  final frozen-source rerun is green. Preserve both logs under `output/audit/`.
+- Preview and apex artifacts each match 199 files across six pages; guest
+  private-data denials and expected feature flags pass, Base Sepolia lag is zero.
+  Opening the preview URL in the browser was declined, so no preview UI run
+  is claimed or retried through another surface. Existing authorized apex
+  browsing continues separately. The local-browser fixture waiver is retained.
+- The owner confirms a single existing passkey assertion now closes the login
+  dialog. Actual apex DOM independently shows Verified, available review queue,
+  zero open dialogs. No reset, enrollment or repeated network ceremony occurred.
+  Evidence: `artwork-admin-stability-native-entry-2026-10-15.json`.
+- Actual apex Report opens only by click and Cancel restores focus. History
+  opens/closes correctly: artwork 18 is empty; artwork 34 has the two existing
+  1-wei donations, with Largest support inside history, never inserted while
+  collapsed. No report, payment or visibility mutation was submitted.
+- Final staff-button inspection found a separate first-click race: the optional
+  client sign-in restoration emitted an auth event and invalidated the opening
+  read, despite existing server-verified access. Follow-up removes the redundant
+  sign-in ceremony from these tools; GET and POST still enforce server session,
+  role and factor, writes match the live connected wallet, and expiry directs
+  staff to Admin. The button shows Checking access during its read. Focused
+  endpoint/client regressions pass 51/51. A-22 remains open for this follow-up,
+  not for another successful-login ceremony.
+- Next step: release the bounded first-click repair after CI/build checks, verify
+  opening/closing the tools on the apex without a visibility mutation, and record
+  A-22 acceptance while leaving the remaining phone/publish/beta rows honest.
+
+Earlier October 15 owner UI report (Canon 05/07/16, donation design):
 
 - Continue from `d78f3b9`, branch `codex/takeover-audit`; PR #309 is not merged.
   Published application remains `ca77eb7` / PR #308. Four historical untracked
