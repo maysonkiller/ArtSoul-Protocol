@@ -47,6 +47,16 @@ October 15 authenticator setup repair (Canon 07 / Bible 11):
 - Exactly next step: finish the exact-candidate full checks and release the
   reviewed UI repair, then request the owner's real renewed factor setup.
   Phase A remains 68 done / 15 in progress; Android stays OWNER-WAIVED / NOT TESTED.
+- Release preparation: implementation `bfe107e` was reconciled with published
+  main as `1c12dcc` with identical trees; only two older documentation conflicts
+  required retaining the new evidence. PR #305 contains the bounded repair.
+  Fresh build and six close-out checks pass. The initial full run in the sandbox
+  could not use Docker/local HTTP fixtures (13 failures, 14 skips); the normal
+  run executed 1860 checks, 1859 passed and one failed because this new migration
+  was absent from the per-file disposition ledger. Both initial CI jobs found
+  the same missing row. The runbook now records the applied repair; all 14 focused
+  ledger/close-out checks pass. Final-candidate CI is required before release. No runtime
+  code changed to resolve that bookkeeping failure.
 
 October 14 avatar display and resumed Admin acceptance:
 

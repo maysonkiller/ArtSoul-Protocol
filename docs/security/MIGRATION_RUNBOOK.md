@@ -46,6 +46,7 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/a8e_moderation_totp_persistence.sql` | **Applied and verified 2026-10-08.** Encrypted TOTP factors, typed grants, atomic step consumption, persistent throttling and monotonic role-version fencing. Version-bound challenges retain historical rows. The approved 5/300/120 policy was installed separately; physical factor acceptance remains open. See the paired-authority application record below. |
 | `sql/migrations/a8f_moderation_dual_wallet_authority.sql` | **Applied and verified 2026-10-08.** Application-authority registry, one-time proposals and audited atomic grants/revocation/rotation/reset. Direct runtime role writes are denied. Grants/resets issue shared 15-minute setup permission. The approved initial pair was seeded separately without creating roles or permissions; no Safe or contract changed. Do not replay. |
 | `sql/migrations/a8g_staff_factor_setup.sql` | **Applied and verified 2026-10-08.** Atomic passkey or encrypted TOTP setup shares the same wallet lock and permission. Schema installation created no factor or session. Server encryption configuration and paired routes are deployed; physical setup/recovery and public moderation acceptance remain open. |
+| `sql/migrations/a8h_staff_factor_pgcrypto_resolution.sql` | **Applied and independently verified 2026-10-15.** Qualifies three existing pgcrypto calls using the installed extension schema. Repairs authenticator setup HTTP 500 on Supabase without changing roles, factors, grants, function OIDs, owner, ACL or SECURITY DEFINER search paths. Apply after A8g on a fresh installation; do not replay the live operation. Exact prior function definitions and a committed receipt are retained privately. See the October 15 stabilization checkpoint. |
 | `sql/migrations/phase18_7a_supabase_security_hardening.sql` | Prior partial classification. Superseded by 18.7b. |
 | `sql/migrations/phase18_7b_supabase_security_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
 | `sql/migrations/phase18_7c_supabase_storage_hardening.sql` | **Applied to production** 2026-07-17 after backup. |
@@ -381,6 +382,9 @@ environment**. Actual owner setup/reset and workflow acceptance remain open.
    service-only RPC execution, fixed search paths and removal of direct runtime
    role writes. Preserve all old credentials and audit records; the new version
    checks reject obsolete factors without deleting them.
+   On a fresh installation, follow A8g with A8h to qualify pgcrypto in its installed
+   schema. On the existing deployment A8h was already applied October 15; compare
+   the committed repair receipt and current function definitions before any action.
 3. Seed only the founder-approved current authority pair, apex origin and Base
    Sepolia chain ID in the protected policy. Record the initial policy and exact
    authorized source privately. Seed TOTP policy as 5 attempts / 300 seconds /
