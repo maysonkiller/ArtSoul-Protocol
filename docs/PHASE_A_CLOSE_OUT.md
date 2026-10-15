@@ -8,18 +8,19 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **68 done, 15 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
 
-**October 15 A-22 / A8 operational evidence accepted; UI follow-up open:** the [dated evidence reconciliation](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
+**October 15 A-22 / A8 accepted, including the UI follow-up:** the [dated evidence reconciliation](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
 maps every required moderation property to existing real journeys, exact-boundary
 session tests, compiled client checks and deployed artifacts. Waiting through a
 natural 24-hour session was an extra restriction introduced by earlier audit
 notes, not an approved ceremony. That observation remains unperformed; it is
 not falsely marked passed. Fixed expiry, non-renewal, re-verification and actual
 device/network acceptance are evidenced. No policy, role or data changed.
-The owner then reported successful factor verification leaving its dialog open.
-**A-22** stays in progress for that repair and its verification, plus moving
-artwork staff controls behind an explicit action. No factor reset is needed.
+The subsequent successful-verification dialog and inline artwork controls are
+repaired in published PR #309 / #310 (`9a2965f`). The owner confirms one passkey
+closes the dialog; actual apex first-click tools, close/focus return and 390px
+layout pass. No factor reset, repeated complaint or payment was needed.
 The remaining device/publishing criteria and A-23's beta review also stay open.
 
 The dated progress notes below preserve earlier observations. Their remaining

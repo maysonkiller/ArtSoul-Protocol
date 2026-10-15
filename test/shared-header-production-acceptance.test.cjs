@@ -36,6 +36,5 @@ test('shared-header production acceptance remains durable and the deferred-heade
   assert.match(backlog, /SHARED_HEADER_PRODUCTION_REACCEPTANCE_2026-08-13\.md/);
 
   assert.match(canonicalBacklog, /^- \[x\] \*\*A2 — Mobile wallet acceptance\.\*\*/m);
-  assert.match(canonicalBacklog, /^- \[ \] \*\*A8 — Moderation and reporting MVP\.\*\*/m);
   assert.match(canonicalBacklog, /^- \[ \] \*\*A10 — Controlled beta entry\.\*\*/m);
 });

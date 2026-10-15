@@ -2,15 +2,33 @@
 
 ## October 15 A-22 / A8 acceptance reconciliation
 
-**Operational evidence accepted; newly reported UI regression open.** The owner
-subsequently reported that successful factor verification leaves the dialog open
-and appears to require repeated entry. The apex observation confirms a Verified
-header and accessible queue behind that dialog; rejection of the first two
-assertions is not established. A-22/A8 remain in progress until this bounded UI
-repair is released and verified. No factor reset or repeated network ceremony is
-required. The evidence reconciliation below supersedes earlier remaining-A8 statements in this dated
-record, without changing any historical observation or the Phase A beta decision.
-Published source is `ca77eb7d60f580e4f963027001d29404364b2d9a` / PR #308.
+**A-22 / A8 accepted, including the October 15 UI follow-up.** PR #309 fixes
+the successful-login dialog and moves artwork tools behind an explicit button.
+The owner confirms that one existing passkey assertion closes the dialog;
+the apex also shows Verified access and the queue with no open dialog. No factor
+reset or repeated network ceremony was needed. Rejection of earlier assertions
+was never established: the old dialog remained open after successful access.
+
+PR #310 removes a redundant wallet sign-in that cancelled the first artwork-tools
+opening. Published source `9a2965f0833089b5bd4f889b8beeeb2bcff40a2b`, production
+deployment `7097845201` (October 15, 16:08:18 UTC), matches 199 assets across six
+pages. Candidate CI `38765668701` passes Linux, Windows and static checks;
+51 focused endpoint/client checks and the production build pass. Actual apex
+first-click opening, checking feedback, Close/focus return and a 390px dialog
+fit pass without a visibility mutation. Guest queue, directory, notifications
+and private-email denials pass. No new report or payment was submitted.
+
+Donation history stays collapsed until requested, including the largest-support
+summary; the two existing 1-wei records on artwork 34 are retained. Same-creator
+hydrated identity and decoded avatars survive refresh. These UI changes do not
+alter economics. Desktop breakpoint checks are not native iPhone acceptance.
+Evidence is retained under `output/audit/artwork-moderation-open-*` and
+`artwork-admin-stability-*`. The preview browser action was declined and not
+retried through another surface; no preview UI pass is claimed.
+
+The reconciliation below supersedes earlier remaining-A8 statements in this
+dated record. Other device/publishing criteria and the Phase A beta decision
+remain open.
 
 | Required property | Evidence retained and its limits |
 | --- | --- |

@@ -9,10 +9,10 @@ This is the operating source of truth for entering the invite-only ArtSoul
 controlled beta. It does not approve a beta window by itself. The Canon Bible
 and the canonical Phase A backlog remain authoritative.
 
-A8 operating/test evidence is accepted October 15, but the owner's subsequent
-successful-verification dialog regression reopens its UI acceptance until the
-repair is released and verified. Remaining connected-device/publishing acceptance and
-the final operator decision still do. The October 15 GitHub open-issue query
+A8 operating/test evidence and the subsequent UI repair are accepted October 15
+after PR #309 / #310, the owner's single-passkey confirmation and actual apex
+artwork-tools verification. Remaining connected-device/publishing acceptance and
+the final operator decision still block beta entry. The October 15 GitHub open-issue query
 returned zero issues; that does not by itself clear unrecorded device outcomes
 or constitute a beta GO. No invitations or beta window are opened by this review.
 
