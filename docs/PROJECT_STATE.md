@@ -2,11 +2,11 @@
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
 and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-15. Implementation
-uses `C:\Projects\ArtSoul`; Admin navigation release `ca77eb7` is deployed.
+uses `C:\Projects\ArtSoul`; Admin/artwork release `9a2965f` is deployed.
 Report/Donate and the protected review queue are enabled; A-21 intake is accepted
-from the October 11 live evidence. A-22/A8 operational evidence is accepted by the October 15
-reconciliation, but the subsequent successful-verification dialog regression
-keeps its UI acceptance open until repaired and verified. Remaining phone/publishing criteria and the beta
+from the October 11 live evidence. A-22/A8 are accepted by the October 15
+reconciliation and published UI follow-up. The owner confirms one passkey closes
+the dialog; actual apex artwork tools open on the first click. Remaining phone/publishing criteria and the beta
 decision stay separate. Older dates and deployment SHAs below remain
 historical evidence; they are not the current release.
 
@@ -120,7 +120,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 68 `done`, 15 `in progress`, 0 `planned` across A-01 to A-83
+current position is 69 `done`, 14 `in progress`, 0 `planned` across A-01 to A-83
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that

@@ -3,7 +3,41 @@
 Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 15 release and final artwork follow-up:
+October 15 final moderation UI acceptance:
+
+- Workspace `C:\Projects\ArtSoul`, branch `codex/takeover-audit`; application
+  HEAD `9a2965f0833089b5bd4f889b8beeeb2bcff40a2b` / PR #310. No source-tree
+  copies or new worktrees. Historical `.codex/`, `output/`, and the two untracked
+  moderation-authority-policy files remain untouched.
+- PR #310 merged at 16:07:52 UTC after exact-candidate CI `38765668701` passed
+  Linux, Windows and static checks. Production deployment `7097845201` succeeded
+  at 16:08:18 UTC. The published apex matches 199 assets across six pages;
+  guest protected-data denials pass, expected flags remain enabled, and Base
+  Sepolia indexer lag is zero. Evidence:
+  `output/audit/artwork-admin-stability-apex-artifact-2026-10-15-activation.json`.
+- Actual apex artwork 34 opens Moderation tools on the first click, with Checking
+  access feedback, then closes and returns focus correctly. At 390px the dialog
+  is 358px wide within the viewport; the page has no horizontal overflow.
+  `artwork-moderation-open-browser-2026-10-15.json` and the matching screenshots
+  retain this result. This is a desktop breakpoint check, not a native phone pass.
+- The owner's single-passkey confirmation and previous actual Admin DOM close
+  the successful-login regression. No new setup, reset, complaint, donation or
+  visibility write occurred. A-22 / canonical A8 are accepted again; the backlog
+  and three count summaries agree at 69 done / 14 in progress / 0 planned.
+- Focused application/API regression: 51/51; production build: 11 routes and
+  174 utilities. PR #309's previous full local result is 1891/1891; it is not
+  relabelled as a PR #310 run. The unrelated header test no longer forces A8 to
+  remain unchecked. Documentation/count checks pass 6/6; application code is
+  unchanged by the acceptance update.
+- Preview browser navigation was declined and not retried through another
+  surface. Existing authorized apex testing continued separately. Android stays
+  owner-waived / not tested. The three iPhone symptom checks are pending owner
+  feedback; do not repeat already accepted wallet, OAuth or factor ceremonies.
+- Exactly next step: record the post-repair iPhone artwork result, then continue
+  the remaining connected publishing/transaction acceptance from the existing
+  device sheet without replaying the completed moderation rehearsal.
+
+Earlier October 15 release and final artwork follow-up:
 
 - PR #309 is merged as `e8c70cf0bfa2f142ab31c3ef96a090dd957f969c` (15:53:50
   UTC), production deployment `7097511209` succeeded at 15:54:17 UTC. Candidate

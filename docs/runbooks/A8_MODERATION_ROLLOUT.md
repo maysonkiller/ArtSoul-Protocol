@@ -173,8 +173,10 @@ Fixed expiry is checked with exact controlled clock boundaries and the compiled
 client deadline; device/network binding also has real owner acceptance. A
 natural 24-hour observation remains unperformed and is not a separately required
 ceremony. This does not authorize beta entry or close unrelated device criteria.
-The subsequently reported successful-verification dialog regression keeps A8's
-UI acceptance open until its bounded repair is released and verified.
+The subsequent successful-verification dialog and inline artwork controls are
+accepted after published PR #309 / #310, the owner's single-passkey confirmation
+and actual apex first-click tools/close/focus/390px verification. No new factor
+setup, complaint, payment or visibility mutation was required.
 
 ## 5. After controlled-beta observation
 
