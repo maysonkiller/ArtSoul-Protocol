@@ -23,6 +23,10 @@ October 20 guest account-avatar follow-up (Canon 05/16, A-53/A-61):
   `guest-avatar-focused-final-2026-10-20.log` and `guest-avatar-build-2026-10-20.log`.
   An intermediate test caught the bridge's 7 KiB budget; the explanatory comment
   was shortened, not the budget relaxed. One read-only helper finished its review.
+- Candidate CI caught two additional stale test-version declarations (three
+  failing assertions on each OS). All page pins were already updated; the
+  runtime hash/version ledger and the network-copy regression now also expect
+  version 5. The application source is unchanged by this follow-up.
 - Tracked changes are this narrow bridge/test/cache-pin repair plus acceptance
   notes; historical untracked paths remain untouched. Phase A remains 69 done /
   14 in progress. No new signatures, setup or credentials are needed.
