@@ -12,9 +12,11 @@ Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
 
 October 20 owner follow-up accepts the scoped iPhone Ownership appearance.
 A separate guest-header reload flash is reproduced as a redundant same-source
-image assignment in the first-frame bridge and repaired locally, with 138
-focused checks and a successful build. Its release/native-phone outcome is
-tracked in the current checkpoint. Other device and publishing criteria remain
+image assignment in the first-frame bridge and repaired in published PR #314
+(`56b17ef`), with 164 expanded checks, 1905 passing local unit checks, green
+Linux/Windows CI and a successful build. All eight apex header pages and 57
+assets match. Chromium guest reload/layout checks pass; native iPhone post-repair
+feedback is still pending in the current checkpoint. Other device and publishing criteria remain
 open; no repeated sign-in or factor setup is needed for this display fix.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the

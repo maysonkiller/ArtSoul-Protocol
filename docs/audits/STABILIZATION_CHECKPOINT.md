@@ -27,11 +27,32 @@ October 20 guest account-avatar follow-up (Canon 05/16, A-53/A-61):
   failing assertions on each OS). All page pins were already updated; the
   runtime hash/version ledger and the network-copy regression now also expect
   version 5. The application source is unchanged by this follow-up.
+- Final candidate `15aa49291d2ce70a80fff838b5b73da0d026e91a` passes 164 expanded
+  checks and 1905/1905 full local unit checks with no skips. Linux/Windows/static
+  CI `39430587316` passes, including 46 contract tests on each OS. Logs are
+  `guest-avatar-expanded-2026-10-20.log`, `guest-avatar-unit-bounded-2026-10-20.log`
+  and `guest-header-ci-final-full-2026-10-20.log` under `output/audit/`.
+- PR #314 merged as `56b17ef73cd633aee3414b5f240661ab5e59eadf` at 13:31:35 UTC.
+  Production deployment `7201066858` succeeded at 13:32:01 UTC. Preview and
+  apex HTTP checks verify all eight header pages, version 5 and 57 built assets,
+  plus unchanged guest access denials. Evidence:
+  `output/audit/guest-header-apex-release-2026-10-20.json`.
+- An isolated Chromium in-app guest browser verifies one complete standard
+  avatar after reload, the guest menu, and no horizontal overflow at a 390px
+  browser width (375px content viewport). The temporary size override is reset.
+  `guest-header-apex-browser-2026-10-20.json` and desktop/mobile screenshots
+  record the final loaded state, not an unobserved native iPhone first-frame
+  sequence. The browser did not support the attempted first-frame diagnostic
+  instrumentation; no application state, wallet session or security setting
+  was changed to work around that limitation.
 - Tracked changes are this narrow bridge/test/cache-pin repair plus acceptance
   notes; historical untracked paths remain untouched. Phase A remains 69 done /
-  14 in progress. No new signatures, setup or credentials are needed.
-- Exactly next step: publish the tested candidate after required CI, verify the
-  apex guest header, then record the owner's post-repair iPhone reload result.
+  14 in progress. The remaining acceptance review found no fully satisfied row
+  to close solely from the current evidence. Both bounded helper tasks ended.
+  No new signatures, setup or credentials are needed for this fix.
+- Exactly next step: record the requested post-repair iPhone guest reload result,
+  then continue the existing device/publishing acceptance sheet without repeating
+  already accepted Ownership, OAuth or staff-factor ceremonies.
 
 October 20 Ownership identity continuation (Canon 05 / A-47 / A-61):
 
