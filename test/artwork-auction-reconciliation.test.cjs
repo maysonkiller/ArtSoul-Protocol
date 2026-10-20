@@ -188,6 +188,63 @@ test('a same-artwork refresh retains the hydrated creator while the next profile
   pending.resolve(profile); await refresh;
 });
 
+test('exact role identities seed before content and confirmed missing profiles do not trigger another lookup', async () => {
+  const OWNER = `0x${'ef'.repeat(20)}`;
+  const identities = {
+    [CREATOR]: {wallet_address: CREATOR, username: 'Artist', avatar_url: '/artist.png'},
+    [BIDDER]: {wallet_address: BIDDER, username: 'Collector', avatar_url: '/collector.png'},
+    [OWNER]: null
+  };
+  let reads = 0;
+  const {page: api, state, writes} = page({
+    getArtwork: async () => projection({creator_id: CREATOR, auction_winner_address: BIDDER,
+      current_owner_address: OWNER, ownership_profiles: identities}),
+    getProfile: async () => {reads++; throw new Error('Covered identity must not be requested again');}
+  });
+  await api.loadArtwork();
+  assert.equal(reads, 0);
+  assert.equal(state.creatorProfile.username, 'Artist');
+  assert.equal(state.auctionWinnerProfile.username, 'Collector');
+  assert.equal(state.currentOwnerProfile.wallet_address, OWNER);
+  assert.equal(state.currentOwnerProfile.username, '');
+  for (const setter of ['creatorProfile', 'auctionWinnerProfile', 'currentOwnerProfile', 'resolvedProfileAddresses']) {
+    assert(writes.indexOf(setter) < writes.indexOf('loading'), setter + ' is committed before content');
+  }
+  assert.deepEqual([...state.resolvedProfileAddresses].sort(), Object.keys(identities).sort());
+});
+
+test('an uncovered role profile resolves independently while another profile remains slow', async () => {
+  const slow = deferred(), started = deferred();
+  const {page: api, state} = page({
+    getArtwork: async () => projection({creator_id: CREATOR, auction_winner_address: BIDDER}),
+    getProfile: address => address === CREATOR ? slow.promise : (started.resolve(), Promise.resolve({wallet_address: BIDDER, username: 'Collector'}))
+  });
+  const work = api.loadArtwork();
+  await started.promise;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(state.auctionWinnerProfile.username, 'Collector');
+  assert.equal(state.resolvedProfileAddresses.has(BIDDER), true);
+  assert.equal(state.resolvedProfileAddresses.has(CREATOR), false);
+  slow.resolve({wallet_address: CREATOR, username: 'Artist'});
+  await work;
+  assert.equal(state.creatorProfile.username, 'Artist');
+});
+
+test('bid history reuses exact role profiles, including confirmed absence', async () => {
+  let reads = 0, rendered;
+  const hydrate = vm.runInNewContext(`(${pageFunction('hydrateBidderProfiles')})`, {
+    bidderProfileCacheRef: {current: new Map()}, console: quiet,
+    window: {ArtSoulDB: {getProfile: async () => {reads++;}}},
+    setBidderProfiles: update => {rendered = update({});}
+  });
+  await hydrate([{bidder: BIDDER}, {bidder: CREATOR}], {
+    [BIDDER]: {wallet_address: BIDDER, username: 'Collector'}, [CREATOR]: null
+  });
+  assert.equal(reads, 0);
+  assert.equal(rendered[BIDDER].username, 'Collector');
+  assert.equal(rendered[CREATOR], null);
+});
+
 test('a new auction resets its bid cursor and ignores a late live response from the previous auction', async () => {
   const delayed = deferred();
   const requests = [];
