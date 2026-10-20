@@ -10,15 +10,22 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
 
+October 20 owner follow-up accepts the scoped iPhone Ownership appearance.
+A separate guest-header reload flash is reproduced as a redundant same-source
+image assignment in the first-frame bridge and repaired locally, with 138
+focused checks and a successful build. Its release/native-phone outcome is
+tracked in the current checkpoint. Other device and publishing criteria remain
+open; no repeated sign-in or factor setup is needed for this display fix.
+
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its
 public name. Confirmed absent profiles retain wallet labels and the standard
 avatar. Final local checks pass 1903/1903, candidate Linux/Windows CI is green,
 and preview/apex artifacts match. Actual apex Chrome verifies both named and
 missing-profile cases and a 390px layout; the latter is not native iPhone proof.
-The owner is currently away from the laptop. The only new requested phone check
-is the repaired Ownership display on /artwork/30 and /artwork/34, without login
-or signatures. Existing connected publishing/receipt and remaining device
+The owner is currently away from the laptop and has since reported the repaired
+Ownership display looks good, while identifying the separate guest-header flash
+above. Existing connected publishing/receipt and remaining device
 criteria stay open; do not restart already accepted sign-in, OAuth, moderation
 or account-switch ceremonies.
 

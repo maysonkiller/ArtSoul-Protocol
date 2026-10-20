@@ -91,7 +91,8 @@
             const displayAddress = shortAddress && label.toLowerCase() !== shortAddress.toLowerCase()
                 ? shortAddress
                 : '';
-            image.src = paintSource;
+            // Preserve the decoded shell image.
+            if (image.getAttribute('src') !== paintSource) image.src = paintSource;
             image.alt = label;
             image.dataset.avatarSource = source;
             image.dataset.avatarIdentity = imageIdentity;
