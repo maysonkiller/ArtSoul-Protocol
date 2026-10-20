@@ -34,15 +34,32 @@ October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
   11 routes/eight headers/174 utilities. Logs: `guest-inline-before`,
   `guest-inline-lifecycle-focused`, `guest-inline-build-final` under `output/audit/`,
   all suffixed `-2026-10-20.log`.
-- Full local unit run before the logout follow-up: **1923/1923 pass, zero skips**, log
-  `output/audit/guest-inline-full-unit-2026-10-20.log`. PR #317 is the release
-  candidate. Its earlier preview is deployed; final candidate CI and apex acceptance remain
-  required. Build assertions also run as a hard gate in `verify-build.mjs`;
+- Final local unit run: **1924/1924 pass, zero skips**, log
+  `output/audit/guest-inline-full-unit-final-2026-10-20.log`.
+  Build assertions also run as a hard gate in `verify-build.mjs`;
   the extra built-output unit case explicitly skips only without a local build.
+- PR #317 is merged as `f183b78f92993362090d624f0a872a9a9cec5fd4`.
+  Candidate `ca2ff85fbbecb2f3c50a568c1c1ea5c1c619f0f0` passes CI
+  `39436940066`: Linux 1893 pass/2 skip, Windows 1724 pass/15 skip,
+  zero failures and 46 contract tests on each OS. Local PostgreSQL checks above
+  cover the environment-dependent cases; do not describe CI skips as passes.
+  Production deployment `7202088484` succeeds at `2026-10-20T14:15:34Z`.
+- All eight apex pages and 57 script/style assets match the local build.
+  Actual apex first-frame traces pass on Chromium/WebKit at 390px Future and
+  1440px Classic: initial opening, reload and clicking Profile (12 traces).
+  Every observed header frame has its bitmap ready; zero neutral bitmap
+  network requests occur, even with such requests deliberately delayed.
+  Recorded WebKit frames also retain the avatar through reload/navigation.
+  Evidence: `output/audit/guest-first-paint-after-2026-10-20.json`,
+  `guest-inline-apex-f183b78-release-2026-10-20.json`, the associated browser
+  recordings and `guest-inline-webkit-frames-2026-10-20/`.
+- Current local application code matches the release. This release-evidence
+  documentation update is a local follow-up; no unpublished application patch
+  remains. Final receipt: `docs/private/guest-inline-release-2026-10-20.json`.
 - No architectural ambiguity or canon amendment: only delivery of the existing
   header bitmap changes. Phase A remains 69 done / 14 in progress. No helpers
-  started. Next: finish candidate checks, release and repeat the same apex
-  first-frame probe; native post-release acceptance remains distinct.
+  started. Next: reconcile the pending narrow native iPhone reply for this
+  release; do not repeat sign-in, OAuth, wallet or moderation ceremonies.
 
 October 20 Supabase Data API follow-up (A-02/A-35, Canon 11):
 
