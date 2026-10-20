@@ -1009,7 +1009,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 const resolvedProfile = projected ? projectedProfiles[address.toLowerCase()] : profile || (
                     isSameAddress(address, artwork.creator_id || artwork.creator) ? creatorProfile : null
                 );
-                const identityResolved = projected || Boolean(resolvedProfile?.avatar_url) || resolvedProfileAddresses.has(address.toLowerCase());
+                const identityResolved = projected || Boolean(resolvedProfile?.avatar_url) ||
+                    resolvedProfileAddresses.has(address.toLowerCase()) || Object.hasOwn(bidderProfiles, address.toLowerCase());
 
                 const roleCardStyle = !isClassic ? {
                     boxShadow: '0 0 15px rgba(var(--c-accent-rgb), 0.2)',

@@ -23,18 +23,21 @@ October 20 Ownership identity continuation (Canon 05 / A-47 / A-61):
   patch saved to `output/audit/ownership-resume-2026-10-20.patch`. No other
   agents are running. The owner is away from the laptop and can only use an
   iPhone; do independent checks without repeating accepted factor ceremonies.
-- Focused API/client regressions pass 48/48, including chain-colliding IDs,
+- Focused API/client regressions pass 49/49, including chain-colliding IDs,
   role deduplication, public-field allowlisting, confirmed absence versus query
   failure, independent fallback completion and decoded identity display.
   The profile batch starts independently of slow metadata/bids/signals.
+  Final review also covers an uncovered Highest Bidder with no avatar; a
+  completed bidder read must release its loading indicator.
   Production build passes 11 routes and 174 utility checks. Logs:
-  `output/audit/ownership-focused-final-2026-10-20.log` and
-  `output/audit/ownership-build-2026-10-20.log`.
+  `output/audit/ownership-focused-bidder-2026-10-20.log` and
+  `output/audit/ownership-build-bidder-2026-10-20.log`.
 - Full local unit run: 1877 passed, two disposable PostgreSQL startup failures,
   no skips. The affected Donate integration files then pass 25/25 sequentially
   without a code change. Both logs are retained as `ownership-unit-2026-10-20.log`
   and `ownership-donation-db-recheck-2026-10-20.log` under `output/audit/`;
-  do not describe the initial all-at-once run as green.
+  do not describe the initial all-at-once run as green or as a full run of the
+  subsequent Highest Bidder edge-case patch.
 - Hosted checks and release verification are still pending. Historical
   untracked paths remain untouched. Phase A remains 69 done / 14 in progress;
   the actual connected-device criteria must not be replaced by fixture tests.

@@ -102,6 +102,27 @@ test('Ownership reveals the name and decoded avatar together, keeping the rest o
     h.unmount();
 });
 
+test('an uncovered Highest Bidder without an avatar resolves after its profile read', async () => {
+    const {transformWithOxc} = await import('vite');
+    const compiled = await transformWithOxc(pageFunction('renderOwnershipRole'), 'role.jsx', {jsx: {runtime: 'classic'}});
+    const address = '0x1111111111111111111111111111111111111111', bidderProfiles = {};
+    const render = vm.runInNewContext(compiled.code + '\nrenderOwnershipRole;', {
+        React: {createElement: (type, props, ...children) => ({type, props: {...props, children}})},
+        OwnershipIdentity: 'OwnershipIdentity', artwork: {}, creatorProfile: null, bidderProfiles,
+        resolvedProfileAddresses: new Set(), isClassic: true, isZeroAddress: () => false,
+        isSameAddress: (left, right) => left === right,
+        getProfileAvatarUrl: profile => profile?.avatar_url || '/default-avatar.png',
+        getProfileDisplayName: profile => profile?.username || address
+    });
+    const identity = profile => descendants(render({label: 'Highest Bidder', address, profile})).find(node => node.type === 'OwnershipIdentity');
+    assert.equal(identity(null).props.source, '', 'unresolved profiles retain loading feedback');
+    for (const profile of [null, {wallet_address: address, username: 'Collector', avatar_url: null}]) {
+        bidderProfiles[address] = profile;
+        assert.equal(identity(profile).props.source, '/default-avatar.png');
+        assert.equal(identity(profile).props.name, profile?.username || address);
+    }
+});
+
 test('late moderation reads cannot restore staff controls after wallet changes or invalidation', async () => {
     for (const boundary of ['wallet', 'auth']) {
         const response = deferred(), state = {wallet: 'staff', writes: []};
