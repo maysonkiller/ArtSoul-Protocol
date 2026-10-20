@@ -3,6 +3,33 @@
 Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
+
+- Start HEAD `338147d577d30779df1adbe095561d2a9af6e6f0`, same checkout and
+  branch. The owner accepts PR #317's iPhone guest avatar and reports a separate
+  whole-page flash. Record only this narrow acceptance; do not restart ceremonies.
+- Read-only apex probes cover all eight product pages in Chromium and WebKit,
+  390px Future and 1440px Classic, plus home/gallery reloads (40 traces).
+  Chromium paints body content before its theme class in every tested route.
+  Delaying the deferred theme script reproduces the issue in WebKit too:
+  the mobile home button visibly changes from polygon to its intended shape
+  after the first paint. Evidence: `output/audit/page-paint-before-2026-10-20.json`
+  and `page-paint-theme-delay-2026-10-20.json`, plus browser recordings.
+- The head selects the theme early, but body-specific styles wait for
+  DOMContentLoaded. Gallery/artwork also initialize React in Classic before
+  syncing the selected theme. Local repair applies the head-selected class
+  immediately after the body opens and uses that theme for the initial render.
+  Existing body classes, theme switching and wallet behavior are preserved.
+  Theme manager now has cache version 1 and a content guard.
+- Ten new regressions fail before the patch. The first focused run passes
+  95/95. No deployment of this patch yet. Unrelated untracked files remain
+  untouched; no helpers started. Next: complete build/full tests and release
+  verification before claiming this first-paint repair is published.
+- Empty roots while React initially loads and the actual artwork data wait are
+  observed separately. No post-content disappearance or light-background flash
+  was reproduced in these traces. Do not claim every native page transition
+  fixed from this theme repair or hide genuine network waits behind a timeout.
+
 October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
 
 - Start HEAD `5149a1bc432a1f1e11b75875dbaa52d421b62ae4`, same checkout.
@@ -58,8 +85,8 @@ October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
   remains. Final receipt: `docs/private/guest-inline-release-2026-10-20.json`.
 - No architectural ambiguity or canon amendment: only delivery of the existing
   header bitmap changes. Phase A remains 69 done / 14 in progress. No helpers
-  started. Next: reconcile the pending narrow native iPhone reply for this
-  release; do not repeat sign-in, OAuth, wallet or moderation ceremonies.
+  started. The later owner reply accepts the narrow guest-avatar result;
+  continue the separate whole-page investigation above.
 
 October 20 Supabase Data API follow-up (A-02/A-35, Canon 11):
 

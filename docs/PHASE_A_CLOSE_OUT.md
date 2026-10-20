@@ -22,9 +22,10 @@ The focused suite passes 166 checks, the full local suite passes 1924/1924,
 and build plus Linux/Windows CI pass. Twelve actual apex first-frame traces
 pass on Chromium/WebKit across mobile/desktop layouts and both themes.
 Zero neutral-avatar requests occur; recorded WebKit frames retain the bitmap.
-Native post-release acceptance remains pending and is not inferred from these
-desktop engine checks. Other device and publishing criteria
-remain open; no repeated sign-in or factor setup is needed for this display fix.
+The owner subsequently accepts the guest-avatar repair on iPhone, while reporting
+a separate whole-page flash. That new symptom is being checked across all eight
+product pages; it does not reopen wallet, OAuth or factor ceremonies. Other
+device and publishing criteria remain open.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its

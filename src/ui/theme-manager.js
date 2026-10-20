@@ -230,7 +230,11 @@ class ThemeManager {
      * Get current theme
      */
     getTheme() {
-        return this.currentTheme || this.DEFAULT_THEME;
+        // Page entries can render before DOMContentLoaded initializes the
+        // manager. The head already selected the theme for the first paint.
+        return this.currentTheme || (
+            document.documentElement.classList.contains('future') ? 'future' : this.DEFAULT_THEME
+        );
     }
 
     /**

@@ -147,6 +147,10 @@ const inlineNeutralAvatar = `data:image/png;base64,${neutralBitmap.toString('bas
 
 for (const page of sharedHeaderPages) {
     const built = await readFile(path.join(dist, page), 'utf8');
+    const bodyStart = built.indexOf('>', built.indexOf('<body')) + 1;
+    if (!built.slice(bodyStart).match(/^\s*<script>document\.body\.classList\.add\(document\.documentElement\.classList\.contains\('future'\) \? 'future' : 'classic'\);<\/script>/)) {
+        throw new Error(`${page} must apply the prepaint theme before visible body content`);
+    }
     const shellAvatar = built.match(/<img data-avatar-image[^>]*>/)?.[0];
     if (!shellAvatar) {
         throw new Error(`${page} does not ship the static shared-header avatar`);

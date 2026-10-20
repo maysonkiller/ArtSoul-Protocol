@@ -46,7 +46,7 @@
     <link rel="stylesheet" href="/simplified-ui.css?v=1">
     <script src="/storage-image.js?v=3" defer></script>
     <script src="/base-network.js?v=2" defer></script>
-    <script src="/src/ui/theme-manager.js" defer></script>
+    <script src="/src/ui/theme-manager.js?v=1" defer></script>
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
     <script defer src="/src/ui/themed-selects.js?v=1"></script>
     <script defer src="/src/ui/theme-validator.js"></script>
@@ -562,6 +562,7 @@
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
 </head>
 <body>
+    <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
     <header class="site-header">
         <div class="site-header-shell">
             <div class="site-header-row">

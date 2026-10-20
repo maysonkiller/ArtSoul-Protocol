@@ -23,7 +23,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         }
 
         function GalleryPage() {
-            const [theme, setTheme] = useState('classic');
+            const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
             const [artworkCorpus, setArtworkCorpus] = useState([]);
             const [loading, setLoading] = useState(true);
             const loadSequenceRef = useRef(0);
