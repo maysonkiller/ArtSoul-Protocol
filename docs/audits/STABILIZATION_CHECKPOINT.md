@@ -3,6 +3,47 @@
 Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
+
+- Start HEAD `5149a1bc432a1f1e11b75875dbaa52d421b62ae4`, same checkout.
+  The Supabase follow-up below is merged as PR #316 and deployed successfully
+  (`7201555402`). Preserve the unrelated untracked files already listed below.
+- The owner's new 9.68-second iPhone recording shows the guest bitmap absent
+  while its button/name are visible at approximately 1.15, 2.75 and 4.25 seconds.
+  This contradicts full acceptance of PR #314; its same-source assignment fix
+  remains valid, but did not eliminate the initial image fetch/decode gap.
+  Frame sheets: `output/audit/guest-video-2026-10-20/`.
+- Read-only apex probes reproduce the gap in Chromium and WebKit with an
+  explicitly delayed image response and empty browser contexts. The shared
+  optimizer also changes the unmarked header image to lazy loading. Evidence:
+  `output/audit/guest-first-paint-before-2026-10-20.json`. This desktop WebKit
+  run is not a substitute for the native recording or native post-repair proof.
+- Local repair: embed the unchanged canonical PNG into each shared header at
+  dev/build time, keep `/default-avatar.png` as its logical identity, preserve
+  its embedded source during prepaint, and declare eager synchronous decoding.
+  This removes a separate first-frame network dependency, without hiding the
+  button, changing the logo, adding a dependency or changing wallet behavior.
+  The eight pages use bridge version 7 and dropdown version 56. Cost: about 34 KiB of raw HTML per page;
+  compression reduces the transfer overhead. Other profile images stay external.
+- Two new cold-load regressions fail before the repair. A further pre-release
+  case catches a new fetch on logout from a cached connected avatar. The bridge
+  now retains its embedded neutral bitmap for logout, wallet switches and image
+  failures as well. Its logical identity remains the canonical URL.
+  The expanded focused suite passes **166/166**, including connected-preview/account-switch
+  protection and exact built bitmap bytes on all eight pages. Build passes
+  11 routes/eight headers/174 utilities. Logs: `guest-inline-before`,
+  `guest-inline-lifecycle-focused`, `guest-inline-build-final` under `output/audit/`,
+  all suffixed `-2026-10-20.log`.
+- Full local unit run before the logout follow-up: **1923/1923 pass, zero skips**, log
+  `output/audit/guest-inline-full-unit-2026-10-20.log`. PR #317 is the release
+  candidate. Its earlier preview is deployed; final candidate CI and apex acceptance remain
+  required. Build assertions also run as a hard gate in `verify-build.mjs`;
+  the extra built-output unit case explicitly skips only without a local build.
+- No architectural ambiguity or canon amendment: only delivery of the existing
+  header bitmap changes. Phase A remains 69 done / 14 in progress. No helpers
+  started. Next: finish candidate checks, release and repeat the same apex
+  first-frame probe; native post-release acceptance remains distinct.
+
 October 20 Supabase Data API follow-up (A-02/A-35, Canon 11):
 
 - Start HEAD `eefdab05ad39c259f8b111c4fa6608d70963122a`; same checkout. Preserve

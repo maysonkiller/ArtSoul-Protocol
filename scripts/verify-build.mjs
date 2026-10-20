@@ -121,14 +121,9 @@ for (const entry of expectedEntries) {
     }
 }
 
-// The shared account button must resolve to exactly ONE neutral avatar URL in
-// the built output. Vite used to rewrite the static header's
-// '/default-avatar.png' to a hashed /assets/default-avatar-<hash>.png while the
-// legacy avatar-dropdown.js kept the literal, so the built pages and the
-// component disagreed about the same picture: the component saw a different
-// src, rewrote the already-rendered image and forced a second request plus a
-// blank bitmap frame on every page load. Source-only tests cannot see this
-// because the rewrite exists only after a build.
+// Embed the canonical bitmap in the shared header, with its logical URL intact.
+// A separate image request leaves a blank first frame on iPhone reload even when
+// hydration never changes src. No hash variant or replacement artwork is allowed.
 const sharedHeaderPages = [
     'index.html',
     'gallery.html',
@@ -147,19 +142,20 @@ if (!componentNeutralAvatar) {
 await access(path.join(dist, componentNeutralAvatar.replace(/^\//, ''))).catch(() => {
     throw new Error(`The neutral avatar ${componentNeutralAvatar} was not emitted to dist`);
 });
+const neutralBitmap = await readFile(path.join(dist, componentNeutralAvatar.replace(/^\//, '')));
+const inlineNeutralAvatar = `data:image/png;base64,${neutralBitmap.toString('base64')}`;
 
 for (const page of sharedHeaderPages) {
     const built = await readFile(path.join(dist, page), 'utf8');
-    const shellAvatar = built.match(/<img data-avatar-image src="([^"]+)"/)?.[1];
+    const shellAvatar = built.match(/<img data-avatar-image[^>]*>/)?.[0];
     if (!shellAvatar) {
         throw new Error(`${page} does not ship the static shared-header avatar`);
     }
-    if (shellAvatar !== componentNeutralAvatar) {
-        throw new Error(
-            `${page} static header avatar ${shellAvatar} does not match `
-            + `avatar-dropdown.js NEUTRAL_AVATAR_URL ${componentNeutralAvatar}. `
-            + 'Two URLs for the same picture cause a duplicate request and a blank frame.'
-        );
+    if (!shellAvatar.includes(`src="${inlineNeutralAvatar}"`)
+        || !shellAvatar.includes(`data-avatar-source="${componentNeutralAvatar}"`)
+        || !shellAvatar.includes('loading="eager"')
+        || !shellAvatar.includes('decoding="sync"')) {
+        throw new Error(`${page} must embed the canonical neutral avatar for eager synchronous paint`);
     }
     if (!built.includes('data-avatar-resolving')) {
         throw new Error(`${page} is missing the coherent resolving label placeholder`);

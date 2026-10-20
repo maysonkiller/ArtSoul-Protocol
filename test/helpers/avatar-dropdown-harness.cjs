@@ -306,16 +306,13 @@ function createAvatarHarness(options = {}) {
   const navButtons = new FakeElement('div', harness);
   navButtons.id = 'navButtons';
   body.appendChild(navButtons);
-  // The static shell every product page ships inside #navButtons. Materialising
-  // it reproduces the real first paint: the browser has already painted the
-  // canonical avatar before a single line of component code runs.
+  // Materialize the parsed shell. Warm-cache tests assume decoded pixels;
+  // cold-load tests must opt out: HTML alone does not load an external bitmap.
   if (options.staticShellHtml) {
     navButtons.innerHTML = options.staticShellHtml;
     navButtons.dataset.avatarRenderKey = 'initializing';
-    // The static markup is part of the document: it is already decoded when the
-    // first paint happens, exactly like a browser serving it from cache.
     const shellImage = navButtons.querySelector('[data-avatar-image]');
-    if (shellImage) shellImage.complete = true;
+    if (shellImage) shellImage.complete = options.staticShellDecoded !== false;
   }
 
   const storage = new Map(Object.entries(options.storage || {}));

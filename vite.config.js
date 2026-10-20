@@ -101,6 +101,25 @@ export function prioritizePublicPageEntry(html, page) {
     return html.replace(entry, '').replace(legacy, `${entry}\n    ${legacy}`);
 }
 
+function inlineSharedHeaderAvatar() {
+    return {
+        name: 'inline-shared-header-avatar',
+        transformIndexHtml: {
+            order: 'pre',
+            async handler(html) {
+                const source = '<img data-avatar-image src="/default-avatar.png"';
+                if (!html.includes(source)) return html;
+                // The guest shell must not wait for an image request on reload.
+                // Keep the existing bitmap and its logical URL; only its delivery
+                // changes. This hook runs in dev and build, before Vite parses HTML.
+                const bitmap = await readFile(path.join(root, 'public/default-avatar.png'));
+                return html.replace(source,
+                    `<img data-avatar-image src="data:image/png;base64,${bitmap.toString('base64')}" data-avatar-source="/default-avatar.png"`);
+            }
+        }
+    };
+}
+
 function keepLegacyRuntimeModulesSeparate() {
     return {
         name: 'keep-legacy-runtime-modules-separate',
@@ -159,7 +178,7 @@ function copyLegacyRuntimeAssets() {
 
 export default defineConfig({
     appType: 'mpa',
-    plugins: [react(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()],
+    plugins: [react(), inlineSharedHeaderAvatar(), keepLegacyRuntimeModulesSeparate(), copyLegacyRuntimeAssets()],
     build: {
         outDir,
         emptyOutDir: true,

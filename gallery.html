@@ -36,7 +36,7 @@
     <link rel="icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="shortcut icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
-    <script src="/header-prepaint.js?v=5"></script>
+    <script src="/header-prepaint.js?v=7"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/unified-styles.css?v=48">
     <link rel="stylesheet" href="/button-effects.css?v=5">
@@ -65,7 +65,7 @@
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
     <script src="/src/ui/components/artwork-card.js?v=19" defer></script>
     <script src="/data-prefetch.js?v=6" async></script>
-    <script src="/avatar-dropdown.js?v=55" defer></script>
+    <script src="/avatar-dropdown.js?v=56" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <style>
         @keyframes spin {
@@ -127,7 +127,7 @@
                     <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">
-                                <img data-avatar-image src="/default-avatar.png" alt="ArtSoul">
+                                <img data-avatar-image src="/default-avatar.png" alt="ArtSoul" loading="eager" decoding="sync">
                                 <div class="avatar-info"><div data-avatar-name>ArtSoul Guest</div><div data-avatar-address hidden aria-hidden="true"></div><div data-avatar-resolving aria-hidden="true">Connecting…</div></div>
                                 <svg width="16" height="16" viewBox="0 0 16 16" class="dropdown-arrow menu-chevron" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg>
                             </button>

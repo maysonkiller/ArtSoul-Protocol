@@ -11,13 +11,17 @@ they disagree with this file, they win and this file is stale.
 Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
 
 October 20 owner follow-up accepts the scoped iPhone Ownership appearance.
-A separate guest-header reload flash is reproduced as a redundant same-source
-image assignment in the first-frame bridge and repaired in published PR #314
-(`56b17ef`), with 164 expanded checks, 1905 passing local unit checks, green
-Linux/Windows CI and a successful build. All eight apex header pages and 57
-assets match. Chromium guest reload/layout checks pass; native iPhone post-repair
-feedback is still pending in the current checkpoint. Other device and publishing criteria remain
-open; no repeated sign-in or factor setup is needed for this display fix.
+The subsequent native recording shows the guest-header reload flash persists
+after PR #314 (`56b17ef`): its redundant-source repair did not remove the
+initial bitmap request. Cold-load Chromium/WebKit probes reproduce a visible
+guest label before its image is ready, including the optimizer marking it lazy.
+The local follow-up embeds the same bitmap in all eight headers, preserves its
+logical identity during prepaint and declares eager synchronous decoding.
+Logout and failed-image fallbacks reuse the embedded bitmap as well.
+The focused suite passes 166 checks and the build passes. Release/first-frame
+evidence is tracked in the current checkpoint; native post-repair acceptance
+is not inferred from a final screenshot. Other device and publishing criteria
+remain open; no repeated sign-in or factor setup is needed for this display fix.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its
