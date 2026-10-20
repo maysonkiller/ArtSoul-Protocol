@@ -558,11 +558,11 @@ test('every shared-header page boots the header in the same order with the same 
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
     assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=48">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=5"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=6"><\/script>/, `${page} prepaint pin`);
     assert.match(html, /<script src="\/avatar-dropdown\.js\?v=55" defer><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=48');
-    const prepaint = html.indexOf('header-prepaint.js?v=5');
+    const prepaint = html.indexOf('header-prepaint.js?v=6');
     const component = html.indexOf('avatar-dropdown.js?v=55');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
     // wallet-runtime-loader.js and appkit-init is imported from inside it. The
@@ -972,7 +972,7 @@ test('the component awaits decode before touching the visible image', () => {
 // 11 — the production-only defects the source-reading tests could not see
 // ---------------------------------------------------------------------------
 
-test('the built output resolves the neutral avatar to exactly one URL', () => {
+test('the built output embeds the canonical neutral avatar without a second URL', () => {
   // The regression that shipped: Vite rewrote the static header avatar to a
   // hashed /assets/default-avatar-<hash>.png while avatar-dropdown.js kept the
   // literal '/default-avatar.png'. The component then saw a "different" src on
@@ -984,8 +984,8 @@ test('the built output resolves the neutral avatar to exactly one URL', () => {
     // invariant is enforced hard by scripts/verify-build.mjs on every build.
     assert.match(
       fs.readFileSync(path.join(ROOT, 'scripts', 'verify-build.mjs'), 'utf8'),
-      /does not match[\s\S]*?NEUTRAL_AVATAR_URL/,
-      'verify-build.mjs must enforce the single neutral avatar URL'
+      /must embed the canonical neutral avatar/,
+      'verify-build.mjs must enforce the embedded canonical bitmap'
     );
     return;
   }
@@ -994,11 +994,14 @@ test('the built output resolves the neutral avatar to exactly one URL', () => {
   const componentUrl = component.match(/const NEUTRAL_AVATAR_URL = '([^']+)';/)?.[1];
   assert.ok(componentUrl, 'dist/avatar-dropdown.js must declare NEUTRAL_AVATAR_URL');
   assert.equal(fs.existsSync(path.join(distDir, componentUrl.replace(/^\//, ''))), true);
+  const bitmap = fs.readFileSync(path.join(distDir, componentUrl.replace(/^\//, '')));
+  const inlineAvatar = `data:image/png;base64,${bitmap.toString('base64')}`;
 
   for (const page of SHARED_HEADER_PAGES) {
     const built = fs.readFileSync(path.join(distDir, page), 'utf8');
     const shellUrl = built.match(/<img data-avatar-image src="([^"]+)"/)?.[1];
-    assert.equal(shellUrl, componentUrl, `${page}: built shell and component must agree on one neutral avatar`);
+    assert.equal(shellUrl, inlineAvatar, `${page}: built shell must carry the same canonical bitmap`);
+    assert.ok(built.includes(`data-avatar-source="${componentUrl}"`), `${page}: preserve the logical source`);
     assert.match(built, /data-avatar-resolving/, `${page}: built shell must ship the resolving label`);
   }
 

@@ -1,9 +1,6 @@
 // Tiny synchronous first-frame bridge for the shared account button.
 //
-// This file is intentionally small and has no wallet SDK dependency. It only
-// restores a previously confirmed VISUAL identity from localStorage while the
-// deferred account component and wallet provider start. It never authenticates
-// a wallet and never exposes connected-only actions before provider settlement.
+// Restores visual identity only; never authenticates or unlocks wallet actions.
 (function () {
     'use strict';
 
@@ -65,8 +62,7 @@
         return PREVIEW_PATTERN.test(preview.dataUri) ? preview.dataUri : null;
     };
 
-    // Claim to be resolving only with nothing to paint: this label showed for
-    // every line of markup between <head> and hydrate(). See its test.
+    // Mark unresolved sessions only when no validated preview can paint.
     if (!appKitDisconnectedAtBoot && !readPreview()
         && (hasWallet || cachedUiState === 'connected')) {
         document.documentElement.classList.add('wallet-state-resolving');
@@ -86,6 +82,10 @@
         const name = button?.querySelector('[data-avatar-name]');
         const address = button?.querySelector('[data-avatar-address]');
         if (!button || !image || !name || !address) return false;
+        // The build embeds the canonical guest bitmap in HTML for first paint.
+        const shellSource = image.getAttribute('src') || '';
+        const neutralPaint = image.dataset.avatarSource === NEUTRAL_AVATAR_URL
+            && PREVIEW_PATTERN.test(shellSource) ? shellSource : NEUTRAL_AVATAR_URL;
 
         const commit = ({ renderKey, source, paintSource, label, shortAddress, imageIdentity, uiState }) => {
             const displayAddress = shortAddress && label.toLowerCase() !== shortAddress.toLowerCase()
@@ -111,7 +111,7 @@
             commit({
                 renderKey,
                 source: NEUTRAL_AVATAR_URL,
-                paintSource: NEUTRAL_AVATAR_URL,
+                paintSource: neutralPaint,
                 label: 'ArtSoul Guest',
                 shortAddress: '',
                 imageIdentity: 'guest',
@@ -136,9 +136,7 @@
             return true;
         }
 
-        // A name beside the neutral avatar is half an identity, so a cached
-        // label paints here only when the cached avatar IS the neutral one:
-        // that account has nothing better arriving. See its test.
+        // A cached name paints alone only for a confirmed pictureless profile.
         const settledWithoutPicture = identity
             && identity.wallet === wallet
             && identity.avatarUrl === NEUTRAL_AVATAR_URL;
@@ -146,7 +144,7 @@
         commit({
             renderKey: `resolving:${wallet}`,
             source: NEUTRAL_AVATAR_URL,
-            paintSource: NEUTRAL_AVATAR_URL,
+            paintSource: neutralPaint,
             label: settledWithoutPicture ? identity.name : shortAddress,
             shortAddress,
             imageIdentity: shortAddress,

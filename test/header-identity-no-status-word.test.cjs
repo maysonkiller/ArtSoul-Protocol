@@ -23,7 +23,7 @@ test('a name still never appears beside an undecoded custom avatar', () => {
   // The image half of the resolving branch is untouched: neutral paints
   // instantly, so the button never blanks while a remote avatar loads.
   const resolving = prepaint.slice(prepaint.indexOf('const settledWithoutPicture'));
-  assert.match(resolving, /source: NEUTRAL_AVATAR_URL,\s*\n\s*paintSource: NEUTRAL_AVATAR_URL,/);
+  assert.match(resolving, /source: NEUTRAL_AVATAR_URL,\s*\n\s*paintSource: neutralPaint,/);
   assert.match(resolving, /uiState: 'resolving'/);
 });
 
