@@ -1,0 +1,16 @@
+/* Native top-layer dialogs do not change the page's sticky-header scroll root.
+   Keep readable input text so focusing a field does not trigger mobile zoom. */
+dialog.report-modal {
+    margin: auto;
+    width: min(560px, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overscroll-behavior: contain;
+}
+dialog.report-modal::backdrop {
+    background: color-mix(in srgb, var(--c-bg) 84%, transparent);
+}
+dialog.report-modal .report-field {
+    font-size: 16px;
+    min-width: 0;
+}

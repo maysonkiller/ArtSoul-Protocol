@@ -3,6 +3,38 @@
 Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 20 mobile actions follow-up (Canon 05/11/12/16, A-33/A-47/A-71):
+
+- Start HEAD `788ea280e9b8bc6d6ca1128f1497c71200d28dab`, same checkout.
+  The owner reports improvement after the page-paint releases, then three
+  concrete failures: Donate/Report zoom and displaced page after closing;
+  X sharing uses the wrong image; mobile AI analysis does not progress before
+  publishing. Do not treat this as complete native visual/publishing acceptance.
+- Public apex probes reproduce Report changing the body scroll root: at a
+  390px layout the sticky header moves from y=0 to y=-756 when opening the
+  form. Donate's initially focused amount input and Report fields compute to
+  14px, outside the existing mobile 16px zoom-prevention rule. Desktop WebKit
+  does not reproduce physical iPhone keyboard zoom; that limit is explicit.
+  Evidence: `output/audit/artwork-actions-before-2026-10-20.json`.
+- Local dialog repair uses the native top layer for Report, as Donate already
+  does, without mutating body overflow. Both focus a close control on opening,
+  preserve scroll on focus return, and use 16px input text within bounded
+  dynamic-viewport dialogs. Manual page zoom remains enabled. Report submission,
+  donation recipient/value and wallet confirmation are unchanged. Focused
+  regression: 35/35; production build passes, no new dependency.
+- Isolated Chromium/WebKit touch probes of the existing upload entry reach
+  analysis and Ready to publish when the synthetic wallet is already authorized.
+  No provider, signature, model, upload or database write occurs in that fixture.
+  This proves the click handler runs in that path, not native wallet handoff.
+  The pending owner clarification concerns browser/wallet and any status text.
+  Evidence: `output/audit/upload-click-before-2026-10-20.json`.
+- X currently receives generic static ArtSoul metadata and a share URL copied
+  from the address bar, including action parameters. Work-specific server
+  metadata and contextual draft text remain to implement and verify.
+- No helpers started. Preserve the unrelated untracked authority-policy files,
+  `.codex/` and `output/`. Next: verify/release the bounded action-dialog repair,
+  then finish sharing and the connected mobile analysis path.
+
 October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
 
 - Start HEAD `338147d577d30779df1adbe095561d2a9af6e6f0`, same checkout and
@@ -58,8 +90,28 @@ October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
   This follows [CSS Fonts](https://www.w3.org/TR/css-fonts-4/#font-display-desc)
   and the [Google Fonts API](https://developers.google.com/fonts/docs/css2).
   No new asset, dependency, layout color or architecture change.
-  The new policy guard fails before the patch. Next: build/test and publish the
-  font-policy follow-up, then repeat the delayed-font trace on the apex.
+  The new policy guard fails before the patch; the final focused suite passes
+  101/101 and build passes. PR #319 candidate
+  `64520ba0774d044aceaf265b020bf2b9da970003` passes CI `39443444864`
+  (Linux 1904 pass/2 skip, Windows 1735 pass/15 skip, zero failures and
+  46 contract tests per OS). Preview `7203029815` is verified.
+- PR #319 is published as `6a255e31f2af3d0bbb091e319f9afabcc2d71f1b`.
+  Production deployment `7203138766` succeeds at `2026-10-20T14:58:44Z`.
+  Eight product pages, the lab font policy and 57 script/style assets match;
+  guest moderation access remains denied. The final apex delayed-font run
+  passes eight open/reload traces in Chromium/WebKit at 390px Future and
+  1440px Classic. The browser receives `optional`; each heading keeps exactly
+  the same measured text width before/after the delayed font response.
+  Evidence: `output/audit/page-paint-after-fonts-2026-10-20.json` and
+  `page-font-apex-6a255e3-release-2026-10-20.json`.
+- The 1934-test local full run belongs to the preceding theme candidate, not
+  the font follow-up; the latter has its own focused/build/full-CI evidence
+  above. No unpublished application patch remains. The final release receipt
+  is `docs/private/page-paint-release-2026-10-20.json`.
+- Native acceptance of the two page repairs remains pending; the earlier guest
+  avatar acceptance stays accepted. Phase A remains 69 done / 14 in progress.
+  No architecture amendment or additional agent was needed. Next: reconcile
+  the owner's pending iPhone page-flash reply against the published version.
 
 October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
 
