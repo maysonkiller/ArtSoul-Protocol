@@ -31,6 +31,11 @@ October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
   11 routes/eight headers/174 utilities. Logs: `guest-inline-before`,
   `guest-inline-focused-final`, `guest-inline-build` under `output/audit/`,
   all suffixed `-2026-10-20.log`.
+- Full local unit run: **1923/1923 pass, zero skips**, log
+  `output/audit/guest-inline-full-unit-2026-10-20.log`. PR #317 is the release
+  candidate. Its preview is deployed; candidate CI and apex acceptance remain
+  required. Build assertions also run as a hard gate in `verify-build.mjs`;
+  the extra built-output unit case explicitly skips only without a local build.
 - No architectural ambiguity or canon amendment: only delivery of the existing
   header bitmap changes. Phase A remains 69 done / 14 in progress. No helpers
   started. Next: finish candidate checks, release and repeat the same apex

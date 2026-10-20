@@ -10,7 +10,7 @@ const inline = `data:image/png;base64,${neutral.toString('base64')}`;
 const pages = ['index', 'gallery', 'profile', 'artwork', 'upload', 'admin', 'collection-builder', 'docs-protocol'];
 const shell = fs.readFileSync('index.html', 'utf8')
   .match(/<div class="avatar-dropdown-container">[\s\S]*?<\/button>\s*<\/div>/)[0]
-  .replace('src="/default-avatar.png"', `src="${inline}" data-avatar-source="/default-avatar.png" loading="eager" decoding="sync"`);
+  .replace('src="/default-avatar.png"', `src="${inline}" data-avatar-source="/default-avatar.png"`);
 
 test('guest prepaint and wallet initialization preserve embedded pixels without a network image request', async () => {
   const harness = createAvatarHarness({ staticShellHtml: shell, staticShellDecoded: false, prepaint: true, settled: false });
@@ -57,7 +57,8 @@ test('embedded guest pixels do not replace a validated connected preview or reve
   assert.equal(switched.avatarSource(), '/default-avatar.png');
 });
 
-test('built shared headers carry the exact canonical guest bitmap before JavaScript or network images', () => {
+test('built shared headers carry the exact canonical guest bitmap before JavaScript or network images',
+  { skip: !fs.existsSync('dist/index.html') }, () => {
   for (const page of pages) {
     const html = fs.readFileSync(`dist/${page}.html`, 'utf8');
     const tag = html.match(/<img data-avatar-image[^>]*>/)?.[0];
