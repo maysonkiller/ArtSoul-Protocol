@@ -12,6 +12,8 @@
     // The previously generated stylized "A" data-URI is gone: it read as a
     // third identity and was mistaken for a stale cached avatar.
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
+    // Reuse the embedded bitmap on logout and fallback as well as initial paint.
+    const NEUTRAL_AVATAR_PAINT = window.ArtSoulHeaderPrepaint?.neutralAvatar || NEUTRAL_AVATAR_URL;
     // The account button paints a 40px circle; 128 covers a 3x screen. It is
     // one number because the box is square and the sizing asks for a square.
     const HEADER_BUTTON_AVATAR_SIZE = 128;
@@ -296,7 +298,7 @@
                 // so a later render for the same avatar recognises it as already
                 // displayed instead of swapping the image again.
                 avatarUrl: nextAvatarUrl,
-                paintSrc: nextAvatarUrl,
+                paintSrc: nextAvatarUrl === NEUTRAL_AVATAR_URL ? NEUTRAL_AVATAR_PAINT : nextAvatarUrl,
                 alt: avatarAlt || nextName,
                 name: nextName,
                 // A wallet with no profile name already uses its shortened
@@ -378,7 +380,7 @@
             // is still committed TOGETHER with the connected name and address as
             // one final state. It never stays pending.
             const source = failed ? NEUTRAL_AVATAR_URL : snapshot.avatarUrl;
-            const paintSrc = failed ? NEUTRAL_AVATAR_URL : (snapshot.paintSrc || snapshot.avatarUrl);
+            const paintSrc = failed ? NEUTRAL_AVATAR_PAINT : (snapshot.paintSrc || snapshot.avatarUrl);
 
             if (image) {
                 if (image.getAttribute('src') !== paintSrc) image.src = paintSrc;
@@ -424,7 +426,7 @@
             const nameNode = button.querySelector('[data-avatar-name]');
             const addressNode = button.querySelector('[data-avatar-address]');
             if (image) {
-                if (image.getAttribute('src') !== NEUTRAL_AVATAR_URL) image.src = NEUTRAL_AVATAR_URL;
+                if (image.getAttribute('src') !== NEUTRAL_AVATAR_PAINT) image.src = NEUTRAL_AVATAR_PAINT;
                 image.alt = 'ArtSoul';
                 image.dataset.avatarIdentity = snapshot.identity;
             }

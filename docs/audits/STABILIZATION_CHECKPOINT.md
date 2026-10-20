@@ -23,17 +23,20 @@ October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
   its embedded source during prepaint, and declare eager synchronous decoding.
   This removes a separate first-frame network dependency, without hiding the
   button, changing the logo, adding a dependency or changing wallet behavior.
-  The eight pages use bridge version 6. Cost: about 34 KiB of raw HTML per page;
+  The eight pages use bridge version 7 and dropdown version 56. Cost: about 34 KiB of raw HTML per page;
   compression reduces the transfer overhead. Other profile images stay external.
-- Two new cold-load regressions fail before the repair. The expanded focused
-  suite now passes **165/165**, including connected-preview/account-switch
+- Two new cold-load regressions fail before the repair. A further pre-release
+  case catches a new fetch on logout from a cached connected avatar. The bridge
+  now retains its embedded neutral bitmap for logout, wallet switches and image
+  failures as well. Its logical identity remains the canonical URL.
+  The expanded focused suite passes **166/166**, including connected-preview/account-switch
   protection and exact built bitmap bytes on all eight pages. Build passes
   11 routes/eight headers/174 utilities. Logs: `guest-inline-before`,
-  `guest-inline-focused-final`, `guest-inline-build` under `output/audit/`,
+  `guest-inline-lifecycle-focused`, `guest-inline-build-final` under `output/audit/`,
   all suffixed `-2026-10-20.log`.
-- Full local unit run: **1923/1923 pass, zero skips**, log
+- Full local unit run before the logout follow-up: **1923/1923 pass, zero skips**, log
   `output/audit/guest-inline-full-unit-2026-10-20.log`. PR #317 is the release
-  candidate. Its preview is deployed; candidate CI and apex acceptance remain
+  candidate. Its earlier preview is deployed; final candidate CI and apex acceptance remain
   required. Build assertions also run as a hard gate in `verify-build.mjs`;
   the extra built-output unit case explicitly skips only without a local build.
 - No architectural ambiguity or canon amendment: only delivery of the existing

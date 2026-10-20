@@ -10,6 +10,7 @@
     const PRELOADABLE_AVATAR_URL = /^(?:https:\/\/[^/\s]|\/(?!\/))/;
     const PREVIEW_MAX_LENGTH = 32 * 1024;
     const NEUTRAL_AVATAR_URL = '/default-avatar.png';
+    let neutralAvatar = NEUTRAL_AVATAR_URL;
 
     const read = (key) => {
         try {
@@ -62,7 +63,6 @@
         return PREVIEW_PATTERN.test(preview.dataUri) ? preview.dataUri : null;
     };
 
-    // Mark unresolved sessions only when no validated preview can paint.
     if (!appKitDisconnectedAtBoot && !readPreview()
         && (hasWallet || cachedUiState === 'connected')) {
         document.documentElement.classList.add('wallet-state-resolving');
@@ -82,10 +82,10 @@
         const name = button?.querySelector('[data-avatar-name]');
         const address = button?.querySelector('[data-avatar-address]');
         if (!button || !image || !name || !address) return false;
-        // The build embeds the canonical guest bitmap in HTML for first paint.
         const shellSource = image.getAttribute('src') || '';
-        const neutralPaint = image.dataset.avatarSource === NEUTRAL_AVATAR_URL
-            && PREVIEW_PATTERN.test(shellSource) ? shellSource : NEUTRAL_AVATAR_URL;
+        if (image.dataset.avatarSource === NEUTRAL_AVATAR_URL && PREVIEW_PATTERN.test(shellSource)) {
+            neutralAvatar = shellSource;
+        }
 
         const commit = ({ renderKey, source, paintSource, label, shortAddress, imageIdentity, uiState }) => {
             const displayAddress = shortAddress && label.toLowerCase() !== shortAddress.toLowerCase()
@@ -111,7 +111,7 @@
             commit({
                 renderKey,
                 source: NEUTRAL_AVATAR_URL,
-                paintSource: neutralPaint,
+                paintSource: neutralAvatar,
                 label: 'ArtSoul Guest',
                 shortAddress: '',
                 imageIdentity: 'guest',
@@ -136,7 +136,6 @@
             return true;
         }
 
-        // A cached name paints alone only for a confirmed pictureless profile.
         const settledWithoutPicture = identity
             && identity.wallet === wallet
             && identity.avatarUrl === NEUTRAL_AVATAR_URL;
@@ -144,7 +143,7 @@
         commit({
             renderKey: `resolving:${wallet}`,
             source: NEUTRAL_AVATAR_URL,
-            paintSource: neutralPaint,
+            paintSource: neutralAvatar,
             label: settledWithoutPicture ? identity.name : shortAddress,
             shortAddress,
             imageIdentity: shortAddress,
@@ -155,6 +154,7 @@
 
     window.ArtSoulHeaderPrepaint = Object.freeze({
         hydrate,
+        get neutralAvatar() { return neutralAvatar; },
         boot: Object.freeze({ appKitDisconnectedAtBoot })
     });
 })();

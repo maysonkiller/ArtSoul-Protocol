@@ -17,7 +17,8 @@ initial bitmap request. Cold-load Chromium/WebKit probes reproduce a visible
 guest label before its image is ready, including the optimizer marking it lazy.
 The local follow-up embeds the same bitmap in all eight headers, preserves its
 logical identity during prepaint and declares eager synchronous decoding.
-The focused suite passes 165 checks and the build passes. Release/first-frame
+Logout and failed-image fallbacks reuse the embedded bitmap as well.
+The focused suite passes 166 checks and the build passes. Release/first-frame
 evidence is tracked in the current checkpoint; native post-repair acceptance
 is not inferred from a final screenshot. Other device and publishing criteria
 remain open; no repeated sign-in or factor setup is needed for this display fix.

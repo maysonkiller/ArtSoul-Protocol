@@ -26,7 +26,7 @@ test('guest avatar uses the local ArtSoul image with the generated fallback', ()
   // with the connected name and address as one final state, so the identity is
   // never left pending and the visible <img> is never blanked.
   assert.match(avatarDropdown, /const source = failed \? NEUTRAL_AVATAR_URL : snapshot\.avatarUrl;/);
-  assert.match(avatarDropdown, /const paintSrc = failed \? NEUTRAL_AVATAR_URL : \(snapshot\.paintSrc \|\| snapshot\.avatarUrl\);/);
+  assert.match(avatarDropdown, /const paintSrc = failed \? NEUTRAL_AVATAR_PAINT : \(snapshot\.paintSrc \|\| snapshot\.avatarUrl\);/);
   // One bounded retry without CORS so an avatar host that sends no CORS headers
   // still renders; only then does the load count as failed.
   assert.match(avatarDropdown, /preloader\.onerror = \(\) => \{\s*if \(corsAttempt\) \{[\s\S]*?withoutCors: true[\s\S]*?\}\s*settle\(true\);/);
@@ -132,8 +132,8 @@ test('every product page loads the same account menu and stylesheet versions', (
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=48/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=6"><\/script>/, `${page} must load the first-frame bridge`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=55" defer><\/script>/, `${page} must load the deferred account menu`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=7"><\/script>/, `${page} must load the first-frame bridge`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=56" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(
       html,
       /<\/header>\s*<script>window\.ArtSoulHeaderPrepaint\?\.hydrate\(document\.getElementById\('navButtons'\)\);<\/script>/,

@@ -24,8 +24,8 @@ const RUNTIME = {
   'modal-system.js': { version: 1, sha256: '73be2dadc241ea78' },
   'webmcp-tools.js': { version: 4, sha256: '0b6e7d5cd51be343' },
   'voice-commands.js': { version: 1, sha256: '4aab5e22a42d8cbb' },
-  'avatar-dropdown.js': { version: 55, sha256: '86c568f50323df8f' },
-  'header-prepaint.js': { version: 6, sha256: '483ff5cf03583b0b' },
+  'avatar-dropdown.js': { version: 56, sha256: 'd5588e4f9d2b8f46' },
+  'header-prepaint.js': { version: 7, sha256: 'b3a85b7f198e2e24' },
   'data-prefetch.js': { version: 6, sha256: '339cad21ebc03f47' },
   'base-network.js': { version: 2, sha256: 'bc527f32ea3df5f9' },
   'storage-image.js': { version: 3, sha256: '99078de8e41f962d' }

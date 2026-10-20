@@ -47,6 +47,10 @@ test('embedded guest pixels do not replace a validated connected preview or reve
   assert.equal(restored.avatarSrc(), preview);
   assert.equal(restored.avatarName(), 'Artist');
   assert.equal(restored.avatarSource(), source);
+  restored.dropdown.renderConnectButton();
+  assert.equal(restored.avatarSrc(), inline, 'logout must reuse embedded guest pixels, not start a new fetch');
+  assert.equal(restored.avatarName(), 'ArtSoul Guest');
+  assert.equal(restored.imageLoads.includes('/default-avatar.png'), false);
   const switchedWallet = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
   const switched = createAvatarHarness({
     staticShellHtml: shell, prepaint: true, settled: false,
@@ -55,6 +59,21 @@ test('embedded guest pixels do not replace a validated connected preview or reve
   assert.equal(switched.avatarSrc(), inline);
   assert.equal(switched.avatarName(), '0xbbbb...bbbb');
   assert.equal(switched.avatarSource(), '/default-avatar.png');
+});
+
+test('a failed profile picture reuses the embedded fallback without a new bitmap request', async () => {
+  const missing = 'https://cdn.artsoul.test/missing.png';
+  const harness = createAvatarHarness({
+    staticShellHtml: shell, prepaint: true, settled: false, failingImages: new Set([missing])
+  });
+  harness.dropdown.updateStableButton({
+    avatarUrl: missing, name: 'Artist', address: '0xaaaa...aaaa', stateKey: 'missing-picture'
+  });
+  await harness.flush();
+  assert.equal(harness.avatarSrc(), inline);
+  assert.equal(harness.avatarSource(), '/default-avatar.png');
+  assert.equal(harness.avatarName(), 'Artist');
+  assert.equal(harness.imageLoads.includes('/default-avatar.png'), false);
 });
 
 test('built shared headers carry the exact canonical guest bitmap before JavaScript or network images',
