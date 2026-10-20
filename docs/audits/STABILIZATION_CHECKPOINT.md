@@ -11,9 +11,9 @@ October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
 - Read-only apex probes cover all eight product pages in Chromium and WebKit,
   390px Future and 1440px Classic, plus home/gallery reloads (40 traces).
   Chromium paints body content before its theme class in every tested route.
-  Delaying the deferred theme script reproduces the issue in WebKit too:
-  the mobile home button visibly changes from polygon to its intended shape
-  after the first paint. Evidence: `output/audit/page-paint-before-2026-10-20.json`
+  Delaying the deferred theme script reproduces unthemed body frames in WebKit
+  too. Body-specific CSS includes the Future loading mark. Evidence:
+  `output/audit/page-paint-before-2026-10-20.json`
   and `page-paint-theme-delay-2026-10-20.json`, plus browser recordings.
 - The head selects the theme early, but body-specific styles wait for
   DOMContentLoaded. Gallery/artwork also initialize React in Classic before
@@ -21,14 +21,45 @@ October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
   immediately after the body opens and uses that theme for the initial render.
   Existing body classes, theme switching and wallet behavior are preserved.
   Theme manager now has cache version 1 and a content guard.
-- Ten new regressions fail before the patch. The first focused run passes
-  95/95. No deployment of this patch yet. Unrelated untracked files remain
-  untouched; no helpers started. Next: complete build/full tests and release
-  verification before claiming this first-paint repair is published.
+- Ten new regressions fail before the patch. Focused checks pass 95/95, the
+  local full suite passes 1934/1934 without skips, and build passes all 11 routes.
+  PR #318 candidate `31ec2df54a17d29cf6ddd489e25a03267fa200bb` passes CI
+  `39440988257` (Linux 1903 pass/2 skip, Windows 1734 pass/15 skip,
+  zero failures; 46 contract tests per OS). Preview `7202634078` is verified.
+  Merge `1a836d9de280268860d4c9da96811009352b85d8` is deployed successfully as
+  `7202749229` at `2026-10-20T14:42:41Z`; post-merge CI `39441659833` passes.
+  All eight apex pages and 57 script/style assets match the build; guest access
+  remains denied. The app patch is published, and unrelated files are untouched.
 - Empty roots while React initially loads and the actual artwork data wait are
   observed separately. No post-content disappearance or light-background flash
   was reproduced in these traces. Do not claim every native page transition
   fixed from this theme repair or hide genuine network waits behind a timeout.
+- Evidence correction: the initial generic `.btn-main` measurement changed
+  targets when the account menu was inserted. Withdraw that button-shape
+  inference; it does not invalidate the independently captured body classes.
+  The corrected probe pins the home hero button and checks loading-mark styles.
+- Corrected post-release evidence: 64 route openings cover eight pages, both
+  themes and both viewport widths in Chromium/WebKit. Thirty separate
+  reload/link/Back traces and 12 delayed-theme traces pass. Every observed
+  body frame has the selected theme and the appropriate loading-mark style.
+  Route traces were recovered from the log after an automation click timed out
+  waiting for continuously animated Future decoration to stop. Navigation was
+  rerun using visible links' current pointer positions. These are instrumented
+  desktop engines, not native iOS or BFCache acceptance. Evidence:
+  `page-paint-after-routes`, `page-paint-after-navigation`,
+  `page-paint-after-theme-delay` under `output/audit/`, dated October 20.
+- The video review also reveals a separate late font swap. With a bounded
+  900ms font-response delay, the same heading's width changes from 306.78 to
+  315.14px in Chromium and 307.84 to 315.13px in WebKit after text is already
+  visible. Font weight stays 700. Evidence: `page-paint-fonts-study-2026-10-20.json`.
+  All nine Inter-loading pages request `display=swap`. The follow-up changes
+  only that policy to `optional`, retaining the family/weights and using the
+  existing fallback for the current document if Inter arrives too late.
+  This follows [CSS Fonts](https://www.w3.org/TR/css-fonts-4/#font-display-desc)
+  and the [Google Fonts API](https://developers.google.com/fonts/docs/css2).
+  No new asset, dependency, layout color or architecture change.
+  The new policy guard fails before the patch. Next: build/test and publish the
+  font-policy follow-up, then repeat the delayed-font trace on the apex.
 
 October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
 
