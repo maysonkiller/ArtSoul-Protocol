@@ -17,6 +17,10 @@ WITH classified(object_name) AS (
         ('artsoul_staff_totp_factors'), ('artsoul_staff_totp_attempts'), ('artsoul_staff_setup_permissions'),
         ('artsoul_staff_authority_policy'), ('artsoul_staff_authority_requests'),
         ('artsoul_staff_authority_events'),
+        ('artwork_donations'), ('donation_message_visibility'),
+        ('profile_email_connections'), ('launch_service_quotas'),
+        ('moderation_report_email_delivery'),
+        ('collection_ai_reviews'), ('email_subscriptions'),
         ('artwork_report_events'), ('artwork_report_notifications'),
         ('v41_public_metric_events'), ('v41_public_metric_participants'),
         ('v41_public_metrics'),
@@ -86,6 +90,10 @@ WITH internal(table_name) AS (
         ('artsoul_staff_totp_factors'), ('artsoul_staff_totp_attempts'), ('artsoul_staff_setup_permissions'),
         ('artsoul_staff_authority_policy'), ('artsoul_staff_authority_requests'),
         ('artsoul_staff_authority_events'),
+        ('artwork_donations'), ('donation_message_visibility'),
+        ('profile_email_connections'), ('launch_service_quotas'),
+        ('moderation_report_email_delivery'),
+        ('collection_ai_reviews'), ('email_subscriptions'),
         ('artwork_report_events'), ('artwork_report_notifications'),
         ('v41_public_metric_events'), ('v41_public_metric_participants'),
         ('v41_public_metrics'),
@@ -197,3 +205,31 @@ WHERE schemaname = 'storage'
         COALESCE(qual, '') ILIKE '%artworks%'
      OR COALESCE(with_check, '') ILIKE '%artworks%'
   );
+
+-- 9. Existing Data API tables must retain explicit server read access.
+-- Expected: zero rows. A BYPASSRLS role still needs table privileges.
+-- Do NOT grant blanket CRUD to fix this report: staff authority, role and
+-- factor writes deliberately require protected RPCs rather than direct writes.
+SELECT c.relname AS missing_service_read
+FROM pg_class c
+WHERE c.relnamespace = 'public'::regnamespace
+  AND c.relkind IN ('r', 'p', 'v', 'm')
+  AND NOT has_table_privilege('service_role', c.oid, 'SELECT')
+ORDER BY c.relname;
+
+-- 10. Informational only: defaults apply to FUTURE objects by their creator.
+-- Supabase removes automatic public-table/sequence grants on October 30, 2026.
+-- Empty defaults are valid; every new feature migration must grant explicitly.
+SELECT
+    pg_get_userbyid(d.defaclrole) AS object_creator,
+    n.nspname AS schema_name,
+    d.defaclobjtype AS object_type,
+    CASE WHEN a.grantee = 0 THEN 'PUBLIC'
+         ELSE pg_get_userbyid(a.grantee) END AS grantee,
+    a.privilege_type
+FROM pg_default_acl d
+LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+WHERE (n.nspname = 'public' OR d.defaclnamespace = 0)
+  AND d.defaclobjtype IN ('r', 'S')
+ORDER BY object_creator, schema_name, object_type, grantee, privilege_type;

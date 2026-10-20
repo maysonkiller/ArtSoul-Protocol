@@ -7,7 +7,7 @@ This runbook is the authoritative operational path for the current ArtSoul repos
 | Location | Purpose | Treatment |
 | --- | --- | --- |
 | `sql/migrations/001_core_indexer_schema.sql` through `003_resilience_schema.sql` | Base indexer schema | First three migrations in the indexer sequence. Managed by `scripts/apply-migrations.js` for fresh or already-ledgered environments. |
-| `src/indexer/migrations/004_*.sql` through `014_*.sql` | Active indexer and V4.1 projections | Remaining eleven migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
+| `src/indexer/migrations/004_*.sql` through `015_*.sql` | Active indexer and V4.1 projections | Remaining twelve migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
 | Other files in `sql/migrations/` | Feature, auth, AI, moderation, observability, and security changes | Manually reviewed migrations. Their production status must be recorded explicitly; filename order is not an execution plan. |
 | `migrations/001_ai_integration.sql` | Early AI integration migration | Historical/manual. Verify schema before use; do not assume it belongs to the indexer 001-014 sequence. |
 
@@ -145,6 +145,12 @@ Do not replay this migration; reconcile the live catalog and journal first.
 
 Do not run `node scripts/apply-migrations.js --apply` against production until the baseline is reconciled.
 
+**October 20 clarification:** the live database already has 18.7b and the newer
+A8 authority restrictions. Do not replay 18.7b as a missing-grant repair: its
+historical blanket service-role grants would undo A8's RPC-only write boundary.
+Keep applied migration files immutable. Any actual live privilege discrepancy
+requires a separately reviewed, table-specific forward repair.
+
 1. Create a database backup and a schema-only export using the Supabase-supported backup path.
 2. Run `sql/verification/phase_a_security_verification.sql`. Export every result grid with timestamp and project/environment name. Do not include keys.
 3. Run `sql/verification/indexer_migration_baseline_001_014.sql` section-by-section. Export every result grid with timestamp and project/environment name. The script opens a read-only transaction and ends with `ROLLBACK`; never replace it with `COMMIT`.
@@ -156,8 +162,8 @@ Do not run `node scripts/apply-migrations.js --apply` against production until t
    ```
 
 6. Do **not** insert ledger rows merely because a similarly named table exists. An operator must verify the complete migration effect and checksum first.
-7. Review `phase18_7b_supabase_security_hardening.sql` against the pre-change export. Add any newly discovered table to exactly one classification before applying.
-8. Apply Phase 18.7b manually in the Supabase SQL editor. It is one transaction.
+7. Compare the historical 18.7b classification and subsequent feature restrictions with the catalog. Classify newly discovered tables in verification evidence, not by editing an applied migration.
+8. If a repair is necessary, review and apply only its explicit forward migration after approval and backup. Existing production does not need 18.7b replay.
 9. Re-run the verification file. Expected results:
    - no unclassified application-owned table;
    - no public application table with RLS disabled or not forced;
@@ -217,7 +223,7 @@ If any post-application result is unexpected, roll back with the transaction or 
    export ARTSOUL_MIGRATION_ENVIRONMENT=preview
    ```
 
-3. List the exact 001-014 sequence and checksums without modifying the database:
+3. List the exact 001-015 sequence and checksums without modifying the database:
 
    ```bash
    node scripts/apply-migrations.js
@@ -239,6 +245,56 @@ The runner:
 - stops on a changed checksum for an applied migration.
 
 Feature/manual migrations still require an explicit reviewed procedure. The indexer runner does not silently execute every SQL file in the repository.
+
+### Data API defaults after October 30, 2026
+
+[Supabase's official change notice](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically)
+confirms that new `public` tables require explicit grants. Existing grants and
+RLS policies remain. The change also affects recreated schemas and previews;
+direct PostgreSQL access is separate from the Data API used by ArtSoul's server.
+
+For a **new, empty environment only**:
+
+1. Create the reviewed legacy prerequisites and run indexer 001-015. Apply
+   `phase18_artwork_moderation_visibility.sql` before the legacy classifier if
+   moderation is part of that environment.
+2. Apply 18.7b **after those legacy tables exist, before A8 or other newer
+   self-hardening features, and before exposing the environment to clients**.
+   Indexer 001-014 by itself grants no Data API access. This historical sequence
+   deliberately retains its applied checksums; 18.7b supplies explicit legacy
+   grants and RLS. It must not run after the narrower authority/factor grants.
+3. Apply only the approved feature migrations in their recorded dependency
+   order. New feature migrations must include explicit table grants, RLS and
+   any necessary sequence/function permissions in the same migration.
+   Grant only approved privileges; do not copy the announcement's illustrative
+   authenticated CRUD grants into ArtSoul. Browser writes remain server-routed.
+4. Run `sql/verification/phase_a_security_verification.sql`. Section 9 expects
+   no missing service read privileges. Section 10 inventories defaults but does
+   not require automatic grants to be restored. Absence of direct service writes
+   to authority/factor tables is intentional; their protected RPCs perform writes.
+5. Run `node --test test/data-api-grants-integration.test.cjs` on a machine with
+   Docker Linux containers. It uses disposable PostgreSQL 17 with implicit
+   grants revoked before every new feature, verifies positive reads/writes and
+   client denials, and preserves the RPC-only authority boundary. A skipped
+   Docker test is not execution evidence. A new table migration must join this
+   rehearsal or explain its historical classification.
+
+This procedure does not turn historical/manual files into a complete automated
+production restore. Reconcile prerequisite schemas against the target catalog;
+do not replay old schema drafts over an existing database. The collection service
+draft is tested only in the disposable database and remains unapproved for live
+application.
+
+October 20 read-only production observation: 61 tables and one view retain
+service reads; all 61 tables have enabled and forced RLS. Client roles have no
+CRUD write grant and cannot read the checked staff/report/email/donation tables.
+Six empty Data API reads (profiles, artworks, reports, staff roles, email and
+donations) returned HTTP 200 without retrieving content. Nineteen sequences were
+checked; the two authority-owned sequences intentionally deny direct service
+usage. Nine authority/factor tables intentionally deny direct service writes,
+matching A8e/A8f. No production SQL change is required for the announced rollout,
+and none was made. This is an observation of existing objects, not a guarantee
+for unreviewed future migrations.
 
 ## Production Forward Fix 014
 

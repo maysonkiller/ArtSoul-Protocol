@@ -325,6 +325,19 @@ test('A11 public metrics projection self-hardens its aggregate and backing ledge
   assert.match(metrics, /GRANT EXECUTE ON FUNCTION public\.record_v41_public_metric_event\([\s\S]*TO service_role;/);
 });
 
+test('security verification includes private donation, email and draft collection tables', () => {
+  const verification = fs.readFileSync(
+    path.join(REPO_ROOT, 'sql/verification/phase_a_security_verification.sql'), 'utf8'
+  );
+  for (const cte of ['classified', 'internal']) {
+    const values = verification.match(new RegExp(`WITH ${cte}\\([a-z_]+\\) AS \\(\\s*VALUES([\\s\\S]*?)\\n\\)`));
+    for (const table of ['artwork_donations', 'donation_message_visibility', 'profile_email_connections',
+      'launch_service_quotas', 'moderation_report_email_delivery', 'collection_ai_reviews', 'email_subscriptions']) {
+      assert.ok(values?.[1].includes(`('${table}')`), `${cte} must classify ${table}`);
+    }
+  }
+});
+
 const STORAGE_HARDENING_PATH = 'sql/migrations/phase18_7c_supabase_storage_hardening.sql';
 
 function readStorageHardening() {

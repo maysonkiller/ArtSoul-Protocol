@@ -3,6 +3,44 @@
 Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 20 Supabase Data API follow-up (A-02/A-35, Canon 11):
+
+- Start HEAD `eefdab05ad39c259f8b111c4fa6608d70963122a`; same checkout. Preserve
+  `.codex/`, `output/` and the two unrelated untracked authority-policy files.
+- The official October 30 change affects new public tables/sequences, not
+  existing grants. ArtSoul uses Data API; newer feature migrations already
+  grant explicitly. No live permission repair or database write was needed.
+- Read-only live evidence: 61 tables with forced RLS, one view, zero client
+  table writes, zero missing service reads and six successful empty Data API
+  reads. The private catalog preserves 19 sequences and the intentional nine
+  RPC-only tables/two authority-owned sequences; do not "repair" their denials.
+  Evidence: `docs/private/data-api-grants-catalog-2026-10-20.json` and
+  `data-api-security-verification-2026-10-20.json`.
+- Repair the migration runbook's missing fresh-environment hardening order and
+  stale 001-014 runner wording. Never replay 18.7b after A8: its broad historical
+  grants would restore direct authority writes. No applied SQL checksum changes.
+- The read-only verifier now includes seven newer private/draft tables and
+  reports missing service reads/default grants. Live missing/unclassified/RLS
+  and client-write queries all return zero rows.
+- New disposable PostgreSQL 17 rehearsal removes implicit grants before every
+  feature, reproduces legacy access denial without hardening, and verifies
+  reads, writes, sequences, private tables and RPC-only authority boundaries.
+  Final focused command: `node --test test/data-api-grants-integration.test.cjs
+  test/security-migration.test.cjs test/migration-ledger-coverage.test.cjs`:
+  **43/43 pass, zero skips**, log `output/audit/data-api-grants-focused-final-2026-10-20.log`.
+  Initial fixture errors (legacy prerequisite order, invalid event name and
+  an unordered sequence-type predicate) were corrected without changing product
+  migrations. Collection draft execution is local evidence, not activation.
+  `npm run build` passes (11 routes, eight shared headers, 174 utilities); log
+  `output/audit/data-api-grants-build-2026-10-20.log`.
+- Only the root agent is running; its previous guest-avatar helper completed.
+  The app's returned task inventory shows only this task active. No additional
+  subagent was started for this follow-up.
+- This follow-up changes verification/tests/docs only. Phase A remains 69/14;
+  scoped native iPhone guest-avatar feedback is still pending. Next: finish
+  required repository checks for this follow-up, then resume that existing gate
+  without repeating wallet/OAuth/moderation ceremonies.
+
 October 20 guest account-avatar follow-up (Canon 05/16, A-53/A-61):
 
 - Start from `03fbae142b6ec8e7010c41f29ff89db28f2077f4` in the same checkout.

@@ -71,6 +71,14 @@ This consolidation audited the repository through `main` commit `ab0b1d7`, [`PRO
 
 ## Phase A - Stabilize Public Testnet
 
+October 20 A-02/A-35 maintenance: the announced Supabase Data API default-grant
+change is checked against the live catalog and a disposable PostgreSQL rehearsal.
+The [migration runbook](security/MIGRATION_RUNBOOK.md#data-api-defaults-after-october-30-2026)
+now states the legacy hardening order and prohibits replay after A8. Updated
+read-only verification and 43 passing focused checks preserve private tables and
+RPC-only authority writes. No production database mutation or Phase A status
+change; evidence is in the stabilization checkpoint.
+
 | ID | Item | Why/source | Status | Phase | Notes |
 | --- | --- | --- | --- | --- | --- |
 | A-01 | Complete secret-hygiene and deployment-security verification | Canon [A1](canon/12_IMPLEMENTATION_BACKLOG.md); [`PROJECT_STATE.md` P1](PROJECT_STATE.md); [PR #110](https://github.com/maysonkiller/ArtSoul-Protocol/pull/110); [`A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md`](testnet/A1_CREDENTIAL_HISTORY_ACCEPTANCE_2026-08-07.md) | done | A | Accepted 2026-08-07. The tracked template contains empty server-secret placeholders, the local server credential decodes to `service_role` while remaining ignored and untracked, the historical secondary development key is absent locally and on Hetzner, and the public repository has Secret Scanning plus push protection enabled with zero open alerts. Repository history is intentionally retained under those controls; no secret value is recorded in Git. |
