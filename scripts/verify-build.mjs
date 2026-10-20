@@ -55,6 +55,15 @@ for (const page of pages) {
         readFile(path.join(dist, page), 'utf8')
     ]);
 
+    // Do not replace already painted fallback text when a font arrives late.
+    for (const html of [source, built]) {
+        for (const [, url] of html.matchAll(/href="(https:\/\/fonts\.googleapis\.com\/[^"]+)"/g)) {
+            if (new URL(url).searchParams.get('display') !== 'optional') {
+                throw new Error(`${page} allows a late webfont swap after first paint`);
+            }
+        }
+    }
+
     for (const forbidden of forbiddenBrowserCompilers) {
         if (source.includes(forbidden) || built.includes(forbidden)) {
             throw new Error(`${page} still contains browser compiler/runtime tag: ${forbidden}`);

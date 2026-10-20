@@ -70,3 +70,14 @@ test('theme-dependent React entries initialize from the prepaint theme', () => {
         assert.match(entry, /const \[theme, setTheme\] = useState\(\(\) => window\.ThemeSync\?\.getTheme\(\) \|\| 'classic'\)/, page);
     }
 });
+
+test('page fonts do not replace already painted fallback text after a slow download', () => {
+    for (const page of [...pages, 'visual-lab']) {
+        const html = fs.readFileSync(`${page}.html`, 'utf8');
+        const fonts = [...html.matchAll(/href="(https:\/\/fonts\.googleapis\.com\/[^"]+)"/g)];
+        assert.equal(fonts.length, 1, page);
+        const request = new URL(fonts[0][1]);
+        assert.equal(request.searchParams.get('family'), 'Inter:wght@300;400;500;600;700', page);
+        assert.equal(request.searchParams.get('display'), 'optional', page);
+    }
+});
