@@ -3,6 +3,38 @@
 Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 20 mobile actions follow-up (Canon 05/11/12/16, A-33/A-47/A-71):
+
+- Start HEAD `788ea280e9b8bc6d6ca1128f1497c71200d28dab`, same checkout.
+  The owner reports improvement after the page-paint releases, then three
+  concrete failures: Donate/Report zoom and displaced page after closing;
+  X sharing uses the wrong image; mobile AI analysis does not progress before
+  publishing. Do not treat this as complete native visual/publishing acceptance.
+- Public apex probes reproduce Report changing the body scroll root: at a
+  390px layout the sticky header moves from y=0 to y=-756 when opening the
+  form. Donate's initially focused amount input and Report fields compute to
+  14px, outside the existing mobile 16px zoom-prevention rule. Desktop WebKit
+  does not reproduce physical iPhone keyboard zoom; that limit is explicit.
+  Evidence: `output/audit/artwork-actions-before-2026-10-20.json`.
+- Local dialog repair uses the native top layer for Report, as Donate already
+  does, without mutating body overflow. Both focus a close control on opening,
+  preserve scroll on focus return, and use 16px input text within bounded
+  dynamic-viewport dialogs. Manual page zoom remains enabled. Report submission,
+  donation recipient/value and wallet confirmation are unchanged. Focused
+  regression: 35/35; production build passes, no new dependency.
+- Isolated Chromium/WebKit touch probes of the existing upload entry reach
+  analysis and Ready to publish when the synthetic wallet is already authorized.
+  No provider, signature, model, upload or database write occurs in that fixture.
+  This proves the click handler runs in that path, not native wallet handoff.
+  The pending owner clarification concerns browser/wallet and any status text.
+  Evidence: `output/audit/upload-click-before-2026-10-20.json`.
+- X currently receives generic static ArtSoul metadata and a share URL copied
+  from the address bar, including action parameters. Work-specific server
+  metadata and contextual draft text remain to implement and verify.
+- No helpers started. Preserve the unrelated untracked authority-policy files,
+  `.codex/` and `output/`. Next: verify/release the bounded action-dialog repair,
+  then finish sharing and the connected mobile analysis path.
+
 October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
 
 - Start HEAD `338147d577d30779df1adbe095561d2a9af6e6f0`, same checkout and

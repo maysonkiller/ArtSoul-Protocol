@@ -297,7 +297,7 @@ test('the artwork UI exposes a flag-gated accessible Report form with no wallet 
   assert.match(source, />\s*Report\s*<\/button>/);
   assert.match(source, /aria-labelledby="artworkReportTitle"/);
   assert.match(source, /ref=\{reportTriggerRef\}/);
-  assert.match(source, /\(reportReturnFocusRef\.current \|\| reportTriggerRef\.current\)\?\.focus\(\)/);
+  assert.match(source, /\(reportReturnFocusRef\.current \|\| reportTriggerRef\.current\)\?\.focus\(\{ preventScroll: true \}\)/);
   assert.match(source, /fetch\('\/api\/moderation\/reports'/);
   assert.match(source, /await window\.ensureAuthenticated\?\.\(\)/);
   const submitStart = source.indexOf('async function submitArtworkReport');

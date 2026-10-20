@@ -5,6 +5,7 @@ import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import { ArtistSupport } from '../features/artwork/artist-support.jsx';
+import '../features/artwork/artwork-dialogs.css';
 
 import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
@@ -382,6 +383,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [openDonationFromCard, setOpenDonationFromCard] = useState(false);
             const cardActionOpenedRef = useRef(false);
             const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+            const reportDialogRef = useRef(null);
             const [artworkReport, setArtworkReport] = useState(emptyArtworkReport);
             const [reportBusy, setReportBusy] = useState(false);
             const [reportError, setReportError] = useState('');
@@ -728,20 +730,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             useEffect(() => {
                 if (!isReportModalOpen) return undefined;
-                const previousOverflow = document.body.style.overflow;
-                document.body.style.overflow = 'hidden';
-                const closeOnEscape = event => {
-                    if (event.key === 'Escape' && !reportBusy) {
-                        setIsReportModalOpen(false);
-                        window.requestAnimationFrame(() => (reportReturnFocusRef.current || reportTriggerRef.current)?.focus());
-                    }
-                };
-                window.addEventListener('keydown', closeOnEscape);
-                return () => {
-                    window.removeEventListener('keydown', closeOnEscape);
-                    document.body.style.overflow = previousOverflow;
-                };
-            }, [isReportModalOpen, reportBusy]);
+                const dialog = reportDialogRef.current;
+                dialog?.showModal();
+                return () => { if (dialog?.open) dialog.close(); };
+            }, [isReportModalOpen]);
 
             useEffect(() => {
                 void loadPendingWithdrawal();
@@ -1582,7 +1574,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             function closeArtworkReport() {
                 if (reportSubmissionRef.current) return;
                 setIsReportModalOpen(false);
-                window.requestAnimationFrame(() => (reportReturnFocusRef.current || reportTriggerRef.current)?.focus());
+                window.requestAnimationFrame(() => (reportReturnFocusRef.current || reportTriggerRef.current)?.focus({ preventScroll: true }));
             }
 
             async function submitArtworkReport(event) {
@@ -3010,19 +3002,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             return (
                 <div className="artwork-page-root">
                     {isReportModalOpen && (
-                        <div
-                            className="report-modal-backdrop"
-                            role="presentation"
-                            onMouseDown={event => {
-                                if (event.target === event.currentTarget) closeArtworkReport();
-                            }}
-                        >
-                            <section
+                            <dialog
+                                ref={reportDialogRef}
                                 className="report-modal"
-                                role="dialog"
                                 aria-modal="true"
                                 aria-labelledby="artworkReportTitle"
                                 aria-describedby="artworkReportDescription"
+                                onCancel={event => { event.preventDefault(); closeArtworkReport(); }}
                             >
                                 <div className="report-modal-header">
                                     <div>
@@ -3036,6 +3022,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         data-allow-rapid="true"
                                         onClick={closeArtworkReport}
                                         disabled={reportBusy}
+                                        autoFocus
                                     >
                                         ×
                                     </button>
@@ -3080,7 +3067,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 category: event.target.value
                                             }))}
                                             disabled={reportBusy}
-                                            autoFocus
                                         >
                                             {REPORT_CATEGORIES.map(category => (
                                                 <option key={category.value} value={category.value}>{category.label}</option>
@@ -3161,8 +3147,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         </div>
                                     </form>
                                 )}
-                            </section>
-                        </div>
+                            </dialog>
                     )}
                     {isNewAuctionModalOpen && (
                         <div

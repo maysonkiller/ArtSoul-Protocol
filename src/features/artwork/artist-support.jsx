@@ -75,7 +75,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             setWalletBalance(document.querySelector('[data-network-balance]')?.textContent || '');
             dialog.current?.showModal();
         }
-        else if (dialog.current?.open) { dialog.current.close(); trigger.current?.focus(); }
+        else if (dialog.current?.open) { dialog.current.close(); trigger.current?.focus({ preventScroll: true }); }
     }, [open]);
     useEffect(() => () => { generation.current += 1; }, []);
     if (!enabled) return null;
@@ -165,9 +165,13 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
         </div>}
         <dialog ref={dialog} className="artist-support-dialog reauction-modal" aria-labelledby="artistSupportTitle"
             onCancel={event => { event.preventDefault(); close(); }} onClose={() => {
-                setOpen(false); window.requestAnimationFrame(() => trigger.current?.focus());
+                setOpen(false); window.requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true }));
             }}>
-            <h2 id="artistSupportTitle">Support the artist</h2>
+            <div className="report-modal-header">
+                <h2 id="artistSupportTitle">Support the artist</h2>
+                <button type="button" className="report-modal-close" aria-label="Close donation"
+                    data-allow-rapid="true" autoFocus onClick={close} disabled={busy}>×</button>
+            </div>
             <p>{creatorName || 'Creator'}</p><p className="artist-support-address">{creator}</p>
             {walletBalance && <p>Wallet balance: {walletBalance}</p>}
             <p>100% goes to the creator. This does not buy the artwork or provide protocol benefits.</p>
@@ -184,7 +188,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                     setAmount(''); setMessage(''); setAnonymous(false); setAccepted(false); setError('');
                 }}>{receiptReverted ? 'Try again' : 'Send another donation'}</button>}
                 <button type="button" data-allow-rapid="true" className="btn-secondary" onClick={close} disabled={busy}>Close</button></div> : <form onSubmit={submit}>
-                <label>Amount in test ETH<input inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} disabled={busy} required/></label>
+                <label>Amount in test ETH<input type="text" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} disabled={busy} required/></label>
                 <label>Message (optional)<textarea value={message} onChange={event => setMessage(event.target.value)} disabled={busy} maxLength={1120}/></label>
                 <p>{messageState.characters ?? 'Too many'} / 140 characters</p>
                 {!messageState.valid && <p role="alert">The message is too long. Please shorten it.</p>}
