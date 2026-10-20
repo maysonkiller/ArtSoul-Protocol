@@ -58,8 +58,28 @@ October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
   This follows [CSS Fonts](https://www.w3.org/TR/css-fonts-4/#font-display-desc)
   and the [Google Fonts API](https://developers.google.com/fonts/docs/css2).
   No new asset, dependency, layout color or architecture change.
-  The new policy guard fails before the patch. Next: build/test and publish the
-  font-policy follow-up, then repeat the delayed-font trace on the apex.
+  The new policy guard fails before the patch; the final focused suite passes
+  101/101 and build passes. PR #319 candidate
+  `64520ba0774d044aceaf265b020bf2b9da970003` passes CI `39443444864`
+  (Linux 1904 pass/2 skip, Windows 1735 pass/15 skip, zero failures and
+  46 contract tests per OS). Preview `7203029815` is verified.
+- PR #319 is published as `6a255e31f2af3d0bbb091e319f9afabcc2d71f1b`.
+  Production deployment `7203138766` succeeds at `2026-10-20T14:58:44Z`.
+  Eight product pages, the lab font policy and 57 script/style assets match;
+  guest moderation access remains denied. The final apex delayed-font run
+  passes eight open/reload traces in Chromium/WebKit at 390px Future and
+  1440px Classic. The browser receives `optional`; each heading keeps exactly
+  the same measured text width before/after the delayed font response.
+  Evidence: `output/audit/page-paint-after-fonts-2026-10-20.json` and
+  `page-font-apex-6a255e3-release-2026-10-20.json`.
+- The 1934-test local full run belongs to the preceding theme candidate, not
+  the font follow-up; the latter has its own focused/build/full-CI evidence
+  above. No unpublished application patch remains. The final release receipt
+  is `docs/private/page-paint-release-2026-10-20.json`.
+- Native acceptance of the two page repairs remains pending; the earlier guest
+  avatar acceptance stays accepted. Phase A remains 69 done / 14 in progress.
+  No architecture amendment or additional agent was needed. Next: reconcile
+  the owner's pending iPhone page-flash reply against the published version.
 
 October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
 

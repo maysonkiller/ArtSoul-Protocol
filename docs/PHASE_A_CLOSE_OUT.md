@@ -23,9 +23,15 @@ and build plus Linux/Windows CI pass. Twelve actual apex first-frame traces
 pass on Chromium/WebKit across mobile/desktop layouts and both themes.
 Zero neutral-avatar requests occur; recorded WebKit frames retain the bitmap.
 The owner subsequently accepts the guest-avatar repair on iPhone, while reporting
-a separate whole-page flash. That new symptom is being checked across all eight
-product pages; it does not reopen wallet, OAuth or factor ceremonies. Other
-device and publishing criteria remain open.
+a separate whole-page flash. Published PR #318 (`1a836d9`) applies the selected
+body theme before content paints and initializes React in that theme. Corrected
+apex evidence covers 64 route openings, 30 reload/link/Back traces and 12
+delayed-theme traces across Chromium/WebKit. PR #319 (`6a255e3`) removes late
+font swaps on all nine Inter-loading pages; eight delayed-font open/reload
+traces retain identical text widths. Both candidates pass build and full
+Linux/Windows CI. These desktop-engine checks do not replace native iPhone
+acceptance, which remains pending. No wallet, OAuth or factor ceremony is
+reopened. Other device and connected publishing criteria remain open.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its
