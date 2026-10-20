@@ -3,6 +3,36 @@
 Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 20 guest account-avatar follow-up (Canon 05/16, A-53/A-61):
+
+- Start from `03fbae142b6ec8e7010c41f29ff89db28f2077f4` in the same checkout.
+  The owner reports Ownership now looks good on iPhone, but the guest header
+  avatar briefly flashes on reload without any wallet ever connected.
+  Accept the scoped Ownership result; do not infer other device/publish results.
+- `header-prepaint.js` assigned the same image source again while adopting the
+  parsed guest shell. The shared component already avoided this unnecessary
+  assignment. New desktop/iPhone-UA harness cases fail before the patch because
+  the decoded image is reset, and pass when the bridge preserves the source.
+  This reproduces the code defect, not an observed native WebKit frame.
+- The bridge now preserves an unchanged image source. Cache version 5 is used
+  by all eight shared-header pages, including the collection draft. Existing
+  real-source preview, account-switch and logout regressions remain green.
+  No theme, connection, authentication or protocol behavior changes.
+- Focused regressions pass 138/138. Build passes 11 routes, all eight header
+  pages and 174 utility checks. Evidence: `output/audit/guest-avatar-before-2026-10-20.log`,
+  `guest-avatar-focused-final-2026-10-20.log` and `guest-avatar-build-2026-10-20.log`.
+  An intermediate test caught the bridge's 7 KiB budget; the explanatory comment
+  was shortened, not the budget relaxed. One read-only helper finished its review.
+- Candidate CI caught two additional stale test-version declarations (three
+  failing assertions on each OS). All page pins were already updated; the
+  runtime hash/version ledger and the network-copy regression now also expect
+  version 5. The application source is unchanged by this follow-up.
+- Tracked changes are this narrow bridge/test/cache-pin repair plus acceptance
+  notes; historical untracked paths remain untouched. Phase A remains 69 done /
+  14 in progress. No new signatures, setup or credentials are needed.
+- Exactly next step: publish the tested candidate after required CI, verify the
+  apex guest header, then record the owner's post-repair iPhone reload result.
+
 October 20 Ownership identity continuation (Canon 05 / A-47 / A-61):
 
 - Continue in the same branch from `190f80ee849d1bd354e866a193a9f6b473e46459`.
