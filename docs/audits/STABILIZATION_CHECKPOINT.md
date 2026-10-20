@@ -3,6 +3,33 @@
 Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 20 whole-page first-paint follow-up (Canon 05/16, A-47/A-53/A-72):
+
+- Start HEAD `338147d577d30779df1adbe095561d2a9af6e6f0`, same checkout and
+  branch. The owner accepts PR #317's iPhone guest avatar and reports a separate
+  whole-page flash. Record only this narrow acceptance; do not restart ceremonies.
+- Read-only apex probes cover all eight product pages in Chromium and WebKit,
+  390px Future and 1440px Classic, plus home/gallery reloads (40 traces).
+  Chromium paints body content before its theme class in every tested route.
+  Delaying the deferred theme script reproduces the issue in WebKit too:
+  the mobile home button visibly changes from polygon to its intended shape
+  after the first paint. Evidence: `output/audit/page-paint-before-2026-10-20.json`
+  and `page-paint-theme-delay-2026-10-20.json`, plus browser recordings.
+- The head selects the theme early, but body-specific styles wait for
+  DOMContentLoaded. Gallery/artwork also initialize React in Classic before
+  syncing the selected theme. Local repair applies the head-selected class
+  immediately after the body opens and uses that theme for the initial render.
+  Existing body classes, theme switching and wallet behavior are preserved.
+  Theme manager now has cache version 1 and a content guard.
+- Ten new regressions fail before the patch. The first focused run passes
+  95/95. No deployment of this patch yet. Unrelated untracked files remain
+  untouched; no helpers started. Next: complete build/full tests and release
+  verification before claiming this first-paint repair is published.
+- Empty roots while React initially loads and the actual artwork data wait are
+  observed separately. No post-content disappearance or light-background flash
+  was reproduced in these traces. Do not claim every native page transition
+  fixed from this theme repair or hide genuine network waits behind a timeout.
+
 October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
 
 - Start HEAD `5149a1bc432a1f1e11b75875dbaa52d421b62ae4`, same checkout.
@@ -34,15 +61,32 @@ October 20 native guest reload follow-up (Canon 05/16, A-53/A-61):
   11 routes/eight headers/174 utilities. Logs: `guest-inline-before`,
   `guest-inline-lifecycle-focused`, `guest-inline-build-final` under `output/audit/`,
   all suffixed `-2026-10-20.log`.
-- Full local unit run before the logout follow-up: **1923/1923 pass, zero skips**, log
-  `output/audit/guest-inline-full-unit-2026-10-20.log`. PR #317 is the release
-  candidate. Its earlier preview is deployed; final candidate CI and apex acceptance remain
-  required. Build assertions also run as a hard gate in `verify-build.mjs`;
+- Final local unit run: **1924/1924 pass, zero skips**, log
+  `output/audit/guest-inline-full-unit-final-2026-10-20.log`.
+  Build assertions also run as a hard gate in `verify-build.mjs`;
   the extra built-output unit case explicitly skips only without a local build.
+- PR #317 is merged as `f183b78f92993362090d624f0a872a9a9cec5fd4`.
+  Candidate `ca2ff85fbbecb2f3c50a568c1c1ea5c1c619f0f0` passes CI
+  `39436940066`: Linux 1893 pass/2 skip, Windows 1724 pass/15 skip,
+  zero failures and 46 contract tests on each OS. Local PostgreSQL checks above
+  cover the environment-dependent cases; do not describe CI skips as passes.
+  Production deployment `7202088484` succeeds at `2026-10-20T14:15:34Z`.
+- All eight apex pages and 57 script/style assets match the local build.
+  Actual apex first-frame traces pass on Chromium/WebKit at 390px Future and
+  1440px Classic: initial opening, reload and clicking Profile (12 traces).
+  Every observed header frame has its bitmap ready; zero neutral bitmap
+  network requests occur, even with such requests deliberately delayed.
+  Recorded WebKit frames also retain the avatar through reload/navigation.
+  Evidence: `output/audit/guest-first-paint-after-2026-10-20.json`,
+  `guest-inline-apex-f183b78-release-2026-10-20.json`, the associated browser
+  recordings and `guest-inline-webkit-frames-2026-10-20/`.
+- Current local application code matches the release. This release-evidence
+  documentation update is a local follow-up; no unpublished application patch
+  remains. Final receipt: `docs/private/guest-inline-release-2026-10-20.json`.
 - No architectural ambiguity or canon amendment: only delivery of the existing
   header bitmap changes. Phase A remains 69 done / 14 in progress. No helpers
-  started. Next: finish candidate checks, release and repeat the same apex
-  first-frame probe; native post-release acceptance remains distinct.
+  started. The later owner reply accepts the narrow guest-avatar result;
+  continue the separate whole-page investigation above.
 
 October 20 Supabase Data API follow-up (A-02/A-35, Canon 11):
 

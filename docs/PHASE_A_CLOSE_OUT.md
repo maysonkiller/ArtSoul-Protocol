@@ -15,13 +15,17 @@ The subsequent native recording shows the guest-header reload flash persists
 after PR #314 (`56b17ef`): its redundant-source repair did not remove the
 initial bitmap request. Cold-load Chromium/WebKit probes reproduce a visible
 guest label before its image is ready, including the optimizer marking it lazy.
-The local follow-up embeds the same bitmap in all eight headers, preserves its
+Published PR #317 (`f183b78`) embeds the same bitmap in all eight headers, preserves its
 logical identity during prepaint and declares eager synchronous decoding.
 Logout and failed-image fallbacks reuse the embedded bitmap as well.
-The focused suite passes 166 checks and the build passes. Release/first-frame
-evidence is tracked in the current checkpoint; native post-repair acceptance
-is not inferred from a final screenshot. Other device and publishing criteria
-remain open; no repeated sign-in or factor setup is needed for this display fix.
+The focused suite passes 166 checks, the full local suite passes 1924/1924,
+and build plus Linux/Windows CI pass. Twelve actual apex first-frame traces
+pass on Chromium/WebKit across mobile/desktop layouts and both themes.
+Zero neutral-avatar requests occur; recorded WebKit frames retain the bitmap.
+The owner subsequently accepts the guest-avatar repair on iPhone, while reporting
+a separate whole-page flash. That new symptom is being checked across all eight
+product pages; it does not reopen wallet, OAuth or factor ceremonies. Other
+device and publishing criteria remain open.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its

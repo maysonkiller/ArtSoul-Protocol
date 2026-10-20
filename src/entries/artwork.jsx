@@ -317,7 +317,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
         }
 
         function ArtworkPage({ initialSkeletonVisible = false }) {
-            const [theme, setTheme] = useState('classic');
+            const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
             const [artwork, setArtwork] = useState(null);
             const [auction, setAuction] = useState(null);
             const [creatorProfile, setCreatorProfile] = useState(null);
