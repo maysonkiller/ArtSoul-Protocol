@@ -78,6 +78,30 @@ test('a same-wallet avatar remains visible during decoding, but artwork media ne
     h.unmount();
 });
 
+test('Ownership reveals the name and decoded avatar together, keeping the rest of the page independent', async () => {
+    const {transformWithOxc} = await import('vite');
+    const h = hooks(), prepared = deferred();
+    const React = {...h, createElement: (type, props, ...children) => ({type, props: {...props, children}})};
+    const compiled = await transformWithOxc(pageFunction('useDecodedImage') + '\n' + pageFunction('OwnershipIdentity'),
+        'ownership.jsx', {jsx: {runtime: 'classic'}});
+    const render = vm.runInNewContext(compiled.code + '\nOwnershipIdentity;', {
+        React, ...h, decodeImage() {}, decodeAvatar: () => prepared.promise
+    });
+    const props = {source: '/portrait.png', label: 'Creator', name: 'Artist', className: 'avatar-border', isClassic: true};
+    let tree = h.render(() => render(props));
+    const nodes = () => descendants(tree);
+    assert.equal(nodes().filter(n => n.type === 'img').length, 0);
+    assert.equal(nodes().some(n => n.type === 'span' && n.props.className === props.className), false);
+    assert.equal(nodes().some(n => n.props?.children?.includes('Artist')), false);
+    assert.equal(nodes().some(n => n.props?.role === 'status'), true);
+    prepared.resolve('/decoded-portrait.png'); await tick();
+    tree = h.render(() => render(props));
+    assert.equal(nodes().find(n => n.type === 'img').props.src, '/decoded-portrait.png');
+    assert.equal(nodes().some(n => n.props?.children?.includes('Artist')), true);
+    assert.equal(nodes().some(n => n.props?.role === 'status'), false);
+    h.unmount();
+});
+
 test('late moderation reads cannot restore staff controls after wallet changes or invalidation', async () => {
     for (const boundary of ['wallet', 'auth']) {
         const response = deferred(), state = {wallet: 'staff', writes: []};

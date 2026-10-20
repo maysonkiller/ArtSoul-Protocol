@@ -1,9 +1,47 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-15. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 15 final moderation UI acceptance:
+October 20 Ownership identity continuation (Canon 05 / A-47 / A-61):
+
+- Continue in the same branch from `190f80ee849d1bd354e866a193a9f6b473e46459`.
+  A-22/A8 remains accepted. The owner confirms the other recent changes work,
+  but reports slow black avatar circles and wallet-to-name replacement in
+  Ownership, with a desktop screenshot of artwork 34. This does not establish
+  a new native iPhone pass for the unrelated profile/publishing criteria.
+- The exact projection supplies only Creator identity. Client role requests
+  start after first content and their shared completion waits for the slowest.
+  Actual apex /34 timing: artwork headers 780ms; Creator/First Collector profile
+  headers 1702ms/1431ms. Both profiles are genuinely absent, so those addresses
+  must retain wallet labels and the standard avatar. Do not invent nicknames.
+- The bounded repair supplies exact-only public role identities in one batch,
+  skips redundant role/bidder reads, resolves uncovered roles independently,
+  and reveals each decoded avatar with its name rather than an empty circle.
+  No authority, transaction, economics or AI-valuation changes.
+- Resumed from the unchanged SHA and seven-file diff on October 20; recovery
+  patch saved to `output/audit/ownership-resume-2026-10-20.patch`. No other
+  agents are running. The owner is away from the laptop and can only use an
+  iPhone; do independent checks without repeating accepted factor ceremonies.
+- Focused API/client regressions pass 48/48, including chain-colliding IDs,
+  role deduplication, public-field allowlisting, confirmed absence versus query
+  failure, independent fallback completion and decoded identity display.
+  The profile batch starts independently of slow metadata/bids/signals.
+  Production build passes 11 routes and 174 utility checks. Logs:
+  `output/audit/ownership-focused-final-2026-10-20.log` and
+  `output/audit/ownership-build-2026-10-20.log`.
+- Full local unit run: 1877 passed, two disposable PostgreSQL startup failures,
+  no skips. The affected Donate integration files then pass 25/25 sequentially
+  without a code change. Both logs are retained as `ownership-unit-2026-10-20.log`
+  and `ownership-donation-db-recheck-2026-10-20.log` under `output/audit/`;
+  do not describe the initial all-at-once run as green.
+- Hosted checks and release verification are still pending. Historical
+  untracked paths remain untouched. Phase A remains 69 done / 14 in progress;
+  the actual connected-device criteria must not be replaced by fixture tests.
+- Exactly next step: finish and verify this Ownership repair, release after
+  green checks, then measure the actual apex profile requests and first display.
+
+Earlier October 15 final moderation UI acceptance:
 
 - Workspace `C:\Projects\ArtSoul`, branch `codex/takeover-audit`; application
   HEAD `9a2965f0833089b5bd4f889b8beeeb2bcff40a2b` / PR #310. No source-tree

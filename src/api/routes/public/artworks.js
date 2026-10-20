@@ -404,34 +404,35 @@ function moderationVisibilityByArtwork(rows = []) {
 // to the shortened wallet address.
 const GENERATED_PROFILE_USERNAME = /^User[0-9a-fA-F]{4,6}$/;
 
-// One batched public-identity lookup per snapshot rebuild for the unique
-// creator addresses already inside the cached projection — never per card,
-// never a full-table read. List cards expose only the public nickname. An
-// exact artwork read also carries the public avatar URL so the Ownership panel
-// can paint the real creator identity in its first content frame instead of
-// briefly inventing a placeholder identity while a second request is pending.
-async function creatorIdentitiesByAddress(artworks = [], warnings, { includeAvatar = false } = {}) {
+// Lists need creator nicknames only; exact reads batch all displayed ownership
+// roles with public avatars. A failed read must remain distinguishable from a
+// confirmed missing profile so clients can retry rather than cache absence.
+async function publicIdentitiesByAddress(wallets = [], warnings, { includeAvatar = false } = {}) {
   const addresses = [...new Set(
-    artworks
-      .map(artwork => normalizeText(artwork.creator).toLowerCase())
+    wallets
+      .map(wallet => normalizeText(wallet).toLowerCase())
       .filter(address => address && address !== ZERO_ADDRESS)
   )];
   if (!addresses.length) return new Map();
 
+  const profileWarnings = [];
   const rows = await queryTable(
     'profiles',
     `select=wallet_address,username${includeAvatar ? ',avatar_url' : ''}&wallet_address=in.(${addresses.map(encodeURIComponent).join(',')})&limit=${addresses.length}`,
-    warnings
+    profileWarnings
   );
+  warnings.push(...profileWarnings);
+  if (profileWarnings.length) return null;
 
-  const map = new Map();
+  const map = new Map(addresses.map(address => [address, null]));
   for (const row of rows) {
     const wallet = normalizeText(row.wallet_address).toLowerCase();
     const username = normalizeText(row.username);
-    if (!wallet) continue;
+    if (!map.has(wallet)) continue;
     map.set(wallet, {
-      name: username && !GENERATED_PROFILE_USERNAME.test(username) ? username : null,
-      avatarUrl: includeAvatar ? normalizeText(row.avatar_url) || null : null
+      wallet_address: wallet,
+      username: username && !GENERATED_PROFILE_USERNAME.test(username) ? username : null,
+      avatar_url: includeAvatar ? normalizeText(row.avatar_url) || null : null
     });
   }
   return map;
@@ -469,7 +470,7 @@ function bidsByAuction(bids = []) {
   return map;
 }
 
-async function toPublicCard(artwork, maps, preloadedMetadata) {
+function ownershipProjection(artwork, maps) {
   const chain = chainId(artwork.chain_id);
   const artworkId = protocolId(artwork.artwork_id);
   const auction = maps.auctions.get(keyFor(chain, artworkId));
@@ -481,6 +482,21 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
   const latestResale = tokenId
     ? maps.resaleHistory.get(keyFor(chain, tokenId))
     : null;
+  const auctionWinnerAddress = addressOrNull(settlement?.winner);
+  const currentOwnerAddress = Boolean(artwork.minted)
+    ? (addressOrNull(latestResale?.buyer) || addressOrNull(resale?.seller) || auctionWinnerAddress)
+    : null;
+  const ownershipAddresses = [...new Set([
+    artwork.creator,
+    auctionWinnerAddress,
+    currentOwnerAddress,
+    auction?.status === 'settlement_pending' ? addressOrNull(auction.current_bidder) : null
+  ].map(address => normalizeText(address).toLowerCase()).filter(address => address && address !== ZERO_ADDRESS))];
+  return { chain, artworkId, auction, tokenId, resale, auctionWinnerAddress, currentOwnerAddress, ownershipAddresses };
+}
+
+async function toPublicCard(artwork, maps, preloadedMetadata) {
+  const { chain, artworkId, auction, tokenId, resale, auctionWinnerAddress, currentOwnerAddress, ownershipAddresses } = ownershipProjection(artwork, maps);
   const floor = maps.floors.get(keyFor(chain, artworkId));
   const signals = maps.socialSignals.get(keyFor(chain, artworkId)) || {
     like: 0,
@@ -502,11 +518,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
   const canonicalFloor = floor?.floor_price || artwork.canonical_floor || auction?.final_price || 0;
   const currentBid = auction?.current_bid || auction?.winning_bid || 0;
   const salePrice = resale?.price || 0;
-  const auctionWinnerAddress = addressOrNull(settlement?.winner);
-  const currentOwnerAddress = Boolean(artwork.minted)
-    ? (addressOrNull(latestResale?.buyer) || addressOrNull(resale?.seller) || auctionWinnerAddress)
-    : null;
-  const creatorIdentity = maps.creatorIdentities.get(normalizeText(artwork.creator).toLowerCase());
+  const creatorIdentity = maps.publicIdentities?.get(normalizeText(artwork.creator).toLowerCase());
 
   return {
     id: `v41:${chain}:${artworkId}`,
@@ -521,8 +533,13 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     description,
     creator: artwork.creator,
     creator_id: artwork.creator,
-    creator_name: creatorIdentity?.name || null,
-    ...(maps.includeCreatorAvatar ? { creator_avatar_url: creatorIdentity?.avatarUrl || null } : {}),
+    creator_name: creatorIdentity?.username || null,
+    ...(maps.includeOwnershipProfiles ? {
+      creator_avatar_url: creatorIdentity?.avatar_url || null,
+      ...(maps.publicIdentities ? {
+        ownership_profiles: Object.fromEntries(ownershipAddresses.map(address => [address, maps.publicIdentities.get(address) ?? null]))
+      } : {})
+    } : {}),
     media_url: mediaUrl,
     file_url: mediaUrl,
     animation_url: ['video', 'audio'].includes(mediaType) ? mediaUrl : null,
@@ -637,15 +654,15 @@ function parseDirectLookup(query = {}) {
 async function projectTableData(tableData, warnings, publicMetrics = null, preload = {}) {
   // Creator names and immutable metadata are independent reads. Starting them
   // together removes one serial network round trip from a cold projection.
-  const [creatorIdentities, metadataRows] = await Promise.all([
-    preload.creatorIdentities ?? creatorIdentitiesByAddress(tableData.v41_artworks, warnings),
+  const [publicIdentities, metadataRows] = await Promise.all([
+    preload.publicIdentities ?? publicIdentitiesByAddress(tableData.v41_artworks.map(artwork => artwork.creator), warnings),
     preload.metadataRows ?? Promise.all(
       tableData.v41_artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
     )
   ]);
   const maps = {
-    creatorIdentities,
-    includeCreatorAvatar: preload.includeCreatorAvatar === true,
+    publicIdentities,
+    includeOwnershipProfiles: preload.includeOwnershipProfiles === true,
     auctions: latestAuctionByArtwork(tableData.v41_auctions),
     settlements: latestCompletedSettlementByArtwork(tableData.v41_settlements),
     resales: resaleByToken(tableData.v41_resale_listings),
@@ -721,8 +738,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
   const v41Artworks = await v41ArtworksPromise;
   const tokenId = protocolId(v41Artworks[0]?.token_id);
   const preload = {
-    creatorIdentities: creatorIdentitiesByAddress(v41Artworks, warnings, { includeAvatar: true }),
-    includeCreatorAvatar: true,
+    includeOwnershipProfiles: true,
     metadataRows: Promise.all(
       v41Artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
     )
@@ -744,6 +760,22 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
           warnings
         )
       : Promise.resolve([]);
+
+  // Ownership reads can finish while bids, signals and metadata are still in
+  // flight. Use the same role projection as the response, including the
+  // pending highest bidder without assigning an unearned First Collector.
+  preload.publicIdentities = Promise.all([
+    v41AuctionsPromise, v41SettlementsPromise, v41ResaleListingsPromise, v41ResaleHistoryPromise
+  ]).then(([auctions, settlements, listings, history]) => {
+    const ownershipMaps = {
+      auctions: latestAuctionByArtwork(auctions),
+      settlements: latestCompletedSettlementByArtwork(settlements),
+      resales: resaleByToken(listings),
+      resaleHistory: latestResaleByToken(history)
+    };
+    const addresses = v41Artworks.flatMap(artwork => ownershipProjection(artwork, ownershipMaps).ownershipAddresses);
+    return publicIdentitiesByAddress(addresses, warnings, { includeAvatar: true });
+  });
 
   const [
     v41Auctions,

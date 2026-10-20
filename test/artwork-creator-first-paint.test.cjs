@@ -28,15 +28,17 @@ test('the exact projection seeds creator identity before the first content frame
   assert.ok(profileRequest > release, 'supplementary profile hydration remains off the page-load gate');
   assert.match(loadArtwork, /username: data\.creator_name \|\| ''/);
   assert.match(loadArtwork, /avatar_url: data\.creator_avatar_url \|\| ''/);
-  assert.match(loadArtwork, /if \(hydratedCreatorProfile\) setCreatorProfile\(hydratedCreatorProfile\)/);
+  assert.match(loadArtwork, /isSameAddress\(address, projectedCreatorAddress\) && profile\) setCreatorProfile\(profile\)/);
   assert.doesNotMatch(loadArtwork, /setCreatorProfile\(profiles\.get\([^)]+\) \|\| null\)/);
 });
 
-test('ownership decodes the avatar without hiding the known name or painting a second background image', () => {
+test('ownership reveals a prepared identity together without a blank bordered avatar', () => {
   const ownership = detail.slice(detail.indexOf('function OwnershipIdentity'), detail.indexOf('const ZERO_ADDRESS'));
   assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png', decodeAvatar, true\)/);
   assert.match(ownership, /image\.url \? <img/);
   assert.match(ownership, /style=\{nameStyle\}>\{name\}/);
+  assert.match(ownership, /role="status">Loading profile…/);
+  assert.doesNotMatch(ownership, /<span className=\{className\}/);
   assert.doesNotMatch(ownership, /backgroundImage/);
   assert.match(detail, /const avatarStyle = \{\s*display: 'block',\s*objectFit: 'cover'/);
   assert.match(detail, /identityResolved \? getProfileAvatarUrl\(resolvedProfile, address\) : ''/);

@@ -38,11 +38,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
     return (
         <>
             {image.url ? <img src={image.url} alt={label} className={className} style={style} /> : (
-                <span className={className} style={style} role="status" aria-label={`Loading ${label.toLowerCase()} identity`} />
+                <span className="w-12 h-12 flex-shrink-0" aria-hidden="true" />
             )}
             <div className="min-w-0 flex-1">
                 <div className={`text-xs ${isClassic ? 'opacity-70' : 'opacity-90'}`}>{label}</div>
-                <div className="font-semibold truncate" style={nameStyle}>{name}</div>
+                {image.url ? <div className="font-semibold truncate" style={nameStyle}>{name}</div> : (
+                    <div className="text-sm" role="status">Loading profile…</div>
+                )}
             </div>
         </>
     );
@@ -1002,10 +1004,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             function renderOwnershipRole({ label, address, profile }) {
                 if (!address || isZeroAddress(address)) return null;
-                const resolvedProfile = profile || (
+                const projectedProfiles = artwork.ownership_profiles || {};
+                const projected = Object.hasOwn(projectedProfiles, address.toLowerCase());
+                const resolvedProfile = projected ? projectedProfiles[address.toLowerCase()] : profile || (
                     isSameAddress(address, artwork.creator_id || artwork.creator) ? creatorProfile : null
                 );
-                const identityResolved = Boolean(resolvedProfile?.avatar_url) || resolvedProfileAddresses.has(address.toLowerCase());
+                const identityResolved = projected || Boolean(resolvedProfile?.avatar_url) || resolvedProfileAddresses.has(address.toLowerCase());
 
                 const roleCardStyle = !isClassic ? {
                     boxShadow: '0 0 15px rgba(var(--c-accent-rgb), 0.2)',
@@ -1199,10 +1203,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 };
             }
 
-            async function hydrateBidderProfiles(bids) {
+            async function hydrateBidderProfiles(bids, projectedProfiles = {}) {
                 const addresses = [...new Set((bids || [])
                     .map(bid => String(bid.bidder || '').toLowerCase())
                     .filter(Boolean))];
+                addresses.forEach(address => {
+                    if (Object.hasOwn(projectedProfiles, address)) bidderProfileCacheRef.current.set(address, projectedProfiles[address]);
+                });
                 const missingAddresses = addresses.filter(address => !bidderProfileCacheRef.current.has(address));
 
                 if (missingAddresses.length > 0) {
@@ -1263,7 +1270,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 advanceBidCursor(nextBids);
                 setBidActivity(nextBids);
                 setAuction(current => mergeProjectedAuction(current, projection));
-                await hydrateBidderProfiles(nextBids);
+                await hydrateBidderProfiles(nextBids, projection?.ownership_profiles);
             }
 
             // Live polling hits the light cursor endpoint (new bids only), not the
@@ -1881,13 +1888,22 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         setBidActivity([]);
                     }
                     const projectedCreatorAddress = data.creator_id || data.creator || '';
-                    setCreatorProfile(current => isSameAddress(current?.wallet_address, projectedCreatorAddress) ? current : projectedCreatorAddress ? {
+                    const projectedProfiles = data.ownership_profiles || {};
+                    function profileFromProjection(address, current, fallback = null) {
+                        if (!address) return null;
+                        if (Object.hasOwn(projectedProfiles, address.toLowerCase())) {
+                            return projectedProfiles[address.toLowerCase()] || { wallet_address: address, username: '', avatar_url: '' };
+                        }
+                        return isSameAddress(current?.wallet_address, address) ? current : fallback;
+                    }
+                    setCreatorProfile(current => profileFromProjection(projectedCreatorAddress, current, projectedCreatorAddress ? {
                         wallet_address: projectedCreatorAddress,
                         username: data.creator_name || '',
                         avatar_url: data.creator_avatar_url || ''
-                    } : null);
-                    setAuctionWinnerProfile(current => isSameAddress(current?.wallet_address, data.auction_winner_address) ? current : null);
-                    setCurrentOwnerProfile(current => isSameAddress(current?.wallet_address, data.current_owner_address) ? current : null);
+                    } : null));
+                    setAuctionWinnerProfile(current => profileFromProjection(data.auction_winner_address, current));
+                    setCurrentOwnerProfile(current => profileFromProjection(data.current_owner_address, current));
+                    setResolvedProfileAddresses(current => new Set([...current, ...Object.keys(projectedProfiles)]));
                     setSocialSignals(window.ArtSoulDiscovery?.getSocialSignals?.(data) || {
                         likes: data.vote_count || 0,
                         wouldBuy: 0,
@@ -1902,39 +1918,30 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     document.getElementById('og-url').setAttribute('content', pageUrl);
                     document.title = data.title + ' - ArtSoul';
 
-                    // The canonical artwork projection is enough to paint the
-                    // page. Profiles, votes, provenance and wallet-backed
-                    // contract details continue below and fill their own
-                    // sections when ready instead of extending a black screen.
+                    // Exact projections already contain public role identities.
+                    // Missing-profile fallbacks, votes, provenance and contract
+                    // details stay off the page-load gate.
                     setLoading(false);
 
                     const profileAddresses = [...new Set([
-                        data.creator_id,
+                        projectedCreatorAddress,
                         data.auction_winner_address,
                         data.current_owner_address
-                    ].filter(address => address && !isZeroAddress(address)).map(address => address.toLowerCase()))];
+                    ].filter(address => address && !isZeroAddress(address)).map(address => address.toLowerCase()))]
+                        .filter(address => !Object.hasOwn(projectedProfiles, address));
                     const profilesPromise = Promise.allSettled(profileAddresses.map(async address => {
-                        const profile = await window.ArtSoulDB.getProfile(address);
-                        return { address, profile };
-                    })).then(results => {
-                        if (!isCurrent()) return;
-                        const profiles = new Map();
-                        results.forEach(result => {
-                            if (result.status === 'fulfilled') profiles.set(result.value.address, result.value.profile);
-                            else console.warn('Could not load artwork profile:', result.reason);
-                        });
-                        setResolvedProfileAddresses(current => new Set([...current, ...profileAddresses]));
-                        if (data.creator_id) {
-                            const hydratedCreatorProfile = profiles.get(data.creator_id.toLowerCase());
-                            if (hydratedCreatorProfile) setCreatorProfile(hydratedCreatorProfile);
+                        try {
+                            const profile = await window.ArtSoulDB.getProfile(address);
+                            if (!isCurrent()) return;
+                            if (isSameAddress(address, projectedCreatorAddress) && profile) setCreatorProfile(profile);
+                            if (isSameAddress(address, data.auction_winner_address)) setAuctionWinnerProfile(profile);
+                            if (isSameAddress(address, data.current_owner_address)) setCurrentOwnerProfile(profile);
+                        } catch (error) {
+                            console.warn('Could not load artwork profile:', error);
+                        } finally {
+                            if (isCurrent()) setResolvedProfileAddresses(current => new Set([...current, address]));
                         }
-                        if (data.auction_winner_address && !isZeroAddress(data.auction_winner_address)) {
-                            setAuctionWinnerProfile(profiles.get(data.auction_winner_address.toLowerCase()) || null);
-                        }
-                        if (data.current_owner_address && !isZeroAddress(data.current_owner_address)) {
-                            setCurrentOwnerProfile(profiles.get(data.current_owner_address.toLowerCase()) || null);
-                        }
-                    });
+                    }));
 
                     const votesPromise = (async () => {
                         if (isV41CompositeId) {

@@ -166,12 +166,43 @@ const FIXTURES = {
       twitter_handle: 'leak',
       discord_username: 'leak#1'
     },
-    { wallet_address: GENERATED_NAME_CREATOR.toLowerCase(), username: 'User1a2b' }
+    { wallet_address: GENERATED_NAME_CREATOR.toLowerCase(), username: 'User1a2b' },
+    { wallet_address: FIRST_COLLECTOR.toLowerCase(), username: 'first collector', avatar_url: 'https://cdn.example/first.png', email: 'private@example.test', discord_id: 'private-id' },
+    { wallet_address: RESALE_BUYER_2.toLowerCase(), username: 'current owner', avatar_url: 'https://cdn.example/owner.png', twitter_id: 'private-id' },
+    { wallet_address: PENDING_WINNER.toLowerCase(), username: 'pending bidder', avatar_url: 'https://cdn.example/pending.png' },
+    { wallet_address: LEGACY_COLLECTOR.toLowerCase(), username: 'legacy collector' }
   ]
 };
 
-function loadHandler() {
-  const supabaseRest = async (path) => FIXTURES[String(path).split('?')[0]] || [];
+function fixtureRows(path, fixtures) {
+  const [table, rawQuery] = String(path).split('?'), query = new URLSearchParams(rawQuery);
+  let rows = [...(fixtures[table] || [])];
+  for (const key of ['chain_id', 'artwork_id', 'token_id', 'wallet_address']) {
+    const filter = query.get(key);
+    if (filter?.startsWith('eq.')) rows = rows.filter(row => String(row[key]) === filter.slice(3));
+    if (filter?.startsWith('in.(')) {
+      const accepted = filter.slice(4, -1).split(',');
+      rows = rows.filter(row => accepted.includes(String(row[key]).toLowerCase()));
+    }
+  }
+  const order = query.get('order');
+  if (order) rows.sort((a,b) => {
+    for (const term of order.split(',')) {
+      const [field,direction] = term.split('.');
+      const difference = Number(a[field] || 0) - Number(b[field] || 0);
+      if (difference) return direction === 'desc' ? -difference : difference;
+    }
+    return 0;
+  });
+  return rows.slice(0, Number(query.get('limit')) || rows.length);
+}
+
+function loadHandler({ fixtures = FIXTURES, calls = [], tableRead, metadataRead } = {}) {
+  const supabaseRest = async path => {
+    calls.push(path);
+    const override = await tableRead?.(path);
+    return override === undefined ? fixtureRows(path, fixtures) : override;
+  };
 
   const source = fs
     .readFileSync('src/api/routes/public/artworks.js', 'utf8')
@@ -184,9 +215,9 @@ function loadHandler() {
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },
     getModerationAccess: async () => ({ canModerate: false }),
-    readArtworkMetadata: async (url) => String(url).includes('missing')
+    readArtworkMetadata: metadataRead || (async (url) => String(url).includes('missing')
       ? {}
-      : { name: 'Fixture Art', image: 'https://img.test/a.png' },
+      : { name: 'Fixture Art', image: 'https://img.test/a.png' }),
     fetch: async (url) => String(url).includes('missing')
       ? { ok: false, json: async () => ({}) }
       : { ok: true, json: async () => ({ name: 'Fixture Art', image: 'https://img.test/a.png' }) },
@@ -212,8 +243,8 @@ function fakeRes() {
   };
 }
 
-async function projectCards(query = {}) {
-  const handler = loadHandler();
+async function projectCards(query = {}, options) {
+  const handler = loadHandler(options);
   const res = fakeRes();
   await handler({ query }, res);
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
@@ -337,7 +368,7 @@ test('cards carry the creator public nickname from one batched profiles lookup',
   const card = cardById(body, 'v41:84532:1');
   assert.equal(card.creator_name, 'soulpainter');
   // Only the public display name is exposed — no other profile fields leak.
-  for (const field of ['bio', 'twitter_handle', 'discord_username', 'avatar_url', 'creator_avatar_url', 'username']) {
+  for (const field of ['bio', 'twitter_handle', 'discord_username', 'avatar_url', 'creator_avatar_url', 'username', 'ownership_profiles']) {
     assert.equal(field in card, false, `${field} must not leak into public cards`);
   }
 });
@@ -357,4 +388,94 @@ test('auto-generated usernames never surface as creator attribution', async () =
   const body = await projectCards();
   const card = cardById(body, 'v41:84532:10');
   assert.equal(card.creator_name, null);
+});
+
+test('an exact resale artwork returns only its three public ownership identities in one batch',async()=>{
+  const calls=[];
+  const card=cardById(await projectCards({id:'6'},{calls}),'v41:84532:6');
+  const addresses=[CREATOR,FIRST_COLLECTOR,RESALE_BUYER_2].map(address=>address.toLowerCase()).sort();
+  assert.deepEqual(Object.keys(card.ownership_profiles).sort(),addresses);
+  assert.equal(card.ownership_profiles[FIRST_COLLECTOR.toLowerCase()].username,'first collector');
+  assert.equal(card.ownership_profiles[RESALE_BUYER_2.toLowerCase()].avatar_url,'https://cdn.example/owner.png');
+  for(const [wallet,profile] of Object.entries(card.ownership_profiles)){
+    assert.deepEqual(Object.keys(profile).sort(),['avatar_url','username','wallet_address']);
+    assert.equal(profile.wallet_address,wallet);
+  }
+  const reads=calls.filter(path=>path.startsWith('profiles?'));
+  assert.equal(reads.length,1);
+  const query=new URLSearchParams(reads[0].split('?')[1]);
+  assert.equal(query.get('select'),'wallet_address,username,avatar_url');
+  assert.equal(query.get('limit'),'3');
+  assert.deepEqual(query.get('wallet_address').slice(4,-1).split(',').sort(),addresses);
+});
+
+test('exact ownership identities include the pending highest bidder without inventing settled roles',async()=>{
+  const card=cardById(await projectCards({id:'3'}),'v41:84532:3');
+  assert.deepEqual(Object.keys(card.ownership_profiles).sort(),[CREATOR,PENDING_WINNER].map(address=>address.toLowerCase()).sort());
+  assert.equal(card.auction_winner_address,null);assert.equal(card.current_owner_address,null);
+  assert.equal(card.ownership_profiles[PENDING_WINNER.toLowerCase()].username,'pending bidder');
+  const active=cardById(await projectCards({id:'2'}),'v41:84532:2');
+  assert.deepEqual(Object.keys(active.ownership_profiles),[CREATOR.toLowerCase()]);
+});
+
+test('ownership profile absence is explicit while a failed lookup keeps client fallback available',async()=>{
+  const fixtures={...FIXTURES,profiles:FIXTURES.profiles.filter(row=>row.wallet_address!==FIRST_COLLECTOR.toLowerCase())};
+  const card=cardById(await projectCards({id:'4'},{fixtures}),'v41:84532:4');
+  assert.equal(card.ownership_profiles[FIRST_COLLECTOR.toLowerCase()],null);
+  const calls=[];
+  const body=await projectCards({id:'4'},{calls,tableRead:async path=>{
+    if(path.startsWith('profiles?'))throw Object.assign(new Error('private backend detail'),{code:'QUERY_FAILED'});
+  }});
+  const failed=cardById(body,'v41:84532:4');
+  assert.equal('ownership_profiles' in failed,false);
+  assert.equal(failed.auction_winner_address,FIRST_COLLECTOR);
+  assert.equal(body.warnings.some(warning=>warning.table==='profiles'&&warning.code==='QUERY_FAILED'),true);
+  assert.equal(calls.filter(path=>path.startsWith('profiles?')).length,1);
+  assert.doesNotMatch(JSON.stringify(body),/private backend detail/);
+});
+
+test('an identity shared by creator, first collector and owner is queried once', async () => {
+  const fixtures = structuredClone(FIXTURES);
+  fixtures.v41_artworks.find(row => row.chain_id === 84532 && row.artwork_id === '4').creator = FIRST_COLLECTOR.toLowerCase();
+  const calls = [];
+  const card = cardById(await projectCards({ id: '4' }, { fixtures, calls }), 'v41:84532:4');
+  assert.deepEqual(Object.keys(card.ownership_profiles), [FIRST_COLLECTOR.toLowerCase()]);
+  const reads = calls.filter(path => path.startsWith('profiles?'));
+  assert.equal(reads.length, 1);
+  assert.equal(new URLSearchParams(reads[0].split('?')[1]).get('limit'), '1');
+});
+
+test('exact ownership identities remain isolated across colliding chain and artwork IDs', async () => {
+  for (const [chain, collector] of [[84532, FIRST_COLLECTOR], [11155111, LEGACY_COLLECTOR]]) {
+    const calls = [];
+    const card = cardById(await projectCards({ id: `v41:${chain}:4` }, { calls }), `v41:${chain}:4`);
+    assert.equal(card.auction_winner_address, collector);
+    assert.deepEqual(Object.keys(card.ownership_profiles).sort(), [CREATOR, collector].map(address => address.toLowerCase()).sort());
+    assert.equal(calls.filter(path => path.startsWith('profiles?')).length, 1);
+  }
+});
+
+test('ownership identity lookup starts while unrelated metadata, bids and signals remain pending', async () => {
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const calls = [];
+  let complete = false;
+  const request = projectCards({ id: '6' }, {
+    calls,
+    tableRead: async path => {
+      if (/^(v41_bids|artwork_social_signals)\?/.test(path)) await pending;
+    },
+    metadataRead: async () => {
+      await pending;
+      return { name: 'Fixture Art', image: 'https://img.test/a.png' };
+    }
+  }).then(body => { complete = true; return body; });
+  try {
+    await new Promise(setImmediate);
+    assert.equal(complete, false);
+    assert.equal(calls.filter(path => path.startsWith('profiles?')).length, 1);
+  } finally {
+    release();
+    await request;
+  }
 });
