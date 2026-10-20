@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-15. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-20. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -9,6 +9,18 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 they disagree with this file, they win and this file is stale.
 
 Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
+
+**October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
+separate ownership-profile round trips and reveals each decoded avatar with its
+public name. Confirmed absent profiles retain wallet labels and the standard
+avatar. Final local checks pass 1903/1903, candidate Linux/Windows CI is green,
+and preview/apex artifacts match. Actual apex Chrome verifies both named and
+missing-profile cases and a 390px layout; the latter is not native iPhone proof.
+The owner is currently away from the laptop. The only new requested phone check
+is the repaired Ownership display on /artwork/30 and /artwork/34, without login
+or signatures. Existing connected publishing/receipt and remaining device
+criteria stay open; do not restart already accepted sign-in, OAuth, moderation
+or account-switch ceremonies.
 
 **October 15 A-22 / A8 accepted, including the UI follow-up:** the [dated evidence reconciliation](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
 maps every required moderation property to existing real journeys, exact-boundary
@@ -266,7 +278,7 @@ Ordered by what the founder can feel, not by row number.
 | Row | What it is | Note |
 | --- | --- | --- |
 | **A-64** | Accept deferred wallet runtime on connected devices | The deferred loader and hidden-tab timer fallback are implemented. iPhone reconnect/sign-in and wallet return passed on October 12; the owner confirmed working network switching on October 14. Do not repeat those flows. Connected iPhone publishing and usability before the deferred SDK is ready remain unrecorded. The old static-SDK diagnosis is historical; Android is owner-waived / not tested |
-| **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | PR #233 is merged after revised iOS preview acceptance and desktop/Android/tablet browser verification. A later cold-import audit isolated the exact public projection from the shared all-routes serverless graph without changing live-state caching, and the exact response now carries Creator identity before the first content frame instead of briefly showing a generated avatar. Preview proof plus production desktop, iOS and legacy-video timing remain open evidence; Android is owner-waived / not tested |
+| **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | The dedicated public function and parallel projection reads are published. PR #312 now batches all displayed public ownership identities into the exact response, without caching live auction state. Exact-candidate preview/apex artifact and public-read checks pass; actual apex Chrome verifies named and absent profiles without redundant Ownership requests. The latest native iPhone visual outcome remains pending; Android is owner-waived / not tested. Use the current checkpoint rather than repeating historical video analysis |
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |

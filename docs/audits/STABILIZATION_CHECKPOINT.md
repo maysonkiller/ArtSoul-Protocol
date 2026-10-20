@@ -38,11 +38,33 @@ October 20 Ownership identity continuation (Canon 05 / A-47 / A-61):
   and `ownership-donation-db-recheck-2026-10-20.log` under `output/audit/`;
   do not describe the initial all-at-once run as green or as a full run of the
   subsequent Highest Bidder edge-case patch.
-- Hosted checks and release verification are still pending. Historical
-  untracked paths remain untouched. Phase A remains 69 done / 14 in progress;
-  the actual connected-device criteria must not be replaced by fixture tests.
-- Exactly next step: finish and verify this Ownership repair, release after
-  green checks, then measure the actual apex profile requests and first display.
+- The final full local run (file concurrency 4) passes 1903/1903, no skips:
+  `output/audit/ownership-unit-bounded-2026-10-20.log`. Candidate `57721aa`
+  passed Linux, Windows, contract and static CI `39426262073`. Preview verification
+  matches 199 assets across six pages, exact identity payloads and access guards.
+  No declined local/preview browser check was retried.
+- PR #312 merged as `bf6604df8413fd5f48255589e4000d6d3dec227e` at
+  13:00:26 UTC; production deployment `7200357647` succeeded at 13:00:53 UTC.
+  Apex verification matches the same 199 assets, private/no-store exact reads,
+  enabled feature flags and guest protected-data denials. Base Sepolia indexer
+  is healthy with zero observed lag. Evidence:
+  `output/audit/ownership-apex-artifact-2026-10-20.json`.
+- Actual apex Chrome: /34 has both complete default avatars and wallet labels
+  without either ownership-profile request; /30 shows maysonkiller and a complete
+  decoded portrait. The one remaining same-wallet profile read originates in the
+  header, not Ownership. Observed artwork response headers: 1208ms (/34) and
+  883ms (/30); these are samples, not a universal latency guarantee. A 390px
+  desktop viewport has no horizontal overflow; its override was cleared.
+  Artwork /19 also renders three distinct Creator / First Collector / Owner
+  rows, complete avatars and correct profile links with no loading indicator.
+  Evidence: `output/audit/ownership-apex-browser-2026-10-20.json` and screenshots.
+- Historical untracked paths remain untouched. Phase A remains 69 done /
+  14 in progress. The owner was asked only for the two repaired public artwork
+  views on iPhone; no new authentication or signature is required. Native phone
+  feedback is pending and is not inferred from desktop screenshots.
+- Exactly next step: record the scoped iPhone Ownership result, then complete
+  the remaining connected publishing/transaction acceptance from the existing
+  device sheet. Do not replay accepted moderation, OAuth or account-switch runs.
 
 Earlier October 15 final moderation UI acceptance:
 
