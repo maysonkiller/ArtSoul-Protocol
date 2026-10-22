@@ -8,7 +8,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **72 done, 11 in progress, 0 planned** across A-01 to A-83.
 
 October 22 next acceptance, without repeating completed ceremonies:
 
@@ -18,10 +18,12 @@ October 22 next acceptance, without repeating completed ceremonies:
    in published PR #321 (`02356e0`); exact candidate CI, preview/apex artifacts
    and crawler routing pass. PR #322 (`1214e7d`) also fixes card links reopening
    a dismissed form on reload, with actual apex card-action checks. A native
-   iPhone result and X-generated card are not inferred from unit tests.
-2. **One connected iPhone publishing journey** covers the remaining parts of
-   A-33/A-64/A-71/A-78/A-83: network/authorization, mandatory AI, both transaction
-   confirmations, correct artwork/auction identity, and indexer convergence.
+   iPhone dialog result is not inferred from unit tests. The owner now confirms
+   actual X sharing; the supplied screenshot shows the correct artwork image,
+   title, creator, live-auction price and testnet attribution.
+2. **Connected iPhone publishing is now accepted** for network/authorization,
+   mandatory AI, both transaction confirmations, correct artwork/auction identity
+   and indexer convergence. Separate frame/delay observations remain below.
    The already completed operator settlement does not replace this journey.
    The latest owner report identifies filename/title rejection and misleading
    field highlighting; PR #323 (`8ba8082`) repairs it and is published. A separate
@@ -30,8 +32,18 @@ October 22 next acceptance, without repeating completed ceremonies:
    apex desktop-engine form journeys pass, using synthetic wallet/AI responses;
    the owner now confirms AI guidance and Ready to publish on the iPhone.
    New video `IMG_2546.MP4` shows the subsequent registration request failing;
-   TA-11 tracks this separately, including the unwanted Back overlay. The
-   underlying mobile exception is not visible in the video. An additional code
+   TA-11 tracks this separately, including the unwanted Back overlay. Published
+   PR #325 (`fb9dde0`) removes that control, refreshes the current signer and
+   corrects nested wallet errors while retaining uncertain-registration recovery.
+   Exact-candidate Linux/Windows CI, preview/apex artifacts and four actual-apex
+   synthetic-provider browser journeys pass. The underlying mobile exception
+   is not visible in the video. The owner now confirms successful native
+   publication: two RPCs verify artwork 36 / auction 70 and both successful
+   receipts, matching the exact indexed projection and provenance. Together
+   with prior connected-wallet/resale evidence this closes A-33/A-64/A-78.
+   A-71's immediate post-publish frame and A-83's delayed-receipt recovery
+   remain distinct unobserved criteria; ordinary success does not prove them.
+   See the current checkpoint for hashes and evidence. An additional code
    inspection confirms there is no enforced exact-file duplicate check despite
    the browser calculating a hash. The requested duplicate protection remains
    open as TA-10; a website guard cannot enforce uniqueness in the unchanged contract.
@@ -337,26 +349,25 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-64** | Accept deferred wallet runtime on connected devices | The deferred loader and hidden-tab timer fallback are implemented. iPhone reconnect/sign-in and wallet return passed on October 12; the owner confirmed working network switching on October 14. Do not repeat those flows. Connected iPhone publishing and usability before the deferred SDK is ready remain unrecorded. The old static-SDK diagnosis is historical; Android is owner-waived / not tested |
 | **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | The dedicated public function and parallel projection reads are published. PR #312 now batches all displayed public ownership identities into the exact response, without caching live auction state. Exact-candidate preview/apex artifact and public-read checks pass; actual apex Chrome verifies named and absent profiles without redundant Ownership requests. The owner accepted the scoped iPhone Ownership appearance on October 20; broader cold-load/continuity criteria remain open. The separate guest-header flash is tracked in the current checkpoint. Android is owner-waived / not tested. Do not repeat historical video analysis |
 | **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
 | **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
 | **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
 | **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS acceptance remains open; navigation timing or desktop viewport emulation cannot replace it. Android is owner-waived / not tested |
 | **A-53** | The identity settle gap between header and profile | Correct-profile iPhone reload/navigation and reconnect outcomes are accepted. The transient restoration menu and header-to-profile visual timing remain unrecorded; do not repeat the whole sign-in flow. Android is owner-waived / not tested |
-| **A-33** | Artwork-page acceptance sweep | Composition and the three-distinct-address provenance example are accepted. The remaining criterion is real-phone transaction feedback; desktop layout checks do not replace it |
 | **A-57** | Wallet capability limits | Current iPhone network switching is owner-confirmed working. The old Robinhood failure stage and masked provider error remain unknown; neither a confirmed ArtSoul defect nor a proven wallet limitation is established. Do not manufacture a failure or repeat the accepted Rabby account-switch flow |
 
-## 2a. All the device acceptance, in five trips
+## 2a. Remaining device observations
 
-Thirteen rows remain for device and connected-flow acceptance after A-79, A-59 and A-73 closed.
+Ten rows remain for device observations, recovery evidence or historical-defect
+disposition; A-23 is the subsequent beta decision. A-33, A-64 and A-78 are accepted
+on October 22 from native publication plus their previously recorded evidence.
 The underlying repairs, including the September 29 portrait/profile
 corrections, are published. A failed acceptance may require another fix.
 [`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)
-organises them by trip instead - arrive cold, connect, publish, settle, and the
-two wallet questions - because most of these rows are watching the same screens
-for different things. It is five sessions per device, and it carries the result
-table.
+retains the historical trip/result table. Do not rerun completed connection,
+publication, settlement or OAuth ceremonies; use only the open observations in
+this close-out and the current backlog.
 
 ## 3. Waiting only on a look
 
@@ -379,10 +390,11 @@ Merged and measured, needing the device coverage specified in each backlog row:
 account menu shows a numeric Base Sepolia balance. The recorded desktop check
 already passed. Android remains owner-waived / not tested.
 
-**A-78 reopened on 2026-09-06.** The active-first heuristic can target another
+**A-78 accepted October 22 after its September 6 reopening.** The old active-first heuristic could target another
 artwork's auction when two counters collide. The same ambiguity affects token
 versus artwork resale inputs. Explicit identifier namespaces replace guessing;
-connected-flow acceptance remains outstanding. See the backlog for current scope.
+native artwork 36 / auction 70 and earlier real resale/settlement evidence now
+complete connected-flow acceptance. See the backlog and checkpoint for receipts.
 
 A-82 closed on 2026-09-14. The graceful-shutdown module no longer registers
 a leave-site confirmation in the browser. The current explicit allowlist covers

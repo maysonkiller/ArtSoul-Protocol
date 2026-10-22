@@ -3,7 +3,38 @@
 Updated: 2026-10-22. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 22 later publication video follow-up (Canon 1/2/5/16):
+October 22 native publication and X acceptance (Canon 1/2/5/17):
+
+- Resume HEAD `fb9dde0c063237ad90198e0e040dd5a061de2a28`, same branch and
+  workspace. Preserved the existing tracked documentation diff in
+  `output/audit/before-mobile-acceptance-2026-10-22.patch`; unrelated untracked
+  authority-policy files, `.codex/` and `output/` remain untouched.
+- The owner confirms successful iPhone Chrome/MetaMask publication and actual
+  X sharing. The supplied 23:14 screenshot shows "Web 3 Rialo test", creator,
+  live-auction wording, 0.0001 test ETH, Base Sepolia and the actual artwork image.
+  This is native/user acceptance, not a synthetic browser result.
+- Independent Base and PublicNode reads agree: artwork 36 belongs to
+  `0x6EC8C121043357aC231E36D403EdAbf90AE6989B`, active auction 70 references
+  artwork 36, start price is 100000000000000 wei, no NFT/floor exists yet.
+  Core runtime hash is `0xa5409acf771b939445714ede5c8aeeb6db4567a5c759beec807f17f83f874d8b`.
+  Registration `0x7165fc4aab96e1bb6087903fc1f5370d006ce22508b8ead45fa1de0047cc0d2f`
+  and auction `0x2ba1c2930d12f4dd50537abc0e7494792d935128eedd74abf6c331f4ac77f028`
+  both succeeded. The exact public projection/provenance contains one of each.
+  Outer transaction senders are relayers; creator identity is checked against
+  events emitted by the pinned Core and its storage, not assumed from tx.from.
+- Reproducible read-only verifier:
+  `node docs/private/verify-mobile-publication-2026-10-22.mjs`; result:
+  `output/audit/mobile-publication-accepted-2026-10-22.json`. Initial verifier
+  assumptions about the API field and direct sender were corrected against
+  actual API/receipt evidence; no product mutation or signing occurred.
+- TA-11 is accepted. A-33/A-64/A-78 now combine this native publication with
+  their recorded prior composition, connection/network and resale evidence.
+  A-71's immediate post-publish frame and A-83's deliberate receipt-delay
+  recovery are NOT inferred. Native dialog geometry/BFCache remain separate.
+- Next: implement the first reviewed TA-10 server-side exact-byte identity
+  change with regression tests; do not claim unchanged contracts enforce it.
+
+October 22 later publication video follow-up (Canon 1/2/5/16; superseded acceptance above):
 
 - Resume HEAD `0378eb7f9296476b71cc66ec1df18004619e9b7b`, same workspace.
   The previous tracked checkpoint/close-out diff is preserved in
@@ -44,13 +75,35 @@ October 22 later publication video follow-up (Canon 1/2/5/16):
   are repaired with retained-hash coverage. No dependency or canon economics
   changed. Interpretation: the video proves a failed user journey, not an RPC
   outage; no hidden wallet error is attributed to the owner.
-- Next: finish exact-candidate CI/release verification, then observe one native
-  publication or its precise diagnostic. TA-10 remains independent unfinished
-  work. Do not close Phase A from these synthetic-provider results.
 - First candidate CI `39851012395` found one stale secondary A12 test still
   expecting contract runtime v12; both OS suites otherwise passed. Its expected
   version is updated to v13, matching all five pages and the hash guard; full
   CI is rerun on the corrected candidate. This was not a phone-flow failure.
+- PR #325 is merged as `fb9dde0c063237ad90198e0e040dd5a061de2a28`; production
+  deployment `7263337939` succeeds at 20:49:22 UTC. Corrected candidate
+  `ccc454258a78cd6e7c356eca4e33f048dcfa8ad9` passes CI `39851594302`: Linux
+  1938 pass/2 skip, Windows 1769 pass/15 skip, and 46 contract tests per OS.
+  Preview `7263264508` and apex match eight pages and 57 assets. The final
+  numeric-zero receipt hardening also passes 12 targeted recovery checks.
+- Actual released Chromium/WebKit code at 390px and 1440px passes all four
+  synthetic-provider journeys: no Upload Back control, precise 4100 session
+  recovery, unknown -32603 submission diagnostics without a false unsent claim.
+  Both attempts reach the actual ethers send method; no real transaction is
+  signed. Evidence: `output/audit/publish-wallet-after-2026-10-22.json`,
+  `publish-video-final-ci-2026-10-22.log`, and
+  `publish-video-{final-preview,apex}-artifacts-2026-10-22.log`.
+- Read-only RPC evidence is saved in
+  `output/audit/publish-read-only-chain-2026-10-22.json`. Before asking the owner
+  to retry, both RPCs report artworkCounter=35; the anonymous projection has
+  35 works and no Piwko title. This does not predict a later wallet response.
+- Current HEAD is `fb9dde0` in the same branch/workspace. Post-release edits
+  affect only this checkpoint, backlog and close-out report; preserve them on
+  continuation along with the unrelated untracked entries. The bounded helper
+  has completed; no additional agents were launched.
+- Next: collect one native iPhone publication result or its new precise error
+  (requested after apex verification). Do not claim the underlying recorded
+  phone failure is solved until that result exists. TA-10 remains independent
+  unfinished work; Phase A remains open.
 
 October 22 upload validation follow-up (Canon 05/11/12/16):
 
