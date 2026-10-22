@@ -242,17 +242,46 @@ let selectedFile = null;
 
         function mapPublishError(error) {
             const code = String(error?.code || '').toUpperCase();
-            const message = String(error?.shortMessage || error?.reason || error?.message || '');
-            const lower = message.toLowerCase();
+            const nodes = [error], seen = new Set(), codes = [], messages = [], methods = [];
+            for (let i = 0; i < nodes.length && seen.size < 12; i += 1) {
+                const item = nodes[i];
+                if (!item || typeof item !== 'object' || seen.has(item)) continue;
+                seen.add(item);
+                codes.push(String(item.code || '').toUpperCase());
+                messages.push(...[item.shortMessage, item.reason, item.message].filter(value => typeof value === 'string'));
+                methods.push(item.payload?.method, item.info?.payload?.method);
+                nodes.push(item.cause, item.error, item.info?.error, item.data, item.originalError);
+            }
+            const lower = messages.join(' | ').toLowerCase();
+            const method = methods.find(value => typeof value === 'string' && /^[a-zA-Z_]{1,64}$/.test(value)) || '';
+            const walletSubmission = method === 'eth_sendTransaction' || method === 'eth_signTransaction';
 
-            if (code === 'ACTION_REJECTED' || code === '4001' || lower.includes('user rejected') || lower.includes('user denied')) {
-                return { code: 'USER_REJECTED', message: 'The transaction was rejected in your wallet. No artwork was published.' };
+            if (codes.includes('ACTION_REJECTED') || codes.includes('4001') || lower.includes('user rejected') || lower.includes('user denied')) {
+                return { code: 'USER_REJECTED', message: currentPublishStage === 'auction'
+                    ? 'The auction request was rejected in your wallet. Your artwork is already registered; open it from your profile to start its auction.'
+                    : 'The transaction was rejected in your wallet. No artwork was published.' };
             }
             if (lower.includes('nonce too low')) {
                 return { code: 'NONCE_TOO_LOW', message: 'Your wallet has a pending transaction. Wait for it to finish, then try again.' };
             }
-            if (lower.includes('insufficient funds') || lower.includes('insufficient gas') || lower.includes('not enough funds')) {
+            if (lower.includes('insufficient funds') || lower.includes('insufficient gas') || lower.includes('not enough funds') || lower.includes('outoffunds')) {
                 return { code: 'INSUFFICIENT_FUNDS', message: 'Insufficient ETH on Base Sepolia to publish this artwork. Top up your wallet and try again.' };
+            }
+            const explicitRevert = lower.includes('execution reverted') || error?.revert || (error?.reason && code === 'CALL_EXCEPTION');
+            const networkChanged = lower.includes('network was changed') || lower.includes('network changed') || codes.includes('4901');
+            const sessionUnavailable = codes.some(value => ['CORE_METHOD_NOT_APPROVED', 'CORE_METHOD_RUNTIME_MISMATCH', 'CORE_SIGN_CLIENT_UNAVAILABLE', '4100'].includes(value));
+            if (!explicitRevert && currentPublishStage === 'register' && submittedRegisterTxHash &&
+                (networkChanged || sessionUnavailable || lower.includes('wallet changed'))) {
+                return { code: 'REGISTRATION_UNCONFIRMED', message: 'The registration was submitted before the wallet connection changed. It may still complete. Check this artwork in your profile before publishing it again.' };
+            }
+            if (sessionUnavailable) {
+                return { code: 'WALLET_SESSION_REQUIRED', message: 'This wallet connection cannot authorize the transaction. Disconnect and reconnect your wallet, select Base Sepolia, then try again.' };
+            }
+            if (lower.includes('wallet changed')) {
+                return { code: 'AUTHORIZATION_WALLET_CHANGED', message: 'The wallet changed during publishing. Authorize the selected wallet again before publishing.' };
+            }
+            if (networkChanged) {
+                return { code: 'NETWORK_CHANGED', message: 'The wallet network changed during publishing. Switch back to Base Sepolia and try again.' };
             }
             // A revert carries a reason. This one carries none, and it comes
             // from estimateGas, which means the node never executed anything:
@@ -263,28 +292,37 @@ let selectedFile = null;
             // successfully against another endpoint at the same moment. Calling
             // that a failed transaction told the person their artwork had been
             // rejected on-chain, which had not happened and was not true.
-            const networkWentQuiet = lower.includes('missing revert data')
-                || lower.includes('could not coalesce error')
+            const networkWentQuiet = !explicitRevert && (lower.includes('missing revert data')
                 || lower.includes('no backend is currently healthy')
                 || code === 'NETWORK_ERROR'
                 || code === 'SERVER_ERROR'
-                || code === 'TIMEOUT';
+                || code === 'TIMEOUT');
             // The same ethers errors mean opposite things on either side of the
             // broadcast. Before it, the node never took the transaction and
             // nothing exists. After it, the registration is on its way and will
             // be permanent once mined - and registration is the first of two
             // transactions, so telling someone nothing was published sends them
             // to publish the same artwork a second time.
-            if (networkWentQuiet && submittedRegisterTxHash) {
+            if ((networkWentQuiet || lower.includes('could not coalesce error')) && currentPublishStage === 'register' && submittedRegisterTxHash) {
                 return {
                     code: 'REGISTRATION_UNCONFIRMED',
                     message: 'The registration was submitted to Base Sepolia and its confirmation has not come back yet. It may still complete. Open your profile and check for this artwork before publishing it again.'
                 };
             }
+            // A generic ethers wrapper is not proof of an RPC outage. A failed
+            // wallet response can also leave submission uncertain without a hash.
+            if (!explicitRevert && (walletSubmission || lower.includes('could not coalesce error'))) {
+                const detailCode = codes.find(value => /^-?\d+$/.test(value)) || code;
+                const details = [currentPublishStage, method, /^[A-Z_0-9-]{1,64}$/.test(detailCode) ? detailCode : '']
+                    .filter(Boolean).join(' / ');
+                return { code: 'WALLET_REQUEST_FAILED', message: `The wallet could not complete the publication request. Check its activity and your ArtSoul profile before trying again. If no transaction appears, reconnect your wallet and retry. Details: ${details}.` };
+            }
             if (networkWentQuiet) {
                 return {
                     code: 'NETWORK_UNAVAILABLE',
-                    message: 'Base Sepolia did not answer, so nothing was sent and nothing was published. This is the network, not your artwork or your wallet. Wait a moment and try again.'
+                    message: currentPublishStage === 'auction'
+                        ? 'Your artwork is already registered, but the auction request could not be prepared. Open the artwork from your profile to start its auction.'
+                        : 'The publication could not be prepared on Base Sepolia; nothing was sent and nothing was published. Wait a moment and try again.'
                 };
             }
             if (code === 'CALL_EXCEPTION' || lower.includes('reverted') || lower.includes('execution reverted')) {
@@ -297,9 +335,6 @@ let selectedFile = null;
             }
             if (lower.includes('no wallet provider') || (lower.includes('wallet provider') && lower.includes('not available'))) {
                 return { code: 'WALLET_NOT_CONNECTED', message: 'Connect your wallet before publishing this artwork.' };
-            }
-            if (lower.includes('network was changed') || code === 'NETWORK_ERROR') {
-                return { code: 'NETWORK_CHANGED', message: 'The wallet network changed during publishing. Switch back to Base Sepolia and try again.' };
             }
             if (lower.includes('metadata upload')) {
                 return { code: 'METADATA_UPLOAD_FAILED', message: 'The artwork details could not be stored. Please try again.' };
@@ -1088,6 +1123,8 @@ let selectedFile = null;
                     fileHash,
                     price,
                     {
+                        expectedWallet: walletAddress,
+                        expectedChainId: BASE_SEPOLIA_CHAIN_ID,
                         onSubmitted: (registerTxHash) => {
                             submittedRegisterTxHash = registerTxHash || '';
                             pendingArtwork = savePendingArtwork({
@@ -1140,6 +1177,8 @@ let selectedFile = null;
                         price,
                         selectedAuctionDuration,
                         {
+                            expectedWallet: walletAddress,
+                            expectedChainId: BASE_SEPOLIA_CHAIN_ID,
                             onSubmitted: (submittedAuctionTxHash) => {
                                 resolveAuctionSubmission(submittedAuctionTxHash || '');
                                 pendingArtwork = savePendingArtwork({
@@ -1240,7 +1279,8 @@ let selectedFile = null;
                 // the only trace that a transaction was in flight.
                 if (pendingArtwork?.register_tx_hash
                     && !pendingArtwork?.artwork_id
-                    && mapped.code !== 'REGISTRATION_UNCONFIRMED') {
+                    && mapped.code !== 'REGISTRATION_UNCONFIRMED'
+                    && error?.receipt?.status === 0) {
                     removePendingArtwork(pendingArtwork.temp_id);
                 }
 

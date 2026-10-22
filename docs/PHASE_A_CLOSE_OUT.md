@@ -25,8 +25,13 @@ October 22 next acceptance, without repeating completed ceremonies:
    The already completed operator settlement does not replace this journey.
    The latest owner report identifies filename/title rejection and misleading
    field highlighting; PR #323 (`8ba8082`) repairs it and is published. A separate
-   reproduced WebKit first-tap failure has a bounded local follow-up: field blur
-   must not replace an unchanged analysis/retry button text node. An additional code
+   reproduced WebKit first-tap failure is repaired in published PR #324 (`0378eb7`):
+   field blur preserves an unchanged analysis/retry button text node. Four actual
+   apex desktop-engine form journeys pass, using synthetic wallet/AI responses;
+   the owner now confirms AI guidance and Ready to publish on the iPhone.
+   New video `IMG_2546.MP4` shows the subsequent registration request failing;
+   TA-11 tracks this separately, including the unwanted Back overlay. The
+   underlying mobile exception is not visible in the video. An additional code
    inspection confirms there is no enforced exact-file duplicate check despite
    the browser calculating a hash. The requested duplicate protection remains
    open as TA-10; a website guard cannot enforce uniqueness in the unchanged contract.

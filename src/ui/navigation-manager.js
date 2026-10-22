@@ -4,7 +4,7 @@
  * Features:
  * - History stack (frontend routing state)
  * - goBack() / goHome() functions
- * - "← Back" button always available
+ * - "← Back" control on pages that use it
  * - Protection: empty stack → goHome()
  * - Theme-aware navigation
  */
@@ -179,6 +179,8 @@ class NavigationManager {
      * Setup back button
      */
     setupBackButton() {
+        // Publish has its own header navigation; a fixed Back control covers its logo.
+        if (this.currentPage === '/upload') return;
         // Create back button if it doesn't exist
         let backBtn = document.getElementById('backButton');
 
