@@ -25,8 +25,15 @@ October 22 TA-10 exact-media foundation (Canon 1/2/11; not activated):
 - The disposable PostgreSQL 17 suite passes 21 tests with no skips, including
   real concurrency, permissions, rollback and legacy duplicates. The server
   verifier has independent review; 48 focused policy/docs/security checks and
-  `npm run build` pass. The full suite and hosted candidate checks are pending
-  at this checkpoint. No new dependency, live migration or transaction occurred.
+  `npm run build` pass. Initial full run: 1986 pass / 14 fail. Two failures
+  correctly require the migration in the disposition ledger and no-default-grant
+  rehearsal; both registrations are fixed and the 21-check rehearsal/ledger
+  rerun passes. The other 12 are two existing indexer suites' temporary Docker
+  TCP startup failures; both suites pass all 12 checks when rerun sequentially.
+  Do not describe that initial full run as green. Logs are
+  `output/audit/media-identity-{full-unit,grants,existing-pg-recheck}-2026-10-22.log`.
+  Hosted checks on the corrected candidate remain pending. No new dependency,
+  live migration or transaction occurred.
 - Interpretation: exact bytes identify a repeated file, not copyright or
   authorship. Catalog rows retain all historical artwork references. These
   internal coordination states do not amend artwork/auction lifecycle states.
