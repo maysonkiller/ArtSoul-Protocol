@@ -3,10 +3,51 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 TA-10 upload preparation (Canon 1/2/11; not activated):
+October 23 native visual acceptance (Canon 5/16/17):
+
+- Resume HEAD `826281e`, same workspace/branch and preserved untracked files.
+  The owner answers the outstanding, scoped iPhone observation question:
+  whole-page/empty-card flicker, delayed names/avatars and wrong profile-tab
+  lists are no longer observed. This is owner-reported acceptance of the
+  completed phone run, not a new agent-captured trace or quantitative timing.
+- A-47/A-53/A-54/A-58/A-61/A-72 are now done, combining this native outcome with
+  published repairs and prior desktop/regression evidence. Do not repeat
+  accepted visual, login, OAuth, publication, X or Donate/Report ceremonies.
+  Android remains owner-waived / not tested.
+- A subsequent explicit owner answer accepts browser Back: the gallery returns
+  to its previous position without flicker or visible reconstruction. A-48 is
+  done with prior desktop BFCache/lazy-image evidence; no Safari cache marker
+  or `pageshow.persisted` measurement is inferred from the phone observation.
+- Counts: 79 done / 4 in progress / 0 planned. Remaining formal rows are
+  A-57 (historical provider-error disposition), A-71
+  (immediate post-publish wait), A-83 (actual delayed-receipt recovery), then
+  A-23 (beta decision). Additional TA-10 exact-file enforcement remains open.
+  No unasked delayed-receipt or publishing-frame outcome is inferred.
+- Acceptance bookkeeping verification: `node scripts/sync-phase-a-counts.mjs
+  --check`, seven existing close-out/status-summary/header-acceptance tests and `git diff --check`
+  pass. This update changes documentation only; the prior application release
+  and its build/runtime checks remain the implementation evidence. Hosted CI
+  identified an older documentation assertion that required A-48 to stay open;
+  it now checks the dated acceptance and its explicit native-telemetry limit.
+- The next TA-10 read-only review confirms that the current browser stores a
+  pending record only after receiving a transaction hash, while unknown
+  no-hash attempts are discarded by display-card cleanup. The new server
+  issuance/claim survives, but contains no submission journal yet. Never use
+  those display cards as authoritative submission evidence or treat `RESUME`
+  as permission to broadcast again. A client rejection is not server proof
+  that no transaction exists.
+- Next concrete step: add a private, atomic submission journal for the existing
+  publication UUID before wallet submission, idempotent hash recording and
+  recovery reads. Keep rollout disabled until confirmed receipt/event and
+  indexer/reorg recovery is integrated; absence from current logs is not proof
+  of cancellation. No timeout-based claim release or new contract behavior.
+
+October 23 TA-10 upload preparation (Canon 1/2/11; released, not activated):
 
 - Resume HEAD `a29dd90124472d872820400b75428f4d6bbf68c8`; remote main remains
-  `66a3dde`. Existing untracked authority-policy files, `.codex/` and `output/`
+  `66a3dde` at that preflight. PR #327 is now merged as
+  `3f12c48598a1e594808711b3ae9b27305237b65d`; this workspace fast-forwarded
+  without replacing files. Existing untracked authority-policy files, `.codex/` and `output/`
   are preserved and excluded from this change. No additional checkout exists
   for this work; older registered worktrees remain recovery/history only.
 - The new private preparation table durably records wallet/deployment and fixed
@@ -26,13 +67,31 @@ October 23 TA-10 upload preparation (Canon 1/2/11; not activated):
 - Focused API checks: 19 pass. Disposable PostgreSQL preparation checks: 21
   pass, no skips, including authenticated API-to-real-SQL integration and
   concurrent retries. The independent review's existing-object signing concern
-  is fixed and rechecked. The build passes. Full regression results and release
-  evidence will be recorded here after completion; earlier baselines are not
-  evidence for this patch.
+  is fixed and rechecked. The build passes. Complete local workspace unit run:
+  2040 pass, zero failures/skips, using the existing collector with file
+  concurrency 2 (includes preserved untracked tests, excluded from the PR).
+  Log: `output/audit/media-preparation-full-unit-2026-10-23.log`; runner:
+  `node docs/private/run-phase-a-unit-2026-10-23.mjs`. This includes the actual
+  no-default-grant migration rehearsal, not just static SQL checks.
+- Exact candidate `dc137c0` passes CI `39864320530`: Linux 2009 pass / 2 skips,
+  Windows 1800 pass / 17 skips, zero failures, and 46 contract tests per OS.
+  Linux skips are Windows custody tests; local Docker covers the SQL groups
+  unavailable on hosted Windows. Logs:
+  `output/audit/media-preparation-ci-{linux,windows}-2026-10-23.log`.
+- Production deployment `7265216560` succeeded at 2026-10-22 22:25:34 UTC
+  (October 23 local time). Preview and apex match all eight checked pages and
+  57 assets. Evidence: `output/audit/page-font-{preview-dc137c0,apex-3f12c48}-release-2026-10-20.json`.
+  The new route denies anonymous POST with 401 and `private, no-store`; preview
+  also rejects GET with 405. No authenticated production write was exercised.
+  Post-merge CI `39864805267` also passes both OS jobs and static checks.
 - Not applied: both media migrations remain manual rollout prerequisites;
   no production schema/flags, browser publishing flow or on-chain state changed.
   Phase A remains 72 done / 11 in progress; TA-10 remains additionally open.
   Exact bytes are file identity, not copyright evidence or title reservation.
+- Fresh anonymous projection reads identify the old inventory's four unresolved
+  rows: artworks 1-4 have empty media URLs and only historical metadata URIs.
+  These reads cannot establish their original-byte hashes. No record was removed,
+  repaired or marked verified, and hidden/unindexed coverage is not inferred.
 - Next concrete step: implement durable submission/recovery coordination for
   the same publication UUID, with unknown-broadcast and confirmed-event/reorg
   tests, before switching the browser. Legacy coverage and actual storage-policy

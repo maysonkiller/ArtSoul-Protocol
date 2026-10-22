@@ -8,9 +8,9 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **72 done, 11 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **79 done, 4 in progress, 0 planned** across A-01 to A-83.
 
-October 22 next acceptance, without repeating completed ceremonies:
+October 23 remaining work, without repeating completed ceremonies:
 
 1. **Current mobile defects:** PR #320's bounded Donate/Report dialogs are
    published and pass actual-apex desktop-engine geometry checks. The separate
@@ -49,15 +49,20 @@ October 22 next acceptance, without repeating completed ceremonies:
    inspection confirms there is no enforced exact-file duplicate check despite
    the browser calculating a hash. The requested duplicate protection remains
    open as TA-10; a website guard cannot enforce uniqueness in the unchanged contract.
-   October 23 adds private durable upload issuance and immutable server metadata
+   PR #327 (`3f12c48`, October 23 local time) adds private durable upload issuance and immutable server metadata
    preparation, with actual PostgreSQL/API retry and ownership tests. The route
    is disabled and always returns `can_submit: false`; no live migration or
    browser switch occurred. Broadcast recovery, indexer/reorg integration and
-   legacy coverage still precede activation. See the current checkpoint.
-3. **A short visual/navigation pass** covers A-47/A-48/A-53/A-54/A-58/A-61/A-72:
-   profile avatar/identity, first tab load, quick navigation and browser Back.
-   Ownership and the guest-header avatar have already been accepted. Actual
-   BFCache restoration must be identified separately from ordinary navigation.
+   legacy coverage still precede activation. Candidate CI passes on both OSes;
+   preview/apex artifacts match. See the current checkpoint.
+3. **Visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
+   reports no remaining whole-page/empty-card flicker, delayed names/avatars or
+   wrong lists on profile-tab switching in the completed iPhone run. Previous
+   desktop tests and published repairs supply the implementation evidence.
+   A separate explicit answer also accepts A-48: browser Back restores the
+   gallery position without flicker or visible reconstruction. Prior desktop
+   BFCache evidence remains separate; the phone result does not establish an
+   internal Safari cache marker. No repeat of these checks is needed.
 4. **A-57 disposition:** current switching works according to the owner; the
    historical Robinhood iOS provider failure is unresolved evidence, not a newly
    confirmed defect. Do not invent a wallet limitation to close it.
@@ -86,8 +91,9 @@ delayed-theme traces across Chromium/WebKit. PR #319 (`6a255e3`) removes late
 font swaps on all nine Inter-loading pages; eight delayed-font open/reload
 traces retain identical text widths. Both candidates pass build and full
 Linux/Windows CI. These desktop-engine checks do not replace native iPhone
-acceptance, which remains pending. No wallet, OAuth or factor ceremony is
-reopened. Other device and connected publishing criteria remain open.
+acceptance, which was pending at that dated check and is now recorded above.
+No wallet, OAuth or factor ceremony is reopened. The remaining criteria are
+listed in the current October 23 close-out above.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its
@@ -356,19 +362,15 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-47** | Keep artwork loading continuous and shorten the exact-artwork path | The dedicated public function and parallel projection reads are published. PR #312 now batches all displayed public ownership identities into the exact response, without caching live auction state. Exact-candidate preview/apex artifact and public-read checks pass; actual apex Chrome verifies named and absent profiles without redundant Ownership requests. The owner accepted the scoped iPhone Ownership appearance on October 20; broader cold-load/continuity criteria remain open. The separate guest-header flash is tracked in the current checkpoint. Android is owner-waived / not tested. Do not repeat historical video analysis |
-| **A-58** | Remove synthetic cards from the first uncached profile-tab load | Reopened by iOS evidence: `display: contents` bypassed the skeleton wrapper's opacity. The repair keeps the panel mounted and uses only the existing compact status |
-| **A-61** | Commit the large profile avatar only after its frame is decoded | Reopened by contradictory iOS evidence: unlike the already-protected header avatar, the profile hero inserted the original multi-megabyte upload directly into visible DOM and exposed a partially decoded strip |
-| **A-54** | Release profile identity before gallery data | The static shell removed empty frames but remained visible for 3-4 seconds because profile identity, Genesis state and up to 200 artworks shared one completion gate. The revised repair head-prefetches a narrow public profile read and commits identity first; the gallery retains the compact A-58 loading status instead of synthetic cards |
-| **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS acceptance remains open; navigation timing or desktop viewport emulation cannot replace it. Android is owner-waived / not tested |
-| **A-53** | The identity settle gap between header and profile | Correct-profile iPhone reload/navigation and reconnect outcomes are accepted. The transient restoration menu and header-to-profile visual timing remain unrecorded; do not repeat the whole sign-in flow. Android is owner-waived / not tested |
 | **A-57** | Wallet capability limits | Current iPhone network switching is owner-confirmed working. The old Robinhood failure stage and masked provider error remain unknown; neither a confirmed ArtSoul defect nor a proven wallet limitation is established. Do not manufacture a failure or repeat the accepted Rabby account-switch flow |
 
 ## 2a. Remaining device observations
 
-Ten rows remain for device observations, recovery evidence or historical-defect
-disposition; A-23 is the subsequent beta decision. A-33, A-64 and A-78 are accepted
-on October 22 from native publication plus their previously recorded evidence.
+Three rows remain for device observations, recovery evidence or historical-defect
+disposition: A-57/A-71/A-83; A-23 is the subsequent beta decision. A-33,
+A-64 and A-78 were accepted on October 22 from native publication and prior
+evidence. A-47/A-48/A-53/A-54/A-58/A-61/A-72 are accepted on October 23 from the
+specific native visual and Back follow-ups, published repairs and prior desktop evidence.
 The underlying repairs, including the September 29 portrait/profile
 corrections, are published. A failed acceptance may require another fix.
 [`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)
@@ -391,7 +393,8 @@ cards. This closes its one-device criterion; the separate mobile rows stay open.
 Merged and measured, needing the device coverage specified in each backlog row:
 
 - **A-71** the ArtSoul mark, not a skeleton, after publishing
-- **A-72** quick loads showing no placeholder at all
+
+A-72's quick-load visual acceptance is recorded on October 23 above.
 
 **A-73 accepted October 14:** the owner explicitly confirms the actual iPhone
 account menu shows a numeric Base Sepolia balance. The recorded desktop check
