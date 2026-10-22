@@ -45,14 +45,14 @@ function sanitizeFilename(value, fallbackExtension) {
   return safe.includes('.') ? safe : `${safe}.${fallbackExtension}`;
 }
 
-function buildStoragePath(wallet, fileName, contentType) {
+export function buildStoragePath(wallet, fileName, contentType) {
   const extension = ALLOWED_TYPES.get(contentType);
   const safeName = sanitizeFilename(fileName, extension);
   const nonce = crypto.randomUUID();
   return `uploads/${wallet}/${Date.now()}-${nonce}-${safeName}`;
 }
 
-function buildMetadataStoragePath(wallet, fileName) {
+export function buildMetadataStoragePath(wallet, fileName) {
   const safeName = sanitizeFilename(fileName, 'json').replace(/\.[^.]+$/, '.json');
   const nonce = crypto.randomUUID();
   return `metadata/${wallet}/${Date.now()}-${nonce}-${safeName}`;
@@ -85,6 +85,33 @@ function sendUploadError(res, error) {
     stage: 'SIGNED_UPLOAD_CREATE',
     bucket: ARTWORKS_BUCKET
   });
+}
+
+export async function createSignedArtworkUpload(path, contentType, kind = 'media', options = {}) {
+  assertServiceRoleKey();
+  const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  const signed = await supabaseStorageRest(
+    `object/upload/sign/${ARTWORKS_BUCKET}/${encodedPath}`,
+    { method: 'POST', body: {}, headers: { 'x-upsert': 'false' }, signal: options.signal }
+  );
+  const relativeUrl = signed?.url || signed?.signedURL || signed?.signedUrl;
+  if (!relativeUrl) {
+    const error = new Error('Supabase Storage did not return a signed upload URL');
+    error.statusCode = 500;
+    error.code = 'SIGNED_UPLOAD_URL_MISSING';
+    throw error;
+  }
+  const storageBase = getSupabaseStorageBaseUrl();
+  const url = relativeUrl.startsWith('http')
+    ? relativeUrl : `${storageBase}${relativeUrl.startsWith('/') ? '' : '/'}${relativeUrl}`;
+  return {
+    bucket: ARTWORKS_BUCKET, kind, path,
+    token: new URL(url).searchParams.get('token') || signed.token || null,
+    signed_upload_url: url,
+    public_url: getPublicStorageUrl(ARTWORKS_BUCKET, path),
+    content_type: contentType,
+    max_size: kind === 'metadata' ? MAX_METADATA_BYTES : MAX_ARTWORK_UPLOAD_BYTES
+  };
 }
 
 export default async function handler(req, res) {
@@ -139,36 +166,7 @@ export default async function handler(req, res) {
     const path = isMetadata
       ? buildMetadataStoragePath(wallet, fileName || 'metadata.json')
       : buildStoragePath(wallet, fileName, contentType);
-    const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
-    const signed = await supabaseStorageRest(
-      `object/upload/sign/${encodeURIComponent(ARTWORKS_BUCKET)}/${encodedPath}`,
-      { method: 'POST', body: {} }
-    );
-
-    const relativeUrl = signed?.url || signed?.signedURL || signed?.signedUrl;
-    if (!relativeUrl) {
-      const err = new Error('Supabase Storage did not return a signed upload URL');
-      err.statusCode = 500;
-      err.code = 'SIGNED_UPLOAD_URL_MISSING';
-      throw err;
-    }
-
-    const storageBase = getSupabaseStorageBaseUrl();
-    const signedUploadUrl = relativeUrl.startsWith('http')
-      ? relativeUrl
-      : `${storageBase}${relativeUrl.startsWith('/') ? '' : '/'}${relativeUrl}`;
-    const token = new URL(signedUploadUrl).searchParams.get('token') || signed.token || null;
-
-    res.status(200).json({
-      bucket: ARTWORKS_BUCKET,
-      kind: isMetadata ? 'metadata' : 'media',
-      path,
-      token,
-      signed_upload_url: signedUploadUrl,
-      public_url: getPublicStorageUrl(ARTWORKS_BUCKET, path),
-      content_type: contentType,
-      max_size: isMetadata ? MAX_METADATA_BYTES : MAX_ARTWORK_UPLOAD_BYTES
-    });
+    res.status(200).json(await createSignedArtworkUpload(path, contentType, isMetadata ? 'metadata' : 'media'));
   } catch (error) {
     sendUploadError(res, error);
   }

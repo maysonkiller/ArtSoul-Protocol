@@ -113,7 +113,7 @@ function server(authenticated = true) {
         getPublicStorageUrl: (bucket, path) => `https://storage.example.test/${bucket}/${path}`,
         supabaseStorageRest: async path => { signed.push(path); return { url: '/upload?token=fixture' }; }
     });
-    vm.runInContext(`${policy}\n${withoutImports(read('src/api/routes/upload/file.js')).replace('export default ', '')}`, context);
+    vm.runInContext(`${policy}\n${withoutImports(read('src/api/routes/upload/file.js')).replace(/^export (?:default )?/gm, '')}`, context);
     return { signed, call: async body => {
         const response = { status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
         await context.handler({ method: 'POST', body }, response);

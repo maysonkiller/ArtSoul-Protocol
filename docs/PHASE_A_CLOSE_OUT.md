@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-22. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-23. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -49,6 +49,11 @@ October 22 next acceptance, without repeating completed ceremonies:
    inspection confirms there is no enforced exact-file duplicate check despite
    the browser calculating a hash. The requested duplicate protection remains
    open as TA-10; a website guard cannot enforce uniqueness in the unchanged contract.
+   October 23 adds private durable upload issuance and immutable server metadata
+   preparation, with actual PostgreSQL/API retry and ownership tests. The route
+   is disabled and always returns `can_submit: false`; no live migration or
+   browser switch occurred. Broadcast recovery, indexer/reorg integration and
+   legacy coverage still precede activation. See the current checkpoint.
 3. **A short visual/navigation pass** covers A-47/A-48/A-53/A-54/A-58/A-61/A-72:
    profile avatar/identity, first tab load, quick navigation and browser Back.
    Ownership and the guest-header avatar have already been accepted. Actual

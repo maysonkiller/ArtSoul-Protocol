@@ -36,6 +36,35 @@ All remaining SQL files are feature/manual migrations. Their presence in this di
 
 ## Exact-media publication foundation
 
+`artwork_media_preparation.sql` is the next private, manual prerequisite. It
+records a publication UUID, authenticated wallet, deployment and fixed media /
+metadata paths before signing an upload URL. A second service-only RPC pins the
+verified bytes and exact metadata JSON once; retries return the same record.
+It has explicit grants, revokes and forced RLS and is rehearsed without platform
+default grants. It does not release claims or authorize blockchain submission.
+
+The authenticated `POST /api/upload/publication` preparation route is disabled
+unless `ARTSOUL_MEDIA_PREPARATION_ENABLED=true` and an explicit
+`ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA` exists. Keep it disabled until rollout is
+reviewed. `issue` requires a stable `publication_id`, filename, MIME type and
+size; only its media upload URL is signed. `prepare` requires that UUID and the
+existing artwork metadata shape. It loads wallet-owned issuance, verifies the
+original bytes, binds every consumed media/creator alias, pins JSON before a
+server-only metadata write and reads the object back before claiming the hash.
+No browser-selected path/hash/deployment is authoritative. Both responses say
+`can_submit: false`: a matching preparation or existing claim is not permission
+to broadcast again. The browser publishing path has not been switched over.
+
+After a successful or uncertain media PUT, non-overwrite upload signing can
+return a conflict because the object already exists. Reissuing verifies the
+stored raw bytes against the issuance (and any pinned hash) and returns
+`upload_complete: true` with `upload: null`; it never authorizes overwrite.
+After an uncertain metadata write, only an exact readback match allows progress;
+the service does not overwrite or change the fixed path. This follows the
+[Supabase standard-upload conflict behavior](https://supabase.com/docs/guides/storage/uploads/standard-uploads)
+and [signed-upload upsert rules](https://supabase.com/docs/reference/javascript/file-buckets-uploadtosignedurl).
+Actual production storage-policy verification remains a rollout gate.
+
 `artwork_media_identity.sql` is additive preparation for the founder-requested
 website check against identical original bytes. It is not in the active indexer
 sequence and has not been applied to production. Its private catalog retains

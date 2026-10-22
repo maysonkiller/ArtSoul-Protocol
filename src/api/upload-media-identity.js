@@ -4,7 +4,7 @@ import { allowedArtworkUrl } from './safe-artwork-fetch.js';
 import { ARTWORK_MIME_EXTENSIONS, MAX_ARTWORK_UPLOAD_BYTES } from '../config/upload-policy.js';
 
 const FETCH_TIMEOUT_MS = 30000;
-const ISSUED_FILENAME = /^\d{13}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[\w.-]{1,100}$/;
+const ISSUED_FILENAME = /^\d{13}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[\w.-]{1,101}$/;
 
 class UploadMediaIdentityError extends Error {
   constructor(code, statusCode = 422) {

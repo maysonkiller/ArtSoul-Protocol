@@ -335,6 +335,7 @@ export async function supabaseStorageRest(path, options = {}) {
     response = await fetch(url, {
       method,
       headers,
+      ...(options.signal ? { signal: options.signal } : {}),
       body: options.body === undefined ? undefined : JSON.stringify(options.body)
     });
   } catch (error) {
