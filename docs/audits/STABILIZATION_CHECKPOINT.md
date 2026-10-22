@@ -1,9 +1,51 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-22. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 22 TA-10 exact-media foundation (Canon 1/2/11; not activated):
+October 23 TA-10 upload preparation (Canon 1/2/11; not activated):
+
+- Resume HEAD `a29dd90124472d872820400b75428f4d6bbf68c8`; remote main remains
+  `66a3dde`. Existing untracked authority-policy files, `.codex/` and `output/`
+  are preserved and excluded from this change. No additional checkout exists
+  for this work; older registered worktrees remain recovery/history only.
+- The new private preparation table durably records wallet/deployment and fixed
+  media/metadata paths before upload authorization. Its service-only RPC pins
+  actual original-byte SHA-256, size, MIME and exact metadata once. Retrying
+  preserves the record; changing pinned data or another wallet's request fails.
+- `POST /api/upload/publication` authenticates the wallet, pins Base Sepolia/Core
+  from server configuration and remains disabled by default. It binds every
+  consumed creator/media alias using the existing metadata shape, writes
+  metadata without overwrite, reads it back and only then claims the hash.
+  Lost upload/write responses recover from verified existing bytes/JSON.
+  Every response says `can_submit: false`; `RESUME` never authorizes rebroadcast.
+- The existing upload route reuses its extracted signing helper with the same
+  response shape. The byte verifier now accepts the existing issuer's full
+  101-character filename output (96-character stem plus `.webp` / `.webm`).
+  No file format, title rule, AI guidance or contract behavior is changed.
+- Focused API checks: 19 pass. Disposable PostgreSQL preparation checks: 21
+  pass, no skips, including authenticated API-to-real-SQL integration and
+  concurrent retries. The independent review's existing-object signing concern
+  is fixed and rechecked. The build passes. Full regression results and release
+  evidence will be recorded here after completion; earlier baselines are not
+  evidence for this patch.
+- Not applied: both media migrations remain manual rollout prerequisites;
+  no production schema/flags, browser publishing flow or on-chain state changed.
+  Phase A remains 72 done / 11 in progress; TA-10 remains additionally open.
+  Exact bytes are file identity, not copyright evidence or title reservation.
+- Next concrete step: implement durable submission/recovery coordination for
+  the same publication UUID, with unknown-broadcast and confirmed-event/reorg
+  tests, before switching the browser. Legacy coverage and actual storage-policy
+  verification remain activation gates. The bounded helper has finished.
+
+October 22 TA-10 exact-media foundation (Canon 1/2/11; merged, not activated):
+
+- PR #326 is merged as `66a3ddee4ac4c60dc1e91fe7ebc5e8aea7eec90e`; this
+  workspace fast-forwarded to that exact main commit without disturbing the
+  existing untracked files. Production deployment `7264434883` succeeded at
+  21:43:59 UTC. Preview and apex HTTP verification match all eight checked pages
+  and 57 assets. This code release does not apply the manual database migration
+  or enable website duplicate enforcement.
 
 - Native acceptance is recorded in commit `f37cd18`, following application
   merge `fb9dde0`. Phase A is 72 done / 11 in progress; the extra TA-10 website
@@ -32,8 +74,9 @@ October 22 TA-10 exact-media foundation (Canon 1/2/11; not activated):
   TCP startup failures; both suites pass all 12 checks when rerun sequentially.
   Do not describe that initial full run as green. Logs are
   `output/audit/media-identity-{full-unit,grants,existing-pg-recheck}-2026-10-22.log`.
-  Hosted checks on the corrected candidate remain pending. No new dependency,
-  live migration or transaction occurred.
+  Exact corrected candidate `de37f0f` passes hosted CI `39858992650`: Linux
+  1969 pass / 2 skipped, Windows 1780 pass / 16 skipped, zero failures, and 46
+  contract tests per OS. No new dependency, live migration or transaction occurred.
 - Interpretation: exact bytes identify a repeated file, not copyright or
   authorship. Catalog rows retain all historical artwork references. These
   internal coordination states do not amend artwork/auction lifecycle states.
@@ -46,6 +89,19 @@ October 22 TA-10 exact-media foundation (Canon 1/2/11; not activated):
 - Next concrete step: connect authenticated, server-issued upload preparation
   to immutable metadata and the verified claim, with rejection/retry tests,
   before enabling any website duplicate block. The bounded helper is finished.
+  Focused integration review at `66a3dde` confirms two activation blockers:
+  metadata repeats creator/media in multiple aliases, and the public adapter
+  can prefer image/animation_url over media_url; bind every consumed alias.
+  Existing upload/profile pending-card cleanup removes records without a
+  registration hash, so prepared/uncertain operations need durable server
+  issuance and recovery separate from display cards. SQL `RESUME` is only an
+  identical preparation, never permission to broadcast another registration.
+  Preserve the existing upload helper's return shape for unrelated callers.
+  This review changed no code or external state; the single helper is finished.
+- Owner follow-up: both Donate and Report open and close correctly on the real
+  iPhone; the page, logo and wallet button keep their positions without stretch.
+  This closes native modal geometry acceptance for PR #320/#322. Do not ask for
+  this trip again. It does not imply BFCache or delayed-receipt recovery.
 
 October 22 native publication and X acceptance (Canon 1/2/5/17):
 
