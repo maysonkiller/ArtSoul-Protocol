@@ -7,8 +7,8 @@ its historical evidence. It is not an Android PASS or a compatibility claim.
 Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
 iPhone trip without a specific unresolved outcome.
 
-Thirteen backlog rows remain for device and connected-flow acceptance after
-A-79 closed on September 27 and A-59/A-73 on October 14. Their implementation is published; failed
+Ten backlog rows remain for device observations, recovery evidence or historical
+defect disposition after A-33/A-64/A-78 were accepted on October 22. Their implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
 
@@ -16,6 +16,17 @@ This sheet is organised by trip. Each trip says what to do, what to watch, and
 which rows its answers close. Record the result here, dated, per device. An
 owner-reported run is evidence of the outcomes actually asked about; label it
 as owner-reported and do not infer unasked OAuth, transaction or device results.
+
+**October 22 native publication acceptance:** the owner confirms successful
+iPhone Chrome/MetaMask registration and auction creation after PR #325, and
+provides an actual X post showing the correct image, title, creator, price and
+testnet label. Read-only verification through both Base and PublicNode agrees:
+artwork 36 / auction 70, successful receipts and matching indexer provenance.
+See the current checkpoint for hashes and verifier. With the earlier recorded
+connection/network and resale outcomes, A-33/A-64/A-78 are accepted. Do not repeat
+publication or X sharing. The immediate publishing wait frame (A-71), deliberate
+receipt-delay recovery (A-83), native modal geometry and BFCache are not inferred
+from this success or screenshot.
 
 October 8 owner follow-up: asked about the previous iPhone gallery/detail/Back,
 wallet/profile reload, tab switching and lock/resume run, the owner reported

@@ -3,6 +3,43 @@
 Updated: 2026-10-22. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 22 TA-10 exact-media foundation (Canon 1/2/11; not activated):
+
+- Native acceptance is recorded in commit `f37cd18`, following application
+  merge `fb9dde0`. Phase A is 72 done / 11 in progress; the extra TA-10 website
+  duplicate guard is still in progress, not silently counted as complete.
+- `src/api/upload-media-identity.js` hashes actual original storage bytes with
+  Node SHA-256, bounded streaming, the existing 50 MB/MIME policy, a deadline,
+  wallet-owned issued-path format validation and the existing host allowlist. It never
+  accepts a supplied digest or image-transform URL as byte identity. Ten tests
+  pass, including renamed files, false Content-Length, stream timeout and
+  foreign paths. A read-only live call verifies artwork 36's 1,493,557-byte PNG:
+  `17978df015cc2175624a73dcba8a57fba15ffd05ebfb0b23f5acb986f9125f10`.
+  Evidence: `output/audit/upload-media-identity-live-2026-10-22.json`.
+- `sql/migrations/artwork_media_identity.sql` adds a private historical catalog
+  and deployment/hash-unique publication claims. Two service-only RPCs preserve
+  identical retries, serialize catalog/claim races, reconcile matching confirmed
+  registration and block conflicts without deleting history. Explicit grants,
+  revokes and forced RLS cover the changed Supabase default-grant behavior.
+  It is a manual migration, not part of automatic indexer setup.
+- The disposable PostgreSQL 17 suite passes 21 tests with no skips, including
+  real concurrency, permissions, rollback and legacy duplicates. The server
+  verifier has independent review; 48 focused policy/docs/security checks and
+  `npm run build` pass. The full suite and hosted candidate checks are pending
+  at this checkpoint. No new dependency, live migration or transaction occurred.
+- Interpretation: exact bytes identify a repeated file, not copyright or
+  authorship. Catalog rows retain all historical artwork references. These
+  internal coordination states do not amend artwork/auction lifecycle states.
+  No claim expiry, abandoned-attempt release or reorg policy was invented.
+- NOT activated: no upload route or browser consumes this foundation yet.
+  Before rollout it still needs server-issued preparation/metadata binding,
+  safe cancellation/unknown-broadcast recovery, confirmed-event/reorg integration
+  and a full legacy coverage report. The unchanged permissionless contract
+  cannot enforce website uniqueness. Existing publication remains unchanged.
+- Next concrete step: connect authenticated, server-issued upload preparation
+  to immutable metadata and the verified claim, with rejection/retry tests,
+  before enabling any website duplicate block. The bounded helper is finished.
+
 October 22 native publication and X acceptance (Canon 1/2/5/17):
 
 - Resume HEAD `fb9dde0c063237ad90198e0e040dd5a061de2a28`, same branch and
