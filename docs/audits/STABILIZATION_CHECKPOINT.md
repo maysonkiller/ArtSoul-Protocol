@@ -47,6 +47,10 @@ October 22 later publication video follow-up (Canon 1/2/5/16):
 - Next: finish exact-candidate CI/release verification, then observe one native
   publication or its precise diagnostic. TA-10 remains independent unfinished
   work. Do not close Phase A from these synthetic-provider results.
+- First candidate CI `39851012395` found one stale secondary A12 test still
+  expecting contract runtime v12; both OS suites otherwise passed. Its expected
+  version is updated to v13, matching all five pages and the hash guard; full
+  CI is rerun on the corrected candidate. This was not a phone-flow failure.
 
 October 22 upload validation follow-up (Canon 05/11/12/16):
 
