@@ -3,6 +3,54 @@
 Updated: 2026-10-22. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 22 upload validation follow-up (Canon 05/11/12/16):
+
+- Resume HEAD `1214e7d9d177e0801bb4b0513067b42131882a5b`, same checkout.
+  PR #322 consumes card action links once. Candidate CI `39842627269` and
+  post-merge CI `39843119661` pass; production `7262009091` succeeds.
+  Preview/apex match eight pages and 57 assets. Actual apex Chromium/WebKit
+  card-menu Donate/Report and contextual Share checks pass; see
+  `output/audit/card-actions-share-apex-2026-10-22.json`.
+- The owner now reports rejected filenames/titles while publishing. Both the
+  client and signed-upload API reject screenshot/camera filenames. The client
+  also rejects short titles and broad prefixes such as Photo and Untitled.
+  Any details error focuses the title, including a short description or bad
+  price. The owner explicitly asks to accept ordinary titles and device files.
+- Local repair removes both filename heuristics and the title blacklist,
+  retaining a nonempty title, existing format/50 MB bounds, authentication and
+  sanitized random storage paths. Details errors identify their actual field
+  with inline feedback and clear on editing. Price entry reuses the existing
+  exact ETH parser, accepts decimal commas and removes the unrelated HTML
+  0.01 step constraint. Mandatory AI and contract economics are unchanged.
+  Five new regressions fail before repair; focused tests pass 39/39 and the
+  production build passes. No dependency added.
+- Actual apex Chromium/WebKit at 390px and 1440px reproduces screenshot-name
+  rejection, Photo-title rejection and description errors focusing the title.
+  It also exposes input events being rendered as `[object InputEvent]` in the
+  readiness hint; the repaired input listener calls readiness without passing
+  the event as a message. Evidence: `upload-validation-before-2026-10-22.json`
+  under `output/audit/`. All writes are blocked in the isolated probe.
+- Interpretation: filename is not artwork title, and a common title is not a
+  unique NFT identifier. OpenSea documents separate media/name metadata, not
+  a global title reservation. No title-uniqueness restriction was invented.
+  The 12-to-1000-character description requirement remains unchanged.
+- **Newly confirmed gap:** the existing browser SHA-256 is only stored in a
+  pending local draft. `contracts-integration.js:uploadArtwork` ignores its
+  `_fileHash` argument; `ArtSoulCore.registerArtwork` only checks a nonempty
+  metadata URI. Neither the API nor contract enforces file uniqueness. Earlier
+  chat language implying existing duplicate protection was incorrect and has
+  been corrected. Owner requests duplicate protection; deployment scope is
+  being clarified. Do not mark it implemented or replace it with a title check.
+  A server implementation needs verified bytes, atomic reservations, bounded
+  legacy coverage and registration reconciliation. It cannot prevent direct
+  calls to the unchanged permissionless contract. Cropped/re-encoded images
+  are not byte-identical; no visual copyright guarantee is implied.
+- Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
+  One narrowly scoped read-only helper checked duplicate enforcement and has
+  completed. Next: finish full validation, release the filename/field repair,
+  then implement the agreed duplicate-publication scope. Native phone publishing
+  remains unaccepted while the owner encounters this form defect.
+
 October 22 mobile publishing and share follow-up (Canon 05/11/12/16):
 
 - Resume HEAD `a4b06f8437d14fa71468b410ef80597f83731a8e`, same checkout.
@@ -67,8 +115,8 @@ October 22 mobile publishing and share follow-up (Canon 05/11/12/16):
   only the supported one-time action once the form is permitted, preserving
   artwork ID, hash, other parameters and history state. It does not navigate
   or sign. A regression fails before the patch; the focused suite passes
-  30/30 and build passes. Next: release this bounded follow-up, finish actual
-  card-button checks, then record native acceptance if the owner replies.
+  30/30 and build passes. Released as PR #322; see the newer entry above for
+  actual card-button and deployment evidence.
 
 October 20 mobile actions follow-up (Canon 05/11/12/16, A-33/A-47/A-71):
 
