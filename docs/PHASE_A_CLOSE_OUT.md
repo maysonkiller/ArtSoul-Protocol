@@ -75,7 +75,9 @@ October 23 remaining work, without repeating completed ceremonies:
    internal Safari cache marker. No repeat of these checks is needed.
    A later October 23 desktop report is tracked separately as TA-12: brief
    Ownership flicker, slow Protocol activity / Provenance and late card timers.
-   The supplied video exists but has not yet been analyzed. The owner defers
+   Frame review confirms brief loading text, delayed history/statistics and an
+   initially empty timer pill; it does not establish overlap or a code cause.
+   Exact timestamps are in the checkpoint. The owner defers
    these repairs until existing phase work is finished. Earlier phone acceptance
    remains valid; the beta decision must disclose this deferred desktop follow-up.
 4. **A-57 disposition:** current switching works according to the owner; the

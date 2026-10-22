@@ -3,7 +3,7 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 TA-10 registration evidence (Canon 1/2/11; local, not activated):
+October 23 TA-10 registration evidence (Canon 1/2/11; PR #330, not activated):
 
 - Resume HEAD `f004836`, same workspace/branch; preserved untracked authority
   files are excluded. No UI, contract, live schema or feature flag changed.
@@ -29,6 +29,13 @@ October 23 TA-10 registration evidence (Canon 1/2/11; local, not activated):
   The focused suite passes 104 checks (59 in the new evidence suite), zero skips;
   build passes. Logs: `output/audit/registration-evidence-focused-2026-10-23.log`
   and `registration-evidence-build-2026-10-23.log` in the same directory.
+  Candidate `8d3a74904cb2823172f576d317da9e2b86121686` is preserved in
+  [PR #330](https://github.com/maysonkiller/ArtSoul-Protocol/pull/330).
+  Exact-candidate CI `39871256897` passes: Linux 2080 pass / 2 skips;
+  Windows 1862 pass / 17 skips; zero failures, and 46 contract tests pass on
+  each OS. Log: `output/audit/registration-evidence-ci-2026-10-23.log`.
+  PR is not merged; production remains `dbefd68`. No activation is requested
+  by this preservation/review step.
 - Actual read-only evidence: both existing RPCs verify artwork 36 at block
   `48908274` by reported hash and by an explicit five-block no-hash scan, and
   reject changed metadata. The verified common finalized anchor is `48939549`.
@@ -54,7 +61,21 @@ October 23 deferred desktop observation (Canon 5/16/17):
   auction timers after refresh. Possible subsection overlap is a hypothesis,
   not a diagnosed cause. Source: `Запись экрана 2026-10-23 004307.mp4`, retained
   in the owner's local screen-recordings directory (59,452,664 bytes). The
-  file exists; no frame analysis or reproduction has been performed yet.
+  file is 54.4 seconds at 30 fps. Subsequent frame review covers the full
+  recording at one-second intervals, a consecutive 30 fps Ownership burst,
+  and 10 fps activity/provenance/timer intervals. Observed transitions:
+  - 00:02.033 and 00:02.067: Ownership shows `Loading profile...`; by
+    00:02.100 avatars and shortened addresses are visible.
+  - 00:20.5-00:21.2: Provenance shows `Loading indexer history...`; four
+    events appear by 00:21.3.
+  - 00:29.9-00:30.4: Protocol activity has dashes; the four values are
+    visible by 00:30.5.
+  - 00:49.7-00:50.1: the live card has an empty timer pill; `1d 22h`
+    appears by 00:50.2. This is outside the uploaded artwork image.
+  Crops/contact sheets are preserved in `output/audit/video-review-2026-10-23/`.
+  These are recorded visual transitions, not request timings or established
+  causes. No overlap is demonstrated in the inspected frames; no fresh browser
+  reproduction, code diagnosis or audio transcription is claimed.
 - The owner explicitly defers these repairs until the existing phase work is
   finished. Track the follow-up as October 23 TA-12 in `BACKLOG.md`; do not
   change these UI areas now or erase the separately accepted iPhone results.
