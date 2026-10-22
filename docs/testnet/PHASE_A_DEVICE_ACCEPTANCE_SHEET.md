@@ -26,7 +26,11 @@ See the current checkpoint for hashes and verifier. With the earlier recorded
 connection/network and resale outcomes, A-33/A-64/A-78 are accepted. Do not repeat
 publication or X sharing. The immediate publishing wait frame (A-71), deliberate
 receipt-delay recovery (A-83), native modal geometry and BFCache are not inferred
-from this success or screenshot.
+from this success or screenshot. In a subsequent explicit iPhone check the
+owner confirms both Donate and Report fit the screen and closing them leaves
+the page, logo and wallet button in place without stretching. Native modal
+geometry is therefore accepted separately; no form or donation was submitted
+as part of that geometry check.
 
 October 8 owner follow-up: asked about the previous iPhone gallery/detail/Back,
 wallet/profile reload, tab switching and lock/resume run, the owner reported

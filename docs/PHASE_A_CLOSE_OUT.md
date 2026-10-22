@@ -18,9 +18,11 @@ October 22 next acceptance, without repeating completed ceremonies:
    in published PR #321 (`02356e0`); exact candidate CI, preview/apex artifacts
    and crawler routing pass. PR #322 (`1214e7d`) also fixes card links reopening
    a dismissed form on reload, with actual apex card-action checks. A native
-   iPhone dialog result is not inferred from unit tests. The owner now confirms
-   actual X sharing; the supplied screenshot shows the correct artwork image,
-   title, creator, live-auction price and testnet attribution.
+   owner now confirms both Donate and Report on the real iPhone: the dialogs
+   fit, and closing them preserves the page, logo and wallet-button position
+   without stretching. Actual X sharing is also accepted; the supplied
+   screenshot shows the correct artwork image, title, creator, live-auction
+   price and testnet attribution. These scoped mobile defects are accepted.
 2. **Connected iPhone publishing is now accepted** for network/authorization,
    mandatory AI, both transaction confirmations, correct artwork/auction identity
    and indexer convergence. Separate frame/delay observations remain below.
