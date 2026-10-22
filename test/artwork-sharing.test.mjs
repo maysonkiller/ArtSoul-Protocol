@@ -99,10 +99,18 @@ test('HEAD resolves the same public identity and sends no HTML body', async () =
 });
 
 test('crawler routing precedes normal artwork routing without changing human entry points', () => {
-    const {rewrites}=JSON.parse(fs.readFileSync('vercel.json','utf8'));
+    const {rewrites,redirects}=JSON.parse(fs.readFileSync('vercel.json','utf8'));
     const bots=rewrites.filter(route=>route.destination.startsWith('/api/artwork-preview'));
-    assert.equal(bots.length,2);
-    for(const route of bots) {
+    assert.equal(bots.length,1);
+    const legacy=redirects.find(route=>route.source==='/artwork');
+    assert.equal(legacy.destination,'/artwork/:artworkId');
+    assert.equal(legacy.permanent,false);
+    const idRule=legacy.has.find(rule=>rule.type==='query');
+    assert.equal(idRule.key,'id');
+    const idPattern=new RegExp('^'+idRule.value+'$');
+    for(const id of ['34','v41:84532:34','v41:11155111:34']) assert.equal(id.match(idPattern).groups.artworkId,id);
+    for(const id of ['../34','https://example.com','v41:8453:34']) assert.equal(idPattern.test(id),false);
+    for(const route of [...bots,legacy]) {
         const condition=route.has[0];
         assert.equal(condition.key,'user-agent');
         const re=new RegExp(condition.value);

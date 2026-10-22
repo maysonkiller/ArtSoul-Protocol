@@ -39,6 +39,13 @@ October 22 mobile publishing and share follow-up (Canon 05/11/12/16):
   no other helpers are running. Preserve unrelated untracked authority-policy
   files, `.codex/` and `output/`. Next: finish build/full checks, verify preview
   routing, then release these two small repairs and test actual apex paths.
+- Preview verification caught static-file precedence on `/artwork?id=...`:
+  the short path served the correct work image, but the legacy query URL still
+  served generic static tags. Replace only that ineffective rewrite with a
+  temporary Twitterbot-only redirect of validated IDs to the existing short
+  route; normal browser routes are unchanged. This follows Vercel's conditional
+  [redirect configuration](https://vercel.com/docs/project-configuration/vercel-json#redirects).
+  Retest both forms on the next preview before merging.
 
 October 20 mobile actions follow-up (Canon 05/11/12/16, A-33/A-47/A-71):
 
