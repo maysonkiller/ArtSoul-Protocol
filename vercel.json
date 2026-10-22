@@ -52,6 +52,15 @@
   ],
   "redirects": [
     {
+      "source": "/artwork",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*[Tt]witterbot.*" },
+        { "type": "query", "key": "id", "value": "(?<artworkId>(?:v41:(?:84532|11155111):)?[1-9][0-9]{0,77})" }
+      ],
+      "destination": "/artwork/:artworkId",
+      "permanent": false
+    },
+    {
       "source": "/index",
       "destination": "/",
       "permanent": true
@@ -68,6 +77,11 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/artwork/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": ".*[Tt]witterbot.*" }],
+      "destination": "/api/artwork-preview?id=:id"
+    },
     {
       "source": "/artwork/:id",
       "destination": "/artwork?id=:id"

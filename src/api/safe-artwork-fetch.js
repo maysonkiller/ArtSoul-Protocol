@@ -3,7 +3,7 @@ import { MAX_METADATA_BYTES } from '../config/upload-policy.js';
 const STORAGE_PATHS = ['/storage/v1/object/public/artworks/', '/storage/v1/render/image/public/artworks/'];
 const IPFS_CID = /^(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,120})$/;
 
-function allowedArtworkUrl(value) {
+export function allowedArtworkUrl(value) {
   try {
     const text = String(value || '').trim();
     const url = new URL(text.startsWith('ipfs://') ? `https://ipfs.io/ipfs/${text.slice(7)}` : text);
