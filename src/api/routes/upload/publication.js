@@ -1,5 +1,5 @@
 import { allowMethods, readJson, requireWallet } from '../../backend.js';
-import { issuePublication, preparationDeployment, preparePublication } from '../../upload-publication.js';
+import { issuePublication, journalPublication, preparationDeployment, preparePublication } from '../../upload-publication.js';
 
 const PUBLIC_ERRORS = new Map([
   ['UNAUTHENTICATED', 401], ['INVALID_PUBLICATION_ID', 400], ['INVALID_UPLOAD_PAYLOAD', 400],
@@ -11,7 +11,9 @@ const PUBLIC_ERRORS = new Map([
   ['PUBLICATION_METADATA_UNAVAILABLE', 503], ['UPLOAD_MEDIA_UNAVAILABLE', 503],
   ['UPLOAD_MEDIA_TIMEOUT', 503], ['UPLOAD_MEDIA_TOO_LARGE', 413],
   ['UNSUPPORTED_UPLOAD_MEDIA', 422], ['EMPTY_UPLOAD_MEDIA', 422],
-  ['DUPLICATE_MEDIA', 409], ['PUBLICATION_BLOCKED', 409], ['PUBLICATION_MISMATCH', 409]
+  ['DUPLICATE_MEDIA', 409], ['PUBLICATION_BLOCKED', 409], ['PUBLICATION_MISMATCH', 409],
+  ['INVALID_PUBLICATION_ACTION', 400], ['INVALID_TRANSACTION_HASH', 400], ['MEDIA_PUBLICATION_NOT_FOUND', 404],
+  ['MEDIA_SUBMISSION_NOT_STARTED', 409], ['MEDIA_SUBMISSION_HASH_CONFLICT', 409]
 ]);
 
 export default async function handler(req, res) {
@@ -24,14 +26,15 @@ export default async function handler(req, res) {
       return res.status(415).json({ error: 'JSON_REQUIRED' });
     }
     const body = await readJson(req);
-    if (!body || !['issue', 'prepare'].includes(body.action)) {
+    if (!body || !['issue', 'prepare', 'begin', 'report-transaction', 'status'].includes(body.action)) {
       return res.status(400).json({ error: 'INVALID_PUBLICATION_ACTION' });
     }
     // The existing file route and browser remain unchanged until rollout.
     // No client-provided path, digest, wallet or chain can replace issued data.
     const result = body.action === 'issue'
       ? await issuePublication(wallet, body, deployment)
-      : await preparePublication(wallet, body, deployment);
+      : body.action === 'prepare' ? await preparePublication(wallet, body, deployment)
+      : await journalPublication(wallet, body, deployment);
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
     const candidate = error instanceof SyntaxError ? 'INVALID_UPLOAD_PAYLOAD'

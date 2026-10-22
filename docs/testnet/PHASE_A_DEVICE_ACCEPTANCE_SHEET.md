@@ -7,8 +7,8 @@ its historical evidence. It is not an Android PASS or a compatibility claim.
 Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
 iPhone trip without a specific unresolved outcome.
 
-Three backlog rows remain for device observations, recovery evidence or historical
-defect disposition: A-57, A-71 and A-83. Their implementation is published; failed
+Two backlog rows remain for recovery evidence or historical
+defect disposition: A-57 and A-83. Their implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
 
@@ -38,6 +38,12 @@ prior actual desktop BFCache probe and lazy-image repair, this closes A-48's
 reported navigation symptom. The phone observation does not establish
 `pageshow.persisted` or any captured Safari cache marker; no internal cache
 mechanism is inferred. Do not repeat this accepted navigation check.
+
+**October 23 immediate publishing-wait acceptance:** asked separately about the
+interval after the successful native publication transactions, the owner confirms
+the ArtSoul mark appeared without empty cards. This closes A-71 with the
+published branded-wait repair and regression tests. No new publication or
+transaction was performed; a deliberate receipt-delay case (A-83) is not inferred.
 
 **October 22 native publication acceptance:** the owner confirms successful
 iPhone Chrome/MetaMask registration and auction creation after PR #325, and

@@ -103,10 +103,53 @@ function backend(options = {}) {
 
 test('preparation denies guests and is disabled by default before any network request', async () => {
   const state=backend();
-  assert.equal((await call({action:'issue'},null)).statusCode,401);
+  for (const action of ['issue','prepare','begin','report-transaction','status']) {
+    assert.equal((await call({action},null)).statusCode,401);
+  }
   delete process.env.ARTSOUL_MEDIA_PREPARATION_ENABLED;
-  assert.equal((await call({action:'issue'})).body.error,'MEDIA_PREPARATION_DISABLED');
+  for (const action of ['issue','prepare','begin','report-transaction','status']) {
+    assert.equal((await call({action})).body.error,'MEDIA_PREPARATION_DISABLED');
+  }
   assert.equal(state.seen.length,0);
+});
+
+test('journal rejects invalid IDs, hashes and client release actions before a database request', async () => {
+  const state=backend();
+  for (const action of ['begin','report-transaction','status']) {
+    for (const publication_id of [undefined,id+'\n',id+'&creator_wallet=not.is.null',{},null]) {
+      const result=await call({action,publication_id});
+      assert.equal(result.statusCode,400);assert.equal(result.body.error,'INVALID_PUBLICATION_ID');
+    }
+  }
+  for (const transaction_hash of [undefined,null,{},'0x'+'dd'.repeat(31),'0x'+'dd'.repeat(32)+'\n']) {
+    assert.equal((await call({action:'report-transaction',publication_id:id,transaction_hash})).body.error,'INVALID_TRANSACTION_HASH');
+  }
+  for (const action of ['cancel','release','retry','confirm','mark-reverted']) {
+    assert.equal((await call({action,publication_id:id})).body.error,'INVALID_PUBLICATION_ACTION');
+  }
+  assert.equal(state.seen.length,0);
+});
+
+test('journal status enforces wallet and deployment scope and never leaks a foreign backend row', async () => {
+  let seen;
+  globalThis.fetch=async (raw,init)=>{
+    seen=new URL(raw);
+    assert.equal(init.method,'GET');
+    return Response.json([{publication_id:id,creator_wallet:other,chain_id:84532,core_address:core,
+      metadata_uri:'https://storage.example/private-other.json',reported_transaction_hash:'0x'+'dd'.repeat(32)}]);
+  };
+  const result=await call({action:'status',publication_id:id,creator_wallet:other,core_address:other,chain_id:1});
+  assert.equal(seen.searchParams.get('creator_wallet'),'eq.'+wallet);
+  assert.equal(seen.searchParams.get('chain_id'),'eq.84532');assert.equal(seen.searchParams.get('core_address'),'eq.'+core);
+  assert.equal(result.statusCode,404);assert.deepEqual(result.body,{error:'MEDIA_PUBLICATION_NOT_FOUND'});
+});
+
+test('journal database failures return a bounded public error without backend details', async () => {
+  globalThis.fetch=async()=>Response.json({message:'private database connection diagnostics',hint:'private details'},{status:500});
+  for (const action of ['begin','report-transaction','status']) {
+    const result=await call({action,publication_id:id,transaction_hash:'0x'+'dd'.repeat(32)});
+    assert.equal(result.statusCode,503);assert.deepEqual(result.body,{error:'MEDIA_PREPARATION_UNAVAILABLE'});
+  }
 });
 
 test('preparation requires JSON requests and rejects malformed JSON without storage access', async () => {
