@@ -6,6 +6,7 @@ import { buildStoragePath, buildMetadataStoragePath, createSignedArtworkUpload }
 import { ARTWORK_MIME_EXTENSIONS, MAX_ARTWORK_UPLOAD_BYTES, MAX_METADATA_BYTES } from '../config/upload-policy.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const TRANSACTION_HASH = /^0x[0-9a-f]{64}$/;
 const METADATA_FILENAME = /^\d{13}-[0-9a-f-]{36}-[\w.-]{1,101}\.json$/;
 const MEDIA_FIELDS = ['image', 'image_url', 'animation_url', 'media_url', 'file_url', 'poster_url', 'thumbnail_url'];
 const fail = (code, statusCode = 409) => Object.assign(new Error(code), { code, statusCode });
@@ -136,13 +137,18 @@ async function storePreparedMetadata(row, uri) {
   if (!isDeepStrictEqual(parsed, row.metadata_json)) throw fail('PUBLICATION_METADATA_CONFLICT');
 }
 
-export async function preparePublication(wallet, body, deployment) {
-  const id = publicationId(body.publication_id);
+async function readPreparation(wallet, id, deployment) {
   const rows = await supabaseRest(`artwork_media_preparations?publication_id=eq.${id}&creator_wallet=eq.${wallet}&select=*&limit=1`, {
     signal: AbortSignal.timeout(15000)
   });
   const row = rows?.[0];
   const metadataUri = assertIssuance(row, wallet, deployment);
+  return { row, metadataUri };
+}
+
+export async function preparePublication(wallet, body, deployment) {
+  const id = publicationId(body.publication_id);
+  const { row, metadataUri } = await readPreparation(wallet, id, deployment);
   const metadata = validatePublicationMetadata(body.metadata, row, {
     mediaUrl: uploadedMediaUrl(wallet, row.media_path), contentType: row.declared_content_type
   });
@@ -167,4 +173,45 @@ export async function preparePublication(wallet, body, deployment) {
   if (['DUPLICATE_MEDIA', 'PUBLICATION_BLOCKED', 'PUBLICATION_MISMATCH'].includes(status)) throw fail(status);
   if (!['CLAIMED', 'RESUME', 'REGISTERED'].includes(status)) throw fail('MEDIA_PREPARATION_UNAVAILABLE', 503);
   return { publication_id: id, metadata_uri: metadataUri, media_sha256: media.sha256, claim_status: status, can_submit: false };
+}
+
+function submissionView(row, id, wallet, deployment) {
+  if (!row || row.publication_id !== id || row.creator_wallet !== wallet ||
+      Number(row.chain_id) !== deployment.chainId || row.core_address !== deployment.core) {
+    throw fail('MEDIA_PUBLICATION_NOT_FOUND', 404);
+  }
+  return {
+    publication_id: id, metadata_uri: row.metadata_uri, claim_status: row.claim_status,
+    submission_started_at: row.submission_started_at || null,
+    reported_transaction_hash: row.reported_transaction_hash || null,
+    // The journal is dormant scaffolding, not registration authorization.
+    // In particular, a client-reported hash does not establish broadcast.
+    can_submit: false,
+    ...(typeof row.submission_created === 'boolean' ? { submission_created: row.submission_created } : {})
+  };
+}
+
+export async function journalPublication(wallet, body, deployment) {
+  const id = publicationId(body.publication_id);
+  const params = { p_publication_id: id, p_chain_id: deployment.chainId,
+    p_core_address: deployment.core, p_creator_wallet: wallet };
+  let row;
+  if (body.action === 'begin') {
+    const { metadataUri } = await readPreparation(wallet, id, deployment);
+    row = await rpc('begin_artwork_media_submission', { ...params, p_metadata_uri: metadataUri });
+  } else if (body.action === 'report-transaction') {
+    const hash = typeof body.transaction_hash === 'string' ? body.transaction_hash.toLowerCase() : '';
+    if (!TRANSACTION_HASH.test(hash)) throw fail('INVALID_TRANSACTION_HASH', 400);
+    row = await rpc('report_artwork_media_transaction', { ...params, p_transaction_hash: hash });
+  } else if (body.action === 'status') {
+    const rows = await supabaseRest(`artwork_media_publications?publication_id=eq.${id}&creator_wallet=eq.${wallet}` +
+      `&chain_id=eq.${deployment.chainId}&core_address=eq.${deployment.core}` +
+      '&select=publication_id,creator_wallet,chain_id,core_address,metadata_uri,claim_status,submission_started_at,reported_transaction_hash&limit=1', {
+      signal: AbortSignal.timeout(15000)
+    });
+    row = rows?.[0];
+  } else {
+    throw fail('INVALID_PUBLICATION_ACTION', 400);
+  }
+  return submissionView(row, id, wallet, deployment);
 }

@@ -28,7 +28,8 @@ const features = [
   'a8e_moderation_totp_persistence', 'a8f_moderation_dual_wallet_authority',
   'a8g_staff_factor_setup', 'a8h_staff_factor_pgcrypto_resolution',
   'launch_service_quotas', 'profile_email_verification', 'artist_support',
-  'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation'
+  'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
+  'artwork_media_submission'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [

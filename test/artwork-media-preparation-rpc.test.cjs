@@ -8,6 +8,7 @@ const {execFileSync, execFile} = require('node:child_process');
 const {promisify} = require('node:util');
 const run = promisify(execFile);
 const migration = fs.readFileSync(path.join(__dirname, '../sql/migrations/artwork_media_preparation.sql'), 'utf8');
+const submissionMigration = fs.readFileSync(path.join(__dirname, '../sql/migrations/artwork_media_submission.sql'), 'utf8');
 const container = `artsoul-prepare-pg-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
 const creator = '0x' + '11'.repeat(20), other = '0x' + '22'.repeat(20);
 const core = '0x' + 'aa'.repeat(20), otherCore = '0x' + 'bb'.repeat(20);
@@ -29,7 +30,30 @@ function fixture(overrides = {}) {
   value.mediaPath ??= `uploads/${value.creator.toLowerCase()}/1700000000000-${nonce}-image.png`;
   value.metadataPath ??= `metadata/${value.creator.toLowerCase()}/1700000000000-${nonce}-metadata.json`;
   value.metadata ??= {name:'Ordinary artwork', creator:value.creator, media_url:`https://storage.example/${value.mediaPath}`};
+  value.metadataUri ??= `https://storage.example/storage/v1/object/public/artworks/${value.metadataPath}`;
   return value;
+}
+function claim(value) {
+  return `SELECT to_jsonb(public.claim_artwork_media_publication(${[
+    value.id,value.chain,value.core,value.creator,value.hash,value.mediaPath,value.bytes,value.metadataUri
+  ].map(q).join(',')}));`;
+}
+function begin(value) {
+  return `SELECT public.begin_artwork_media_submission(${[
+    value.id,value.chain,value.core,value.creator,value.metadataUri
+  ].map(q).join(',')});`;
+}
+function report(value, tx = '0x'+'dd'.repeat(32)) {
+  return `SELECT public.report_artwork_media_transaction(${[
+    value.id,value.chain,value.core,value.creator,tx
+  ].map(q).join(',')});`;
+}
+function claimed(value) {rpc(issue(value));rpc(prepare(value));assert.equal(rpc(claim(value)),'CLAIMED');}
+function recordIdentity(value, artwork=1, creator=value.creator) {
+  return `SELECT to_jsonb(public.record_artwork_media_identity(${[
+    value.chain,value.core,artwork,creator,value.hash,'https://storage.example/'+value.mediaPath,
+    value.bytes,value.metadataUri,'0x'+'dd'.repeat(32),123,0
+  ].map(q).join(',')}));`;
 }
 function issue(value) {
   return `SELECT public.issue_artwork_media_upload(${[
@@ -78,6 +102,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
   sql('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;');
   applyMigration();
   sql(fs.readFileSync(path.join(__dirname, '../sql/migrations/artwork_media_identity.sql'), 'utf8'));
+  sql(submissionMigration);
   t.beforeEach(() => sql('TRUNCATE public.artwork_media_preparations, public.artwork_media_publications, public.artwork_media_catalog;'));
 
   await t.test('issuance returns owned fixed paths with no measured or metadata fields pinned', () => {
@@ -272,6 +297,153 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
     error(asService('DELETE FROM artwork_media_preparations;'), /permission denied/);
   });
 
+  await t.test('submission begins once before any hash, including concurrent and lost-response retries', async () => {
+    const value=fixture();claimed(value);
+    const results=(await Promise.all([parallel(asService(begin(value))),parallel(asService(begin(value)))])).map(JSON.parse);
+    assert.deepEqual(results.map(row=>row.submission_created).sort(),[false,true]);
+    assert.equal(results[0].submission_started_at,results[1].submission_started_at);
+    const repeated=rpc(begin(value));
+    assert.equal(repeated.submission_created,false);assert.equal(repeated.reported_transaction_hash,null);
+    assert.ok(repeated.submission_started_at);assert.equal(repeated.claim_status,'claimed');
+    assert.equal(repeated.registered_artwork_id,null);
+    assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0');
+    assert.equal(rpc(claim({...value,id:crypto.randomUUID()})),'DUPLICATE_MEDIA');
+  });
+
+  await t.test('submission requires the exact owned deployment, claim and immutable preparation', () => {
+    const value=fixture();
+    error(asService(begin(value)),/MEDIA_PUBLICATION_NOT_FOUND/);
+    rpc(issue(value));rpc(prepare(value));
+    error(asService(begin(value)),/MEDIA_PUBLICATION_NOT_FOUND/);
+    rpc(claim(value));
+    for(const change of [{creator:other},{chain:8453},{core:otherCore},{metadataUri:'https://other.example/wrong.json'}]) {
+      const failure=error(asService(begin({...value,...change})),/MEDIA_PUBLICATION_NOT_FOUND/);
+      assert.ok(!failure.includes(value.creator) && !failure.includes(value.metadataUri));
+    }
+    sql('TRUNCATE artwork_media_preparations;');
+    error(asService(begin(value)),/MEDIA_PREPARATION_MISMATCH/);
+    rpc(issue(value));
+    error(asService(begin(value)),/MEDIA_PREPARATION_MISMATCH/);
+    rpc(prepare({...value,hash:'ee'.repeat(32)}));
+    error(asService(begin(value)),/MEDIA_PREPARATION_MISMATCH/);
+    assert.equal(sql('SELECT submission_started_at IS NULL FROM artwork_media_publications;'),'t');
+  });
+
+  await t.test('an indexed conflict blocks a first submission and never resets an earlier attempt', () => {
+    const value=fixture();claimed(value);
+    sql("UPDATE artwork_media_publications SET claim_status='conflict';");
+    error(asService(begin(value)),/PUBLICATION_BLOCKED/);
+    sql("UPDATE artwork_media_publications SET claim_status='claimed';");
+    const started=rpc(begin(value));
+    sql("UPDATE artwork_media_publications SET claim_status='conflict';");
+    const repeated=rpc(begin(value));
+    assert.equal(repeated.submission_created,false);assert.equal(repeated.claim_status,'conflict');
+    assert.equal(repeated.submission_started_at,started.submission_started_at);
+    assert.equal(rpc(report(value)).claim_status,'conflict','late hash is evidence, not a state override');
+  });
+
+  await t.test('actual identity reconciliation preserves the journal through registration and later conflict', () => {
+    const already=fixture();claimed(already);assert.equal(rpc(recordIdentity(already)),'RECORDED');
+    error(asService(begin(already)),/PUBLICATION_BLOCKED/);
+    const value=fixture({hash:crypto.randomBytes(32).toString('hex')});claimed(value);
+    const started=rpc(begin(value)),reported=rpc(report(value));
+    assert.equal(rpc(recordIdentity(value,2)),'RECORDED');
+    const registered=rpc(begin(value));
+    assert.equal(registered.claim_status,'registered');assert.equal(registered.registered_artwork_id,2);
+    assert.equal(registered.submission_created,false);assert.equal(registered.submission_started_at,started.submission_started_at);
+    assert.equal(registered.reported_transaction_hash,reported.reported_transaction_hash);
+    assert.equal(rpc(recordIdentity(value,3,other)),'RECORDED');
+    const conflict=rpc(begin(value));
+    assert.equal(conflict.claim_status,'conflict');assert.equal(conflict.submission_created,false);
+    assert.equal(conflict.submission_started_at,started.submission_started_at);
+    assert.equal(conflict.reported_transaction_hash,reported.reported_transaction_hash);
+    assert.equal(rpc(report(value)).claim_status,'conflict');
+  });
+
+  await t.test('begin rechecks a conflict that commits while waiting for the indexer hash lock', async () => {
+    const value=fixture();claimed(value);
+    const key=`artsoul-media-hash:${value.chain}:${value.core}:${value.hash}`;
+    const writer=parallel(`BEGIN; SET application_name='submission-conflict-fixture';
+      SELECT pg_advisory_xact_lock(hashtextextended(${q(key)},0));
+      UPDATE artwork_media_publications SET claim_status='conflict'; SELECT pg_sleep(1); COMMIT;`);
+    try {
+      let sleeping=false;
+      for(let i=0;i<30;i++) {
+        if(sql("SELECT count(*) FROM pg_stat_activity WHERE application_name='submission-conflict-fixture' AND wait_event='PgSleep';") === '1') {sleeping=true;break;}
+        await delay(20);
+      }
+      assert(sleeping,'conflict transaction holds the shared hash lock');
+      await assert.rejects(parallel(asService(begin(value))),e=>/PUBLICATION_BLOCKED/.test(e.stderr));
+    } finally {await writer;}
+    assert.equal(sql('SELECT submission_started_at IS NULL FROM artwork_media_publications;'),'t');
+  });
+
+  await t.test('reporting a hash requires an attempt and cannot change ownership or confirm an artwork', async () => {
+    const value=fixture();claimed(value);
+    error(asService(report(value)),/MEDIA_SUBMISSION_NOT_STARTED/);
+    const started=rpc(begin(value));
+    for(const change of [{creator:other},{chain:8453},{core:otherCore}]) {
+      error(asService(report({...value,...change})),/MEDIA_PUBLICATION_NOT_FOUND/);
+    }
+    for(const tx of [null,'bad','0x'+'ee'.repeat(31),'0x'+'ee'.repeat(32)+'\n']) {
+      error(asService(report(value,tx)),/INVALID_TRANSACTION_HASH/);
+    }
+    const results=(await Promise.all([parallel(asService(report(value))),parallel(asService(report(value)))])).map(JSON.parse);
+    assert.deepEqual(results[0],results[1]);
+    assert.equal(results[0].reported_transaction_hash,'0x'+'dd'.repeat(32));
+    assert.equal(results[0].submission_started_at,started.submission_started_at);
+    assert.equal(results[0].claim_status,'claimed');assert.equal(results[0].registered_artwork_id,null);
+    assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0');
+    assert.deepEqual(rpc(report(value,'0x'+'DD'.repeat(32))),results[0]);
+    error(asService(report(value,'0x'+'ee'.repeat(32))),/MEDIA_SUBMISSION_HASH_CONFLICT/);
+    assert.equal(rpc(begin(value)).submission_created,false);
+  });
+
+  await t.test('two different reported hashes cannot overwrite one another concurrently', async () => {
+    const value=fixture();claimed(value);rpc(begin(value));
+    const results=await Promise.allSettled([parallel(asService(report(value))),parallel(asService(report(value,'0x'+'ee'.repeat(32))))]);
+    assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
+    assert.match(results.find(result=>result.status==='rejected').reason.stderr,/MEDIA_SUBMISSION_HASH_CONFLICT/);
+    assert.equal(rpc(begin(value)).submission_created,false);
+  });
+
+  await t.test('failed begin is atomic and a failed hash write preserves the no-hash attempt', () => {
+    const value=fixture();claimed(value);
+    const install=()=>sql(`CREATE FUNCTION _submission_fail_write() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_SUBMISSION_FAILURE'; END $f$;
+      CREATE TRIGGER _submission_fail_write BEFORE UPDATE ON artwork_media_publications
+      FOR EACH ROW EXECUTE FUNCTION _submission_fail_write();`);
+    const remove=()=>sql('DROP TRIGGER _submission_fail_write ON artwork_media_publications; DROP FUNCTION _submission_fail_write();');
+    install();
+    try {error(asService(begin(value)),/FORCED_SUBMISSION_FAILURE/);} finally {remove();}
+    assert.equal(sql('SELECT submission_started_at IS NULL FROM artwork_media_publications;'),'t');
+    const started=rpc(begin(value));install();
+    try {error(asService(report(value)),/FORCED_SUBMISSION_FAILURE/);} finally {remove();}
+    const repeated=rpc(begin(value));
+    assert.equal(repeated.submission_created,false);assert.equal(repeated.reported_transaction_hash,null);
+    assert.equal(repeated.submission_started_at,started.submission_started_at);
+  });
+
+  await t.test('journal remains private and migration retries preserve a recorded attempt', () => {
+    const value=fixture();claimed(value);rpc(begin(value));const recorded=rpc(report(value));
+    sql(submissionMigration);assert.deepEqual(rpc(report(value)),recorded);
+    for(const role of ['anon','authenticated']) {
+      error(`SET ROLE ${role}; SELECT submission_started_at FROM artwork_media_publications;`,/permission denied/);
+      for(const query of [begin(value),report(value)]) error(`SET ROLE ${role}; ${query}`,/permission denied for function/);
+    }
+    for(const query of ['DELETE FROM artwork_media_publications;','TRUNCATE artwork_media_publications;',
+      'UPDATE artwork_media_publications SET submission_started_at=NULL, reported_transaction_hash=NULL;']) {
+      error(asService(query),/permission denied/);
+    }
+    for(const isolation of ['REPEATABLE READ','SERIALIZABLE']) {
+      for(const query of [begin(value),report(value)]) {
+        error(`BEGIN ISOLATION LEVEL ${isolation}; ${asService(query)}`,/MEDIA_IDENTITY_REQUIRES_READ_COMMITTED/);
+      }
+    }
+    error('UPDATE artwork_media_publications SET submission_started_at=NULL;',/violates check constraint/);
+    assert.equal(sql("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.artwork_media_publications'::regclass;"),'t');
+  });
+
   await t.test('authenticated API prepares and resumes through actual PostgreSQL RPCs without submission permission', async () => {
     const {default:handler} = await import('../src/api/routes/upload/publication.js');
     const {setWalletSession} = await import('../src/api/backend.js');
@@ -299,7 +471,9 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       prepare_artwork_media_upload:['p_publication_id','p_creator_wallet','p_media_sha256','p_byte_size',
         'p_content_type','p_metadata_json'],
       claim_artwork_media_publication:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet',
-        'p_media_sha256','p_media_path','p_byte_size','p_metadata_uri']
+        'p_media_sha256','p_media_path','p_byte_size','p_metadata_uri'],
+      begin_artwork_media_submission:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet','p_metadata_uri'],
+      report_artwork_media_transaction:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet','p_transaction_hash']
     };
     Object.assign(process.env,env);
     globalThis.fetch = async (raw, init={}) => {
@@ -326,6 +500,16 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
         return Response.json(rpc(`SELECT coalesce(jsonb_agg(to_jsonb(p)), '[]'::JSONB)
           FROM public.artwork_media_preparations p WHERE publication_id=${q(publication.slice(3))}
           AND creator_wallet=${q(owner.slice(3))};`));
+      }
+      if (url.pathname === '/rest/v1/artwork_media_publications') {
+        assert.equal(url.searchParams.get('limit'),'1');
+        const publication=url.searchParams.get('publication_id'),owner=url.searchParams.get('creator_wallet');
+        assert.match(publication,/^eq\.[0-9a-f-]{36}$/);assert.match(owner,/^eq\.0x[0-9a-f]{40}$/);
+        assert.equal(url.searchParams.get('chain_id'),'eq.84532');
+        assert.equal(url.searchParams.get('core_address'),'eq.'+core);
+        return Response.json(rpc(`SELECT coalesce(jsonb_agg(to_jsonb(p)), '[]'::JSONB)
+          FROM public.artwork_media_publications p WHERE publication_id=${q(publication.slice(3))}
+          AND creator_wallet=${q(owner.slice(3))} AND chain_id=84532 AND core_address=${q(core)};`));
       }
       const signing = '/storage/v1/object/upload/sign/artworks/';
       if (url.pathname.startsWith(signing)) {
@@ -391,6 +575,32 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       assert.equal(calls.length,reads+1,'foreign operation stops before reading media or metadata');
       assert.equal(sql('SELECT count(*) FROM artwork_media_publications;'),'1');
       assert.deepEqual(JSON.parse(objects.get(metadataPath).data.toString()),metadata);
+      const status=await call({action:'status',publication_id:id});
+      assert.equal(status.statusCode,200);assert.equal(status.body.submission_started_at,null);
+      assert.equal(status.body.can_submit,false);assert.equal(status.body.media_path,undefined);
+      const tx='0x'+'dd'.repeat(32);
+      assert.equal((await call({action:'report-transaction',publication_id:id,transaction_hash:tx})).body.error,'MEDIA_SUBMISSION_NOT_STARTED');
+      const started=await call({action:'begin',publication_id:id,creator_wallet:other,chain_id:1,core_address:other,
+        metadata_uri:'https://attacker.example/other.json'});
+      assert.equal(started.statusCode,200,JSON.stringify(started.body));
+      assert.equal(started.body.submission_created,true);assert.equal(started.body.can_submit,false);
+      assert.equal(started.body.metadata_uri,prepared.body.metadata_uri);
+      const retry=await call({action:'begin',publication_id:id});
+      assert.equal(retry.statusCode,200);assert.equal(retry.body.submission_created,false);
+      assert.equal(retry.body.submission_started_at,started.body.submission_started_at);
+      assert.equal(retry.body.reported_transaction_hash,null);
+      const reported=await call({action:'report-transaction',publication_id:id,transaction_hash:tx});
+      assert.equal(reported.statusCode,200);assert.equal(reported.body.reported_transaction_hash,tx);
+      assert.equal(reported.body.claim_status,'claimed');assert.equal(reported.body.can_submit,false);
+      assert.deepEqual((await call({action:'report-transaction',publication_id:id,transaction_hash:tx})).body,reported.body);
+      assert.equal((await call({action:'report-transaction',publication_id:id,transaction_hash:'0x'+'ee'.repeat(32)})).body.error,'MEDIA_SUBMISSION_HASH_CONFLICT');
+      const recovered=await call({action:'status',publication_id:id});
+      assert.deepEqual(recovered.body,reported.body);
+      for(const action of ['begin','report-transaction','status']) {
+        const foreign=await call({action,publication_id:id,transaction_hash:tx},other);
+        assert.equal(foreign.statusCode,404);assert.ok(!JSON.stringify(foreign.body).includes(id));
+      }
+      assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0','a reported hash never becomes verified registration');
     } finally {
       globalThis.fetch=originalFetch;
       for(const [key,value] of Object.entries(previous)) value === undefined ? delete process.env[key] : process.env[key]=value;
