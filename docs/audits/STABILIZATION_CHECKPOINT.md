@@ -35,6 +35,12 @@ October 23 TA-10 atomic registration persistence (Canon 1/2/11; not activated):
   `registration-persistence-build-2026-10-23.log`.
 - Independent read-only SQL/API review found no blocker in this dormant slice.
   Only the existing review agent was reused; it is finished and inactive.
+- Code candidate `688f16704410ab53a2d403dab68bda7b0ef5170b` is preserved in
+  PR #330. Its full CI `39873578936` exposed a missing entry in the static
+  self-hardening migration inventory. The new table already passes actual
+  forced-RLS/service-only/no-default-grant checks; register its migration in
+  `security-migration.test.cjs` without editing the historical applied SQL or
+  weakening the coverage check. Final CI is required on the corrected head.
 - Interpretation recorded: first saved finality evidence is immutable; a later
   verified head does not rewrite it. This is recovery bookkeeping, not a new
   protocol state or changed auction timing. An SQL rejection of contradictory
