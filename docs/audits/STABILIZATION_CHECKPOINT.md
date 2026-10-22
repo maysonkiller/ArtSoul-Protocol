@@ -3,7 +3,7 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 TA-10 submission journal (Canon 1/2/11; local, rollout disabled):
+October 23 TA-10 submission journal (Canon 1/2/11; released, rollout disabled):
 
 - Resume HEAD `7a1adf7` in the same workspace. Native acceptance PR #328 is
   merged as `79fc7cb`; its exact candidate `62ac5a8` passed Linux/Windows/static
@@ -32,7 +32,19 @@ October 23 TA-10 submission journal (Canon 1/2/11; local, rollout disabled):
   also pass (13 checks). Logs: `output/audit/media-submission-full-unit-2026-10-23.log`,
   `media-submission-grants-2026-10-23.log` and `media-submission-build-2026-10-23.log`
   in the same directory. The untracked authority tests remain excluded from Git.
-  Candidate hosted checks and release verification remain separate.
+  Exact candidate `0518cfb` passes hosted CI `39868754680`: Linux 2021 pass /
+  2 skips; Windows 1803 pass / 17 skips; zero failures, and 46 contract tests
+  pass on each OS. Log: `output/audit/media-submission-candidate-ci-2026-10-23.log`.
+- PR #329 is merged as `dbefd6840ea5765dc2f4041731925ac6174987a6`; this workspace
+  fast-forwarded without replacing files. Production deployment `7265815674`
+  succeeded at 23:02:47 UTC on October 22 (October 23 Warsaw). Preview and apex
+  checks match eight pages and 57 assets. All five guest preparation/journal
+  actions return private/no-store 401; GET returns 405. Server code is published,
+  but live schema, feature flag, browser integration and enforcement are not
+  activated. Exact evidence: `output/audit/media-submission-apex-dbefd68-2026-10-23.json`
+  and `page-font-apex-dbefd68-release-2026-10-20.json` in that directory. These
+  checks do not claim a live journal write or any wallet transaction.
+  Post-merge main CI `39869122331` also completed successfully.
 - Interpretation: reported hash means unverified client evidence, not an
   on-chain state. A missing hash or an empty indexer query never proves that
   nothing was sent. Recovery must establish positive chain evidence before

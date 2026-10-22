@@ -56,9 +56,10 @@ October 23 remaining work, without repeating completed ceremonies:
    browser switch occurred. Broadcast recovery, indexer/reorg integration and
    legacy coverage still precede activation. Candidate CI passes on both OSes;
    preview/apex artifacts match. See the current checkpoint.
-   The next local patch adds an atomic pre-wallet attempt journal and private
-   recovery reads, retaining `can_submit: false`. Its live schema and browser
-   integration remain disabled; verified receipt/event recovery is still needed.
+   Published PR #329 (`dbefd68`) adds an atomic pre-wallet attempt journal and
+   private recovery reads, retaining `can_submit: false`. Its live schema and
+   browser integration remain disabled; verified receipt/event recovery is still
+   needed. Exact-candidate CI and preview/apex boundary/artifact checks pass.
 3. **Visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous

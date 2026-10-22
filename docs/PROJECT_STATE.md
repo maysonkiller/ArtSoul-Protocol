@@ -2,8 +2,9 @@
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
 and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-23. Implementation
-uses `C:\Projects\ArtSoul`; latest application release is PR #327 (`3f12c48`).
-Its new upload preparation remains disabled pending complete recovery rollout.
+uses `C:\Projects\ArtSoul`; latest application release is PR #329 (`dbefd68`).
+Upload preparation and the new private submission journal remain disabled
+pending complete receipt/event recovery and browser rollout.
 The owner accepts the current iPhone visual behavior and browser Back, closing
 A-47/A-48/A-53/A-54/A-58/A-61/A-72. Earlier Admin/artwork release `9a2965f` is deployed.
 A-71 is separately accepted from the owner's explicit branded-wait observation.

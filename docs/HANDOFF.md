@@ -1,8 +1,9 @@
 # ArtSoul Engineering Handoff
 
 Current continuation (2026-10-23): use `C:\Projects\ArtSoul`, branch
-`codex/takeover-audit`. Latest application release is PR #327 (`3f12c48`);
-its new upload preparation remains disabled pending complete recovery rollout.
+`codex/takeover-audit`. Latest application release is PR #329 (`dbefd68`);
+upload preparation and the new private submission journal remain disabled
+pending complete receipt/event recovery and browser rollout.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72
 are done. Preserve the completed native flows and consult the checkpoint for
 the three remaining formal rows and additional TA-10 implementation work.
