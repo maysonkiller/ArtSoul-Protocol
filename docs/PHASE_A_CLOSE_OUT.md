@@ -16,19 +16,24 @@ October 22 next acceptance, without repeating completed ceremonies:
    published and pass actual-apex desktop-engine geometry checks. The separate
    Chrome/MetaMask pre-analysis failure and contextual X preview are repaired
    in published PR #321 (`02356e0`); exact candidate CI, preview/apex artifacts
-   and crawler routing pass. Card links reopening a dismissed form on reload
-   have a small local follow-up; see the checkpoint for its release state. A native
+   and crawler routing pass. PR #322 (`1214e7d`) also fixes card links reopening
+   a dismissed form on reload, with actual apex card-action checks. A native
    iPhone result and X-generated card are not inferred from unit tests.
 2. **One connected iPhone publishing journey** covers the remaining parts of
    A-33/A-64/A-71/A-78/A-83: network/authorization, mandatory AI, both transaction
    confirmations, correct artwork/auction identity, and indexer convergence.
    The already completed operator settlement does not replace this journey.
+   The latest owner report identifies filename/title rejection and misleading
+   field highlighting; its bounded repair is in progress. An additional code
+   inspection confirms there is no enforced exact-file duplicate check despite
+   the browser calculating a hash. The requested duplicate protection remains
+   open; a website guard cannot enforce uniqueness in the unchanged contract.
 3. **A short visual/navigation pass** covers A-47/A-48/A-53/A-54/A-58/A-61/A-72:
    profile avatar/identity, first tab load, quick navigation and browser Back.
    Ownership and the guest-header avatar have already been accepted. Actual
    BFCache restoration must be identified separately from ordinary navigation.
 4. **A-57 disposition:** current switching works according to the owner; the
-   historical unnamed provider failure is unresolved evidence, not a newly
+   historical Robinhood iOS provider failure is unresolved evidence, not a newly
    confirmed defect. Do not invent a wallet limitation to close it.
 5. **A-23 beta decision** follows the remaining acceptance and open-defect
    review. Android remains owner-waived / not tested. Wallet login, OAuth,

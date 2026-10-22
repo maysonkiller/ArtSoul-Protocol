@@ -649,18 +649,21 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block opacity-70 mb-2 font-medium">Title</label>
-                    <input type="text" id="artTitle" class="form-input" placeholder="Name of your piece" required>
+                    <label for="artTitle" class="block opacity-70 mb-2 font-medium">Title</label>
+                    <input type="text" id="artTitle" class="form-input" aria-describedby="artTitleError" placeholder="Name of your piece" required>
+                    <p id="artTitleError" class="validation-message" style="display: none;"></p>
                 </div>
                 <div>
-                    <label class="block opacity-70 mb-2 font-medium">Starting Price (ETH)</label>
-                    <input type="number" id="artPrice" step="0.01" class="form-input" placeholder="0.5" required>
+                    <label for="artPrice" class="block opacity-70 mb-2 font-medium">Starting Price (ETH)</label>
+                    <input type="text" inputmode="decimal" id="artPrice" class="form-input" aria-describedby="artPriceError" placeholder="0.5" required>
+                    <p id="artPriceError" class="validation-message" style="display: none;"></p>
                 </div>
             </div>
 
             <div>
-                <label class="block opacity-70 mb-2 font-medium">Description</label>
-                <textarea id="artDescription" class="form-input h-32" maxlength="1000" aria-describedby="artDescriptionCount" placeholder="Share the story, medium, and collector context..."></textarea>
+                <label for="artDescription" class="block opacity-70 mb-2 font-medium">Description</label>
+                <textarea id="artDescription" class="form-input h-32" maxlength="1000" aria-describedby="artDescriptionCount artDescriptionError" placeholder="Share the story, medium, and collector context..."></textarea>
+                <p id="artDescriptionError" class="validation-message" style="display: none;"></p>
                 <div id="artDescriptionCount" class="form-hint" aria-live="polite">0 / 1000</div>
             </div>
 
@@ -678,8 +681,8 @@
                 <h2 id="beforePublishTitle" class="font-semibold mb-3">Before you publish</h2>
                 <ul class="text-sm opacity-80 space-y-1 mb-4">
                     <li>Publish only your own original work.</li>
-                    <li>Do not upload screenshots or unrelated random files.</li>
-                    <li>Do not publish duplicates or use fake titles.</li>
+                    <li>Your file name is separate from the artwork title. Photos and screenshots of your own work are supported.</li>
+                    <li>Do not publish the same work again as a new original.</li>
                     <li>Your NFT is minted only after a successful auction settlement.</li>
                 </ul>
                 <label class="original-work-confirmation">

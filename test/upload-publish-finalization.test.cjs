@@ -172,7 +172,7 @@ test('Publish stays clickable and explains what is blocking it', () => {
   assert.doesNotMatch(reveal, /\.click\(\)/);
 
   const handler = extractFunction('handleUpload');
-  assert.match(handler, /revealBlockingStep\(validationError\)/);
+  assert.match(handler, /revealBlockingStep\(validationError\.message, validationError\.fieldId\)/);
   // Only the form steps are covered: a wrong network is an environment problem,
   // not a control on this page, and keeps its own modal warning.
   const formSteps = handler.slice(0, handler.indexOf('const walletAddress ='));
@@ -181,7 +181,7 @@ test('Publish stays clickable and explains what is blocking it', () => {
 
 test('the artwork description has a bounded length', () => {
   assert.match(source, /const MAX_ARTWORK_DESCRIPTION_LENGTH = 1000;/);
-  assert.match(source, /Keep the description under \$\{MAX_ARTWORK_DESCRIPTION_LENGTH\} characters/);
+  assert.match(source, /Keep the description within \$\{MAX_ARTWORK_DESCRIPTION_LENGTH\} characters/);
 
   const html = fs.readFileSync(path.join(__dirname, '..', 'upload.html'), 'utf8');
   assert.match(html, /id="artDescription"[^>]*maxlength="1000"/);
