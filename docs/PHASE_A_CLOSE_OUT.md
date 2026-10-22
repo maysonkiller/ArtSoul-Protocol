@@ -8,7 +8,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **79 done, 4 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **80 done, 3 in progress, 0 planned** across A-01 to A-83.
 
 October 23 remaining work, without repeating completed ceremonies:
 
@@ -43,8 +43,9 @@ October 23 remaining work, without repeating completed ceremonies:
    publication: two RPCs verify artwork 36 / auction 70 and both successful
    receipts, matching the exact indexed projection and provenance. Together
    with prior connected-wallet/resale evidence this closes A-33/A-64/A-78.
-   A-71's immediate post-publish frame and A-83's delayed-receipt recovery
-   remain distinct unobserved criteria; ordinary success does not prove them.
+   In a separate October 23 answer the owner confirms the ArtSoul mark appeared
+   without empty cards immediately after publishing; A-71 is accepted.
+   A-83's delayed-receipt recovery remains distinct; ordinary success does not prove it.
    See the current checkpoint for hashes and evidence. An additional code
    inspection confirms there is no enforced exact-file duplicate check despite
    the browser calculating a hash. The requested duplicate protection remains
@@ -55,6 +56,9 @@ October 23 remaining work, without repeating completed ceremonies:
    browser switch occurred. Broadcast recovery, indexer/reorg integration and
    legacy coverage still precede activation. Candidate CI passes on both OSes;
    preview/apex artifacts match. See the current checkpoint.
+   The next local patch adds an atomic pre-wallet attempt journal and private
+   recovery reads, retaining `can_submit: false`. Its live schema and browser
+   integration remain disabled; verified receipt/event recovery is still needed.
 3. **Visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous
@@ -366,8 +370,8 @@ Ordered by what the founder can feel, not by row number.
 
 ## 2a. Remaining device observations
 
-Three rows remain for device observations, recovery evidence or historical-defect
-disposition: A-57/A-71/A-83; A-23 is the subsequent beta decision. A-33,
+Two rows remain for recovery evidence or historical-defect
+disposition: A-57/A-83; A-23 is the subsequent beta decision. A-33,
 A-64 and A-78 were accepted on October 22 from native publication and prior
 evidence. A-47/A-48/A-53/A-54/A-58/A-61/A-72 are accepted on October 23 from the
 specific native visual and Back follow-ups, published repairs and prior desktop evidence.
@@ -392,7 +396,8 @@ cards. This closes its one-device criterion; the separate mobile rows stay open.
 
 Merged and measured, needing the device coverage specified in each backlog row:
 
-- **A-71** the ArtSoul mark, not a skeleton, after publishing
+- A-71 is accepted on October 23: the owner confirms the ArtSoul mark without
+  empty cards after the successful iPhone publication. No repeat is needed.
 
 A-72's quick-load visual acceptance is recorded on October 23 above.
 

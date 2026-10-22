@@ -3,6 +3,46 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 submission journal (Canon 1/2/11; local, rollout disabled):
+
+- Resume HEAD `7a1adf7` in the same workspace. Native acceptance PR #328 is
+  merged as `79fc7cb`; its exact candidate `62ac5a8` passed Linux/Windows/static
+  CI `39867472947`. The squash produced identical trees on main and the task
+  branch; an explicit ancestry-only merge preserved all unfinished source edits.
+  After the later A-71 answer, Phase A is 80 done / 3 in progress; TA-10 remains
+  additional unfinished work.
+- The private claim now has a durable attempt timestamp and optional reported
+  transaction hash. Atomic begin requires the matching prepared metadata and
+  owned deployment; concurrent/lost-response retries return the same attempt
+  with `submission_created: false`. A late hash is recorded idempotently, never
+  substituted or treated as confirmed registration. Indexer registration and
+  conflict reconciliation preserve this evidence. No expiry/release is added.
+- Authenticated begin/report/status actions share the existing disabled route.
+  All responses retain `can_submit: false`; neither a begin nor `RESUME` allows
+  a browser broadcast. This is private recovery scaffolding, not an activated
+  duplicate-file restriction. No live migration, flag or contract was changed.
+- The bounded independent review found no blocker and requested a real
+  `record_artwork_media_identity` integration check; it is included alongside
+  race, lost-response, failed-write and private-access cases. The extended
+  PostgreSQL suite passes 30 checks and the API suite 22. Build passes.
+  Full local workspace run: 2051 pass / one failure / zero skips; the sole
+  failure was the missing migration-ledger entry, which is now added. The
+  subsequent ledger/security/no-default-grant rehearsal passes all 43 checks
+  with the new migration included. Counts, close-out and branded-wait checks
+  also pass (13 checks). Logs: `output/audit/media-submission-full-unit-2026-10-23.log`,
+  `media-submission-grants-2026-10-23.log` and `media-submission-build-2026-10-23.log`
+  in the same directory. The untracked authority tests remain excluded from Git.
+  Candidate hosted checks and release verification remain separate.
+- Interpretation: reported hash means unverified client evidence, not an
+  on-chain state. A missing hash or an empty indexer query never proves that
+  nothing was sent. Recovery must establish positive chain evidence before
+  connecting this journal to the browser. Existing contract writes remain
+  permissionless and bypass any website-only restriction.
+- Next concrete step: add bounded receipt/event verification against the pinned
+  Base Sepolia Core and reconcile the exact creator/metadata registration with
+  the existing catalog. Keep activation disabled through reorg and legacy
+  coverage checks; do not authorize replay from a timeout or a client rejection.
+
 October 23 native visual acceptance (Canon 5/16/17):
 
 - Resume HEAD `826281e`, same workspace/branch and preserved untracked files.
@@ -18,11 +58,13 @@ October 23 native visual acceptance (Canon 5/16/17):
   to its previous position without flicker or visible reconstruction. A-48 is
   done with prior desktop BFCache/lazy-image evidence; no Safari cache marker
   or `pageshow.persisted` measurement is inferred from the phone observation.
-- Counts: 79 done / 4 in progress / 0 planned. Remaining formal rows are
-  A-57 (historical provider-error disposition), A-71
-  (immediate post-publish wait), A-83 (actual delayed-receipt recovery), then
+- A further scoped answer confirms the ArtSoul mark appeared without empty
+  cards after the successful iPhone publication. A-71 is accepted; no new
+  transaction or deliberate receipt-delay case is inferred.
+- Counts: 80 done / 3 in progress / 0 planned. Remaining formal rows are
+  A-57 (historical provider-error disposition), A-83 (actual delayed-receipt recovery), then
   A-23 (beta decision). Additional TA-10 exact-file enforcement remains open.
-  No unasked delayed-receipt or publishing-frame outcome is inferred.
+  No unasked delayed-receipt outcome is inferred.
 - Acceptance bookkeeping verification: `node scripts/sync-phase-a-counts.mjs
   --check`, seven existing close-out/status-summary/header-acceptance tests and `git diff --check`
   pass. This update changes documentation only; the prior application release
