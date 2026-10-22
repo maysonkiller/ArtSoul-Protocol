@@ -7,8 +7,8 @@ its historical evidence. It is not an Android PASS or a compatibility claim.
 Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
 iPhone trip without a specific unresolved outcome.
 
-Ten backlog rows remain for device observations, recovery evidence or historical
-defect disposition after A-33/A-64/A-78 were accepted on October 22. Their implementation is published; failed
+Four backlog rows remain for device observations, recovery evidence or historical
+defect disposition: A-48, A-57, A-71 and A-83. Their implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
 
@@ -16,6 +16,20 @@ This sheet is organised by trip. Each trip says what to do, what to watch, and
 which rows its answers close. Record the result here, dated, per device. An
 owner-reported run is evidence of the outcomes actually asked about; label it
 as owner-reported and do not infer unasked OAuth, transaction or device results.
+
+**October 23 native visual acceptance:** asked specifically whether whole-page
+or empty-card flicker, delayed names/avatars or wrong lists on profile-tab
+switching remained in the already completed iPhone run, the owner reports that
+these problems are no longer observed. This closes the outstanding qualitative
+native outcomes for A-47/A-53/A-54/A-58/A-61/A-72 together with their published
+repairs, prior desktop measurements/traces and regression evidence. It is not
+a new cold-load timing benchmark, captured browser trace or repeated sign-in.
+Do not repeat these visual checks. The historical trip checklists below remain
+the record of their criteria, not a request to rerun accepted steps. The reply
+does not establish native BFCache, A-71's immediate post-publication frame or
+A-83's deliberate receipt-delay recovery; those remain separate. Android stays
+owner-waived / not tested. A-23 is the later beta decision, and the additional
+TA-10 exact-file restriction remains open independently.
 
 **October 22 native publication acceptance:** the owner confirms successful
 iPhone Chrome/MetaMask registration and auction creation after PR #325, and

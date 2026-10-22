@@ -3,6 +3,39 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 native visual acceptance (Canon 5/16/17):
+
+- Resume HEAD `826281e`, same workspace/branch and preserved untracked files.
+  The owner answers the outstanding, scoped iPhone observation question:
+  whole-page/empty-card flicker, delayed names/avatars and wrong profile-tab
+  lists are no longer observed. This is owner-reported acceptance of the
+  completed phone run, not a new agent-captured trace or quantitative timing.
+- A-47/A-53/A-54/A-58/A-61/A-72 are now done, combining this native outcome with
+  published repairs and prior desktop/regression evidence. Do not repeat
+  accepted visual, login, OAuth, publication, X or Donate/Report ceremonies.
+  Android remains owner-waived / not tested.
+- Counts: 78 done / 5 in progress / 0 planned. Remaining formal rows are A-48
+  (native Back/BFCache), A-57 (historical provider-error disposition), A-71
+  (immediate post-publish wait), A-83 (actual delayed-receipt recovery), then
+  A-23 (beta decision). Additional TA-10 exact-file enforcement remains open.
+  No unasked Back, delayed-receipt or publishing-frame outcome is inferred.
+- Acceptance bookkeeping verification: `node scripts/sync-phase-a-counts.mjs
+  --check`, six existing close-out/status-summary tests and `git diff --check`
+  pass. This update changes documentation only; the prior application release
+  and its build/runtime checks remain the implementation evidence.
+- The next TA-10 read-only review confirms that the current browser stores a
+  pending record only after receiving a transaction hash, while unknown
+  no-hash attempts are discarded by display-card cleanup. The new server
+  issuance/claim survives, but contains no submission journal yet. Never use
+  those display cards as authoritative submission evidence or treat `RESUME`
+  as permission to broadcast again. A client rejection is not server proof
+  that no transaction exists.
+- Next concrete step: add a private, atomic submission journal for the existing
+  publication UUID before wallet submission, idempotent hash recording and
+  recovery reads. Keep rollout disabled until confirmed receipt/event and
+  indexer/reorg recovery is integrated; absence from current logs is not proof
+  of cancellation. No timeout-based claim release or new contract behavior.
+
 October 23 TA-10 upload preparation (Canon 1/2/11; released, not activated):
 
 - Resume HEAD `a29dd90124472d872820400b75428f4d6bbf68c8`; remote main remains

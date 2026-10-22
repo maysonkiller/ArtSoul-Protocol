@@ -1,8 +1,11 @@
 # ArtSoul Project State
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
-and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-15. Implementation
-uses `C:\Projects\ArtSoul`; Admin/artwork release `9a2965f` is deployed.
+and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-23. Implementation
+uses `C:\Projects\ArtSoul`; latest application release is PR #327 (`3f12c48`).
+Its new upload preparation remains disabled pending complete recovery rollout.
+The owner accepts the current iPhone visual behavior, closing
+A-47/A-53/A-54/A-58/A-61/A-72. Earlier Admin/artwork release `9a2965f` is deployed.
 Report/Donate and the protected review queue are enabled; A-21 intake is accepted
 from the October 11 live evidence. A-22/A8 are accepted by the October 15
 reconciliation and published UI follow-up. The owner confirms one passkey closes
@@ -120,7 +123,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 72 `done`, 11 `in progress`, 0 `planned` across A-01 to A-83
+current position is 78 `done`, 5 `in progress`, 0 `planned` across A-01 to A-83
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that
