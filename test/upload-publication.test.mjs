@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { createHash } from 'node:crypto';
+import { Interface, keccak256 } from 'ethers';
+import { V41_CORE_ABI } from '../src/indexer/v4-1-event-schema.js';
 import handler from '../src/api/routes/upload/publication.js';
 import { setWalletSession, getPublicStorageUrl } from '../src/api/backend.js';
 import { buildStoragePath, buildMetadataStoragePath } from '../src/api/routes/upload/file.js';
 import { uploadedMediaUrl } from '../src/api/upload-media-identity.js';
-import { validatePublicationMetadata } from '../src/api/upload-publication.js';
+import { validatePublicationMetadata, recoverPublication } from '../src/api/upload-publication.js';
 import { MAX_METADATA_BYTES, ALLOWED_ARTWORK_MIME_TYPES } from '../src/config/upload-policy.js';
 
 const wallet = '0x' + '11'.repeat(20), other = '0x' + '22'.repeat(20), core = '0x' + 'aa'.repeat(20);
@@ -51,7 +53,10 @@ function backend(options = {}) {
     media_path:buildStoragePath(wallet,'IMG_1234.png','image/png'),
     metadata_path:buildMetadataStoragePath(wallet,'metadata.json'), declared_content_type:'image/png', declared_size:bytes.length
   };
-  let stored = null;
+  if (options.prepared) row = {...row,media_sha256:sha256,byte_size:bytes.length,
+    content_type:'image/png',metadata_json:metadata(row)};
+  let stored = options.prepared ? structuredClone(row.metadata_json) : null;
+  if (options.changeMetadata) stored.name='Unexpected replacement';
   const seen=[];
   globalThis.fetch = async (raw, init={}) => {
     const url=String(raw), body=init.body ? JSON.parse(init.body) : undefined;
@@ -71,6 +76,15 @@ function backend(options = {}) {
     if (url.includes('/rest/v1/artwork_media_preparations?')) {
       assert.match(url,/creator_wallet=eq\.0x[0-9a-f]{40}/);
       return Response.json(row && url.includes(`creator_wallet=eq.${row.creator_wallet}`) ? [row] : []);
+    }
+    if (url.includes('/rest/v1/artwork_media_publications?')) {
+      return Response.json([{publication_id:id,chain_id:84532,core_address:core,creator_wallet:wallet,
+        metadata_uri:getPublicStorageUrl('artworks',row.metadata_path),claim_status:'claimed',
+        reported_transaction_hash:options.noHash ? null : '0x'+'dd'.repeat(32)}]);
+    }
+    if (url.includes('/rpc/reconcile_artwork_media_registration')) {
+      if (options.reconcileError) return Response.json({message:'private database error'},{status:500});
+      return Response.json(options.reconciled || {publication_id:id,claim_status:'registered',registered_artwork_id:'36',can_submit:false});
     }
     if (url.includes('/rpc/prepare_artwork_media_upload')) {
       if (options.pinError) return Response.json({message:options.pinError},{status:400});
@@ -100,6 +114,75 @@ function backend(options = {}) {
   };
   return {seen,get row(){return row;}};
 }
+
+function recoveryFixture(options = {}) {
+  const backendState=backend({prepared:true,...options}), code='0x6001600055';
+  const deployment={chainId:84532,core,coreCodeHash:keccak256(code),startBlock:'50'};
+  const uri=getPublicStorageUrl('artworks',backendState.row.metadata_path);
+  const iface=new Interface(V41_CORE_ABI),tx='0x'+'dd'.repeat(32),blockHash='0x'+'bb'.repeat(32),anchorHash='0x'+'cc'.repeat(32);
+  const log={...iface.encodeEventLog(iface.getEvent('ArtworkRegistered'),[36n,wallet,uri]),address:core,
+    transactionHash:tx,blockNumber:'0x64',blockHash,transactionIndex:'0x0',logIndex:'0x0'};
+  const receipt={transactionHash:tx,blockNumber:'0x64',blockHash,transactionIndex:'0x0',status:'0x1',logs:[log]};
+  const calls=[];
+  const rpcs=[0,1].map(index=>async(method,params)=>{
+    calls.push({index,method,params});
+    switch(method) {
+      case 'eth_chainId':return '0x14a34';
+      case 'eth_getCode':return code;
+      case 'eth_getBlockByNumber':return params[0]==='0x64' ? {number:'0x64',hash:blockHash} : {number:'0xc8',hash:anchorHash};
+      case 'eth_getTransactionReceipt':return options.absentReceipt ? null : receipt;
+      case 'eth_getLogs':return [log];
+      default:assert.fail('Unexpected recovery method '+method);
+    }
+  });
+  return {...backendState,calls,run:(scan=null)=>recoverPublication(wallet,id,deployment,{rpcs,scan})};
+}
+
+test('recovery reads actual pinned bytes and metadata before atomically saving verified chain evidence', async () => {
+  const f=recoveryFixture(),result=await f.run();
+  assert.equal(result.state,'registered');assert.equal(result.registered_artwork_id,'36');assert.equal(result.can_submit,false);
+  const writes=f.seen.filter(c=>c.init.method==='POST');assert.equal(writes.length,1);
+  const write=writes[0];assert.match(write.url,/rpc\/reconcile_artwork_media_registration$/);
+  assert.equal(write.body.p_media_sha256,sha256);assert.equal(write.body.p_byte_size,bytes.length);
+  assert.equal(write.body.p_evidence.finalized_anchor.number,'200');
+  assert.equal(write.body.p_evidence.registrations[0].block_hash,'0x'+'bb'.repeat(32));
+  assert.ok(!f.seen.some(c=>c.url.includes('/object/artworks/')),'recovery never writes storage');
+});
+
+test('recovery from a missing reported hash uses only an explicit server scan and keeps coverage', async () => {
+  const f=recoveryFixture({noHash:true});
+  const unresolved=await f.run();assert.equal(unresolved.reason,'NO_TRANSACTION_OR_SCAN');assert.equal(f.calls.length,0);
+  const result=await f.run({fromBlock:'99',toBlock:'101'});
+  assert.equal(result.state,'registered');assert.equal(result.coverage.proves_absence,false);
+  assert.equal(result.coverage.next_block,'102');
+  assert.ok(!f.seen.some(c=>/begin_artwork|report_artwork/.test(c.url)));
+});
+
+test('missing receipt, changed bytes and replaced metadata never reach persistence', async () => {
+  for(const options of [{absentReceipt:true},{bytes:Buffer.from('changed original')},{changeMetadata:true}]) {
+    const f=recoveryFixture(options);
+    if(options.absentReceipt) {const result=await f.run();assert.equal(result.state,'unresolved');assert.equal(result.can_submit,false);}
+    else {await assert.rejects(f.run(),/MEDIA_PREPARATION_MISMATCH|PUBLICATION_METADATA_CONFLICT/);assert.equal(f.calls.length,0);}
+    assert.equal(f.seen.filter(c=>c.init.method==='POST').length,0);
+  }
+});
+
+test('recovery retains a conflict returned by atomic reconciliation and never claims success after a database failure', async () => {
+  const f=recoveryFixture({reconciled:{publication_id:id,claim_status:'conflict',registered_artwork_id:null,can_submit:false}});
+  const result=await f.run();assert.equal(result.state,'conflict');assert.equal(result.can_submit,false);
+  await assert.rejects(recoveryFixture({reconcileError:true}).run());
+  for(const reconciled of [{publication_id:other,claim_status:'registered',can_submit:false},
+    {publication_id:id,claim_status:'registered',registered_artwork_id:null,can_submit:false},
+    {publication_id:id,claim_status:'registered',registered_artwork_id:'36',can_submit:true}]) {
+    await assert.rejects(recoveryFixture({reconciled}).run(),/MEDIA_PREPARATION_UNAVAILABLE/);
+  }
+});
+
+test('recovery has no public route even when preparation is enabled', async () => {
+  const state=backend();
+  assert.equal((await call({action:'recover',publication_id:id,evidence:{state:'verified'}})).body.error,'INVALID_PUBLICATION_ACTION');
+  assert.equal(state.seen.length,0);
+});
 
 test('preparation denies guests and is disabled by default before any network request', async () => {
   const state=backend();

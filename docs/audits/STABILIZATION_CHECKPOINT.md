@@ -3,6 +3,49 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 atomic registration persistence (Canon 1/2/11; not activated):
+
+- Resume HEAD `fe62b749620ddc595badae47aa4c1a3164c028aa`, same workspace and
+  branch. PR #330's prior final-head CI `39871785909` is green, but is not
+  evidence for this new diff. Preserved untracked authority-policy files,
+  `.codex/` and `output/` remain excluded from commits.
+- `artwork_media_registration.sql` adds a private forced-RLS evidence table
+  and one service-only RPC. Verified block hash, pinned code hash and the first
+  finalized anchor commit with the existing catalog and claim reconciliation.
+  All 1-8 exact matches are retained. Multiple valid registrations block the
+  claim as a conflict; contradictory immutable evidence rolls back the entire
+  batch. UUID, sorted artwork, hash and row locks follow the existing writers.
+- `recoverPublication` reuses raw-byte hashing and metadata validation, reads
+  the actual pinned metadata without re-uploading, runs the two-RPC verifier
+  and invokes the atomic RPC. It is deliberately absent from the public route.
+  A trusted explicit scan can recover a different registration transaction;
+  the original unverified client-reported hash remains unchanged. Every result
+  still has `can_submit: false`. No new dependency or contract change.
+- Verification on this diff: 109 focused API/verifier/regression checks,
+  39 actual disposable PostgreSQL 17 checks, 21 no-default-grant/ledger checks,
+  all passing with zero skips; build passes. The PostgreSQL integration runs
+  preparation, journal, original-byte/metadata verification, synthetic two-RPC
+  evidence and real SQL persistence end-to-end, including a committed write
+  whose HTTP response is lost, a repeated read, a replacement hash and an ID
+  above JavaScript's safe integer range. Separate tests cover concurrent writers,
+  multiple registrations, late anchors, conflicting batches and forced rollback.
+  Logs in `output/audit/`: `registration-persistence-focused-2026-10-23.log`,
+  `registration-persistence-pg-final-2026-10-23.log`,
+  `registration-persistence-grants-2026-10-23.log`, and
+  `registration-persistence-build-2026-10-23.log`.
+- Independent read-only SQL/API review found no blocker in this dormant slice.
+  Only the existing review agent was reused; it is finished and inactive.
+- Interpretation recorded: first saved finality evidence is immutable; a later
+  verified head does not rewrite it. This is recovery bookkeeping, not a new
+  protocol state or changed auction timing. An SQL rejection of contradictory
+  evidence is not a complete indexer/reorg quarantine policy. Activation still
+  requires that policy, historical coverage and browser integration. No live
+  migration, flag activation, transaction, or production release in this block.
+  Local fixtures do not establish A-83's native delayed-receipt acceptance.
+- Next concrete step: integrate registration recovery with indexer/reorg handling
+  so contradictory or orphaned evidence keeps claims blocked while retaining
+  immutable history; verify convergence and failure paths before browser rollout.
+
 October 23 TA-10 registration evidence (Canon 1/2/11; PR #330, not activated):
 
 - Resume HEAD `f004836`, same workspace/branch; preserved untracked authority

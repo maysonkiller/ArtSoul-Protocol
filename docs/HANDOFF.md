@@ -4,9 +4,12 @@ Current continuation (2026-10-23): use `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Latest application release is PR #329 (`dbefd68`);
 upload preparation and the new private submission journal remain disabled
 pending complete receipt/event recovery and browser rollout.
-The October 23 local read-only registration verifier passes 104 focused checks,
-build and a two-RPC replay of artwork 36; it is not wired to catalog writes or
-the route. Next: atomic block/finality evidence persistence with reconciliation.
+The October 23 registration verifier passed a two-RPC replay of artwork 36.
+The local follow-up adds atomic finalized-evidence/catalog/claim persistence
+and a server-only recovery helper, with no public recovery action or activation.
+Next: review indexer/reorg integration so conflicting or orphaned evidence keeps
+claims blocked without rewriting immutable registration history. See the current
+checkpoint for exact test evidence; browser rollout and legacy coverage remain open.
 The owner's new desktop flicker/delay video is queued as TA-12; repairs are
 explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72

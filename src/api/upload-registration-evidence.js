@@ -101,7 +101,7 @@ function registration(log, core, creator, metadataUri) {
     log_index: log.log_index };
 }
 
-// Read-only evidence, deliberately not wired to the upload route or catalog.
+// Read-only evidence, deliberately not wired to the public upload route.
 // A caller must persist canonical block/finality anchors atomically with catalog
 // reconciliation before using this result for durable publication recovery.
 export async function verifyArtworkRegistration({ deployment, creator, metadataUri, transactionHash = null, scan = null }, { rpcs }) {

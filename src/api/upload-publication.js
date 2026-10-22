@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { getPublicStorageUrl, normalizeWallet, supabaseRest, supabaseStorageRest } from './backend.js';
 import { allowedArtworkUrl, fetchArtworkResource } from './safe-artwork-fetch.js';
 import { uploadedMediaUrl, verifyUploadedMedia } from './upload-media-identity.js';
+import { verifyArtworkRegistration } from './upload-registration-evidence.js';
 import { buildStoragePath, buildMetadataStoragePath, createSignedArtworkUpload } from './routes/upload/file.js';
 import { ARTWORK_MIME_EXTENSIONS, MAX_ARTWORK_UPLOAD_BYTES, MAX_METADATA_BYTES } from '../config/upload-policy.js';
 
@@ -128,6 +129,10 @@ async function storePreparedMetadata(row, uri) {
       signal: AbortSignal.timeout(15000)
     });
   } catch { /* Verify the actual object below, without exposing storage errors. */ }
+  await verifyPreparedMetadata(row, uri);
+}
+
+async function verifyPreparedMetadata(row, uri) {
   const stored = await fetchArtworkResource(uri, {
     maxBytes: MAX_METADATA_BYTES, timeoutMs: 10000, acceptContentType: type => type === 'application/json'
   });
@@ -214,4 +219,38 @@ export async function journalPublication(wallet, body, deployment) {
     throw fail('INVALID_PUBLICATION_ACTION', 400);
   }
   return submissionView(row, id, wallet, deployment);
+}
+
+// Server-only recovery building block. Deliberately absent from the route and
+// browser until deployment, legacy coverage and reorg handling are reviewed.
+// The scan cursor and pinned deployment/readers come from the server, not JSON
+// submitted by a browser. A lost response can repeat this exact reconciliation.
+export async function recoverPublication(wallet, id, deployment, { rpcs, scan = null }) {
+  publicationId(id);
+  if (!wallet || normalizeWallet(wallet) !== wallet || /^0x0{40}$/.test(wallet)) throw fail('INVALID_RECOVERY_SCOPE', 400);
+  const { row, metadataUri } = await readPreparation(wallet, id, deployment);
+  if (!row.metadata_json || !row.media_sha256) throw fail('MEDIA_PREPARATION_MISMATCH');
+  const journal = await journalPublication(wallet, { action: 'status', publication_id: id }, deployment);
+  if (journal.metadata_uri !== metadataUri) throw fail('MEDIA_PREPARATION_MISMATCH');
+  const media = await verifyUploadedMedia(wallet, row.media_path);
+  if (row.media_sha256 !== media.sha256 || Number(row.byte_size) !== media.size ||
+      row.content_type !== media.contentType) throw fail('MEDIA_PREPARATION_MISMATCH');
+  validatePublicationMetadata(row.metadata_json, row, media);
+  await verifyPreparedMetadata(row, metadataUri);
+  const evidence = await verifyArtworkRegistration({ deployment, creator: wallet, metadataUri,
+    transactionHash: scan ? null : journal.reported_transaction_hash, scan }, { rpcs });
+  if (evidence.state !== 'verified') return { publication_id: id, ...evidence };
+  const saved = await rpc('reconcile_artwork_media_registration', {
+    p_publication_id: id, p_chain_id: deployment.chainId, p_core_address: deployment.core,
+    p_creator_wallet: wallet, p_media_sha256: media.sha256, p_media_uri: media.mediaUrl,
+    p_byte_size: media.size, p_metadata_uri: metadataUri, p_evidence: evidence
+  });
+  if (saved?.publication_id !== id || saved.can_submit !== false ||
+      !['registered', 'conflict'].includes(saved.claim_status) ||
+      (saved.registered_artwork_id !== null && (typeof saved.registered_artwork_id !== 'string' ||
+        !/^[1-9]\d{0,77}$/.test(saved.registered_artwork_id))) ||
+      (saved.claim_status === 'registered' && !saved.registered_artwork_id)) throw fail('MEDIA_PREPARATION_UNAVAILABLE', 503);
+  return { publication_id: id, state: saved.claim_status, registered_artwork_id: saved.registered_artwork_id,
+    registrations: evidence.registrations, can_submit: false,
+    ...(evidence.coverage ? { coverage: evidence.coverage } : {}) };
 }

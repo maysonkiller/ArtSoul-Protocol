@@ -63,8 +63,11 @@ October 23 remaining work, without repeating completed ceremonies:
    The October 23 local read-only verifier now checks exact registration receipts
    and bounded no-hash scans against two RPCs, with pinned code and finality
    evidence. It passes 104 focused checks, build and an actual artwork 36 replay.
-   It is not activated: atomic catalog/finality persistence and browser recovery
-   remain open. That replay does not simulate or accept A-83's receipt delay.
+   The local follow-up now persists evidence, catalog and claim reconciliation
+   atomically, preserving the original unverified hash and every exact match.
+   It remains inactive: indexer/reorg handling, legacy coverage and browser
+   recovery/rollout are still open. That replay does not simulate or accept
+   A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous

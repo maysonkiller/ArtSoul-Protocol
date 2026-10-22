@@ -9,6 +9,7 @@ const {promisify} = require('node:util');
 const run = promisify(execFile);
 const migration = fs.readFileSync(path.join(__dirname, '../sql/migrations/artwork_media_preparation.sql'), 'utf8');
 const submissionMigration = fs.readFileSync(path.join(__dirname, '../sql/migrations/artwork_media_submission.sql'), 'utf8');
+const registrationMigration = fs.readFileSync(path.join(__dirname, '../sql/migrations/artwork_media_registration.sql'), 'utf8');
 const container = `artsoul-prepare-pg-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
 const creator = '0x' + '11'.repeat(20), other = '0x' + '22'.repeat(20);
 const core = '0x' + 'aa'.repeat(20), otherCore = '0x' + 'bb'.repeat(20);
@@ -54,6 +55,17 @@ function recordIdentity(value, artwork=1, creator=value.creator) {
     value.chain,value.core,artwork,creator,value.hash,'https://storage.example/'+value.mediaPath,
     value.bytes,value.metadataUri,'0x'+'dd'.repeat(32),123,0
   ].map(q).join(',')}));`;
+}
+function evidence(value, ids = ['1']) {
+  return {state:'verified',can_submit:false,chain_id:84532,core_address:value.core,core_code_hash:'0x'+'aa'.repeat(32),
+    finalized_anchor:{number:'200',hash:'0x'+'cc'.repeat(32)},
+    registrations:ids.map((id,index)=>({artwork_id:id,creator_wallet:value.creator,metadata_uri:value.metadataUri,
+      transaction_hash:'0x'+'dd'.repeat(32),block_number:'123',block_hash:'0x'+'bb'.repeat(32),log_index:String(index)}))};
+}
+function reconcile(value, proof=evidence(value)) {
+  return `SELECT public.reconcile_artwork_media_registration(${[
+    value.id,value.chain,value.core,value.creator,value.hash,value.metadata.media_url,value.bytes,value.metadataUri
+  ].map(q).join(',')},${q(JSON.stringify(proof))}::JSONB);`;
 }
 function issue(value) {
   return `SELECT public.issue_artwork_media_upload(${[
@@ -103,7 +115,8 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
   applyMigration();
   sql(fs.readFileSync(path.join(__dirname, '../sql/migrations/artwork_media_identity.sql'), 'utf8'));
   sql(submissionMigration);
-  t.beforeEach(() => sql('TRUNCATE public.artwork_media_preparations, public.artwork_media_publications, public.artwork_media_catalog;'));
+  sql(registrationMigration);
+  t.beforeEach(() => sql('TRUNCATE public.artwork_media_registration_evidence, public.artwork_media_preparations, public.artwork_media_publications, public.artwork_media_catalog;'));
 
   await t.test('issuance returns owned fixed paths with no measured or metadata fields pinned', () => {
     const value = fixture(), row = rpc(issue(value));
@@ -444,6 +457,136 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
     assert.equal(sql("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.artwork_media_publications'::regclass;"),'t');
   });
 
+  await t.test('registration atomically persists catalog and original finality evidence without rewriting the reported hash', () => {
+    const value=fixture();claimed(value);const started=rpc(begin(value));
+    rpc(report(value,'0x'+'ee'.repeat(32)));
+    const first=rpc(reconcile(value));
+    assert.deepEqual(first,{publication_id:value.id,claim_status:'registered',registered_artwork_id:'1',can_submit:false});
+    const stored=sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;');
+    assert.equal(JSON.parse(stored).block_hash,evidence(value).registrations[0].block_hash);
+    assert.equal(rpc(begin(value)).reported_transaction_hash,'0x'+'ee'.repeat(32));
+    assert.equal(rpc(begin(value)).submission_started_at,started.submission_started_at);
+    const later=evidence(value);later.finalized_anchor={number:'300',hash:'0x'+'ff'.repeat(32)};
+    for(const proof of [evidence(value),later]) assert.deepEqual(rpc(reconcile(value,proof)),first);
+    sql(registrationMigration);
+    assert.equal(sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;'),stored);
+    assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'1');
+  });
+
+  await t.test('all matching registrations survive and block the claim even when results are reversed', () => {
+    const value=fixture();claimed(value);
+    const proof=evidence(value,['9007199254740993','1']);
+    const result=rpc(reconcile(value,proof));assert.equal(result.claim_status,'conflict');
+    assert.equal(result.can_submit,false);assert.equal(result.registered_artwork_id,'1');
+    assert.equal(sql('SELECT count(*) FROM artwork_media_registration_evidence;'),'2');
+    assert.equal(sql('SELECT max(artwork_id)::TEXT FROM artwork_media_catalog;'),'9007199254740993');
+    proof.registrations.reverse();assert.deepEqual(rpc(reconcile(value,proof)),result);
+    assert.equal(rpc(claim(value)),'PUBLICATION_BLOCKED');
+  });
+
+  await t.test('conflicting immutable evidence rolls back earlier entries in the same batch', () => {
+    const value=fixture();claimed(value);rpc(reconcile(value,evidence(value,['2'])));
+    const before=sql('SELECT row_to_json(p) FROM artwork_media_publications p;');
+    for(const change of [p=>p.registrations[1].block_hash='0x'+'ee'.repeat(32),
+      p=>p.core_code_hash='0x'+'ee'.repeat(32),p=>p.finalized_anchor.hash='0x'+'ee'.repeat(32),
+      p=>p.registrations[1].transaction_hash='0x'+'ee'.repeat(32)]) {
+      const proof=evidence(value,['1','2']);proof.registrations[0].block_number='122';
+      proof.registrations[0].transaction_hash='0x'+'ff'.repeat(32);
+      // Existing artwork 2 has log index zero; artwork 1 uses a different block.
+      proof.registrations[1].log_index='0';change(proof);
+      error(asService(reconcile(value,proof)),/MEDIA_(REGISTRATION_EVIDENCE|IDENTITY)_CONFLICT/);
+      assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'1');
+      assert.equal(sql('SELECT count(*) FROM artwork_media_registration_evidence;'),'1');
+      assert.equal(sql('SELECT row_to_json(p) FROM artwork_media_publications p;'),before);
+    }
+  });
+
+  await t.test('failure writing evidence cannot leave a catalog entry or registered claim', () => {
+    const value=fixture();claimed(value);
+    sql(`CREATE FUNCTION _evidence_fail_write() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_EVIDENCE_FAILURE'; END $f$;
+      CREATE TRIGGER _evidence_fail_write BEFORE INSERT ON artwork_media_registration_evidence
+      FOR EACH ROW EXECUTE FUNCTION _evidence_fail_write();`);
+    try {error(asService(reconcile(value)),/FORCED_EVIDENCE_FAILURE/);} finally {
+      sql('DROP TRIGGER _evidence_fail_write ON artwork_media_registration_evidence; DROP FUNCTION _evidence_fail_write();');
+    }
+    assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0');
+    assert.equal(sql('SELECT claim_status FROM artwork_media_publications;'),'claimed');
+  });
+
+  await t.test('registration rejects malformed, unfinalized and duplicate evidence without writing', () => {
+    const value=fixture();claimed(value);
+    for(const change of [p=>p.state='unresolved',p=>p.can_submit=true,p=>delete p.finalized_anchor,
+      p=>p.chain_id=8453,p=>p.core_address=otherCore,p=>p.registrations=[],p=>p.registrations=Array(9).fill(p.registrations[0]),
+      p=>p.registrations.push({...p.registrations[0]}),p=>p.registrations.push({...p.registrations[0],artwork_id:'2'}),
+      p=>p.registrations[0].artwork_id='1.0',p=>p.registrations[0].artwork_id='01',
+      p=>p.registrations[0].artwork_id='1e78',p=>p.registrations[0].log_index='2147483648',
+      p=>p.registrations[0].artwork_id=1,p=>p.registrations[0].block_number=123,p=>p.registrations[0].log_index=0,
+      p=>p.finalized_anchor.number=200,p=>p.registrations[0].artwork_id=(2n**256n).toString(),
+      p=>p.registrations[0].block_number='201',p=>p.finalized_anchor.number='123',
+      p=>p.registrations[0].creator_wallet=other,p=>p.registrations[0].metadata_uri='wrong',
+      p=>p.registrations[0].transaction_hash='bad',p=>p.registrations[0].block_hash=null]) {
+      const proof=evidence(value);change(proof);
+      error(asService(reconcile(value,proof)),/INVALID_REGISTRATION_EVIDENCE/);
+    }
+    assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0');
+  });
+
+  await t.test('registration requires the owned claim and exact prepared bytes and URI', () => {
+    const value=fixture();claimed(value);
+    for(const change of [{creator:other},{core:otherCore},{id:crypto.randomUUID()}]) {
+      error(asService(reconcile({...value,...change})),/MEDIA_PUBLICATION_NOT_FOUND/);
+    }
+    for(const change of [{bytes:value.bytes+1},{hash:'ee'.repeat(32)},{metadataUri:'https://storage.example/wrong.json'},
+      {metadata:{media_url:'https://other.example/art.png'}}]) {
+      error(asService(reconcile({...value,...change})),/MEDIA_PREPARATION_MISMATCH/);
+    }
+    sql('TRUNCATE artwork_media_preparations;');
+    error(asService(reconcile(value)),/MEDIA_PREPARATION_MISMATCH/);
+    assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0');
+  });
+
+  await t.test('simultaneous repeated and overlapping registration batches converge without deadlocks', async () => {
+    const value=fixture();claimed(value);
+    const a=evidence(value,['1','2']),b=structuredClone(a);b.registrations.reverse();
+    const results=(await Promise.all([parallel(asService(reconcile(value,a))),parallel(asService(reconcile(value,b)))])).map(JSON.parse);
+    assert.deepEqual(results[0],results[1]);assert.equal(results[0].claim_status,'conflict');
+    assert.equal(sql('SELECT count(*) FROM artwork_media_registration_evidence;'),'2');
+  });
+
+  await t.test('registration waits safely for the existing catalog writer and then preserves its conflict', async () => {
+    const value=fixture();claimed(value);
+    const writer=parallel(`BEGIN; SET application_name='registration-writer-fixture';
+      ${recordIdentity(value,2,other)} SELECT pg_sleep(1); COMMIT;`);
+    try {
+      let sleeping=false;
+      for(let i=0;i<30;i++) {
+        if(sql("SELECT count(*) FROM pg_stat_activity WHERE application_name='registration-writer-fixture' AND wait_event='PgSleep';")==='1') {sleeping=true;break;}
+        await delay(20);
+      }
+      assert(sleeping);
+      const result=JSON.parse(await parallel(asService(reconcile(value))));
+      assert.equal(result.claim_status,'conflict');assert.equal(result.can_submit,false);
+    } finally {await writer;}
+    assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'2');
+    assert.equal(sql('SELECT count(*) FROM artwork_media_registration_evidence;'),'1');
+  });
+
+  await t.test('evidence stays private and service writes require the atomic READ COMMITTED RPC', () => {
+    const value=fixture();claimed(value);rpc(reconcile(value));
+    for(const role of ['anon','authenticated']) {
+      error(`SET ROLE ${role}; SELECT * FROM artwork_media_registration_evidence;`,/permission denied/);
+      error(`SET ROLE ${role}; ${reconcile(value)}`,/permission denied for function/);
+    }
+    for(const query of ['DELETE FROM artwork_media_registration_evidence;',
+      'UPDATE artwork_media_registration_evidence SET verified_at=now();','TRUNCATE artwork_media_registration_evidence;']) {
+      error(asService(query),/permission denied/);
+    }
+    for(const isolation of ['REPEATABLE READ','SERIALIZABLE']) {
+      error(`BEGIN ISOLATION LEVEL ${isolation}; ${asService(reconcile(value))}`,/MEDIA_IDENTITY_REQUIRES_READ_COMMITTED/);
+    }
+  });
+
   await t.test('authenticated API prepares and resumes through actual PostgreSQL RPCs without submission permission', async () => {
     const {default:handler} = await import('../src/api/routes/upload/publication.js');
     const {setWalletSession} = await import('../src/api/backend.js');
@@ -455,6 +598,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
     const id = crypto.randomUUID(), bytes = Buffer.from('actual stored artwork bytes');
     const digest = crypto.createHash('sha256').update(bytes).digest('hex');
     const objects = new Map(), calls = [];
+    let dropReconciliationResponse = false;
     const response = () => ({headers:{},statusCode:200,body:null,
       setHeader(key,value){this.headers[key]=value;},status(value){this.statusCode=value;return this;},
       json(value){this.body=value;return this;},end(){}});
@@ -473,7 +617,9 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       claim_artwork_media_publication:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet',
         'p_media_sha256','p_media_path','p_byte_size','p_metadata_uri'],
       begin_artwork_media_submission:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet','p_metadata_uri'],
-      report_artwork_media_transaction:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet','p_transaction_hash']
+      report_artwork_media_transaction:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet','p_transaction_hash'],
+      reconcile_artwork_media_registration:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet',
+        'p_media_sha256','p_media_uri','p_byte_size','p_metadata_uri','p_evidence']
     };
     Object.assign(process.env,env);
     globalThis.fetch = async (raw, init={}) => {
@@ -484,9 +630,14 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
         assert.ok(Object.hasOwn(signatures,name));
         assert.deepEqual(Object.keys(body).sort(),[...signatures[name]].sort());
         const parameters = signatures[name].map(key => `${key} => ` +
-          (key === 'p_metadata_json' ? q(JSON.stringify(body[key]))+'::JSONB' : q(body[key])));
+          (['p_metadata_json','p_evidence'].includes(key) ? q(JSON.stringify(body[key]))+'::JSONB' : q(body[key])));
         try {
-          return Response.json(rpc(`SELECT to_jsonb(public.${name}(${parameters.join(',')}));`));
+          const committed=rpc(`SELECT to_jsonb(public.${name}(${parameters.join(',')}));`);
+          if(name==='reconcile_artwork_media_registration' && dropReconciliationResponse) {
+            dropReconciliationResponse=false;
+            return new Response('',{status:503}); // Commit succeeded; response was lost.
+          }
+          return Response.json(committed);
         } catch (caught) {
           const message = String(caught.stderr).match(/ERROR:\s+([A-Z_]+)/)?.[1];
           assert.ok(message,'database errors have a stable application code');
@@ -601,6 +752,41 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
         assert.equal(foreign.statusCode,404);assert.ok(!JSON.stringify(foreign.body).includes(id));
       }
       assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0','a reported hash never becomes verified registration');
+      const {recoverPublication}=await import('../src/api/upload-publication.js');
+      const {Interface,keccak256}=await import('ethers');
+      const {V41_CORE_ABI}=await import('../src/indexer/v4-1-event-schema.js');
+      const iface=new Interface(V41_CORE_ABI),code='0x6001600055';
+      const deployment={chainId:84532,core,coreCodeHash:keccak256(code),startBlock:'50'};
+      const blockHash='0x'+'bb'.repeat(32),anchorHash='0x'+'cc'.repeat(32),replacement='0x'+'ff'.repeat(32);
+      const log={...iface.encodeEventLog(iface.getEvent('ArtworkRegistered'),[9007199254740993n,creator,prepared.body.metadata_uri]),
+        address:core,transactionHash:replacement,blockNumber:'0x64',blockHash,transactionIndex:'0x0',logIndex:'0x0'};
+      const receipt={transactionHash:replacement,blockNumber:'0x64',blockHash,transactionIndex:'0x0',status:'0x1',logs:[log]};
+      const rpcs=[0,1].map(()=>async(method,params)=>{
+        switch(method) {
+          case 'eth_chainId':return '0x14a34';
+          case 'eth_getCode':return code;
+          case 'eth_getBlockByNumber':return params[0]==='0x64' ? {number:'0x64',hash:blockHash} : {number:'0xc8',hash:anchorHash};
+          case 'eth_getLogs':return [log];
+          case 'eth_getTransactionReceipt':return params[0]===replacement ? receipt : null;
+          default:assert.fail('Unexpected integration chain method '+method);
+        }
+      });
+      const unresolved=await recoverPublication(creator,id,deployment,{rpcs});
+      assert.equal(unresolved.state,'unresolved','original reported hash has no receipt');
+      dropReconciliationResponse=true;
+      await assert.rejects(recoverPublication(creator,id,deployment,{rpcs,scan:{fromBlock:'99',toBlock:'101'}}));
+      assert.equal(sql('SELECT count(*) FROM artwork_media_registration_evidence;'),'1','response loss does not undo a committed transaction');
+      const recoveredRegistration=await recoverPublication(creator,id,deployment,{rpcs,scan:{fromBlock:'99',toBlock:'101'}});
+      assert.equal(recoveredRegistration.state,'registered');assert.equal(recoveredRegistration.registered_artwork_id,'9007199254740993');
+      assert.equal(recoveredRegistration.can_submit,false);
+      const saved=sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;');
+      assert.deepEqual(await recoverPublication(creator,id,deployment,{rpcs,scan:{fromBlock:'99',toBlock:'101'}}),recoveredRegistration);
+      assert.equal(sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;'),saved);
+      assert.equal(sql('SELECT transaction_hash FROM artwork_media_catalog;'),replacement);
+      const finalStatus=await call({action:'status',publication_id:id});
+      assert.equal(finalStatus.body.claim_status,'registered');assert.equal(finalStatus.body.reported_transaction_hash,tx);
+      assert.equal(finalStatus.body.submission_started_at,started.body.submission_started_at);
+      assert.equal(calls.filter(value=>value.startsWith('/storage/v1/object/artworks/')).length,writes);
     } finally {
       globalThis.fetch=originalFetch;
       for(const [key,value] of Object.entries(previous)) value === undefined ? delete process.env[key] : process.env[key]=value;
