@@ -8,7 +8,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **78 done, 5 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **79 done, 4 in progress, 0 planned** across A-01 to A-83.
 
 October 23 remaining work, without repeating completed ceremonies:
 
@@ -59,8 +59,10 @@ October 23 remaining work, without repeating completed ceremonies:
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous
    desktop tests and published repairs supply the implementation evidence.
-   No repeat is needed. A-48's native browser Back/BFCache remains separate;
-   ordinary navigation acceptance is not proof of a preserved document.
+   A separate explicit answer also accepts A-48: browser Back restores the
+   gallery position without flicker or visible reconstruction. Prior desktop
+   BFCache evidence remains separate; the phone result does not establish an
+   internal Safari cache marker. No repeat of these checks is needed.
 4. **A-57 disposition:** current switching works according to the owner; the
    historical Robinhood iOS provider failure is unresolved evidence, not a newly
    confirmed defect. Do not invent a wallet limitation to close it.
@@ -89,8 +91,9 @@ delayed-theme traces across Chromium/WebKit. PR #319 (`6a255e3`) removes late
 font swaps on all nine Inter-loading pages; eight delayed-font open/reload
 traces retain identical text widths. Both candidates pass build and full
 Linux/Windows CI. These desktop-engine checks do not replace native iPhone
-acceptance, which remains pending. No wallet, OAuth or factor ceremony is
-reopened. Other device and connected publishing criteria remain open.
+acceptance, which was pending at that dated check and is now recorded above.
+No wallet, OAuth or factor ceremony is reopened. The remaining criteria are
+listed in the current October 23 close-out above.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its
@@ -359,16 +362,15 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-48** | The single full-document repaint on browser Back | Ordinary headed desktop Chrome passed the apex [probe](testnet/A48_BACK_NAVIGATION_PROBE.md) on September 27: the marker survived and `pageshow.persisted` was true. iOS acceptance remains open; navigation timing or desktop viewport emulation cannot replace it. Android is owner-waived / not tested |
 | **A-57** | Wallet capability limits | Current iPhone network switching is owner-confirmed working. The old Robinhood failure stage and masked provider error remain unknown; neither a confirmed ArtSoul defect nor a proven wallet limitation is established. Do not manufacture a failure or repeat the accepted Rabby account-switch flow |
 
 ## 2a. Remaining device observations
 
-Four rows remain for device observations, recovery evidence or historical-defect
-disposition: A-48/A-57/A-71/A-83; A-23 is the subsequent beta decision. A-33,
+Three rows remain for device observations, recovery evidence or historical-defect
+disposition: A-57/A-71/A-83; A-23 is the subsequent beta decision. A-33,
 A-64 and A-78 were accepted on October 22 from native publication and prior
-evidence. A-47/A-53/A-54/A-58/A-61/A-72 are accepted on October 23 from the
-specific native visual follow-up, published repairs and prior desktop evidence.
+evidence. A-47/A-48/A-53/A-54/A-58/A-61/A-72 are accepted on October 23 from the
+specific native visual and Back follow-ups, published repairs and prior desktop evidence.
 The underlying repairs, including the September 29 portrait/profile
 corrections, are published. A failed acceptance may require another fix.
 [`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)

@@ -7,8 +7,8 @@ its historical evidence. It is not an Android PASS or a compatibility claim.
 Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
 iPhone trip without a specific unresolved outcome.
 
-Four backlog rows remain for device observations, recovery evidence or historical
-defect disposition: A-48, A-57, A-71 and A-83. Their implementation is published; failed
+Three backlog rows remain for device observations, recovery evidence or historical
+defect disposition: A-57, A-71 and A-83. Their implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
 
@@ -30,6 +30,14 @@ does not establish native BFCache, A-71's immediate post-publication frame or
 A-83's deliberate receipt-delay recovery; those remain separate. Android stays
 owner-waived / not tested. A-23 is the later beta decision, and the additional
 TA-10 exact-file restriction remains open independently.
+
+**October 23 native Back acceptance:** in a separate explicit answer, the owner
+confirms that browser Back from an artwork returns the gallery to its previous
+scroll position without flicker or visible reconstruction. Together with the
+prior actual desktop BFCache probe and lazy-image repair, this closes A-48's
+reported navigation symptom. The phone observation does not establish
+`pageshow.persisted` or any captured Safari cache marker; no internal cache
+mechanism is inferred. Do not repeat this accepted navigation check.
 
 **October 22 native publication acceptance:** the owner confirms successful
 iPhone Chrome/MetaMask registration and auction creation after PR #325, and
@@ -128,9 +136,10 @@ Run the probe in [`A48_BACK_NAVIGATION_PROBE.md`](A48_BACK_NAVIGATION_PROBE.md)
 — a page-restoration marker — and paste Chrome's own list of blocking reasons rather
 than guessing.
 
-The desktop portion passed on September 27. Complete the outstanding real iOS
-portion; Android is owner-waived / not tested. A navigation timing type alone
-does not prove or disprove BFCache.
+The desktop portion passed on September 27; the owner accepted the native iOS
+navigation outcome on October 23. Use this probe only if the symptom returns.
+Android is owner-waived / not tested. A navigation timing type alone does not
+prove or disprove BFCache, and no native cache instrumentation is claimed.
 
 ---
 

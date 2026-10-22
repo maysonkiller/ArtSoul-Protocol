@@ -14,11 +14,15 @@ October 23 native visual acceptance (Canon 5/16/17):
   published repairs and prior desktop/regression evidence. Do not repeat
   accepted visual, login, OAuth, publication, X or Donate/Report ceremonies.
   Android remains owner-waived / not tested.
-- Counts: 78 done / 5 in progress / 0 planned. Remaining formal rows are A-48
-  (native Back/BFCache), A-57 (historical provider-error disposition), A-71
+- A subsequent explicit owner answer accepts browser Back: the gallery returns
+  to its previous position without flicker or visible reconstruction. A-48 is
+  done with prior desktop BFCache/lazy-image evidence; no Safari cache marker
+  or `pageshow.persisted` measurement is inferred from the phone observation.
+- Counts: 79 done / 4 in progress / 0 planned. Remaining formal rows are
+  A-57 (historical provider-error disposition), A-71
   (immediate post-publish wait), A-83 (actual delayed-receipt recovery), then
   A-23 (beta decision). Additional TA-10 exact-file enforcement remains open.
-  No unasked Back, delayed-receipt or publishing-frame outcome is inferred.
+  No unasked delayed-receipt or publishing-frame outcome is inferred.
 - Acceptance bookkeeping verification: `node scripts/sync-phase-a-counts.mjs
   --check`, six existing close-out/status-summary tests and `git diff --check`
   pass. This update changes documentation only; the prior application release
