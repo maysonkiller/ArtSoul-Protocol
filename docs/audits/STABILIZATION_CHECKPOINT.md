@@ -3,10 +3,12 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 TA-10 upload preparation (Canon 1/2/11; not activated):
+October 23 TA-10 upload preparation (Canon 1/2/11; released, not activated):
 
 - Resume HEAD `a29dd90124472d872820400b75428f4d6bbf68c8`; remote main remains
-  `66a3dde`. Existing untracked authority-policy files, `.codex/` and `output/`
+  `66a3dde` at that preflight. PR #327 is now merged as
+  `3f12c48598a1e594808711b3ae9b27305237b65d`; this workspace fast-forwarded
+  without replacing files. Existing untracked authority-policy files, `.codex/` and `output/`
   are preserved and excluded from this change. No additional checkout exists
   for this work; older registered worktrees remain recovery/history only.
 - The new private preparation table durably records wallet/deployment and fixed
@@ -26,13 +28,31 @@ October 23 TA-10 upload preparation (Canon 1/2/11; not activated):
 - Focused API checks: 19 pass. Disposable PostgreSQL preparation checks: 21
   pass, no skips, including authenticated API-to-real-SQL integration and
   concurrent retries. The independent review's existing-object signing concern
-  is fixed and rechecked. The build passes. Full regression results and release
-  evidence will be recorded here after completion; earlier baselines are not
-  evidence for this patch.
+  is fixed and rechecked. The build passes. Complete local workspace unit run:
+  2040 pass, zero failures/skips, using the existing collector with file
+  concurrency 2 (includes preserved untracked tests, excluded from the PR).
+  Log: `output/audit/media-preparation-full-unit-2026-10-23.log`; runner:
+  `node docs/private/run-phase-a-unit-2026-10-23.mjs`. This includes the actual
+  no-default-grant migration rehearsal, not just static SQL checks.
+- Exact candidate `dc137c0` passes CI `39864320530`: Linux 2009 pass / 2 skips,
+  Windows 1800 pass / 17 skips, zero failures, and 46 contract tests per OS.
+  Linux skips are Windows custody tests; local Docker covers the SQL groups
+  unavailable on hosted Windows. Logs:
+  `output/audit/media-preparation-ci-{linux,windows}-2026-10-23.log`.
+- Production deployment `7265216560` succeeded at 2026-10-22 22:25:34 UTC
+  (October 23 local time). Preview and apex match all eight checked pages and
+  57 assets. Evidence: `output/audit/page-font-{preview-dc137c0,apex-3f12c48}-release-2026-10-20.json`.
+  The new route denies anonymous POST with 401 and `private, no-store`; preview
+  also rejects GET with 405. No authenticated production write was exercised.
+  Post-merge CI `39864805267` also passes both OS jobs and static checks.
 - Not applied: both media migrations remain manual rollout prerequisites;
   no production schema/flags, browser publishing flow or on-chain state changed.
   Phase A remains 72 done / 11 in progress; TA-10 remains additionally open.
   Exact bytes are file identity, not copyright evidence or title reservation.
+- Fresh anonymous projection reads identify the old inventory's four unresolved
+  rows: artworks 1-4 have empty media URLs and only historical metadata URIs.
+  These reads cannot establish their original-byte hashes. No record was removed,
+  repaired or marked verified, and hidden/unindexed coverage is not inferred.
 - Next concrete step: implement durable submission/recovery coordination for
   the same publication UUID, with unknown-broadcast and confirmed-event/reorg
   tests, before switching the browser. Legacy coverage and actual storage-policy

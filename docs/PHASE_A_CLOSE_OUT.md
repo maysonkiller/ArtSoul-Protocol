@@ -49,11 +49,12 @@ October 22 next acceptance, without repeating completed ceremonies:
    inspection confirms there is no enforced exact-file duplicate check despite
    the browser calculating a hash. The requested duplicate protection remains
    open as TA-10; a website guard cannot enforce uniqueness in the unchanged contract.
-   October 23 adds private durable upload issuance and immutable server metadata
+   PR #327 (`3f12c48`, October 23 local time) adds private durable upload issuance and immutable server metadata
    preparation, with actual PostgreSQL/API retry and ownership tests. The route
    is disabled and always returns `can_submit: false`; no live migration or
    browser switch occurred. Broadcast recovery, indexer/reorg integration and
-   legacy coverage still precede activation. See the current checkpoint.
+   legacy coverage still precede activation. Candidate CI passes on both OSes;
+   preview/apex artifacts match. See the current checkpoint.
 3. **A short visual/navigation pass** covers A-47/A-48/A-53/A-54/A-58/A-61/A-72:
    profile avatar/identity, first tab load, quick navigation and browser Back.
    Ownership and the guest-header avatar have already been accepted. Actual
