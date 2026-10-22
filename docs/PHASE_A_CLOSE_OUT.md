@@ -24,10 +24,12 @@ October 22 next acceptance, without repeating completed ceremonies:
    confirmations, correct artwork/auction identity, and indexer convergence.
    The already completed operator settlement does not replace this journey.
    The latest owner report identifies filename/title rejection and misleading
-   field highlighting; its bounded repair is in progress. An additional code
+   field highlighting; PR #323 (`8ba8082`) repairs it and is published. A separate
+   reproduced WebKit first-tap failure has a bounded local follow-up: field blur
+   must not replace an unchanged analysis/retry button text node. An additional code
    inspection confirms there is no enforced exact-file duplicate check despite
    the browser calculating a hash. The requested duplicate protection remains
-   open; a website guard cannot enforce uniqueness in the unchanged contract.
+   open as TA-10; a website guard cannot enforce uniqueness in the unchanged contract.
 3. **A short visual/navigation pass** covers A-47/A-48/A-53/A-54/A-58/A-61/A-72:
    profile avatar/identity, first tab load, quick navigation and browser Back.
    Ownership and the guest-header avatar have already been accepted. Actual

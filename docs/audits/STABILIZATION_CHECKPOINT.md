@@ -47,9 +47,41 @@ October 22 upload validation follow-up (Canon 05/11/12/16):
   are not byte-identical; no visual copyright guarantee is implied.
 - Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
   One narrowly scoped read-only helper checked duplicate enforcement and has
-  completed. Next: finish full validation, release the filename/field repair,
-  then implement the agreed duplicate-publication scope. Native phone publishing
-  remains unaccepted while the owner encounters this form defect.
+  completed. The final bounded diff review also found no blockers.
+- PR #323 is merged as `8ba8082c6fdbc89aff6919e5ed715c289c857651`; production
+  deployment `7262421713` succeeds. Exact candidate `4ae2a0f` passes CI
+  `39845339997`: Linux 1927 pass/2 skip, Windows 1758 pass/15 skip and 46
+  contract checks on each OS, zero failures. Local full suite: 1958/1958,
+  including the unrelated preserved authority-policy tests. Preview and apex
+  match eight pages and 57 assets; guest moderation remains denied. Evidence:
+  `output/audit/upload-input-{preview,apex}-artifacts-2026-10-22.log`.
+- The owner delegates the duplicate-protection approach and says new test
+  contracts will be prepared before mainnet. Sequence: website publishing
+  protection first, contract enforcement reviewed for that later deployment.
+  No current contract replacement, migration or duplicate deletion is performed.
+  Common artwork titles remain allowed; filenames are not identity keys.
+- A read-only inventory hashes 31 of 35 anonymous Base Sepolia projected works
+  (47,643,763 downloaded bytes). Exact-byte pairs: artworks 6/13, 8/32 and
+  14/15. Four legacy media URLs are outside the reviewed fetch allowlist and
+  remain unresolved. This does not cover hidden, archived or unindexed media,
+  nor establish authorship. The first inventory attempt lacked the public
+  storage-origin environment and downloaded nothing; the configured retry is
+  `output/audit/public-media-hashes-checked-2026-10-22.json`. Nothing is mutated.
+- Post-release form probes pass in Chromium but reveal a second actionable
+  WebKit defect: after editing price, the first analysis tap never reaches the
+  handler. Explicitly settling scroll does not fix it. Field blur rewrites the
+  unchanged button text node between pointer-down and click. Suppressing just
+  these redundant assignments in the isolated client makes both WebKit layouts
+  reach Ready to publish. This is an actual DOM/touch reproduction, not a native
+  wallet ceremony. A late real guest-runtime event also interfered with the
+  synthetic wallet fixture; it is explicitly isolated, not counted as a product
+  account-switch failure. Evidence: `upload-validation-after-webkit-{settled,guard}-2026-10-22.log`.
+- Local follow-up preserves unchanged text nodes on both analysis and retry
+  buttons. Its new regression fails before repair; focused suite passes 40/40.
+  Next: release this bounded first-tap repair, then implement TA-10's verified
+  byte identity and atomic publication coordination. Native iPhone publishing
+  remains a separate acceptance; no real provider, model, upload or chain write
+  occurred in the isolated browser fixtures.
 
 October 22 mobile publishing and share follow-up (Canon 05/11/12/16):
 

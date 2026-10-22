@@ -1,6 +1,6 @@
 # ArtSoul Durable Backlog
 
-Updated: 2026-10-14
+Updated: 2026-10-22
 Canonical phase model: `A-D` from [`docs/canon/ARTSOUL_CANON_BIBLE_FULL.md`](canon/ARTSOUL_CANON_BIBLE_FULL.md) section 17.
 
 This is the repository's durable work register. It consolidates verified completed work, open implementation work, founder-owned inputs, and code-level follow-ups so that ideas do not remain authoritative only in chat sessions or external prompt files.
@@ -16,6 +16,12 @@ This is the repository's durable work register. It consolidates verified complet
 7. Resource-gated work follows [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md). Missing funding defers activation; it never waives security, audit, role-separation, legal, migration, or mainnet acceptance requirements.
 
 ## Canonical Phase Mapping
+
+### October 22 publishing follow-up
+
+| ID | Item | Why/source | Status | Phase | Notes |
+| --- | --- | --- | --- | --- | --- |
+| TA-10 | Prevent exact-file repeats in the website publishing flow | Founder October 22 requirement; `contracts-integration.js:uploadArtwork` ignores `_fileHash`; `ArtSoulCore.registerArtwork` has no hash check; [checkpoint](audits/STABILIZATION_CHECKPOINT.md) | in progress | A | Investigation and bounded public-media inventory only; protection is not implemented. Server must verify bytes rather than trust a client hash, coordinate concurrent publication atomically, retain uncertain broadcasts, reconcile confirmed registration and report legacy coverage. Current public inventory hashes 31/35 works and finds exact-byte pairs 6/13, 8/32 and 14/15; existing works remain unchanged. Common titles are allowed and file renaming is not identity. Cropped/re-encoded content and copyright review are separate. Direct calls to the unchanged contract remain possible; contract enforcement belongs to the owner's upcoming test-contract review before mainnet, not an unannounced deployment. Future collection editions need explicit scope before applying this 1/1 restriction. |
 
 ### Takeover intake — 2026-09-20
 

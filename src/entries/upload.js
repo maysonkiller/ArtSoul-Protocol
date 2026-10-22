@@ -493,9 +493,12 @@ let selectedFile = null;
             const canStart = !formError && !estimateCurrent && !aiValuationController && !authorizationInProgress && aiValuationAttemptCount === 0;
             action.style.display = canStart ? 'inline-flex' : 'none';
             action.disabled = !canStart;
-            action.textContent = window.getCurrentWalletAddress?.()
+            const label = window.getCurrentWalletAddress?.()
                 ? 'Authorize and analyze'
                 : 'Connect, authorize, and analyze';
+            // Field blur can run between touch-down and click. Replacing an
+            // unchanged button text node makes WebKit discard that first tap.
+            if (action.textContent !== label) action.textContent = label;
         }
 
         function updatePublishReadiness(message = '') {
@@ -702,7 +705,8 @@ let selectedFile = null;
 
             retry.disabled = !canRetry;
             retry.style.display = canRetry ? 'inline-flex' : 'none';
-            retry.textContent = `Retry (${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left)`;
+            const label = `Retry (${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left)`;
+            if (retry.textContent !== label) retry.textContent = label;
             note.style.display = limitReached ? 'block' : 'none';
             note.textContent = 'AI value guidance limit reached for this upload session.';
         }
