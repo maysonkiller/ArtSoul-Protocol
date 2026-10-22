@@ -260,7 +260,9 @@ class ArtSoulContracts {
             throw new Error('This action requires Base Sepolia.');
         }
 
-        await window.ensureArtSoulWriteNetwork();
+        if (await window.ensureArtSoulWriteNetwork() === false) {
+            throw new Error('This action requires Base Sepolia.');
+        }
         const rawProvider = await window.web3Modal?.getWalletProvider?.() || window.ethereum;
         if (!rawProvider?.request) {
             throw new Error('This action requires Base Sepolia.');
@@ -272,11 +274,9 @@ class ArtSoulContracts {
             throw new Error('This action requires Base Sepolia.');
         }
 
-        // Reads from legacy Ethereum Sepolia remain supported. Before any write,
-        // rebuild the signer/contracts against Base Sepolia after a successful switch.
-        if (this.currentNetwork !== 'baseSepolia') {
-            await this.init(rawProvider);
-        }
+        // A reconnect or account change can keep the same chain. Rebuild from
+        // the current provider so writes cannot retain the previous signer.
+        await this.init(rawProvider);
         if (this.currentNetwork !== 'baseSepolia') {
             throw new Error('This action requires Base Sepolia.');
         }
@@ -407,6 +407,7 @@ class ArtSoulContracts {
     async registerArtwork(metadataURI, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
+        await this.assertExpectedWallet(options);
         const tx = await this.coreContract.registerArtwork(metadataURI);
         console.log('Registering artwork...', tx.hash);
         try {
@@ -471,6 +472,10 @@ class ArtSoulContracts {
             provider.request({method: 'eth_accounts'}), provider.request({method: 'eth_chainId'})
         ]);
         if (options.expectedWallet && String(accounts?.[0]).toLowerCase() !== options.expectedWallet.toLowerCase()) {
+            throw new Error('The wallet changed. Review the action again.');
+        }
+        if (options.expectedWallet && this.signer?.getAddress &&
+            (await this.signer.getAddress()).toLowerCase() !== options.expectedWallet.toLowerCase()) {
             throw new Error('The wallet changed. Review the action again.');
         }
         if (options.expectedChainId && Number(chainId) !== Number(options.expectedChainId)) {

@@ -3,6 +3,51 @@
 Updated: 2026-10-22. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 22 later publication video follow-up (Canon 1/2/5/16):
+
+- Resume HEAD `0378eb7f9296476b71cc66ec1df18004619e9b7b`, same workspace.
+  The previous tracked checkpoint/close-out diff is preserved in
+  `output/audit/before-publish-network-2026-10-22.patch`. Unrelated untracked
+  authority-policy files, `.codex/` and `output/` remain untouched.
+- Reviewed the new 2:16.70 iPhone video `IMG_2546.MP4`. Around 00:48–00:51,
+  guidance is present and the form reaches Ready to publish; around 00:54–00:56
+  it enters Registering artwork and opens MetaMask; around 01:03 the site shows
+  the generic Base Sepolia error. Repeated attempts reproduce the symptom.
+  The visible wallet screen is its dashboard, not a transaction approval.
+  No internal exception or receipt is visible; do not invent one. Frames are
+  under `output/audit/publish-video-2026-10-22/`.
+- Two independent live RPC reads confirm chain 84532, sufficient creator gas
+  balance, unpaused Core and successful registerArtwork estimation. No signing
+  or transaction was performed. Current success cannot prove historical RPC
+  health. A bounded helper found mobile read RPC still uses only the SDK's
+  first endpoint; this remains a limitation, not a proven video cause.
+- Actual apex Chromium/WebKit, 390px, real deployed ethers plus a synthetic
+  EIP-1193 peer reproduce the exact misleading message for both error 4100
+  (unauthorized account) and -32603 (unknown provider failure). No storage,
+  AI or chain write is real in this probe. Evidence:
+  `output/audit/publish-wallet-before-2026-10-22.json`.
+- Local repair traverses bounded nested wallet errors; preserves distinct
+  rejection, insufficient funds, session and chain-change guidance; unknown
+  submissions show only safe stage/method/code diagnostics and instruct checking
+  wallet activity before retry. A recorded registration hash survives connection
+  changes; only a proven failed receipt may remove its pending record. Auction
+  failures retain the fact that registration already succeeded. No auto-resend.
+- Every guarded write refreshes its signer from the current provider even on the
+  same chain. A false network-preparation result stops the write. Registration
+  and initial auction both check the upload's authorized wallet/chain. Back is
+  omitted only on Upload; history functions and other pages remain available.
+  Both modified runtime cache pins advance across all consuming pages.
+- Corrected pre-patch fixtures fail 8 of 11 checks (the first run also exposed
+  two fixture history assumptions, corrected before recording the baseline).
+  Final focused checks pass 121/121 and the build passes. The independent review
+  caught a post-broadcast network-change regression and stale cache pins; both
+  are repaired with retained-hash coverage. No dependency or canon economics
+  changed. Interpretation: the video proves a failed user journey, not an RPC
+  outage; no hidden wallet error is attributed to the owner.
+- Next: finish exact-candidate CI/release verification, then observe one native
+  publication or its precise diagnostic. TA-10 remains independent unfinished
+  work. Do not close Phase A from these synthetic-provider results.
+
 October 22 upload validation follow-up (Canon 05/11/12/16):
 
 - Resume HEAD `1214e7d9d177e0801bb4b0513067b42131882a5b`, same checkout.
@@ -78,10 +123,26 @@ October 22 upload validation follow-up (Canon 05/11/12/16):
   account-switch failure. Evidence: `upload-validation-after-webkit-{settled,guard}-2026-10-22.log`.
 - Local follow-up preserves unchanged text nodes on both analysis and retry
   buttons. Its new regression fails before repair; focused suite passes 40/40.
-  Next: release this bounded first-tap repair, then implement TA-10's verified
-  byte identity and atomic publication coordination. Native iPhone publishing
-  remains a separate acceptance; no real provider, model, upload or chain write
-  occurred in the isolated browser fixtures.
+- PR #324 is merged as `0378eb7f9296476b71cc66ec1df18004619e9b7b`; production
+  deployment `7262695828` succeeds. Candidate `88cabb2` passes CI `39847285561`:
+  Linux 1928 pass/2 skip, Windows 1759 pass/15 skip, plus 46 contract checks per
+  OS. Preview/apex each match eight pages and 57 assets. Actual released code,
+  without the diagnostic text-setter guard, now passes all four Chromium/WebKit
+  390/1440px form journeys: camera/screenshot filename, short Unicode title,
+  precise comma price, correct error focus, and first-tap Ready to publish.
+  Evidence: `output/audit/upload-validation-after-2026-10-22.json` and
+  `upload-button-blur-apex-artifacts-2026-10-22.log`. Synthetic provider/session/AI
+  responses are still used and real guest-runtime events are isolated; no native
+  wallet, model, upload or chain transaction is claimed. The owner has been asked
+  to repeat this specific blocked step on the real iPhone, without renaming media.
+- Current app HEAD is `0378eb7` in the same checkout/branch. Only this checkpoint
+  and the close-out report are being updated after release; the unrelated four
+  untracked entries remain preserved. Next: implement TA-10's server-verified
+  byte identity and atomic publication coordination. Include pending/uncertain
+  registration recovery, deployment-scoped identity, explicit Data API grants
+  and legacy coverage before activation; do not ship a raceable client-only
+  check or claim a hash proves copyright. Native publishing acceptance remains
+  pending independently. No helper is running.
 
 October 22 mobile publishing and share follow-up (Canon 05/11/12/16):
 
