@@ -33,7 +33,7 @@ test('shared-header production acceptance remains durable and the deferred-heade
   assert.match(backlog, /^\| A-46 \|[^\n]*\| done \| A \|/m);
   const backRow = backlog.split('\n').find(line => line.startsWith('| A-48 |'));
   assert.match(backRow, /\| done \| A \|/);
-  assert.match(backRow, /Accepted 2026-10-23 \(owner-reported iPhone\)/);
+  assert.match(backRow, /Accepted 2026-10-23 \(owner-reported iPhone Back\)/);
   assert.match(backRow, /does not establish.*pageshow\.persisted/);
   assert.match(backlog, /SHARED_HEADER_PRODUCTION_ACCEPTANCE_2026-08-04\.md/);
   assert.match(backlog, /SHARED_HEADER_PRODUCTION_REACCEPTANCE_2026-08-13\.md/);
