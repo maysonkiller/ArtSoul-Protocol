@@ -37,15 +37,38 @@ October 22 mobile publishing and share follow-up (Canon 05/11/12/16):
   routing and X's own preview/cache still require separate verification.
 - One bounded read-only review helper found no blocking issue and completed;
   no other helpers are running. Preserve unrelated untracked authority-policy
-  files, `.codex/` and `output/`. Next: finish build/full checks, verify preview
-  routing, then release these two small repairs and test actual apex paths.
+  files, `.codex/` and `output/`.
 - Preview verification caught static-file precedence on `/artwork?id=...`:
   the short path served the correct work image, but the legacy query URL still
   served generic static tags. Replace only that ineffective rewrite with a
   temporary Twitterbot-only redirect of validated IDs to the existing short
   route; normal browser routes are unchanged. This follows Vercel's conditional
   [redirect configuration](https://vercel.com/docs/project-configuration/vercel-json#redirects).
-  Retest both forms on the next preview before merging.
+  Both forms pass on the final preview and apex, with human responses unchanged.
+- PR #321 is merged as `02356e0e58429a4466d3584a02bfc103937a552c` and
+  production deployment `7261805010` succeeds on October 22. Exact candidate
+  `1f66491` passes CI `39841335348`: Linux 1921 pass/2 skip, Windows 1752
+  pass/15 skip, zero failures and 46 contract checks per OS. Post-merge CI
+  `39841938134` also passes. The local full suite passes 1952/1952, including
+  the preserved untracked authority-policy tests; that broader local count is
+  not the public candidate's test count. Build passes all 11 routes.
+  Preview and apex each match eight pages and 57 assets; guest moderation
+  access remains denied. Evidence: `share-apex-02356e0-2026-10-22.json`,
+  `sharing-upload-apex-artifacts-2026-10-22.log` under `output/audit/`.
+- Actual-apex isolated Chromium/WebKit fixtures now reach Ready to publish
+  after a synthetic wrong-chain switch and after synthetic sign-in; rejecting
+  the switch retains its specific message and makes no analysis request.
+  These six flows use synthetic provider/session/AI responses, not real keys,
+  wallet approvals or model calls. The owner's iPhone Chrome/MetaMask check is
+  pending. Evidence: `upload-{network,declined,sign-in}-after-2026-10-22.log`.
+  Future-theme dialog probes also pass at both widths in both engines.
+- The card-menu pass finds a separate reproducible issue: closing Donate leaves
+  `action=donate` in the URL, and reloading reopens it. Local follow-up consumes
+  only the supported one-time action once the form is permitted, preserving
+  artwork ID, hash, other parameters and history state. It does not navigate
+  or sign. A regression fails before the patch; the focused suite passes
+  30/30 and build passes. Next: release this bounded follow-up, finish actual
+  card-button checks, then record native acceptance if the owner replies.
 
 October 20 mobile actions follow-up (Canon 05/11/12/16, A-33/A-47/A-71):
 
