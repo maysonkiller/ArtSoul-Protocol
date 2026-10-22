@@ -60,7 +60,12 @@ October 23 remaining work, without repeating completed ceremonies:
    private recovery reads, retaining `can_submit: false`. Its live schema and
    browser integration remain disabled; verified receipt/event recovery is still
    needed. Exact-candidate CI and preview/apex boundary/artifact checks pass.
-3. **Visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
+   The October 23 local read-only verifier now checks exact registration receipts
+   and bounded no-hash scans against two RPCs, with pinned code and finality
+   evidence. It passes 104 focused checks, build and an actual artwork 36 replay.
+   It is not activated: atomic catalog/finality persistence and browser recovery
+   remain open. That replay does not simulate or accept A-83's receipt delay.
+3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous
    desktop tests and published repairs supply the implementation evidence.
@@ -68,6 +73,11 @@ October 23 remaining work, without repeating completed ceremonies:
    gallery position without flicker or visible reconstruction. Prior desktop
    BFCache evidence remains separate; the phone result does not establish an
    internal Safari cache marker. No repeat of these checks is needed.
+   A later October 23 desktop report is tracked separately as TA-12: brief
+   Ownership flicker, slow Protocol activity / Provenance and late card timers.
+   The supplied video exists but has not yet been analyzed. The owner defers
+   these repairs until existing phase work is finished. Earlier phone acceptance
+   remains valid; the beta decision must disclose this deferred desktop follow-up.
 4. **A-57 disposition:** current switching works according to the owner; the
    historical Robinhood iOS provider failure is unresolved evidence, not a newly
    confirmed defect. Do not invent a wallet limitation to close it.

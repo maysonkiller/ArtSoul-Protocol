@@ -5,6 +5,10 @@ and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-23. Implementatio
 uses `C:\Projects\ArtSoul`; latest application release is PR #329 (`dbefd68`).
 Upload preparation and the new private submission journal remain disabled
 pending complete receipt/event recovery and browser rollout.
+The October 23 local read-only registration verifier is tested against two RPCs
+but is not activated or connected to durable catalog recovery. Block/finality
+anchor persistence is next. New desktop flicker/delay report TA-12 is explicitly
+deferred by the owner; it does not erase the accepted phone observations.
 The owner accepts the current iPhone visual behavior and browser Back, closing
 A-47/A-48/A-53/A-54/A-58/A-61/A-72. Earlier Admin/artwork release `9a2965f` is deployed.
 A-71 is separately accepted from the owner's explicit branded-wait observation.

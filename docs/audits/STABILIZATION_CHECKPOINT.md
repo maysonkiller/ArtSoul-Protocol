@@ -3,6 +3,65 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 registration evidence (Canon 1/2/11; local, not activated):
+
+- Resume HEAD `f004836`, same workspace/branch; preserved untracked authority
+  files are excluded. No UI, contract, live schema or feature flag changed.
+- `src/api/upload-registration-evidence.js` reuses the indexer's registration
+  ABI and installed ethers. Its read-only verifier requires the pinned Base
+  Sepolia chain/Core/code hash, exact creator and metadata URI, matching receipts
+  and canonical block hashes on two RPCs. Relayed execution is valid; the outer
+  sender is not substituted for the event's creator.
+- Each RPC's own advertised finalized header is checked before choosing their
+  common anchor. Code is checked at that anchor and the registration block;
+  anchor/event headers are reread before returning evidence. This is deliberately
+  stronger than the indexer's three-block lag for an immutable catalog write;
+  it changes no auction timing or economics. See the official
+  [Base finality stages](https://docs.base.org/specifications/transactions/transaction-finality)
+  and [JSON-RPC block/receipt definitions](https://ethereum.org/developers/docs/apis/json-rpc/).
+- A missing transaction hash can use a trusted explicit scan page (at most
+  2,000 blocks, 128 returned logs and eight matching registrations). The result
+  reports coverage/cursor and retains every match, cross-checked against receipts.
+  No result proves absence or permits another send: `can_submit` is always false.
+  RPC bodies/time are bounded; errors do not reveal endpoints or upstream text.
+- Independent review found an unchecked higher finalized header; it was repaired
+  and negative regressions added. The subsequent bounded review has no blocker.
+  The focused suite passes 104 checks (59 in the new evidence suite), zero skips;
+  build passes. Logs: `output/audit/registration-evidence-focused-2026-10-23.log`
+  and `registration-evidence-build-2026-10-23.log` in the same directory.
+- Actual read-only evidence: both existing RPCs verify artwork 36 at block
+  `48908274` by reported hash and by an explicit five-block no-hash scan, and
+  reject changed metadata. The verified common finalized anchor is `48939549`.
+  Latest evidence after the review fix:
+  `output/audit/registration-evidence-2026-10-22T23-18-49-628Z.json`;
+  local reproducer `docs/private/verify-registration-evidence-2026-10-23.mjs`.
+  No transaction was sent and no actual receipt delay was induced: A-83 remains open.
+- The verifier is not connected to the public route or catalog writer. The current
+  catalog cannot atomically retain block-hash/finality anchors or handle reorg
+  discrepancies. Do not insert these observations through the old RPC and call
+  durable recovery complete. Browser integration and legacy coverage remain open.
+- Next concrete step: persist verified registration and its block/finality anchors
+  atomically with the existing catalog/claim reconciliation, including repeated
+  reads, multiple matching registrations and conflicting evidence tests. Keep
+  activation disabled and preserve the original unverified reported hash.
+
+October 23 deferred desktop observation (Canon 5/16/17):
+
+- Resume HEAD `f004836`, same workspace and branch. The existing untracked
+  `.codex/`, `output/` and two authority-policy files remain untouched.
+- The owner reports a very brief Ownership flash when opening an artwork on
+  desktop, slow Protocol activity / Provenance population, and delayed card
+  auction timers after refresh. Possible subsection overlap is a hypothesis,
+  not a diagnosed cause. Source: `Запись экрана 2026-10-23 004307.mp4`, retained
+  in the owner's local screen-recordings directory (59,452,664 bytes). The
+  file exists; no frame analysis or reproduction has been performed yet.
+- The owner explicitly defers these repairs until the existing phase work is
+  finished. Track the follow-up as October 23 TA-12 in `BACKLOG.md`; do not
+  change these UI areas now or erase the separately accepted iPhone results.
+  A beta decision must disclose this pending desktop observation.
+- Next concrete step remains TA-10 bounded registration receipt/event recovery;
+  no new wallet ceremony, deployment or UI repair is implied by this report.
+
 October 23 TA-10 submission journal (Canon 1/2/11; released, rollout disabled):
 
 - Resume HEAD `7a1adf7` in the same workspace. Native acceptance PR #328 is

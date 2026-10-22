@@ -4,6 +4,11 @@ Current continuation (2026-10-23): use `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Latest application release is PR #329 (`dbefd68`);
 upload preparation and the new private submission journal remain disabled
 pending complete receipt/event recovery and browser rollout.
+The October 23 local read-only registration verifier passes 104 focused checks,
+build and a two-RPC replay of artwork 36; it is not wired to catalog writes or
+the route. Next: atomic block/finality evidence persistence with reconciliation.
+The owner's new desktop flicker/delay video is queued as TA-12; repairs are
+explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72
 are done. Preserve the completed native flows and consult the checkpoint for
 the three remaining formal rows and additional TA-10 implementation work.
