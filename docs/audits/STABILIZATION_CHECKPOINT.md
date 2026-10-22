@@ -3,7 +3,82 @@
 Updated: 2026-10-22. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 22 later publication video follow-up (Canon 1/2/5/16):
+October 22 TA-10 exact-media foundation (Canon 1/2/11; not activated):
+
+- Native acceptance is recorded in commit `f37cd18`, following application
+  merge `fb9dde0`. Phase A is 72 done / 11 in progress; the extra TA-10 website
+  duplicate guard is still in progress, not silently counted as complete.
+- `src/api/upload-media-identity.js` hashes actual original storage bytes with
+  Node SHA-256, bounded streaming, the existing 50 MB/MIME policy, a deadline,
+  wallet-owned issued-path format validation and the existing host allowlist. It never
+  accepts a supplied digest or image-transform URL as byte identity. Ten tests
+  pass, including renamed files, false Content-Length, stream timeout and
+  foreign paths. A read-only live call verifies artwork 36's 1,493,557-byte PNG:
+  `17978df015cc2175624a73dcba8a57fba15ffd05ebfb0b23f5acb986f9125f10`.
+  Evidence: `output/audit/upload-media-identity-live-2026-10-22.json`.
+- `sql/migrations/artwork_media_identity.sql` adds a private historical catalog
+  and deployment/hash-unique publication claims. Two service-only RPCs preserve
+  identical retries, serialize catalog/claim races, reconcile matching confirmed
+  registration and block conflicts without deleting history. Explicit grants,
+  revokes and forced RLS cover the changed Supabase default-grant behavior.
+  It is a manual migration, not part of automatic indexer setup.
+- The disposable PostgreSQL 17 suite passes 21 tests with no skips, including
+  real concurrency, permissions, rollback and legacy duplicates. The server
+  verifier has independent review; 48 focused policy/docs/security checks and
+  `npm run build` pass. Initial full run: 1986 pass / 14 fail. Two failures
+  correctly require the migration in the disposition ledger and no-default-grant
+  rehearsal; both registrations are fixed and the 21-check rehearsal/ledger
+  rerun passes. The other 12 are two existing indexer suites' temporary Docker
+  TCP startup failures; both suites pass all 12 checks when rerun sequentially.
+  Do not describe that initial full run as green. Logs are
+  `output/audit/media-identity-{full-unit,grants,existing-pg-recheck}-2026-10-22.log`.
+  Hosted checks on the corrected candidate remain pending. No new dependency,
+  live migration or transaction occurred.
+- Interpretation: exact bytes identify a repeated file, not copyright or
+  authorship. Catalog rows retain all historical artwork references. These
+  internal coordination states do not amend artwork/auction lifecycle states.
+  No claim expiry, abandoned-attempt release or reorg policy was invented.
+- NOT activated: no upload route or browser consumes this foundation yet.
+  Before rollout it still needs server-issued preparation/metadata binding,
+  safe cancellation/unknown-broadcast recovery, confirmed-event/reorg integration
+  and a full legacy coverage report. The unchanged permissionless contract
+  cannot enforce website uniqueness. Existing publication remains unchanged.
+- Next concrete step: connect authenticated, server-issued upload preparation
+  to immutable metadata and the verified claim, with rejection/retry tests,
+  before enabling any website duplicate block. The bounded helper is finished.
+
+October 22 native publication and X acceptance (Canon 1/2/5/17):
+
+- Resume HEAD `fb9dde0c063237ad90198e0e040dd5a061de2a28`, same branch and
+  workspace. Preserved the existing tracked documentation diff in
+  `output/audit/before-mobile-acceptance-2026-10-22.patch`; unrelated untracked
+  authority-policy files, `.codex/` and `output/` remain untouched.
+- The owner confirms successful iPhone Chrome/MetaMask publication and actual
+  X sharing. The supplied 23:14 screenshot shows "Web 3 Rialo test", creator,
+  live-auction wording, 0.0001 test ETH, Base Sepolia and the actual artwork image.
+  This is native/user acceptance, not a synthetic browser result.
+- Independent Base and PublicNode reads agree: artwork 36 belongs to
+  `0x6EC8C121043357aC231E36D403EdAbf90AE6989B`, active auction 70 references
+  artwork 36, start price is 100000000000000 wei, no NFT/floor exists yet.
+  Core runtime hash is `0xa5409acf771b939445714ede5c8aeeb6db4567a5c759beec807f17f83f874d8b`.
+  Registration `0x7165fc4aab96e1bb6087903fc1f5370d006ce22508b8ead45fa1de0047cc0d2f`
+  and auction `0x2ba1c2930d12f4dd50537abc0e7494792d935128eedd74abf6c331f4ac77f028`
+  both succeeded. The exact public projection/provenance contains one of each.
+  Outer transaction senders are relayers; creator identity is checked against
+  events emitted by the pinned Core and its storage, not assumed from tx.from.
+- Reproducible read-only verifier:
+  `node docs/private/verify-mobile-publication-2026-10-22.mjs`; result:
+  `output/audit/mobile-publication-accepted-2026-10-22.json`. Initial verifier
+  assumptions about the API field and direct sender were corrected against
+  actual API/receipt evidence; no product mutation or signing occurred.
+- TA-11 is accepted. A-33/A-64/A-78 now combine this native publication with
+  their recorded prior composition, connection/network and resale evidence.
+  A-71's immediate post-publish frame and A-83's deliberate receipt-delay
+  recovery are NOT inferred. Native dialog geometry/BFCache remain separate.
+- Next: implement the first reviewed TA-10 server-side exact-byte identity
+  change with regression tests; do not claim unchanged contracts enforce it.
+
+October 22 later publication video follow-up (Canon 1/2/5/16; superseded acceptance above):
 
 - Resume HEAD `0378eb7f9296476b71cc66ec1df18004619e9b7b`, same workspace.
   The previous tracked checkpoint/close-out diff is preserved in
@@ -44,13 +119,35 @@ October 22 later publication video follow-up (Canon 1/2/5/16):
   are repaired with retained-hash coverage. No dependency or canon economics
   changed. Interpretation: the video proves a failed user journey, not an RPC
   outage; no hidden wallet error is attributed to the owner.
-- Next: finish exact-candidate CI/release verification, then observe one native
-  publication or its precise diagnostic. TA-10 remains independent unfinished
-  work. Do not close Phase A from these synthetic-provider results.
 - First candidate CI `39851012395` found one stale secondary A12 test still
   expecting contract runtime v12; both OS suites otherwise passed. Its expected
   version is updated to v13, matching all five pages and the hash guard; full
   CI is rerun on the corrected candidate. This was not a phone-flow failure.
+- PR #325 is merged as `fb9dde0c063237ad90198e0e040dd5a061de2a28`; production
+  deployment `7263337939` succeeds at 20:49:22 UTC. Corrected candidate
+  `ccc454258a78cd6e7c356eca4e33f048dcfa8ad9` passes CI `39851594302`: Linux
+  1938 pass/2 skip, Windows 1769 pass/15 skip, and 46 contract tests per OS.
+  Preview `7263264508` and apex match eight pages and 57 assets. The final
+  numeric-zero receipt hardening also passes 12 targeted recovery checks.
+- Actual released Chromium/WebKit code at 390px and 1440px passes all four
+  synthetic-provider journeys: no Upload Back control, precise 4100 session
+  recovery, unknown -32603 submission diagnostics without a false unsent claim.
+  Both attempts reach the actual ethers send method; no real transaction is
+  signed. Evidence: `output/audit/publish-wallet-after-2026-10-22.json`,
+  `publish-video-final-ci-2026-10-22.log`, and
+  `publish-video-{final-preview,apex}-artifacts-2026-10-22.log`.
+- Read-only RPC evidence is saved in
+  `output/audit/publish-read-only-chain-2026-10-22.json`. Before asking the owner
+  to retry, both RPCs report artworkCounter=35; the anonymous projection has
+  35 works and no Piwko title. This does not predict a later wallet response.
+- Current HEAD is `fb9dde0` in the same branch/workspace. Post-release edits
+  affect only this checkpoint, backlog and close-out report; preserve them on
+  continuation along with the unrelated untracked entries. The bounded helper
+  has completed; no additional agents were launched.
+- Next: collect one native iPhone publication result or its new precise error
+  (requested after apex verification). Do not claim the underlying recorded
+  phone failure is solved until that result exists. TA-10 remains independent
+  unfinished work; Phase A remains open.
 
 October 22 upload validation follow-up (Canon 05/11/12/16):
 

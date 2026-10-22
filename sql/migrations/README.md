@@ -33,3 +33,20 @@ Use `node scripts/apply-migrations.js` for a dry run. Existing production databa
 - `phase18_7c_supabase_storage_hardening.sql`: current reviewed `storage.objects` (artworks bucket) proposal, manual application only. Preserves the server-signed upload flow.
 
 All remaining SQL files are feature/manual migrations. Their presence in this directory does not prove they were applied to any environment.
+
+## Exact-media publication foundation
+
+`artwork_media_identity.sql` is additive preparation for the founder-requested
+website check against identical original bytes. It is not in the active indexer
+sequence and has not been applied to production. Its private catalog retains
+every historical artwork reference, including existing duplicates. The claim
+RPC coordinates a single publication identity per deployment/hash; it is not
+permission to submit a transaction and introduces no timeout-based release.
+
+Before activation, connect authenticated upload preparation and immutable
+metadata verification, persist/recover publication attempts, reconcile verified
+registration evidence including reorgs, and record full legacy coverage at a
+known deployment/block watermark. Unknown broadcasts must not silently become
+new registrations. The unchanged contract accepts direct registrations and
+does not enforce this website restriction. New-contract enforcement remains a
+separate test-contract/mainnet-preparation decision.
