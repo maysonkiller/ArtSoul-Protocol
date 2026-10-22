@@ -80,6 +80,28 @@ test('upload prices use the existing exact decimal parser, including comma and o
     }
 });
 
+test('blurring a field preserves the pressed analysis or retry button text node', () => {
+    const { context, element } = client();
+    vm.runInContext("selectedFile = { name: 'IMG_1234.png', type: 'image/png', size: 100 }; selectedAuctionDuration = 24;", context);
+    element('artTitle').value = 'A';
+    element('artPrice').value = '0,0001';
+    element('artDescription').value = 'An original work.';
+    element('originalWorkConfirm').checked = true;
+    context.window.getCurrentWalletAddress = () => '0xcreator';
+    for (const [id, update] of [['prePublishAction', 'updatePrePublishAction'], ['aiValuationRetry', 'updateAIValuationRetryState']]) {
+        let text = '', node;
+        Object.defineProperty(element(id), 'textContent', {
+            get: () => text,
+            set: value => { text = value; node = {}; }
+        });
+        if (id === 'aiValuationRetry') vm.runInContext('aiValuationAttemptCount = 1;', context);
+        context[update]();
+        const pressedNode = node;
+        context.handleUploadFormChange();
+        assert.equal(node, pressedNode, `${id}: unchanged text must survive pointer-down / field-blur / pointer-up`);
+    }
+});
+
 function server(authenticated = true) {
     const signed = [];
     const context = vm.createContext({ crypto, URL, console,
