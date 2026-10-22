@@ -1,7 +1,44 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-20. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-22. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 22 mobile publishing and share follow-up (Canon 05/11/12/16):
+
+- Resume HEAD `a4b06f8437d14fa71468b410ef80597f83731a8e`, same checkout.
+  PR #320's Donate/Report repair is published. Candidate CI `39447392182`
+  passes Linux (1908 pass/2 skip) and Windows (1739 pass/15 skip), plus
+  46 contract checks per OS; production deployment `7203757517` succeeds.
+  Eight apex pages and 57 built assets match. Post-release Chromium/WebKit
+  probes at 390px and 1440px keep the header and document geometry stable
+  while both dialogs open/close; text fields are 16px. Evidence:
+  `output/audit/artwork-actions-after-2026-10-20.json`. Native iPhone keyboard
+  zoom acceptance remains separate; no payment or report was submitted.
+- The owner identifies iPhone Chrome with MetaMask and supplies the exact
+  pre-analysis error screenshot. An isolated actual-apex fixture reproduces
+  the same message in both engines when the connected wallet reports chain 1:
+  the handler stops before session/signature/analysis because it rejects the
+  network without calling the existing provider-confirmed switch guard, then
+  loses `UNSUPPORTED_NETWORK` in the generic publish-error mapper. This is a
+  confirmed failure path, not proof of the owner's unseen selected chain.
+  Evidence: `output/audit/upload-wrong-chain-before-2026-10-22.log`.
+- Local repair reuses `ensureArtSoulWriteNetwork` before authorization,
+  rechecks wallet/chain after signing, and retains specific retry feedback.
+  Four new regressions fail before the patch; focused authorization,
+  finalization and submitted-registration checks pass 24/24 afterward.
+  AI remains mandatory before Publish; neither the model nor transaction
+  lifecycle/economics changed. Native MetaMask handoff remains unverified.
+- Local sharing repair prepares a canonical work link and a bounded draft
+  with creator, lifecycle-appropriate price and explicit testnet context.
+  Twitterbot receives work-specific HTML from the existing anonymous public
+  projection, including its permitted image URL. Hidden work cannot leak via
+  staff cookies; HTML is escaped. Other visitors retain the static page.
+  Focused sharing/media/URL checks pass 36/36. Actual deployed conditional
+  routing and X's own preview/cache still require separate verification.
+- One bounded read-only review helper found no blocking issue and completed;
+  no other helpers are running. Preserve unrelated untracked authority-policy
+  files, `.codex/` and `output/`. Next: finish build/full checks, verify preview
+  routing, then release these two small repairs and test actual apex paths.
 
 October 20 mobile actions follow-up (Canon 05/11/12/16, A-33/A-47/A-71):
 

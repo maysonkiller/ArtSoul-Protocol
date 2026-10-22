@@ -120,3 +120,64 @@ test('ready UI does not present invalid prices and identifies text-only analysis
     assert.equal(element('aiValuationContent').style.display, 'none');
     assert.match(element('aiValuationStatus').textContent, /unavailable/);
 });
+
+function authorization({ chain = 84532, authenticated = true, switchError, changeWallet = false } = {}) {
+    const calls = [], states = [], hints = [];
+    let wallet = '0x1111111111111111111111111111111111111111';
+    const context = vm.createContext({
+        BASE_SEPOLIA_CHAIN_ID: 84532, MAX_ARTWORK_UPLOAD_MB: 100,
+        authorizedWalletAddress: '', authorizationInProgress: false, aiValuationController: null,
+        currentPublishStage: '', submittedRegisterTxHash: '', selectedFile: {},
+        window: {
+            getCurrentWalletAddress: () => wallet, getCurrentChainId: () => chain,
+            ensureArtSoulWriteNetwork: async () => { calls.push('network'); if (switchError) throw switchError; chain = 84532; return true; },
+            SupabaseAuth: { isAuthenticatedForWallet: async () => { calls.push('session'); return authenticated; } },
+            ensureAuthenticated: async () => { calls.push('signature'); if (changeWallet) wallet = '0x2222222222222222222222222222222222222222'; return true; }
+        },
+        getFormCompletionError: () => '', requestAIValuation: async () => calls.push('analysis'),
+        updateAIValuationRetryState() {}, updatePublishReadiness: message => hints.push(message),
+        setAIValuationState: (state, details) => states.push({ state, details })
+    });
+    vm.runInContext(['createUploadError', 'describePublishError', 'mapPublishError',
+        'ensureUploadAuthorization', 'beginPrePublishFlow'].map(extract).join('\n'), context);
+    return { context, calls, states, hints };
+}
+
+test('analysis prepares the actual write network before authorization, including unknown chains', async () => {
+    for (const chain of [1, 0, 84532]) {
+        const { context, calls } = authorization({ chain, authenticated: false });
+        await context.beginPrePublishFlow();
+        assert.deepEqual(calls, ['network', 'session', 'signature', 'analysis']);
+        assert.equal(context.authorizedWalletAddress, '0x1111111111111111111111111111111111111111');
+        assert.equal(context.authorizationInProgress, false);
+    }
+});
+
+test('declined or unavailable network never starts analysis and keeps a useful retry message', async () => {
+    for (const code of ['BASE_SEPOLIA_SWITCH_REJECTED', 'BASE_SEPOLIA_REQUIRED', 'UNSUPPORTED_NETWORK']) {
+        const { context, calls, states, hints } = authorization({ chain: 1, switchError: { code, message: 'This action requires Base Sepolia.' } });
+        await context.beginPrePublishFlow();
+        assert.deepEqual(calls, ['network']);
+        assert.match(states.at(-1).details.message, /Base Sepolia/);
+        assert.equal(hints.at(-1), states.at(-1).details.message);
+        assert.equal(context.authorizedWalletAddress, '');
+        assert.equal(context.authorizationInProgress, false);
+    }
+});
+
+test('a wallet change while signing cannot authorize analysis for the previous creator', async () => {
+    const { context, calls, states } = authorization({ authenticated: false, changeWallet: true });
+    await context.beginPrePublishFlow();
+    assert.equal(calls.includes('analysis'), false);
+    assert.equal(context.authorizedWalletAddress, '');
+    assert.match(states.at(-1).details.message, /wallet changed/i);
+});
+
+test('unexpected authorization failure is not described as a publishing or AI failure', async () => {
+    const { context, states, hints } = authorization();
+    context.window.SupabaseAuth.isAuthenticatedForWallet = async () => { throw new TypeError('Failed to fetch'); };
+    await context.beginPrePublishFlow();
+    assert.match(states.at(-1).details.message, /authorization.*try again/i);
+    assert.doesNotMatch(states.at(-1).details.message, /publish flow/);
+    assert.equal(hints.at(-1), states.at(-1).details.message);
+});

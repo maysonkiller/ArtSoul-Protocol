@@ -70,6 +70,16 @@
   "rewrites": [
     {
       "source": "/artwork/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": ".*[Tt]witterbot.*" }],
+      "destination": "/api/artwork-preview?id=:id"
+    },
+    {
+      "source": "/artwork",
+      "has": [{ "type": "header", "key": "user-agent", "value": ".*[Tt]witterbot.*" }],
+      "destination": "/api/artwork-preview"
+    },
+    {
+      "source": "/artwork/:id",
       "destination": "/artwork?id=:id"
     },
     {

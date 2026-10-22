@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-20. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-22. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -9,6 +9,29 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 they disagree with this file, they win and this file is stale.
 
 Phase A stands at **69 done, 14 in progress, 0 planned** across A-01 to A-83.
+
+October 22 next acceptance, without repeating completed ceremonies:
+
+1. **Current mobile defects:** PR #320's bounded Donate/Report dialogs are
+   published and pass actual-apex desktop-engine geometry checks. The separate
+   Chrome/MetaMask pre-analysis failure and contextual X preview are being
+   repaired; see the current checkpoint for exact release evidence. A native
+   iPhone result and X-generated card are not inferred from unit tests.
+2. **One connected iPhone publishing journey** covers the remaining parts of
+   A-33/A-64/A-71/A-78/A-83: network/authorization, mandatory AI, both transaction
+   confirmations, correct artwork/auction identity, and indexer convergence.
+   The already completed operator settlement does not replace this journey.
+3. **A short visual/navigation pass** covers A-47/A-48/A-53/A-54/A-58/A-61/A-72:
+   profile avatar/identity, first tab load, quick navigation and browser Back.
+   Ownership and the guest-header avatar have already been accepted. Actual
+   BFCache restoration must be identified separately from ordinary navigation.
+4. **A-57 disposition:** current switching works according to the owner; the
+   historical unnamed provider failure is unresolved evidence, not a newly
+   confirmed defect. Do not invent a wallet limitation to close it.
+5. **A-23 beta decision** follows the remaining acceptance and open-defect
+   review. Android remains owner-waived / not tested. Wallet login, OAuth,
+   moderation/factors, donation settlement and complaint-email delivery already
+   have their recorded results; do not reopen them without a regression.
 
 October 20 owner follow-up accepts the scoped iPhone Ownership appearance.
 The subsequent native recording shows the guest-header reload flash persists

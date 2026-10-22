@@ -380,6 +380,10 @@ let selectedFile = null;
                 UNSUPPORTED_FILE_TYPE: 'This file type is not supported. Choose a supported image, video, or audio file.',
                 WALLET_NOT_CONNECTED: 'Connect your wallet before publishing this artwork.',
                 AUTHORIZATION_REQUIRED: 'Authorize this upload with your wallet signature before publishing.',
+                AUTHORIZATION_WALLET_CHANGED: 'The wallet changed during authorization. Tap Authorize and analyze again for the selected wallet.',
+                UNSUPPORTED_NETWORK: 'This artwork must be published on Base Sepolia. Switch networks and try again.',
+                BASE_SEPOLIA_REQUIRED: 'Base Sepolia could not be confirmed. Open your wallet, select Base Sepolia, then try again.',
+                BASE_SEPOLIA_SWITCH_REJECTED: 'The network switch was declined. Select Base Sepolia in your wallet, then try again.',
                 AI_UNAVAILABLE: 'AI value guidance is not ready. Request an estimate before publishing.',
                 AUCTION_CONFIRMATION_PENDING: 'The auction transaction was submitted and is still finalizing. Check its status from your profile before trying anything again.'
             };
@@ -657,8 +661,10 @@ let selectedFile = null;
                 throw createUploadError('WALLET_NOT_CONNECTED', 'Connect your wallet to continue.');
             }
 
-            const chainId = Number(window.getCurrentChainId?.() || window.ArtSoulContracts?.currentNetwork?.chainId || 0);
-            if (chainId && chainId !== BASE_SEPOLIA_CHAIN_ID) {
+            // Reuse the provider-confirmed write guard, including its mobile
+            // wallet handoff. A connected profile can still be on another chain.
+            const networkReady = await window.ensureArtSoulWriteNetwork?.();
+            if (networkReady !== true) {
                 throw createUploadError('UNSUPPORTED_NETWORK', 'This artwork must be published on Base Sepolia. Switch networks and try again.');
             }
 
@@ -676,6 +682,12 @@ let selectedFile = null;
                 }
             }
 
+            if (window.getCurrentWalletAddress?.()?.toLowerCase() !== walletAddress.toLowerCase()) {
+                throw createUploadError('AUTHORIZATION_WALLET_CHANGED', 'The wallet changed during authorization.');
+            }
+            if (Number(window.getCurrentChainId?.()) !== BASE_SEPOLIA_CHAIN_ID) {
+                throw createUploadError('UNSUPPORTED_NETWORK', 'The wallet network changed during authorization.');
+            }
             authorizedWalletAddress = walletAddress.toLowerCase();
             return walletAddress;
         }
@@ -689,20 +701,26 @@ let selectedFile = null;
             }
 
             authorizationInProgress = true;
-            updatePublishReadiness('Waiting for wallet authorization.');
-            setAIValuationState('unavailable', { message: 'Confirm the gas-free wallet authorization to continue.' });
+            let authorizationError = '';
+            updatePublishReadiness('Preparing Base Sepolia and wallet authorization.');
+            setAIValuationState('unavailable', { message: 'Confirm Base Sepolia and the gas-free authorization in your wallet to continue.' });
 
             try {
                 await ensureUploadAuthorization();
                 await requestAIValuation(selectedFile);
             } catch (error) {
                 const mapped = mapPublishError(error);
-                setAIValuationState('unavailable', { message: mapped.message });
-                updatePublishReadiness(mapped.message);
+                const authorizationCodes = ['WALLET_NOT_CONNECTED', 'AUTHORIZATION_REQUIRED',
+                    'AUTHORIZATION_WALLET_CHANGED', 'UNSUPPORTED_NETWORK',
+                    'BASE_SEPOLIA_REQUIRED', 'BASE_SEPOLIA_SWITCH_REJECTED'];
+                authorizationError = authorizationCodes.includes(mapped.code) ? mapped.message
+                    : mapped.code === 'USER_REJECTED' ? 'Wallet authorization was declined. Tap Authorize and analyze to try again.'
+                    : 'Wallet authorization could not be completed. Check your wallet connection and try again.';
+                setAIValuationState('unavailable', { message: authorizationError });
             } finally {
                 authorizationInProgress = false;
                 updateAIValuationRetryState();
-                updatePublishReadiness();
+                updatePublishReadiness(authorizationError);
             }
         }
 

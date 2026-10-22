@@ -6,6 +6,7 @@ import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import { ArtistSupport } from '../features/artwork/artist-support.jsx';
 import '../features/artwork/artwork-dialogs.css';
+import { artworkShareIntent } from '../features/artwork/artwork-sharing.js';
 
 import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
@@ -3610,9 +3611,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     <div className="artwork-ownership-actions">
                                         <button
                                             onClick={() => {
-                                                const text = `Check out "${artwork.title}" by ${creatorName || 'artist'} on ArtSoul Protocol!`;
-                                                const url = window.location.href;
-                                                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=550,height=420');
+                                                const intent = artworkShareIntent({ ...artwork, creator_name: creatorName });
+                                                if (intent) window.open(intent, '_blank', 'noopener,noreferrer,width=550,height=420');
                                             }}
                                             className="btn-secondary artwork-page-compact-action artwork-page-share"
                                             title="Share on X"
