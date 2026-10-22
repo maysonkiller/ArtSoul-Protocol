@@ -725,6 +725,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 }
                 // A navigation may open a form; only its explicit submit action
                 // may request authentication or a wallet transaction.
+                try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('action');
+                    window.history.replaceState(window.history.state, '', url);
+                } catch { /* Opening the form does not depend on history access. */ }
                 if (action === 'report') openArtworkReport();
                 else setOpenDonationFromCard(true);
             }, [artwork, cardActionsReady, reportingEnabled, donationDeployment, walletRenderState.settled]);

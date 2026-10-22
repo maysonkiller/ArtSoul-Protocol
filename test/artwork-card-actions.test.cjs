@@ -64,7 +64,7 @@ test('a report deeplink only opens the existing form after artwork and live conf
     const run = (overrides = {}) => {
         const events = [];
         const context = { artwork, cardActionsReady: true, cardActionOpenedRef: { current: false }, walletRenderState: { settled: true },
-            window: { ...window, location: { search: '?action=report' } }, URLSearchParams,
+            window: { ...window, location: { search: '?action=report' } }, URLSearchParams, URL,
             reportingEnabled: true, donationDeployment: enabled.donations,
             openArtworkReport: () => events.push('report'), setOpenDonationFromCard: () => events.push('donate'),
             setCardActionNotice: value => events.push(value), ...overrides };
@@ -80,6 +80,23 @@ test('a report deeplink only opens the existing form after artwork and live conf
     assert.deepEqual(run({ window: { ...window, location: { search: '?action=donate' } }, walletRenderState: { settled: false } }), []);
     assert.deepEqual(run({ window: { ...window, location: { search: '?action=donate' } }, donationDeployment: null }), ['Donations are unavailable for this artwork.']);
     assert.doesNotMatch(callback, /ensureAuthenticated|ensureWalletConnected|\.submit|ArtSoulContracts/);
+    for (const action of ['report', 'donate']) {
+        const location = new URL(`https://artsoulprotocol.com/artwork?id=v41%3A84532%3A34&action=${action}&published=1#ownership`);
+        const state = { galleryScroll: 700 };
+        let cleaned;
+        const history = { state, replaceState: (nextState, title, url) => {
+            assert.equal(nextState, state); cleaned = new URL(url);
+        } };
+        assert.deepEqual(run({ window: { ...window, location, history } }), [action]);
+        assert.ok(cleaned, 'consume the one-time action before a reload can reopen the form');
+        assert.equal(cleaned.searchParams.has('action'), false);
+        assert.equal(cleaned.searchParams.get('id'), 'v41:84532:34');
+        assert.equal(cleaned.searchParams.get('published'), '1');
+        assert.equal(cleaned.hash, '#ownership');
+        assert.deepEqual(run({ window: { ...window, location: cleaned, history } }), []);
+        history.replaceState = () => { throw new Error('History is unavailable'); };
+        assert.deepEqual(run({ window: { ...window, location, history } }), [action], 'history failure must not block the form');
+    }
 });
 
 test('shared menu preserves native modified links, focus and navigation boundaries through a delayed config read', async () => {

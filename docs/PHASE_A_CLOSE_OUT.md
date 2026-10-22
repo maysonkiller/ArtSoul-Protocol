@@ -14,8 +14,10 @@ October 22 next acceptance, without repeating completed ceremonies:
 
 1. **Current mobile defects:** PR #320's bounded Donate/Report dialogs are
    published and pass actual-apex desktop-engine geometry checks. The separate
-   Chrome/MetaMask pre-analysis failure and contextual X preview are being
-   repaired; see the current checkpoint for exact release evidence. A native
+   Chrome/MetaMask pre-analysis failure and contextual X preview are repaired
+   in published PR #321 (`02356e0`); exact candidate CI, preview/apex artifacts
+   and crawler routing pass. Card links reopening a dismissed form on reload
+   have a small local follow-up; see the checkpoint for its release state. A native
    iPhone result and X-generated card are not inferred from unit tests.
 2. **One connected iPhone publishing journey** covers the remaining parts of
    A-33/A-64/A-71/A-78/A-83: network/authorization, mandatory AI, both transaction
