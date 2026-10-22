@@ -24,9 +24,11 @@ October 23 native visual acceptance (Canon 5/16/17):
   A-23 (beta decision). Additional TA-10 exact-file enforcement remains open.
   No unasked delayed-receipt or publishing-frame outcome is inferred.
 - Acceptance bookkeeping verification: `node scripts/sync-phase-a-counts.mjs
-  --check`, six existing close-out/status-summary tests and `git diff --check`
+  --check`, seven existing close-out/status-summary/header-acceptance tests and `git diff --check`
   pass. This update changes documentation only; the prior application release
-  and its build/runtime checks remain the implementation evidence.
+  and its build/runtime checks remain the implementation evidence. Hosted CI
+  identified an older documentation assertion that required A-48 to stay open;
+  it now checks the dated acceptance and its explicit native-telemetry limit.
 - The next TA-10 read-only review confirms that the current browser stores a
   pending record only after receiving a transaction hash, while unknown
   no-hash attempts are discarded by display-card cleanup. The new server
