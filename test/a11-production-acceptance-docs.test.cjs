@@ -34,7 +34,10 @@ test('A11 evidence remains scoped while current backlogs preserve unresolved ope
   const durableBacklog = read('docs/BACKLOG.md');
   const runbook = read('docs/runbooks/A11_PUBLIC_METRICS_ROLLOUT.md');
 
-  assert.match(canonicalBacklog, /^- \[ \] \*\*A10 — Controlled beta entry\.\*\*/m);
+  const betaEntry = canonicalBacklog.split('\n').find(line => line.includes('**A10 — Controlled beta entry.'));
+  assert.match(betaEntry, /^- \[x\]/);
+  assert.match(betaEntry, /dated engineering-readiness GO/);
+  assert.match(betaEntry, /not an invitation window/);
   assert.match(canonicalBacklog, /^- \[x\] \*\*A12 — Remove stale network copy\.\*\*/m);
   const dependencies = durableBacklog.match(/^\| A-38 \|[^\n]*/m)?.[0];
   assert.ok(dependencies, 'dependency follow-up must not disappear behind the older A11 acceptance');

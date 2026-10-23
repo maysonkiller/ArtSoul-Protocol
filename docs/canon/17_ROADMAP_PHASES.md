@@ -15,7 +15,7 @@ The active canonical model is A–D:
 
 Earlier informal A–G plans are retired and are not parallel authority. Token or multichain phases from historical planning have no A–D destination and remain out of scope. Any old stabilization/testnet item belongs to A; beta/growth validation belongs to B; contract, security, Genesis, Collections, legal, and final visual work belongs to C; migration/deployment/activation belongs to D.
 
-## Phase A — Stabilize Public Testnet (active)
+## Phase A — Stabilize Public Testnet (accepted October 24, 2026)
 
 Goal: a production testnet trustworthy enough for a controlled beta.
 

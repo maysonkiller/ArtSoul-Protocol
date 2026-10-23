@@ -3,7 +3,38 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 24 native interruption acceptance and preparation feedback (Canon 2/11):
+October 24 final Phase A engineering acceptance (Canon 17; no architecture change):
+
+- Work remains in C:\Projects\ArtSoul, branch codex/takeover-audit, HEAD
+  `b0d722b11119e17c81adec6e0dee457b6f75c823` after reviewed PR #334 and
+  source-identical fast-forward. The existing untracked authority-policy files,
+  .codex and output remain untouched and excluded. No extra checkout/agent work.
+- TA-13 is deployed: exact candidate/merge CI pass (Linux 2221 / Windows 1957,
+  zero failures, 2 / 18 skips), 46 contract tests on each OS. Local workspace
+  full suite: 2252 pass, zero failures/skips, including retained untracked tests;
+  focused 74 checks and build pass. Production dpl_2YQ5eFmFs4FSNAFXhBXZ7dRAUKYV
+  matches all nine upload assets and retains the eight reviewed media entries.
+- The bounded final review reconciles TA-02 to the actual October 12 provider
+  unlink/relink and TA-06 to native artwork28/auction68 re-auction plus indexed
+  corroboration. Neither needs another owner ceremony. Actual Chrome artwork1
+  now shows the creator as Owner after buyback; both RPCs corroborate it (B-10).
+  Artwork14 correctly offers default closure and forbids expired payment;
+  B-11's actual closure/re-auction remains unperformed, not falsely accepted.
+- A-23 / canonical A10 are accepted by the dated engineering GO in
+  docs/testnet/CONTROLLED_BETA_ENTRY.md: all Phase A gates have evidence, current
+  indexer health is good and the tracker/backlog review identifies no open P1.
+  Formal total: 83 done / 0 in progress / 0 planned. A real beta window remains
+  NOT SCHEDULED / NO-GO until B1/B2 operator/cohort/dates/support are assigned.
+  This distinction corrects mixed stage/window status; it waives no requirement.
+- Remaining limitations: TA-12 desktop polish is owner-deferred, B-11/B-12
+  live acceptance stays open, Android owner-waived/not tested, Robinhood
+  compatibility unverified, originals1-4 unavailable, website-only exact-byte
+  protection, prototype/mainnet deviations retained. No mainnet/reset approval.
+- Exactly next step: publish this reviewed acceptance record, then take the
+  owner-deferred TA-12 desktop artwork loading/timer investigation as a focused
+  follow-up. Do not reopen completed Phase A ceremonies.
+
+October 24 native interruption acceptance and preparation feedback (historical stage; release above completes it):
 
 - Same checkout and branch, starting HEAD `3c6d40e886ad5e9d62a000a55f22f7d0e1fe7649`
   (PR #333). Candidate/merge CI pass: 2216 Linux / 1952 Windows unit checks,

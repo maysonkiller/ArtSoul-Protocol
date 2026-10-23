@@ -8,26 +8,31 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **82 done, 1 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **83 done, 0 in progress, 0 planned** across A-01 to A-83.
 
-Latest release: PR #333 (`3c6d40e`), verified on the apex domain.
-Candidate and post-merge CI pass (Linux 2216 / Windows 1952 unit checks,
-zero failures; 2 / 18 skips; 46 contract tests on each OS). The guarded media
-implementation described below is now published. The private media schema and
-32 verified historical identities are installed. The October 24 same-source
-redeployment activates the guard with reviewed server pins; 13 actual apex
-SIWE/HTTP checks pass. The owner's native interruption/return and refresh with
-continuation to the second transaction now accept A-83 and guarded publishing.
-Artwork 37 / auction 71, one registration and the same original/preparation are
-independently verified. TA-13's separate preparation-error correction is locally
-tested and awaits release. See the checkpoint for exact evidence and limits.
+**Phase A engineering readiness is accepted on October 24.** The recorded GO,
+gate-by-gate evidence and limits are in [controlled beta entry](testnet/CONTROLLED_BETA_ENTRY.md).
+Application PR #334 (`b0d722b`) is published and verified on the apex. Candidate
+and post-merge CI pass: Linux 2221 / Windows 1957 unit checks, zero failures,
+2 / 18 skips; 46 contract tests on each OS. Local workspace checks pass 2252/2252
+without skips, plus 46 contract tests; build and nine deployed assets match.
+TA-13's preparation-message correction is released for desktop and mobile.
+
+The actual beta window remains **not scheduled**. Its cohort, dates, operator,
+private support and pause coverage are Phase B inputs required before invitations.
+This closes engineering acceptance, not every future project task or mainnet
+readiness. TA-12 desktop display polish is the next owner-ordered follow-up;
+B-11/B-12 live journeys and the disclosed compatibility/legacy limits remain.
+
+The dated progress below preserves evidence; pending statements inside older
+observations are superseded by the current decision above.
 
 October 23 hosting follow-up is applied on both designated servers: security
 packages, restored key-only indexer SSH, verified database TLS and a 2000 ms
 Base poll override. Actual worker identity and existing rollback execution
 rights are now observed directly. The reviewed media revision fence is installed
 and worker integration passes 37 checks. [Evidence and limits](audits/HOST_SECURITY_2026-10-23.md) include
-Denim's confirmation/cost implications. A-23 remains a separate final decision.
+Denim's confirmation/cost implications. A-23 uses the separate decision above.
 
 October 24 current disposition, without repeating completed ceremonies:
 
@@ -103,7 +108,7 @@ October 24 current disposition, without repeating completed ceremonies:
    deployed HTTP checks now pass after the same-source activation; guarded
    browser/device publication is now accepted from the separate native result
    above. All three flags are active. TA-13 addresses misleading preparation-error
-   text before a wallet request; its confirmed code cause does not establish the
+   text before a wallet request and is now released; its confirmed code cause does not establish the
    underlying exception on the owner's phone.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
@@ -125,8 +130,9 @@ October 24 current disposition, without repeating completed ceremonies:
    The published classifier repair and ten current regressions pass. This closes
    the repaired application issue for the exercised flows; Robinhood/Base Sepolia
    remains UNVERIFIED, not a demonstrated wallet limitation or a passed test.
-5. **A-23 beta decision** follows the remaining acceptance and open-defect
-   review. Android remains owner-waived / not tested. Wallet login, OAuth,
+5. **A-23 is accepted** by the October 24 engineering GO after release and
+   open-defect review. The actual beta window stays not scheduled. Android
+   remains owner-waived / not tested. Wallet login, OAuth,
    moderation/factors, donation settlement and complaint-email delivery already
    have their recorded results; do not reopen them without a regression.
 
@@ -411,36 +417,26 @@ Moderation Activation**, and the surrounding rollout in
 [`runbooks/A8_MODERATION_ROLLOUT.md`](runbooks/A8_MODERATION_ROLLOUT.md).
 
 **A-21 and A-22 are accepted from implementation and operating evidence.**
-A-23 still needs the recorded beta review and remains NO-GO while a required
-device/publishing criterion lacks evidence or a P1 issue remains open. Existing
+A-23 is accepted by the recorded engineering-readiness GO. The beta invitation
+window remains NO-GO until its own operator checklist is complete. Existing
 operator and controlled-clock tests are labelled as such, not phone ceremonies.
 
-## 2. Implementation and acceptance still open
+## 2. Phase A complete; separate follow-up scope
 
-Ordered by what the founder can feel, not by row number.
+No formal Phase A row remains open. Do not repeat accepted native publishing,
+OAuth, sign-in, moderation or donation ceremonies to demonstrate closure again.
+The [device sheet](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md) retains their
+historical limits; Android remains waived/not tested and Robinhood unverified.
 
-| Row | What it is | Note |
-| --- | --- | --- |
-| **A-23** | Final controlled-beta readiness decision | Reconcile current release, health, accepted gates and open defects; no beta GO is inferred from a completed repair |
-| TA-13 | Preparation-error explanation | Local shared upload fix, 74 focused checks and build pass; complete CI and deployment verification |
+| Follow-up | Actual remaining scope |
+| --- | --- |
+| TA-12 | Owner-deferred desktop Ownership loading, activity/provenance delay and initially empty card timer; investigate without undoing accepted phone fixes |
+| B-11 | Actual page-driven expired settlement closure and creator re-auction; current UI and regressions pass, but that journey is not marked performed |
+| B-12 | Remaining native agent-command acceptance |
+| B1/B2 window | Owner/operator cohort, dates, private support and pause coverage before invitations |
+| Phase C/D | Final contracts, audited economics/custody, collections/Genesis and mainnet preparation; unchanged by Phase A acceptance |
 
-## 2a. Remaining device observations
-
-No repeat device ceremony is requested: A-83 is accepted from the October 24
-interruption/continuation result and independent chain/preparation verification.
-A-23 is the remaining formal decision. A-57 is accepted with Robinhood
-compatibility explicitly unverified. A-33,
-A-64 and A-78 were accepted on October 22 from native publication and prior
-evidence. A-47/A-48/A-53/A-54/A-58/A-61/A-72 are accepted on October 23 from the
-specific native visual and Back follow-ups, published repairs and prior desktop evidence.
-The underlying repairs, including the September 29 portrait/profile
-corrections, are published. A failed acceptance may require another fix.
-[`testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md`](testnet/PHASE_A_DEVICE_ACCEPTANCE_SHEET.md)
-retains the historical trip/result table. Do not rerun completed connection,
-publication, settlement or OAuth ceremonies; use only the open observations in
-this close-out and the current backlog.
-
-## 3. Waiting only on a look
+## 3. Historical visual acceptance notes
 
 **A-38 accepted on September 27:** the bounded fixes passed candidate and
 post-merge Linux/Windows CI and apex guest warning/font checks. The current audit
@@ -450,9 +446,9 @@ it does not close residual dependency cleanup or certify the protocol as secure.
 
 **A-79 accepted on September 27:** the actual apex profile opened with 24 works,
 committed identity first and loaded the remaining corpus without clearing settled
-cards. This closes its one-device criterion; the separate mobile rows stay open.
+cards. This closed its one-device criterion; the later mobile acceptance is recorded above.
 
-Merged and measured, needing the device coverage specified in each backlog row:
+The following notes retain the original measurements and later device acceptance:
 
 - A-71 is accepted on October 23: the owner confirms the ArtSoul mark without
   empty cards after the successful iPhone publication. No repeat is needed.
