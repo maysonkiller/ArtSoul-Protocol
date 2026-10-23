@@ -589,7 +589,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
     }
   });
 
-  await t.test('authenticated API prepares and resumes through actual PostgreSQL RPCs without submission permission', async () => {
+  await t.test('authenticated API prepares, hands off once and recovers through actual PostgreSQL RPCs', async () => {
     // Keep earlier foundation tests on their historical schema; the full API
     // journey uses the newest rollout, including revocation of old writers.
     sql('CREATE TABLE public.v41_artworks(chain_id NUMERIC, artwork_id NUMERIC(78,0), creator TEXT, metadata_uri TEXT, block_number BIGINT, transaction_hash TEXT);');
@@ -601,6 +601,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
     const env = {SESSION_SECRET:'private-preparation-integration-test',SUPABASE_URL:'https://storage.example',
       SUPABASE_SERVICE_ROLE_KEY:`x.${Buffer.from('{"role":"service_role"}').toString('base64url')}.x`,
       ARTSOUL_MEDIA_PREPARATION_ENABLED:'true',ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core,
+      ARTSOUL_MEDIA_SUBMISSION_ENABLED:'false',
       ARTSOUL_MEDIA_RECOVERY_ENABLED:'false',ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH:'',
       ARTSOUL_MEDIA_RECOVERY_START_BLOCK:'50',ARTSOUL_MEDIA_RECOVERY_RPC_PRIMARY:'https://rpc-one.example',
       ARTSOUL_MEDIA_RECOVERY_RPC_SECONDARY:'https://rpc-two.example'};
@@ -760,13 +761,18 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       assert.equal(status.body.can_submit,false);assert.equal(status.body.media_path,undefined);
       const tx='0x'+'dd'.repeat(32);
       assert.equal((await call({action:'report-transaction',publication_id:id,transaction_hash:tx})).body.error,'MEDIA_SUBMISSION_NOT_STARTED');
-      const started=await call({action:'begin',publication_id:id,creator_wallet:other,chain_id:1,core_address:other,
-        metadata_uri:'https://attacker.example/other.json'});
+      assert.equal((await call({action:'begin',publication_id:id})).body.error,'MEDIA_SUBMISSION_DISABLED');
+      process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED='true';process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='true';
+      process.env.ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH='0x'+'aa'.repeat(32);
+      assert.equal((await call({action:'begin',publication_id:id,creator_wallet:other,chain_id:1,core_address:other,
+        metadata_uri:'https://attacker.example/other.json'})).body.error,'INVALID_SUBMISSION_REQUEST');
+      const started=await call({action:'begin',publication_id:id});
       assert.equal(started.statusCode,200,JSON.stringify(started.body));
-      assert.equal(started.body.submission_created,true);assert.equal(started.body.can_submit,false);
+      assert.equal(started.body.submission_created,true);assert.equal(started.body.can_submit,true);
       assert.equal(started.body.metadata_uri,prepared.body.metadata_uri);
       const retry=await call({action:'begin',publication_id:id});
       assert.equal(retry.statusCode,200);assert.equal(retry.body.submission_created,false);
+      assert.equal(retry.body.can_submit,false);
       assert.equal(retry.body.submission_started_at,started.body.submission_started_at);
       assert.equal(retry.body.reported_transaction_hash,null);
       const reported=await call({action:'report-transaction',publication_id:id,transaction_hash:tx});
@@ -777,7 +783,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       const recovered=await call({action:'status',publication_id:id});
       assert.deepEqual(recovered.body,reported.body);
       for(const action of ['begin','report-transaction','status']) {
-        const foreign=await call({action,publication_id:id,transaction_hash:tx},other);
+        const foreign=await call({action,publication_id:id,...(action==='report-transaction'?{transaction_hash:tx}:{})},other);
         assert.equal(foreign.statusCode,404);assert.ok(!JSON.stringify(foreign.body).includes(id));
       }
       assert.equal(sql('SELECT count(*) FROM artwork_media_catalog;'),'0','a reported hash never becomes verified registration');
@@ -842,6 +848,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       const foreignRecovery=await call({action:'recover',publication_id:id},other);
       assert.equal(foreignRecovery.statusCode,404);assert.equal(foreignRecovery.body.error,'MEDIA_UPLOAD_NOT_FOUND');
       process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='false';
+      process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED='false';
 
       // The real browser preparation helper now crosses the authenticated API
       // and real SQL, retaining one UUID after a committed response is lost.

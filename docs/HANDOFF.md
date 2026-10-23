@@ -16,9 +16,11 @@ Browser preparation now retains immutable UUID-bound drafts and handles retries
 through the existing API. Authenticated recovery is now connected behind a
 separate disabled gate, with server-only pins, durable quotas and a shared
 deadline. Actual SQL and 28 compiled-browser checks pass, including navigation
-to a verified artwork without another transaction. It stays disabled and stops
-before registration. Next: the one-time registration handoff, then the complete
-reviewed rollout.
+to a verified artwork without another transaction. The one-time registration
+handoff is now connected behind a third default-off gate, with independent hash
+retention, exact wallet/Core checks and no permission replay. Targeted checks and
+real SQL pass; consult the checkpoint for final build/CI evidence. No activation.
+Next: verified legacy catalog intake, then the complete reviewed rollout.
 Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
 and works 1-4 remain unavailable. See the checkpoint for exact tests and gaps;
 legacy catalog intake and the worker-role check still precede migration rollout.

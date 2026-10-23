@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { prepareBrowserPublication } from '../src/features/artwork/publication-preparation.js';
 
 const wallet='0x'+'11'.repeat(20), core='0x'+'aa'.repeat(20), hash='ab'.repeat(32);
+const txHash='0x'+'dd'.repeat(32);
 function fixture() {
     const data=new Map(), requests=[], writes=[];
     let uuidCount=0, uploaded=false, metadataCalls=0, pending=false, config={success:true,enabled:true,chain_id:84532,core_address:core,can_submit:false};
@@ -170,4 +171,113 @@ test('malformed status or a wrong server digest cannot authorize publishing',asy
     const f=fixture(),request=f.dependencies.request;
     f.dependencies.request=async(...args)=>{const result=await request(...args);return args[0].action==='prepare'?{...result,media_sha256:'cd'.repeat(32)}:result;};
     await assert.rejects(f.run(),{code:'MEDIA_PREPARATION_MISMATCH'});
+});
+
+function submissionFixture() {
+    const f=fixture();f.config={...f.config,recovery_enabled:true,submission_enabled:true};
+    const request=f.dependencies.request;let started=null,reported=null,sends=0,drop=null,mutation=null;
+    f.dependencies.request=async(body,owner)=>{
+        assert.equal(owner,wallet);
+        if(!['begin','report-transaction','recover'].includes(body.action)) {
+            const result=await request(body,owner);
+            return body.action==='status'?{...result,submission_started_at:started,reported_transaction_hash:reported}:result;
+        }
+        f.requests.push(structuredClone(body));
+        let result={success:true,publication_id:body.publication_id,metadata_uri:'https://storage.example/meta.json',
+            claim_status:'claimed',can_submit:false,submission_started_at:started,reported_transaction_hash:reported};
+        if(body.action==='begin') {
+            const created=!started;started||='2026-10-23T01:00:00Z';
+            result={...result,chain_id:84532,core_address:core,submission_started_at:started,submission_created:created,can_submit:created,...mutation};
+        } else if(body.action==='report-transaction') {
+            if(drop!=='report-before')reported=body.transaction_hash;
+            result.reported_transaction_hash=reported;
+        } else result={...result,state:'unresolved'};
+        if(drop===body.action || (body.action==='report-transaction'&&drop==='report-before')){drop=null;throw Error('lost response');}
+        return result;
+    };
+    f.args.register=async ({beforeSubmit,onSubmitted,metadataUri,mediaUrl,coreAddress})=>{
+        assert.equal(metadataUri,'https://storage.example/meta.json');assert.equal(mediaUrl,'https://storage.example/original.png');
+        assert.equal(coreAddress,core);await beforeSubmit();sends++;
+        // The adapter retains the receipt wait even when reporting the hash fails.
+        try {await onSubmitted(txHash);}catch{}
+        return {artworkId:'36',txHash};
+    };
+    return {f,get sends(){return sends;},set drop(v){drop=v;},set mutation(v){mutation=v;},get reported(){return reported;}};
+}
+
+test('enabled handoff registers once and a repeated click recovers without another wallet request',async()=>{
+    const s=submissionFixture(),{f}=s;
+    const result=await f.run();assert.equal(result.registration.artworkId,'36');assert.equal(result.can_submit,false);
+    assert.equal(s.sends,1);assert.equal(s.reported,txHash);
+    assert.equal(JSON.parse([...f.data.values()][0]).reported_transaction_hash,txHash);
+    assert.deepEqual(f.requests.map(r=>r.action),['config','issue','prepare','status','begin','report-transaction']);
+    const retry=await f.run();assert.equal(retry.recovery.state,'unresolved');assert.equal(s.sends,1);
+});
+
+test('concurrent tabs cannot turn one publication into two registration sends',async()=>{
+    const s=submissionFixture();const results=await Promise.all([s.f.run(),s.f.run()]);
+    assert.equal(s.sends,1);assert.equal(results.filter(r=>r.registration).length,1);
+    assert.equal(results.filter(r=>r.recovery).length,1);
+});
+
+test('lost begin response and wallet rejection retain the attempt without automatically resending',async()=>{
+    for(const failure of ['begin','wallet']) {
+        const s=submissionFixture(),{f}=s;
+        if(failure==='begin')s.drop='begin';
+        else f.args.register=async({beforeSubmit})=>{await beforeSubmit();throw Error('wallet rejected');};
+        await assert.rejects(f.run(),{code:'PUBLICATION_ATTEMPT_PENDING'});
+        const retry=await f.run();assert.equal(retry.recovery.state,'unresolved');assert.equal(s.sends,0);
+        assert.equal(f.requests.filter(r=>r.action==='begin').length,1);
+    }
+});
+
+test('a locally captured hash is reported on retry if its API response or request was lost',async()=>{
+    for(const failure of ['report-transaction','report-before']) {
+        const s=submissionFixture();s.drop=failure;
+        const first=await s.f.run();assert.equal(first.registration.artworkId,'36');
+        assert.equal(JSON.parse([...s.f.data.values()][0]).reported_transaction_hash,txHash);
+        await s.f.run();assert.equal(s.reported,txHash);assert.equal(s.sends,1);
+    }
+});
+
+test('local hash storage failure cannot suppress the available server journal',async()=>{
+    const s=submissionFixture(),{f}=s,save=f.dependencies.storage.setItem;
+    f.dependencies.storage.setItem=(key,value)=>{
+        if(JSON.parse(value).reported_transaction_hash)throw Error('storage full');
+        return save(key,value);
+    };
+    const result=await f.run();assert.equal(result.registration.artworkId,'36');
+    assert.equal(s.reported,txHash);assert.equal(s.sends,1);
+    await f.run();assert.equal(s.sends,1);
+});
+
+test('a wallet switch after broadcast preserves the original scoped hash without reporting as the new account',async()=>{
+    const s=submissionFixture(),{f}=s;
+    f.args.register=async({beforeSubmit,onSubmitted})=>{
+        await beforeSubmit();f.current=false;try{await onSubmitted(txHash);}catch{}
+        return {artworkId:'36',txHash};
+    };
+    await assert.rejects(f.run(),{code:'PUBLICATION_ATTEMPT_PENDING'});
+    assert.equal(JSON.parse([...f.data.values()][0]).reported_transaction_hash,txHash);
+    assert(!f.requests.some(r=>r.action==='report-transaction'));f.current=true;
+    await f.run();assert.equal(s.reported,txHash);assert.equal(f.requests.filter(r=>r.action==='begin').length,1);
+});
+
+test('malformed permission and a repeated invocation of its hook never authorize another send',async()=>{
+    for(const mutation of [{chain_id:1},{core_address:wallet},{publication_id:randomUUID()},
+        {metadata_uri:'https://attacker.example'},{can_submit:false},{submission_created:false},
+        {claim_status:'registered'},{reported_transaction_hash:txHash},{submission_started_at:null}]) {
+        const s=submissionFixture();s.mutation=mutation;
+        await assert.rejects(s.f.run(),{code:'PUBLICATION_ATTEMPT_PENDING'});assert.equal(s.sends,0);
+    }
+    const s=submissionFixture();s.f.args.register=async({beforeSubmit})=>{await beforeSubmit();await beforeSubmit();assert.fail('must not send');};
+    await assert.rejects(s.f.run(),{code:'PUBLICATION_ATTEMPT_PENDING'});
+    assert.equal(s.f.requests.filter(r=>r.action==='begin').length,1);
+});
+
+test('failure during wallet preflight does not consume an attempt and enabled submission requires recovery',async()=>{
+    const s=submissionFixture();s.f.args.register=async()=>{throw Error('preflight failed');};
+    await assert.rejects(s.f.run(),/preflight failed/);assert(!s.f.requests.some(r=>r.action==='begin'));
+    s.f.config={...s.f.config,recovery_enabled:false};
+    await assert.rejects(s.f.run(),{code:'MEDIA_PREPARATION_UNAVAILABLE'});
 });

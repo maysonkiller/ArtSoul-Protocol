@@ -12,7 +12,7 @@ const userDetails = value => {
 // This store is deliberately separate from pending gallery cards: those are
 // disposable presentation records and discard attempts without a returned hash.
 // No signed upload URL, auth token or file bytes are stored here.
-export async function prepareBrowserPublication({ file, fileHash, wallet, details, assertCurrent }, dependencies = {}) {
+export async function prepareBrowserPublication({ file, fileHash, wallet, details, assertCurrent, register }, dependencies = {}) {
     wallet = String(wallet || '').toLowerCase();
     if (!ADDRESS.test(wallet) || /^0x0{40}$/.test(wallet) || !/^[0-9a-f]{64}$/.test(fileHash || '') ||
         !file || !Number.isSafeInteger(file.size) || file.size <= 0 || typeof assertCurrent !== 'function') {
@@ -32,7 +32,8 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
     if (config.enabled === false) return null;
     const core = config.core_address;
     if (config.enabled !== true || config.chain_id !== 84532 || !ADDRESS.test(core || '') ||
-        /^0x0{40}$/.test(core) || config.can_submit !== false) fail('MEDIA_PREPARATION_UNAVAILABLE');
+        /^0x0{40}$/.test(core) || config.can_submit !== false ||
+        (config.submission_enabled === true && config.recovery_enabled !== true)) fail('MEDIA_PREPARATION_UNAVAILABLE');
 
     let storage, locks;
     try {
@@ -67,8 +68,10 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
             draft = { version: 1, publication_id: publicationId, ...scope,
                 file_name: file.name, details: input, created_at: new Date().toISOString() };
         }
-        const persist = () => {
-            assertCurrent();
+        const persist = (submitted = false) => {
+            // The original wallet's returned hash must survive even if the
+            // user switches accounts while the native wallet is responding.
+            if (!submitted) assertCurrent();
             try {
                 const value = JSON.stringify(draft);
                 storage.setItem(key, value);
@@ -113,9 +116,21 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
             (draft.metadata_uri && draft.metadata_uri !== prepared.metadata_uri)) fail('MEDIA_PREPARATION_MISMATCH');
         draft.metadata_uri = prepared.metadata_uri;
         persist();
-        const status = await ask({ action: 'status', publication_id: id });
+        let status = await ask({ action: 'status', publication_id: id });
         if (status?.publication_id !== id || status.metadata_uri !== draft.metadata_uri || status.can_submit !== false ||
             !['claimed', 'registered', 'conflict'].includes(status.claim_status)) fail('MEDIA_PREPARATION_MISMATCH');
+        const reportHash = async hash => {
+            if (typeof hash !== 'string' || !/^0x[0-9a-f]{64}$/.test(hash)) fail('INVALID_TRANSACTION_HASH');
+            const reported = await ask({ action: 'report-transaction', publication_id: id, transaction_hash: hash });
+            if (reported?.publication_id !== id || reported.metadata_uri !== draft.metadata_uri ||
+                reported.can_submit !== false || reported.reported_transaction_hash !== hash || !reported.submission_started_at) {
+                fail('MEDIA_PREPARATION_MISMATCH');
+            }
+            return reported;
+        };
+        if (draft.reported_transaction_hash && !status.reported_transaction_hash && status.submission_started_at) {
+            status = await reportHash(draft.reported_transaction_hash);
+        }
         // A journal entry without a hash is still an attempt. Only the server
         // can recover it from independently verified registration evidence.
         if (config.recovery_enabled === true && (status.submission_started_at || status.claim_status !== 'claimed')) {
@@ -128,8 +143,48 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
             }
             return { ...status, recovery, can_submit: false };
         }
-        // Preparation is not registration authorization. In particular, do not
-        // call begin or infer that a missing reported hash permits another send.
+        if (config.submission_enabled === true && status.claim_status === 'claimed' && !status.submission_started_at &&
+            typeof register === 'function') {
+            let beginRequested = false, granted = false;
+            const beforeSubmit = async () => {
+                if (beginRequested) fail('PUBLICATION_ATTEMPT_PENDING');
+                beginRequested = true;
+                const begun = await ask({ action: 'begin', publication_id: id });
+                if (begun?.success !== true || begun.publication_id !== id || begun.chain_id !== 84532 ||
+                    begun.core_address !== core || begun.metadata_uri !== draft.metadata_uri ||
+                    !begun.submission_started_at || typeof begun.submission_created !== 'boolean' ||
+                    begun.can_submit !== begun.submission_created) fail('MEDIA_PREPARATION_MISMATCH');
+                if (!begun.can_submit || begun.claim_status !== 'claimed' || begun.reported_transaction_hash) {
+                    fail('PUBLICATION_ATTEMPT_PENDING');
+                }
+                granted = true;
+            };
+            const onSubmitted = async value => {
+                const hash = typeof value === 'string' ? value.toLowerCase() : '';
+                if (!granted || !/^0x[0-9a-f]{64}$/.test(hash) ||
+                    (draft.reported_transaction_hash && draft.reported_transaction_hash !== hash)) fail('INVALID_TRANSACTION_HASH');
+                draft.reported_transaction_hash = hash;
+                // Either storage channel may fail independently after broadcast.
+                try { persist(true); } finally { await reportHash(hash); }
+            };
+            try {
+                const registration = await register({ metadataUri: draft.metadata_uri, mediaUrl, mediaPath,
+                    coreAddress: core, beforeSubmit, onSubmitted });
+                assertCurrent();
+                if (!granted || typeof registration?.artworkId !== 'string' ||
+                    !/^[1-9][0-9]{0,77}$/.test(registration.artworkId) ||
+                    typeof registration.txHash !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(registration.txHash)) {
+                    fail('MEDIA_PREPARATION_MISMATCH');
+                }
+                return { ...status, registration, can_submit: false };
+            } catch (error) {
+                if (!beginRequested) throw error;
+                // Even a wallet cancellation cannot prove that no delayed
+                // request will be broadcast. Preserve the attempt for recovery.
+                throw Object.assign(new Error('PUBLICATION_ATTEMPT_PENDING'), { code: 'PUBLICATION_ATTEMPT_PENDING', cause: error });
+            }
+        }
+        // Preparation, status and a missing hash never authorize a wallet send.
         return { ...status, can_submit: false };
     });
 }

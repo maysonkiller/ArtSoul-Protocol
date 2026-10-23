@@ -242,6 +242,11 @@ let selectedFile = null;
         }
 
         function mapPublishError(error) {
+            // The durable begin record takes precedence over nested wallet or
+            // transport errors: none of those proves that no send can complete.
+            if (error?.code === 'PUBLICATION_ATTEMPT_PENDING') {
+                return { code: error.code, message: 'This artwork already has a registration attempt. Check your profile and wallet activity; do not publish the file again.' };
+            }
             const code = String(error?.code || '').toUpperCase();
             const nodes = [error], seen = new Set(), codes = [], messages = [], methods = [];
             for (let i = 0; i < nodes.length && seen.size < 12; i += 1) {
@@ -1057,6 +1062,16 @@ let selectedFile = null;
             const originalMarkup = uploadBtn.innerHTML;
             setTransactionButtonProcessing(uploadBtn);
             let pendingArtwork = null;
+            let publicationJournalActive = false;
+            const savePublishProgress = record => {
+                try { return savePendingArtwork(record); } catch (error) {
+                    if (!publicationJournalActive) throw error;
+                    // The guarded flow has its own durable journal. A temporary
+                    // gallery-card cache must not turn a receipt into failure.
+                    console.warn('Temporary artwork preview could not be saved.');
+                    return record;
+                }
+            };
             const assertCurrent = () => {
                 if (String(window.getCurrentWalletAddress?.() || '').toLowerCase() !== walletAddress.toLowerCase()) {
                     throw createUploadError('AUTHORIZATION_WALLET_CHANGED', 'The wallet changed during preparation.');
@@ -1089,8 +1104,44 @@ let selectedFile = null;
                 assertCurrent();
                 console.log('📝 File hash:', fileHash);
 
+                const register = async ({ fileUpload, metadataUri, coreAddress, beforeSubmit, onSubmitted }) => {
+                    currentPublishStage = 'wallet_init';
+                    setTransactionButtonProcessing(uploadBtn, 'Connecting wallet...');
+                    if (!window.ArtSoulContracts.marketplaceContract) {
+                        const provider = await window.web3Modal?.getWalletProvider();
+                        if (!provider) throw new Error('No wallet provider');
+                        await window.ArtSoulContracts.init(provider);
+                    }
+                    assertCurrent();
+                    currentPublishStage = 'register';
+                    setTransactionButtonProcessing(uploadBtn, 'Registering artwork...');
+                    return window.ArtSoulContracts.uploadArtwork(fileUpload.ipfsHash, metadataUri, fileHash, price, {
+                        expectedWallet: walletAddress, expectedChainId: BASE_SEPOLIA_CHAIN_ID,
+                        expectedCoreAddress: coreAddress, beforeSubmit, assertCurrent,
+                        onSubmitted: async registerTxHash => {
+                            submittedRegisterTxHash = registerTxHash || '';
+                            try {
+                                pendingArtwork = savePublishProgress({ ...pendingArtwork,
+                                    register_tx_hash: registerTxHash || '', stage: 'register_submitted',
+                                    lifecycle_label: 'Finalizing...',
+                                    lifecycle_message: 'Registration was submitted. Waiting for blockchain confirmation.' });
+                            } finally {
+                                await onSubmitted?.(registerTxHash);
+                            }
+                        }
+                    });
+                };
+                let result;
                 const preparation = await prepareBrowserPublication({ file, fileHash, wallet: walletAddress,
-                    details: { title, description, creatorValue: price, aiGuidance: guidance, duration }, assertCurrent });
+                    details: { title, description, creatorValue: price, aiGuidance: guidance, duration }, assertCurrent,
+                    register: async prepared => {
+                        publicationJournalActive = true;
+                        const fileUpload = { url: prepared.mediaUrl, ipfsHash: prepared.mediaPath, path: prepared.mediaPath };
+                        pendingArtwork = { ...createPendingArtworkDraft({ walletAddress, title, description, price, fileHash, fileUpload, file }),
+                            stage: 'metadata_prepared', metadata_uri: prepared.metadataUri };
+                        return register({ ...prepared, fileUpload });
+                    }
+                });
                 if (preparation) {
                     if (preparation.recovery?.state === 'registered') {
                         assertCurrent();
@@ -1100,11 +1151,10 @@ let selectedFile = null;
                     if (preparation.recovery?.state === 'conflict' || preparation.claim_status === 'conflict') {
                         throw createUploadError('PUBLICATION_CONFLICT', 'Publication conflict retained.');
                     }
-                    // This rollout slice never begins an attempt or initializes
-                    // contracts. An error cannot fall back to legacy publishing.
-                    throw createUploadError(preparation.submission_started_at || preparation.claim_status !== 'claimed'
+                    if (!preparation.registration) throw createUploadError(preparation.submission_started_at || preparation.claim_status !== 'claimed'
                         ? 'PUBLICATION_ATTEMPT_PENDING' : 'PUBLICATION_PREPARED_ONLY', 'Publication preparation retained.');
-                }
+                    result = preparation.registration;
+                } else {
 
                 // Step 2: Prepare media storage
                 currentPublishStage = 'media_upload';
@@ -1154,45 +1204,14 @@ let selectedFile = null;
                 };
                 console.log('📤 Metadata uploaded:', metadataUpload.ipfsHash);
 
-                // Step 5: Initialize contracts
-                currentPublishStage = 'wallet_init';
-                setTransactionButtonProcessing(uploadBtn, 'Connecting wallet...');
-                if (!window.ArtSoulContracts.marketplaceContract) {
-                    const provider = await window.web3Modal?.getWalletProvider();
-                    if (!provider) throw new Error('No wallet provider');
-                    await window.ArtSoulContracts.init(provider);
+                result = await register({ fileUpload, metadataUri: metadataUpload.url });
                 }
-
-                // Step 6: Register artwork with the protocol
-                assertCurrent();
-                currentPublishStage = 'register';
-                setTransactionButtonProcessing(uploadBtn, 'Registering artwork...');
-                const result = await window.ArtSoulContracts.uploadArtwork(
-                    fileUpload.ipfsHash,
-                    metadataUpload.url,
-                    fileHash,
-                    price,
-                    {
-                        expectedWallet: walletAddress,
-                        expectedChainId: BASE_SEPOLIA_CHAIN_ID,
-                        onSubmitted: (registerTxHash) => {
-                            submittedRegisterTxHash = registerTxHash || '';
-                            pendingArtwork = savePendingArtwork({
-                                ...pendingArtwork,
-                                register_tx_hash: registerTxHash || '',
-                                stage: 'register_submitted',
-                                lifecycle_label: 'Finalizing...',
-                                lifecycle_message: 'Registration was submitted. Waiting for blockchain confirmation.'
-                            });
-                        }
-                    }
-                );
 
                 console.log(' Artwork created! ID:', result.artworkId);
                 if (!result?.txHash || !result?.artworkId) {
                     throw new Error('Register transaction did not return a confirmed artwork id.');
                 }
-                pendingArtwork = savePendingArtwork({
+                pendingArtwork = savePublishProgress({
                     ...pendingArtwork,
                     id: `pending:${result.artworkId || pendingArtwork.temp_id}`,
                     artwork_id: result.artworkId ? String(result.artworkId) : '',
@@ -1231,7 +1250,7 @@ let selectedFile = null;
                             expectedChainId: BASE_SEPOLIA_CHAIN_ID,
                             onSubmitted: (submittedAuctionTxHash) => {
                                 resolveAuctionSubmission(submittedAuctionTxHash || '');
-                                pendingArtwork = savePendingArtwork({
+                                pendingArtwork = savePublishProgress({
                                     ...pendingArtwork,
                                     auction_tx_hash: submittedAuctionTxHash || '',
                                     stage: 'auction_submitted',
@@ -1262,7 +1281,7 @@ let selectedFile = null;
                         });
                     }
                     auctionCreated = true;
-                    pendingArtwork = savePendingArtwork({
+                    pendingArtwork = savePublishProgress({
                         ...pendingArtwork,
                         auction_tx_hash: auctionTxHash || '',
                         auction_receipt_status: 1,
@@ -1279,7 +1298,7 @@ let selectedFile = null;
                     const mappedAuctionError = mapPublishError(auctionError);
                     console.log('Auction creation error shown to user:', mappedAuctionError.message);
                     if (mappedAuctionError.code === 'AUCTION_CONFIRMATION_PENDING' && pendingArtwork?.auction_tx_hash) {
-                        pendingArtwork = savePendingArtwork({
+                        pendingArtwork = savePublishProgress({
                             ...pendingArtwork,
                             stage: 'auction_submitted',
                             lifecycle_label: 'Finalizing...',
@@ -1291,7 +1310,7 @@ let selectedFile = null;
                         navigateAfterPublish('/profile');
                         return;
                     }
-                    pendingArtwork = savePendingArtwork({
+                    pendingArtwork = savePublishProgress({
                         ...pendingArtwork,
                         stage: 'auction_failed',
                         lifecycle_label: 'Artwork registered - auction failed',

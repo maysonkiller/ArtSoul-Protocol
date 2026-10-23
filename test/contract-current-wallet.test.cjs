@@ -39,3 +39,30 @@ test('registration refuses a wallet change before asking for a transaction', asy
     };
     await assert.rejects(api.registerArtwork('https://example.com/art.json', {expectedWallet: '0xcreator'}), /wallet changed/);
 });
+
+test('registration obtains one-time permission only after preflight and rechecks the live context before sending',async()=>{
+    for(const change of ['none','wallet','core','form','permission']) {
+        const {api}=fixture(),calls=[];let begun=false;
+        api.ensureBaseSepoliaWrite=async()=>calls.push('network');
+        api.coreContract={target:'0x'+'aa'.repeat(20),async registerArtwork(uri){calls.push('send');assert.equal(uri,'https://example.com/pinned.json');
+            return {hash:'0xhash',wait:async()=>({status:1})};}};
+        api.assertExpectedWallet=async()=>{calls.push('wallet');if(begun&&change==='wallet')throw Error('wallet changed');};
+        api.waitForEvent=async()=>({args:{artworkId:36n}});
+        const options={expectedCoreAddress:'0x'+'aa'.repeat(20),
+            beforeSubmit:async()=>{calls.push('begin');begun=true;if(change==='permission')throw Error('No permission');
+                if(change==='core')api.coreContract={...api.coreContract};},
+            assertCurrent:()=>{if(begun&&change==='form')throw Error('form changed');}};
+        if(change==='none'){
+            assert.equal((await api.registerArtwork('https://example.com/pinned.json',options)).artworkId,'36');
+            assert.deepEqual(calls,['network','wallet','begin','wallet','send']);
+        }else{await assert.rejects(api.registerArtwork('https://example.com/pinned.json',options));assert(!calls.includes('send'));}
+    }
+});
+
+test('a different Core target fails before consuming submission permission',async()=>{
+    const {api}=fixture();api.ensureBaseSepoliaWrite=async()=>{};api.assertExpectedWallet=async()=>{};
+    api.coreContract={target:'0x'+'bb'.repeat(20)};
+    await assert.rejects(api.registerArtwork('https://example.com/pinned.json',{
+        expectedCoreAddress:'0x'+'aa'.repeat(20),beforeSubmit:()=>assert.fail('must not begin')
+    }),/contract changed/);
+});

@@ -1,6 +1,7 @@
 import { allowMethods, readJson, requireWallet } from '../../backend.js';
 import { issuePublication, journalPublication, preparationDeployment, preparePublication,
-  publicationRecoveryConfiguration, requestPublicationRecovery } from '../../upload-publication.js';
+  publicationRecoveryConfiguration, requestPublicationRecovery,
+  publicationSubmissionConfiguration, requestPublicationSubmission } from '../../upload-publication.js';
 
 const PUBLIC_ERRORS = new Map([
   ['UNAUTHENTICATED', 401], ['SESSION_WALLET_MISMATCH', 401], ['INVALID_PUBLICATION_ID', 400], ['INVALID_UPLOAD_PAYLOAD', 400],
@@ -16,6 +17,7 @@ const PUBLIC_ERRORS = new Map([
   ['INVALID_PUBLICATION_ACTION', 400], ['INVALID_TRANSACTION_HASH', 400], ['MEDIA_PUBLICATION_NOT_FOUND', 404],
   ['MEDIA_SUBMISSION_NOT_STARTED', 409], ['MEDIA_SUBMISSION_HASH_CONFLICT', 409],
   ['INVALID_RECOVERY_REQUEST', 400], ['MEDIA_RECOVERY_DISABLED', 503], ['MEDIA_RECOVERY_UNAVAILABLE', 503],
+  ['INVALID_SUBMISSION_REQUEST', 400], ['MEDIA_SUBMISSION_DISABLED', 503],
   ['RATE_LIMITED', 429]
 ]);
 
@@ -45,9 +47,12 @@ export default async function handler(req, res) {
     if (body.action === 'config') {
       const recovery = process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED === 'true';
       if (recovery) publicationRecoveryConfiguration(deployment);
+      const submission = process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED === 'true';
+      if (submission) publicationSubmissionConfiguration(deployment);
       return res.status(200).json({ success: true, enabled: true,
         chain_id: deployment.chainId, core_address: deployment.core, can_submit: false,
-        ...(recovery ? { recovery_enabled: true } : {}) });
+        ...(recovery ? { recovery_enabled: true } : {}),
+        ...(submission ? { submission_enabled: true } : {}) });
     }
     // The existing file route remains shared with profile-avatar uploads.
     // No client-provided path, digest, wallet or chain can replace issued data.
@@ -55,6 +60,7 @@ export default async function handler(req, res) {
       ? await issuePublication(wallet, body, deployment)
       : body.action === 'prepare' ? await preparePublication(wallet, body, deployment)
       : body.action === 'recover' ? await requestPublicationRecovery(wallet, body, deployment)
+      : body.action === 'begin' ? await requestPublicationSubmission(wallet, body, deployment)
       : await journalPublication(wallet, body, deployment);
     return res.status(200).json({ success: true, ...result });
   } catch (error) {

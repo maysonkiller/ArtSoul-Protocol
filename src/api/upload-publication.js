@@ -46,6 +46,43 @@ export function publicationRecoveryConfiguration(deployment) {
   return { deployment: { ...deployment, coreCodeHash, startBlock }, rpcs };
 }
 
+export function publicationSubmissionConfiguration(deployment) {
+  if (process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED !== 'true') throw fail('MEDIA_SUBMISSION_DISABLED', 503);
+  // Recovery must be configured before any one-time handoff is offered. A
+  // transport failure after begin cannot safely grant another wallet request.
+  publicationRecoveryConfiguration(deployment);
+}
+
+export async function requestPublicationSubmission(wallet, body, deployment) {
+  const id = publicationId(body.publication_id);
+  if (Object.keys(body).some(key => !['action', 'publication_id'].includes(key))) throw fail('INVALID_SUBMISSION_REQUEST', 400);
+  publicationSubmissionConfiguration(deployment);
+  const signal = AbortSignal.timeout(25000);
+  await consumeServiceQuota(`media-submission:${deployment.chainId}:${deployment.core}`, wallet, 4, 60, { signal });
+  const { row, metadataUri } = await readPreparation(wallet, id, deployment, signal);
+  const media = await verifyUploadedMedia(wallet, row.media_path, { signal });
+  if (!row.metadata_json || row.media_sha256 !== media.sha256 || Number(row.byte_size) !== media.size ||
+      row.content_type !== media.contentType) throw fail('MEDIA_PREPARATION_MISMATCH');
+  validatePublicationMetadata(row.metadata_json, row, media);
+  await verifyPreparedMetadata(row, metadataUri, signal);
+  signal.throwIfAborted();
+  const saved = await rpc('begin_artwork_media_submission', {
+    p_publication_id: id, p_chain_id: deployment.chainId, p_core_address: deployment.core,
+    p_creator_wallet: wallet, p_metadata_uri: metadataUri
+  }, signal);
+  signal.throwIfAborted();
+  const result = submissionView(saved, id, wallet, deployment);
+  if (result.metadata_uri !== metadataUri || typeof result.submission_created !== 'boolean' ||
+      !result.submission_started_at || !['claimed', 'registered', 'conflict'].includes(result.claim_status) ||
+      (result.submission_created && (result.claim_status !== 'claimed' || result.reported_transaction_hash))) {
+    throw fail('MEDIA_PREPARATION_MISMATCH');
+  }
+  // Only this successful, fresh begin response permits one wallet request.
+  // Status, retries, recovery and a lost response never recreate permission.
+  return { ...result, chain_id: deployment.chainId, core_address: deployment.core,
+    can_submit: result.submission_created === true };
+}
+
 export async function requestPublicationRecovery(wallet, body, deployment) {
   const id = publicationId(body.publication_id);
   if (Object.keys(body).some(key => !['action', 'publication_id'].includes(key))) throw fail('INVALID_RECOVERY_REQUEST', 400);
@@ -221,8 +258,7 @@ function submissionView(row, id, wallet, deployment) {
     publication_id: id, metadata_uri: row.metadata_uri, claim_status: row.claim_status,
     submission_started_at: row.submission_started_at || null,
     reported_transaction_hash: row.reported_transaction_hash || null,
-    // The journal is dormant scaffolding, not registration authorization.
-    // In particular, a client-reported hash does not establish broadcast.
+    // Journal reads and client-reported hashes never authorize registration.
     can_submit: false,
     ...(typeof row.submission_created === 'boolean' ? { submission_created: row.submission_created } : {})
   };
@@ -233,10 +269,7 @@ export async function journalPublication(wallet, body, deployment, { signal } = 
   const params = { p_publication_id: id, p_chain_id: deployment.chainId,
     p_core_address: deployment.core, p_creator_wallet: wallet };
   let row;
-  if (body.action === 'begin') {
-    const { metadataUri } = await readPreparation(wallet, id, deployment);
-    row = await rpc('begin_artwork_media_submission', { ...params, p_metadata_uri: metadataUri });
-  } else if (body.action === 'report-transaction') {
+  if (body.action === 'report-transaction') {
     const hash = typeof body.transaction_hash === 'string' ? body.transaction_hash.toLowerCase() : '';
     if (!TRANSACTION_HASH.test(hash)) throw fail('INVALID_TRANSACTION_HASH', 400);
     row = await rpc('report_artwork_media_transaction', { ...params, p_transaction_hash: hash });

@@ -3,6 +3,48 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 one-time registration handoff (Canon 1/2/11):
+
+- Starting commit `333044100a48088e5f341652a88d6b81609d9da7` passes exact CI
+  `39881727281`: Linux 2143 pass / 2 skips, Windows 1897 pass / 18 skips,
+  zero failures and 46 contract tests on each OS. Its clean PostgreSQL retry
+  passes 39/39; preview `artsoul-2ue50j92x-maysonkiller-be9112b5.vercel.app`
+  denies all seven unauthenticated publication actions (401, private/no-store),
+  rejects GET (405), and matches eight built assets after CRLF normalization.
+- The new, default-off `ARTSOUL_MEDIA_SUBMISSION_ENABLED` requires recovery
+  configuration. An owned begin request accepts only its UUID, rechecks the
+  original bytes and pinned metadata, and uses the existing atomic SQL journal.
+  Only a fresh successful begin response permits one wallet request. Repeated,
+  lost, malformed or interrupted responses never recreate that permission.
+- The existing registration adapter checks wallet, chain, Core and current form
+  around the handoff. Browser tabs serialize the same immutable draft. A returned
+  hash is retained locally and reported independently; failure of either storage
+  channel does not suppress the other. The cosmetic pending-card cache is best
+  effort only in the guarded path. Existing legacy error handling is preserved.
+  Pending-attempt wording takes precedence over nested wallet/provider errors.
+  The normal successful flow still registers, then creates its initial auction;
+  recovery of an earlier registration never sends either transaction again.
+- Targeted API/client/adapter/upload and close-out checks pass (116); actual PostgreSQL checks
+  pass (39), including one-time API permission and existing concurrency/retry
+  coverage. Build and 32 compiled Chromium/WebKit journeys at 390/1440px pass,
+  exercising the actual registration adapter with synthetic wallet responses,
+  storage failures and the disabled legacy path. No native signature was made.
+  Final full CI results are pending;
+  do not substitute the starting-commit CI for this diff. Evidence uses the
+  `output/audit/publication-submission-*2026-10-23` files.
+- Interpretation: four begin checks per wallet per minute and a shared 25-second
+  request budget reuse the recovery operational bounds, not protocol economics.
+  HTTP cancellation does not imply SQL rollback. A wallet rejection or interrupted
+  handoff conservatively retains the attempt: automatic release remains unsafe
+  with the unchanged direct-call contract. This UX/rollout limitation is unresolved,
+  not a passed native-wallet acceptance or a closed duplicate-enforcement feature.
+- No production release, live schema/configuration change, signing or contract
+  deployment. All three flags remain disabled. Preserve the unrelated untracked
+  authority-policy files, `.codex/` and `output/`. A-57, A-83 and A-23 remain open;
+  owner-deferred TA-12 display work is unchanged. Next concrete step: prepare a
+  verified legacy catalog intake with explicit coverage for the four unavailable
+  originals, before worker-role preflight and a reviewed migration/activation.
+
 October 23 TA-10 authenticated recovery continuation (Canon 1/2/11):
 
 - Recovery implementation saved in `659c2b178a57bbf11b5089343e7ebce315c6d5d9`.
@@ -15,7 +57,8 @@ October 23 TA-10 authenticated recovery continuation (Canon 1/2/11):
   now use TCP inside their own disposable containers, waiting for the final
   server without relaxing any assertion. The grant checks and all 37 preparation
   subchecks passed on the first targeted rerun, but its Docker cleanup exceeded
-  30 seconds; no owned container remained. A clean preparation rerun is required.
+  30 seconds; no owned container remained. The clean retry subsequently passes
+  39/39 in `publication-recovery-final-pg-retry-2026-10-23.log`.
   Recovery navigation also reuses `navigateAfterPublish`, retaining the branded
   finalization state; 24 upload regressions and four rebuilt browser journeys pass.
 - Dormant recovery configuration is documented in `.env.example`; all flags

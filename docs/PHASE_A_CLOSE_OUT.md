@@ -77,8 +77,12 @@ October 23 remaining work, without repeating completed ceremonies:
    server-only pins, durable quotas and a shared deadline. It passes actual SQL
    and 28 built-browser cases; a verified registration opens its existing page
    without another transaction. The separate activation gate remains disabled.
-   Legacy catalog intake and the one-time begin/registration handoff/rollout
-   remain open, and all new media schema remains inactive. That replay does not simulate or accept
+   The next local slice connects one-time begin/registration behind a third
+   default-off flag, preserving hashes independently of the preview-card cache
+   and preventing permission replay after lost responses. Targeted checks and
+   actual SQL pass; the checkpoint records final build/CI evidence. Legacy
+   catalog intake and rollout remain open, and all new media schema remains
+   inactive. That replay does not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or

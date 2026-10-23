@@ -26,6 +26,16 @@ function client() {
     return { context, element };
 }
 
+test('durable pending publication overrides nested rejection, network and revert suggestions',()=>{
+    const {context}=client();
+    for(const code of [4001,'ACTION_REJECTED','NETWORK_ERROR',4901,'CALL_EXCEPTION','INSUFFICIENT_FUNDS']) {
+        const result=context.mapPublishError({code:'PUBLICATION_ATTEMPT_PENDING',cause:{code,message:'User rejected. Please try again.'}});
+        assert.equal(result.code,'PUBLICATION_ATTEMPT_PENDING');
+        assert.match(result.message,/do not publish the file again/);
+        assert.doesNotMatch(result.message,/No artwork was published|try again/);
+    }
+});
+
 test('ordinary short, Unicode, numeric and formerly blacklisted artwork titles are accepted', () => {
     const { context } = client();
     for (const title of ['A', '夜', '🎨', '123', 'Untitled', 'Photo of the sea', 'Screenshot', 'test', 'Image.png']) {

@@ -14,9 +14,11 @@ drive verified recovery of missing/replaced hashes. Browser preparation is now
 wired with immutable drafts and tested retries, still disabled and without
 registration permission. Bounded authenticated recovery now connects the
 browser to this verifier behind a separate disabled gate, with durable quotas,
-a shared deadline and 28 passing built-browser journeys. Next is the one-time
-begin/registration handoff;
-legacy catalog intake and rollout remain open. The read-only full indexed inventory
+a shared deadline and 28 passing built-browser journeys. The subsequent one-time
+begin/registration handoff is locally connected behind a third default-off gate;
+targeted API/client/adapter checks and actual SQL pass. Consult the checkpoint
+for its final build/CI evidence. Legacy catalog intake and rollout remain open.
+The read-only full indexed inventory
 covers 36 IDs, with 32 files hashed and four historical originals unavailable.
 New desktop flicker/delay report TA-12 is explicitly
 deferred by the owner; it does not erase the accepted phone observations.

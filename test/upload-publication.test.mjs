@@ -19,6 +19,7 @@ const sha256 = createHash('sha256').update(bytes).digest('hex');
 const env = { SESSION_SECRET: 'publication-test-only-secret', SUPABASE_URL: 'https://storage.example',
   SUPABASE_SERVICE_ROLE_KEY: `x.${Buffer.from('{"role":"service_role"}').toString('base64url')}.x`,
   ARTSOUL_MEDIA_PREPARATION_ENABLED: 'true', ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: core,
+  ARTSOUL_MEDIA_SUBMISSION_ENABLED: 'false',
   ARTSOUL_MEDIA_RECOVERY_ENABLED: 'false', ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH: keccak256('0x6001600055'),
   ARTSOUL_MEDIA_RECOVERY_START_BLOCK: '50', ARTSOUL_MEDIA_RECOVERY_RPC_PRIMARY: 'https://rpc-one.example',
   ARTSOUL_MEDIA_RECOVERY_RPC_SECONDARY: 'https://rpc-two.example' };
@@ -411,11 +412,110 @@ test('journal status enforces wallet and deployment scope and never leaks a fore
 });
 
 test('journal database failures return a bounded public error without backend details', async () => {
+  process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED='true';process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='true';
   globalThis.fetch=async()=>Response.json({message:'private database connection diagnostics',hint:'private details'},{status:500});
   for (const action of ['begin','report-transaction','status']) {
-    const result=await call({action,publication_id:id,transaction_hash:'0x'+'dd'.repeat(32)});
+    const result=await call({action,publication_id:id,...(action==='report-transaction'?{transaction_hash:'0x'+'dd'.repeat(32)}:{})});
     assert.equal(result.statusCode,503);assert.deepEqual(result.body,{error:'MEDIA_PREPARATION_UNAVAILABLE'});
   }
+});
+
+function submissionBackend(options={}) {
+  process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED='true';process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='true';
+  const f=backend({prepared:true,...options}),fetch=globalThis.fetch;
+  let started=null;
+  globalThis.fetch=async(raw,init)=>{
+    if(!String(raw).includes('/rpc/begin_artwork_media_submission'))return fetch(raw,init);
+    f.seen.push({url:String(raw),init,body:JSON.parse(init.body)});
+    const fresh=!started;started||='2026-10-23T01:00:00Z';
+    return Response.json({publication_id:id,creator_wallet:wallet,chain_id:84532,core_address:core,
+      metadata_uri:getPublicStorageUrl('artworks',f.row.metadata_path),claim_status:'claimed',
+      submission_started_at:started,reported_transaction_hash:null,submission_created:fresh,...options.result});
+  };
+  return f;
+}
+
+test('submission requires its own flag and valid recovery pins before accessing a draft',async()=>{
+  const f=backend({prepared:true});
+  assert.equal((await call({action:'begin',publication_id:id})).body.error,'MEDIA_SUBMISSION_DISABLED');
+  process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED='true';
+  assert.equal((await call({action:'config'})).body.error,'MEDIA_RECOVERY_DISABLED');
+  assert.equal((await call({action:'begin',publication_id:id})).body.error,'MEDIA_RECOVERY_DISABLED');
+  process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='true';process.env.ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH='';
+  assert.equal((await call({action:'begin',publication_id:id})).body.error,'MEDIA_RECOVERY_UNAVAILABLE');
+  assert.equal(f.seen.length,0);
+});
+
+test('only a fresh owned begin grants submission after rechecking original bytes and metadata',async()=>{
+  const f=submissionBackend(),body={action:'begin',publication_id:id};
+  const config=await call({action:'config'});assert.equal(config.body.submission_enabled,true);assert.equal(config.body.can_submit,false);
+  const first=await call(body),retry=await call(body);
+  assert.equal(first.statusCode,200,JSON.stringify(first.body));assert.equal(first.body.can_submit,true);
+  assert.equal(first.body.chain_id,84532);assert.equal(first.body.core_address,core);
+  assert.equal(retry.body.can_submit,false);assert.equal(retry.body.submission_created,false);
+  assert.equal(retry.body.submission_started_at,first.body.submission_started_at);
+  const started=f.seen.findIndex(r=>r.url.includes('/rpc/begin_artwork'));
+  assert(started>f.seen.findIndex(r=>r.url.endsWith(f.row.metadata_path)));
+  assert(started>f.seen.findIndex(r=>r.url.endsWith(f.row.media_path)));
+  assert.equal((await call({action:'status',publication_id:id})).body.can_submit,false);
+});
+
+test('submission rejects browser overrides, foreign drafts, unavailable originals and quota exhaustion before begin',async()=>{
+  let f=submissionBackend();
+  for(const extra of [{chain_id:1},{core_address:other},{creator_wallet:other},{metadata_uri:'https://attacker.example'},
+    {can_submit:true},{transaction_hash:'0x'+'dd'.repeat(32)}]) {
+    assert.equal((await call({action:'begin',publication_id:id,...extra})).body.error,'INVALID_SUBMISSION_REQUEST');
+  }
+  assert.equal(f.seen.length,0);
+  for(const options of [{changeMetadata:true},{quotaDenied:true},{rawAbsent:true}]) {
+    f=submissionBackend(options);
+    const res=await call({action:'begin',publication_id:id});assert.notEqual(res.statusCode,200);
+    assert(!f.seen.some(r=>r.url.includes('/rpc/begin_artwork')));
+  }
+  f=submissionBackend();assert.equal((await call({action:'begin',publication_id:id},other)).statusCode,404);
+  assert(!f.seen.some(r=>r.url.includes('/rpc/begin_artwork')));
+});
+
+test('malformed or mismatched begin results cannot become submission authorization',async()=>{
+  for(const result of [{creator_wallet:other},{core_address:other},{chain_id:1},{publication_id:other},
+    {metadata_uri:'https://attacker.example'},{submission_created:'true'},{submission_started_at:null},
+    {claim_status:'registered'},{claim_status:'conflict'},{reported_transaction_hash:'0x'+'dd'.repeat(32)}]) {
+    submissionBackend({result});const res=await call({action:'begin',publication_id:id});
+    assert.notEqual(res.statusCode,200,JSON.stringify(result));assert.notEqual(res.body.can_submit,true);
+  }
+});
+
+test('lost committed begin response never restores permission on retry',async()=>{
+  submissionBackend();const fetch=globalThis.fetch;let drop=true;
+  globalThis.fetch=async(raw,init)=>{
+    const res=await fetch(raw,init);
+    if(String(raw).includes('/rpc/begin_artwork')&&drop){drop=false;throw Error('lost after commit');}
+    return res;
+  };
+  assert.equal((await call({action:'begin',publication_id:id})).statusCode,503);
+  const retry=await call({action:'begin',publication_id:id});
+  assert.equal(retry.statusCode,200);assert.equal(retry.body.can_submit,false);assert.equal(retry.body.submission_created,false);
+});
+
+test('submission deadline covers quotas, original bytes, metadata and the atomic begin response',async()=>{
+  const timeout=AbortSignal.timeout;
+  try {
+    AbortSignal.timeout=ms=>timeout(ms===25000?20:ms);
+    for(const step of ['consume_launch_service_quota','artwork_media_preparations?',
+      '/public/artworks/uploads/','/public/artworks/metadata/','begin_artwork_media_submission']) {
+      const f=submissionBackend(),fetch=globalThis.fetch;
+      globalThis.fetch=async(raw,init)=>{
+        if(!String(raw).includes(step))return fetch(raw,init);
+        await new Promise((resolve,reject)=>{
+          const keepAlive=setTimeout(resolve,1000);
+          init.signal.addEventListener('abort',()=>{clearTimeout(keepAlive);reject(init.signal.reason);},{once:true});
+        });
+        assert.fail('deadline must interrupt stalled submission request');
+      };
+      const res=await call({action:'begin',publication_id:id});assert.equal(res.statusCode,503);assert.notEqual(res.body.can_submit,true);
+      assert(!f.seen.some(c=>c.url.includes('/rpc/begin_artwork')));
+    }
+  }finally{AbortSignal.timeout=timeout;}
 });
 
 test('preparation requires JSON requests and rejects malformed JSON without storage access', async () => {
