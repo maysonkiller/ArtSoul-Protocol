@@ -66,11 +66,11 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     if (created) docker('rm','-f',container);
   });
   docker('run','-d','--name',container,'-e','POSTGRES_PASSWORD=local-media-reorg-only',
-    '-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');
+    '-e','POSTGRES_USER=media_fixture_admin','-e','POSTGRES_DB=artsoul','-p','127.0.0.1::5432','postgres:17');
   created = true;
   const endpoint = docker('port',container,'5432/tcp');
   assert.match(endpoint,/^127\.0\.0\.1:\d+$/);
-  pool = new Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',user:'postgres',
+  pool = new Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',user:'media_fixture_admin',
     password:'local-media-reorg-only',connectionTimeoutMillis:1000,statement_timeout:10000,max:8});
   let ready = false;
   for(let i=0;i<60;i++) {
@@ -78,26 +78,34 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     catch {await delay(250);}
   }
   assert(ready,'disposable PostgreSQL is ready');
-  await pool.query('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;');
-  for(const name of ['identity','preparation','submission','registration']) {
-    await pool.query(migration(`sql/migrations/artwork_media_${name}.sql`));
-  }
-  await pool.query(`CREATE TABLE public.event_processing_registry(chain_id NUMERIC(78,0),block_number BIGINT);
-    CREATE TABLE public.contract_events(chain_id NUMERIC(78,0),block_number BIGINT,transaction_hash TEXT,log_index INTEGER);
-    CREATE TABLE public.outbox_events(correlation_id TEXT,idempotency_key TEXT);`);
-  for(const table of projectionTables) await pool.query(`CREATE TABLE public.${table}(chain_id NUMERIC(78,0),block_number BIGINT);`);
-  await pool.query('ALTER TABLE public.v41_artworks ADD artwork_id NUMERIC(78,0), ADD creator TEXT, ADD metadata_uri TEXT, ADD transaction_hash TEXT;');
-  await pool.query(migration('src/indexer/migrations/014_schema_aware_reorg_rollback.sql'));
-  // The legacy signature delegates exactly as migration 013 does.
-  await pool.query(`CREATE FUNCTION public.rollback_events_from_block(reorg_block BIGINT)
-    RETURNS TABLE(events_deleted BIGINT,auctions_deleted BIGINT,bids_deleted BIGINT,outbox_deleted BIGINT)
-    LANGUAGE plpgsql AS $f$ BEGIN
-      RETURN QUERY SELECT * FROM public.rollback_events_from_block(reorg_block,84532);
-    END $f$;`);
+  await pool.query(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+    CREATE ROLE postgres LOGIN NOSUPERUSER BYPASSRLS PASSWORD 'local-media-worker-only';
+    GRANT USAGE,CREATE ON SCHEMA public TO postgres;`);
   const fenceMigration = migration('sql/migrations/artwork_media_reorg.sql');
-  await pool.query(fenceMigration);
   const legacyMigration = migration('sql/migrations/artwork_media_legacy_intake.sql');
-  await pool.query(legacyMigration);
+  // The real worker is a non-superuser postgres that owns the rollback functions.
+  // initdb's bootstrap role cannot be demoted, so keep fixture administration separate.
+  const setup=await pool.connect();
+  try {
+    await setup.query('SET ROLE postgres');
+    for(const name of ['identity','preparation','submission','registration']) {
+      await setup.query(migration(`sql/migrations/artwork_media_${name}.sql`));
+    }
+    await setup.query(`CREATE TABLE public.event_processing_registry(chain_id NUMERIC(78,0),block_number BIGINT);
+      CREATE TABLE public.contract_events(chain_id NUMERIC(78,0),block_number BIGINT,transaction_hash TEXT,log_index INTEGER);
+      CREATE TABLE public.outbox_events(correlation_id TEXT,idempotency_key TEXT);`);
+    for(const table of projectionTables) await setup.query(`CREATE TABLE public.${table}(chain_id NUMERIC(78,0),block_number BIGINT);`);
+    await setup.query('ALTER TABLE public.v41_artworks ADD artwork_id NUMERIC(78,0), ADD creator TEXT, ADD metadata_uri TEXT, ADD transaction_hash TEXT;');
+    await setup.query(migration('src/indexer/migrations/014_schema_aware_reorg_rollback.sql'));
+    // The legacy signature delegates exactly as migration 013 does.
+    await setup.query(`CREATE FUNCTION public.rollback_events_from_block(reorg_block BIGINT)
+      RETURNS TABLE(events_deleted BIGINT,auctions_deleted BIGINT,bids_deleted BIGINT,outbox_deleted BIGINT)
+      LANGUAGE plpgsql AS $f$ BEGIN
+        RETURN QUERY SELECT * FROM public.rollback_events_from_block(reorg_block,84532);
+      END $f$;`);
+    await setup.query(fenceMigration);
+    await setup.query(legacyMigration);
+  } finally {await setup.query('RESET ROLE');setup.release();}
 
   async function service(query, values) {
     const client=await pool.connect();
@@ -548,5 +556,95 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     const rls=(await pool.query(`SELECT relname,relrowsecurity AND relforcerowsecurity AS private
       FROM pg_class WHERE oid IN ('public.artwork_media_chain_revisions'::regclass,'public.artwork_media_rewinds'::regclass)`)).rows;
     assert.equal(rls.length,2);assert(rls.every(row=>row.private));
+  });
+
+  await t.test('actual indexer recovery methods use the media fence as a non-superuser worker',async workerTest=>{
+    let workerPool,purges=0,networkReads=0;
+    const hadRedis=Object.hasOwn(process.env,'REDIS_URL'),previousRedis=process.env.REDIS_URL;
+    // Loading the engine must not load local credentials or initialize Redis.
+    workerTest.mock.method(require('dotenv'),'config',()=>({parsed:{}}));
+    process.env.REDIS_URL='';
+    try {
+      const cache=(await import('../src/services/cache-service.js')).default;
+      workerTest.mock.method(cache,'purge',async()=>{purges++;});
+      workerTest.mock.method(cache,'getRedis',async()=>assert.fail('Recovery must use the isolated cache stub'));
+      const {default:IndexerSyncEngine}=await import('../src/indexer/sync-engine.js');
+      workerPool=new Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',
+        user:'postgres',password:'local-media-worker-only',connectionTimeoutMillis:1000,statement_timeout:10000});
+      await workerPool.query(`CREATE TABLE public.indexer_state(
+        chain_id NUMERIC(78,0) PRIMARY KEY, last_indexed_block BIGINT NOT NULL,
+        last_confirmed_block BIGINT NOT NULL, confirmation_depth INTEGER NOT NULL,
+        last_indexed_at TIMESTAMPTZ);
+        CREATE TABLE public.block_hashes(chain_id NUMERIC(78,0) NOT NULL,block_number BIGINT NOT NULL,
+          block_hash VARCHAR(66) NOT NULL,parent_hash VARCHAR(66) NOT NULL,timestamp BIGINT NOT NULL,
+          indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(chain_id,block_number));`);
+      const role=(await workerPool.query(`SELECT current_user AS name,rolsuper,rolbypassrls,
+        has_function_privilege(current_user,'public.rollback_events_from_block(bigint,numeric)','EXECUTE') AS can_rollback
+        FROM pg_roles WHERE rolname=current_user`)).rows[0];
+      assert.deepEqual(role,{name:'postgres',rolsuper:false,rolbypassrls:true,can_rollback:true});
+      assert.equal((await workerPool.query(`SELECT pg_get_userbyid(proowner) AS owner FROM pg_proc
+        WHERE oid='public.rollback_events_from_block(bigint,numeric)'::regprocedure`)).rows[0].owner,'postgres');
+      const database={async query(sql,params){return (await workerPool.query(sql,params)).rows;}};
+      const workerState=async()=>({
+        cursors:(await pool.query('SELECT * FROM public.indexer_state ORDER BY chain_id')).rows,
+        hashes:(await pool.query('SELECT * FROM public.block_hashes ORDER BY chain_id,block_number')).rows
+      });
+      for(const method of ['_handleReorg','recoverFromSafeBlock']) {
+        for(const failRollback of [false,true]) await workerTest.test(`${method} ${failRollback?'stops before cursor changes when rollback fails':'rewinds only its chain and retains publication evidence'}`,async()=>{
+          await reset();
+          await pool.query('TRUNCATE public.indexer_state, public.block_hashes');
+          purges=0;networkReads=0;
+          const value=fixture(),foreign=fixture({chain:11155111});
+          await claimed(value);await started(value,method==='_handleReorg');await reconcile(value);
+          await claimed(foreign);await pool.query(identityQuery(foreign));
+          await seedProjection();await seedProjection(123,11155111);
+          await pool.query(`INSERT INTO public.indexer_state VALUES(84532,130,$1,3,'2026-10-23T00:00:00Z'),
+            (11155111,777,700,12,'2026-10-22T00:00:00Z')`,[method==='_handleReorg'?125:119]);
+          await pool.query(`INSERT INTO public.block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
+            SELECT chain_id,block_number,$1,$2,1792713600 FROM unnest(ARRAY[84532,11155111]) AS chain_id
+            CROSS JOIN unnest(ARRAY[119,120,123,130]) AS block_number`,['0x'+'ab'.repeat(32),'0x'+'bc'.repeat(32)]);
+          const before=await snapshot(),beforeWorker=await workerState(),beforeClaim=await claimRow(value);
+          const foreignClaim=await claimRow(foreign),observed=await revision();
+          const engine=new IndexerSyncEngine(database,{chainId:84532,async getCurrentBlock(){networkReads++;return 119;}});
+          const run=async()=>method==='_handleReorg'?engine._handleReorg(120):engine.recoverFromSafeBlock(await engine.getIndexerState());
+          if(failRollback) {
+            await pool.query(`CREATE FUNCTION public._fail_worker_reorg() RETURNS trigger LANGUAGE plpgsql AS $f$
+              BEGIN RAISE EXCEPTION 'FORCED_WORKER_ROLLBACK_FAILURE'; END $f$;
+              CREATE TRIGGER _fail_worker_reorg BEFORE DELETE ON public.contract_events
+              FOR EACH ROW EXECUTE FUNCTION public._fail_worker_reorg();`);
+            try {await assert.rejects(run(),/FORCED_WORKER_ROLLBACK_FAILURE/);}
+            finally {await pool.query('DROP TRIGGER _fail_worker_reorg ON public.contract_events; DROP FUNCTION public._fail_worker_reorg();');}
+            assert.deepEqual(await snapshot(),before);
+            assert.deepEqual(await workerState(),beforeWorker);
+            assert.equal(purges,0);assert.equal(networkReads,0);
+          } else {
+            await run();
+            assert.equal(await revision(),'1');assert.equal(purges,1);
+            assert.equal(networkReads,method==='recoverFromSafeBlock'?1:0);
+            await assert.rejects(reconcile(value,evidence(value),observed),/MEDIA_REGISTRATION_STALE_REVISION/);
+            const after=await snapshot(),afterWorker=await workerState(),afterClaim=await claimRow(value);
+            assert.equal(afterClaim.claim_status,'conflict');
+            for(const field of ['publication_id','registered_artwork_id','submission_started_at','reported_transaction_hash']) {
+              assert.equal(afterClaim[field],beforeClaim[field],field);
+            }
+            assert.deepEqual(after.artwork_media_catalog,before.artwork_media_catalog);
+            assert.deepEqual(after.artwork_media_registration_evidence,before.artwork_media_registration_evidence);
+            assert.deepEqual(await claimRow(foreign),foreignClaim);
+            for(const table of ['contract_events','event_processing_registry',...projectionTables]) {
+              assert.deepEqual(after[table],before[table].filter(row=>row.chain_id===11155111),table);
+            }
+            assert.deepEqual(after.outbox_events,before.outbox_events.filter(row=>row.correlation_id.startsWith('11155111-')));
+            assert.deepEqual(afterWorker.cursors.find(row=>row.chain_id==='11155111'),beforeWorker.cursors.find(row=>row.chain_id==='11155111'));
+            const cursor=afterWorker.cursors.find(row=>row.chain_id==='84532');
+            assert.equal(cursor.last_indexed_block,'119');assert.equal(cursor.last_confirmed_block,'119');
+            assert.deepEqual(afterWorker.hashes,beforeWorker.hashes.filter(row=>row.chain_id==='11155111'||row.block_number==='119'));
+          }
+        });
+      }
+    } finally {
+      if(workerPool) await workerPool.end();
+      workerTest.mock.restoreAll();
+      if(hadRedis) process.env.REDIS_URL=previousRedis; else delete process.env.REDIS_URL;
+    }
   });
 });

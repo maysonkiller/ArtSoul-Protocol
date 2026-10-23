@@ -105,9 +105,14 @@ normal recovery path; first diagnose and preserve the verified configuration.
 Remaining operational follow-ups are explicit:
 
 - The existing three-block confirmation policy is unchanged. Denim reduces its
-  elapsed-time equivalent from about six seconds to 0.6 seconds; review the
-  indexer/recovery confirmation policy together before the next rollout. It is
-  not Ethereum finality. No new confirmation number is silently approved here.
+  elapsed-time equivalent from about six seconds to 0.6 seconds. The subsequent
+  TA-10 review confirms recovery independently requires a common `finalized`
+  anchor from both RPCs; indexed rows are only search hints. The 2000-block
+  scan limit now spans about 6m40s but is neither an attempt expiry nor a
+  latest-history window. Incomplete coverage stays unresolved without another
+  send permission. No change to that recovery rule is required by Denim; depth 3
+  is still not Ethereum finality and remains a separate indexer-policy follow-up.
+  See the official [block lifecycle](https://docs.base.org/upgrades/denim/200ms-blocks#block-lifecycle).
 - Faster polling and block production alter RPC cost assumptions. Keep existing
   spending controls and inspect measured fallback usage; July cost estimates are
   historical. No paid plan or auto-scale setting was enabled.

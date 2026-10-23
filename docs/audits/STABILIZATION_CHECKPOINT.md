@@ -1,9 +1,101 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 cross-reload publication discovery (Canon 1/2/11; local candidate):
+October 24 media rollout (Canon 1/2/11; website protection active):
+
+- Work started in the same checkout at `195be55`; PR #332 is released as
+  `a0f14f4`. After confirming ancestry and identical source trees, the branch
+  fast-forwarded to that merge without changing the pending diff. A recovery
+  patch is in `output/recovery/media-rollout-2026-10-24`. The new diff is a worker integration test and evidence, not another
+  application implementation. Preserve unrelated authority-policy files,
+  `.codex/` and `output/`.
+- The owner delegates the missing-original disposition. Retain works 1-4 and
+  all their history as explicit legacy test exceptions with unavailable original
+  bytes. Do not invent hashes, delete records, infer mainnet cleanup permission,
+  or claim duplicate detection covers those four files. The 32 available originals
+  and new guarded uploads are the covered scope; historical duplicate pairs stay.
+- Before application, read-only preflight confirmed 36 Base Sepolia registrations and no media schema.
+  The actual two-argument rollback body equals migration 014 after LF normalization
+  (SHA256 `ef74957f992d3ed038e095635a100a0ecf471966d67c17e1d6495bd662de1ca1`).
+  Its 17 relevant tables have no user triggers or foreign keys in this snapshot.
+- Four actual worker-method/PostgreSQL cases extend the existing SQL suite:
+  37 pass, zero failures/skips. They use the non-superuser `postgres` owner with
+  BYPASSRLS, preserve claim/evidence on rewind, reject stale verification, check
+  cursor/hash chain isolation and prove SQL failure prevents later worker effects.
+  Network replay is stubbed at the safe block; this is not a live reorg test.
+  Log: `output/audit/media-worker-reorg-2026-10-24.log`.
+- Fresh full/schema backups are ACL-restricted to the current Windows owner in
+  `docs/private/phase-a-db-backup-media-2026-10-23`. Both hashes and the complete
+  custom archive read pass; no full restore is claimed. The private rollout
+  runner rehearses all six migrations in one transaction as the worker-equivalent
+  non-superuser, checks six private forced-RLS tables and 13 function signatures,
+  and proves a whole-batch rollback restores the original function and no tables.
+- Denim review: recovery still requires a common finalized anchor from both
+  RPCs, independently of the indexer's depth 3. The 2000-block scan bound now
+  spans about 6m40s, not an attempt expiry or latest-history window. Excess range
+  remains unresolved and cannot grant another send. No recovery policy change.
+- All six migrations committed atomically and the live catalog matches rehearsal:
+  six forced-RLS private tables, 13 function signatures and explicit privileges.
+  The indexer revision fence became active immediately; website flags were still
+  absent at that schema-only stage. Their later activation is recorded below.
+  `docs/private/media-schema-apply-2026-10-24.json` is the committed receipt.
+  An earlier Vercel read failure stopped before a database connection; its journal
+  and reconciliation are preserved separately. Normal CLI credential refresh and
+  a successful HTTP 200 settings read preceded the reviewed retry.
+- Fresh revision `0` was captured before Alchemy/Tenderly receipt verification and
+  original-byte reads. Independent before/after finalized counters and projection
+  snapshots still contain exactly 36 works. All 32 available originals are unchanged.
+  `docs/private/legacy-media-fresh-2026-10-23T22-12-39-566Z.json` supplies this proof;
+  old snapshots were not relabelled. A real READ COMMITTED rollback rehearsal and
+  independent review preceded the committed 32-row intake. Exact catalog/evidence
+  fields match; duplicate pairs 6/13, 8/32 and 14/15 remain; no historical attempt
+  or preparation was fabricated. Receipt: `legacy-media-intake-apply-2026-10-24.json`.
+- Direct server-function rehearsal now passes against real Supabase Data API and
+  storage: renamed artwork-34 bytes return DUPLICATE_MEDIA; a separate project
+  logo supports immutable preparation, one fresh begin, no repeated permission,
+  retained status and unresolved no-hash recovery. Two private preparations and
+  one intentionally unbroadcast claim remain as evidence; neither is an artwork.
+  No signing, chain write, authentication or native-device PASS is claimed by this
+  direct invocation (`docs/private/media-services-probe-2026-10-24.json`).
+- Website activation is complete: eight reviewed production configuration entries
+  and a same-source redeployment of a0f14f4, dpl_C8VbrvppuWTAU6uT6x6XyjUNYVSk
+  (artsoul-jkn1xt953-maysonkiller-be9112b5.vercel.app), now serving the apex.
+  All three flags are true; Core, code hash, start block and two server-only RPCs
+  are pinned. No unrelated Vercel entries changed. The existing server Alchemy
+  credential is a sensitive environment value and is not stored in evidence.
+- Actual apex SIWE/HTTP verification passes 13 steps with the authorized old
+  creator: config, unauthorized/mismatched-wallet 401, duplicate 409, immutable
+  preparation resume, repeated begin without permission, retained status and a
+  deliberately mismatched historical hash returning NO_MATCHING_REGISTRATION
+  from the two-RPC finalized verifier. No transaction was signed/sent; that probe
+  stays claimed and must not be replayed or deleted. Logout cookie clearing passes.
+  Receipt: docs/private/media-http-probe-2026-10-24.json. All nine upload assets
+  match the prior tested build; output/audit/publication-apex-a0f14f4-2026-10-24.json.
+  Indexer health at 22:24:45Z passes: 13 blocks behind, synced, zero unresolved
+  errors / rolling RPC errors. This is one bounded observation, not an SLA.
+- Final close-out/migration-ledger checks pass 13/13 without skips and the Phase A
+  count check remains 81 done / 2 in progress / 0 planned. Whitespace passes.
+  Log: `output/audit/media-rollout-docs-final-2026-10-24.log`.
+- Exactly next step: complete a guarded browser/device publication and A-83's
+  actual delayed-confirmation recovery acceptance, preserving the saved attempt;
+  then record A-23's beta GO/NO-GO. Do not repeat accepted OAuth/moderation/iPhone
+  ceremonies. Source tests and rollout evidence should be committed separately
+  from unrelated untracked authority-policy files. Keep all claims/evidence on
+  rollback; disable submission only, retaining preparation and recovery.
+
+October 23 cross-reload publication discovery (Canon 1/2/11; released):
+
+- PR #332 is merged/deployed as `a0f14f410f27c1eb47e54c3aa328c18925f5dfda`;
+  its tree equals candidate `195be55`. Candidate CI `40029510499` and merge CI
+  `40030046410` pass: 2211 Linux / 1952 Windows unit checks, zero failures,
+  2 / 18 skips recorded separately, plus 46 contract tests on each OS.
+  Preview and actual apex match all nine checked upload assets; all seven
+  unauthenticated API actions return private/no-store 401 and GET returns 405.
+  Evidence: `output/audit/publication-{preview-195be55,apex-a0f14f4}-2026-10-23.json`,
+  `media-submission-{preview-195be55,apex-a0f14f4}-2026-10-23.json`, and both
+  `publication-reload-ci-full-*-2026-10-23.log` files. Media flags remain absent.
 
 - Starting HEAD `1d79902`; same workspace/branch, no worktree or source overlay.
   Pre-edit copies are in `output/recovery/publication-reload-2026-10-23`.
@@ -28,17 +120,15 @@ October 23 cross-reload publication discovery (Canon 1/2/11; local candidate):
   The initial full unit run has 2208 pass / one PostgreSQL-startup failure / zero
   skips. The clean isolated PostgreSQL retry passes all 32 checks with no skips
   (`output/audit/publication-reload-sql-retry-2026-10-23.log`); the failed first
-  run remains retained. Exact-candidate hosted CI remains a release gate.
+  run remains retained. Exact-candidate and merge CI subsequently passed above.
 - Local browser opening was denied by the saved origin permission policy for
   `http://127.0.0.1:4196`; no alternative surface or policy bypass was used. The
   fixture server is stopped. No compiled-browser or physical-device PASS is
   claimed for this slice. This does not invalidate earlier accepted phone flows.
 - No schema, flags, host, credentials, economics or chain state changed. The
-  website still runs PR #331 / `5f3127c`; all three media flags remain inactive.
-  Formal Phase A remains 81/2/0. Missing-original disposition, current-revision
-  intake/worker integration, reviewed activation and A-83 remain distinct gates.
-- Exactly next step: obtain exact-candidate CI and preview evidence,
-  then review the candidate release while preserving the inactive media gates.
+  website now runs PR #332 / `a0f14f4`; all three media flags remain inactive.
+  Formal Phase A remains 81/2/0. Current-revision intake, reviewed activation
+  and A-83 remain distinct gates. The next bounded rollout step is recorded above.
 
 October 23 two-host maintenance (Canon 1/17; applied, supersedes pending triage):
 

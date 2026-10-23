@@ -1,6 +1,6 @@
 # ArtSoul Controlled Beta Entry
 
-Last reviewed: 2026-10-23
+Last reviewed: 2026-10-24
 
 Status: **NO-GO — entry materials are prepared, but invitations must wait until
 the remaining Phase A acceptance gates pass.**
@@ -21,8 +21,11 @@ network-selection/publication outcomes. Robinhood/Base Sepolia compatibility
 remains UNVERIFIED: neither successful support nor the cause of its historical
 failure is established. This is an explicit beta compatibility limitation, not
 a passed Robinhood device test. Additional
-TA-10 duplicate-file protection is not activated; TA-12 desktop display repairs
-are owner-deferred. See [Phase A close-out](../PHASE_A_CLOSE_OUT.md) for scope and
+TA-10 exact-file protection is active on the website with 32 verified historical
+identities and 13 passing real SIWE/HTTP checks. Works 1-4 remain explicit
+unavailable-original exceptions; direct contract calls can bypass the website
+guard. Guarded browser/device publication acceptance is still pending. TA-12
+desktop display repairs are owner-deferred. See [Phase A close-out](../PHASE_A_CLOSE_OUT.md) for scope and
 evidence. The October 23 GitHub query returned zero open issues; that does not
 clear these recorded gaps or constitute a beta GO. No invitations or beta window
 are opened by this review.

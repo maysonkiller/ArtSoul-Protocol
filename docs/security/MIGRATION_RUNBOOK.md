@@ -62,12 +62,12 @@ Verify against the database before applying or re-applying it.
 | `sql/migrations/indexer_dedup_setup.sql` | `not recorded`. Manual deduplication setup. |
 | `sql/migrations/collection_launch_services.sql` | **LOCAL DRAFT, DO NOT APPLY.** Added during the September takeover; not applied by this task. Services remain unwired/disabled. Inline RLS/service-role restrictions are statically checked; PostgreSQL execution and newsletter delivery consistency remain unverified. |
 | `sql/migrations/profile_email_verification.sql` | **Applied 2026-10-03.** Private wallet-bound mailbox verification; email runtime is enabled. Newsletter consent is separate. See the dated feature-schema record below; do not reapply. |
-| `sql/migrations/artwork_media_identity.sql` | **LOCAL PREPARATION, DO NOT APPLY.** TA-10 exact-byte catalog and atomic publication claims, tested in disposable PostgreSQL 17 only. No production migration or website activation. Upload/metadata binding, broadcast recovery, indexer/reorg handling and legacy coverage must precede rollout; existing duplicate references are retained. |
-| `sql/migrations/artwork_media_preparation.sql` | **LOCAL PREPARATION, DO NOT APPLY.** TA-10 private upload issuance and immutable metadata pins. Both service-only RPCs and default-grant independence are tested in disposable PostgreSQL; the preparation route stays disabled. No production migration, website enforcement or blockchain submission permission. Apply only as part of the reviewed complete identity/recovery rollout, after backup and privilege verification. |
-| `sql/migrations/artwork_media_submission.sql` | **LOCAL PREPARATION, DO NOT APPLY.** TA-10 private pre-wallet attempt timestamp and optional unverified client-reported transaction hash. Apply after media identity and preparation. Atomic begin/report RPCs retain unknown attempts, require the owned deployment, and never set registration status or release a claim. Tested in disposable PostgreSQL only; receipt/event verification and indexer/reorg recovery remain required before activation. Existing forced RLS and service-only reads are retained, and new functions have explicit private grants. |
-| `sql/migrations/artwork_media_registration.sql` | **LOCAL PREPARATION, DO NOT APPLY.** TA-10 atomic finalized-evidence/catalog/claim reconciliation, after identity, preparation and submission. Private forced-RLS evidence table and one service-only RPC; bounded batches retain every matching registration and the original unverified transaction report. Conflicting evidence rolls back the whole batch. The original finality anchor is immutable; this is not an automatic reorg repair policy. Browser integration, historical coverage and reviewed reorg handling remain required before rollout. |
-| `sql/migrations/artwork_media_reorg.sql` | **LOCAL PREPARATION, DO NOT APPLY.** After media registration and indexer 014: a private chain revision fences recovery against projection rollback; affected claims become sticky conflicts without deleting catalog, first finality evidence or the attempt journal. Both existing rollback signatures share the same atomic revision/history/claim/projection transaction. Only the indexer database owner may call rollback; verify the actual worker role before rollout. The service must use the revision-aware reconciliation; direct access to the old writers is revoked. Do not reapply older migrations over this fence. Rewind is conservative quarantine, not proof of a chain reorg or automatic unblocking. The private candidate getter exposes only owned indexed registration hints; they still require both RPCs and the revision fence. Browser recovery and legacy catalog intake/coverage remain rollout prerequisites. |
-| `sql/migrations/artwork_media_legacy_intake.sql` | **LOCAL PREPARATION, DO NOT APPLY.** After the media reorg fence: owner-only intake of one independently verified historical registration and its original-byte identity. Capture the database chain revision before verification, then submit that expected revision. Preserve duplicate historical works and the first finality anchor; never fabricate an upload preparation or publication attempt. No Data API execution permission, automatic backfill, live import or activation. Complete manifest coverage, missing-original disposition, backups and worker-role verification precede a reviewed rollout. |
+| `sql/migrations/artwork_media_identity.sql` | **Applied and verified 2026-10-24.** Private exact-byte catalog and atomic claims. Historical duplicate references are deliberately non-unique. See the media application record below; schema installation alone does not enable website enforcement. |
+| `sql/migrations/artwork_media_preparation.sql` | **Applied and verified 2026-10-24.** Private upload issuance and immutable metadata pins, with explicit service RPC permissions. See the media application record below; schema installation alone does not enable website enforcement. |
+| `sql/migrations/artwork_media_submission.sql` | **Applied and verified 2026-10-24.** Pre-wallet attempt journal and unverified client hash. Unknown attempts are retained without automatic release. See the media application record below; schema installation alone does not enable website enforcement. |
+| `sql/migrations/artwork_media_registration.sql` | **Applied and verified 2026-10-24.** Atomic verified registration/catalog/evidence persistence. The first finalized anchor is preserved. See the media application record below; schema installation alone does not enable website enforcement. |
+| `sql/migrations/artwork_media_reorg.sql` | **Applied and verified 2026-10-24.** Active indexer revision fence on both rollback signatures; only the database owner can roll back. Stale evidence is rejected and affected claims become sticky conflicts. Do not apply older rollback/writer migrations over this fence. See the media application record below; schema installation alone does not enable website enforcement. |
+| `sql/migrations/artwork_media_legacy_intake.sql` | **Applied and verified 2026-10-24.** Owner-only historical intake, bound to a revision captured before fresh chain/media verification. No website execution grant or synthetic historical publication attempts. See the media application record below; schema installation alone does not enable website enforcement. |
 | `sql/migrations/launch_service_quotas.sql` | **Applied 2026-10-03.** Quota-only prerequisite for private email; no Collection Launch tables or services were activated. |
 | `sql/migrations/artist_support.sql` | **Applied 2026-10-03.** Event-only donation projection and independent message visibility. Live catalog reverified October 7; Donate indexer source connected October 7. Public Donate activation remains separate. |
 | `sql/migrations/artist_support_moderation.sql` | **Applied 2026-10-03; moderation dormant.** Existing complaint/review extensions target donation-message text only. No review or visibility decision was made by schema preparation. |
@@ -75,6 +75,44 @@ Verify against the database before applying or re-applying it.
 | `migrations/001_ai_integration.sql` | Historical/manual, third tree. Its `001` prefix does **not** belong to the indexer sequence; the numbering collision with `sql/migrations/001_core_indexer_schema.sql` is real. Verify schema before any use. |
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.
+
+## Media Application Record (2026-10-24)
+
+Scope: the existing Base Sepolia 1/1 website only, under the owner's duplicate-file
+requirement and delegated legacy disposition. No economics, contract, mainnet,
+artwork deletion or reset. Private operation journals and the dated checkpoint
+hold exact file hashes, database catalog evidence and reconciliation outcomes.
+
+- A current full custom backup and schema backup were created, hashed and read
+  successfully. No full restore is claimed. The six published media migrations
+  were rehearsed in one transaction under a non-superuser owner with BYPASSRLS.
+- After independent review, the same six-file transaction committed. Six private
+  forced-RLS tables, 13 function signatures and effective grants match rehearsal.
+  Anonymous/authenticated access is denied; the service has only the documented
+  reads/RPCs. The indexer revision fence became active at commit. Actual worker
+  integration passes 37 tests, including stale proof and rollback failure cases.
+- Fresh revision 0 was captured before verifying all 36 registrations through
+  Alchemy/Tenderly and rereading original bytes. Independent counter/projection
+  snapshots remained unchanged. A rollback rehearsal preceded committed intake
+  of 32 original identities and their exact finalized evidence. Works 1-4 remain
+  unavailable-original exceptions; pairs 6/13, 8/32 and 14/15 retain every work.
+- No historical preparations/attempts were fabricated. A subsequent real Data
+  API/storage probe created two explicitly labelled preparations and one
+  unbroadcast test claim. Renamed known bytes are rejected; metadata is immutable;
+  begin permits only one handoff and status/recovery cannot grant a retry.
+- Website activation completed in a separate reviewed operation on October 24:
+  all three media flags, pinned Core/code/deployment block and two server RPCs
+  were configured, then the existing a0f14f4 source was redeployed. Actual apex
+  SIWE/HTTP verification passes 13 checks and all nine upload assets match the
+  tested build. Browser/device publication and delayed-receipt acceptance remain.
+  Before future changes, recheck the live catalog, registration coverage and deployment.
+  Direct contract calls can bypass this website guard; four unavailable files,
+  re-encoding and future collection editions are outside its guarantee.
+- After activation, containment means disabling only new submission and deploying
+  the same recovery-capable code. Preserve preparation/recovery, pins, stored
+  media, all claims and evidence. Turning preparation off restores the unguarded
+  legacy path and is not an acceptable routine rollback. An unknown commit or
+  broadcast requires reconciliation, never deletion or automatic replay.
 
 ## Security Migration Status
 

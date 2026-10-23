@@ -1,6 +1,6 @@
 # Phase A Close-Out
 
-Updated: 2026-10-23. Local work is in `C:\Projects\ArtSoul`; see
+Updated: 2026-10-24. Local work is in `C:\Projects\ArtSoul`; see
 [workspace reconciliation](WORKSPACE.md) and the [current checkpoint](audits/STABILIZATION_CHECKPOINT.md).
 
 One page answering one question: what is left before Phase A can close, and who
@@ -10,21 +10,23 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **81 done, 2 in progress, 0 planned** across A-01 to A-83.
 
-Latest code release: PR #331 (`5f3127c`), verified on the apex domain.
-Candidate and post-merge CI pass (Linux 2194 / Windows 1935 unit checks,
+Latest code release: PR #332 (`a0f14f4`), verified on the apex domain.
+Candidate and post-merge CI pass (Linux 2211 / Windows 1952 unit checks,
 zero failures; 2 / 18 skips; 46 contract tests on each OS). The guarded media
-implementation described below is now published, but all three flags and the
-live media schema remain inactive. Publication is not duplicate-enforcement
-acceptance. See the checkpoint for exact logs and activation limitations.
+implementation described below is now published. The private media schema and
+32 verified historical identities are installed. The October 24 same-source
+redeployment activates the guard with reviewed server pins; 13 actual apex
+SIWE/HTTP checks pass. A guarded browser/device publication and delayed-receipt
+acceptance remain separate. See the checkpoint for exact evidence and limits.
 
 October 23 hosting follow-up is applied on both designated servers: security
 packages, restored key-only indexer SSH, verified database TLS and a 2000 ms
 Base poll override. Actual worker identity and existing rollback execution
-rights are now observed directly; media schema/worker integration remains
-unactivated. [Evidence and limits](audits/HOST_SECURITY_2026-10-23.md) include
+rights are now observed directly. The reviewed media revision fence is installed
+and worker integration passes 37 checks. [Evidence and limits](audits/HOST_SECURITY_2026-10-23.md) include
 Denim's confirmation/cost implications. This does not close A-83 or A-23.
 
-October 23 remaining work, without repeating completed ceremonies:
+October 24 current disposition, without repeating completed ceremonies:
 
 1. **Current mobile defects:** PR #320's bounded Donate/Report dialogs are
    published and pass actual-apex desktop-engine geometry checks. The separate
@@ -60,61 +62,42 @@ October 23 remaining work, without repeating completed ceremonies:
    In a separate October 23 answer the owner confirms the ArtSoul mark appeared
    without empty cards immediately after publishing; A-71 is accepted.
    A-83's delayed-receipt recovery remains distinct; ordinary success does not prove it.
-   See the current checkpoint for hashes and evidence. An additional code
-   inspection confirms there is no enforced exact-file duplicate check despite
-   the browser calculating a hash. The requested duplicate protection remains
-   open as TA-10; a website guard cannot enforce uniqueness in the unchanged contract.
-   PR #327 (`3f12c48`, October 23 local time) adds private durable upload issuance and immutable server metadata
-   preparation, with actual PostgreSQL/API retry and ownership tests. The route
-   is disabled and always returns `can_submit: false`; no live migration or
-   browser switch occurred. Broadcast recovery, indexer/reorg integration and
-   legacy coverage still precede activation. Candidate CI passes on both OSes;
-   preview/apex artifacts match. See the current checkpoint.
-   Published PR #329 (`dbefd68`) adds an atomic pre-wallet attempt journal and
-   private recovery reads, retaining `can_submit: false`. Its live schema and
-   browser integration remain disabled; verified receipt/event recovery is still
-   needed. Exact-candidate CI and preview/apex boundary/artifact checks pass.
-   The October 23 local read-only verifier now checks exact registration receipts
-   and bounded no-hash scans against two RPCs, with pinned code and finality
-   evidence. It passes 104 focused checks, build and an actual artwork 36 replay.
-   The local follow-up now persists evidence, catalog and claim reconciliation
-   atomically, preserving the original unverified hash and every exact match.
-   The local indexer rollback fence now rejects stale verification and retains
-   affected claims as conflicts, with 18 actual PostgreSQL checks covering
-   concurrency and atomic failure. A further tested server change now uses owned
-   indexed candidates to recover missing/replaced hashes through both RPCs.
-   The full indexed inventory contains 36 IDs: 32 files are hashed, while works
-   1-4 lack fetchable originals. The local browser preparation now preserves
-   UUID-bound immutable drafts and passes real SQL and 16 built-browser cases.
-   It remains disabled, stops before registration, and does not close TA-10.
-   The following local slice connects bounded authenticated recovery, with
-   server-only pins, durable quotas and a shared deadline. It passes actual SQL
-   and 28 built-browser cases; a verified registration opens its existing page
-   without another transaction. The separate activation gate remains disabled.
-   The next local slice connects one-time begin/registration behind a third
-   default-off flag, preserving hashes independently of the preview-card cache
-   and preventing permission replay after lost responses. Targeted checks and
-   actual SQL pass; the checkpoint records final build/CI evidence. Legacy
-   catalog intake is now implemented as an owner-only, revision-fenced operation.
-   Actual PostgreSQL checks and an import/replay of 32 independently verified
-   historical records pass, preserving three duplicate pairs and adding no
-   synthetic publication attempts. All 36 historical registrations are verified
-   through Alchemy/Tenderly, but works 1-4 still lack fetchable original files.
+   See the current checkpoint for hashes and evidence. TA-10 adds website
+   exact-byte duplicate protection; the unchanged permissionless contract does
+   not enforce it. Titles are reusable, filename changes cannot evade the guard,
+   and re-encoding/cropping is outside exact-byte identity. The staged preparation,
+   submission and recovery work is published through PR #332. It binds immutable
+   drafts to a wallet/deployment, permits one handoff, preserves unknown attempts
+   and reconciles finalized receipt/event evidence through two independent RPCs.
+   An indexer revision fence rejects evidence verified before a rewind and retains
+   affected claims as conflicts. Indexed rows are candidate hints, not chain proof.
+   The dated checkpoint retains the earlier disabled-stage tests and reviews.
    Published PR #331 adds check-only recovery for a retained attempt
    in the current page, independent of new form/AI input. It renews an expired
    wallet sign-in when explicitly clicked and cannot send another registration
    or auction. Candidate CI, 64 compiled-browser journeys and apex verification pass; see the checkpoint.
-   A subsequent local candidate discovers the existing saved drafts after
+   Published PR #332 discovers the existing saved drafts after
    reload, without a file/new AI or automatic requests. Explicit selection uses
    the same check-only path, with current-wallet, storage and late-response
-   guards. Its 116 focused checks, 28 related checks and build pass; exact CI and
-   release are pending. Local browser opening was denied by a saved permission,
-   so no browser/device PASS is claimed for that candidate. Actual worker role
+   guards. Its 116 focused checks, 28 related checks, build and exact CI pass.
+   Local browser opening was denied by a saved permission,
+   so no browser/device PASS is claimed for that slice. Actual worker role
    and rollback execution rights are now observed in the host report.
-   Missing-original disposition, current-revision intake/worker integration and
-   reviewed rollout remain open; all new media schema remains inactive.
-   These replays do not simulate or accept
-   A-83's real receipt delay.
+   The owner now delegates missing-original disposition: retain works 1-4 and
+   their history as explicit legacy test exceptions, without invented digests or
+   a claim that their unavailable files can be detected. The covered scope is
+   the 32 available originals and new guarded uploads. No mainnet reset is approved.
+   Actual worker-method PostgreSQL integration now passes 37 tests, including
+   the non-superuser owner and failure isolation. A fresh protected backup and
+   a complete atomic migration/rollback rehearsal are retained. All six migrations
+   have now committed, with private forced RLS and exact grants verified. Fresh
+   current-revision verification and the 32-row legacy intake also committed,
+   preserving all historical works and duplicates. Direct server functions using
+   real Data API/storage reject a renamed known original and retain one intentionally
+   unbroadcast probe without granting a repeated send. Website activation and
+   deployed HTTP checks now pass after the same-source activation; guarded
+   browser/device publication acceptance remains open. All three flags are active.
+   These checks do not establish A-83's actual-device receipt-delay acceptance.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous
@@ -162,7 +145,7 @@ traces retain identical text widths. Both candidates pass build and full
 Linux/Windows CI. These desktop-engine checks do not replace native iPhone
 acceptance, which was pending at that dated check and is now recorded above.
 No wallet, OAuth or factor ceremony is reopened. The remaining criteria are
-listed in the current October 23 close-out above.
+listed in the current October 24 close-out above.
 
 **October 20 Ownership repair published:** PR #312 (`bf6604d`) removes the
 separate ownership-profile round trips and reveals each decoded avatar with its
