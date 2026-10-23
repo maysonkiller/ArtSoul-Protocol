@@ -56,10 +56,41 @@ October 23 remaining work, without repeating completed ceremonies:
    browser switch occurred. Broadcast recovery, indexer/reorg integration and
    legacy coverage still precede activation. Candidate CI passes on both OSes;
    preview/apex artifacts match. See the current checkpoint.
-   The next local patch adds an atomic pre-wallet attempt journal and private
-   recovery reads, retaining `can_submit: false`. Its live schema and browser
-   integration remain disabled; verified receipt/event recovery is still needed.
-3. **Visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
+   Published PR #329 (`dbefd68`) adds an atomic pre-wallet attempt journal and
+   private recovery reads, retaining `can_submit: false`. Its live schema and
+   browser integration remain disabled; verified receipt/event recovery is still
+   needed. Exact-candidate CI and preview/apex boundary/artifact checks pass.
+   The October 23 local read-only verifier now checks exact registration receipts
+   and bounded no-hash scans against two RPCs, with pinned code and finality
+   evidence. It passes 104 focused checks, build and an actual artwork 36 replay.
+   The local follow-up now persists evidence, catalog and claim reconciliation
+   atomically, preserving the original unverified hash and every exact match.
+   The local indexer rollback fence now rejects stale verification and retains
+   affected claims as conflicts, with 18 actual PostgreSQL checks covering
+   concurrency and atomic failure. A further tested server change now uses owned
+   indexed candidates to recover missing/replaced hashes through both RPCs.
+   The full indexed inventory contains 36 IDs: 32 files are hashed, while works
+   1-4 lack fetchable originals. The local browser preparation now preserves
+   UUID-bound immutable drafts and passes real SQL and 16 built-browser cases.
+   It remains disabled, stops before registration, and does not close TA-10.
+   The following local slice connects bounded authenticated recovery, with
+   server-only pins, durable quotas and a shared deadline. It passes actual SQL
+   and 28 built-browser cases; a verified registration opens its existing page
+   without another transaction. The separate activation gate remains disabled.
+   The next local slice connects one-time begin/registration behind a third
+   default-off flag, preserving hashes independently of the preview-card cache
+   and preventing permission replay after lost responses. Targeted checks and
+   actual SQL pass; the checkpoint records final build/CI evidence. Legacy
+   catalog intake is now implemented as an owner-only, revision-fenced operation.
+   Actual PostgreSQL checks and an import/replay of 32 independently verified
+   historical records pass, preserving three duplicate pairs and adding no
+   synthetic publication attempts. All 36 historical registrations are verified
+   through Alchemy/Tenderly, but works 1-4 still lack fetchable original files.
+   Missing-original disposition, unresolved-attempt UX, actual worker role and
+   reviewed rollout remain open; all new media schema remains inactive.
+   These replays do not simulate or accept
+   A-83's real receipt delay.
+3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous
    desktop tests and published repairs supply the implementation evidence.
@@ -67,6 +98,13 @@ October 23 remaining work, without repeating completed ceremonies:
    gallery position without flicker or visible reconstruction. Prior desktop
    BFCache evidence remains separate; the phone result does not establish an
    internal Safari cache marker. No repeat of these checks is needed.
+   A later October 23 desktop report is tracked separately as TA-12: brief
+   Ownership flicker, slow Protocol activity / Provenance and late card timers.
+   Frame review confirms brief loading text, delayed history/statistics and an
+   initially empty timer pill; it does not establish overlap or a code cause.
+   Exact timestamps are in the checkpoint. The owner defers
+   these repairs until existing phase work is finished. Earlier phone acceptance
+   remains valid; the beta decision must disclose this deferred desktop follow-up.
 4. **A-57 disposition:** current switching works according to the owner; the
    historical Robinhood iOS provider failure is unresolved evidence, not a newly
    confirmed defect. Do not invent a wallet limitation to close it.

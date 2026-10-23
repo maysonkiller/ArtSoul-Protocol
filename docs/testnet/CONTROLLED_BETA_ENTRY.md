@@ -1,6 +1,6 @@
 # ArtSoul Controlled Beta Entry
 
-Last reviewed: 2026-10-15
+Last reviewed: 2026-10-23
 
 Status: **NO-GO — entry materials are prepared, but invitations must wait until
 the remaining Phase A acceptance gates pass.**
@@ -11,10 +11,16 @@ and the canonical Phase A backlog remain authoritative.
 
 A8 operating/test evidence and the subsequent UI repair are accepted October 15
 after PR #309 / #310, the owner's single-passkey confirmation and actual apex
-artwork-tools verification. Remaining connected-device/publishing acceptance and
-the final operator decision still block beta entry. The October 15 GitHub open-issue query
-returned zero issues; that does not by itself clear unrecorded device outcomes
-or constitute a beta GO. No invitations or beta window are opened by this review.
+artwork-tools verification. The owner subsequently accepted native iPhone
+publication, X sharing, Donate/Report geometry, profile rendering, browser Back
+and the branded publication wait. Do not repeat those ceremonies.
+The remaining formal gates are A-57's historical wallet-failure disposition,
+A-83's real delayed-confirmation acceptance and A-23's final decision. Additional
+TA-10 duplicate-file protection is not activated; TA-12 desktop display repairs
+are owner-deferred. See [Phase A close-out](../PHASE_A_CLOSE_OUT.md) for scope and
+evidence. The October 23 GitHub query returned zero open issues; that does not
+clear these recorded gaps or constitute a beta GO. No invitations or beta window
+are opened by this review.
 
 ## 1. Scope and safety
 

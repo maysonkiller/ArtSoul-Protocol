@@ -29,15 +29,17 @@ export function allowedArtworkUrl(value) {
 
 // Only these public artwork stores are fetched. Caller-controlled URLs never
 // reach arbitrary hosts, REST/auth endpoints, or redirect destinations.
-export async function fetchArtworkResource(uri, { maxBytes, timeoutMs, acceptContentType = () => true }) {
+export async function fetchArtworkResource(uri, { maxBytes, timeoutMs, acceptContentType = () => true, signal }) {
   const url = allowedArtworkUrl(uri);
   if (!url) return null;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   let reader;
   try {
-    const response = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    requestSignal.throwIfAborted();
+    const response = await fetch(url, { signal: requestSignal, redirect: 'error' });
     if (!response.ok) return null;
     const mimeType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
     if (!acceptContentType(mimeType) || Number(response.headers.get('content-length')) > maxBytes) return null;
@@ -48,6 +50,7 @@ export async function fetchArtworkResource(uri, { maxBytes, timeoutMs, acceptCon
     const data = Buffer.alloc(maxBytes);
     let size = 0;
     while (true) {
+      requestSignal.throwIfAborted();
       const { done, value } = await reader.read();
       if (done) break;
       if (value.byteLength > maxBytes - size) return null;

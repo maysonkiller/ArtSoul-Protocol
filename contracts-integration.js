@@ -408,7 +408,21 @@ class ArtSoulContracts {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
         await this.assertExpectedWallet(options);
-        const tx = await this.coreContract.registerArtwork(metadataURI);
+        const core = this.coreContract;
+        const assertCore = () => {
+            if (this.coreContract !== core || (options.expectedCoreAddress &&
+                String(core.target || '').toLowerCase() !== options.expectedCoreAddress.toLowerCase())) {
+                throw new Error('The artwork contract changed. Review the action again.');
+            }
+            options.assertCurrent?.();
+        };
+        assertCore();
+        if (options.beforeSubmit) {
+            await options.beforeSubmit();
+            await this.assertExpectedWallet(options);
+            assertCore();
+        }
+        const tx = await core.registerArtwork(metadataURI);
         console.log('Registering artwork...', tx.hash);
         try {
             await options.onSubmitted?.(tx.hash);

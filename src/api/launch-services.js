@@ -38,9 +38,10 @@ export function privateDigest(value) {
 }
 
 // Atomic database quota; no cross-instance or restart bypass for these services.
-export async function consumeServiceQuota(scope, subject, max = 4, seconds = 3600) {
+export async function consumeServiceQuota(scope, subject, max = 4, seconds = 3600, { signal } = {}) {
   const result = await supabaseRest('rpc/consume_launch_service_quota', {
-    method: 'POST', body: {p_key: digest(`${scope}:${subject}`), p_max: max, p_seconds: seconds}
+    method: 'POST', body: {p_key: digest(`${scope}:${subject}`), p_max: max, p_seconds: seconds},
+    ...(signal ? { signal } : {})
   });
   if (result !== true) throw serviceError('RATE_LIMITED', 'Please wait before trying again.', 429);
 }

@@ -3,7 +3,429 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 TA-10 submission journal (Canon 1/2/11; local, rollout disabled):
+October 23 TA-10 one-time registration handoff (Canon 1/2/11):
+
+- Starting commit `333044100a48088e5f341652a88d6b81609d9da7` passes exact CI
+  `39881727281`: Linux 2143 pass / 2 skips, Windows 1897 pass / 18 skips,
+  zero failures and 46 contract tests on each OS. Its clean PostgreSQL retry
+  passes 39/39; preview `artsoul-2ue50j92x-maysonkiller-be9112b5.vercel.app`
+  denies all seven unauthenticated publication actions (401, private/no-store),
+  rejects GET (405), and matches eight built assets after CRLF normalization.
+- The new, default-off `ARTSOUL_MEDIA_SUBMISSION_ENABLED` requires recovery
+  configuration. An owned begin request accepts only its UUID, rechecks the
+  original bytes and pinned metadata, and uses the existing atomic SQL journal.
+  Only a fresh successful begin response permits one wallet request. Repeated,
+  lost, malformed or interrupted responses never recreate that permission.
+- The existing registration adapter checks wallet, chain, Core and current form
+  around the handoff. Browser tabs serialize the same immutable draft. A returned
+  hash is retained locally and reported independently; failure of either storage
+  channel does not suppress the other. The cosmetic pending-card cache is best
+  effort only in the guarded path. Existing legacy error handling is preserved.
+  Pending-attempt wording takes precedence over nested wallet/provider errors.
+  The normal successful flow still registers, then creates its initial auction;
+  recovery of an earlier registration never sends either transaction again.
+- Targeted API/client/adapter/upload and close-out checks pass (116); actual PostgreSQL checks
+  pass (39), including one-time API permission and existing concurrency/retry
+  coverage. Build and 32 compiled Chromium/WebKit journeys at 390/1440px pass,
+  exercising the actual registration adapter with synthetic wallet responses,
+  storage failures and the disabled legacy path. No native signature was made.
+  Commit `28f48220aec003d36e8ea8195190a3e90c32e05c` passes exact CI
+  `39884207844`: Linux 2160 pass / 2 skips; Windows 1914 pass / 18 skips;
+  zero failures and 46 contract tests on each OS. The current adapter is v14
+  on all five loading pages. Its preview denies all seven unauthenticated
+  actions (401, private/no-store), rejects GET (405), and matches nine built
+  assets after CRLF normalization. Evidence uses the
+  `output/audit/publication-submission-*2026-10-23` files.
+- Interpretation: four begin checks per wallet per minute and a shared 25-second
+  request budget reuse the recovery operational bounds, not protocol economics.
+  HTTP cancellation does not imply SQL rollback. A wallet rejection or interrupted
+  handoff conservatively retains the attempt: automatic release remains unsafe
+  with the unchanged direct-call contract. This UX/rollout limitation is unresolved,
+  not a passed native-wallet acceptance or a closed duplicate-enforcement feature.
+- No production release, live schema/configuration change, signing or contract
+  deployment. All three flags remain disabled. Preserve the unrelated untracked
+  authority-policy files, `.codex/` and `output/`. A-57, A-83 and A-23 remain open;
+  owner-deferred TA-12 display work is unchanged. Next concrete step: prepare a
+  verified legacy catalog intake with explicit coverage for the four unavailable
+  originals, before worker-role preflight and a reviewed migration/activation.
+
+October 23 legacy verification follow-up (read-only; not an import):
+
+- Base public RPC could not return some historical blocks; PublicNode omitted
+  old receipts. A bounded dRPC probe also lacked historical code/block evidence.
+  These failures are provider coverage gaps, not proof that artwork disappeared.
+  No verification condition was relaxed and no application RPC was changed.
+- Existing configured Alchemy plus the Tenderly public Base Sepolia RPC verify
+  all 36 registrations against chain 84532, pinned Core/code, exact receipt/log,
+  creator/metadata and canonical finality. Re-reading metadata and original bytes
+  verifies 32 hashes, unchanged from the earlier inventory (49,137,320 bytes).
+  Works 1-4 still have no fetchable original through their recorded test/malformed
+  IPFS pointers. Existing duplicate pairs 6/13, 8/32 and 14/15 are preserved.
+  Evidence: `docs/private/legacy-media-candidates-2026-10-23T01-33-58-126Z.json`
+  and `output/audit/legacy-media-two-archive-verification-2026-10-23.log`.
+- A read-only database session observation finds a postgres Supavisor session
+  with an indexer-query hint and postgres-owned rollback functions. The pooler
+  masks its originating host, so this does not yet establish the Hetzner
+  worker's effective role. Do not substitute inference for host preflight.
+  Evidence: `docs/private/media-worker-role-observation-2026-10-23T01-37-42-841Z.json`.
+- `artwork_media_legacy_intake.sql` now adds owner-only, single-registration
+  intake after the reorg fence. It validates scope/finality shape, checks the
+  revision captured before verification, and commits catalog/evidence/claim
+  reconciliation together. It preserves the first anchor, historical duplicates
+  and sticky conflicts. No fake preparation/publication is created and no Data
+  API role can execute it. The unfenced old writers remain revoked.
+- Actual disposable PostgreSQL checks pass 32/32, including 13 new intake
+  scenarios for both rollback race orders, retries, contradictions, null inputs,
+  atomic failure and role denial. A separate local rehearsal imports the 32
+  verified existing records, replays all 32 without mutation, retains the three
+  duplicate pairs, and leaves publication/preparation counts zero. Evidence:
+  `output/audit/legacy-media-local-intake-2026-10-23.json`. This is a local fixture
+  with revision zero, not permission to import the old proof into live state.
+  The complete no-default-grants, migration and close-out checks pass 40/40 in
+  `output/audit/legacy-intake-grants-and-closeout-2026-10-23.log`.
+- The verified manifest is local evidence, not an applied catalog or complete
+  original-file coverage. A-57/A-83/A-23, unresolved-attempt disposition and
+  rollout acceptance remain open; no production schema, flags or data changed.
+  The exact earlier CI above precedes the intake addition; use PR #330's checks
+  for the later head. Next concrete step: finish a reviewed activation manifest
+  with the four missing originals, unresolved-attempt policy and actual worker
+  role resolved, then capture the live revision BEFORE fresh intake verification.
+
+October 23 TA-10 authenticated recovery continuation (Canon 1/2/11):
+
+- Recovery implementation saved in `659c2b178a57bbf11b5089343e7ebce315c6d5d9`.
+  Local full unit run: 2174 pass / zero failures or skips (includes the preserved
+  untracked authority-policy test; tracked CI is reported independently).
+  Its Linux CI `39880861020` failed at the unrelated Data API grant fixture:
+  the Unix-socket readiness query reached the temporary initdb server before
+  its shutdown. The installed PostgreSQL image entrypoint confirms that server
+  disables TCP. The affected grant fixture and the touched preparation fixture
+  now use TCP inside their own disposable containers, waiting for the final
+  server without relaxing any assertion. The grant checks and all 37 preparation
+  subchecks passed on the first targeted rerun, but its Docker cleanup exceeded
+  30 seconds; no owned container remained. The clean retry subsequently passes
+  39/39 in `publication-recovery-final-pg-retry-2026-10-23.log`.
+  Recovery navigation also reuses `navigateAfterPublish`, retaining the branded
+  finalization state; 24 upload regressions and four rebuilt browser journeys pass.
+- Dormant recovery configuration is documented in `.env.example`; all flags
+  remain false and deployment pins empty. No runtime configuration was changed.
+- Resume `dd2424dae2a9ed0e23d1e5c768e6018dda1ecf30` in the same workspace.
+  That exact commit passes CI `39879486672`: Linux 2134 pass / 2 skips,
+  Windows 1888 pass / 18 skips, zero failures, 46 contract tests on each OS.
+  These counts precede this recovery continuation, not its final CI.
+- The publication route now accepts an owned `recover` request containing only
+  its UUID. It requires the existing SIWE/intended-wallet match, preparation
+  activation and a separate `ARTSOUL_MEDIA_RECOVERY_ENABLED=true` gate. Server
+  configuration must supply the reviewed Core code hash, deployment start block
+  and two independent HTTPS RPCs. Browser-provided endpoints, ranges, hashes or
+  evidence are rejected. All results retain `can_submit:false`.
+- Recovery reuses durable service quotas: four requests per wallet per minute,
+  and one per owned publication per 30 seconds. These are operational read-cost
+  limits, not protocol economics. The shared 25-second cancellation budget
+  includes quotas, SQL, original bytes, metadata and both RPCs. HTTP cancellation
+  cannot promise rollback of an already submitted SQL call; the saved journal
+  and idempotent reconciliation cover a committed response that was lost.
+- The browser checks pending/no-hash attempts through this gated route. A
+  verified string artwork ID opens the existing artwork page without another
+  registration or auction request. Unresolved, reverted, conflicted, throttled
+  or interrupted recovery retains the draft. Original hashes/timestamps stay
+  unchanged. No new dependency, schema, worker or signing path was introduced.
+- This diff passes 126 focused checks and 39 actual PostgreSQL checks, including
+  authenticated recovery with real durable quotas and reconciliation after a
+  lost committed response. Build passes. All 28 isolated built Chromium/WebKit
+  journeys at 390/1440px pass, including verified navigation, pending/conflict/
+  rate-limit states and the disabled legacy path. Evidence:
+  `output/audit/publication-recovery-focused-2026-10-23.log`,
+  `publication-recovery-pg-2026-10-23.log`, `publication-recovery-build-2026-10-23.log`,
+  `publication-recovery-built-2026-10-23.json`. Full unit results are recorded above.
+  One reused reviewer found no blocker and finished; no agent swarm was started.
+- No production release, live migration, activation or transaction. Preserve
+  unrelated authority-policy files and `.codex/` / `output/`. TA-10 is not closed:
+  next concrete step is the one-time begin/registration handoff. Legacy catalog
+  intake, four unavailable originals and actual worker-role verification still
+  precede rollout. A-83 native delayed-receipt acceptance, A-57 disposition and
+  A-23 remain open; the owner-deferred TA-12 display work is unchanged.
+
+October 23 TA-10 browser preparation (Canon 1/2/11; not activated):
+
+- Resume `e4ae8bfb765c6ee3cad453ad5803a3d88490054d`, same workspace/branch.
+  Its exact CI `39877617886` passes: Linux 2118 pass / 2 skips, Windows 1872
+  pass / 18 skips, zero failures, 46 contract tests on each OS. These counts
+  precede the browser diff below; they are not its verification.
+- Publish now checks authenticated, uncached preparation configuration. Only
+  explicit disabled mode selects the existing flow; an unavailable response
+  never bypasses preparation. Every publication API action checks the intended
+  wallet against the signed-in wallet, including shared-cookie changes in
+  another tab. This adds one bounded configuration request to existing Publish.
+- Enabled preparation keeps a separate durable UUID/file/wallet/Core draft,
+  serializes tabs with Web Locks, and saves exact metadata before requests.
+  Lost issue/PUT/prepare responses reuse the same paths and metadata. A new AI
+  estimate after reload cannot replace the original pinned estimate or prevent
+  retry with identical user inputs. Missing storage/locks stops before issuance.
+  Signed upload credentials and bytes are not persisted. PUT is bounded to
+  60 seconds, followed by server byte verification if its outcome is uncertain.
+- This slice never calls begin, initializes contracts, or sends a transaction
+  when preparation is enabled. It preserves `can_submit:false`, including a
+  no-hash attempt returned by the journal. It does not implement browser receipt
+  recovery or claim that TA-10 is enforced. The shared legacy file route remains
+  available because profile-avatar uploads use it too; no avatar flow changed.
+  The existing publication path now snapshots file/duration/guidance and stops
+  before registration if the file, form, wallet or chain changes during awaits.
+- Checks: 85 focused client/API/upload regressions; 39 actual PostgreSQL checks,
+  including the browser helper through the authenticated API and real SQL after
+  a committed response is lost; build passes. The final built artifact passes
+  16 Chromium/WebKit journeys at 390/1440px with isolated APIs/wallets. These
+  browser fixtures are not native wallet or delayed-receipt acceptance.
+  Logs: `output/audit/publication-browser-focused-2026-10-23.log`,
+  `publication-browser-pg-2026-10-23.log`, `publication-browser-build-2026-10-23.log`,
+  and `publication-preparation-built-2026-10-23.json`.
+- Independent review identified the changed-AI retry and stalled-PUT cases;
+  both are repaired and covered. Reviewer finished; no extra agents remain active.
+  Interpretations: local drafts are recoverable hints, not server authority;
+  missing hashes never authorize retries; derived AI output is preserved while
+  user-entered details remain immutable for the attempt. No economics changed.
+- No production release, migration, feature activation or signing. Preserved
+  unrelated authority-policy files, `.codex/` and `output/` remain unstaged.
+  Next concrete step: connect bounded authenticated registration recovery and
+  the one-time begin/registration handoff, retaining every ambiguous attempt.
+  Legacy catalog intake, four unavailable originals and the worker-role check
+  still precede live migration/activation. A-83/A-23 remain separate gates.
+
+October 23 TA-10 indexed registration recovery and full indexed-media inventory:
+
+- Resume `fd109663cf2284c42be0088a44c086220e36825a` in the same workspace/branch.
+  Its exact CI `39876151905` passes: Linux 2113 pass / 2 skips; Windows 1868
+  pass / 18 skips; zero failures; 46 contract tests on each OS. This precedes
+  the follow-up below and is not claimed as testing its new diff.
+- Recovery now finds owned, deployment-scoped registration candidates in
+  `v41_artworks`. The private stable getter preserves numeric precision and
+  returns up to nine rows to detect verifier-bound overflow. The captured chain
+  revision precedes this read. Indexed rows only choose a bounded RPC scan:
+  every candidate must match canonical, finalized evidence through both RPCs
+  before persistence. More than eight candidates, a range wider than 2,000
+  blocks, or a missing canonical match stays unresolved with no resend.
+  Empty indexer results do not prove absence; a known hash still uses receipt
+  verification. No-hash attempts can recover once their indexed event appears.
+  No background process, dependency or new indexer polling loop was introduced.
+- Verification on the follow-up: 110 focused API/verifier/actual PostgreSQL
+  checks, and 52 preparation/recovery/grant checks on actual PostgreSQL, all
+  pass with zero skips. The API-to-SQL test now recovers a replacement hash
+  from an indexed row without a caller-supplied scan, handles a lost committed
+  response, repeats safely, and retains the original hash and attempt time.
+  Logs: `output/audit/registration-indexer-recovery-focused-2026-10-23.log` and
+  `registration-indexer-recovery-integration-2026-10-23.log`.
+- Read-only live DB snapshot contains all 36 Base Sepolia indexed registrations
+  and no media-identity/preparation/registration/reorg schema. Both rollback
+  functions are owned by postgres; the remote worker's connection role remains
+  unchecked. Two existing RPCs agree on pinned Core code, counter 36 and finalized
+  block 48957097 (`0x83ddbb17f6d5bd045b7f6dede63657b6c9b25b8247a17ab229444bd9f878deac`).
+  Indexed IDs cover 1-36 at that anchor. This count check does not independently
+  verify every historical receipt or metadata pointer.
+- Bounded original-media reads across the complete indexed snapshot hash 32/36
+  files (49,137,320 downloaded bytes). Works 1-4 have no fetchable media reference
+  through their stored historical test/malformed IPFS metadata URIs. Confirmed
+  duplicate pairs remain 6/13, 8/32 and 14/15. No existing work or duplicate was
+  deleted, hidden, rewritten or imported into the inactive identity catalog.
+  Private evidence: `media-rollout-inventory-2026-10-23T00-14-06-971Z.json`,
+  `indexed-media-hashes-2026-10-23T00-15-46-531Z.json`, and
+  `media-inventory-counter-2026-10-23T00-17-19-021Z.json` in `docs/private/`.
+- Interpretation: an indexed registration is a recovery hint, never finality
+  proof. Metadata-URI equality is not file identity. Missing legacy bytes must
+  remain an explicit coverage gap; do not fabricate a hash or claim full-file
+  coverage from a complete ID count. Website enforcement cannot constrain direct
+  calls to the unchanged contract; future contract work remains separate.
+- Next concrete step: connect the authenticated browser preparation/recovery
+  flow to these tested server primitives, retaining unknown attempts and requiring
+  the complete rollout checks before activation. Legacy catalog intake and the
+  four unavailable originals remain explicit gaps. A-83 native delay and A-23
+  beta acceptance are not established by these offline/read-only checks.
+
+October 23 TA-10 indexer rollback fence (Canon 1/2/11; not activated):
+
+- Resume HEAD `c565156d8671047e3f4b3175e8de7e2a2416992a`, same workspace and
+  branch. Preserve `.codex/`, `output/` and the two untracked authority-policy
+  files; they are unrelated and excluded. PR #330 remains unmerged; latest
+  application release remains `dbefd68`.
+- Reproduced the missing coordination boundary: registration evidence can be
+  computed before a projection rollback and committed afterward. The new manual
+  `artwork_media_reorg.sql` migration adds a private chain revision and rewind
+  journal. Recovery reads the revision before RPC verification; the writer
+  checks it under the same chain-row lock as both existing indexer rollback
+  signatures, before UUID/artwork/hash/claim locks. Revisions cross JSON as text.
+- Rollback changes revision, records its boundary, quarantines affected claims
+  and removes projections in one transaction. Event blocks OR first finalized
+  anchors at/above the boundary are affected. Older finalized evidence stays
+  registered. Catalog, evidence, UUIDs, original reported hashes and submission
+  timestamps survive; neither timeout nor rollback authorizes another send.
+  Direct service access to the old unfenced writers is revoked. Contradictory
+  immutable evidence rolls back its batch and commits a sticky owned-claim
+  conflict instead of leaving an apparently successful registration.
+- Verification: 117 focused API/verifier/security/ledger checks; 39 actual
+  PostgreSQL preparation/journal/recovery checks; 18 additional PostgreSQL
+  rollback/concurrency checks; 21 no-default-grant/ledger checks, all passing
+  with zero skips; build passes. Both race orders use actual row-lock waits.
+  A forced late projection failure restores revision, claims, journal and all
+  projections. Tests also cover large revisions, old-RPC denial, repeated
+  migrations, wrong ownership and unchanged hash/no-hash attempt journals.
+- An initial generated SQL delimiter typo failed migration application and was
+  repaired before the final PostgreSQL runs. The initial combined log retains
+  that failure; the separate final grant log is green. Logs in `output/audit/`:
+  `registration-reorg-focused-2026-10-23.log`,
+  `registration-reorg-integration-2026-10-23.log` (39 preparation checks pass),
+  `registration-reorg-grants-final-2026-10-23.log`, and
+  `registration-reorg-build-2026-10-23.log`. The existing reviewer implemented
+  and ran the new 18-check PostgreSQL suite; it is finished and inactive.
+- Interpretation: an indexer rewind is not itself proof of an actual chain
+  reorganization. Quarantine is deliberately conservative when it crosses
+  immutable evidence; there is no automatic unblocking or new protocol state.
+  No economics, contract, UI or public recovery-route change. No live schema,
+  feature flag, signing, transaction or production deployment changed.
+- Rollout still needs worker intake, legacy coverage and browser recovery.
+  Before schema activation verify the actual worker DB role owns/can execute
+  rollback; ordinary key-only SSH access was unavailable in this session, so
+  that live role check is not claimed. No credentials were requested or printed.
+  Native A-83 delayed-confirmation acceptance remains separate.
+- Next concrete step: connect bounded indexer registration intake/replay to the
+  verified media recovery path, preserving the rollback fence and keeping the
+  public browser switch disabled until legacy coverage and recovery are ready.
+
+October 23 TA-10 atomic registration persistence (Canon 1/2/11; not activated):
+
+- Resume HEAD `fe62b749620ddc595badae47aa4c1a3164c028aa`, same workspace and
+  branch. PR #330's prior final-head CI `39871785909` is green, but is not
+  evidence for this new diff. Preserved untracked authority-policy files,
+  `.codex/` and `output/` remain excluded from commits.
+- `artwork_media_registration.sql` adds a private forced-RLS evidence table
+  and one service-only RPC. Verified block hash, pinned code hash and the first
+  finalized anchor commit with the existing catalog and claim reconciliation.
+  All 1-8 exact matches are retained. Multiple valid registrations block the
+  claim as a conflict; contradictory immutable evidence rolls back the entire
+  batch. UUID, sorted artwork, hash and row locks follow the existing writers.
+- `recoverPublication` reuses raw-byte hashing and metadata validation, reads
+  the actual pinned metadata without re-uploading, runs the two-RPC verifier
+  and invokes the atomic RPC. It is deliberately absent from the public route.
+  A trusted explicit scan can recover a different registration transaction;
+  the original unverified client-reported hash remains unchanged. Every result
+  still has `can_submit: false`. No new dependency or contract change.
+- Verification on this diff: 109 focused API/verifier/regression checks,
+  39 actual disposable PostgreSQL 17 checks, 21 no-default-grant/ledger checks,
+  all passing with zero skips; build passes. The PostgreSQL integration runs
+  preparation, journal, original-byte/metadata verification, synthetic two-RPC
+  evidence and real SQL persistence end-to-end, including a committed write
+  whose HTTP response is lost, a repeated read, a replacement hash and an ID
+  above JavaScript's safe integer range. Separate tests cover concurrent writers,
+  multiple registrations, late anchors, conflicting batches and forced rollback.
+  Logs in `output/audit/`: `registration-persistence-focused-2026-10-23.log`,
+  `registration-persistence-pg-final-2026-10-23.log`,
+  `registration-persistence-grants-2026-10-23.log`, and
+  `registration-persistence-build-2026-10-23.log`.
+- Independent read-only SQL/API review found no blocker in this dormant slice.
+  Only the existing review agent was reused; it is finished and inactive.
+- Code candidate `688f16704410ab53a2d403dab68bda7b0ef5170b` is preserved in
+  PR #330. Its full CI `39873578936` exposed a missing entry in the static
+  self-hardening migration inventory. The new table already passes actual
+  forced-RLS/service-only/no-default-grant checks; register its migration in
+  `security-migration.test.cjs` without editing the historical applied SQL or
+  weakening the coverage check. Corrected HEAD
+  `c565156d8671047e3f4b3175e8de7e2a2416992a` passes full CI `39873900992`:
+  Linux 2094 pass / 2 skips, Windows 1867 pass / 17 skips, zero failures;
+  46 contract tests pass on each OS, static checks and Vercel preview pass.
+  Logs: `output/audit/registration-persistence-final-{linux,windows}-2026-10-23.log`.
+  No application/SQL changes followed this tested head. This closing checkpoint
+  note is the only remaining tracked local diff; PR #330 remains unmerged and
+  the latest application release remains `dbefd68`.
+- Interpretation recorded: first saved finality evidence is immutable; a later
+  verified head does not rewrite it. This is recovery bookkeeping, not a new
+  protocol state or changed auction timing. An SQL rejection of contradictory
+  evidence is not a complete indexer/reorg quarantine policy. Activation still
+  requires that policy, historical coverage and browser integration. No live
+  migration, flag activation, transaction, or production release in this block.
+  Local fixtures do not establish A-83's native delayed-receipt acceptance.
+- Next concrete step: integrate registration recovery with indexer/reorg handling
+  so contradictory or orphaned evidence keeps claims blocked while retaining
+  immutable history; verify convergence and failure paths before browser rollout.
+
+October 23 TA-10 registration evidence (Canon 1/2/11; PR #330, not activated):
+
+- Resume HEAD `f004836`, same workspace/branch; preserved untracked authority
+  files are excluded. No UI, contract, live schema or feature flag changed.
+- `src/api/upload-registration-evidence.js` reuses the indexer's registration
+  ABI and installed ethers. Its read-only verifier requires the pinned Base
+  Sepolia chain/Core/code hash, exact creator and metadata URI, matching receipts
+  and canonical block hashes on two RPCs. Relayed execution is valid; the outer
+  sender is not substituted for the event's creator.
+- Each RPC's own advertised finalized header is checked before choosing their
+  common anchor. Code is checked at that anchor and the registration block;
+  anchor/event headers are reread before returning evidence. This is deliberately
+  stronger than the indexer's three-block lag for an immutable catalog write;
+  it changes no auction timing or economics. See the official
+  [Base finality stages](https://docs.base.org/specifications/transactions/transaction-finality)
+  and [JSON-RPC block/receipt definitions](https://ethereum.org/developers/docs/apis/json-rpc/).
+- A missing transaction hash can use a trusted explicit scan page (at most
+  2,000 blocks, 128 returned logs and eight matching registrations). The result
+  reports coverage/cursor and retains every match, cross-checked against receipts.
+  No result proves absence or permits another send: `can_submit` is always false.
+  RPC bodies/time are bounded; errors do not reveal endpoints or upstream text.
+- Independent review found an unchecked higher finalized header; it was repaired
+  and negative regressions added. The subsequent bounded review has no blocker.
+  The focused suite passes 104 checks (59 in the new evidence suite), zero skips;
+  build passes. Logs: `output/audit/registration-evidence-focused-2026-10-23.log`
+  and `registration-evidence-build-2026-10-23.log` in the same directory.
+  Candidate `8d3a74904cb2823172f576d317da9e2b86121686` is preserved in
+  [PR #330](https://github.com/maysonkiller/ArtSoul-Protocol/pull/330).
+  Exact-candidate CI `39871256897` passes: Linux 2080 pass / 2 skips;
+  Windows 1862 pass / 17 skips; zero failures, and 46 contract tests pass on
+  each OS. Log: `output/audit/registration-evidence-ci-2026-10-23.log`.
+  PR is not merged; production remains `dbefd68`. No activation is requested
+  by this preservation/review step.
+- Actual read-only evidence: both existing RPCs verify artwork 36 at block
+  `48908274` by reported hash and by an explicit five-block no-hash scan, and
+  reject changed metadata. The verified common finalized anchor is `48939549`.
+  Latest evidence after the review fix:
+  `output/audit/registration-evidence-2026-10-22T23-18-49-628Z.json`;
+  local reproducer `docs/private/verify-registration-evidence-2026-10-23.mjs`.
+  No transaction was sent and no actual receipt delay was induced: A-83 remains open.
+- The verifier is not connected to the public route or catalog writer. The current
+  catalog cannot atomically retain block-hash/finality anchors or handle reorg
+  discrepancies. Do not insert these observations through the old RPC and call
+  durable recovery complete. Browser integration and legacy coverage remain open.
+- Next concrete step: persist verified registration and its block/finality anchors
+  atomically with the existing catalog/claim reconciliation, including repeated
+  reads, multiple matching registrations and conflicting evidence tests. Keep
+  activation disabled and preserve the original unverified reported hash.
+
+October 23 deferred desktop observation (Canon 5/16/17):
+
+- Resume HEAD `f004836`, same workspace and branch. The existing untracked
+  `.codex/`, `output/` and two authority-policy files remain untouched.
+- The owner reports a very brief Ownership flash when opening an artwork on
+  desktop, slow Protocol activity / Provenance population, and delayed card
+  auction timers after refresh. Possible subsection overlap is a hypothesis,
+  not a diagnosed cause. Source: `Запись экрана 2026-10-23 004307.mp4`, retained
+  in the owner's local screen-recordings directory (59,452,664 bytes). The
+  file is 54.4 seconds at 30 fps. Subsequent frame review covers the full
+  recording at one-second intervals, a consecutive 30 fps Ownership burst,
+  and 10 fps activity/provenance/timer intervals. Observed transitions:
+  - 00:02.033 and 00:02.067: Ownership shows `Loading profile...`; by
+    00:02.100 avatars and shortened addresses are visible.
+  - 00:20.5-00:21.2: Provenance shows `Loading indexer history...`; four
+    events appear by 00:21.3.
+  - 00:29.9-00:30.4: Protocol activity has dashes; the four values are
+    visible by 00:30.5.
+  - 00:49.7-00:50.1: the live card has an empty timer pill; `1d 22h`
+    appears by 00:50.2. This is outside the uploaded artwork image.
+  Crops/contact sheets are preserved in `output/audit/video-review-2026-10-23/`.
+  These are recorded visual transitions, not request timings or established
+  causes. No overlap is demonstrated in the inspected frames; no fresh browser
+  reproduction, code diagnosis or audio transcription is claimed.
+- The owner explicitly defers these repairs until the existing phase work is
+  finished. Track the follow-up as October 23 TA-12 in `BACKLOG.md`; do not
+  change these UI areas now or erase the separately accepted iPhone results.
+  A beta decision must disclose this pending desktop observation.
+- Next concrete step remains TA-10 bounded registration receipt/event recovery;
+  no new wallet ceremony, deployment or UI repair is implied by this report.
+
+October 23 TA-10 submission journal (Canon 1/2/11; released, rollout disabled):
 
 - Resume HEAD `7a1adf7` in the same workspace. Native acceptance PR #328 is
   merged as `79fc7cb`; its exact candidate `62ac5a8` passed Linux/Windows/static
@@ -32,7 +454,19 @@ October 23 TA-10 submission journal (Canon 1/2/11; local, rollout disabled):
   also pass (13 checks). Logs: `output/audit/media-submission-full-unit-2026-10-23.log`,
   `media-submission-grants-2026-10-23.log` and `media-submission-build-2026-10-23.log`
   in the same directory. The untracked authority tests remain excluded from Git.
-  Candidate hosted checks and release verification remain separate.
+  Exact candidate `0518cfb` passes hosted CI `39868754680`: Linux 2021 pass /
+  2 skips; Windows 1803 pass / 17 skips; zero failures, and 46 contract tests
+  pass on each OS. Log: `output/audit/media-submission-candidate-ci-2026-10-23.log`.
+- PR #329 is merged as `dbefd6840ea5765dc2f4041731925ac6174987a6`; this workspace
+  fast-forwarded without replacing files. Production deployment `7265815674`
+  succeeded at 23:02:47 UTC on October 22 (October 23 Warsaw). Preview and apex
+  checks match eight pages and 57 assets. All five guest preparation/journal
+  actions return private/no-store 401; GET returns 405. Server code is published,
+  but live schema, feature flag, browser integration and enforcement are not
+  activated. Exact evidence: `output/audit/media-submission-apex-dbefd68-2026-10-23.json`
+  and `page-font-apex-dbefd68-release-2026-10-20.json` in that directory. These
+  checks do not claim a live journal write or any wallet transaction.
+  Post-merge main CI `39869122331` also completed successfully.
 - Interpretation: reported hash means unverified client evidence, not an
   on-chain state. A missing hash or an empty indexer query never proves that
   nothing was sent. Recovery must establish positive chain evidence before

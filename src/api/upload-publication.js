@@ -2,6 +2,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { getPublicStorageUrl, normalizeWallet, supabaseRest, supabaseStorageRest } from './backend.js';
 import { allowedArtworkUrl, fetchArtworkResource } from './safe-artwork-fetch.js';
 import { uploadedMediaUrl, verifyUploadedMedia } from './upload-media-identity.js';
+import { createRegistrationReaders, verifyArtworkRegistration } from './upload-registration-evidence.js';
+import { consumeServiceQuota } from './launch-services.js';
 import { buildStoragePath, buildMetadataStoragePath, createSignedArtworkUpload } from './routes/upload/file.js';
 import { ARTWORK_MIME_EXTENSIONS, MAX_ARTWORK_UPLOAD_BYTES, MAX_METADATA_BYTES } from '../config/upload-policy.js';
 
@@ -10,7 +12,8 @@ const TRANSACTION_HASH = /^0x[0-9a-f]{64}$/;
 const METADATA_FILENAME = /^\d{13}-[0-9a-f-]{36}-[\w.-]{1,101}\.json$/;
 const MEDIA_FIELDS = ['image', 'image_url', 'animation_url', 'media_url', 'file_url', 'poster_url', 'thumbnail_url'];
 const fail = (code, statusCode = 409) => Object.assign(new Error(code), { code, statusCode });
-const rpc = (name, body) => supabaseRest(`rpc/${name}`, { method: 'POST', body, signal: AbortSignal.timeout(15000) });
+const requestSignal = signal => signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000);
+const rpc = (name, body, signal) => supabaseRest(`rpc/${name}`, { method: 'POST', body, signal: requestSignal(signal) });
 
 export function publicationId(value) {
   if (typeof value !== 'string' || !UUID.test(value)) throw fail('INVALID_PUBLICATION_ID', 400);
@@ -24,6 +27,73 @@ export function preparationDeployment() {
   const core = normalizeWallet(process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA);
   if (!core || /^0x0{40}$/.test(core)) throw fail('MEDIA_PREPARATION_UNAVAILABLE', 503);
   return { chainId: 84532, core };
+}
+
+// Reviewed deployment pins are required separately from preparation activation.
+// Neither RPC endpoints, scan ranges nor evidence are accepted from the browser.
+export function publicationRecoveryConfiguration(deployment) {
+  if (process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED !== 'true') throw fail('MEDIA_RECOVERY_DISABLED', 503);
+  const coreCodeHash = process.env.ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH;
+  const startBlock = process.env.ARTSOUL_MEDIA_RECOVERY_START_BLOCK;
+  if (deployment.chainId !== 84532 || !TRANSACTION_HASH.test(coreCodeHash || '') || /^0x0{64}$/.test(coreCodeHash) ||
+      typeof startBlock !== 'string' || !/^[1-9][0-9]{0,77}$/.test(startBlock) || BigInt(startBlock) >= 2n ** 256n) {
+    throw fail('MEDIA_RECOVERY_UNAVAILABLE', 503);
+  }
+  let rpcs;
+  try { rpcs = createRegistrationReaders([
+    process.env.ARTSOUL_MEDIA_RECOVERY_RPC_PRIMARY, process.env.ARTSOUL_MEDIA_RECOVERY_RPC_SECONDARY
+  ]); } catch { throw fail('MEDIA_RECOVERY_UNAVAILABLE', 503); }
+  return { deployment: { ...deployment, coreCodeHash, startBlock }, rpcs };
+}
+
+export function publicationSubmissionConfiguration(deployment) {
+  if (process.env.ARTSOUL_MEDIA_SUBMISSION_ENABLED !== 'true') throw fail('MEDIA_SUBMISSION_DISABLED', 503);
+  // Recovery must be configured before any one-time handoff is offered. A
+  // transport failure after begin cannot safely grant another wallet request.
+  publicationRecoveryConfiguration(deployment);
+}
+
+export async function requestPublicationSubmission(wallet, body, deployment) {
+  const id = publicationId(body.publication_id);
+  if (Object.keys(body).some(key => !['action', 'publication_id'].includes(key))) throw fail('INVALID_SUBMISSION_REQUEST', 400);
+  publicationSubmissionConfiguration(deployment);
+  const signal = AbortSignal.timeout(25000);
+  await consumeServiceQuota(`media-submission:${deployment.chainId}:${deployment.core}`, wallet, 4, 60, { signal });
+  const { row, metadataUri } = await readPreparation(wallet, id, deployment, signal);
+  const media = await verifyUploadedMedia(wallet, row.media_path, { signal });
+  if (!row.metadata_json || row.media_sha256 !== media.sha256 || Number(row.byte_size) !== media.size ||
+      row.content_type !== media.contentType) throw fail('MEDIA_PREPARATION_MISMATCH');
+  validatePublicationMetadata(row.metadata_json, row, media);
+  await verifyPreparedMetadata(row, metadataUri, signal);
+  signal.throwIfAborted();
+  const saved = await rpc('begin_artwork_media_submission', {
+    p_publication_id: id, p_chain_id: deployment.chainId, p_core_address: deployment.core,
+    p_creator_wallet: wallet, p_metadata_uri: metadataUri
+  }, signal);
+  signal.throwIfAborted();
+  const result = submissionView(saved, id, wallet, deployment);
+  if (result.metadata_uri !== metadataUri || typeof result.submission_created !== 'boolean' ||
+      !result.submission_started_at || !['claimed', 'registered', 'conflict'].includes(result.claim_status) ||
+      (result.submission_created && (result.claim_status !== 'claimed' || result.reported_transaction_hash))) {
+    throw fail('MEDIA_PREPARATION_MISMATCH');
+  }
+  // Only this successful, fresh begin response permits one wallet request.
+  // Status, retries, recovery and a lost response never recreate permission.
+  return { ...result, chain_id: deployment.chainId, core_address: deployment.core,
+    can_submit: result.submission_created === true };
+}
+
+export async function requestPublicationRecovery(wallet, body, deployment) {
+  const id = publicationId(body.publication_id);
+  if (Object.keys(body).some(key => !['action', 'publication_id'].includes(key))) throw fail('INVALID_RECOVERY_REQUEST', 400);
+  const configuration = publicationRecoveryConfiguration(deployment);
+  // One shared budget includes quotas, storage, SQL and both chain readers.
+  // A lost response or expired budget never clears the submission journal.
+  const signal = AbortSignal.timeout(25000);
+  const scope = `media-recovery:${deployment.chainId}:${deployment.core}`;
+  await consumeServiceQuota(scope, wallet, 4, 60, { signal });
+  await consumeServiceQuota(`${scope}:publication`, `${wallet}:${id}`, 1, 30, { signal });
+  return recoverPublication(wallet, id, configuration.deployment, { rpcs: configuration.rpcs, signal });
 }
 
 function assertIssuance(row, wallet, deployment) {
@@ -128,8 +198,12 @@ async function storePreparedMetadata(row, uri) {
       signal: AbortSignal.timeout(15000)
     });
   } catch { /* Verify the actual object below, without exposing storage errors. */ }
+  await verifyPreparedMetadata(row, uri);
+}
+
+async function verifyPreparedMetadata(row, uri, signal) {
   const stored = await fetchArtworkResource(uri, {
-    maxBytes: MAX_METADATA_BYTES, timeoutMs: 10000, acceptContentType: type => type === 'application/json'
+    maxBytes: MAX_METADATA_BYTES, timeoutMs: 10000, acceptContentType: type => type === 'application/json', signal
   });
   if (!stored) throw fail('PUBLICATION_METADATA_UNAVAILABLE', 503);
   let parsed;
@@ -137,9 +211,9 @@ async function storePreparedMetadata(row, uri) {
   if (!isDeepStrictEqual(parsed, row.metadata_json)) throw fail('PUBLICATION_METADATA_CONFLICT');
 }
 
-async function readPreparation(wallet, id, deployment) {
+async function readPreparation(wallet, id, deployment, signal) {
   const rows = await supabaseRest(`artwork_media_preparations?publication_id=eq.${id}&creator_wallet=eq.${wallet}&select=*&limit=1`, {
-    signal: AbortSignal.timeout(15000)
+    signal: requestSignal(signal)
   });
   const row = rows?.[0];
   const metadataUri = assertIssuance(row, wallet, deployment);
@@ -184,22 +258,18 @@ function submissionView(row, id, wallet, deployment) {
     publication_id: id, metadata_uri: row.metadata_uri, claim_status: row.claim_status,
     submission_started_at: row.submission_started_at || null,
     reported_transaction_hash: row.reported_transaction_hash || null,
-    // The journal is dormant scaffolding, not registration authorization.
-    // In particular, a client-reported hash does not establish broadcast.
+    // Journal reads and client-reported hashes never authorize registration.
     can_submit: false,
     ...(typeof row.submission_created === 'boolean' ? { submission_created: row.submission_created } : {})
   };
 }
 
-export async function journalPublication(wallet, body, deployment) {
+export async function journalPublication(wallet, body, deployment, { signal } = {}) {
   const id = publicationId(body.publication_id);
   const params = { p_publication_id: id, p_chain_id: deployment.chainId,
     p_core_address: deployment.core, p_creator_wallet: wallet };
   let row;
-  if (body.action === 'begin') {
-    const { metadataUri } = await readPreparation(wallet, id, deployment);
-    row = await rpc('begin_artwork_media_submission', { ...params, p_metadata_uri: metadataUri });
-  } else if (body.action === 'report-transaction') {
+  if (body.action === 'report-transaction') {
     const hash = typeof body.transaction_hash === 'string' ? body.transaction_hash.toLowerCase() : '';
     if (!TRANSACTION_HASH.test(hash)) throw fail('INVALID_TRANSACTION_HASH', 400);
     row = await rpc('report_artwork_media_transaction', { ...params, p_transaction_hash: hash });
@@ -207,11 +277,81 @@ export async function journalPublication(wallet, body, deployment) {
     const rows = await supabaseRest(`artwork_media_publications?publication_id=eq.${id}&creator_wallet=eq.${wallet}` +
       `&chain_id=eq.${deployment.chainId}&core_address=eq.${deployment.core}` +
       '&select=publication_id,creator_wallet,chain_id,core_address,metadata_uri,claim_status,submission_started_at,reported_transaction_hash&limit=1', {
-      signal: AbortSignal.timeout(15000)
+      signal: requestSignal(signal)
     });
     row = rows?.[0];
   } else {
     throw fail('INVALID_PUBLICATION_ACTION', 400);
   }
   return submissionView(row, id, wallet, deployment);
+}
+
+// The optional operator scan and pinned deployment/readers come from the server, not JSON
+// submitted by a browser. A lost response can repeat this exact reconciliation.
+export async function recoverPublication(wallet, id, deployment, { rpcs, scan = null, signal }) {
+  publicationId(id);
+  if (!wallet || normalizeWallet(wallet) !== wallet || /^0x0{40}$/.test(wallet)) throw fail('INVALID_RECOVERY_SCOPE', 400);
+  signal?.throwIfAborted();
+  const { row, metadataUri } = await readPreparation(wallet, id, deployment, signal);
+  if (!row.metadata_json || !row.media_sha256) throw fail('MEDIA_PREPARATION_MISMATCH');
+  const journal = await journalPublication(wallet, { action: 'status', publication_id: id }, deployment, { signal });
+  if (journal.metadata_uri !== metadataUri) throw fail('MEDIA_PREPARATION_MISMATCH');
+  const media = await verifyUploadedMedia(wallet, row.media_path, { signal });
+  if (row.media_sha256 !== media.sha256 || Number(row.byte_size) !== media.size ||
+      row.content_type !== media.contentType) throw fail('MEDIA_PREPARATION_MISMATCH');
+  validatePublicationMetadata(row.metadata_json, row, media);
+  await verifyPreparedMetadata(row, metadataUri, signal);
+  // Capture before any chain reads. SQL compares under the same chain lock as
+  // indexer rollback; a later read here would bless evidence from an old chain.
+  const revision = await supabaseRest(`rpc/read_artwork_media_revision?p_chain_id=${deployment.chainId}`, {
+    signal: requestSignal(signal)
+  });
+  if (typeof revision !== 'string' || !/^(0|[1-9][0-9]{0,77})$/.test(revision)) {
+    throw fail('MEDIA_REGISTRATION_REVISION_UNAVAILABLE', 503);
+  }
+  let candidates = [];
+  if (!scan) {
+    const query = new URLSearchParams({p_publication_id:id, p_chain_id:String(deployment.chainId),
+      p_core_address:deployment.core, p_creator_wallet:wallet});
+    candidates = await supabaseRest(`rpc/read_artwork_media_registration_candidates?${query}`, {
+      signal: requestSignal(signal)
+    });
+    if (!Array.isArray(candidates) || candidates.length > 9 || candidates.some(candidate =>
+      typeof candidate?.artwork_id !== 'string' || !/^[1-9][0-9]{0,77}$/.test(candidate.artwork_id) ||
+      typeof candidate.block_number !== 'string' || !/^(0|[1-9][0-9]{0,77})$/.test(candidate.block_number) ||
+      typeof candidate.transaction_hash !== 'string' || !TRANSACTION_HASH.test(candidate.transaction_hash))) {
+      throw fail('MEDIA_REGISTRATION_INDEX_UNAVAILABLE', 503);
+    }
+    if (candidates.length > 8) return {publication_id:id, state:'unresolved', reason:'INDEXED_REGISTRATION_LIMIT', can_submit:false};
+    if (candidates.length) {
+      const blocks = candidates.map(candidate => BigInt(candidate.block_number));
+      const first = blocks.reduce((a,b) => a < b ? a : b), last = blocks.reduce((a,b) => a > b ? a : b);
+      if (last - first >= 2000n) return {publication_id:id, state:'unresolved', reason:'INDEXED_REGISTRATION_RANGE', can_submit:false};
+      scan = {fromBlock:first.toString(), toBlock:last.toString()};
+    }
+  }
+  const evidence = await verifyArtworkRegistration({ deployment, creator: wallet, metadataUri,
+    transactionHash: scan ? null : journal.reported_transaction_hash, scan }, { rpcs, signal });
+  signal?.throwIfAborted();
+  if (evidence.state !== 'verified') return { publication_id: id, ...evidence };
+  // An indexed candidate missing from canonical RPC evidence may be orphaned
+  // or lagging. Do not silently certify only the subset that happened to match.
+  if (candidates.some(candidate => !evidence.registrations.some(registration =>
+    registration.artwork_id === candidate.artwork_id && registration.block_number === candidate.block_number &&
+    registration.transaction_hash === candidate.transaction_hash))) {
+    return {publication_id:id, state:'unresolved', reason:'INDEXER_REGISTRATION_MISMATCH', can_submit:false};
+  }
+  const saved = await rpc('reconcile_artwork_media_registration', {
+    p_publication_id: id, p_chain_id: deployment.chainId, p_core_address: deployment.core,
+    p_creator_wallet: wallet, p_media_sha256: media.sha256, p_media_uri: media.mediaUrl,
+    p_byte_size: media.size, p_metadata_uri: metadataUri, p_evidence: evidence, p_expected_revision: revision
+  }, signal);
+  if (saved?.publication_id !== id || saved.can_submit !== false ||
+      !['registered', 'conflict'].includes(saved.claim_status) ||
+      (saved.registered_artwork_id !== null && (typeof saved.registered_artwork_id !== 'string' ||
+        !/^[1-9]\d{0,77}$/.test(saved.registered_artwork_id))) ||
+      (saved.claim_status === 'registered' && !saved.registered_artwork_id)) throw fail('MEDIA_PREPARATION_UNAVAILABLE', 503);
+  return { publication_id: id, state: saved.claim_status, registered_artwork_id: saved.registered_artwork_id,
+    registrations: evidence.registrations, can_submit: false,
+    ...(evidence.coverage ? { coverage: evidence.coverage } : {}) };
 }

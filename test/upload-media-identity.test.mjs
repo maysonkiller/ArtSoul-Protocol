@@ -52,6 +52,18 @@ test('a different byte sequence produces a different identity', async () => {
   assert.notEqual((await verifyUploadedMedia(wallet, path)).sha256, first.sha256);
 });
 
+test('shared recovery cancellation stops media reads before fetch or before a digest is returned',async()=>{
+  const controller=new AbortController();let calls=0;
+  globalThis.fetch=async(_url,options)=>{
+    calls++;assert(options.signal instanceof AbortSignal);
+    controller.abort();return new Response('bytes',{headers:{'content-type':'image/png'}});
+  };
+  await assert.rejects(verifyUploadedMedia(wallet,path,{signal:controller.signal}),expectCode('UPLOAD_MEDIA_TIMEOUT',503));
+  assert.equal(calls,1);
+  await assert.rejects(verifyUploadedMedia(wallet,path,{signal:controller.signal}),expectCode('UPLOAD_MEDIA_TIMEOUT',503));
+  assert.equal(calls,1);
+});
+
 test('only the authenticated wallet original upload path can be fetched', async () => {
   let fetches = 0;
   globalThis.fetch = async () => { fetches++; throw Error('unexpected fetch'); };

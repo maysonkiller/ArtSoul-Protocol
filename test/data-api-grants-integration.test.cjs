@@ -12,7 +12,10 @@ function docker(...args) {
 let available = false;
 try { available = docker('version', '--format', '{{.Server.Os}}') === 'linux'; } catch {}
 function query(sql) {
-  return execFileSync('docker', ['exec', '-i', container, 'psql', '-U', 'postgres', '-d', 'artsoul',
+  // The image's temporary initdb server accepts Unix sockets before restarting.
+  // TCP is available only on the final server; stay inside this disposable container.
+  return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=local-grants-only', container,
+    'psql', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'artsoul',
     '-X', '-qAt', '-v', 'ON_ERROR_STOP=1'], {input: sql, encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'], timeout: 30000}).trim();
 }
@@ -29,14 +32,15 @@ const features = [
   'a8g_staff_factor_setup', 'a8h_staff_factor_pgcrypto_resolution',
   'launch_service_quotas', 'profile_email_verification', 'artist_support',
   'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
-  'artwork_media_submission'
+  'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [
   'artsoul_staff_roles', 'artsoul_staff_setup_permissions', 'artsoul_staff_totp_policy',
   'artsoul_staff_totp_grants', 'artsoul_staff_totp_factors', 'artsoul_staff_totp_attempts',
   'artsoul_staff_authority_policy', 'artsoul_staff_authority_requests', 'artsoul_staff_authority_events',
-  'artwork_media_catalog', 'artwork_media_publications', 'artwork_media_preparations'
+  'artwork_media_catalog', 'artwork_media_publications', 'artwork_media_preparations', 'artwork_media_registration_evidence',
+  'artwork_media_chain_revisions', 'artwork_media_rewinds'
 ];
 
 test('new table migrations must join the no-default-grant rehearsal', () => {

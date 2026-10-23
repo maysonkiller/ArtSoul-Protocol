@@ -137,10 +137,10 @@ test('publish submits one auction transaction and never prompts a duplicate on t
   assert.match(uploadHandler, /stage: 'auction_submitted'/);
   assert.match(uploadHandler, /Do not submit the auction again while it is finalizing/);
 
-  const pendingBranch = uploadHandler.slice(
-    uploadHandler.indexOf("mappedAuctionError.code === 'AUCTION_CONFIRMATION_PENDING'"),
-    uploadHandler.indexOf('pendingArtwork = savePendingArtwork({', uploadHandler.indexOf("mappedAuctionError.code === 'AUCTION_CONFIRMATION_PENDING'") + 100)
-  );
+  const pendingStart = uploadHandler.indexOf("mappedAuctionError.code === 'AUCTION_CONFIRMATION_PENDING'");
+  const pendingEnd = uploadHandler.indexOf('return;', pendingStart);
+  assert.ok(pendingEnd > pendingStart, 'pending auction exits without another submission');
+  const pendingBranch = uploadHandler.slice(pendingStart, pendingEnd);
   assert.doesNotMatch(pendingBranch, /auction_failed|createAuction\(/);
 });
 

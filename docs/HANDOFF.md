@@ -1,8 +1,36 @@
 # ArtSoul Engineering Handoff
 
 Current continuation (2026-10-23): use `C:\Projects\ArtSoul`, branch
-`codex/takeover-audit`. Latest application release is PR #327 (`3f12c48`);
-its new upload preparation remains disabled pending complete recovery rollout.
+`codex/takeover-audit`. Latest application release is PR #329 (`dbefd68`);
+upload preparation and the new private submission journal remain disabled
+pending complete receipt/event recovery and browser rollout.
+The October 23 registration verifier passed a two-RPC replay of artwork 36.
+The local follow-up adds atomic finalized-evidence/catalog/claim persistence
+and a recovery helper, without activation.
+The local rollback fence now rejects pre-rewind verification and atomically
+quarantines affected claims while retaining immutable history. Actual PostgreSQL
+tests cover both race orders and rollback failures; the schema is not activated.
+The follow-up now uses owned indexed registrations as bounded RPC search hints,
+including lost/replaced hashes; actual API-to-PostgreSQL recovery passes.
+Browser preparation now retains immutable UUID-bound drafts and handles retries
+through the existing API. Authenticated recovery is now connected behind a
+separate disabled gate, with server-only pins, durable quotas and a shared
+deadline. Actual SQL and 28 compiled-browser checks pass, including navigation
+to a verified artwork without another transaction. The one-time registration
+handoff is now connected behind a third default-off gate, with independent hash
+retention, exact wallet/Core checks and no permission replay. Targeted checks and
+real SQL pass; commit `28f4822` passes exact Linux/Windows CI and preview checks.
+An owner-only legacy intake now shares the revision fence and passes actual SQL
+checks. A local rehearsal imports and replays all 32 verified available originals,
+retaining duplicates and creating no synthetic publication attempts. No activation.
+Next: complete the reviewed rollout manifest, including missing-original and
+unresolved-attempt disposition, current worker-role evidence and fresh intake pins.
+Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
+and works 1-4 remain unavailable. Alchemy/Tenderly independently verify all 36
+registrations; original-file coverage remains 32/36. See the checkpoint for tests
+and gaps; actual intake and the worker-role check still precede migration rollout.
+The owner's new desktop flicker/delay video is queued as TA-12; repairs are
+explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72
 are done. Preserve the completed native flows and consult the checkpoint for
 the three remaining formal rows and additional TA-10 implementation work.

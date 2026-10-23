@@ -2,8 +2,30 @@
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
 and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-23. Implementation
-uses `C:\Projects\ArtSoul`; latest application release is PR #327 (`3f12c48`).
-Its new upload preparation remains disabled pending complete recovery rollout.
+uses `C:\Projects\ArtSoul`; latest application release is PR #329 (`dbefd68`).
+Upload preparation and the new private submission journal remain disabled
+pending complete receipt/event recovery and browser rollout.
+The October 23 registration verifier is tested against two RPCs. Its local
+follow-up adds atomic block/finality anchor persistence with catalog/claim
+reconciliation, still disabled. The local
+rollback fence now rejects stale verification and preserves quarantined history;
+actual PostgreSQL concurrency/failure checks pass. Bounded indexed candidates now
+drive verified recovery of missing/replaced hashes. Browser preparation is now
+wired with immutable drafts and tested retries, still disabled and without
+registration permission. Bounded authenticated recovery now connects the
+browser to this verifier behind a separate disabled gate, with durable quotas,
+a shared deadline and 28 passing built-browser journeys. The subsequent one-time
+begin/registration handoff is locally connected behind a third default-off gate;
+targeted API/client/adapter checks and actual SQL pass. Consult the checkpoint
+for its final build/CI evidence (`28f4822` passes Linux/Windows CI and preview).
+Owner-only, revision-fenced legacy intake is now locally tested, including an
+actual PostgreSQL import/replay of 32 verified existing records. No live import
+or activation occurred; rollout and unresolved-attempt disposition remain open.
+The read-only full indexed inventory
+covers 36 IDs, all registrations independently verified through Alchemy/Tenderly,
+with 32 current original files hashed and four historical originals unavailable.
+New desktop flicker/delay report TA-12 is explicitly
+deferred by the owner; it does not erase the accepted phone observations.
 The owner accepts the current iPhone visual behavior and browser Back, closing
 A-47/A-48/A-53/A-54/A-58/A-61/A-72. Earlier Admin/artwork release `9a2965f` is deployed.
 A-71 is separately accepted from the owner's explicit branded-wait observation.
