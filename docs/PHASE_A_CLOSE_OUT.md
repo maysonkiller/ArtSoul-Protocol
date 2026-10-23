@@ -73,7 +73,11 @@ October 23 remaining work, without repeating completed ceremonies:
    1-4 lack fetchable originals. The local browser preparation now preserves
    UUID-bound immutable drafts and passes real SQL and 16 built-browser cases.
    It remains disabled, stops before registration, and does not close TA-10.
-   Legacy catalog intake and browser recovery/registration/rollout
+   The following local slice connects bounded authenticated recovery, with
+   server-only pins, durable quotas and a shared deadline. It passes actual SQL
+   and 28 built-browser cases; a verified registration opens its existing page
+   without another transaction. The separate activation gate remains disabled.
+   Legacy catalog intake and the one-time begin/registration handoff/rollout
    remain open, and all new media schema remains inactive. That replay does not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner

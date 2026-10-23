@@ -101,10 +101,9 @@ function registration(log, core, creator, metadataUri) {
     log_index: log.log_index };
 }
 
-// Read-only evidence, deliberately not wired to the public upload route.
-// A caller must persist canonical block/finality anchors atomically with catalog
+// Read-only evidence. A caller must persist block/finality anchors atomically with catalog
 // reconciliation before using this result for durable publication recovery.
-export async function verifyArtworkRegistration({ deployment, creator, metadataUri, transactionHash = null, scan = null }, { rpcs }) {
+export async function verifyArtworkRegistration({ deployment, creator, metadataUri, transactionHash = null, scan = null }, { rpcs, signal }) {
   const core = lower(deployment?.core);
   if (deployment?.chainId !== 84532 || !validAddress(core) || !HASH.test(deployment?.coreCodeHash || '') ||
       !validAddress(creator) || typeof metadataUri !== 'string' || !metadataUri.trim() ||
@@ -122,13 +121,17 @@ export async function verifyArtworkRegistration({ deployment, creator, metadataU
   creator = lower(creator);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45000);
+  const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   try {
-    const both = (method, params = []) => Promise.all(rpcs.map(rpc => rpc(method, params, { signal: controller.signal })));
+    const both = (method, params = []) => {
+      requestSignal.throwIfAborted();
+      return Promise.all(rpcs.map(rpc => rpc(method, params, { signal: requestSignal })));
+    };
     const chains = await both('eth_chainId');
     if (chains.some(chain => quantity(chain) !== 84532n)) fail('RECOVERY_CHAIN_MISMATCH');
     const heads = (await both('eth_getBlockByNumber', ['finalized', false])).map(blockIdentity);
     const ownHeads = await Promise.all(rpcs.map(async (rpc, index) => blockIdentity(
-      await rpc('eth_getBlockByNumber', [toQuantity(BigInt(heads[index].number)), false], { signal: controller.signal })
+      await rpc('eth_getBlockByNumber', [toQuantity(BigInt(heads[index].number)), false], { signal: requestSignal })
     )));
     if (heads.some((head, index) => !isDeepStrictEqual(head, ownHeads[index]))) fail('RECOVERY_BLOCK_DISAGREEMENT');
     const anchorHeight = heads.map(b => BigInt(b.number)).reduce((a, b) => a < b ? a : b);
@@ -221,6 +224,7 @@ export async function verifyArtworkRegistration({ deployment, creator, metadataU
     for (const entry of outcome.registrations || []) {
       if ((await agreedBlock(BigInt(entry.block_number))).hash !== entry.block_hash) fail('RECOVERY_BLOCK_DISAGREEMENT');
     }
+    requestSignal.throwIfAborted();
     return result(outcome.state, { ...outcome, chain_id: 84532, core_address: core,
       core_code_hash: lower(deployment.coreCodeHash), finalized_anchor: anchor });
   } catch (error) {

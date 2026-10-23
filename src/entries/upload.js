@@ -368,6 +368,8 @@ let selectedFile = null;
                 PUBLICATION_STORAGE_UNAVAILABLE: 'This browser could not safely save the publication attempt. Allow site storage and try again; no wallet request was started.',
                 PUBLICATION_DRAFT_INVALID: 'The saved publication attempt could not be read safely. Do not clear it or publish the file again; contact support.',
                 PUBLICATION_PREPARED_ONLY: 'Your artwork preparation is saved. Registration is not enabled for this preparation yet; no wallet request was started.',
+                PUBLICATION_CONFLICT: 'This file has conflicting publication records. Your saved attempt is retained; another registration was not sent.',
+                RATE_LIMITED: 'Please wait one minute before checking this publication again. Your saved attempt is retained.',
                 PUBLICATION_ATTEMPT_PENDING: 'This artwork already has a registration attempt. Check your profile and wallet activity; do not publish the file again.',
                 DUPLICATE_MEDIA: 'This file already has a publication or a pending attempt. Renaming it does not create a different artwork.',
                 SESSION_WALLET_MISMATCH: 'Another tab changed your signed-in wallet. Sign in with this artwork creator wallet before continuing.',
@@ -1090,6 +1092,14 @@ let selectedFile = null;
                 const preparation = await prepareBrowserPublication({ file, fileHash, wallet: walletAddress,
                     details: { title, description, creatorValue: price, aiGuidance: guidance, duration }, assertCurrent });
                 if (preparation) {
+                    if (preparation.recovery?.state === 'registered') {
+                        assertCurrent();
+                        window.location.href = `/artwork/${preparation.recovery.registered_artwork_id}`;
+                        return;
+                    }
+                    if (preparation.recovery?.state === 'conflict' || preparation.claim_status === 'conflict') {
+                        throw createUploadError('PUBLICATION_CONFLICT', 'Publication conflict retained.');
+                    }
                     // This rollout slice never begins an attempt or initializes
                     // contracts. An error cannot fall back to legacy publishing.
                     throw createUploadError(preparation.submission_started_at || preparation.claim_status !== 'claimed'

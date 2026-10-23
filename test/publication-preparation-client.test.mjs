@@ -36,6 +36,7 @@ function fixture() {
             return result;
         }};
     return {args,dependencies,data,requests,writes,run:()=>prepareBrowserPublication(args,dependencies),
+        get config(){return config;},
         set config(v){config=v;},set current(v){current=v;},set drop(v){drop=v;},set pending(v){pending=v;},set before(v){before=v;},
         get uuidCount(){return uuidCount;},get metadataCalls(){return metadataCalls;}};
 }
@@ -77,6 +78,42 @@ test('unknown no-hash submission stays pending and never requests begin or cance
     const f=fixture();f.pending=true;const result=await f.run();
     assert(result.submission_started_at);assert.equal(result.reported_transaction_hash,null);assert.equal(result.can_submit,false);
     assert.deepEqual(f.requests.map(r=>r.action),['config','issue','prepare','status']);
+});
+
+test('a pending no-hash attempt requests bounded recovery and only returns a verified string identifier',async()=>{
+    for(const state of ['registered','conflict','unresolved','reverted']) {
+        const f=fixture();f.pending=true;f.config={...f.config,recovery_enabled:true};
+        const request=f.dependencies.request;
+        f.dependencies.request=async(body,owner)=>{
+            if(body.action!=='recover')return request(body,owner);
+            f.requests.push(body);assert.equal(owner,wallet);
+            assert.deepEqual(Object.keys(body),['action','publication_id']);
+            return {success:true,publication_id:body.publication_id,state,can_submit:false,
+                ...(state==='registered'?{registered_artwork_id:'9007199254740993'}:{})};
+        };
+        const result=await f.run();assert.equal(result.recovery.state,state);assert.equal(result.can_submit,false);
+        assert.deepEqual(f.requests.map(r=>r.action),['config','issue','prepare','status','recover']);
+        assert.equal(f.uuidCount,1);assert.doesNotMatch([...f.data.values()][0],/9007199254740993/,'recovery is rechecked, not trusted from local storage');
+    }
+});
+
+test('lost, denied, stale and malformed recovery cannot become a second registration request',async()=>{
+    for(const mutation of ['lost','rate','wallet','permission','number','invalid-id','wrong-publication','unknown-state']) {
+        const f=fixture();f.pending=true;f.config={...f.config,recovery_enabled:true};
+        const request=f.dependencies.request;
+        f.dependencies.request=async(body,owner)=>{
+            if(body.action!=='recover')return request(body,owner);
+            f.requests.push(body);
+            if(mutation==='lost'||mutation==='rate')throw Error(mutation);
+            if(mutation==='wallet')f.current=false;
+            return {success:true,publication_id:mutation==='wrong-publication'?randomUUID():body.publication_id,
+                state:mutation==='unknown-state'?'ready':'registered',can_submit:mutation==='permission',
+                registered_artwork_id:mutation==='number'?36:mutation==='invalid-id'?'36/../other':'36'};
+        };
+        await assert.rejects(f.run());assert.equal(f.data.size,1);assert.equal(f.uuidCount,1);
+        assert.equal(f.requests.at(-1).action,'recover');
+        assert(!f.requests.some(r=>r.action==='begin'));
+    }
 });
 
 test('details changed after a saved attempt fail before new storage or metadata requests',async()=>{

@@ -35,16 +35,18 @@ export function uploadedMediaUrl(walletAddress, storagePath) {
   return url;
 }
 
-export async function verifyUploadedMedia(walletAddress, storagePath, { timeoutMs = FETCH_TIMEOUT_MS } = {}) {
+export async function verifyUploadedMedia(walletAddress, storagePath, { timeoutMs = FETCH_TIMEOUT_MS, signal } = {}) {
   const url = uploadedMediaUrl(walletAddress, storagePath);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > FETCH_TIMEOUT_MS) {
     throw identityError('INVALID_UPLOAD_TIMEOUT', 500);
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   let reader;
   try {
-    const response = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    requestSignal.throwIfAborted();
+    const response = await fetch(url, { signal: requestSignal, redirect: 'error' });
     if (!response.ok || !response.body) throw identityError('UPLOAD_MEDIA_UNAVAILABLE', 503);
     const contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
     if (!Object.hasOwn(ARTWORK_MIME_EXTENSIONS, contentType)) {
@@ -57,6 +59,7 @@ export async function verifyUploadedMedia(walletAddress, storagePath, { timeoutM
     const hash = createHash('sha256');
     let size = 0;
     while (true) {
+      requestSignal.throwIfAborted();
       const { done, value } = await reader.read();
       if (done) break;
       if (value.byteLength > MAX_ARTWORK_UPLOAD_BYTES - size) {
@@ -68,7 +71,7 @@ export async function verifyUploadedMedia(walletAddress, storagePath, { timeoutM
     if (!size) throw identityError('EMPTY_UPLOAD_MEDIA');
     return { sha256: hash.digest('hex'), size, contentType, storagePath, mediaUrl: url };
   } catch (error) {
-    if (controller.signal.aborted) throw identityError('UPLOAD_MEDIA_TIMEOUT', 503);
+    if (requestSignal.aborted) throw identityError('UPLOAD_MEDIA_TIMEOUT', 503);
     if (error instanceof UploadMediaIdentityError) throw error;
     // Do not return storage response bodies, internal URLs or transport errors.
     throw identityError('UPLOAD_MEDIA_UNAVAILABLE', 503);

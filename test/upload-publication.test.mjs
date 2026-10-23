@@ -18,7 +18,10 @@ const bytes = Buffer.from('original stored media');
 const sha256 = createHash('sha256').update(bytes).digest('hex');
 const env = { SESSION_SECRET: 'publication-test-only-secret', SUPABASE_URL: 'https://storage.example',
   SUPABASE_SERVICE_ROLE_KEY: `x.${Buffer.from('{"role":"service_role"}').toString('base64url')}.x`,
-  ARTSOUL_MEDIA_PREPARATION_ENABLED: 'true', ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: core };
+  ARTSOUL_MEDIA_PREPARATION_ENABLED: 'true', ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: core,
+  ARTSOUL_MEDIA_RECOVERY_ENABLED: 'false', ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH: keccak256('0x6001600055'),
+  ARTSOUL_MEDIA_RECOVERY_START_BLOCK: '50', ARTSOUL_MEDIA_RECOVERY_RPC_PRIMARY: 'https://rpc-one.example',
+  ARTSOUL_MEDIA_RECOVERY_RPC_SECONDARY: 'https://rpc-two.example' };
 let previous, originalFetch;
 test.beforeEach(() => {
   previous = Object.fromEntries(Object.keys(env).map(k => [k, process.env[k]]));
@@ -62,6 +65,7 @@ function backend(options = {}) {
   globalThis.fetch = async (raw, init={}) => {
     const url=String(raw), body=init.body ? JSON.parse(init.body) : undefined;
     seen.push({url,init,body});
+    if (url.includes('/rpc/consume_launch_service_quota')) return Response.json(!options.quotaDenied);
     if (url.includes('/rpc/issue_artwork_media_upload')) {
       if (options.issueError) return Response.json({message:options.issueError},{status:400});
       row ??= {publication_id:body.p_publication_id,chain_id:body.p_chain_id,core_address:body.p_core_address,
@@ -151,7 +155,19 @@ function recoveryFixture(options = {}) {
       default:assert.fail('Unexpected recovery method '+method);
     }
   });
-  return {...backendState,calls,run:(scan=null)=>recoverPublication(wallet,id,deployment,{rpcs,scan})};
+  return {...backendState,calls,rpcs,run:(scan=null,signal)=>recoverPublication(wallet,id,deployment,{rpcs,scan,signal})};
+}
+
+function enableRecovery(f) {
+  process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='true';
+  const storage=globalThis.fetch;
+  globalThis.fetch=async(raw,init)=>{
+    const index=['https://rpc-one.example/','https://rpc-two.example/'].indexOf(String(raw));
+    if(index<0)return storage(raw,init);
+    const body=JSON.parse(init.body);
+    assert(init.signal instanceof AbortSignal);assert.equal(init.redirect,'error');
+    return Response.json({jsonrpc:'2.0',id:body.id,result:await f.rpcs[index](body.method,body.params)});
+  };
 }
 
 test('recovery reads actual pinned bytes and metadata before atomically saving verified chain evidence', async () => {
@@ -257,20 +273,92 @@ test('recovery retains a conflict returned by atomic reconciliation and never cl
   }
 });
 
-test('recovery has no public route even when preparation is enabled', async () => {
+test('recovery remains separately disabled even when preparation is enabled', async () => {
   const state=backend();
-  assert.equal((await call({action:'recover',publication_id:id,evidence:{state:'verified'}})).body.error,'INVALID_PUBLICATION_ACTION');
+  assert.equal((await call({action:'recover',publication_id:id})).body.error,'MEDIA_RECOVERY_DISABLED');
   assert.equal(state.seen.length,0);
+});
+
+test('authenticated recovery uses only server pins, durable quotas and owned immutable evidence',async()=>{
+  const f=recoveryFixture();enableRecovery(f);
+  const config=await call({action:'config'});assert.equal(config.body.recovery_enabled,true);assert.equal(f.seen.length,0);
+  const res=await call({action:'recover',publication_id:id});
+  assert.equal(res.statusCode,200,JSON.stringify(res.body));assert.equal(res.body.state,'registered');
+  assert.equal(res.body.registered_artwork_id,'36');assert.equal(res.body.can_submit,false);
+  const quotas=f.seen.filter(c=>c.url.includes('/consume_launch_service_quota'));
+  assert.equal(quotas.length,2);assert.deepEqual(quotas.map(c=>[c.body.p_max,c.body.p_seconds]),[[4,60],[1,30]]);
+  assert(quotas.every(c=>c.init.signal instanceof AbortSignal && /^[0-9a-f]{64}$/.test(c.body.p_key)));
+  assert.notEqual(quotas[0].body.p_key,quotas[1].body.p_key);
+  assert(!JSON.stringify(res.body).includes('rpc-one'));
+  assert(!f.seen.some(c=>/begin_artwork|report_artwork|issue_artwork|prepare_artwork/.test(c.url)));
+});
+
+test('recovery rejects caller scan, deployment, evidence and receipt hints before any request',async()=>{
+  const f=recoveryFixture();enableRecovery(f);
+  for(const extra of [{scan:{fromBlock:'1',toBlock:'2'}},{deployment:{chainId:1}},{rpcs:['https://attacker.example']},
+    {evidence:{state:'verified'}},{transaction_hash:'0x'+'ee'.repeat(32)},{creator_wallet:other}]) {
+    assert.equal((await call({action:'recover',publication_id:id,...extra})).body.error,'INVALID_RECOVERY_REQUEST');
+  }
+  for(const publication_id of [undefined,id+'\n',id+'&select=*']) {
+    assert.equal((await call({action:'recover',publication_id})).body.error,'INVALID_PUBLICATION_ID');
+  }
+  assert.equal(f.seen.length,0);assert.equal(f.calls.length,0);
+});
+
+test('missing or malformed recovery pins fail closed without trusting client replacements',async()=>{
+  const f=recoveryFixture();enableRecovery(f);
+  for(const [key,bad] of [['ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH','0x'+'00'.repeat(32)],
+    ['ARTSOUL_MEDIA_RECOVERY_START_BLOCK','-1'],['ARTSOUL_MEDIA_RECOVERY_START_BLOCK',(2n**256n).toString()],
+    ['ARTSOUL_MEDIA_RECOVERY_RPC_PRIMARY','http://localhost'],['ARTSOUL_MEDIA_RECOVERY_RPC_SECONDARY','https://rpc-one.example/path']]) {
+    const previous=process.env[key];process.env[key]=bad;
+    assert.equal((await call({action:'recover',publication_id:id})).body.error,'MEDIA_RECOVERY_UNAVAILABLE');
+    assert.equal((await call({action:'config'})).body.error,'MEDIA_RECOVERY_UNAVAILABLE');
+    process.env[key]=previous;
+  }
+  assert.equal(f.seen.length,0);
+});
+
+test('durable quota denial and foreign ownership stop recovery before raw storage or chain reads',async()=>{
+  let f=recoveryFixture({quotaDenied:true});enableRecovery(f);
+  const denied=await call({action:'recover',publication_id:id});
+  assert.equal(denied.statusCode,429);assert.equal(denied.headers['Retry-After'],'60');
+  assert.equal(f.seen.length,1);assert.equal(f.calls.length,0);
+  f=recoveryFixture();enableRecovery(f);
+  const foreign=await call({action:'recover',publication_id:id},other);
+  assert.equal(foreign.statusCode,404);assert.equal(foreign.body.error,'MEDIA_UPLOAD_NOT_FOUND');
+  assert.equal(f.calls.length,0);assert(!f.seen.some(c=>c.url.includes('/storage/v1/')));
+});
+
+test('one recovery deadline aborts stalled quota, storage, chain and reconciliation requests',async()=>{
+  const timeout=AbortSignal.timeout;
+  try {
+    AbortSignal.timeout=ms=>timeout(ms===25000?20:ms);
+    for(const step of ['consume_launch_service_quota','artwork_media_preparations?',
+      '/public/artworks/uploads/','/public/artworks/metadata/','rpc-one.example','reconcile_artwork_media_registration']) {
+      const f=recoveryFixture();enableRecovery(f);const fetch=globalThis.fetch;
+      globalThis.fetch=async(raw,init)=>String(raw).includes(step)?new Promise((resolve,reject)=>{
+        assert(init.signal instanceof AbortSignal);
+        if(init.signal.aborted)reject(init.signal.reason);
+        else init.signal.addEventListener('abort',()=>reject(init.signal.reason),{once:true});
+      }):fetch(raw,init);
+      const keepAlive=setTimeout(()=>{},1000);
+      try {
+        const result=await call({action:'recover',publication_id:id});assert.equal(result.statusCode,503,step);
+        assert(!JSON.stringify(result.body).includes('rpc-one'));
+        assert(!f.seen.some(c=>/begin_artwork|report_artwork/.test(c.url)));
+      } finally {clearTimeout(keepAlive);}
+    }
+  } finally {AbortSignal.timeout=timeout;}
 });
 
 test('preparation denies guests and is disabled by default before any network request', async () => {
   const state=backend();
-  for (const action of ['config','issue','prepare','begin','report-transaction','status']) {
+  for (const action of ['config','issue','prepare','begin','report-transaction','status','recover']) {
     assert.equal((await call({action},null)).statusCode,401);
   }
   delete process.env.ARTSOUL_MEDIA_PREPARATION_ENABLED;
   assert.deepEqual((await call({action:'config'})).body,{success:true,enabled:false});
-  for (const action of ['issue','prepare','begin','report-transaction','status']) {
+  for (const action of ['issue','prepare','begin','report-transaction','status','recover']) {
     assert.equal((await call({action})).body.error,'MEDIA_PREPARATION_DISABLED');
   }
   assert.equal(state.seen.length,0);
@@ -281,7 +369,7 @@ test('uncached publication config requires the intended signed-in wallet and exa
   assert.deepEqual((await call({action:'config'})).body,
     {success:true,enabled:true,chain_id:84532,core_address:core,can_submit:false});
   for(const intended of [null,other,{},wallet+'\n']) {
-    for(const action of ['config','issue','prepare','begin','report-transaction','status']) {
+    for(const action of ['config','issue','prepare','begin','report-transaction','status','recover']) {
       assert.equal((await call({action,publication_id:id},wallet,intended)).body.error,'SESSION_WALLET_MISMATCH');
     }
   }

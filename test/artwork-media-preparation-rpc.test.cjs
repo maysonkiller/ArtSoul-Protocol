@@ -593,17 +593,22 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
     sql('CREATE TABLE public.v41_artworks(chain_id NUMERIC, artwork_id NUMERIC(78,0), creator TEXT, metadata_uri TEXT, block_number BIGINT, transaction_hash TEXT);');
     sql(fs.readFileSync(path.join(__dirname,'../src/indexer/migrations/014_schema_aware_reorg_rollback.sql'),'utf8'));
     sql(fs.readFileSync(path.join(__dirname,'../sql/migrations/artwork_media_reorg.sql'),'utf8'));
+    sql(fs.readFileSync(path.join(__dirname,'../sql/migrations/launch_service_quotas.sql'),'utf8'));
     const {default:handler} = await import('../src/api/routes/upload/publication.js');
     const {setWalletSession} = await import('../src/api/backend.js');
     const env = {SESSION_SECRET:'private-preparation-integration-test',SUPABASE_URL:'https://storage.example',
       SUPABASE_SERVICE_ROLE_KEY:`x.${Buffer.from('{"role":"service_role"}').toString('base64url')}.x`,
-      ARTSOUL_MEDIA_PREPARATION_ENABLED:'true',ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core};
+      ARTSOUL_MEDIA_PREPARATION_ENABLED:'true',ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA:core,
+      ARTSOUL_MEDIA_RECOVERY_ENABLED:'false',ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH:'',
+      ARTSOUL_MEDIA_RECOVERY_START_BLOCK:'50',ARTSOUL_MEDIA_RECOVERY_RPC_PRIMARY:'https://rpc-one.example',
+      ARTSOUL_MEDIA_RECOVERY_RPC_SECONDARY:'https://rpc-two.example'};
     const previous = Object.fromEntries(Object.keys(env).map(key => [key,process.env[key]]));
     const originalFetch = globalThis.fetch;
     const id = crypto.randomUUID(), bytes = Buffer.from('actual stored artwork bytes');
     const digest = crypto.createHash('sha256').update(bytes).digest('hex');
     const objects = new Map(), calls = [];
     let dropReconciliationResponse = false;
+    let recoveryReaders = null;
     const response = () => ({headers:{},statusCode:200,body:null,
       setHeader(key,value){this.headers[key]=value;},status(value){this.statusCode=value;return this;},
       json(value){this.body=value;return this;},end(){}});
@@ -615,6 +620,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       return result;
     };
     const signatures = {
+      consume_launch_service_quota:['p_key','p_max','p_seconds'],
       issue_artwork_media_upload:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet',
         'p_media_path','p_metadata_path','p_content_type','p_declared_size'],
       prepare_artwork_media_upload:['p_publication_id','p_creator_wallet','p_media_sha256','p_byte_size',
@@ -630,6 +636,11 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
     globalThis.fetch = async (raw, init={}) => {
       const url = new URL(String(raw)), body = init.body ? JSON.parse(init.body) : undefined;
       calls.push(url.pathname);
+      const readerIndex=['rpc-one.example','rpc-two.example'].indexOf(url.hostname);
+      if(readerIndex>=0){
+        assert(recoveryReaders);assert(init.signal instanceof AbortSignal);
+        return Response.json({jsonrpc:'2.0',id:body.id,result:await recoveryReaders[readerIndex](body.method,body.params)});
+      }
       if (url.pathname === '/rest/v1/rpc/read_artwork_media_revision') {
         assert.equal(init.method,'GET');assert.equal(body,undefined);
         assert.equal(url.searchParams.get('p_chain_id'),'84532');
@@ -804,6 +815,31 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       assert.equal(finalStatus.body.claim_status,'registered');assert.equal(finalStatus.body.reported_transaction_hash,tx);
       assert.equal(finalStatus.body.submission_started_at,started.body.submission_started_at);
       assert.equal(calls.filter(value=>value.startsWith('/storage/v1/object/artworks/')).length,writes);
+
+      // The public recovery route uses the same actual journal/reconciliation
+      // transactions plus durable, cross-request quotas. No browser evidence.
+      recoveryReaders=rpcs;
+      process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='true';
+      process.env.ARTSOUL_MEDIA_RECOVERY_CORE_CODE_HASH=keccak256(code);
+      dropReconciliationResponse=true;
+      const lostRecovery=await call({action:'recover',publication_id:id});
+      assert.equal(lostRecovery.statusCode,503);
+      assert.equal(sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;'),saved);
+      const deniedRecovery=await call({action:'recover',publication_id:id});
+      assert.equal(deniedRecovery.statusCode,429);assert.equal(deniedRecovery.headers['Retry-After'],'60');
+      // Advance only this isolated quota fixture, never protocol or chain time.
+      sql("UPDATE public.launch_service_quotas SET window_started=now()-interval '61 seconds';");
+      const publicRecovery=await call({action:'recover',publication_id:id});
+      assert.equal(publicRecovery.statusCode,200,JSON.stringify(publicRecovery.body));
+      assert.equal(publicRecovery.body.state,'registered');assert.equal(publicRecovery.body.can_submit,false);
+      assert.equal(publicRecovery.body.registered_artwork_id,'9007199254740993');
+      assert.equal(sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;'),saved);
+      const preserved=await call({action:'status',publication_id:id});
+      assert.equal(preserved.body.reported_transaction_hash,tx);
+      assert.equal(preserved.body.submission_started_at,started.body.submission_started_at);
+      const foreignRecovery=await call({action:'recover',publication_id:id},other);
+      assert.equal(foreignRecovery.statusCode,404);assert.equal(foreignRecovery.body.error,'MEDIA_UPLOAD_NOT_FOUND');
+      process.env.ARTSOUL_MEDIA_RECOVERY_ENABLED='false';
 
       // The real browser preparation helper now crosses the authenticated API
       // and real SQL, retaining one UUID after a committed response is lost.

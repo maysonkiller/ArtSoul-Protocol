@@ -58,6 +58,17 @@ test('two independent reads verify the exact finalized Core event, including rel
   assert(f.calls.every(call => !/send|sign|estimate/i.test(call.method)));
 });
 
+test('parent recovery cancellation prevents a verified result and further RPC reads',async()=>{
+  const f=fixture(),controller=new AbortController();
+  f.nodes[0].override=method=>{if(method==='eth_getTransactionReceipt')controller.abort();};
+  const result=await verifyArtworkRegistration(f.input,{rpcs:f.rpcs,signal:controller.signal});
+  assert.equal(result.state,'unresolved');assert.equal(result.can_submit,false);assert.deepEqual(result.registrations,[]);
+  assert.equal(f.calls.at(-1).method,'eth_getTransactionReceipt');
+  const calls=f.calls.length;
+  assert.equal((await verifyArtworkRegistration(f.input,{rpcs:f.rpcs,signal:controller.signal})).state,'unresolved');
+  assert.equal(f.calls.length,calls);
+});
+
 test('finalized providers may have different head heights; verification uses their common height', async () => {
   const f = fixture(); f.nodes[1].finalized = { number: '0xc9', hash: '0x' + 'ee'.repeat(32) };
   f.nodes[1].blocks['0xc9'] = { ...f.nodes[1].finalized };

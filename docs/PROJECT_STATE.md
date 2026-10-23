@@ -7,12 +7,15 @@ Upload preparation and the new private submission journal remain disabled
 pending complete receipt/event recovery and browser rollout.
 The October 23 registration verifier is tested against two RPCs. Its local
 follow-up adds atomic block/finality anchor persistence with catalog/claim
-reconciliation, still disconnected from the public route and disabled. The local
+reconciliation, still disabled. The local
 rollback fence now rejects stale verification and preserves quarantined history;
 actual PostgreSQL concurrency/failure checks pass. Bounded indexed candidates now
 drive verified recovery of missing/replaced hashes. Browser preparation is now
 wired with immutable drafts and tested retries, still disabled and without
-registration permission. Next is bounded browser recovery/registration;
+registration permission. Bounded authenticated recovery now connects the
+browser to this verifier behind a separate disabled gate, with durable quotas,
+a shared deadline and 28 passing built-browser journeys. Next is the one-time
+begin/registration handoff;
 legacy catalog intake and rollout remain open. The read-only full indexed inventory
 covers 36 IDs, with 32 files hashed and four historical originals unavailable.
 New desktop flicker/delay report TA-12 is explicitly

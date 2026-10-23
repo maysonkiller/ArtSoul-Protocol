@@ -116,6 +116,18 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
         const status = await ask({ action: 'status', publication_id: id });
         if (status?.publication_id !== id || status.metadata_uri !== draft.metadata_uri || status.can_submit !== false ||
             !['claimed', 'registered', 'conflict'].includes(status.claim_status)) fail('MEDIA_PREPARATION_MISMATCH');
+        // A journal entry without a hash is still an attempt. Only the server
+        // can recover it from independently verified registration evidence.
+        if (config.recovery_enabled === true && (status.submission_started_at || status.claim_status !== 'claimed')) {
+            const recovery = await ask({ action: 'recover', publication_id: id });
+            if (recovery?.success !== true || recovery.publication_id !== id || recovery.can_submit !== false ||
+                !['registered', 'conflict', 'unresolved', 'reverted'].includes(recovery.state) ||
+                (recovery.state === 'registered' && (typeof recovery.registered_artwork_id !== 'string' ||
+                    !/^[1-9][0-9]{0,77}$/.test(recovery.registered_artwork_id)))) {
+                fail('MEDIA_PREPARATION_MISMATCH');
+            }
+            return { ...status, recovery, can_submit: false };
+        }
         // Preparation is not registration authorization. In particular, do not
         // call begin or infer that a missing reported hash permits another send.
         return { ...status, can_submit: false };

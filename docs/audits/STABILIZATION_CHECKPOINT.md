@@ -3,6 +3,45 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 authenticated recovery continuation (Canon 1/2/11):
+
+- Resume `dd2424dae2a9ed0e23d1e5c768e6018dda1ecf30` in the same workspace.
+  That exact commit passes CI `39879486672`: Linux 2134 pass / 2 skips,
+  Windows 1888 pass / 18 skips, zero failures, 46 contract tests on each OS.
+  These counts precede this recovery continuation, not its final CI.
+- The publication route now accepts an owned `recover` request containing only
+  its UUID. It requires the existing SIWE/intended-wallet match, preparation
+  activation and a separate `ARTSOUL_MEDIA_RECOVERY_ENABLED=true` gate. Server
+  configuration must supply the reviewed Core code hash, deployment start block
+  and two independent HTTPS RPCs. Browser-provided endpoints, ranges, hashes or
+  evidence are rejected. All results retain `can_submit:false`.
+- Recovery reuses durable service quotas: four requests per wallet per minute,
+  and one per owned publication per 30 seconds. These are operational read-cost
+  limits, not protocol economics. The shared 25-second cancellation budget
+  includes quotas, SQL, original bytes, metadata and both RPCs. HTTP cancellation
+  cannot promise rollback of an already submitted SQL call; the saved journal
+  and idempotent reconciliation cover a committed response that was lost.
+- The browser checks pending/no-hash attempts through this gated route. A
+  verified string artwork ID opens the existing artwork page without another
+  registration or auction request. Unresolved, reverted, conflicted, throttled
+  or interrupted recovery retains the draft. Original hashes/timestamps stay
+  unchanged. No new dependency, schema, worker or signing path was introduced.
+- This diff passes 126 focused checks and 39 actual PostgreSQL checks, including
+  authenticated recovery with real durable quotas and reconciliation after a
+  lost committed response. Build passes. All 28 isolated built Chromium/WebKit
+  journeys at 390/1440px pass, including verified navigation, pending/conflict/
+  rate-limit states and the disabled legacy path. Evidence:
+  `output/audit/publication-recovery-focused-2026-10-23.log`,
+  `publication-recovery-pg-2026-10-23.log`, `publication-recovery-build-2026-10-23.log`,
+  `publication-recovery-built-2026-10-23.json`. Full unit validation is running.
+  One reused reviewer found no blocker and finished; no agent swarm was started.
+- No production release, live migration, activation or transaction. Preserve
+  unrelated authority-policy files and `.codex/` / `output/`. TA-10 is not closed:
+  next concrete step is the one-time begin/registration handoff. Legacy catalog
+  intake, four unavailable originals and actual worker-role verification still
+  precede rollout. A-83 native delayed-receipt acceptance, A-57 disposition and
+  A-23 remain open; the owner-deferred TA-12 display work is unchanged.
+
 October 23 TA-10 browser preparation (Canon 1/2/11; not activated):
 
 - Resume `e4ae8bfb765c6ee3cad453ad5803a3d88490054d`, same workspace/branch.

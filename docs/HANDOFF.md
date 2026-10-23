@@ -6,16 +6,19 @@ upload preparation and the new private submission journal remain disabled
 pending complete receipt/event recovery and browser rollout.
 The October 23 registration verifier passed a two-RPC replay of artwork 36.
 The local follow-up adds atomic finalized-evidence/catalog/claim persistence
-and a server-only recovery helper, with no public recovery action or activation.
+and a recovery helper, without activation.
 The local rollback fence now rejects pre-rewind verification and atomically
 quarantines affected claims while retaining immutable history. Actual PostgreSQL
 tests cover both race orders and rollback failures; the schema is not activated.
 The follow-up now uses owned indexed registrations as bounded RPC search hints,
 including lost/replaced hashes; actual API-to-PostgreSQL recovery passes.
 Browser preparation now retains immutable UUID-bound drafts and handles retries
-through the existing API, with real SQL and 16 compiled-browser checks. It stays
-disabled and stops before registration. Next: authenticated bounded recovery and
-the one-time registration handoff, then the complete reviewed rollout.
+through the existing API. Authenticated recovery is now connected behind a
+separate disabled gate, with server-only pins, durable quotas and a shared
+deadline. Actual SQL and 28 compiled-browser checks pass, including navigation
+to a verified artwork without another transaction. It stays disabled and stops
+before registration. Next: the one-time registration handoff, then the complete
+reviewed rollout.
 Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
 and works 1-4 remain unavailable. See the checkpoint for exact tests and gaps;
 legacy catalog intake and the worker-role check still precede migration rollout.
