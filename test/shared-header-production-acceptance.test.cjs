@@ -39,5 +39,8 @@ test('shared-header production acceptance remains durable and the deferred-heade
   assert.match(backlog, /SHARED_HEADER_PRODUCTION_REACCEPTANCE_2026-08-13\.md/);
 
   assert.match(canonicalBacklog, /^- \[x\] \*\*A2 — Mobile wallet acceptance\.\*\*/m);
-  assert.match(canonicalBacklog, /^- \[ \] \*\*A10 — Controlled beta entry\.\*\*/m);
+  const betaEntry = canonicalBacklog.split('\n').find(line => line.includes('**A10 — Controlled beta entry.'));
+  assert.match(betaEntry, /^- \[x\]/);
+  assert.match(betaEntry, /dated engineering-readiness GO/);
+  assert.match(betaEntry, /not an invitation window/);
 });

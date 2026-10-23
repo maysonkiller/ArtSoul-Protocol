@@ -19,7 +19,7 @@ const canonicalBacklog = read('docs/canon/12_IMPLEMENTATION_BACKLOG.md');
 const issueFormSource = read('.github/ISSUE_TEMPLATE/controlled-beta-bug.yml');
 const issueForm = yaml.load(issueFormSource);
 
-test('controlled-beta entry pack is explicitly NO-GO until evidence and P1 gates pass', () => {
+test('beta invitations remain NO-GO until the window checklist and P1 gates pass', () => {
     assert.match(entry, /Status: \*\*NO-GO/);
     assert.match(entry, /GO is permitted only when every operator checklist item is evidenced and no P1/);
     assert.match(entry, /Any missing evidence means NO-GO/);
@@ -115,14 +115,18 @@ test('public issue form parses and requires reproducible, redacted evidence', ()
     assert.match(issueFormSource, /Report security, privacy, copyright, or credential exposure privately/);
 });
 
-test('both backlogs show preparation in progress without falsely accepting A10', () => {
+test('engineering acceptance agrees across backlogs without opening a beta window', () => {
     const durableRow = backlog.split('\n').find(line => line.includes('| A-23 |'));
     assert.ok(durableRow);
-    assert.match(durableRow, /\| in progress \|/);
-    assert.match(durableRow, /remains NO-GO/);
+    assert.match(durableRow, /\| done \|/);
+    assert.match(durableRow, /remains NO-GO \/ not scheduled/);
 
     const canonicalRow = canonicalBacklog.split('\n').find(line => line.includes('**A10 — Controlled beta entry.'));
     assert.ok(canonicalRow);
-    assert.match(canonicalRow, /^- \[ \]/);
-    assert.match(canonicalRow, /acceptance remains open/);
+    assert.match(canonicalRow, /^- \[x\]/);
+    assert.match(canonicalRow, /dated engineering-readiness GO/);
+    assert.match(entry, /Phase A engineering-readiness decision: \*\*GO/);
+    assert.match(entry, /Window decision: NOT SCHEDULED \/ NO-GO/);
+    assert.match(entry, /- \[ \] The tester cohort, assigned journeys, start time, stop time/);
+    assert.match(canonicalBacklog, /^- \[ \] \*\*B1 — Tester cohort/m);
 });

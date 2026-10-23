@@ -317,10 +317,14 @@ or authorize mainnet deployment.
 
 *Aligned 2026-07-16 by founder decision.* The canonical roadmap has four phases:
 
-- **Phase A: Stabilize Public Testnet** (active).
+- **Phase A: Stabilize Public Testnet** (engineering readiness accepted October 24, 2026; see [the acceptance decision](../testnet/CONTROLLED_BETA_ENTRY.md)).
 - **Phase B: Public Beta**.
 - **Phase C: Mainnet Preparation**.
 - **Phase D: Staged Mainnet Launch**.
+
+Phase A acceptance does not open a beta invitation window. The Phase B cohort,
+dates, operator and support/pause responsibility remain unassigned; the window
+stays NO-GO until its pre-window checklist is complete.
 
 The 2026-10-03 founder amendment brings real passkey setup and its operator
 ceremony into current Phase A activation, superseding the September 29 deferral

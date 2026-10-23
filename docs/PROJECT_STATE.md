@@ -1,27 +1,21 @@
 # ArtSoul Project State
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
-and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-24. Implementation
-uses `C:\Projects\ArtSoul`; latest release is PR #333 (`3c6d40e`). Both CI jobs,
-production identity and nine upload assets are verified. Media preparation,
-submission and recovery are active with reviewed server pins; six private
-migrations and 32 historical media identities are installed. Works 1-4 remain
-explicit unavailable-original exceptions; direct contract calls are outside
-website duplicate protection. Both hosts are serviced and worker rights verified.
+and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-24. Application
+release PR #334 (`b0d722b`) is deployed and verified; Phase A engineering readiness
+is accepted by the dated GO in [controlled beta entry](testnet/CONTROLLED_BETA_ENTRY.md).
+The 83 formal Phase A rows are complete. A real beta window remains not scheduled
+until B1/B2 operator/cohort/dates/support are assigned; no invitation or mainnet
+launch is authorized by the engineering decision.
 
-The owner confirms native iPhone interruption/return and refresh continued to
-the auction transaction. Artwork 37 / auction 71 and one matching registration
-are corroborated through both RPCs and immutable media/preparation evidence.
-A-83 and the website guard are accepted; neither a captured ethers TIMEOUT nor
-explicit Check publication use is claimed. Formal A-23 remains open. TA-13's
-shared desktop/mobile preparation-error correction is locally tested and awaits
-CI/release verification after a successful build. TA-12 desktop display work is owner-deferred.
-
-Preserve completed publishing, iPhone visual/Back, wallet/OAuth, moderation,
-passkey/authenticator, donation and email acceptance. Android remains owner-waived
-/ not tested; Robinhood/Base Sepolia compatibility remains unverified. The
-checkpoint supplies exact evidence and next work; historical dates below do not
-describe the current branch, deployment or outstanding acceptance.
+Native interruption/reload publication37/auction71, real OAuth/moderation,
+donations, mail and device outcomes retain their exact evidence. The common
+PC/mobile preparation-error repair is released. The next focused work is the
+owner-deferred TA-12 desktop loading/timer issue. B-11/B-12 live acceptance,
+Android not tested, Robinhood unverified and mainnet requirements remain explicit.
+Legacy originals1-4 are unavailable; the active duplicate guard covers website
+exact bytes, not direct contract calls or re-encoding. Historical snapshots below
+do not describe current deployment or status. Use only C:\Projects\ArtSoul.
 
 Audit date: 2026-07-15
 Reconciled: 2026-08-20 against `main` at `0bbeec5` (merged PR #201)
@@ -133,7 +127,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 82 `done`, 1 `in progress`, 0 `planned` across A-01 to A-83
+current position is 83 `done`, 0 `in progress`, 0 `planned` across A-01 to A-83
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that

@@ -45,7 +45,7 @@ test('completed moderation retains evidence and does not imply beta acceptance',
     assert.ok(closeOut.includes(gate), `${gate} must be named`);
   }
   assert.match(closeOut, /audits\/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11\.md/);
-  assert.match(closeOut, /A-23 still needs the recorded beta review/);
+  assert.match(closeOut, /A-23 is accepted by the recorded engineering-readiness GO/);
   assert.match(closeOut, /Passkey\/recovery setup is authorized now/);
   assert.match(closeOut, /Both designated wallets approved staff setup/);
   assert.match(closeOut, /automated fixtures are not that ceremony/);

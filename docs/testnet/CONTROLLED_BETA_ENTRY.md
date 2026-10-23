@@ -2,12 +2,18 @@
 
 Last reviewed: 2026-10-24
 
-Status: **NO-GO — entry materials are prepared, but invitations must wait until
-the remaining Phase A acceptance gates pass.**
+Phase A engineering-readiness decision: **GO — accepted October 24, 2026.**
+
+Beta-window Status: **NO-GO — not scheduled.** Before invitations, assign the
+Phase B cohort, dates, operator, private support and pause responsibility and
+complete the pre-window checklist for that window.
 
 This is the operating source of truth for entering the invite-only ArtSoul
-controlled beta. It does not approve a beta window by itself. The Canon Bible
-and the canonical Phase A backlog remain authoritative.
+controlled beta. Engineering readiness closes Phase A; a specific test window
+has its own operational decision. Cohort recruitment and continuing operations
+belong to canonical B1/B2. This clarification does not waive any pre-window
+requirement or open invitations. The Canon Bible and canonical backlog remain
+authoritative; no architecture or economic rule is amended.
 
 A8 operating/test evidence and the subsequent UI repair are accepted October 15
 after PR #309 / #310, the owner's single-passkey confirmation and actual apex
@@ -17,8 +23,9 @@ and the branded publication wait. Do not repeat those ceremonies.
 The October 24 native interruption/return and refresh with continuation to the
 second transaction accept A-83, corroborated by artwork 37 / auction 71 through
 two RPCs and the original immutable server preparation. No captured ethers
-TIMEOUT or explicit Check publication use is claimed. A-23's final decision
-remains open, following TA-13's preparation-error release verification. A-57's classifier repair is accepted on October 23 under
+TIMEOUT or explicit Check publication use is claimed. A-23 is accepted by the
+October 24 engineering decision below, after TA-13's actual release verification.
+A-57's classifier repair is accepted on October 23 under
 the owner's delegated engineering disposition and already recorded working
 network-selection/publication outcomes. Robinhood/Base Sepolia compatibility
 remains UNVERIFIED: neither successful support nor the cause of its historical
@@ -29,9 +36,9 @@ identities and 13 passing real SIWE/HTTP checks. Works 1-4 remain explicit
 unavailable-original exceptions; direct contract calls can bypass the website
 guard. Guarded native publication is accepted by the evidence above. TA-12
 desktop display repairs are owner-deferred. See [Phase A close-out](../PHASE_A_CLOSE_OUT.md) for scope and
-evidence. The October 23 GitHub query returned zero open issues; that does not
-clear these recorded gaps or constitute a beta GO. No invitations or beta window
-are opened by this review.
+evidence. The October 24 query returns zero open GitHub issues. Repository
+follow-ups were reviewed separately, as recorded below; an empty tracker alone
+is not acceptance. No invitations or beta window are opened by this review.
 
 ## 1. Scope and safety
 
@@ -199,7 +206,63 @@ the relevant runbook for the affected service.
 
 ## 8. Go / no-go decision record
 
-### October 11 preparation record — NO-GO
+### October 24 engineering-readiness decision — GO
+
+- Recorded at 2026-10-23T23:01:49.862Z (October 24 in Warsaw), under the owner's existing
+  direction to complete Phase A. Scope: readiness to enter Phase B planning,
+  not a mainnet launch or an active invitation window.
+- Released code: `b0d722b11119e17c81adec6e0dee457b6f75c823`, PR #334.
+  Production deployment: `dpl_2YQ5eFmFs4FSNAFXhBXZ7dRAUKYV`.
+  Nine apex upload assets match the tested build; all eight media configuration
+  entries are unchanged. Local baseline: 2252 passed, zero failed/skipped
+  (includes preserved untracked local authority tests); 46 contract tests pass.
+  Clean candidate CI [40036245476](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/40036245476)
+  and merge CI [40036657013](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/40036657013)
+  both pass: Linux 2221 / Windows 1957 unit checks, zero failures, 2 / 18 skips;
+  46 contract tests on each OS, build and static checks green.
+- Current health at 2026-10-23T22:52:28Z: Base Sepolia, depth 3, synced,
+  8 blocks behind, zero unresolved errors and zero rolling RPC errors. This is
+  an observed healthy state; ongoing monitoring remains an operator duty.
+- Evidence mapping (retain original dates and limits):
+
+| Gate | Acceptance basis |
+| --- | --- |
+| A1 | Existing security/RLS/credential acceptance in canonical A1; October 24 private schema/grants and actual authenticated/denied media HTTP checks in the checkpoint |
+| A2 / A3 | Completed real desktop/iPhone wallet, restore, logout, switching and OAuth evidence in RG-01/device sheet; production debug cleanup accepted; Android waived / not tested |
+| A4 | Exact released build, local tests and clean Linux/Windows CI above |
+| A5 / A6 | Accepted projection/provenance and reorg behavior; 37 real worker/PostgreSQL checks, native 37/71 convergence and current health |
+| A7 | Existing lifecycle/action matrix, real settlement/resales, native re-auction 28/68 and publication 36/70 and 37/71; A-83 interruption outcome plus timeout/no-replay regressions |
+| A8 | [October 11/15 moderation acceptance](../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md): real reports, decisions, notifications, project-mail receipt, paired recovery and device factors |
+| A9 | Accepted no-cost monitoring/alerting controls and [October 23 host maintenance](../audits/HOST_SECURITY_2026-10-23.md); ongoing monitoring is not silently discontinued |
+| A10 | This decision, tester checklist/guide, support path, issue form, prototype deviations and pause criteria |
+| A11 / A12 | Previously accepted Base commitments, cached metrics and active-network copy; no conflicting lifecycle/economic change in this release |
+
+- Open-defect triage: zero open GitHub issues at this review, plus a separate
+  durable-backlog review. TA-02/TA-06 were stale acceptance statuses and are now
+  reconciled to actual prior OAuth/re-auction evidence. TA-13 is released and
+  verified; its original uncaptured phone exception is not claimed diagnosed.
+  B-10's creator-buyback Owner display now passes actual Chrome plus two RPCs.
+  No open P1 is identified by the evidence reviewed.
+- Explicit remaining scope: owner-deferred TA-12 desktop loading/flicker/timer
+  polish (P3); B-11's page-driven default-close/re-auction acceptance (P2 until
+  exercised, not a demonstrated current blocker). Current artwork 14 correctly
+  hides payment and offers Close Expired Settlement; no default transaction was
+  performed here. Existing B-12 agent/native acceptance also stays open.
+  Robinhood/Base Sepolia remains unverified; Android is not claimed tested.
+  The website's exact-byte duplicate guard excludes unavailable legacy originals
+  1-4 and cannot enforce direct contract calls or detect re-encoding. Mainnet
+  contract/custody/economic deviations in section 5 remain Phase C work.
+- Evidence: `output/audit/preparation-feedback-{focused,unit,contracts,build}-2026-10-24.log`,
+  both `preparation-feedback-ci-full-*-2026-10-24.log` files,
+  `media-release-b0d722b-2026-10-24.json`,
+  `publication-apex-b0d722b-2026-10-24.json`,
+  `phase-a-final-health-2026-10-24.json`, `phase-a-open-issues-2026-10-24.json`
+  and the native 37/71 evidence linked in the checkpoint. No secrets are included.
+- Window decision: NOT SCHEDULED / NO-GO. Operator, cohort, dates and private
+  support/pause coverage have not been assigned for a new window. Do not mark
+  those boxes checked, send invitations or infer a mainnet/reset authorization.
+
+### October 11 preparation record — NO-GO (historical)
 
 - Production main: `c7dcef6a511046ed94a406377b6093f8851b30f7` (PR #296),
   deployment 6993341447. Candidate `38c9e71` passed Linux/Windows/static CI;
@@ -236,5 +299,5 @@ Rollback/pause owner:
 Decision notes:
 ```
 
-GO is permitted only when every operator checklist item is evidenced and no P1
+A beta-window GO is permitted only when every operator checklist item is evidenced and no P1
 issue is open. Any missing evidence means NO-GO.
