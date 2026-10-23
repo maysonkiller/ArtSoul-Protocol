@@ -17,9 +17,13 @@ browser to this verifier behind a separate disabled gate, with durable quotas,
 a shared deadline and 28 passing built-browser journeys. The subsequent one-time
 begin/registration handoff is locally connected behind a third default-off gate;
 targeted API/client/adapter checks and actual SQL pass. Consult the checkpoint
-for its final build/CI evidence. Legacy catalog intake and rollout remain open.
+for its final build/CI evidence (`28f4822` passes Linux/Windows CI and preview).
+Owner-only, revision-fenced legacy intake is now locally tested, including an
+actual PostgreSQL import/replay of 32 verified existing records. No live import
+or activation occurred; rollout and unresolved-attempt disposition remain open.
 The read-only full indexed inventory
-covers 36 IDs, with 32 files hashed and four historical originals unavailable.
+covers 36 IDs, all registrations independently verified through Alchemy/Tenderly,
+with 32 current original files hashed and four historical originals unavailable.
 New desktop flicker/delay report TA-12 is explicitly
 deferred by the owner; it does not erase the accepted phone observations.
 The owner accepts the current iPhone visual behavior and browser Back, closing

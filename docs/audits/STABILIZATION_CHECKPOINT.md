@@ -29,8 +29,12 @@ October 23 TA-10 one-time registration handoff (Canon 1/2/11):
   coverage. Build and 32 compiled Chromium/WebKit journeys at 390/1440px pass,
   exercising the actual registration adapter with synthetic wallet responses,
   storage failures and the disabled legacy path. No native signature was made.
-  Final full CI results are pending;
-  do not substitute the starting-commit CI for this diff. Evidence uses the
+  Commit `28f48220aec003d36e8ea8195190a3e90c32e05c` passes exact CI
+  `39884207844`: Linux 2160 pass / 2 skips; Windows 1914 pass / 18 skips;
+  zero failures and 46 contract tests on each OS. The current adapter is v14
+  on all five loading pages. Its preview denies all seven unauthenticated
+  actions (401, private/no-store), rejects GET (405), and matches nine built
+  assets after CRLF normalization. Evidence uses the
   `output/audit/publication-submission-*2026-10-23` files.
 - Interpretation: four begin checks per wallet per minute and a shared 25-second
   request budget reuse the recovery operational bounds, not protocol economics.
@@ -44,6 +48,48 @@ October 23 TA-10 one-time registration handoff (Canon 1/2/11):
   owner-deferred TA-12 display work is unchanged. Next concrete step: prepare a
   verified legacy catalog intake with explicit coverage for the four unavailable
   originals, before worker-role preflight and a reviewed migration/activation.
+
+October 23 legacy verification follow-up (read-only; not an import):
+
+- Base public RPC could not return some historical blocks; PublicNode omitted
+  old receipts. A bounded dRPC probe also lacked historical code/block evidence.
+  These failures are provider coverage gaps, not proof that artwork disappeared.
+  No verification condition was relaxed and no application RPC was changed.
+- Existing configured Alchemy plus the Tenderly public Base Sepolia RPC verify
+  all 36 registrations against chain 84532, pinned Core/code, exact receipt/log,
+  creator/metadata and canonical finality. Re-reading metadata and original bytes
+  verifies 32 hashes, unchanged from the earlier inventory (49,137,320 bytes).
+  Works 1-4 still have no fetchable original through their recorded test/malformed
+  IPFS pointers. Existing duplicate pairs 6/13, 8/32 and 14/15 are preserved.
+  Evidence: `docs/private/legacy-media-candidates-2026-10-23T01-33-58-126Z.json`
+  and `output/audit/legacy-media-two-archive-verification-2026-10-23.log`.
+- A read-only database session observation finds a postgres Supavisor session
+  with an indexer-query hint and postgres-owned rollback functions. The pooler
+  masks its originating host, so this does not yet establish the Hetzner
+  worker's effective role. Do not substitute inference for host preflight.
+  Evidence: `docs/private/media-worker-role-observation-2026-10-23T01-37-42-841Z.json`.
+- `artwork_media_legacy_intake.sql` now adds owner-only, single-registration
+  intake after the reorg fence. It validates scope/finality shape, checks the
+  revision captured before verification, and commits catalog/evidence/claim
+  reconciliation together. It preserves the first anchor, historical duplicates
+  and sticky conflicts. No fake preparation/publication is created and no Data
+  API role can execute it. The unfenced old writers remain revoked.
+- Actual disposable PostgreSQL checks pass 32/32, including 13 new intake
+  scenarios for both rollback race orders, retries, contradictions, null inputs,
+  atomic failure and role denial. A separate local rehearsal imports the 32
+  verified existing records, replays all 32 without mutation, retains the three
+  duplicate pairs, and leaves publication/preparation counts zero. Evidence:
+  `output/audit/legacy-media-local-intake-2026-10-23.json`. This is a local fixture
+  with revision zero, not permission to import the old proof into live state.
+  The complete no-default-grants, migration and close-out checks pass 40/40 in
+  `output/audit/legacy-intake-grants-and-closeout-2026-10-23.log`.
+- The verified manifest is local evidence, not an applied catalog or complete
+  original-file coverage. A-57/A-83/A-23, unresolved-attempt disposition and
+  rollout acceptance remain open; no production schema, flags or data changed.
+  The exact earlier CI above precedes the intake addition; use PR #330's checks
+  for the later head. Next concrete step: finish a reviewed activation manifest
+  with the four missing originals, unresolved-attempt policy and actual worker
+  role resolved, then capture the live revision BEFORE fresh intake verification.
 
 October 23 TA-10 authenticated recovery continuation (Canon 1/2/11):
 

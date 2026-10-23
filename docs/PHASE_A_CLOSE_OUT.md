@@ -81,8 +81,14 @@ October 23 remaining work, without repeating completed ceremonies:
    default-off flag, preserving hashes independently of the preview-card cache
    and preventing permission replay after lost responses. Targeted checks and
    actual SQL pass; the checkpoint records final build/CI evidence. Legacy
-   catalog intake and rollout remain open, and all new media schema remains
-   inactive. That replay does not simulate or accept
+   catalog intake is now implemented as an owner-only, revision-fenced operation.
+   Actual PostgreSQL checks and an import/replay of 32 independently verified
+   historical records pass, preserving three duplicate pairs and adding no
+   synthetic publication attempts. All 36 historical registrations are verified
+   through Alchemy/Tenderly, but works 1-4 still lack fetchable original files.
+   Missing-original disposition, unresolved-attempt UX, actual worker role and
+   reviewed rollout remain open; all new media schema remains inactive.
+   These replays do not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or

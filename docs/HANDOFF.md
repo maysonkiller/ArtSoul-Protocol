@@ -19,11 +19,16 @@ deadline. Actual SQL and 28 compiled-browser checks pass, including navigation
 to a verified artwork without another transaction. The one-time registration
 handoff is now connected behind a third default-off gate, with independent hash
 retention, exact wallet/Core checks and no permission replay. Targeted checks and
-real SQL pass; consult the checkpoint for final build/CI evidence. No activation.
-Next: verified legacy catalog intake, then the complete reviewed rollout.
+real SQL pass; commit `28f4822` passes exact Linux/Windows CI and preview checks.
+An owner-only legacy intake now shares the revision fence and passes actual SQL
+checks. A local rehearsal imports and replays all 32 verified available originals,
+retaining duplicates and creating no synthetic publication attempts. No activation.
+Next: complete the reviewed rollout manifest, including missing-original and
+unresolved-attempt disposition, current worker-role evidence and fresh intake pins.
 Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
-and works 1-4 remain unavailable. See the checkpoint for exact tests and gaps;
-legacy catalog intake and the worker-role check still precede migration rollout.
+and works 1-4 remain unavailable. Alchemy/Tenderly independently verify all 36
+registrations; original-file coverage remains 32/36. See the checkpoint for tests
+and gaps; actual intake and the worker-role check still precede migration rollout.
 The owner's new desktop flicker/delay video is queued as TA-12; repairs are
 explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72

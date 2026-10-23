@@ -53,6 +53,10 @@ function identityQuery(value, artwork='1', block='123') {
     values:[value.chain,value.core,artwork,value.creator,value.hash,value.mediaUri,value.bytes,value.metadataUri,
       '0x'+'dd'.repeat(32),block,0]};
 }
+function legacyQuery(value, proof=evidence(value), revision='0', artwork=proof?.registrations?.[0]?.artwork_id || '1') {
+  return {text:'SELECT public.intake_legacy_artwork_media_registration($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) AS value',
+    values:[value.chain,value.core,artwork,value.creator,value.hash,value.mediaUri,value.bytes,value.metadataUri,proof,revision]};
+}
 
 test('media registration and indexer rollback share an atomic revision fence (PostgreSQL 17)',
   {skip:available ? false : 'Docker unavailable; PostgreSQL revision fencing remains unverified'}, async t => {
@@ -92,6 +96,8 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     END $f$;`);
   const fenceMigration = migration('sql/migrations/artwork_media_reorg.sql');
   await pool.query(fenceMigration);
+  const legacyMigration = migration('sql/migrations/artwork_media_legacy_intake.sql');
+  await pool.query(legacyMigration);
 
   async function service(query, values) {
     const client=await pool.connect();
@@ -105,6 +111,8 @@ test('media registration and indexer rollback share an atomic revision fence (Po
   const revision = (chain=84532) => rpc('SELECT public.read_artwork_media_revision($1) AS value',[chain]);
   const claimRow = async value => (await pool.query('SELECT to_jsonb(p) AS value FROM public.artwork_media_publications p WHERE publication_id=$1',[value.id])).rows[0].value;
   const rollback = (block,chain=84532) => pool.query('SELECT * FROM public.rollback_events_from_block($1,$2)',[block,chain]);
+  const intake = async (value,proof=evidence(value),token='0',artwork) =>
+    (await pool.query(legacyQuery(value,proof,token,artwork))).rows[0].value;
   async function claimed(value) {
     await rpc('SELECT public.issue_artwork_media_upload($1,$2,$3,$4,$5,$6,$7,$8) AS value',
       [value.id,value.chain,value.core,value.creator,value.mediaPath,value.metadataPath,'image/png',value.bytes]);
@@ -151,6 +159,187 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     assert.fail('the competing transaction must wait on a database lock');
   }
   t.beforeEach(reset);
+
+  await t.test('owner legacy intake preserves exact identifiers and the first anchor without synthetic publications',async()=>{
+    const value=fixture(),proof=evidence(value,{artwork:'9007199254740993'});
+    assert.deepEqual(await intake(value,proof),{artwork_id:'9007199254740993',catalog_status:'RECORDED',can_submit:false});
+    const before=await snapshot();
+    assert.equal((await intake(value,proof)).catalog_status,'ALREADY_RECORDED');
+    assert.equal((await intake(value,evidence(value,{artwork:'9007199254740993',anchor:'250'}))).catalog_status,'ALREADY_RECORDED');
+    assert.deepEqual(await snapshot(),before,'later finalized heads cannot replace the first proof');
+    for(const table of ['artwork_media_preparations','artwork_media_publications']) {
+      assert.equal((await pool.query(`SELECT count(*) AS count FROM public.${table}`)).rows[0].count,'0');
+    }
+  });
+
+  await t.test('concurrent owner intakes record one immutable identity',async()=>{
+    const value=fixture();
+    const results=await Promise.all([intake(value),intake(value)]);
+    assert.deepEqual(results.map(r=>r.catalog_status).sort(),['ALREADY_RECORDED','RECORDED']);
+    assert.equal((await pool.query('SELECT count(*) AS count FROM public.artwork_media_registration_evidence')).rows[0].count,'1');
+  });
+
+  await t.test('historical exact-byte duplicates remain separate facts and block a new claim',async()=>{
+    const first=fixture(),second=fixture({creator:other});
+    await intake(first);await intake(second,evidence(second,{artwork:'2',block:'124'}));
+    const rows=(await pool.query('SELECT artwork_id::TEXT,creator_wallet FROM public.artwork_media_catalog ORDER BY artwork_id')).rows;
+    assert.deepEqual(rows,[{artwork_id:'1',creator_wallet:creator},{artwork_id:'2',creator_wallet:other}]);
+    assert.equal((await pool.query('SELECT count(*) AS count FROM public.artwork_media_registration_evidence')).rows[0].count,'2');
+    assert.equal(await rpc('SELECT public.claim_artwork_media_publication($1,$2,$3,$4,$5,$6,$7,$8) AS value',
+      [first.id,first.chain,first.core,first.creator,first.hash,first.mediaPath,first.bytes,first.metadataUri]),'DUPLICATE_MEDIA');
+  });
+
+  await t.test('legacy intake reconciles matching claims then preserves their journal when another artwork conflicts',async()=>{
+    const value=fixture(),duplicate=fixture({creator:other});await claimed(value);await started(value,true);
+    const initial=await claimRow(value);await intake(value);
+    assert.equal((await claimRow(value)).claim_status,'registered');
+    await intake(duplicate,evidence(duplicate,{artwork:'2',block:'124'}));
+    const after=await claimRow(value);assert.equal(after.claim_status,'conflict');
+    assert.equal(after.registered_artwork_id,1);assert.equal(after.reported_transaction_hash,reportedHash);
+    assert.equal(after.submission_started_at,initial.submission_started_at);
+    assert.equal((await started(value)).submission_created,false);
+    const before=await snapshot();await intake(value);assert.deepEqual(await snapshot(),before);
+  });
+
+  await t.test('a different legacy creator or metadata never acquires the pending claim',async()=>{
+    const value=fixture(),legacy=fixture({creator:other});await claimed(value);await started(value);
+    await intake(legacy);const row=await claimRow(value);
+    assert.equal(row.claim_status,'conflict');assert.equal(row.registered_artwork_id,null);
+    assert.equal(row.creator_wallet,creator);assert.equal(row.reported_transaction_hash,null);
+  });
+
+  await t.test('legacy intake rejects malformed, null, multiple and cross-scope evidence before writes',async()=>{
+    const value=fixture(),base=evidence(value),before=await snapshot();
+    const invalid=[null,{},[],{...base,state:'unresolved'},{...base,can_submit:true},
+      {...base,chain_id:1},{...base,core_address:otherCore},{...base,core_code_hash:'0x'+'00'.repeat(32)},
+      {...base,registrations:[]},{...base,registrations:[base.registrations[0],base.registrations[0]]}];
+    for(const field of ['state','can_submit','chain_id','core_address','core_code_hash','finalized_anchor','registrations']) {
+      const missing=structuredClone(base);delete missing[field];invalid.push(missing,{...base,[field]:null});
+    }
+    for(const field of ['artwork_id','creator_wallet','metadata_uri','transaction_hash','block_number','block_hash','log_index']) {
+      const missing=structuredClone(base);delete missing.registrations[0][field];invalid.push(missing);
+      const empty=structuredClone(base);empty.registrations[0][field]=null;invalid.push(empty);
+    }
+    for(const change of [{creator_wallet:other},{metadata_uri:value.metadataUri+'-wrong'},{artwork_id:1},
+      {block_number:123},{log_index:0},{log_index:'2147483648'},{block_number:'201'},
+      {block_hash:'0x'+'00'.repeat(32)},{transaction_hash:'0x'+'00'.repeat(32)}]) {
+      const changed=structuredClone(base);Object.assign(changed.registrations[0],change);invalid.push(changed);
+    }
+    for(const anchor of [{number:200,hash:'0x'+'cc'.repeat(32)},
+      {number:'123',hash:'0x'+'cc'.repeat(32)},{number:(2n**256n).toString(),hash:'0x'+'cc'.repeat(32)}]) {
+      invalid.push({...base,finalized_anchor:anchor});
+    }
+    for(const proof of invalid) await assert.rejects(intake(value,proof,'0','1'),/INVALID_REGISTRATION_EVIDENCE/);
+    for(const [field,replacement] of [['chain',null],['chain',1],['core',null],['core','0x'+'00'.repeat(20)],
+      ['creator',null],['creator','0x'+'00'.repeat(20)],['hash',null],['hash','invalid'],
+      ['mediaUri',null],['mediaUri',' '],['metadataUri',null],['bytes',null],['bytes',0]]) {
+      await assert.rejects(intake({...value,[field]:replacement},base),/INVALID_MEDIA_REGISTRATION_REVISION|INVALID_REGISTRATION_EVIDENCE/);
+    }
+    for(const id of ['',null,'0','01',(2n**256n).toString()]) {
+      const proof=structuredClone(base);proof.registrations[0].artwork_id=id;
+      await assert.rejects(intake(value,proof,'0',id),/INVALID_REGISTRATION_EVIDENCE/);
+    }
+    assert.deepEqual(await snapshot(),before);
+  });
+
+  await t.test('contradictory legacy catalog or evidence cannot overwrite the original or change claims',async()=>{
+    const value=fixture();await claimed(value);await started(value,true);await intake(value);
+    const before=await snapshot();
+    for(const field of ['transaction_hash','block_hash']) {
+      const changed=evidence(value);changed.registrations[0][field]='0x'+'ff'.repeat(32);
+      await assert.rejects(intake(value,changed),/MEDIA_IDENTITY_CONFLICT|MEDIA_REGISTRATION_EVIDENCE_CONFLICT/);
+    }
+    for(const change of [{hash:'ff'.repeat(32)},{bytes:value.bytes+1},{mediaUri:value.mediaUri+'-wrong'},
+      {metadataUri:value.metadataUri+'-wrong'},{creator:other}]) {
+      const changed={...value,...change};
+      await assert.rejects(intake(changed),/MEDIA_IDENTITY_CONFLICT/);
+    }
+    for(const changed of [{...evidence(value),core_code_hash:'0x'+'ff'.repeat(32)},
+      {...evidence(value),finalized_anchor:{number:'200',hash:'0x'+'ff'.repeat(32)}}]) {
+      await assert.rejects(intake(value,changed),/MEDIA_REGISTRATION_EVIDENCE_CONFLICT/);
+    }
+    assert.deepEqual(await snapshot(),before);
+  });
+
+  await t.test('legacy intake requires a present exact revision and read committed isolation',async()=>{
+    const value=fixture(),before=await snapshot();
+    for(const token of [null,'','00','-1','0.0','1e3','1'.repeat(79)]) {
+      await assert.rejects(intake(value,evidence(value),token),/INVALID_MEDIA_REGISTRATION_REVISION/);
+    }
+    const client=await pool.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+      await assert.rejects(client.query(legacyQuery(value)),/MEDIA_IDENTITY_REQUIRES_READ_COMMITTED/);
+    } finally {await client.query('ROLLBACK');client.release();}
+    assert.deepEqual(await snapshot(),before);
+    await rollback(120);await assert.rejects(intake(value),/MEDIA_REGISTRATION_STALE_REVISION/);
+    await pool.query('DELETE FROM public.artwork_media_rewinds; DELETE FROM public.artwork_media_chain_revisions;');
+    await assert.rejects(intake(value),/MEDIA_REGISTRATION_REVISION_UNAVAILABLE/);
+    assert.equal((await pool.query('SELECT count(*) AS count FROM public.artwork_media_catalog')).rows[0].count,'0');
+  });
+
+  for(const intakeFirst of [true,false]) await t.test(`legacy intake and rollback serialize when ${intakeFirst?'intake':'rollback'} locks first`,async()=>{
+    const value=fixture();await claimed(value);await started(value);const writer=await pool.connect(),rewinder=await pool.connect();let pending;
+    try {
+      await writer.query('BEGIN');await rewinder.query('BEGIN');
+      if(intakeFirst) {
+        await writer.query(legacyQuery(value));
+        const pid=(await rewinder.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        pending=rewinder.query('SELECT * FROM public.rollback_events_from_block(120,84532)').then(result=>({result}),error=>({error}));
+        await waitForLock(pid);await writer.query('COMMIT');assert.ifError((await pending).error);await rewinder.query('COMMIT');
+        assert.equal((await claimRow(value)).claim_status,'conflict');
+        assert.equal((await pool.query('SELECT count(*) AS count FROM public.artwork_media_registration_evidence')).rows[0].count,'1');
+      } else {
+        await rewinder.query('SELECT * FROM public.rollback_events_from_block(120,84532)');
+        const pid=(await writer.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        pending=writer.query(legacyQuery(value)).then(result=>({result}),error=>({error}));
+        await waitForLock(pid);await rewinder.query('COMMIT');
+        assert.match((await pending).error?.message||'',/MEDIA_REGISTRATION_STALE_REVISION/);await writer.query('ROLLBACK');
+        assert.equal((await pool.query('SELECT count(*) AS count FROM public.artwork_media_catalog')).rows[0].count,'0');
+      }
+      assert.equal(await revision(),'1');assert.equal((await started(value)).submission_created,false);
+    } finally {
+      await writer.query('ROLLBACK');await rewinder.query('ROLLBACK');if(pending)await pending;
+      writer.release();rewinder.release();
+    }
+  });
+
+  await t.test('a new revision cannot readmit conflicting retained legacy proof or release its quarantined claim',async()=>{
+    const value=fixture();await claimed(value);await started(value,true);await intake(value);await rollback(120);
+    const before=await snapshot(),changed=evidence(value,{anchor:'250'});changed.registrations[0].block_hash='0x'+'ff'.repeat(32);
+    await assert.rejects(intake(value,changed,'1'),/MEDIA_REGISTRATION_EVIDENCE_CONFLICT/);
+    assert.equal((await intake(value,evidence(value,{anchor:'250'}),'1')).catalog_status,'ALREADY_RECORDED');
+    assert.deepEqual(await snapshot(),before);assert.equal((await claimRow(value)).claim_status,'conflict');
+  });
+
+  await t.test('legacy evidence insertion failure rolls back catalog and claim reconciliation together',async()=>{
+    const value=fixture();await claimed(value);await started(value,true);const before=await snapshot();
+    await pool.query(`CREATE FUNCTION public._fail_legacy_evidence() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_LEGACY_EVIDENCE_FAILURE'; END $f$;
+      CREATE TRIGGER _fail_legacy_evidence BEFORE INSERT ON public.artwork_media_registration_evidence
+      FOR EACH ROW EXECUTE FUNCTION public._fail_legacy_evidence();`);
+    try {await assert.rejects(intake(value),/FORCED_LEGACY_EVIDENCE_FAILURE/);}
+    finally {await pool.query('DROP TRIGGER _fail_legacy_evidence ON public.artwork_media_registration_evidence; DROP FUNCTION public._fail_legacy_evidence();');}
+    assert.deepEqual(await snapshot(),before);
+  });
+
+  await t.test('legacy intake is owner-only and replaying its migration preserves evidence and revoked raw writers',async()=>{
+    const value=fixture();await intake(value);await rollback(201);const before=await snapshot();
+    await pool.query(legacyMigration);assert.deepEqual(await snapshot(),before);
+    const properties=(await pool.query(`SELECT prosecdef,proconfig FROM pg_proc
+      WHERE oid='public.intake_legacy_artwork_media_registration(numeric,text,text,text,text,text,bigint,text,jsonb,text)'::regprocedure`)).rows[0];
+    assert.equal(properties.prosecdef,false);assert.deepEqual(properties.proconfig,['search_path=pg_catalog, public']);
+    for(const role of ['service_role','anon','authenticated']) {
+      const client=await pool.connect();
+      try {
+        for(const query of [legacyQuery(value,evidence(value),'1'),identityQuery(value),registrationQuery(value,evidence(value),null)]) {
+          await client.query('BEGIN');await client.query(`SET LOCAL ROLE ${role}`);
+          await assert.rejects(client.query(query),/permission denied for function/);await client.query('ROLLBACK');
+        }
+      } finally {await client.query('ROLLBACK');client.release();}
+    }
+    assert.equal((await intake(value,evidence(value),'1')).catalog_status,'ALREADY_RECORDED');
+  });
 
   await t.test('indexer hints are owned and deployment scoped, bounded and preserve numeric precision',async()=>{
     const value=fixture({creator:'0x'+'ab'.repeat(20)});await claimed(value);
