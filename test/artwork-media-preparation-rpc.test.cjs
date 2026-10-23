@@ -590,6 +590,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
   await t.test('authenticated API prepares and resumes through actual PostgreSQL RPCs without submission permission', async () => {
     // Keep earlier foundation tests on their historical schema; the full API
     // journey uses the newest rollout, including revocation of old writers.
+    sql('CREATE TABLE public.v41_artworks(chain_id NUMERIC, artwork_id NUMERIC(78,0), creator TEXT, metadata_uri TEXT, block_number BIGINT, transaction_hash TEXT);');
     sql(fs.readFileSync(path.join(__dirname,'../src/indexer/migrations/014_schema_aware_reorg_rollback.sql'),'utf8'));
     sql(fs.readFileSync(path.join(__dirname,'../sql/migrations/artwork_media_reorg.sql'),'utf8'));
     const {default:handler} = await import('../src/api/routes/upload/publication.js');
@@ -633,6 +634,12 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
         assert.equal(init.method,'GET');assert.equal(body,undefined);
         assert.equal(url.searchParams.get('p_chain_id'),'84532');
         return Response.json(rpc('SELECT to_jsonb(public.read_artwork_media_revision(84532));'));
+      }
+      if (url.pathname === '/rest/v1/rpc/read_artwork_media_registration_candidates') {
+        assert.equal(init.method,'GET');assert.equal(body,undefined);
+        const keys=['p_publication_id','p_chain_id','p_core_address','p_creator_wallet'];
+        assert.deepEqual([...url.searchParams.keys()].sort(),[...keys].sort());
+        return Response.json(rpc(`SELECT public.read_artwork_media_registration_candidates(${keys.map(k=>q(url.searchParams.get(k))).join(',')});`));
       }
       if (url.pathname.startsWith('/rest/v1/rpc/')) {
         const name = url.pathname.slice('/rest/v1/rpc/'.length);
@@ -782,14 +789,15 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       });
       const unresolved=await recoverPublication(creator,id,deployment,{rpcs});
       assert.equal(unresolved.state,'unresolved','original reported hash has no receipt');
+      sql(`INSERT INTO public.v41_artworks VALUES(84532,9007199254740993,${q(creator)},${q(prepared.body.metadata_uri)},100,${q(replacement)});`);
       dropReconciliationResponse=true;
-      await assert.rejects(recoverPublication(creator,id,deployment,{rpcs,scan:{fromBlock:'99',toBlock:'101'}}));
+      await assert.rejects(recoverPublication(creator,id,deployment,{rpcs}));
       assert.equal(sql('SELECT count(*) FROM artwork_media_registration_evidence;'),'1','response loss does not undo a committed transaction');
-      const recoveredRegistration=await recoverPublication(creator,id,deployment,{rpcs,scan:{fromBlock:'99',toBlock:'101'}});
+      const recoveredRegistration=await recoverPublication(creator,id,deployment,{rpcs});
       assert.equal(recoveredRegistration.state,'registered');assert.equal(recoveredRegistration.registered_artwork_id,'9007199254740993');
       assert.equal(recoveredRegistration.can_submit,false);
       const saved=sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;');
-      assert.deepEqual(await recoverPublication(creator,id,deployment,{rpcs,scan:{fromBlock:'99',toBlock:'101'}}),recoveredRegistration);
+      assert.deepEqual(await recoverPublication(creator,id,deployment,{rpcs}),recoveredRegistration);
       assert.equal(sql('SELECT row_to_json(e) FROM artwork_media_registration_evidence e;'),saved);
       assert.equal(sql('SELECT transaction_hash FROM artwork_media_catalog;'),replacement);
       const finalStatus=await call({action:'status',publication_id:id});

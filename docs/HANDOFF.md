@@ -10,9 +10,12 @@ and a server-only recovery helper, with no public recovery action or activation.
 The local rollback fence now rejects pre-rewind verification and atomically
 quarantines affected claims while retaining immutable history. Actual PostgreSQL
 tests cover both race orders and rollback failures; the schema is not activated.
-Next: bounded indexer registration intake/replay through the verified recovery
-path. See the checkpoint for exact tests; browser rollout and legacy coverage
-remain open. The worker database role must be checked before migration rollout.
+The follow-up now uses owned indexed registrations as bounded RPC search hints,
+including lost/replaced hashes; actual API-to-PostgreSQL recovery passes. Next:
+connect browser preparation/recovery, still disabled until the complete rollout.
+Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
+and works 1-4 remain unavailable. See the checkpoint for exact tests and gaps;
+legacy catalog intake and the worker-role check still precede migration rollout.
 The owner's new desktop flicker/delay video is queued as TA-12; repairs are
 explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72

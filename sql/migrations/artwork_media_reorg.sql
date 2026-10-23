@@ -38,6 +38,31 @@ AS $$ SELECT revision::TEXT FROM public.artwork_media_chain_revisions WHERE chai
 REVOKE ALL ON FUNCTION public.read_artwork_media_revision(NUMERIC) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.read_artwork_media_revision(NUMERIC) TO service_role;
 
+-- Indexed rows are search hints, never registration proof. Return one extra
+-- row beyond the verifier's bound so overflow cannot be silently truncated.
+-- Cast protocol numbers before JSON serialization to retain their precision.
+CREATE OR REPLACE FUNCTION public.read_artwork_media_registration_candidates(
+    p_publication_id UUID, p_chain_id NUMERIC, p_core_address TEXT, p_creator_wallet TEXT
+)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public
+AS $$
+    SELECT coalesce(jsonb_agg(jsonb_build_object('artwork_id', a.artwork_id::TEXT,
+        'block_number', a.block_number::TEXT, 'transaction_hash', a.transaction_hash)
+        ORDER BY a.block_number, a.artwork_id), '[]'::JSONB)
+    FROM (
+        SELECT a.artwork_id, a.block_number, lower(a.transaction_hash) AS transaction_hash
+        FROM public.v41_artworks a
+        JOIN public.artwork_media_publications p ON p.chain_id = a.chain_id
+            AND p.creator_wallet = lower(a.creator) AND p.metadata_uri = a.metadata_uri
+        WHERE p.publication_id = p_publication_id AND p.chain_id = p_chain_id AND p_chain_id = 84532
+            AND p.core_address = lower(p_core_address) AND p.creator_wallet = lower(p_creator_wallet)
+        ORDER BY a.block_number, a.artwork_id LIMIT 9
+    ) a
+$$;
+REVOKE ALL ON FUNCTION public.read_artwork_media_registration_candidates(UUID, NUMERIC, TEXT, TEXT)
+    FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.read_artwork_media_registration_candidates(UUID, NUMERIC, TEXT, TEXT) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.reconcile_artwork_media_registration(
     p_publication_id UUID, p_chain_id NUMERIC, p_core_address TEXT, p_creator_wallet TEXT,
     p_media_sha256 TEXT, p_media_uri TEXT, p_byte_size BIGINT, p_metadata_uri TEXT, p_evidence JSONB,

@@ -88,6 +88,14 @@ function backend(options = {}) {
       if (options.revisionError) return Response.json({message:'private database error'},{status:503});
       return Response.json(Object.hasOwn(options,'revision') ? options.revision : '0');
     }
+    if (url.includes('/rpc/read_artwork_media_registration_candidates')) {
+      const query=new URL(url).searchParams;
+      assert.equal(query.get('p_publication_id'),id);assert.equal(query.get('p_chain_id'),'84532');
+      assert.equal(query.get('p_core_address'),core);assert.equal(query.get('p_creator_wallet'),wallet);
+      assert.ok(!init.method || init.method==='GET');
+      if (options.indexError) return Response.json({message:'private database error'},{status:503});
+      return Response.json(Object.hasOwn(options,'candidates') ? options.candidates : []);
+    }
     if (url.includes('/rpc/reconcile_artwork_media_registration')) {
       if (options.reconcileError) return Response.json({message:'private database error'},{status:500});
       return Response.json(options.reconciled || {publication_id:id,claim_status:'registered',registered_artwork_id:'36',can_submit:false});
@@ -174,13 +182,58 @@ test('recovery captures an exact revision before chain verification and never re
   }
 });
 
-test('recovery from a missing reported hash uses only an explicit server scan and keeps coverage', async () => {
+test('recovery without a reported hash or indexer hints needs an explicit server scan and keeps coverage', async () => {
   const f=recoveryFixture({noHash:true});
   const unresolved=await f.run();assert.equal(unresolved.reason,'NO_TRANSACTION_OR_SCAN');assert.equal(f.calls.length,0);
   const result=await f.run({fromBlock:'99',toBlock:'101'});
   assert.equal(result.state,'registered');assert.equal(result.coverage.proves_absence,false);
   assert.equal(result.coverage.next_block,'102');
   assert.ok(!f.seen.some(c=>/begin_artwork|report_artwork/.test(c.url)));
+});
+
+test('indexed registration recovers a missing or replaced browser hash through verified bounded logs', async () => {
+  for(const noHash of [false,true]) {
+    const f=recoveryFixture({noHash,candidates:[{artwork_id:'36',block_number:'100',transaction_hash:'0x'+'dd'.repeat(32)}]});
+    const result=await f.run();
+    assert.equal(result.state,'registered');assert.equal(result.can_submit,false);
+    assert.equal(result.coverage.from_block,'100');assert.equal(result.coverage.to_block,'100');
+    assert.equal(result.coverage.proves_absence,false);
+    assert.ok(f.calls.some(call=>call.method==='eth_getLogs'));
+    assert.ok(!f.seen.some(call=>/begin_artwork|report_artwork/.test(call.url)));
+  }
+});
+
+test('indexer candidates are hints and cannot certify a missing canonical registration', async () => {
+  const current={artwork_id:'36',block_number:'100',transaction_hash:'0x'+'dd'.repeat(32)};
+  for(const extra of [{...current,artwork_id:'37'}, {...current,transaction_hash:'0x'+'ee'.repeat(32)},
+    {...current,block_number:'101'}]) {
+    const f=recoveryFixture({candidates:[current,extra]});
+    const result=await f.run();
+    assert.equal(result.state,'unresolved');assert.equal(result.reason,'INDEXER_REGISTRATION_MISMATCH');
+    assert.equal(result.can_submit,false);assert.ok(!f.seen.some(call=>call.body?.p_evidence));
+  }
+});
+
+test('indexer overflow and wide ranges stay unresolved rather than truncating registration evidence', async () => {
+  const candidate={artwork_id:'36',block_number:'100',transaction_hash:'0x'+'dd'.repeat(32)};
+  for(const [candidates,reason] of [
+    [Array.from({length:9},(_,i)=>({...candidate,artwork_id:String(i+1)})),'INDEXED_REGISTRATION_LIMIT'],
+    [[candidate,{...candidate,artwork_id:'37',block_number:'2100'}],'INDEXED_REGISTRATION_RANGE']
+  ]) {
+    const f=recoveryFixture({candidates}), result=await f.run();
+    assert.equal(result.reason,reason);assert.equal(result.can_submit,false);
+    assert.equal(f.calls.length,0);assert.ok(!f.seen.some(call=>call.body?.p_evidence));
+  }
+});
+
+test('malformed or unavailable indexer hints fail closed without writes or chain requests', async () => {
+  const candidate={artwork_id:'36',block_number:'100',transaction_hash:'0x'+'dd'.repeat(32)};
+  for(const options of [{indexError:true},{candidates:null},{candidates:{}},{candidates:[{}]},
+    {candidates:[{...candidate,artwork_id:36}]},{candidates:[{...candidate,block_number:100}]},
+    {candidates:[{...candidate,transaction_hash:'invalid'}]},{candidates:Array(10).fill(candidate)}]) {
+    const f=recoveryFixture(options);await assert.rejects(f.run());
+    assert.equal(f.calls.length,0);assert.ok(!f.seen.some(call=>call.body?.p_evidence));
+  }
 });
 
 test('missing receipt, changed bytes and replaced metadata never reach persistence', async () => {

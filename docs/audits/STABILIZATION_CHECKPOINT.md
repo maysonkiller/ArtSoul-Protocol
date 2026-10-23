@@ -3,6 +3,55 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 indexed registration recovery and full indexed-media inventory:
+
+- Resume `fd109663cf2284c42be0088a44c086220e36825a` in the same workspace/branch.
+  Its exact CI `39876151905` passes: Linux 2113 pass / 2 skips; Windows 1868
+  pass / 18 skips; zero failures; 46 contract tests on each OS. This precedes
+  the follow-up below and is not claimed as testing its new diff.
+- Recovery now finds owned, deployment-scoped registration candidates in
+  `v41_artworks`. The private stable getter preserves numeric precision and
+  returns up to nine rows to detect verifier-bound overflow. The captured chain
+  revision precedes this read. Indexed rows only choose a bounded RPC scan:
+  every candidate must match canonical, finalized evidence through both RPCs
+  before persistence. More than eight candidates, a range wider than 2,000
+  blocks, or a missing canonical match stays unresolved with no resend.
+  Empty indexer results do not prove absence; a known hash still uses receipt
+  verification. No-hash attempts can recover once their indexed event appears.
+  No background process, dependency or new indexer polling loop was introduced.
+- Verification on the follow-up: 110 focused API/verifier/actual PostgreSQL
+  checks, and 52 preparation/recovery/grant checks on actual PostgreSQL, all
+  pass with zero skips. The API-to-SQL test now recovers a replacement hash
+  from an indexed row without a caller-supplied scan, handles a lost committed
+  response, repeats safely, and retains the original hash and attempt time.
+  Logs: `output/audit/registration-indexer-recovery-focused-2026-10-23.log` and
+  `registration-indexer-recovery-integration-2026-10-23.log`.
+- Read-only live DB snapshot contains all 36 Base Sepolia indexed registrations
+  and no media-identity/preparation/registration/reorg schema. Both rollback
+  functions are owned by postgres; the remote worker's connection role remains
+  unchecked. Two existing RPCs agree on pinned Core code, counter 36 and finalized
+  block 48957097 (`0x83ddbb17f6d5bd045b7f6dede63657b6c9b25b8247a17ab229444bd9f878deac`).
+  Indexed IDs cover 1-36 at that anchor. This count check does not independently
+  verify every historical receipt or metadata pointer.
+- Bounded original-media reads across the complete indexed snapshot hash 32/36
+  files (49,137,320 downloaded bytes). Works 1-4 have no fetchable media reference
+  through their stored historical test/malformed IPFS metadata URIs. Confirmed
+  duplicate pairs remain 6/13, 8/32 and 14/15. No existing work or duplicate was
+  deleted, hidden, rewritten or imported into the inactive identity catalog.
+  Private evidence: `media-rollout-inventory-2026-10-23T00-14-06-971Z.json`,
+  `indexed-media-hashes-2026-10-23T00-15-46-531Z.json`, and
+  `media-inventory-counter-2026-10-23T00-17-19-021Z.json` in `docs/private/`.
+- Interpretation: an indexed registration is a recovery hint, never finality
+  proof. Metadata-URI equality is not file identity. Missing legacy bytes must
+  remain an explicit coverage gap; do not fabricate a hash or claim full-file
+  coverage from a complete ID count. Website enforcement cannot constrain direct
+  calls to the unchanged contract; future contract work remains separate.
+- Next concrete step: connect the authenticated browser preparation/recovery
+  flow to these tested server primitives, retaining unknown attempts and requiring
+  the complete rollout checks before activation. Legacy catalog intake and the
+  four unavailable originals remain explicit gaps. A-83 native delay and A-23
+  beta acceptance are not established by these offline/read-only checks.
+
 October 23 TA-10 indexer rollback fence (Canon 1/2/11; not activated):
 
 - Resume HEAD `c565156d8671047e3f4b3175e8de7e2a2416992a`, same workspace and

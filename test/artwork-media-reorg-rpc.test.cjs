@@ -82,6 +82,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     CREATE TABLE public.contract_events(chain_id NUMERIC(78,0),block_number BIGINT,transaction_hash TEXT,log_index INTEGER);
     CREATE TABLE public.outbox_events(correlation_id TEXT,idempotency_key TEXT);`);
   for(const table of projectionTables) await pool.query(`CREATE TABLE public.${table}(chain_id NUMERIC(78,0),block_number BIGINT);`);
+  await pool.query('ALTER TABLE public.v41_artworks ADD artwork_id NUMERIC(78,0), ADD creator TEXT, ADD metadata_uri TEXT, ADD transaction_hash TEXT;');
   await pool.query(migration('src/indexer/migrations/014_schema_aware_reorg_rollback.sql'));
   // The legacy signature delegates exactly as migration 013 does.
   await pool.query(`CREATE FUNCTION public.rollback_events_from_block(reorg_block BIGINT)
@@ -129,7 +130,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
   async function seedProjection(block=123,chain=84532) {
     await pool.query('INSERT INTO public.contract_events VALUES($1,$2,$3,0)',[chain,block,'0x'+'dd'.repeat(32)]);
     await pool.query('INSERT INTO public.event_processing_registry VALUES($1,$2)',[chain,block]);
-    for(const table of projectionTables) await pool.query(`INSERT INTO public.${table} VALUES($1,$2)`,[chain,block]);
+    for(const table of projectionTables) await pool.query(`INSERT INTO public.${table}(chain_id,block_number) VALUES($1,$2)`,[chain,block]);
     await pool.query('INSERT INTO public.outbox_events VALUES($1,$2)',
       [`${chain}-0x${'dd'.repeat(32)}-0`,`${chain}-0x${'dd'.repeat(32)}-0-webhook`]);
   }
@@ -150,6 +151,27 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     assert.fail('the competing transaction must wait on a database lock');
   }
   t.beforeEach(reset);
+
+  await t.test('indexer hints are owned and deployment scoped, bounded and preserve numeric precision',async()=>{
+    const value=fixture({creator:'0x'+'ab'.repeat(20)});await claimed(value);
+    const hintQuery={text:'SELECT public.read_artwork_media_registration_candidates($1,$2,$3,$4) AS value',
+      values:[value.id,value.chain,value.core,value.creator]};
+    assert.deepEqual(await rpc(hintQuery),[]);
+    await pool.query(`INSERT INTO public.v41_artworks(chain_id,block_number,artwork_id,creator,metadata_uri,transaction_hash)
+      SELECT 84532,100+i,9007199254740993+i,$1,$2,$3 FROM generate_series(0,9) i`,
+      ['0x'+'AB'.repeat(20),value.metadataUri,'0x'+'DD'.repeat(32)]);
+    const rows=await rpc(hintQuery);
+    assert.equal(rows.length,9,'overflow remains visible to the caller');
+    assert.equal(rows[0].artwork_id,'9007199254740993');assert.equal(rows[8].block_number,'108');
+    assert.equal(rows[0].transaction_hash,'0x'+'dd'.repeat(32));
+    for(const [index,changed] of [[0,crypto.randomUUID()],[1,11155111],[2,otherCore],[3,other]]) {
+      const values=[...hintQuery.values];values[index]=changed;
+      assert.deepEqual(await rpc({text:hintQuery.text,values}),[]);
+    }
+    await rollback(100);
+    assert.deepEqual(await rpc(hintQuery),[],'rewound projections cannot remain lookup hints');
+    assert.equal((await claimRow(value)).claim_status,'claimed','unverified hints never confirm or release a claim');
+  });
 
   await t.test('revision getter is stable, exact and unavailable without the chain row',async()=>{
     assert.equal(await revision(),'0');
@@ -320,6 +342,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
       const client=await pool.connect();
       try {
         for(const query of [registrationQuery(value),{text:'SELECT public.read_artwork_media_revision(84532)'},
+          {text:'SELECT public.read_artwork_media_registration_candidates($1,84532,$2,$3)',values:[value.id,core,creator]},
           {text:'SELECT * FROM public.artwork_media_rewinds'},{text:'SELECT * FROM public.artwork_media_chain_revisions'},
           {text:'SELECT * FROM public.rollback_events_from_block(120,84532)'}]) {
           await client.query('BEGIN');await client.query(`SET LOCAL ROLE ${role}`);

@@ -245,9 +245,37 @@ export async function recoverPublication(wallet, id, deployment, { rpcs, scan = 
   if (typeof revision !== 'string' || !/^(0|[1-9][0-9]{0,77})$/.test(revision)) {
     throw fail('MEDIA_REGISTRATION_REVISION_UNAVAILABLE', 503);
   }
+  let candidates = [];
+  if (!scan) {
+    const query = new URLSearchParams({p_publication_id:id, p_chain_id:String(deployment.chainId),
+      p_core_address:deployment.core, p_creator_wallet:wallet});
+    candidates = await supabaseRest(`rpc/read_artwork_media_registration_candidates?${query}`, {
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!Array.isArray(candidates) || candidates.length > 9 || candidates.some(candidate =>
+      typeof candidate?.artwork_id !== 'string' || !/^[1-9][0-9]{0,77}$/.test(candidate.artwork_id) ||
+      typeof candidate.block_number !== 'string' || !/^(0|[1-9][0-9]{0,77})$/.test(candidate.block_number) ||
+      typeof candidate.transaction_hash !== 'string' || !TRANSACTION_HASH.test(candidate.transaction_hash))) {
+      throw fail('MEDIA_REGISTRATION_INDEX_UNAVAILABLE', 503);
+    }
+    if (candidates.length > 8) return {publication_id:id, state:'unresolved', reason:'INDEXED_REGISTRATION_LIMIT', can_submit:false};
+    if (candidates.length) {
+      const blocks = candidates.map(candidate => BigInt(candidate.block_number));
+      const first = blocks.reduce((a,b) => a < b ? a : b), last = blocks.reduce((a,b) => a > b ? a : b);
+      if (last - first >= 2000n) return {publication_id:id, state:'unresolved', reason:'INDEXED_REGISTRATION_RANGE', can_submit:false};
+      scan = {fromBlock:first.toString(), toBlock:last.toString()};
+    }
+  }
   const evidence = await verifyArtworkRegistration({ deployment, creator: wallet, metadataUri,
     transactionHash: scan ? null : journal.reported_transaction_hash, scan }, { rpcs });
   if (evidence.state !== 'verified') return { publication_id: id, ...evidence };
+  // An indexed candidate missing from canonical RPC evidence may be orphaned
+  // or lagging. Do not silently certify only the subset that happened to match.
+  if (candidates.some(candidate => !evidence.registrations.some(registration =>
+    registration.artwork_id === candidate.artwork_id && registration.block_number === candidate.block_number &&
+    registration.transaction_hash === candidate.transaction_hash))) {
+    return {publication_id:id, state:'unresolved', reason:'INDEXER_REGISTRATION_MISMATCH', can_submit:false};
+  }
   const saved = await rpc('reconcile_artwork_media_registration', {
     p_publication_id: id, p_chain_id: deployment.chainId, p_core_address: deployment.core,
     p_creator_wallet: wallet, p_media_sha256: media.sha256, p_media_uri: media.mediaUrl,
