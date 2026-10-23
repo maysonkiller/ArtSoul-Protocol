@@ -1094,7 +1094,7 @@ let selectedFile = null;
                 if (preparation) {
                     if (preparation.recovery?.state === 'registered') {
                         assertCurrent();
-                        window.location.href = `/artwork/${preparation.recovery.registered_artwork_id}`;
+                        navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${BASE_SEPOLIA_CHAIN_ID}:${preparation.recovery.registered_artwork_id}`));
                         return;
                     }
                     if (preparation.recovery?.state === 'conflict' || preparation.claim_status === 'conflict') {
