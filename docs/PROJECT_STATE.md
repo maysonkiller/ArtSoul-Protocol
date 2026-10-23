@@ -2,9 +2,9 @@
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
 and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-23. Implementation
-uses `C:\Projects\ArtSoul`; latest application release is PR #329 (`dbefd68`).
-Upload preparation and the new private submission journal remain disabled
-pending complete receipt/event recovery and browser rollout.
+uses `C:\Projects\ArtSoul`; latest application release is PR #330 (`333e527`).
+Upload preparation, recovery and one-time submission are implemented and
+deployed behind three disabled flags; the live media schema remains inactive.
 The October 23 registration verifier is tested against two RPCs. Its local
 follow-up adds atomic block/finality anchor persistence with catalog/claim
 reconciliation, still disabled. The local
@@ -17,10 +17,14 @@ browser to this verifier behind a separate disabled gate, with durable quotas,
 a shared deadline and 28 passing built-browser journeys. The subsequent one-time
 begin/registration handoff is locally connected behind a third default-off gate;
 targeted API/client/adapter checks and actual SQL pass. Consult the checkpoint
-for its final build/CI evidence (`28f4822` passes Linux/Windows CI and preview).
+for final build/CI evidence: candidate `363a463` and merge `333e527` both pass
+Linux/Windows CI, with 2173/1914 unit passes, zero failures, 2/18 skips and
+46 contract tests on each OS. Actual apex API and nine release assets match.
 Owner-only, revision-fenced legacy intake is now locally tested, including an
 actual PostgreSQL import/replay of 32 verified existing records. No live import
 or activation occurred; rollout and unresolved-attempt disposition remain open.
+The actual host worker role still needs read-only confirmation; pooler metadata
+is insufficient and the current console stops at Hetzner's security check.
 The read-only full indexed inventory
 covers 36 IDs, all registrations independently verified through Alchemy/Tenderly,
 with 32 current original files hashed and four historical originals unavailable.

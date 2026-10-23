@@ -10,6 +10,13 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **80 done, 3 in progress, 0 planned** across A-01 to A-83.
 
+Latest code release: PR #330 (`333e527`), verified on the apex domain.
+Candidate and post-merge CI pass (Linux 2173 / Windows 1914 unit checks,
+zero failures; 2 / 18 skips; 46 contract tests on each OS). The guarded media
+implementation described below is now published, but all three flags and the
+live media schema remain inactive. Publication is not duplicate-enforcement
+acceptance. See the checkpoint for exact logs and activation limitations.
+
 October 23 remaining work, without repeating completed ceremonies:
 
 1. **Current mobile defects:** PR #320's bounded Donate/Report dialogs are

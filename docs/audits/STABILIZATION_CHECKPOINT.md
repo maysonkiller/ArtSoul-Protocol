@@ -3,6 +3,40 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 released continuation (supersedes the pre-release notes below):
+
+- PR #330 is merged and deployed at `333e527abc1daa67a62bce91126de3fa30aa8a85`.
+  The same workspace/branch was fast-forwarded to that commit; its tree equals
+  the tested candidate `363a463825d4f7d9577f5e08788af1524d2c3017`.
+  Candidate CI `39885693498` and post-merge CI `39886056120` both pass:
+  Linux 2173 pass / 2 skips; Windows 1914 pass / 18 skips; zero failures;
+  46 contract tests on each OS. Build/static checks also pass.
+  Final log: `output/audit/publication-release-main-ci-333e527-2026-10-23.log`.
+- Production deployment `7268143135` succeeded. Actual apex checks deny all seven
+  unauthenticated publication actions (401, private/no-store), reject GET (405),
+  and match nine built assets after CRLF normalization. Evidence:
+  `output/audit/media-submission-apex-333e527-2026-10-23.json` and
+  `output/audit/publication-apex-333e527-2026-10-23.json`.
+- This releases the guarded publication/recovery implementation, not its
+  activation. All three media flags remain disabled; no live media migration,
+  catalog import, server-secret/configuration change or signing occurred.
+  The successful local SQL/browser/catalog tests below are not live acceptance.
+- Key-only server access was unavailable. The October 23 Hetzner browser attempt
+  stopped at its automatic security-check page; no console command, credential
+  change or security bypass occurred. The pooler observation below remains
+  insufficient to identify the live worker's effective database role.
+- Formal Phase A remains 80 done / 3 in progress (A-57, A-83, A-23). The owner
+  question about closing A-57 with Robinhood compatibility explicitly unverified
+  is pending. A-83 still needs real delayed-confirmation device evidence. TA-10
+  additionally needs missing-original and interrupted-attempt disposition, live
+  worker integration and reviewed activation. TA-12 remains owner-deferred.
+- Preserve the unrelated untracked authority-policy files, `.codex/` and
+  `output/`. The reused review agent has completed; no helper remains active.
+  Next concrete step: obtain read-only host evidence for the running indexer's
+  database role and rollback path before preparing the live migration sequence.
+  Capture the actual database revision BEFORE any fresh intake verification;
+  the saved local manifest does not authorize a live import.
+
 October 23 TA-10 one-time registration handoff (Canon 1/2/11):
 
 - Starting commit `333044100a48088e5f341652a88d6b81609d9da7` passes exact CI
@@ -42,8 +76,9 @@ October 23 TA-10 one-time registration handoff (Canon 1/2/11):
   handoff conservatively retains the attempt: automatic release remains unsafe
   with the unchanged direct-call contract. This UX/rollout limitation is unresolved,
   not a passed native-wallet acceptance or a closed duplicate-enforcement feature.
-- No production release, live schema/configuration change, signing or contract
-  deployment. All three flags remain disabled. Preserve the unrelated untracked
+- At this earlier checkpoint there was no production release. PR #330 is now
+  released as recorded above, without live schema/configuration changes,
+  signing or contract deployment. All three flags remain disabled. Preserve the unrelated untracked
   authority-policy files, `.codex/` and `output/`. A-57, A-83 and A-23 remain open;
   owner-deferred TA-12 display work is unchanged. Next concrete step: prepare a
   verified legacy catalog intake with explicit coverage for the four unavailable
@@ -86,8 +121,8 @@ October 23 legacy verification follow-up (read-only; not an import):
 - The verified manifest is local evidence, not an applied catalog or complete
   original-file coverage. A-57/A-83/A-23, unresolved-attempt disposition and
   rollout acceptance remain open; no production schema, flags or data changed.
-  The exact earlier CI above precedes the intake addition; use PR #330's checks
-  for the later head. Next concrete step: finish a reviewed activation manifest
+  Exact CI for the intake addition and its published merge is recorded at the
+  top of this file. Next concrete step: finish a reviewed activation manifest
   with the four missing originals, unresolved-attempt policy and actual worker
   role resolved, then capture the live revision BEFORE fresh intake verification.
 

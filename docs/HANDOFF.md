@@ -1,9 +1,10 @@
 # ArtSoul Engineering Handoff
 
 Current continuation (2026-10-23): use `C:\Projects\ArtSoul`, branch
-`codex/takeover-audit`. Latest application release is PR #329 (`dbefd68`);
-upload preparation and the new private submission journal remain disabled
-pending complete receipt/event recovery and browser rollout.
+`codex/takeover-audit`. Latest application release and local code baseline are
+PR #330 (`333e527`); all three media rollout flags and the live media schema
+remain inactive. The release includes receipt/event recovery and the guarded
+browser handoff; it does not activate exact-file duplicate enforcement.
 The October 23 registration verifier passed a two-RPC replay of artwork 36.
 The local follow-up adds atomic finalized-evidence/catalog/claim persistence
 and a recovery helper, without activation.
@@ -19,12 +20,17 @@ deadline. Actual SQL and 28 compiled-browser checks pass, including navigation
 to a verified artwork without another transaction. The one-time registration
 handoff is now connected behind a third default-off gate, with independent hash
 retention, exact wallet/Core checks and no permission replay. Targeted checks and
-real SQL pass; commit `28f4822` passes exact Linux/Windows CI and preview checks.
+real SQL pass. Final candidate `363a463` and merge `333e527` both pass CI:
+2173 Linux / 1914 Windows unit checks, zero failures and 46 contract tests on
+each OS; 2 Linux / 18 Windows skips are recorded separately. The apex API
+boundary and nine deployed assets are verified against this release.
 An owner-only legacy intake now shares the revision fence and passes actual SQL
 checks. A local rehearsal imports and replays all 32 verified available originals,
 retaining duplicates and creating no synthetic publication attempts. No activation.
-Next: complete the reviewed rollout manifest, including missing-original and
-unresolved-attempt disposition, current worker-role evidence and fresh intake pins.
+Next: establish the live indexer's effective database role through read-only
+host evidence. SSH key access was unavailable and the console stopped at
+Hetzner's automatic security check. Then complete the reviewed rollout manifest,
+including missing-original and unresolved-attempt disposition and fresh intake pins.
 Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
 and works 1-4 remain unavailable. Alchemy/Tenderly independently verify all 36
 registrations; original-file coverage remains 32/36. See the checkpoint for tests
