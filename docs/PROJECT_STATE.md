@@ -30,6 +30,10 @@ covers 36 IDs, all registrations independently verified through Alchemy/Tenderly
 with 32 current original files hashed and four historical originals unavailable.
 New desktop flicker/delay report TA-12 is explicitly
 deferred by the owner; it does not erase the accepted phone observations.
+A-57 is accepted on October 23 for the published classifier repair and recorded
+working wallet flows under the owner's delegated engineering disposition.
+Robinhood/Base Sepolia compatibility remains explicitly unverified; A-83/A-23
+are the remaining formal Phase A rows.
 The owner accepts the current iPhone visual behavior and browser Back, closing
 A-47/A-48/A-53/A-54/A-58/A-61/A-72. Earlier Admin/artwork release `9a2965f` is deployed.
 A-71 is separately accepted from the owner's explicit branded-wait observation.
@@ -150,7 +154,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 80 `done`, 3 `in progress`, 0 `planned` across A-01 to A-83
+current position is 81 `done`, 2 `in progress`, 0 `planned` across A-01 to A-83
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that

@@ -3,6 +3,32 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 A-57 disposition (Canon 1/17; documentation only):
+
+- Starting HEAD `49bd8c7`; code release remains PR #330 (`333e527`). The owner
+  delegates the engineering decision after confirming current iPhone balance
+  and network selection; later native Chrome/MetaMask publication also passed.
+  Clarification: network selection means Base Sepolia within the wallet, not
+  changing accounts or adding another product chain.
+- A-57's published classifier repair (PR #262) is accepted for the exercised
+  flows. `node --test test/network-switch-failure-classifier.test.cjs` passes
+  10/10 on the current code. Robinhood/Base Sepolia compatibility stays explicitly
+  UNVERIFIED in the backlog, device sheet and beta entry; no historical provider
+  cause or new Robinhood device result is invented.
+- The deployed compiled wallet asset matches the local release byte-for-byte:
+  `output/audit/a57-apex-artifact-2026-10-23.json`. The source filename itself
+  returns 404 because this entry is bundled; the compiled asset returns 200.
+  `npm run sync:phase-a` derives 81/2/0 from the backlog; the six existing
+  close-out/status consistency checks pass. No application rebuild is needed
+  for this documentation-only disposition.
+- Interpretation: the owner's delegation permits an engineering disposition of
+  the old evidence gap, not a fictitious test pass. No canon architecture, runtime
+  code, credentials, network support or economics changed. Formal Phase A is now
+  81 done / 2 in progress (A-83/A-23); TA-10 activation and deferred TA-12 remain.
+- The next concrete engineering step remains read-only confirmation of the live
+  indexer's database role and rollback path before the TA-10 migration sequence.
+  Preserve the unrelated untracked files and the accepted phone ceremonies.
+
 October 23 released continuation (supersedes the pre-release notes below):
 
 - PR #330 is merged and deployed at `333e527abc1daa67a62bce91126de3fa30aa8a85`.
@@ -25,9 +51,9 @@ October 23 released continuation (supersedes the pre-release notes below):
   stopped at its automatic security-check page; no console command, credential
   change or security bypass occurred. The pooler observation below remains
   insufficient to identify the live worker's effective database role.
-- Formal Phase A remains 80 done / 3 in progress (A-57, A-83, A-23). The owner
-  question about closing A-57 with Robinhood compatibility explicitly unverified
-  is pending. A-83 still needs real delayed-confirmation device evidence. TA-10
+- At release, formal Phase A was 80 done / 3 in progress (A-57, A-83, A-23).
+  A-57 is subsequently disposed of above with Robinhood compatibility unverified.
+  A-83 still needs real delayed-confirmation device evidence. TA-10
   additionally needs missing-original and interrupted-attempt disposition, live
   worker integration and reviewed activation. TA-12 remains owner-deferred.
 - Preserve the unrelated untracked authority-policy files, `.codex/` and

@@ -8,7 +8,7 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **80 done, 3 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **81 done, 2 in progress, 0 planned** across A-01 to A-83.
 
 Latest code release: PR #330 (`333e527`), verified on the apex domain.
 Candidate and post-merge CI pass (Linux 2173 / Windows 1914 unit checks,
@@ -112,9 +112,11 @@ October 23 remaining work, without repeating completed ceremonies:
    Exact timestamps are in the checkpoint. The owner defers
    these repairs until existing phase work is finished. Earlier phone acceptance
    remains valid; the beta decision must disclose this deferred desktop follow-up.
-4. **A-57 disposition:** current switching works according to the owner; the
-   historical Robinhood iOS provider failure is unresolved evidence, not a newly
-   confirmed defect. Do not invent a wallet limitation to close it.
+4. **A-57 accepted with a recorded compatibility limitation:** the owner confirms
+   working network selection and delegates disposition of the old Robinhood gap.
+   The published classifier repair and ten current regressions pass. This closes
+   the repaired application issue for the exercised flows; Robinhood/Base Sepolia
+   remains UNVERIFIED, not a demonstrated wallet limitation or a passed test.
 5. **A-23 beta decision** follows the remaining acceptance and open-defect
    review. Android remains owner-waived / not tested. Wallet login, OAuth,
    moderation/factors, donation settlement and complaint-email delivery already
@@ -411,12 +413,12 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-57** | Wallet capability limits | Current iPhone network switching is owner-confirmed working. The old Robinhood failure stage and masked provider error remain unknown; neither a confirmed ArtSoul defect nor a proven wallet limitation is established. Do not manufacture a failure or repeat the accepted Rabby account-switch flow |
+| **A-83** | Registration confirmation delay | The repair is published and automated recovery checks pass; a real-device publish across a real confirmation delay is still unobserved. Ordinary successful publication does not establish that outcome |
 
 ## 2a. Remaining device observations
 
-Two rows remain for recovery evidence or historical-defect
-disposition: A-57/A-83; A-23 is the subsequent beta decision. A-33,
+One row remains for device recovery evidence: A-83; A-23 is the subsequent beta
+decision. A-57 is accepted with Robinhood compatibility explicitly unverified. A-33,
 A-64 and A-78 were accepted on October 22 from native publication and prior
 evidence. A-47/A-48/A-53/A-54/A-58/A-61/A-72 are accepted on October 23 from the
 specific native visual and Back follow-ups, published repairs and prior desktop evidence.
