@@ -2,6 +2,7 @@ import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
+import { prepareBrowserPublication } from '../features/artwork/publication-preparation.js';
 import {
     ALLOWED_ARTWORK_MIME_TYPES,
     MAX_ARTWORK_UPLOAD_BYTES,
@@ -363,6 +364,16 @@ let selectedFile = null;
                 BASE_SEPOLIA_REQUIRED: 'Base Sepolia could not be confirmed. Open your wallet, select Base Sepolia, then try again.',
                 BASE_SEPOLIA_SWITCH_REJECTED: 'The network switch was declined. Select Base Sepolia in your wallet, then try again.',
                 AI_UNAVAILABLE: 'AI value guidance is not ready. Request an estimate before publishing.',
+                PUBLICATION_DETAILS_LOCKED: 'This file already has a saved publication attempt with different details. Restore its original details before continuing; do not create another attempt.',
+                PUBLICATION_STORAGE_UNAVAILABLE: 'This browser could not safely save the publication attempt. Allow site storage and try again; no wallet request was started.',
+                PUBLICATION_DRAFT_INVALID: 'The saved publication attempt could not be read safely. Do not clear it or publish the file again; contact support.',
+                PUBLICATION_PREPARED_ONLY: 'Your artwork preparation is saved. Registration is not enabled for this preparation yet; no wallet request was started.',
+                PUBLICATION_ATTEMPT_PENDING: 'This artwork already has a registration attempt. Check your profile and wallet activity; do not publish the file again.',
+                DUPLICATE_MEDIA: 'This file already has a publication or a pending attempt. Renaming it does not create a different artwork.',
+                SESSION_WALLET_MISMATCH: 'Another tab changed your signed-in wallet. Sign in with this artwork creator wallet before continuing.',
+                PUBLICATION_FORM_CHANGED: 'The artwork details changed during preparation. Review them and request updated AI value guidance before continuing.',
+                MEDIA_PREPARATION_UNAVAILABLE: 'Publication preparation is temporarily unavailable. Your saved attempt is retained; please try again later.',
+                MEDIA_PREPARATION_MISMATCH: 'The saved file or publication details do not match this attempt. Do not publish it again; contact support.',
                 AUCTION_CONFIRMATION_PENDING: 'The auction transaction was submitted and is still finalizing. Check its status from your profile before trying anything again.'
             };
             if (directMessages[code]) return { code, message: directMessages[code] };
@@ -434,7 +445,7 @@ let selectedFile = null;
 
         window.ArtSoulCleanupBadPendingCards = cleanupBadPendingCards;
 
-        function createPendingArtworkDraft({ walletAddress, title, description, price, fileHash, fileUpload }) {
+        function createPendingArtworkDraft({ walletAddress, title, description, price, fileHash, fileUpload, file = selectedFile }) {
             const now = new Date().toISOString();
             return {
                 temp_id: crypto.randomUUID?.() || `pending-${Date.now()}`,
@@ -450,8 +461,8 @@ let selectedFile = null;
                 file_hash: fileHash,
                 file_url: fileUpload.url,
                 media_url: fileUpload.url,
-                file_type: selectedFile?.type?.split('/')[0] || 'image',
-                media_type: selectedFile?.type || '',
+                file_type: file?.type?.split('/')[0] || 'image',
+                media_type: file?.type || '',
                 storage_path: fileUpload.path || fileUpload.storagePath || '',
                 upload_hash: fileUpload.ipfsHash || '',
                 stage: 'media_uploaded',
@@ -1026,6 +1037,10 @@ let selectedFile = null;
 
             clearBlockingStep();
 
+            const file = selectedFile;
+            const duration = selectedAuctionDuration;
+            const guidance = latestAIValuation;
+            const formKey = getAIValuationFormKey();
             const walletAddress = window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
             if (!walletAddress) return;
             const chainId = Number(window.getCurrentChainId?.() || window.ArtSoulContracts?.currentNetwork?.chainId || 0);
@@ -1040,6 +1055,17 @@ let selectedFile = null;
             const originalMarkup = uploadBtn.innerHTML;
             setTransactionButtonProcessing(uploadBtn);
             let pendingArtwork = null;
+            const assertCurrent = () => {
+                if (String(window.getCurrentWalletAddress?.() || '').toLowerCase() !== walletAddress.toLowerCase()) {
+                    throw createUploadError('AUTHORIZATION_WALLET_CHANGED', 'The wallet changed during preparation.');
+                }
+                if (Number(window.getCurrentChainId?.()) !== BASE_SEPOLIA_CHAIN_ID) {
+                    throw createUploadError('BASE_SEPOLIA_REQUIRED', 'Base Sepolia is required.');
+                }
+                if (file !== selectedFile || formKey !== getAIValuationFormKey()) {
+                    throw createUploadError('PUBLICATION_FORM_CHANGED', 'Artwork details changed during preparation.');
+                }
+            };
 
             try {
                 // Authorization and AI guidance are completed before Publish is enabled.
@@ -1057,20 +1083,32 @@ let selectedFile = null;
                 // Step 1: Generate file hash for duplicate detection
                 currentPublishStage = 'fingerprint';
                 setTransactionButtonProcessing(uploadBtn, 'Preparing artwork fingerprint...');
-                const fileHash = await window.IPFSClient.generateFileHash(selectedFile);
+                const fileHash = await window.IPFSClient.generateFileHash(file);
+                assertCurrent();
                 console.log('📝 File hash:', fileHash);
+
+                const preparation = await prepareBrowserPublication({ file, fileHash, wallet: walletAddress,
+                    details: { title, description, creatorValue: price, aiGuidance: guidance, duration }, assertCurrent });
+                if (preparation) {
+                    // This rollout slice never begins an attempt or initializes
+                    // contracts. An error cannot fall back to legacy publishing.
+                    throw createUploadError(preparation.submission_started_at || preparation.claim_status !== 'claimed'
+                        ? 'PUBLICATION_ATTEMPT_PENDING' : 'PUBLICATION_PREPARED_ONLY', 'Publication preparation retained.');
+                }
 
                 // Step 2: Prepare media storage
                 currentPublishStage = 'media_upload';
                 setTransactionButtonProcessing(uploadBtn, 'Preparing media...');
-                const fileUpload = await window.IPFSClient.uploadFile(selectedFile);
+                const fileUpload = await window.IPFSClient.uploadFile(file);
+                assertCurrent();
                 pendingArtwork = createPendingArtworkDraft({
                     walletAddress,
                     title,
                     description,
                     price,
                     fileHash,
-                    fileUpload
+                    fileUpload,
+                    file
                 });
                 console.log('📤 File uploaded:', fileUpload.ipfsHash);
 
@@ -1080,16 +1118,17 @@ let selectedFile = null;
                     title: title,
                     description: description,
                     imageUrl: fileUpload.url,
-                    mediaType: selectedFile.type,
+                    mediaType: file.type,
                     creator: walletAddress,
                     creatorValue: price,
-                    aiGuidance: latestAIValuation,
+                    aiGuidance: guidance,
                     createdAt: new Date().toISOString()
                 });
 
                 // Step 4: Store artwork metadata
                 currentPublishStage = 'metadata_upload';
                 const metadataUpload = await window.IPFSClient.uploadMetadata(metadata);
+                assertCurrent();
                 if (!metadataUpload?.url) {
                     throw new Error('Metadata upload failed before on-chain registration.');
                 }
@@ -1115,6 +1154,7 @@ let selectedFile = null;
                 }
 
                 // Step 6: Register artwork with the protocol
+                assertCurrent();
                 currentPublishStage = 'register';
                 setTransactionButtonProcessing(uploadBtn, 'Registering artwork...');
                 const result = await window.ArtSoulContracts.uploadArtwork(
@@ -1175,7 +1215,7 @@ let selectedFile = null;
                     const auctionConfirmation = window.ArtSoulContracts.createAuction(
                         result.artworkId,
                         price,
-                        selectedAuctionDuration,
+                        duration,
                         {
                             expectedWallet: walletAddress,
                             expectedChainId: BASE_SEPOLIA_CHAIN_ID,

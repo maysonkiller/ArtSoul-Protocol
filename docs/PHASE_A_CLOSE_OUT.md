@@ -70,7 +70,10 @@ October 23 remaining work, without repeating completed ceremonies:
    concurrency and atomic failure. A further tested server change now uses owned
    indexed candidates to recover missing/replaced hashes through both RPCs.
    The full indexed inventory contains 36 IDs: 32 files are hashed, while works
-   1-4 lack fetchable originals. Legacy catalog intake and browser recovery/rollout
+   1-4 lack fetchable originals. The local browser preparation now preserves
+   UUID-bound immutable drafts and passes real SQL and 16 built-browser cases.
+   It remains disabled, stops before registration, and does not close TA-10.
+   Legacy catalog intake and browser recovery/registration/rollout
    remain open, and all new media schema remains inactive. That replay does not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner

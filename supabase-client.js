@@ -165,10 +165,11 @@ function currentChainId() {
     return Number(chainId) || 84532;
 }
 
-async function backendWrite(path, body, method = 'POST', headers = {}) {
+async function backendWrite(path, body, method = 'POST', headers = {}, options = {}) {
     const response = await fetch(path, {
         method,
         credentials: 'include',
+        signal: options.signal,
         headers: {
             'Content-Type': 'application/json',
             ...headers
@@ -645,7 +646,10 @@ async function uploadSignedBlob({ blob, fileName, contentType, size, kind = 'med
         content_type: contentType,
         size
     });
+    return uploadIssuedBlob({ blob, fileName, signedUpload });
+}
 
+async function uploadIssuedBlob({ blob, fileName, signedUpload, signal }) {
     if (!signedUpload?.signed_upload_url || !signedUpload?.public_url) {
         throw new Error('Upload authorization failed');
     }
@@ -656,6 +660,7 @@ async function uploadSignedBlob({ blob, fileName, contentType, size, kind = 'med
 
     const response = await fetch(signedUpload.signed_upload_url, {
         method: 'PUT',
+        signal,
         headers: {
             'x-upsert': 'false'
         },
@@ -674,6 +679,11 @@ async function uploadSignedBlob({ blob, fileName, contentType, size, kind = 'med
     }
 
     return signedUpload;
+}
+
+function requestPublication(body, wallet) {
+    return backendWrite('/api/upload/publication', body, 'POST', { 'X-ArtSoul-Wallet': wallet },
+        { signal: AbortSignal.timeout(30000) });
 }
 
 async function uploadFile(file, fileName) {
@@ -1154,6 +1164,8 @@ window.ArtSoulDB = {
     updateArtwork,
     deleteArtwork,
     // Storage
+    requestPublication,
+    uploadIssuedBlob,
     uploadFile,
     uploadMetadata,
     // Auctions

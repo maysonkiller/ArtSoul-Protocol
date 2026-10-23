@@ -11,8 +11,11 @@ The local rollback fence now rejects pre-rewind verification and atomically
 quarantines affected claims while retaining immutable history. Actual PostgreSQL
 tests cover both race orders and rollback failures; the schema is not activated.
 The follow-up now uses owned indexed registrations as bounded RPC search hints,
-including lost/replaced hashes; actual API-to-PostgreSQL recovery passes. Next:
-connect browser preparation/recovery, still disabled until the complete rollout.
+including lost/replaced hashes; actual API-to-PostgreSQL recovery passes.
+Browser preparation now retains immutable UUID-bound drafts and handles retries
+through the existing API, with real SQL and 16 compiled-browser checks. It stays
+disabled and stops before registration. Next: authenticated bounded recovery and
+the one-time registration handoff, then the complete reviewed rollout.
 Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
 and works 1-4 remain unavailable. See the checkpoint for exact tests and gaps;
 legacy catalog intake and the worker-role check still precede migration rollout.

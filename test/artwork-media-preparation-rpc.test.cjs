@@ -609,7 +609,7 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       json(value){this.body=value;return this;},end(){}});
     const call = async (body, owner=creator) => {
       const signed=response(), result=response();setWalletSession(signed,owner);
-      await handler({method:'POST',headers:{'content-type':'application/json',
+      await handler({method:'POST',headers:{'content-type':'application/json','x-artsoul-wallet':owner,
         cookie:signed.headers['Set-Cookie'].split(';')[0]},body},result);
       assert.equal(result.headers['Cache-Control'],'private, no-store');
       return result;
@@ -804,6 +804,38 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       assert.equal(finalStatus.body.claim_status,'registered');assert.equal(finalStatus.body.reported_transaction_hash,tx);
       assert.equal(finalStatus.body.submission_started_at,started.body.submission_started_at);
       assert.equal(calls.filter(value=>value.startsWith('/storage/v1/object/artworks/')).length,writes);
+
+      // The real browser preparation helper now crosses the authenticated API
+      // and real SQL, retaining one UUID after a committed response is lost.
+      const {prepareBrowserPublication}=await import('../src/features/artwork/publication-preparation.js');
+      const browserBytes=Buffer.from('A different original file for browser preparation');
+      const browserHash=crypto.createHash('sha256').update(browserBytes).digest('hex');
+      const draftStore=new Map();let dropBrowserPrepare=true, browserId;
+      const dependencies={
+        storage:{getItem:k=>draftStore.get(k)??null,setItem:(k,v)=>draftStore.set(k,v)},
+        locks:{request:(_key,_options,fn)=>fn()},randomUUID:()=>crypto.randomUUID(),
+        createMetadata:input=>context.window.IPFSClient.createMetadata(input),
+        upload:async({signedUpload})=>objects.set(signedUpload.path,{data:browserBytes,type:'image/png'}),
+        request:async(body,owner)=>{
+          assert.equal(owner,creator);
+          const result=await call(body,owner);
+          if(result.statusCode!==200)throw Object.assign(Error(result.body.error),{code:result.body.error});
+          if(body.action==='prepare' && dropBrowserPrepare){dropBrowserPrepare=false;browserId=body.publication_id;throw Error('lost browser response');}
+          return result.body;
+        }
+      };
+      const browserInput={file:{name:'screenshot.png',size:browserBytes.length,type:'image/png'},fileHash:browserHash,
+        wallet:creator,details:{title:'夜',description:'Browser preparation test.',creatorValue:'0.001',duration:24},assertCurrent(){}};
+      await assert.rejects(prepareBrowserPublication(browserInput,dependencies),/lost browser response/);
+      const persisted=JSON.parse([...draftStore.values()][0]);assert.equal(persisted.publication_id,browserId);
+      browserInput.file={...browserInput.file,name:'renamed.png'};
+      const resumed=await prepareBrowserPublication(browserInput,dependencies);
+      assert.equal(resumed.publication_id,browserId);assert.equal(resumed.claim_status,'claimed');
+      assert.equal(resumed.can_submit,false);assert.equal(resumed.submission_started_at,null);
+      assert.equal(sql(`SELECT count(*) FROM artwork_media_preparations WHERE publication_id=${q(browserId)};`),'1');
+      assert.equal(sql(`SELECT count(*) FROM artwork_media_publications WHERE media_sha256=${q(browserHash)};`),'1');
+      assert.deepEqual(JSON.parse([...draftStore.values()][0]).metadata,persisted.metadata);
+      assert.equal(rpc(`SELECT to_jsonb(p) FROM artwork_media_preparations p WHERE publication_id=${q(browserId)};`).metadata_json.name,'夜');
     } finally {
       globalThis.fetch=originalFetch;
       for(const [key,value] of Object.entries(previous)) value === undefined ? delete process.env[key] : process.env[key]=value;

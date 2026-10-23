@@ -31,9 +31,10 @@ test.afterEach(() => {
 const response = () => ({headers:{}, statusCode:200, body:null,
   setHeader(k,v){this.headers[k]=v;}, status(v){this.statusCode=v;return this;}, json(v){this.body=v;return this;}, end(){}});
 const session = owner => {const res=response();setWalletSession(res,owner);return res.headers['Set-Cookie'].split(';')[0];};
-async function call(body, owner = wallet) {
+async function call(body, owner = wallet, intendedWallet = owner) {
   const res=response();
-  await handler({method:'POST', headers:{'content-type':'application/json',...(owner ? {cookie:session(owner)} : {})}, body},res);
+  await handler({method:'POST', headers:{'content-type':'application/json', 'x-artsoul-wallet':intendedWallet,
+    ...(owner ? {cookie:session(owner)} : {})}, body},res);
   assert.equal(res.headers['Cache-Control'],'private, no-store');
   return res;
 }
@@ -264,13 +265,29 @@ test('recovery has no public route even when preparation is enabled', async () =
 
 test('preparation denies guests and is disabled by default before any network request', async () => {
   const state=backend();
-  for (const action of ['issue','prepare','begin','report-transaction','status']) {
+  for (const action of ['config','issue','prepare','begin','report-transaction','status']) {
     assert.equal((await call({action},null)).statusCode,401);
   }
   delete process.env.ARTSOUL_MEDIA_PREPARATION_ENABLED;
+  assert.deepEqual((await call({action:'config'})).body,{success:true,enabled:false});
   for (const action of ['issue','prepare','begin','report-transaction','status']) {
     assert.equal((await call({action})).body.error,'MEDIA_PREPARATION_DISABLED');
   }
+  assert.equal(state.seen.length,0);
+});
+
+test('uncached publication config requires the intended signed-in wallet and exact deployment', async () => {
+  const state=backend();
+  assert.deepEqual((await call({action:'config'})).body,
+    {success:true,enabled:true,chain_id:84532,core_address:core,can_submit:false});
+  for(const intended of [null,other,{},wallet+'\n']) {
+    for(const action of ['config','issue','prepare','begin','report-transaction','status']) {
+      assert.equal((await call({action,publication_id:id},wallet,intended)).body.error,'SESSION_WALLET_MISMATCH');
+    }
+  }
+  assert.equal((await call({action:'config'},wallet,wallet.toUpperCase())).statusCode,200);
+  delete process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA;
+  assert.equal((await call({action:'config'})).body.error,'MEDIA_PREPARATION_UNAVAILABLE');
   assert.equal(state.seen.length,0);
 });
 
@@ -315,7 +332,7 @@ test('journal database failures return a bounded public error without backend de
 
 test('preparation requires JSON requests and rejects malformed JSON without storage access', async () => {
   const state=backend(), res=response();
-  await handler({method:'POST',headers:{cookie:session(wallet),'content-type':'text/plain'},body:'{}'},res);
+  await handler({method:'POST',headers:{cookie:session(wallet),'x-artsoul-wallet':wallet,'content-type':'text/plain'},body:'{}'},res);
   assert.equal(res.statusCode,415);
   const malformed=await call('{');
   assert.equal(malformed.statusCode,400);assert.equal(state.seen.length,0);

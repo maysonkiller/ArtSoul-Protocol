@@ -3,6 +3,51 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 browser preparation (Canon 1/2/11; not activated):
+
+- Resume `e4ae8bfb765c6ee3cad453ad5803a3d88490054d`, same workspace/branch.
+  Its exact CI `39877617886` passes: Linux 2118 pass / 2 skips, Windows 1872
+  pass / 18 skips, zero failures, 46 contract tests on each OS. These counts
+  precede the browser diff below; they are not its verification.
+- Publish now checks authenticated, uncached preparation configuration. Only
+  explicit disabled mode selects the existing flow; an unavailable response
+  never bypasses preparation. Every publication API action checks the intended
+  wallet against the signed-in wallet, including shared-cookie changes in
+  another tab. This adds one bounded configuration request to existing Publish.
+- Enabled preparation keeps a separate durable UUID/file/wallet/Core draft,
+  serializes tabs with Web Locks, and saves exact metadata before requests.
+  Lost issue/PUT/prepare responses reuse the same paths and metadata. A new AI
+  estimate after reload cannot replace the original pinned estimate or prevent
+  retry with identical user inputs. Missing storage/locks stops before issuance.
+  Signed upload credentials and bytes are not persisted. PUT is bounded to
+  60 seconds, followed by server byte verification if its outcome is uncertain.
+- This slice never calls begin, initializes contracts, or sends a transaction
+  when preparation is enabled. It preserves `can_submit:false`, including a
+  no-hash attempt returned by the journal. It does not implement browser receipt
+  recovery or claim that TA-10 is enforced. The shared legacy file route remains
+  available because profile-avatar uploads use it too; no avatar flow changed.
+  The existing publication path now snapshots file/duration/guidance and stops
+  before registration if the file, form, wallet or chain changes during awaits.
+- Checks: 85 focused client/API/upload regressions; 39 actual PostgreSQL checks,
+  including the browser helper through the authenticated API and real SQL after
+  a committed response is lost; build passes. The final built artifact passes
+  16 Chromium/WebKit journeys at 390/1440px with isolated APIs/wallets. These
+  browser fixtures are not native wallet or delayed-receipt acceptance.
+  Logs: `output/audit/publication-browser-focused-2026-10-23.log`,
+  `publication-browser-pg-2026-10-23.log`, `publication-browser-build-2026-10-23.log`,
+  and `publication-preparation-built-2026-10-23.json`.
+- Independent review identified the changed-AI retry and stalled-PUT cases;
+  both are repaired and covered. Reviewer finished; no extra agents remain active.
+  Interpretations: local drafts are recoverable hints, not server authority;
+  missing hashes never authorize retries; derived AI output is preserved while
+  user-entered details remain immutable for the attempt. No economics changed.
+- No production release, migration, feature activation or signing. Preserved
+  unrelated authority-policy files, `.codex/` and `output/` remain unstaged.
+  Next concrete step: connect bounded authenticated registration recovery and
+  the one-time begin/registration handoff, retaining every ambiguous attempt.
+  Legacy catalog intake, four unavailable originals and the worker-role check
+  still precede live migration/activation. A-83/A-23 remain separate gates.
+
 October 23 TA-10 indexed registration recovery and full indexed-media inventory:
 
 - Resume `fd109663cf2284c42be0088a44c086220e36825a` in the same workspace/branch.
