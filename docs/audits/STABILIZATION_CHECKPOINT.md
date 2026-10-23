@@ -3,6 +3,43 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 cross-reload publication discovery (Canon 1/2/11; local candidate):
+
+- Starting HEAD `1d79902`; same workspace/branch, no worktree or source overlay.
+  Pre-edit copies are in `output/recovery/publication-reload-2026-10-23`.
+- The existing journal survives reload, but the previous UI only retained its
+  check context in memory. The upload page now discovers bounded, validated
+  candidates for the connected wallet/current Base Sepolia Core, without a
+  file, new AI, signing or API request. Multiple records require explicit choice;
+  local names are text, and local permissions/artwork IDs are never accepted.
+- A saved draft is not evidence of a send. Check renews SIWE only on a click and
+  reuses server status/recovery. It cannot issue, prepare, begin, register or
+  create an auction. A fresh local read preserves another tab's returned hash.
+  Invalid records remain untouched and produce a warning; limits are 2000 local
+  keys, 50 candidates and three metadata-size units per record, not protocol limits.
+- Independent review reproduced a same-context pageshow/storage race. Snapshot
+  comparison now preserves the pending check and first-tap button when nothing
+  changed; wallet-away-and-back and removed/changed records still fence replies.
+  The follow-up review found no additional blocker in this bounded diff.
+- Focused tests pass 116/116 and related upload/Phase A checks pass 28/28 with no
+  skips. Build verifies 11 routes / 174 utilities; syntax and whitespace pass.
+  Logs: `output/audit/publication-reload-focused-2026-10-23.log`,
+  `publication-reload-related-2026-10-23.log`, and `publication-reload-build-2026-10-23.log`.
+  The initial full unit run has 2208 pass / one PostgreSQL-startup failure / zero
+  skips. The clean isolated PostgreSQL retry passes all 32 checks with no skips
+  (`output/audit/publication-reload-sql-retry-2026-10-23.log`); the failed first
+  run remains retained. Exact-candidate hosted CI remains a release gate.
+- Local browser opening was denied by the saved origin permission policy for
+  `http://127.0.0.1:4196`; no alternative surface or policy bypass was used. The
+  fixture server is stopped. No compiled-browser or physical-device PASS is
+  claimed for this slice. This does not invalidate earlier accepted phone flows.
+- No schema, flags, host, credentials, economics or chain state changed. The
+  website still runs PR #331 / `5f3127c`; all three media flags remain inactive.
+  Formal Phase A remains 81/2/0. Missing-original disposition, current-revision
+  intake/worker integration, reviewed activation and A-83 remain distinct gates.
+- Exactly next step: obtain exact-candidate CI and preview evidence,
+  then review the candidate release while preserving the inactive media gates.
+
 October 23 two-host maintenance (Canon 1/17; applied, supersedes pending triage):
 
 - Starting HEAD `c6a584e`; same workspace/branch. The owner restored Hetzner/root

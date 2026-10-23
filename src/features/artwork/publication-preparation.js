@@ -1,4 +1,4 @@
-import { MAX_METADATA_BYTES } from '../../config/upload-policy.js';
+import { MAX_METADATA_BYTES, MAX_ARTWORK_UPLOAD_BYTES, ALLOWED_ARTWORK_MIME_TYPES } from '../../config/upload-policy.js';
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -9,6 +9,56 @@ const userDetails = value => {
     const { aiGuidance, ...details } = value;
     return details;
 };
+
+// Local records are candidates for a server check, never proof of a send or
+// permission to send. Discover no-hash and older drafts without rewriting them.
+export function readBrowserPublications({ wallet, coreAddress }, dependencies = {}) {
+    wallet = String(wallet || '').toLowerCase();
+    coreAddress = String(coreAddress || '').toLowerCase();
+    if (!ADDRESS.test(wallet) || /^0x0{40}$/.test(wallet) ||
+        !ADDRESS.test(coreAddress) || /^0x0{40}$/.test(coreAddress)) return [];
+    let storage;
+    try {
+        storage = dependencies.storage ?? globalThis.localStorage;
+        const count = storage?.length;
+        if (!Number.isSafeInteger(count) || count < 0 || count > 2000) fail('PUBLICATION_STORAGE_UNAVAILABLE');
+        const prefix = `artsoul_media_publication:84532:${coreAddress}:${wallet}:`;
+        const attempts = [];
+        for (let index = 0; index < count; index++) {
+            const key = storage.key(index);
+            if (typeof key !== 'string' || !key.startsWith(prefix)) continue;
+            const hash = key.slice(prefix.length);
+            const raw = storage.getItem(key);
+            if (raw === null) continue; // Another tab may remove an entry during enumeration.
+            if (!/^[0-9a-f]{64}$/.test(hash) || raw.length > MAX_METADATA_BYTES * 3) fail('PUBLICATION_DRAFT_INVALID');
+            let draft;
+            try { draft = JSON.parse(raw); } catch { fail('PUBLICATION_DRAFT_INVALID'); }
+            if (!draft || draft.version !== 1 || typeof draft.publication_id !== 'string' || !UUID.test(draft.publication_id) ||
+                draft.chain_id !== 84532 || draft.core_address !== coreAddress ||
+                draft.creator_wallet !== wallet || draft.file_sha256 !== hash ||
+                !Number.isSafeInteger(draft.byte_size) || draft.byte_size <= 0 || draft.byte_size > MAX_ARTWORK_UPLOAD_BYTES ||
+                !ALLOWED_ARTWORK_MIME_TYPES.includes(draft.content_type) ||
+                (draft.reported_transaction_hash != null && (typeof draft.reported_transaction_hash !== 'string' ||
+                    !TRANSACTION_HASH.test(draft.reported_transaction_hash)))) {
+                fail('PUBLICATION_DRAFT_INVALID');
+            }
+            // A record saved before preparation cannot yet have reached begin.
+            if (draft.metadata_uri == null) continue;
+            if (typeof draft.metadata_uri !== 'string' || !draft.metadata_uri || draft.metadata_uri.length > 2048) {
+                fail('PUBLICATION_DRAFT_INVALID');
+            }
+            if (attempts.some(attempt => attempt.publicationId === draft.publication_id)) fail('PUBLICATION_DRAFT_INVALID');
+            attempts.push({ publicationId: draft.publication_id, wallet, coreAddress,
+                metadataUri: draft.metadata_uri, reportedTransactionHash: draft.reported_transaction_hash || null,
+                title: typeof draft.details?.title === 'string' ? draft.details.title.slice(0, 160) : 'Saved artwork' });
+            if (attempts.length > 50) fail('PUBLICATION_STORAGE_UNAVAILABLE');
+        }
+        return attempts;
+    } catch (error) {
+        if (error?.code === 'PUBLICATION_DRAFT_INVALID') throw error;
+        fail('PUBLICATION_STORAGE_UNAVAILABLE');
+    }
+}
 
 function publicationRequest(wallet, assertCurrent, dependencies) {
     const request = dependencies.request || ((body, owner) => window.ArtSoulDB.requestPublication(body, owner));

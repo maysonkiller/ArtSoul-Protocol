@@ -604,6 +604,12 @@
         </nav>
 
         <div class="upload-form-stack space-y-8">
+            <section id="savedPublications" class="publish-panel" aria-labelledby="savedPublicationsTitle" hidden>
+                <h2 id="savedPublicationsTitle" class="font-semibold mb-3">Saved publications</h2>
+                <p class="form-hint">Check a previous publication before trying again. Checking does not send a transaction or require the original file or new AI guidance.</p>
+                <p id="savedPublicationsError" class="validation-message" role="status" hidden></p>
+                <div id="savedPublicationsList" class="space-y-4 mt-3"></div>
+            </section>
             <div class="upload-zone rounded-xl p-12 text-center" onclick="document.getElementById('fileInput').click()">
                 <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.gif" style="display: none;" onchange="handleFileSelect(event)">
 

@@ -104,9 +104,15 @@ October 23 remaining work, without repeating completed ceremonies:
    in the current page, independent of new form/AI input. It renews an expired
    wallet sign-in when explicitly clicked and cannot send another registration
    or auction. Candidate CI, 64 compiled-browser journeys and apex verification pass; see the checkpoint.
-   Automatic recovery discovery after reload, missing-original disposition,
-   worker integration and reviewed rollout remain open; all new media schema
-   remains inactive.
+   A subsequent local candidate discovers the existing saved drafts after
+   reload, without a file/new AI or automatic requests. Explicit selection uses
+   the same check-only path, with current-wallet, storage and late-response
+   guards. Its 116 focused checks, 28 related checks and build pass; exact CI and
+   release are pending. Local browser opening was denied by a saved permission,
+   so no browser/device PASS is claimed for that candidate. Actual worker role
+   and rollback execution rights are now observed in the host report.
+   Missing-original disposition, current-revision intake/worker integration and
+   reviewed rollout remain open; all new media schema remains inactive.
    These replays do not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner

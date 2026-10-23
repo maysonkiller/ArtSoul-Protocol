@@ -220,6 +220,92 @@ function loadPublicationCheck(check) {
   return { sandbox, button, hint, attempt, wallet };
 }
 
+function loadSavedPublicationPanel(check) {
+  const f = loadPublicationCheck(check);
+  const {sandbox, attempt} = f;
+  function element() {
+    return {children:[], listeners:{}, style:{}, dataset:{}, innerHTML:'Check publication', textContent:'',
+      append(...nodes){this.children.push(...nodes);}, replaceChildren(){this.children=[];},
+      addEventListener(name,fn){this.listeners[name]=fn;},
+      setAttribute(name,value){this[name]=value;}, removeAttribute(name){delete this[name];}};
+  }
+  const panel=element(), list=element(), error=element();
+  const get=sandbox.document.getElementById;
+  sandbox.document.getElementById=id=>({savedPublications:panel,savedPublicationsList:list,savedPublicationsError:error})[id]||get(id);
+  sandbox.document.createElement=element;
+  sandbox.savedPublicationScope='';sandbox.savedPublicationSnapshot='';sandbox.savedPublicationGeneration=0;
+  sandbox.pendingPublicationAttempt=null;sandbox.selectedFile=null;
+  sandbox.window.ARTSOUL_CONTRACTS={baseSepolia:{core:attempt.coreAddress}};
+  let candidates=[{...attempt,title:'Original saved artwork',file:undefined}];
+  sandbox.readBrowserPublications=({wallet})=>wallet===attempt.wallet?candidates.map(row=>({...row})):[];
+  vm.runInContext(extractFunction('refreshSavedPublications'),sandbox);
+  return {...f,panel,list,error,set candidates(value){candidates=value;},
+    refresh:()=>sandbox.refreshSavedPublications(true), click:i=>list.children[i].children[2].listeners.click()};
+}
+
+test('reloaded candidates need no file and require explicit selection before authentication or checking', async () => {
+  const seen=[];const f=loadSavedPublicationPanel(async args=>{seen.push(args.publicationId);return {recovery:{state:'unresolved'}};});
+  let auth=0;f.sandbox.window.ensureAuthenticated=async()=>{auth++;return true;};
+  const second={...f.attempt,publicationId:'22222222-2222-4222-8222-222222222222',title:'<img onerror=alert(1)>'};
+  f.candidates=[{...f.attempt,title:'First'},second];f.refresh();
+  assert.equal(f.panel.hidden,false);assert.equal(f.list.children.length,2);assert.equal(auth,0);assert.deepEqual(seen,[]);
+  assert.equal(f.list.children[1].children[0].textContent,second.title);
+  assert.match(f.list.children[0].children[1].textContent,/status has not been checked/);
+  await f.click(1);assert.deepEqual(seen,[second.publicationId]);assert.equal(auth,1);
+  assert.match(f.list.children[1].children[1].textContent,/not been confirmed/);
+  assert.equal(f.sandbox.selectedFile,null);
+});
+
+test('a saved row reads the latest hash before an explicit check and fences a changed record', async () => {
+  const seen=[];const f=loadSavedPublicationPanel(async args=>{seen.push(args.reportedTransactionHash);return {recovery:{state:'unresolved'}};});
+  f.refresh();const hash='0x'+'dd'.repeat(32);f.candidates=[{...f.attempt,reportedTransactionHash:hash}];
+  await f.click(0);assert.deepEqual(seen,[hash]);
+  f.candidates=[{...f.attempt,metadataUri:'https://fixture.test/changed.json'}];
+  await f.click(0);assert.deepEqual(seen,[hash]);assert.match(f.list.children[0].children[1].textContent,/changed or could not be read/);
+});
+
+test('wallet switch and return during a saved check cannot revive the old response', async () => {
+  let resolve,started;const ready=new Promise(done=>{started=done;});
+  const f=loadSavedPublicationPanel(()=>new Promise(done=>{resolve=done;started();}));
+  f.refresh();const running=f.click(0);await ready;
+  f.sandbox.wallet='0x'+'22'.repeat(20);f.refresh();assert.equal(f.panel.hidden,true);assert.equal(f.list.children.length,0);
+  f.sandbox.wallet=f.wallet;f.refresh();
+  resolve({recovery:{state:'registered',registered_artwork_id:'36'}});await running;
+  assert.equal(f.sandbox.destination,undefined);assert.match(f.list.children[0].children[1].textContent,/status has not been checked/);
+});
+
+test('unchanged pageshow or unrelated storage refresh preserves an in-flight check and its button', async () => {
+  let resolve,started;const ready=new Promise(done=>{started=done;});
+  const f=loadSavedPublicationPanel(()=>new Promise(done=>{resolve=done;started();}));
+  f.refresh();const row=f.list.children[0],generation=f.sandbox.savedPublicationGeneration;
+  const running=f.click(0);await ready;f.refresh();f.refresh();
+  assert.equal(f.sandbox.savedPublicationGeneration,generation);assert.equal(f.list.children[0],row);
+  resolve({recovery:{state:'registered',registered_artwork_id:'36'}});await running;
+  assert.equal(f.sandbox.destination,'/artwork/v41:84532:36');
+});
+
+test('a removed saved candidate invalidates its pending response', async () => {
+  let resolve,started;const ready=new Promise(done=>{started=done;});
+  const f=loadSavedPublicationPanel(()=>new Promise(done=>{resolve=done;started();}));
+  f.refresh();const running=f.click(0);await ready;f.candidates=[];f.refresh();
+  resolve({recovery:{state:'registered',registered_artwork_id:'36'}});await running;
+  assert.equal(f.sandbox.destination,undefined);assert.equal(f.panel.hidden,true);
+});
+
+test('unreadable storage displays a bounded warning and cannot start a check', () => {
+  const f=loadSavedPublicationPanel(()=>assert.fail('No check'));f.refresh();
+  f.sandbox.readBrowserPublications=()=>{throw Error('unreadable');};f.refresh();
+  assert.equal(f.panel.hidden,false);assert.equal(f.error.hidden,false);assert.equal(f.list.children.length,0);
+  assert.match(f.error.textContent,/Keep this browser data/);
+});
+
+test('saved preparation without a recorded send is not described as a broadcast transaction', async () => {
+  const f=loadSavedPublicationPanel(async()=>({claim_status:'claimed',submission_started_at:null,recovery:{state:'unresolved'}}));
+  f.refresh();await f.click(0);
+  assert.match(f.list.children[0].children[1].textContent,/no registration request is recorded yet/);
+  assert.equal(f.sandbox.destination,undefined);
+});
+
 test('a pending attempt is checkable without a valid form, authorization stamp or current AI', async () => {
   let checks = 0;
   const { sandbox, button, hint, attempt } = loadPublicationCheck(async args => {
