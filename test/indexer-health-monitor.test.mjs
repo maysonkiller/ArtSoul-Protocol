@@ -58,7 +58,7 @@ test('fails closed on wrong chain, confirmation drift, lag and unresolved errors
     );
 });
 
-test('accepts the normal 15-second polling edge without a false block-lag alert', () => {
+test('accepts a synced observation below the configured block-lag boundary', () => {
     const result = evaluateIndexerHealth(healthyPayload({
         indexer: { blocksBehind: 11, isSynced: true }
     }), config, NOW);

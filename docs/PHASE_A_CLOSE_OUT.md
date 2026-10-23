@@ -17,6 +17,13 @@ implementation described below is now published, but all three flags and the
 live media schema remain inactive. Publication is not duplicate-enforcement
 acceptance. See the checkpoint for exact logs and activation limitations.
 
+October 23 hosting follow-up is applied on both designated servers: security
+packages, restored key-only indexer SSH, verified database TLS and a 2000 ms
+Base poll override. Actual worker identity and existing rollback execution
+rights are now observed directly; media schema/worker integration remains
+unactivated. [Evidence and limits](audits/HOST_SECURITY_2026-10-23.md) include
+Denim's confirmation/cost implications. This does not close A-83 or A-23.
+
 October 23 remaining work, without repeating completed ceremonies:
 
 1. **Current mobile defects:** PR #320's bounded Donate/Report dialogs are
@@ -98,7 +105,7 @@ October 23 remaining work, without repeating completed ceremonies:
    wallet sign-in when explicitly clicked and cannot send another registration
    or auction. Candidate CI, 64 compiled-browser journeys and apex verification pass; see the checkpoint.
    Automatic recovery discovery after reload, missing-original disposition,
-   actual worker role and reviewed rollout remain open; all new media schema
+   worker integration and reviewed rollout remain open; all new media schema
    remains inactive.
    These replays do not simulate or accept
    A-83's real receipt delay.

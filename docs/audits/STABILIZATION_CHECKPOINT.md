@@ -3,6 +3,44 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 two-host maintenance (Canon 1/17; applied, supersedes pending triage):
+
+- Starting HEAD `c6a584e`; same workspace/branch. The owner restored Hetzner/root
+  access and approved the exact dedicated indexer SSH key. It is installed and
+  fresh SSH login passes. Root SSH now requires a key; console recovery remains.
+- Both hosts were inspected. No PHP runtime was found in the bounded package,
+  process, web/custom-path and container checks. Both now run Node 22.23.4 and
+  zlib `1:1.3.dfsg-3.1ubuntu2.3`. OS reboot activated kernel 6.8.0-147; the indexer
+  already used that kernel. No stale-service/session restart remains, failed
+  systemd units or newer security-package candidates in the checked lists.
+- OS API/bot/dashboard and public curl health pass; watchdog and backup timers
+  work. Indexer/report-email health passes; legacy Ethereum Sepolia stays stopped.
+  The indexer's plaintext database connection was repaired with strict verified
+  TLS 1.3 to the existing Supabase pooler, using the trusted CA. Original configs
+  and package rollback material are retained root-only on each host.
+- Two RPCs and official Base docs verify Sepolia's October 21 move to native
+  200 ms blocks. Polling changed from 15000 to 2000 ms in the Base host override;
+  thresholds, depth and cursors are unchanged. The final 16 reads all pass at
+  5–18 blocks of lag with zero event/RPC errors. An earlier series includes one
+  boundary failure at 20; no long-term performance guarantee is claimed.
+- Actual worker credentials now provide read-only role/rollback-execute evidence,
+  replacing inference from other database sessions. Both rollback overloads are
+  executable; new media tables remain absent. This does not activate TA-10 or
+  prove its future migration/integration. The broad current worker role and the
+  shortened time equivalent of three confirmations are recorded for joint review.
+- [Host report](HOST_SECURITY_2026-10-23.md) contains evidence, rollback and limits.
+  No application source deployment, database migration, chain write or canon
+  economics change occurred. Website release remains PR #331 / `5f3127c`.
+  Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
+  The one reused review helper is finished; no helper remains running.
+- Local health/monitor/close-out checks pass 16/16 with zero skips; log
+  `output/audit/host-maintenance-checks-2026-10-23.log`. `git diff --check` passes.
+  Public changes are the evidence/checkpoint, operational examples/runbooks and
+  corrected test descriptions. No new application build is required or claimed.
+- Phase A remains 81/2/0. Exactly next step: add bounded discovery of the durable
+  publication draft after reload without mutable metadata or submission replay;
+  review Denim's confirmation implications before activating new recovery writes.
+
 October 23 retained-publication UI follow-up (Canon 1/2/11; released):
 
 - PR #331 is merged and deployed at `5f3127c0e44586ff3ee196f3b4425ff49c0e4ed5`.

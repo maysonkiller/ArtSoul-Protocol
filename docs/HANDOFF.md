@@ -356,11 +356,11 @@ pm2 logs artsoul-base-sepolia --lines 100 --nostream
 
 Stop if `git status` shows unexpected tracked changes. Do not delete the untracked `start-base-indexer.sh`, `start-eth-indexer.sh`, `.env.shared`, `.env.base-sepolia`, or `.env.eth-sepolia` files.
 
-Current intended Base settings:
+Current intended Base settings (poll cadence updated after Denim on October 23):
 
 ```text
 ARTSOUL_INDEXER_CHAINS=base-sepolia
-INDEXER_POLL_INTERVAL=15000
+INDEXER_POLL_INTERVAL=2000
 INDEXER_MAX_BLOCK_RANGE=10
 INDEXER_REORG_CHECK_INTERVAL=60000
 INDEXER_REORG_SAMPLE_SIZE=12
