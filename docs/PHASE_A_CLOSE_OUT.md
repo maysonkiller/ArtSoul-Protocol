@@ -10,12 +10,19 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **81 done, 2 in progress, 0 planned** across A-01 to A-83.
 
-Latest code release: PR #330 (`333e527`), verified on the apex domain.
-Candidate and post-merge CI pass (Linux 2173 / Windows 1914 unit checks,
+Latest code release: PR #331 (`5f3127c`), verified on the apex domain.
+Candidate and post-merge CI pass (Linux 2194 / Windows 1935 unit checks,
 zero failures; 2 / 18 skips; 46 contract tests on each OS). The guarded media
 implementation described below is now published, but all three flags and the
 live media schema remain inactive. Publication is not duplicate-enforcement
 acceptance. See the checkpoint for exact logs and activation limitations.
+
+October 23 hosting follow-up is applied on both designated servers: security
+packages, restored key-only indexer SSH, verified database TLS and a 2000 ms
+Base poll override. Actual worker identity and existing rollback execution
+rights are now observed directly; media schema/worker integration remains
+unactivated. [Evidence and limits](audits/HOST_SECURITY_2026-10-23.md) include
+Denim's confirmation/cost implications. This does not close A-83 or A-23.
 
 October 23 remaining work, without repeating completed ceremonies:
 
@@ -93,13 +100,19 @@ October 23 remaining work, without repeating completed ceremonies:
    historical records pass, preserving three duplicate pairs and adding no
    synthetic publication attempts. All 36 historical registrations are verified
    through Alchemy/Tenderly, but works 1-4 still lack fetchable original files.
-   A subsequent local UI slice adds check-only recovery for a retained attempt
+   Published PR #331 adds check-only recovery for a retained attempt
    in the current page, independent of new form/AI input. It renews an expired
    wallet sign-in when explicitly clicked and cannot send another registration
-   or auction. Exact candidate validation/release is recorded in the checkpoint.
-   Automatic recovery discovery after reload, missing-original disposition,
-   actual worker role and reviewed rollout remain open; all new media schema
-   remains inactive.
+   or auction. Candidate CI, 64 compiled-browser journeys and apex verification pass; see the checkpoint.
+   A subsequent local candidate discovers the existing saved drafts after
+   reload, without a file/new AI or automatic requests. Explicit selection uses
+   the same check-only path, with current-wallet, storage and late-response
+   guards. Its 116 focused checks, 28 related checks and build pass; exact CI and
+   release are pending. Local browser opening was denied by a saved permission,
+   so no browser/device PASS is claimed for that candidate. Actual worker role
+   and rollback execution rights are now observed in the host report.
+   Missing-original disposition, current-revision intake/worker integration and
+   reviewed rollout remain open; all new media schema remains inactive.
    These replays do not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner

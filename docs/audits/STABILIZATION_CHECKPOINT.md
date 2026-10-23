@@ -3,10 +3,86 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
+October 23 cross-reload publication discovery (Canon 1/2/11; local candidate):
 
-- Starting HEAD `2d017da`; the deployed application is still PR #330 until this
-  candidate's release is recorded. The current guarded flow can retain a lost
+- Starting HEAD `1d79902`; same workspace/branch, no worktree or source overlay.
+  Pre-edit copies are in `output/recovery/publication-reload-2026-10-23`.
+- The existing journal survives reload, but the previous UI only retained its
+  check context in memory. The upload page now discovers bounded, validated
+  candidates for the connected wallet/current Base Sepolia Core, without a
+  file, new AI, signing or API request. Multiple records require explicit choice;
+  local names are text, and local permissions/artwork IDs are never accepted.
+- A saved draft is not evidence of a send. Check renews SIWE only on a click and
+  reuses server status/recovery. It cannot issue, prepare, begin, register or
+  create an auction. A fresh local read preserves another tab's returned hash.
+  Invalid records remain untouched and produce a warning; limits are 2000 local
+  keys, 50 candidates and three metadata-size units per record, not protocol limits.
+- Independent review reproduced a same-context pageshow/storage race. Snapshot
+  comparison now preserves the pending check and first-tap button when nothing
+  changed; wallet-away-and-back and removed/changed records still fence replies.
+  The follow-up review found no additional blocker in this bounded diff.
+- Focused tests pass 116/116 and related upload/Phase A checks pass 28/28 with no
+  skips. Build verifies 11 routes / 174 utilities; syntax and whitespace pass.
+  Logs: `output/audit/publication-reload-focused-2026-10-23.log`,
+  `publication-reload-related-2026-10-23.log`, and `publication-reload-build-2026-10-23.log`.
+  The initial full unit run has 2208 pass / one PostgreSQL-startup failure / zero
+  skips. The clean isolated PostgreSQL retry passes all 32 checks with no skips
+  (`output/audit/publication-reload-sql-retry-2026-10-23.log`); the failed first
+  run remains retained. Exact-candidate hosted CI remains a release gate.
+- Local browser opening was denied by the saved origin permission policy for
+  `http://127.0.0.1:4196`; no alternative surface or policy bypass was used. The
+  fixture server is stopped. No compiled-browser or physical-device PASS is
+  claimed for this slice. This does not invalidate earlier accepted phone flows.
+- No schema, flags, host, credentials, economics or chain state changed. The
+  website still runs PR #331 / `5f3127c`; all three media flags remain inactive.
+  Formal Phase A remains 81/2/0. Missing-original disposition, current-revision
+  intake/worker integration, reviewed activation and A-83 remain distinct gates.
+- Exactly next step: obtain exact-candidate CI and preview evidence,
+  then review the candidate release while preserving the inactive media gates.
+
+October 23 two-host maintenance (Canon 1/17; applied, supersedes pending triage):
+
+- Starting HEAD `c6a584e`; same workspace/branch. The owner restored Hetzner/root
+  access and approved the exact dedicated indexer SSH key. It is installed and
+  fresh SSH login passes. Root SSH now requires a key; console recovery remains.
+- Both hosts were inspected. No PHP runtime was found in the bounded package,
+  process, web/custom-path and container checks. Both now run Node 22.23.4 and
+  zlib `1:1.3.dfsg-3.1ubuntu2.3`. OS reboot activated kernel 6.8.0-147; the indexer
+  already used that kernel. No stale-service/session restart remains, failed
+  systemd units or newer security-package candidates in the checked lists.
+- OS API/bot/dashboard and public curl health pass; watchdog and backup timers
+  work. Indexer/report-email health passes; legacy Ethereum Sepolia stays stopped.
+  The indexer's plaintext database connection was repaired with strict verified
+  TLS 1.3 to the existing Supabase pooler, using the trusted CA. Original configs
+  and package rollback material are retained root-only on each host.
+- Two RPCs and official Base docs verify Sepolia's October 21 move to native
+  200 ms blocks. Polling changed from 15000 to 2000 ms in the Base host override;
+  thresholds, depth and cursors are unchanged. The final 16 reads all pass at
+  5–18 blocks of lag with zero event/RPC errors. An earlier series includes one
+  boundary failure at 20; no long-term performance guarantee is claimed.
+- Actual worker credentials now provide read-only role/rollback-execute evidence,
+  replacing inference from other database sessions. Both rollback overloads are
+  executable; new media tables remain absent. This does not activate TA-10 or
+  prove its future migration/integration. The broad current worker role and the
+  shortened time equivalent of three confirmations are recorded for joint review.
+- [Host report](HOST_SECURITY_2026-10-23.md) contains evidence, rollback and limits.
+  No application source deployment, database migration, chain write or canon
+  economics change occurred. Website release remains PR #331 / `5f3127c`.
+  Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
+  The one reused review helper is finished; no helper remains running.
+- Local health/monitor/close-out checks pass 16/16 with zero skips; log
+  `output/audit/host-maintenance-checks-2026-10-23.log`. `git diff --check` passes.
+  Public changes are the evidence/checkpoint, operational examples/runbooks and
+  corrected test descriptions. No new application build is required or claimed.
+- Phase A remains 81/2/0. Exactly next step: add bounded discovery of the durable
+  publication draft after reload without mutable metadata or submission replay;
+  review Denim's confirmation implications before activating new recovery writes.
+
+October 23 retained-publication UI follow-up (Canon 1/2/11; released):
+
+- PR #331 is merged and deployed at `5f3127c0e44586ff3ee196f3b4425ff49c0e4ed5`.
+  Its tree equals tested candidate `151eb91`. Starting HEAD was `2d017da`.
+  Reproduction against PR #330 shows that the guarded flow can retain a lost
   begin/wallet attempt correctly while its form returns to "Ready to publish".
   A retry also depends on current form/AI values, despite the attempt's immutable
   metadata. This is a reproduced presentation/recovery issue, not new economics.
@@ -23,8 +99,20 @@ October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
   first-tap behavior. The accepted disabled legacy publishing path is unchanged.
 - Focused upload/publication/client checks pass 190/190, zero skips, in
   `output/audit/pending-publication-focused-2026-10-23.log`. Build/static checks
-  pass. The compiled Chromium/WebKit fixture and final release checks are being
-  rerun on this exact candidate; do not count earlier probe output as final.
+  pass. All 64 compiled Chromium/WebKit journeys pass at 390/1440px, including
+  changed/empty form fields, first tap, sign-in renewal/decline, lost begin,
+  wallet cancellation, storage/report failures, recovery outcomes and disabled
+  feature fallback protection. Evidence:
+  `output/audit/publication-check-ui-built-2026-10-23.json` and
+  `output/audit/publication-readiness-reproduction-2026-10-23.json`.
+- Candidate CI `39925981922` passes: Linux 2194 pass / 2 skips; Windows 1935
+  pass / 18 skips; zero failures and 46 contract tests on each OS. Post-merge
+  CI `39926519391` also passes with the same counts; logs are retained in
+  `output/audit/publication-check-main-ci-5f3127c-2026-10-23.log`. Deployment
+  `7273985149` succeeded; nine actual-apex assets match the tested build and
+  seven unauthenticated publication actions return 401/private-no-store; GET
+  returns 405. Evidence: `output/audit/publication-apex-5f3127c-2026-10-23.json`
+  and `output/audit/publication-check-boundary-apex-5f3127c-2026-10-23.json`.
 - Scope/remaining: this check shortcut retains context in the current page;
   automatic discovery after reload is not implemented. The durable browser/server
   journal remains intact, but cross-reload recovery UX, missing-original
@@ -33,8 +121,8 @@ October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
   This does not close A-83's real delayed-confirmation criterion or A-23.
 - Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
   Only the existing helper agent was reused for this slice/review; it is finished.
-  Next concrete step: finish the exact compiled-browser run, then publish only
-  after the candidate's required CI and release checks pass.
+  Next concrete step: add bounded recovery discovery from the existing durable
+  draft after reload, without renewed AI, mutable metadata or submission replay.
 
 October 23 PHP advisory triage (host inspection pending; owner-deferred):
 

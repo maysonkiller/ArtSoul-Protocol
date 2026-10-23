@@ -2,7 +2,7 @@ import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
-import { prepareBrowserPublication, checkBrowserPublication } from '../features/artwork/publication-preparation.js';
+import { prepareBrowserPublication, checkBrowserPublication, readBrowserPublications } from '../features/artwork/publication-preparation.js';
 import {
     ALLOWED_ARTWORK_MIME_TYPES,
     MAX_ARTWORK_UPLOAD_BYTES,
@@ -30,6 +30,9 @@ let selectedFile = null;
         // Presentation context only. The existing server/browser journals retain
         // the attempt; this lets the current page check it without fresh AI/form data.
         let pendingPublicationAttempt = null;
+        let savedPublicationScope = '';
+        let savedPublicationSnapshot = '';
+        let savedPublicationGeneration = 0;
 
         const AI_ANALYSIS_TIMEOUT_MS = 20000;
         const AI_PREVIEW_MAX_DATA_URL_LENGTH = 1800000;
@@ -1035,6 +1038,10 @@ let selectedFile = null;
         }
 
         function publicationCheckMessage(result) {
+            if (result?.claim_status === 'claimed' && result.submission_started_at === null &&
+                result.recovery?.state === 'unresolved') {
+                return 'Preparation is saved, but no registration request is recorded yet. Keep the original file and details. Check again before continuing; checking never sends a transaction.';
+            }
             switch (result?.recovery?.state || result?.claim_status) {
                 case 'reverted':
                     return 'The registration transaction reverted. Your saved attempt is retained for review. Checking will not send another transaction.';
@@ -1047,17 +1054,87 @@ let selectedFile = null;
             }
         }
 
-        async function checkSavedPublication(attempt) {
-            const button = document.getElementById('publishBtn');
+        function refreshSavedPublications(force = false) {
+            const panel = document.getElementById('savedPublications');
+            if (!panel) return;
+            const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
+            const coreAddress = String(window.ARTSOUL_CONTRACTS?.baseSepolia?.core || '').toLowerCase();
+            const scope = `${wallet}:${coreAddress}`;
+            if (!force && scope === savedPublicationScope) return;
+            let attempts = [], unreadable = false;
+            try { attempts = readBrowserPublications({ wallet, coreAddress }); }
+            catch { unreadable = true; }
+            const snapshot = JSON.stringify({ scope, attempts, unreadable });
+            // BFCache/pageshow and unrelated storage events must not discard an
+            // in-flight check or replace the button under a pending first tap.
+            if (snapshot === savedPublicationSnapshot) return;
+            savedPublicationScope = scope;
+            savedPublicationSnapshot = snapshot;
+            const generation = ++savedPublicationGeneration;
+            const list = document.getElementById('savedPublicationsList');
+            const error = document.getElementById('savedPublicationsError');
+            list.replaceChildren();
+            error.hidden = true;
+            panel.hidden = true;
+            if (!unreadable) {
+                panel.hidden = attempts.length === 0;
+                for (const attempt of attempts) {
+                    const row = document.createElement('div');
+                    const title = document.createElement('p');
+                    title.textContent = attempt.title;
+                    title.style.overflowWrap = 'anywhere';
+                    const hint = document.createElement('p');
+                    hint.className = 'form-hint';
+                    hint.setAttribute('role', 'status');
+                    hint.textContent = `Saved reference: ${attempt.publicationId}. Its current status has not been checked.`;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn-secondary';
+                    button.textContent = 'Check publication';
+                    button.addEventListener('click', () => {
+                        if (uploading || generation !== savedPublicationGeneration) return;
+                        // Another tab may retain a hash while this page is in the
+                        // background. Re-read before checking; never drop that hash.
+                        try {
+                            const fresh = readBrowserPublications({ wallet, coreAddress })
+                                .find(saved => saved.publicationId === attempt.publicationId);
+                            if (!fresh || fresh.metadataUri !== attempt.metadataUri) throw new Error('Saved publication changed');
+                            attempt.reportedTransactionHash = fresh.reportedTransactionHash;
+                        } catch {
+                            hint.textContent = 'This saved publication changed or could not be read. Reload to check it again; no transaction was sent.';
+                            return;
+                        }
+                        return checkSavedPublication(attempt, {
+                            button,
+                            isCurrent: () => generation === savedPublicationGeneration &&
+                                wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase(),
+                            onState: () => { if (attempt.message) hint.textContent = attempt.message; }
+                        });
+                    });
+                    row.append(title, hint, button);
+                    list.append(row);
+                }
+            } else {
+                panel.hidden = false;
+                error.hidden = false;
+                error.textContent = 'Saved publications could not be read safely. Keep this browser data and contact support before republishing a previous file.';
+            }
+        }
+
+        async function checkSavedPublication(attempt, options = {}) {
+            if (uploading) return;
+            const button = options.button || document.getElementById('publishBtn');
             const originalMarkup = button.innerHTML;
+            const isCurrent = options.isCurrent || (() => currentPublicationAttempt() === attempt);
             const assertCurrent = () => {
-                if (currentPublicationAttempt() !== attempt) {
+                if (!isCurrent()) {
                     throw createUploadError('PUBLICATION_CONTEXT_CHANGED', 'The wallet or selected file changed.');
                 }
             };
             uploading = true;
             clearBlockingStep();
             setTransactionButtonProcessing(button, 'Checking publication...');
+            updatePublishReadiness();
             try {
                 assertCurrent();
                 // The explicit click may renew SIWE, but never requests AI or
@@ -1073,7 +1150,7 @@ let selectedFile = null;
                 }
                 attempt.message = publicationCheckMessage(result);
             } catch (error) {
-                if (currentPublicationAttempt() === attempt) {
+                if (isCurrent()) {
                     const messages = {
                         RATE_LIMITED: 'Please wait one minute before checking this publication again.',
                         AUTHORIZATION_REQUIRED: 'Wallet sign-in was not completed. Select Check publication again and approve sign-in in your wallet.',
@@ -1086,6 +1163,8 @@ let selectedFile = null;
             } finally {
                 uploading = false;
                 restoreTransactionButton(button, originalMarkup);
+                if (options.button) button.disabled = false;
+                if (isCurrent()) options.onState?.();
             }
         }
 
@@ -1483,14 +1562,20 @@ let selectedFile = null;
                     cancelAIValuation();
                     setAIValuationState('unavailable', { message: 'Wallet changed. Authorize this wallet and request updated AI value guidance.' });
                 }
+                refreshSavedPublications();
                 updatePublishReadiness();
             });
+            window.addEventListener('storage', event => {
+                if (event.key === null || event.key?.startsWith('artsoul_media_publication:')) refreshSavedPublications(true);
+            });
+            window.addEventListener('pageshow', () => refreshSavedPublications(true));
             window.addEventListener('beforeunload', (event) => {
                 if (!publishNavigationLocked) return;
                 event.preventDefault();
                 event.returnValue = '';
             });
             updateAIValuationRetryState();
+            refreshSavedPublications();
             updatePublishReadiness();
         }
 

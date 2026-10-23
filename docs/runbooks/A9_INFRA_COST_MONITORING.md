@@ -43,7 +43,7 @@ ARTSOUL_MONITOR_MAX_RESPONSE_AGE_MS
 ARTSOUL_MONITOR_REQUEST_TIMEOUT_MS
 ```
 
-Production values remain Base Sepolia, depth `3`, lag below `20`, at most `5` RPC errors per minute, response age at most `120000` ms, and request timeout `10000` ms. The lag boundary allows one normal 15-second polling interval on Base plus confirmation depth and a small scheduling margin. The indexer and standalone checker share the same default. Do not weaken a threshold merely to make a sustained failing check green.
+Production values remain Base Sepolia, depth `3`, lag below `20`, at most `5` RPC errors per minute, response age at most `120000` ms, and request timeout `10000` ms. Since Denim introduced 200 ms native blocks on October 21, a 15-second poll no longer fits that lag boundary. The Base host now explicitly sets `INDEXER_POLL_INTERVAL=2000`; retain that override when deploying because the older runner fallback is still 15000 ms. The indexer and standalone checker retain the same strict lag threshold. Do not weaken a threshold merely to make a sustained failing check green. See the [October 23 maintenance evidence](../audits/HOST_SECURITY_2026-10-23.md), including bounded measurements and the pending review of confirmation policy and RPC cost assumptions.
 
 The `/health` handler observes the current block. Do not poll this command more often than once every five minutes; excessive health polling becomes an RPC consumer itself.
 

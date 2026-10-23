@@ -23,7 +23,7 @@ References:
 - [Alchemy compute units](https://www.alchemy.com/docs/reference/compute-units)
 - [Alchemy compute-unit costs](https://www.alchemy.com/docs/reference/compute-unit-costs)
 
-Daily estimates assume the production defaults of a 15-second indexer poll, a roughly 2-second Base block time, and a 10-block log range. Actual consumption varies with RPC availability, catch-up distance, health checks, and event volume.
+The historical July estimates below assume a 15-second indexer poll, a roughly 2-second Base block time, and a 10-block log range. They are not current forecasts after Denim. Since October 21, Base Sepolia produces native 200 ms blocks; the host now explicitly polls every 2000 ms. Keep spending controls and measure fallback usage under that cadence. See [October 23 maintenance](audits/HOST_SECURITY_2026-10-23.md). Actual consumption varies with RPC availability, catch-up distance, health checks, and event volume.
 
 ## RPC inventory before the diet
 
@@ -71,7 +71,7 @@ ARTSOUL_INDEXER_CHAIN_ID=84532
 # Keep the current private Alchemy URL as the fallback value.
 BASE_SEPOLIA_RPC_URLS=<CURRENT_PRIVATE_ALCHEMY_URL>
 
-INDEXER_POLL_INTERVAL=15000
+INDEXER_POLL_INTERVAL=2000
 INDEXER_CONFIRMATION_DEPTH=3
 INDEXER_MAX_BLOCK_RANGE=10
 INDEXER_REORG_CHECK_INTERVAL=60000

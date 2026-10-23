@@ -7,7 +7,7 @@ import {
     resolveHealthMaxBlocksBehind
 } from '../src/indexer/health-policy.js';
 
-test('default health lag covers the 15-second Base polling edge with margin', () => {
+test('default health lag accepts an observation below the strict boundary', () => {
     assert.equal(DEFAULT_HEALTH_MAX_BLOCKS_BEHIND, 20);
     assert.equal(isIndexerWithinHealthLag(11, DEFAULT_HEALTH_MAX_BLOCKS_BEHIND), true);
 });
