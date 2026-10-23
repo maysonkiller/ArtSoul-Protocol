@@ -65,8 +65,10 @@ October 23 remaining work, without repeating completed ceremonies:
    evidence. It passes 104 focused checks, build and an actual artwork 36 replay.
    The local follow-up now persists evidence, catalog and claim reconciliation
    atomically, preserving the original unverified hash and every exact match.
-   It remains inactive: indexer/reorg handling, legacy coverage and browser
-   recovery/rollout are still open. That replay does not simulate or accept
+   The local indexer rollback fence now rejects stale verification and retains
+   affected claims as conflicts, with 18 actual PostgreSQL checks covering
+   concurrency and atomic failure. It remains inactive: bounded indexer intake,
+   legacy coverage and browser recovery/rollout are still open. That replay does not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or

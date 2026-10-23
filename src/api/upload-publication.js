@@ -237,13 +237,21 @@ export async function recoverPublication(wallet, id, deployment, { rpcs, scan = 
       row.content_type !== media.contentType) throw fail('MEDIA_PREPARATION_MISMATCH');
   validatePublicationMetadata(row.metadata_json, row, media);
   await verifyPreparedMetadata(row, metadataUri);
+  // Capture before any chain reads. SQL compares under the same chain lock as
+  // indexer rollback; a later read here would bless evidence from an old chain.
+  const revision = await supabaseRest(`rpc/read_artwork_media_revision?p_chain_id=${deployment.chainId}`, {
+    signal: AbortSignal.timeout(15000)
+  });
+  if (typeof revision !== 'string' || !/^(0|[1-9][0-9]{0,77})$/.test(revision)) {
+    throw fail('MEDIA_REGISTRATION_REVISION_UNAVAILABLE', 503);
+  }
   const evidence = await verifyArtworkRegistration({ deployment, creator: wallet, metadataUri,
     transactionHash: scan ? null : journal.reported_transaction_hash, scan }, { rpcs });
   if (evidence.state !== 'verified') return { publication_id: id, ...evidence };
   const saved = await rpc('reconcile_artwork_media_registration', {
     p_publication_id: id, p_chain_id: deployment.chainId, p_core_address: deployment.core,
     p_creator_wallet: wallet, p_media_sha256: media.sha256, p_media_uri: media.mediaUrl,
-    p_byte_size: media.size, p_metadata_uri: metadataUri, p_evidence: evidence
+    p_byte_size: media.size, p_metadata_uri: metadataUri, p_evidence: evidence, p_expected_revision: revision
   });
   if (saved?.publication_id !== id || saved.can_submit !== false ||
       !['registered', 'conflict'].includes(saved.claim_status) ||

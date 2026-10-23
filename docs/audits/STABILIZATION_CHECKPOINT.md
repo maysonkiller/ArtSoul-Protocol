@@ -3,6 +3,55 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 TA-10 indexer rollback fence (Canon 1/2/11; not activated):
+
+- Resume HEAD `c565156d8671047e3f4b3175e8de7e2a2416992a`, same workspace and
+  branch. Preserve `.codex/`, `output/` and the two untracked authority-policy
+  files; they are unrelated and excluded. PR #330 remains unmerged; latest
+  application release remains `dbefd68`.
+- Reproduced the missing coordination boundary: registration evidence can be
+  computed before a projection rollback and committed afterward. The new manual
+  `artwork_media_reorg.sql` migration adds a private chain revision and rewind
+  journal. Recovery reads the revision before RPC verification; the writer
+  checks it under the same chain-row lock as both existing indexer rollback
+  signatures, before UUID/artwork/hash/claim locks. Revisions cross JSON as text.
+- Rollback changes revision, records its boundary, quarantines affected claims
+  and removes projections in one transaction. Event blocks OR first finalized
+  anchors at/above the boundary are affected. Older finalized evidence stays
+  registered. Catalog, evidence, UUIDs, original reported hashes and submission
+  timestamps survive; neither timeout nor rollback authorizes another send.
+  Direct service access to the old unfenced writers is revoked. Contradictory
+  immutable evidence rolls back its batch and commits a sticky owned-claim
+  conflict instead of leaving an apparently successful registration.
+- Verification: 117 focused API/verifier/security/ledger checks; 39 actual
+  PostgreSQL preparation/journal/recovery checks; 18 additional PostgreSQL
+  rollback/concurrency checks; 21 no-default-grant/ledger checks, all passing
+  with zero skips; build passes. Both race orders use actual row-lock waits.
+  A forced late projection failure restores revision, claims, journal and all
+  projections. Tests also cover large revisions, old-RPC denial, repeated
+  migrations, wrong ownership and unchanged hash/no-hash attempt journals.
+- An initial generated SQL delimiter typo failed migration application and was
+  repaired before the final PostgreSQL runs. The initial combined log retains
+  that failure; the separate final grant log is green. Logs in `output/audit/`:
+  `registration-reorg-focused-2026-10-23.log`,
+  `registration-reorg-integration-2026-10-23.log` (39 preparation checks pass),
+  `registration-reorg-grants-final-2026-10-23.log`, and
+  `registration-reorg-build-2026-10-23.log`. The existing reviewer implemented
+  and ran the new 18-check PostgreSQL suite; it is finished and inactive.
+- Interpretation: an indexer rewind is not itself proof of an actual chain
+  reorganization. Quarantine is deliberately conservative when it crosses
+  immutable evidence; there is no automatic unblocking or new protocol state.
+  No economics, contract, UI or public recovery-route change. No live schema,
+  feature flag, signing, transaction or production deployment changed.
+- Rollout still needs worker intake, legacy coverage and browser recovery.
+  Before schema activation verify the actual worker DB role owns/can execute
+  rollback; ordinary key-only SSH access was unavailable in this session, so
+  that live role check is not claimed. No credentials were requested or printed.
+  Native A-83 delayed-confirmation acceptance remains separate.
+- Next concrete step: connect bounded indexer registration intake/replay to the
+  verified media recovery path, preserving the rollback fence and keeping the
+  public browser switch disabled until legacy coverage and recovery are ready.
+
 October 23 TA-10 atomic registration persistence (Canon 1/2/11; not activated):
 
 - Resume HEAD `fe62b749620ddc595badae47aa4c1a3164c028aa`, same workspace and
@@ -40,7 +89,14 @@ October 23 TA-10 atomic registration persistence (Canon 1/2/11; not activated):
   self-hardening migration inventory. The new table already passes actual
   forced-RLS/service-only/no-default-grant checks; register its migration in
   `security-migration.test.cjs` without editing the historical applied SQL or
-  weakening the coverage check. Final CI is required on the corrected head.
+  weakening the coverage check. Corrected HEAD
+  `c565156d8671047e3f4b3175e8de7e2a2416992a` passes full CI `39873900992`:
+  Linux 2094 pass / 2 skips, Windows 1867 pass / 17 skips, zero failures;
+  46 contract tests pass on each OS, static checks and Vercel preview pass.
+  Logs: `output/audit/registration-persistence-final-{linux,windows}-2026-10-23.log`.
+  No application/SQL changes followed this tested head. This closing checkpoint
+  note is the only remaining tracked local diff; PR #330 remains unmerged and
+  the latest application release remains `dbefd68`.
 - Interpretation recorded: first saved finality evidence is immutable; a later
   verified head does not rewrite it. This is recovery bookkeeping, not a new
   protocol state or changed auction timing. An SQL rejection of contradictory

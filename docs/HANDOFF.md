@@ -7,9 +7,12 @@ pending complete receipt/event recovery and browser rollout.
 The October 23 registration verifier passed a two-RPC replay of artwork 36.
 The local follow-up adds atomic finalized-evidence/catalog/claim persistence
 and a server-only recovery helper, with no public recovery action or activation.
-Next: review indexer/reorg integration so conflicting or orphaned evidence keeps
-claims blocked without rewriting immutable registration history. See the current
-checkpoint for exact test evidence; browser rollout and legacy coverage remain open.
+The local rollback fence now rejects pre-rewind verification and atomically
+quarantines affected claims while retaining immutable history. Actual PostgreSQL
+tests cover both race orders and rollback failures; the schema is not activated.
+Next: bounded indexer registration intake/replay through the verified recovery
+path. See the checkpoint for exact tests; browser rollout and legacy coverage
+remain open. The worker database role must be checked before migration rollout.
 The owner's new desktop flicker/delay video is queued as TA-12; repairs are
 explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72

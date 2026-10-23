@@ -82,6 +82,12 @@ function backend(options = {}) {
         metadata_uri:getPublicStorageUrl('artworks',row.metadata_path),claim_status:'claimed',
         reported_transaction_hash:options.noHash ? null : '0x'+'dd'.repeat(32)}]);
     }
+    if (url.includes('/rpc/read_artwork_media_revision')) {
+      assert.equal(new URL(url).searchParams.get('p_chain_id'),'84532');
+      assert.ok(!init.method || init.method==='GET');
+      if (options.revisionError) return Response.json({message:'private database error'},{status:503});
+      return Response.json(Object.hasOwn(options,'revision') ? options.revision : '0');
+    }
     if (url.includes('/rpc/reconcile_artwork_media_registration')) {
       if (options.reconcileError) return Response.json({message:'private database error'},{status:500});
       return Response.json(options.reconciled || {publication_id:id,claim_status:'registered',registered_artwork_id:'36',can_submit:false});
@@ -125,6 +131,7 @@ function recoveryFixture(options = {}) {
   const receipt={transactionHash:tx,blockNumber:'0x64',blockHash,transactionIndex:'0x0',status:'0x1',logs:[log]};
   const calls=[];
   const rpcs=[0,1].map(index=>async(method,params)=>{
+    options.onChainRead?.(backendState.seen);
     calls.push({index,method,params});
     switch(method) {
       case 'eth_chainId':return '0x14a34';
@@ -145,8 +152,26 @@ test('recovery reads actual pinned bytes and metadata before atomically saving v
   const write=writes[0];assert.match(write.url,/rpc\/reconcile_artwork_media_registration$/);
   assert.equal(write.body.p_media_sha256,sha256);assert.equal(write.body.p_byte_size,bytes.length);
   assert.equal(write.body.p_evidence.finalized_anchor.number,'200');
+  assert.equal(write.body.p_expected_revision,'0');
   assert.equal(write.body.p_evidence.registrations[0].block_hash,'0x'+'bb'.repeat(32));
   assert.ok(!f.seen.some(c=>c.url.includes('/object/artworks/')),'recovery never writes storage');
+});
+
+test('recovery captures an exact revision before chain verification and never repairs a missing revision', async () => {
+  const revision='9007199254740993123456789';
+  const f=recoveryFixture({revision,onChainRead:seen=>{
+    assert.equal(seen.filter(c=>c.url.includes('/rpc/read_artwork_media_revision')).length,1);
+    assert.ok(!seen.some(c=>c.url.includes('/rpc/reconcile_artwork_media_registration')));
+  }});
+  await f.run();
+  assert.equal(f.seen.find(c=>c.body?.p_evidence).body.p_expected_revision,revision);
+  for(const options of [{revision:null},{revision:1},{revision:'01'},{revision:'-1'},
+    {revision:'1\n'},{revision:'1'.repeat(79)},{revisionError:true}]) {
+    const denied=recoveryFixture(options);
+    await assert.rejects(denied.run());
+    assert.equal(denied.calls.length,0);
+    assert.equal(denied.seen.filter(c=>c.init.method==='POST').length,0);
+  }
 });
 
 test('recovery from a missing reported hash uses only an explicit server scan and keeps coverage', async () => {

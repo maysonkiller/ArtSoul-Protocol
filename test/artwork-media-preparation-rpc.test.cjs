@@ -588,6 +588,10 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
   });
 
   await t.test('authenticated API prepares and resumes through actual PostgreSQL RPCs without submission permission', async () => {
+    // Keep earlier foundation tests on their historical schema; the full API
+    // journey uses the newest rollout, including revocation of old writers.
+    sql(fs.readFileSync(path.join(__dirname,'../src/indexer/migrations/014_schema_aware_reorg_rollback.sql'),'utf8'));
+    sql(fs.readFileSync(path.join(__dirname,'../sql/migrations/artwork_media_reorg.sql'),'utf8'));
     const {default:handler} = await import('../src/api/routes/upload/publication.js');
     const {setWalletSession} = await import('../src/api/backend.js');
     const env = {SESSION_SECRET:'private-preparation-integration-test',SUPABASE_URL:'https://storage.example',
@@ -619,12 +623,17 @@ test('upload issuance and metadata pinning use real PostgreSQL transactions',
       begin_artwork_media_submission:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet','p_metadata_uri'],
       report_artwork_media_transaction:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet','p_transaction_hash'],
       reconcile_artwork_media_registration:['p_publication_id','p_chain_id','p_core_address','p_creator_wallet',
-        'p_media_sha256','p_media_uri','p_byte_size','p_metadata_uri','p_evidence']
+        'p_media_sha256','p_media_uri','p_byte_size','p_metadata_uri','p_evidence','p_expected_revision']
     };
     Object.assign(process.env,env);
     globalThis.fetch = async (raw, init={}) => {
       const url = new URL(String(raw)), body = init.body ? JSON.parse(init.body) : undefined;
       calls.push(url.pathname);
+      if (url.pathname === '/rest/v1/rpc/read_artwork_media_revision') {
+        assert.equal(init.method,'GET');assert.equal(body,undefined);
+        assert.equal(url.searchParams.get('p_chain_id'),'84532');
+        return Response.json(rpc('SELECT to_jsonb(public.read_artwork_media_revision(84532));'));
+      }
       if (url.pathname.startsWith('/rest/v1/rpc/')) {
         const name = url.pathname.slice('/rest/v1/rpc/'.length);
         assert.ok(Object.hasOwn(signatures,name));

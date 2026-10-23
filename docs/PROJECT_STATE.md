@@ -7,8 +7,10 @@ Upload preparation and the new private submission journal remain disabled
 pending complete receipt/event recovery and browser rollout.
 The October 23 registration verifier is tested against two RPCs. Its local
 follow-up adds atomic block/finality anchor persistence with catalog/claim
-reconciliation, still disconnected from the public route and disabled. Next is
-indexer/reorg integration; legacy coverage and browser rollout remain open.
+reconciliation, still disconnected from the public route and disabled. The local
+rollback fence now rejects stale verification and preserves quarantined history;
+actual PostgreSQL concurrency/failure checks pass. Next is bounded indexer intake
+and replay; legacy coverage and browser recovery/rollout remain open.
 New desktop flicker/delay report TA-12 is explicitly
 deferred by the owner; it does not erase the accepted phone observations.
 The owner accepts the current iPhone visual behavior and browser Back, closing
