@@ -12,7 +12,10 @@ function docker(...args) {
 let available = false;
 try { available = docker('version', '--format', '{{.Server.Os}}') === 'linux'; } catch {}
 function query(sql) {
-  return execFileSync('docker', ['exec', '-i', container, 'psql', '-U', 'postgres', '-d', 'artsoul',
+  // The image's temporary initdb server accepts Unix sockets before restarting.
+  // TCP is available only on the final server; stay inside this disposable container.
+  return execFileSync('docker', ['exec', '-i', '-e', 'PGPASSWORD=local-grants-only', container,
+    'psql', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'artsoul',
     '-X', '-qAt', '-v', 'ON_ERROR_STOP=1'], {input: sql, encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'], timeout: 30000}).trim();
 }

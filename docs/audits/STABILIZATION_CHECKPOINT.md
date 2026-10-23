@@ -5,6 +5,21 @@ Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 
 October 23 TA-10 authenticated recovery continuation (Canon 1/2/11):
 
+- Recovery implementation saved in `659c2b178a57bbf11b5089343e7ebce315c6d5d9`.
+  Local full unit run: 2174 pass / zero failures or skips (includes the preserved
+  untracked authority-policy test; tracked CI is reported independently).
+  Its Linux CI `39880861020` failed at the unrelated Data API grant fixture:
+  the Unix-socket readiness query reached the temporary initdb server before
+  its shutdown. The installed PostgreSQL image entrypoint confirms that server
+  disables TCP. The affected grant fixture and the touched preparation fixture
+  now use TCP inside their own disposable containers, waiting for the final
+  server without relaxing any assertion. The grant checks and all 37 preparation
+  subchecks passed on the first targeted rerun, but its Docker cleanup exceeded
+  30 seconds; no owned container remained. A clean preparation rerun is required.
+  Recovery navigation also reuses `navigateAfterPublish`, retaining the branded
+  finalization state; 24 upload regressions and four rebuilt browser journeys pass.
+- Dormant recovery configuration is documented in `.env.example`; all flags
+  remain false and deployment pins empty. No runtime configuration was changed.
 - Resume `dd2424dae2a9ed0e23d1e5c768e6018dda1ecf30` in the same workspace.
   That exact commit passes CI `39879486672`: Linux 2134 pass / 2 skips,
   Windows 1888 pass / 18 skips, zero failures, 46 contract tests on each OS.
@@ -33,7 +48,7 @@ October 23 TA-10 authenticated recovery continuation (Canon 1/2/11):
   rate-limit states and the disabled legacy path. Evidence:
   `output/audit/publication-recovery-focused-2026-10-23.log`,
   `publication-recovery-pg-2026-10-23.log`, `publication-recovery-build-2026-10-23.log`,
-  `publication-recovery-built-2026-10-23.json`. Full unit validation is running.
+  `publication-recovery-built-2026-10-23.json`. Full unit results are recorded above.
   One reused reviewer found no blocker and finished; no agent swarm was started.
 - No production release, live migration, activation or transaction. Preserve
   unrelated authority-policy files and `.codex/` / `output/`. TA-10 is not closed:

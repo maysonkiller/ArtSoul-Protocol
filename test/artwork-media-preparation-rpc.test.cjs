@@ -15,7 +15,9 @@ const creator = '0x' + '11'.repeat(20), other = '0x' + '22'.repeat(20);
 const core = '0x' + 'aa'.repeat(20), otherCore = '0x' + 'bb'.repeat(20);
 const hash = 'cc'.repeat(32);
 const q = value => value == null ? 'NULL' : "'" + String(value).replace(/'/g, "''") + "'";
-const args = ['exec', '-i', container, 'psql', '-U', 'postgres', '-d', 'artsoul', '-v', 'ON_ERROR_STOP=1', '-qAt'];
+// The initdb server exposes only a Unix socket; TCP waits for the final server.
+const args = ['exec', '-i', '-e', 'PGPASSWORD=postgres', container, 'psql', '-h', '127.0.0.1',
+  '-U', 'postgres', '-d', 'artsoul', '-v', 'ON_ERROR_STOP=1', '-qAt'];
 const sql = query => execFileSync('docker', [...args, '-f', '-'],
   {input:query, encoding:'utf8', stdio:['pipe','pipe','pipe'], timeout:20000}).trim();
 const parallel = async query => (await run('docker', [...args, '-c', query], {timeout:20000})).stdout.trim();
