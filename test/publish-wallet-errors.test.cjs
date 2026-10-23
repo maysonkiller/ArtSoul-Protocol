@@ -75,3 +75,89 @@ test('an auction failure never says its confirmed artwork was not published', ()
         assert.doesNotMatch(result.message, /no artwork was published|nothing was published/i);
     }
 });
+
+async function loadPreparationFailure(failAt, failure) {
+    const {prepareBrowserPublication} = await import('../src/features/artwork/publication-preparation.js');
+    const context = load(), alerts = [], requests = [], saved = new Map();
+    const wallet = '0x' + '11'.repeat(20), core = '0x' + 'aa'.repeat(20);
+    const file = {name: 'artwork.png', type: 'image/png', size: 3}, hash = 'ab'.repeat(32);
+    let hashReads = 0;
+    const dependencies = {
+        storage: {getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value)},
+        locks: {request: (_key, _options, run) => run()},
+        randomUUID: () => '11111111-1111-4111-8111-111111111111',
+        createMetadata: value => ({...value, name: value.title}),
+        upload: async () => {},
+        async request(body, owner) {
+            requests.push(body.action);
+            assert.equal(owner, wallet);
+            if (body.action === failAt) throw failure;
+            if (body.action === 'config') return {success: true, enabled: true, chain_id: 84532,
+                core_address: core, can_submit: false};
+            if (body.action === 'issue') return {publication_id: body.publication_id, chain_id: 84532,
+                core_address: core, can_submit: false, upload: {
+                    path: 'uploads/artwork.png', public_url: 'https://storage.example/artwork.png'}};
+            assert.fail(`Unexpected publication action: ${body.action}`);
+        }
+    };
+    Object.assign(context, {
+        fileFixture: file, walletFixture: wallet, alert: message => alerts.push(message),
+        document: {getElementById: id => id === 'originalWorkConfirm' ? {checked: true} : {innerHTML: 'Publish'}},
+        getUploadFormValues: () => ({title: 'Artwork', description: 'Original artwork.', price: '0.001'}),
+        validateArtworkFile: () => null, validateArtworkDetails: () => null,
+        updatePublishReadiness: () => true, clearBlockingStep() {}, getAIValuationFormKey: () => 'ready',
+        setTransactionButtonProcessing() {}, restoreTransactionButton() {},
+        prepareBrowserPublication: args => prepareBrowserPublication(args, dependencies)
+    });
+    Object.assign(context.window, {
+        getCurrentWalletAddress: () => wallet, getCurrentChainId: () => 84532,
+        SupabaseAuth: {isAuthenticatedForWallet: async () => true},
+        IPFSClient: {generateFileHash: async () => {
+            hashReads++;
+            if (failAt === 'fingerprint') throw failure;
+            return hash;
+        }},
+        ArtSoulContracts: {init() {assert.fail('Preparation failure must not initialize a wallet');},
+            uploadArtwork() {assert.fail('Preparation failure must not register an artwork');}}
+    });
+    vm.runInContext("selectedFile = fileFixture; selectedAuctionDuration = 24; latestAIValuation = {estimate: 1}; " +
+        "latestAIValuationFormKey = 'ready'; authorizedWalletAddress = walletFixture;", context);
+    await context.handleUpload();
+    return {alerts, requests, saved, hashReads};
+}
+
+for (const step of ['config', 'issue', 'prepare']) {
+    test(`an interrupted ${step} request after hashing is not a file-read failure`, async () => {
+        for (const failure of [new TypeError('Failed to fetch'), new DOMException('Request aborted', 'AbortError')]) {
+            const result = await loadPreparationFailure(step, failure);
+            assert.equal(result.hashReads, 1);
+            assert.deepEqual(result.requests, ['config', 'issue', 'prepare'].slice(0, ['config', 'issue', 'prepare'].indexOf(step) + 1));
+            assert.equal(result.alerts.length, 1);
+            assert.match(result.alerts[0], /Artwork preparation was interrupted/);
+            assert.match(result.alerts[0], /Check publication/);
+            assert.doesNotMatch(result.alerts[0], /file could not be read|Choose the file again|nothing was sent/);
+            assert.equal(result.saved.size, step === 'config' ? 0 : 1, 'existing preparation is not discarded');
+        }
+    });
+}
+
+test('a genuine fingerprint read rejection retains its file-read explanation', async () => {
+    const result = await loadPreparationFailure('fingerprint', new DOMException('File unavailable', 'NotReadableError'));
+    assert.equal(result.hashReads, 1);
+    assert.deepEqual(result.requests, []);
+    assert.equal(result.saved.size, 0);
+    assert.equal(result.alerts.length, 1);
+    assert.match(result.alerts[0], /selected file could not be read/);
+    assert.doesNotMatch(result.alerts[0], /preparation was interrupted/);
+});
+
+test('a retained publication attempt overrides preparation and nested wallet failures', () => {
+    const context = load();
+    vm.runInContext("currentPublishStage = 'publication_preparation';", context);
+    for (const cause of [new TypeError('Failed to fetch'), {code: 4001}, {code: 'NETWORK_ERROR'}]) {
+        const mapped = context.mapPublishError({code: 'PUBLICATION_ATTEMPT_PENDING', cause});
+        assert.equal(mapped.code, 'PUBLICATION_ATTEMPT_PENDING');
+        assert.match(mapped.message, /do not publish the file again/);
+        assert.doesNotMatch(mapped.message, /file could not be read|preparation was interrupted|No artwork was published/);
+    }
+});

@@ -8,23 +8,26 @@ can do each piece. It is a view of [`BACKLOG.md`](BACKLOG.md) and
 [`RESOURCE_GATED_WORK.md`](RESOURCE_GATED_WORK.md), never a second opinion; if
 they disagree with this file, they win and this file is stale.
 
-Phase A stands at **81 done, 2 in progress, 0 planned** across A-01 to A-83.
+Phase A stands at **82 done, 1 in progress, 0 planned** across A-01 to A-83.
 
-Latest code release: PR #332 (`a0f14f4`), verified on the apex domain.
-Candidate and post-merge CI pass (Linux 2211 / Windows 1952 unit checks,
+Latest release: PR #333 (`3c6d40e`), verified on the apex domain.
+Candidate and post-merge CI pass (Linux 2216 / Windows 1952 unit checks,
 zero failures; 2 / 18 skips; 46 contract tests on each OS). The guarded media
 implementation described below is now published. The private media schema and
 32 verified historical identities are installed. The October 24 same-source
 redeployment activates the guard with reviewed server pins; 13 actual apex
-SIWE/HTTP checks pass. A guarded browser/device publication and delayed-receipt
-acceptance remain separate. See the checkpoint for exact evidence and limits.
+SIWE/HTTP checks pass. The owner's native interruption/return and refresh with
+continuation to the second transaction now accept A-83 and guarded publishing.
+Artwork 37 / auction 71, one registration and the same original/preparation are
+independently verified. TA-13's separate preparation-error correction is locally
+tested and awaits release. See the checkpoint for exact evidence and limits.
 
 October 23 hosting follow-up is applied on both designated servers: security
 packages, restored key-only indexer SSH, verified database TLS and a 2000 ms
 Base poll override. Actual worker identity and existing rollback execution
 rights are now observed directly. The reviewed media revision fence is installed
 and worker integration passes 37 checks. [Evidence and limits](audits/HOST_SECURITY_2026-10-23.md) include
-Denim's confirmation/cost implications. This does not close A-83 or A-23.
+Denim's confirmation/cost implications. A-23 remains a separate final decision.
 
 October 24 current disposition, without repeating completed ceremonies:
 
@@ -61,7 +64,9 @@ October 24 current disposition, without repeating completed ceremonies:
    with prior connected-wallet/resale evidence this closes A-33/A-64/A-78.
    In a separate October 23 answer the owner confirms the ArtSoul mark appeared
    without empty cards immediately after publishing; A-71 is accepted.
-   A-83's delayed-receipt recovery remains distinct; ordinary success does not prove it.
+   October 24 native interruption/return and refresh are accepted for A-83,
+   corroborated by artwork 37 / auction 71 and existing no-replay regressions.
+   No captured ethers TIMEOUT or explicit Check publication use is claimed.
    See the current checkpoint for hashes and evidence. TA-10 adds website
    exact-byte duplicate protection; the unchanged permissionless contract does
    not enforce it. Titles are reusable, filename changes cannot evade the guard,
@@ -96,8 +101,10 @@ October 24 current disposition, without repeating completed ceremonies:
    real Data API/storage reject a renamed known original and retain one intentionally
    unbroadcast probe without granting a repeated send. Website activation and
    deployed HTTP checks now pass after the same-source activation; guarded
-   browser/device publication acceptance remains open. All three flags are active.
-   These checks do not establish A-83's actual-device receipt-delay acceptance.
+   browser/device publication is now accepted from the separate native result
+   above. All three flags are active. TA-13 addresses misleading preparation-error
+   text before a wallet request; its confirmed code cause does not establish the
+   underlying exception on the owner's phone.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner
    reports no remaining whole-page/empty-card flicker, delayed names/avatars or
    wrong lists on profile-tab switching in the completed iPhone run. Previous
@@ -414,12 +421,15 @@ Ordered by what the founder can feel, not by row number.
 
 | Row | What it is | Note |
 | --- | --- | --- |
-| **A-83** | Registration confirmation delay | The repair is published and automated recovery checks pass; a real-device publish across a real confirmation delay is still unobserved. Ordinary successful publication does not establish that outcome |
+| **A-23** | Final controlled-beta readiness decision | Reconcile current release, health, accepted gates and open defects; no beta GO is inferred from a completed repair |
+| TA-13 | Preparation-error explanation | Local shared upload fix, 74 focused checks and build pass; complete CI and deployment verification |
 
 ## 2a. Remaining device observations
 
-One row remains for device recovery evidence: A-83; A-23 is the subsequent beta
-decision. A-57 is accepted with Robinhood compatibility explicitly unverified. A-33,
+No repeat device ceremony is requested: A-83 is accepted from the October 24
+interruption/continuation result and independent chain/preparation verification.
+A-23 is the remaining formal decision. A-57 is accepted with Robinhood
+compatibility explicitly unverified. A-33,
 A-64 and A-78 were accepted on October 22 from native publication and prior
 evidence. A-47/A-48/A-53/A-54/A-58/A-61/A-72 are accepted on October 23 from the
 specific native visual and Back follow-ups, published repairs and prior desktop evidence.
