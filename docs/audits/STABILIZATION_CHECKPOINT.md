@@ -3,6 +3,121 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
+
+- Starting HEAD `2d017da`; the deployed application is still PR #330 until this
+  candidate's release is recorded. The current guarded flow can retain a lost
+  begin/wallet attempt correctly while its form returns to "Ready to publish".
+  A retry also depends on current form/AI values, despite the attempt's immutable
+  metadata. This is a reproduced presentation/recovery issue, not new economics.
+- A retained current-page attempt now has a dedicated "Check publication" action.
+  It uses the original wallet, Core, UUID and metadata URI independently of form
+  edits and AI expiry. Checking uses config/status, optional retained-hash report
+  and bounded recovery only; it cannot prepare, begin, register or create an
+  auction. Reverted, conflicting and unresolved outcomes have distinct inline
+  messages; a verified registration opens its exact existing artwork.
+- The explicit click reuses existing SIWE authentication if the session expired.
+  Cancellation preserves the check action; wallet/file changes fence late
+  responses. Optional UI notifications cannot suppress either durable hash
+  channel. Repeated readiness updates preserve the button's text node for WebKit
+  first-tap behavior. The accepted disabled legacy publishing path is unchanged.
+- Focused upload/publication/client checks pass 190/190, zero skips, in
+  `output/audit/pending-publication-focused-2026-10-23.log`. Build/static checks
+  pass. The compiled Chromium/WebKit fixture and final release checks are being
+  rerun on this exact candidate; do not count earlier probe output as final.
+- Scope/remaining: this check shortcut retains context in the current page;
+  automatic discovery after reload is not implemented. The durable browser/server
+  journal remains intact, but cross-reload recovery UX, missing-original
+  disposition (works 1-4), actual worker-role evidence and reviewed TA-10 rollout
+  remain open. All three media flags and the live media schema remain inactive.
+  This does not close A-83's real delayed-confirmation criterion or A-23.
+- Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
+  Only the existing helper agent was reused for this slice/review; it is finished.
+  Next concrete step: finish the exact compiled-browser run, then publish only
+  after the candidate's required CI and release checks pass.
+
+October 23 PHP advisory triage (host inspection pending; owner-deferred):
+
+- Official PHP and Hetzner notices confirm CVE-2026-109618 / CVE-2026-109619:
+  https://www.php.net/archive/2026.php#2026-10-21-5 and
+  https://status.hetzner.com/incident/f4144d55-38c3-48d1-8664-7a3429355cd7.
+  Ubuntu backport versions are recorded in
+  https://ubuntu.com/security/notices/USN-8948-1; do not compare a distribution
+  package against upstream semver alone.
+- The tracked ArtSoul repository has no PHP files or PHP/web-server/container
+  configuration, and its application/indexer use Node.js. This is repository
+  evidence only, not proof that PHP is absent from the Hetzner host or containers.
+- Both existing key-only SSH attempts were denied. The browser reaches Hetzner
+  Accounts login; the owner reports a ten-minute cooldown and explicitly defers
+  Hetzner until they report successful login. Do not retry login meanwhile.
+  No remote diagnostic command, package update or service restart was executed.
+- Read-only host inventory is prepared and syntax-checked in
+  `docs/private/inspect-php-host-2026-10-23.mjs` (packages, vendor versions,
+  services, process names, container inventory, PHP mappings and indexer health;
+  no credentials/configuration bodies). Actual host findings and any remediation
+  remain unverified. Resume this security check once owner access is available;
+  continue independent Phase A work in the meantime.
+
+October 23 A-57 disposition (Canon 1/17; documentation only):
+
+- Starting HEAD `49bd8c7`; code release remains PR #330 (`333e527`). The owner
+  delegates the engineering decision after confirming current iPhone balance
+  and network selection; later native Chrome/MetaMask publication also passed.
+  Clarification: network selection means Base Sepolia within the wallet, not
+  changing accounts or adding another product chain.
+- A-57's published classifier repair (PR #262) is accepted for the exercised
+  flows. `node --test test/network-switch-failure-classifier.test.cjs` passes
+  10/10 on the current code. Robinhood/Base Sepolia compatibility stays explicitly
+  UNVERIFIED in the backlog, device sheet and beta entry; no historical provider
+  cause or new Robinhood device result is invented.
+- The deployed compiled wallet asset matches the local release byte-for-byte:
+  `output/audit/a57-apex-artifact-2026-10-23.json`. The source filename itself
+  returns 404 because this entry is bundled; the compiled asset returns 200.
+  `npm run sync:phase-a` derives 81/2/0 from the backlog; the six existing
+  close-out/status consistency checks pass. No application rebuild is needed
+  for this documentation-only disposition.
+- Interpretation: the owner's delegation permits an engineering disposition of
+  the old evidence gap, not a fictitious test pass. No canon architecture, runtime
+  code, credentials, network support or economics changed. Formal Phase A is now
+  81 done / 2 in progress (A-83/A-23); TA-10 activation and deferred TA-12 remain.
+- The next concrete engineering step remains read-only confirmation of the live
+  indexer's database role and rollback path before the TA-10 migration sequence.
+  Preserve the unrelated untracked files and the accepted phone ceremonies.
+
+October 23 released continuation (supersedes the pre-release notes below):
+
+- PR #330 is merged and deployed at `333e527abc1daa67a62bce91126de3fa30aa8a85`.
+  The same workspace/branch was fast-forwarded to that commit; its tree equals
+  the tested candidate `363a463825d4f7d9577f5e08788af1524d2c3017`.
+  Candidate CI `39885693498` and post-merge CI `39886056120` both pass:
+  Linux 2173 pass / 2 skips; Windows 1914 pass / 18 skips; zero failures;
+  46 contract tests on each OS. Build/static checks also pass.
+  Final log: `output/audit/publication-release-main-ci-333e527-2026-10-23.log`.
+- Production deployment `7268143135` succeeded. Actual apex checks deny all seven
+  unauthenticated publication actions (401, private/no-store), reject GET (405),
+  and match nine built assets after CRLF normalization. Evidence:
+  `output/audit/media-submission-apex-333e527-2026-10-23.json` and
+  `output/audit/publication-apex-333e527-2026-10-23.json`.
+- This releases the guarded publication/recovery implementation, not its
+  activation. All three media flags remain disabled; no live media migration,
+  catalog import, server-secret/configuration change or signing occurred.
+  The successful local SQL/browser/catalog tests below are not live acceptance.
+- Key-only server access was unavailable. The October 23 Hetzner browser attempt
+  stopped at its automatic security-check page; no console command, credential
+  change or security bypass occurred. The pooler observation below remains
+  insufficient to identify the live worker's effective database role.
+- At release, formal Phase A was 80 done / 3 in progress (A-57, A-83, A-23).
+  A-57 is subsequently disposed of above with Robinhood compatibility unverified.
+  A-83 still needs real delayed-confirmation device evidence. TA-10
+  additionally needs missing-original and interrupted-attempt disposition, live
+  worker integration and reviewed activation. TA-12 remains owner-deferred.
+- Preserve the unrelated untracked authority-policy files, `.codex/` and
+  `output/`. The reused review agent has completed; no helper remains active.
+  Next concrete step: obtain read-only host evidence for the running indexer's
+  database role and rollback path before preparing the live migration sequence.
+  Capture the actual database revision BEFORE any fresh intake verification;
+  the saved local manifest does not authorize a live import.
+
 October 23 TA-10 one-time registration handoff (Canon 1/2/11):
 
 - Starting commit `333044100a48088e5f341652a88d6b81609d9da7` passes exact CI
@@ -42,8 +157,9 @@ October 23 TA-10 one-time registration handoff (Canon 1/2/11):
   handoff conservatively retains the attempt: automatic release remains unsafe
   with the unchanged direct-call contract. This UX/rollout limitation is unresolved,
   not a passed native-wallet acceptance or a closed duplicate-enforcement feature.
-- No production release, live schema/configuration change, signing or contract
-  deployment. All three flags remain disabled. Preserve the unrelated untracked
+- At this earlier checkpoint there was no production release. PR #330 is now
+  released as recorded above, without live schema/configuration changes,
+  signing or contract deployment. All three flags remain disabled. Preserve the unrelated untracked
   authority-policy files, `.codex/` and `output/`. A-57, A-83 and A-23 remain open;
   owner-deferred TA-12 display work is unchanged. Next concrete step: prepare a
   verified legacy catalog intake with explicit coverage for the four unavailable
@@ -86,8 +202,8 @@ October 23 legacy verification follow-up (read-only; not an import):
 - The verified manifest is local evidence, not an applied catalog or complete
   original-file coverage. A-57/A-83/A-23, unresolved-attempt disposition and
   rollout acceptance remain open; no production schema, flags or data changed.
-  The exact earlier CI above precedes the intake addition; use PR #330's checks
-  for the later head. Next concrete step: finish a reviewed activation manifest
+  Exact CI for the intake addition and its published merge is recorded at the
+  top of this file. Next concrete step: finish a reviewed activation manifest
   with the four missing originals, unresolved-attempt policy and actual worker
   role resolved, then capture the live revision BEFORE fresh intake verification.
 

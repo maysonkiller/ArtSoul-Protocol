@@ -1,9 +1,10 @@
 # ArtSoul Engineering Handoff
 
 Current continuation (2026-10-23): use `C:\Projects\ArtSoul`, branch
-`codex/takeover-audit`. Latest application release is PR #329 (`dbefd68`);
-upload preparation and the new private submission journal remain disabled
-pending complete receipt/event recovery and browser rollout.
+`codex/takeover-audit`. Latest application release and local code baseline are
+PR #330 (`333e527`); all three media rollout flags and the live media schema
+remain inactive. The release includes receipt/event recovery and the guarded
+browser handoff; it does not activate exact-file duplicate enforcement.
 The October 23 registration verifier passed a two-RPC replay of artwork 36.
 The local follow-up adds atomic finalized-evidence/catalog/claim persistence
 and a recovery helper, without activation.
@@ -19,12 +20,17 @@ deadline. Actual SQL and 28 compiled-browser checks pass, including navigation
 to a verified artwork without another transaction. The one-time registration
 handoff is now connected behind a third default-off gate, with independent hash
 retention, exact wallet/Core checks and no permission replay. Targeted checks and
-real SQL pass; commit `28f4822` passes exact Linux/Windows CI and preview checks.
+real SQL pass. Final candidate `363a463` and merge `333e527` both pass CI:
+2173 Linux / 1914 Windows unit checks, zero failures and 46 contract tests on
+each OS; 2 Linux / 18 Windows skips are recorded separately. The apex API
+boundary and nine deployed assets are verified against this release.
 An owner-only legacy intake now shares the revision fence and passes actual SQL
 checks. A local rehearsal imports and replays all 32 verified available originals,
 retaining duplicates and creating no synthetic publication attempts. No activation.
-Next: complete the reviewed rollout manifest, including missing-original and
-unresolved-attempt disposition, current worker-role evidence and fresh intake pins.
+Next: establish the live indexer's effective database role through read-only
+host evidence. SSH key access was unavailable and the console stopped at
+Hetzner's automatic security check. Then complete the reviewed rollout manifest,
+including missing-original and unresolved-attempt disposition and fresh intake pins.
 Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
 and works 1-4 remain unavailable. Alchemy/Tenderly independently verify all 36
 registrations; original-file coverage remains 32/36. See the checkpoint for tests
@@ -33,7 +39,10 @@ The owner's new desktop flicker/delay video is queued as TA-12; repairs are
 explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72
 are done. Preserve the completed native flows and consult the checkpoint for
-the three remaining formal rows and additional TA-10 implementation work.
+the two remaining formal rows (A-83/A-23) and additional TA-10 implementation work.
+A-57 is accepted on October 23 using the published repair, ten regression checks,
+the owner's working-switch report and delegated engineering disposition.
+Robinhood/Base Sepolia compatibility remains explicitly unverified.
 A-71 is also accepted: the owner confirms the branded wait after publication.
 Admin/artwork repairs were deployed through PR #310 at `9a2965f`.
 A-21 intake is accepted from the completed October 11 live cases; do not replay
@@ -143,7 +152,7 @@ The current Core has canon-incompatible resale splits, the NFT royalty is 7.5%, 
 never a second opinion. If the two disagree, the backlog wins and this section is
 stale. One backlog item equals one task and one pull request.
 
-Phase A stands at **80 done, 3 in progress, 0 planned** across A-01 to A-83. An audit on 2026-09-03 opened A-79, A-80 and A-81 from the four open pull requests: A-79 records that PR #242 and the merged A-54/A-61 repairs contradict each other and must not keep replacing one another, A-80 records the agent layer's wallet check against the deferred runtime in PR #238, and A-81 records that the Phase A counters in four documents are what makes every parallel branch read as conflicting. A-78 reopened on 2026-09-06: the active-first resolver can select a different artwork's auction; token/artwork resale inputs have the same ambiguity. Explicit input namespaces now replace guessing, with connected-wallet acceptance still pending. A-77 opened on 2026-08-27 after the founder finalized an auction nobody bid on and could not auction the artwork again: `endAuction` releases the work on chain, but `AuctionEnded` is the terminal event for a no-bid auction and no handler cleared `active_auction_id`, so twelve artworks read as permanently occupied while the profile refused a new auction twice over. The indexer and both profile predicates are fixed; the backfill for rows already stored wrong is founder-run and still outstanding. A-47 was reopened on 2026-08-23 by new founder iOS evidence that contradicted browser-only acceptance: artwork loading handed off through a dark body. Its first preview repair also failed cold iOS acceptance because `createRoot` still replaced the visible static tree; the revised branch hydrates that tree in place and has not been accepted yet. A-58 was reopened the same day because first visits to profile tabs flashed synthetic cards; its revised iOS preview was accepted, while Android acceptance is still outstanding. A-61 was reopened by a new iOS capture of the large profile avatar partially painted; the already-accepted header path is not implicated, and revised iOS and Android profile visits are still required. A-75 closed on 2026-08-24 after the PR #237 Vercel preview rendered the audio-detail brand visual from the root asset with an image response. A-76 closed on 2026-08-26 after the PR #239 Vercel preview gave artwork 31 one truthful expired state: `No bids` plus `End Expired Auction`, with no live badge or bid action. A-54 was reopened on 2026-08-24 after new desktop and iOS evidence showed an empty app, a blank themed shell and an invisible mobile skeleton before profile content. Its static-shell repair removed those empty frames but made the 3-4 second critical-path wait more visible; the current revision releases identity before the artwork feed instead of disguising that wait. A-50, A-53 and A-56 await a run on a device with a connected wallet; A-51, A-52, A-55 and A-60 were closed on 2026-08-21 by measurement in a browser. Do not re-open a `done` row without new
+Phase A stands at **81 done, 2 in progress, 0 planned** across A-01 to A-83. An audit on 2026-09-03 opened A-79, A-80 and A-81 from the four open pull requests: A-79 records that PR #242 and the merged A-54/A-61 repairs contradict each other and must not keep replacing one another, A-80 records the agent layer's wallet check against the deferred runtime in PR #238, and A-81 records that the Phase A counters in four documents are what makes every parallel branch read as conflicting. A-78 reopened on 2026-09-06: the active-first resolver can select a different artwork's auction; token/artwork resale inputs have the same ambiguity. Explicit input namespaces now replace guessing, with connected-wallet acceptance still pending. A-77 opened on 2026-08-27 after the founder finalized an auction nobody bid on and could not auction the artwork again: `endAuction` releases the work on chain, but `AuctionEnded` is the terminal event for a no-bid auction and no handler cleared `active_auction_id`, so twelve artworks read as permanently occupied while the profile refused a new auction twice over. The indexer and both profile predicates are fixed; the backfill for rows already stored wrong is founder-run and still outstanding. A-47 was reopened on 2026-08-23 by new founder iOS evidence that contradicted browser-only acceptance: artwork loading handed off through a dark body. Its first preview repair also failed cold iOS acceptance because `createRoot` still replaced the visible static tree; the revised branch hydrates that tree in place and has not been accepted yet. A-58 was reopened the same day because first visits to profile tabs flashed synthetic cards; its revised iOS preview was accepted, while Android acceptance is still outstanding. A-61 was reopened by a new iOS capture of the large profile avatar partially painted; the already-accepted header path is not implicated, and revised iOS and Android profile visits are still required. A-75 closed on 2026-08-24 after the PR #237 Vercel preview rendered the audio-detail brand visual from the root asset with an image response. A-76 closed on 2026-08-26 after the PR #239 Vercel preview gave artwork 31 one truthful expired state: `No bids` plus `End Expired Auction`, with no live badge or bid action. A-54 was reopened on 2026-08-24 after new desktop and iOS evidence showed an empty app, a blank themed shell and an invisible mobile skeleton before profile content. Its static-shell repair removed those empty frames but made the 3-4 second critical-path wait more visible; the current revision releases identity before the artwork feed instead of disguising that wait. A-50, A-53 and A-56 await a run on a device with a connected wallet; A-51, A-52, A-55 and A-60 were closed on 2026-08-21 by measurement in a browser. Do not re-open a `done` row without new
 contradicting evidence; every one of them carries dated production acceptance.
 
 Accepted and closed - do not redo:

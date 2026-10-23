@@ -7,10 +7,17 @@ its historical evidence. It is not an Android PASS or a compatibility claim.
 Desktop and iOS retain their own criteria; do not repeat the owner's satisfactory
 iPhone trip without a specific unresolved outcome.
 
-Two backlog rows remain for recovery evidence or historical
-defect disposition: A-57 and A-83. Their implementation is published; failed
+One backlog row remains for recovery evidence: A-83. Its implementation is published; failed
 acceptance may still require a fix. Group the checks into five trips because
 most rows are watching the same screens for different things.
+
+**October 23 A-57 engineering disposition:** the owner confirms current iPhone
+network selection and delegates the decision on the historical Robinhood gap.
+The published classifier repair is accepted with the existing working-switch
+and native Chrome/MetaMask publication evidence, plus ten current regression
+checks. Robinhood/Base Sepolia compatibility is UNVERIFIED. No new Robinhood
+device run, provider failure cause or lack of testnet support is inferred.
+Reopen the masked diagnostic probe only if a concrete symptom is reported.
 
 This sheet is organised by trip. Each trip says what to do, what to watch, and
 which rows its answers close. Record the result here, dated, per device. An
@@ -260,6 +267,9 @@ Both may end as documented wallet limitations rather than defects. Both need
 evidence before anyone decides.
 
 ### 5a — A wallet that will not switch network (A-57)
+
+Accepted October 23 within the explicit scope above. The following is a future
+diagnostic procedure for a reproduced failure, not an outstanding owner ceremony.
 
 On a wallet that cannot reach Base Sepolia, open `/wallet-test`, try the switch,
 and copy the log. It records the masked provider error per stage. The message

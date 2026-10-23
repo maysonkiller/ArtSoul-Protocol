@@ -188,3 +188,173 @@ test('the artwork description has a bounded length', () => {
   assert.match(html, /id="artDescriptionCount"/);
   assert.match(html, /id="publishBlockedNote"[^>]*role="alert"/);
 });
+
+function loadPublicationCheck(check) {
+  const wallet = '0x' + '11'.repeat(20);
+  const button = { innerHTML: 'Publish Artwork', textContent: 'Publish Artwork', dataset: {},
+    setAttribute(name, value) { this[name] = value; }, removeAttribute(name) { delete this[name]; } };
+  const hint = { textContent: '' };
+  const file = {};
+  const attempt = { publicationId: '11111111-1111-4111-8111-111111111111', wallet,
+    coreAddress: '0x' + 'aa'.repeat(20), metadataUri: 'https://fixture.test/original.json',
+    file, message: 'A publication attempt is saved.' };
+  const sandbox = vm.createContext({
+    console, selectedFile: file, pendingPublicationAttempt: attempt, uploading: false, wallet,
+    latestAIValuation: null, latestAIValuationFormKey: '', authorizedWalletAddress: '',
+    aiValuationController: null, authorizationInProgress: false, BASE_SEPOLIA_CHAIN_ID: 84532,
+    document: { getElementById: id => ({ publishBtn: button, publishReadinessHint: hint })[id] },
+    window: { getCurrentWalletAddress: () => sandbox.wallet, ensureAuthenticated: async () => true,
+      ArtSoulArtworkUrl: { artworkPath: id => '/artwork/' + id } },
+    checkBrowserPublication: check, clearBlockingStep() {}, updatePrePublishAction() {},
+    getFormCompletionError: () => 'Enter a title for your artwork.', getAIValuationFormKey: () => 'changed',
+    // A check must exit the submit handler before reading or validating the new form.
+    getUploadFormValues() { assert.fail('Check attempted to read the publish form'); },
+    prepareBrowserPublication() { assert.fail('Check attempted new preparation'); },
+    navigateAfterPublish: url => { sandbox.destination = url; }
+  });
+  for (const name of ['createUploadError', 'currentPublicationAttempt', 'publicationCheckMessage',
+    'setTransactionButtonProcessing', 'restoreTransactionButton', 'updatePublishReadiness',
+    'checkSavedPublication', 'handleUpload']) {
+    vm.runInContext(extractFunction(name), sandbox);
+  }
+  return { sandbox, button, hint, attempt, wallet };
+}
+
+test('a pending attempt is checkable without a valid form, authorization stamp or current AI', async () => {
+  let checks = 0;
+  const { sandbox, button, hint, attempt } = loadPublicationCheck(async args => {
+    checks++;
+    args.assertCurrent();
+    assert.equal(args.publicationId, attempt.publicationId);
+    assert.equal(args.metadataUri, attempt.metadataUri);
+    assert.equal(args.wallet, attempt.wallet);
+    assert.equal(args.coreAddress, attempt.coreAddress);
+    return { recovery: { state: 'unresolved' } };
+  });
+  sandbox.updatePublishReadiness('Ready to publish.');
+  assert.equal(button.textContent, 'Check publication');
+  assert.equal(button.disabled, false);
+  assert.equal(button['aria-disabled'], 'false');
+  assert.doesNotMatch(hint.textContent, /Ready to publish/);
+  await sandbox.handleUpload();
+  await sandbox.handleUpload();
+  assert.equal(checks, 2);
+  assert.match(hint.textContent, /not been confirmed/);
+  assert.equal(button.textContent, 'Check publication');
+  assert.equal(sandbox.pendingPublicationAttempt, attempt);
+  assert.equal(sandbox.destination, undefined);
+});
+
+test('blur and repeated readiness updates preserve the check button text node for the first tap', () => {
+  const { sandbox, button } = loadPublicationCheck(async () => {});
+  let writes = 0, label = 'Publish Artwork';
+  Object.defineProperty(button, 'textContent', {
+    get: () => label, set(value) { writes++; label = value; }
+  });
+  sandbox.updatePublishReadiness();
+  sandbox.updatePublishReadiness();
+  sandbox.updatePublishReadiness();
+  assert.equal(label, 'Check publication');
+  assert.equal(writes, 1);
+});
+
+test('unresolved, reverted and conflict results have distinct persistent explanations', async () => {
+  for (const [state, expected] of [['unresolved', /not been confirmed/], ['reverted', /transaction reverted/],
+    ['conflict', /conflicting publication records/]]) {
+    const { sandbox, hint, button } = loadPublicationCheck(async () => ({ recovery: { state } }));
+    await sandbox.handleUpload();
+    assert.match(hint.textContent, expected);
+    sandbox.updatePublishReadiness();
+    assert.match(hint.textContent, expected);
+    assert.equal(button.textContent, 'Check publication');
+    assert.equal(sandbox.destination, undefined);
+  }
+});
+
+test('failed checks retain the attempt and never fall through to publishing', async () => {
+  for (const code of ['RATE_LIMITED', 'UNAUTHENTICATED', 'MEDIA_PREPARATION_UNAVAILABLE', 'MEDIA_PREPARATION_MISMATCH']) {
+    const { sandbox, hint, button, attempt } = loadPublicationCheck(async () => { throw { code }; });
+    await sandbox.handleUpload();
+    assert.equal(sandbox.pendingPublicationAttempt, attempt);
+    assert.match(hint.textContent, /retained; no new transaction was sent/);
+    if (code === 'UNAUTHENTICATED') assert.match(hint.textContent, /sign in with the creator wallet/);
+    assert.equal(button.disabled, false);
+    assert.equal(button.textContent, 'Check publication');
+    assert.equal(sandbox.destination, undefined);
+  }
+});
+
+test('check context is isolated to the original wallet and selected file', () => {
+  const { sandbox, button, hint, wallet, attempt } = loadPublicationCheck(async () => {});
+  sandbox.updatePublishReadiness();
+  sandbox.wallet = '0x' + '22'.repeat(20);
+  sandbox.updatePublishReadiness();
+  assert.equal(button.textContent, 'Publish Artwork');
+  assert.doesNotMatch(hint.textContent, /attempt is saved/);
+  sandbox.wallet = wallet;
+  sandbox.selectedFile = {};
+  sandbox.updatePublishReadiness();
+  assert.equal(button.textContent, 'Publish Artwork');
+  sandbox.selectedFile = attempt.file;
+  sandbox.updatePublishReadiness();
+  assert.equal(button.textContent, 'Check publication');
+});
+
+test('an old check cannot redirect or render its state after a wallet or file change', async () => {
+  for (const change of ['wallet', 'file']) {
+    let resolve, started;
+    const didStart = new Promise(done => { started = done; });
+    const { sandbox, hint, button } = loadPublicationCheck(() => new Promise(done => { resolve = done; started(); }));
+    const running = sandbox.handleUpload();
+    await didStart;
+    assert.equal(button.disabled, true);
+    if (change === 'wallet') sandbox.wallet = '0x' + '22'.repeat(20);
+    else sandbox.selectedFile = {};
+    resolve({ recovery: { state: 'registered', registered_artwork_id: '36' } });
+    await running;
+    assert.equal(sandbox.destination, undefined);
+    assert.equal(button.disabled, false);
+    assert.doesNotMatch(hint.textContent, /attempt is saved|registered/);
+  }
+});
+
+test('repeated clicks during a pending check make only one request', async () => {
+  let checks = 0, resolve;
+  const { sandbox } = loadPublicationCheck(() => { checks++; return new Promise(done => { resolve = done; }); });
+  const running = sandbox.handleUpload();
+  await sandbox.handleUpload();
+  assert.equal(checks, 1);
+  resolve({ recovery: { state: 'unresolved' } });
+  await running;
+});
+
+test('verified recovery opens the exact artwork without submitting an auction', async () => {
+  const id = '9007199254740993';
+  const { sandbox } = loadPublicationCheck(async () => ({ recovery: { state: 'registered', registered_artwork_id: id } }));
+  await sandbox.handleUpload();
+  assert.equal(sandbox.destination, '/artwork/v41:84532:' + id);
+});
+
+test('an explicit check renews wallet authentication before reading the saved attempt', async () => {
+  const calls = [];
+  const { sandbox } = loadPublicationCheck(async () => { calls.push('check'); return { recovery: { state: 'unresolved' } }; });
+  sandbox.window.ensureAuthenticated = async () => { calls.push('authenticate'); return true; };
+  await sandbox.handleUpload();
+  assert.deepEqual(calls, ['authenticate', 'check']);
+});
+
+test('declined sign-in retains a retry action without a publication request', async () => {
+  const { sandbox, hint, button, attempt } = loadPublicationCheck(async () => assert.fail('Unauthenticated check'));
+  sandbox.window.ensureAuthenticated = async () => false;
+  await sandbox.handleUpload();
+  assert.equal(button.textContent, 'Check publication');
+  assert.match(hint.textContent, /approve sign-in in your wallet/);
+  assert.equal(sandbox.pendingPublicationAttempt, attempt);
+});
+
+test('a wallet change during sign-in never checks or opens the original wallet publication', async () => {
+  const { sandbox } = loadPublicationCheck(async () => assert.fail('Wrong-wallet check'));
+  sandbox.window.ensureAuthenticated = async () => { sandbox.wallet = '0x' + '22'.repeat(20); return true; };
+  await sandbox.handleUpload();
+  assert.equal(sandbox.destination, undefined);
+});

@@ -14,8 +14,13 @@ after PR #309 / #310, the owner's single-passkey confirmation and actual apex
 artwork-tools verification. The owner subsequently accepted native iPhone
 publication, X sharing, Donate/Report geometry, profile rendering, browser Back
 and the branded publication wait. Do not repeat those ceremonies.
-The remaining formal gates are A-57's historical wallet-failure disposition,
-A-83's real delayed-confirmation acceptance and A-23's final decision. Additional
+The remaining formal gates are A-83's real delayed-confirmation acceptance and
+A-23's final decision. A-57's classifier repair is accepted on October 23 under
+the owner's delegated engineering disposition and already recorded working
+network-selection/publication outcomes. Robinhood/Base Sepolia compatibility
+remains UNVERIFIED: neither successful support nor the cause of its historical
+failure is established. This is an explicit beta compatibility limitation, not
+a passed Robinhood device test. Additional
 TA-10 duplicate-file protection is not activated; TA-12 desktop display repairs
 are owner-deferred. See [Phase A close-out](../PHASE_A_CLOSE_OUT.md) for scope and
 evidence. The October 23 GitHub query returned zero open issues; that does not

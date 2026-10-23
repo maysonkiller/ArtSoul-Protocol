@@ -2,6 +2,7 @@ import { MAX_METADATA_BYTES } from '../../config/upload-policy.js';
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const TRANSACTION_HASH = /^0x[0-9a-f]{64}$/;
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const copy = value => JSON.parse(JSON.stringify(value));
 const userDetails = value => {
@@ -9,10 +10,81 @@ const userDetails = value => {
     return details;
 };
 
+function publicationRequest(wallet, assertCurrent, dependencies) {
+    const request = dependencies.request || ((body, owner) => window.ArtSoulDB.requestPublication(body, owner));
+    return async body => {
+        assertCurrent();
+        const result = await request(body, wallet);
+        assertCurrent();
+        return result;
+    };
+}
+
+function validateConfiguration(config) {
+    if (config?.success !== true || config.enabled !== true || config.chain_id !== 84532 ||
+        !ADDRESS.test(config.core_address || '') || /^0x0{40}$/.test(config.core_address) ||
+        config.can_submit !== false || (config.submission_enabled === true && config.recovery_enabled !== true)) {
+        fail('MEDIA_PREPARATION_UNAVAILABLE');
+    }
+}
+
+function validateStatus(status, id, metadataUri) {
+    if (status?.publication_id !== id || status.metadata_uri !== metadataUri || status.can_submit !== false ||
+        !['claimed', 'registered', 'conflict'].includes(status.claim_status) ||
+        (status.reported_transaction_hash != null && !TRANSACTION_HASH.test(status.reported_transaction_hash)) ||
+        (status.submission_started_at != null && (typeof status.submission_started_at !== 'string' || !status.submission_started_at))) {
+        fail('MEDIA_PREPARATION_MISMATCH');
+    }
+    return status;
+}
+
+async function reportPublicationHash(ask, id, metadataUri, hash) {
+    if (typeof hash !== 'string' || !TRANSACTION_HASH.test(hash)) fail('INVALID_TRANSACTION_HASH');
+    const reported = validateStatus(await ask({ action: 'report-transaction', publication_id: id, transaction_hash: hash }), id, metadataUri);
+    if (reported.reported_transaction_hash !== hash || !reported.submission_started_at) fail('MEDIA_PREPARATION_MISMATCH');
+    return reported;
+}
+
+async function recoverPublicationStatus(ask, id, status) {
+    const recovery = await ask({ action: 'recover', publication_id: id });
+    if (recovery?.success !== true || recovery.publication_id !== id || recovery.can_submit !== false ||
+        !['registered', 'conflict', 'unresolved', 'reverted'].includes(recovery.state) ||
+        (recovery.state === 'registered' && (typeof recovery.registered_artwork_id !== 'string' ||
+            !/^[1-9][0-9]{0,77}$/.test(recovery.registered_artwork_id)))) {
+        fail('MEDIA_PREPARATION_MISMATCH');
+    }
+    return { ...status, recovery, can_submit: false };
+}
+
+// Checking an existing attempt never uses the current form, re-prepares metadata,
+// or asks for permission to send, including after a lost begin response.
+export async function checkBrowserPublication({ publicationId, wallet, coreAddress, metadataUri,
+    reportedTransactionHash, assertCurrent }, dependencies = {}) {
+    wallet = String(wallet || '').toLowerCase();
+    coreAddress = String(coreAddress || '').toLowerCase();
+    if (!UUID.test(publicationId || '') || !ADDRESS.test(wallet) || /^0x0{40}$/.test(wallet) ||
+        !ADDRESS.test(coreAddress) || /^0x0{40}$/.test(coreAddress) ||
+        typeof metadataUri !== 'string' || !metadataUri || typeof assertCurrent !== 'function') fail('INVALID_MEDIA_PREPARATION');
+    if (reportedTransactionHash != null && (typeof reportedTransactionHash !== 'string' ||
+        !TRANSACTION_HASH.test(reportedTransactionHash))) fail('INVALID_TRANSACTION_HASH');
+    const ask = publicationRequest(wallet, assertCurrent, dependencies);
+    const config = await ask({ action: 'config' });
+    validateConfiguration(config);
+    if (config.core_address !== coreAddress || config.recovery_enabled !== true) fail('MEDIA_PREPARATION_UNAVAILABLE');
+    let status = validateStatus(await ask({ action: 'status', publication_id: publicationId }), publicationId, metadataUri);
+    if (reportedTransactionHash && status.reported_transaction_hash && reportedTransactionHash !== status.reported_transaction_hash) {
+        fail('MEDIA_PREPARATION_MISMATCH');
+    }
+    if (reportedTransactionHash && !status.reported_transaction_hash && status.submission_started_at) {
+        status = await reportPublicationHash(ask, publicationId, metadataUri, reportedTransactionHash);
+    }
+    return recoverPublicationStatus(ask, publicationId, status);
+}
+
 // This store is deliberately separate from pending gallery cards: those are
 // disposable presentation records and discard attempts without a returned hash.
 // No signed upload URL, auth token or file bytes are stored here.
-export async function prepareBrowserPublication({ file, fileHash, wallet, details, assertCurrent, register }, dependencies = {}) {
+export async function prepareBrowserPublication({ file, fileHash, wallet, details, assertCurrent, register, onAttempt }, dependencies = {}) {
     wallet = String(wallet || '').toLowerCase();
     if (!ADDRESS.test(wallet) || /^0x0{40}$/.test(wallet) || !/^[0-9a-f]{64}$/.test(fileHash || '') ||
         !file || !Number.isSafeInteger(file.size) || file.size <= 0 || typeof assertCurrent !== 'function') {
@@ -20,20 +92,12 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
     }
     // Snapshot before config/storage awaits; later form changes cannot alter it.
     const input = copy(details);
-    const request = dependencies.request || ((body, owner) => window.ArtSoulDB.requestPublication(body, owner));
-    const ask = async body => {
-        assertCurrent();
-        const result = await request(body, wallet);
-        assertCurrent();
-        return result;
-    };
+    const ask = publicationRequest(wallet, assertCurrent, dependencies);
     const config = await ask({ action: 'config' });
     if (config?.success !== true) fail('MEDIA_PREPARATION_UNAVAILABLE');
     if (config.enabled === false) return null;
+    validateConfiguration(config);
     const core = config.core_address;
-    if (config.enabled !== true || config.chain_id !== 84532 || !ADDRESS.test(core || '') ||
-        /^0x0{40}$/.test(core) || config.can_submit !== false ||
-        (config.submission_enabled === true && config.recovery_enabled !== true)) fail('MEDIA_PREPARATION_UNAVAILABLE');
 
     let storage, locks;
     try {
@@ -116,32 +180,23 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
             (draft.metadata_uri && draft.metadata_uri !== prepared.metadata_uri)) fail('MEDIA_PREPARATION_MISMATCH');
         draft.metadata_uri = prepared.metadata_uri;
         persist();
-        let status = await ask({ action: 'status', publication_id: id });
-        if (status?.publication_id !== id || status.metadata_uri !== draft.metadata_uri || status.can_submit !== false ||
-            !['claimed', 'registered', 'conflict'].includes(status.claim_status)) fail('MEDIA_PREPARATION_MISMATCH');
-        const reportHash = async hash => {
-            if (typeof hash !== 'string' || !/^0x[0-9a-f]{64}$/.test(hash)) fail('INVALID_TRANSACTION_HASH');
-            const reported = await ask({ action: 'report-transaction', publication_id: id, transaction_hash: hash });
-            if (reported?.publication_id !== id || reported.metadata_uri !== draft.metadata_uri ||
-                reported.can_submit !== false || reported.reported_transaction_hash !== hash || !reported.submission_started_at) {
-                fail('MEDIA_PREPARATION_MISMATCH');
-            }
-            return reported;
+        let status = validateStatus(await ask({ action: 'status', publication_id: id }), id, draft.metadata_uri);
+        const reportHash = hash => reportPublicationHash(ask, id, draft.metadata_uri, hash);
+        const notifyAttempt = (hash = draft.reported_transaction_hash || status.reported_transaction_hash || null) => {
+            // UI callbacks are not a persistence channel and cannot suppress either
+            // durable hash write if rendering or optional local UI state fails.
+            try { Promise.resolve(onAttempt?.({ publicationId: id, wallet, coreAddress: core,
+                metadataUri: draft.metadata_uri, reportedTransactionHash: hash })).catch(() => {}); }
+            catch { /* The server and browser journals remain authoritative. */ }
         };
+        if (status.submission_started_at || status.claim_status !== 'claimed') notifyAttempt();
         if (draft.reported_transaction_hash && !status.reported_transaction_hash && status.submission_started_at) {
             status = await reportHash(draft.reported_transaction_hash);
         }
         // A journal entry without a hash is still an attempt. Only the server
         // can recover it from independently verified registration evidence.
         if (config.recovery_enabled === true && (status.submission_started_at || status.claim_status !== 'claimed')) {
-            const recovery = await ask({ action: 'recover', publication_id: id });
-            if (recovery?.success !== true || recovery.publication_id !== id || recovery.can_submit !== false ||
-                !['registered', 'conflict', 'unresolved', 'reverted'].includes(recovery.state) ||
-                (recovery.state === 'registered' && (typeof recovery.registered_artwork_id !== 'string' ||
-                    !/^[1-9][0-9]{0,77}$/.test(recovery.registered_artwork_id)))) {
-                fail('MEDIA_PREPARATION_MISMATCH');
-            }
-            return { ...status, recovery, can_submit: false };
+            return recoverPublicationStatus(ask, id, status);
         }
         if (config.submission_enabled === true && status.claim_status === 'claimed' && !status.submission_started_at &&
             typeof register === 'function') {
@@ -149,6 +204,7 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
             const beforeSubmit = async () => {
                 if (beginRequested) fail('PUBLICATION_ATTEMPT_PENDING');
                 beginRequested = true;
+                notifyAttempt();
                 const begun = await ask({ action: 'begin', publication_id: id });
                 if (begun?.success !== true || begun.publication_id !== id || begun.chain_id !== 84532 ||
                     begun.core_address !== core || begun.metadata_uri !== draft.metadata_uri ||
@@ -164,6 +220,7 @@ export async function prepareBrowserPublication({ file, fileHash, wallet, detail
                 if (!granted || !/^0x[0-9a-f]{64}$/.test(hash) ||
                     (draft.reported_transaction_hash && draft.reported_transaction_hash !== hash)) fail('INVALID_TRANSACTION_HASH');
                 draft.reported_transaction_hash = hash;
+                notifyAttempt(hash);
                 // Either storage channel may fail independently after broadcast.
                 try { persist(true); } finally { await reportHash(hash); }
             };
