@@ -1,45 +1,53 @@
 # ArtSoul Engineering Handoff
 
-Current continuation (2026-10-23): use `C:\Projects\ArtSoul`, branch
-`codex/takeover-audit`. Latest application release and local code baseline are
-PR #330 (`333e527`); all three media rollout flags and the live media schema
-remain inactive. The release includes receipt/event recovery and the guarded
-browser handoff; it does not activate exact-file duplicate enforcement.
-The October 23 registration verifier passed a two-RPC replay of artwork 36.
-The local follow-up adds atomic finalized-evidence/catalog/claim persistence
-and a recovery helper, without activation.
-The local rollback fence now rejects pre-rewind verification and atomically
-quarantines affected claims while retaining immutable history. Actual PostgreSQL
-tests cover both race orders and rollback failures; the schema is not activated.
-The follow-up now uses owned indexed registrations as bounded RPC search hints,
-including lost/replaced hashes; actual API-to-PostgreSQL recovery passes.
-Browser preparation now retains immutable UUID-bound drafts and handles retries
-through the existing API. Authenticated recovery is now connected behind a
-separate disabled gate, with server-only pins, durable quotas and a shared
-deadline. Actual SQL and 28 compiled-browser checks pass, including navigation
-to a verified artwork without another transaction. The one-time registration
-handoff is now connected behind a third default-off gate, with independent hash
-retention, exact wallet/Core checks and no permission replay. Targeted checks and
-real SQL pass. Final candidate `363a463` and merge `333e527` both pass CI:
-2173 Linux / 1914 Windows unit checks, zero failures and 46 contract tests on
-each OS; 2 Linux / 18 Windows skips are recorded separately. The apex API
-boundary and nine deployed assets are verified against this release.
-An owner-only legacy intake now shares the revision fence and passes actual SQL
-checks. A local rehearsal imports and replays all 32 verified available originals,
-retaining duplicates and creating no synthetic publication attempts. No activation.
-Next: establish the live indexer's effective database role through read-only
-host evidence. SSH key access was unavailable and the console stopped at
-Hetzner's automatic security check. Then complete the reviewed rollout manifest,
-including missing-original and unresolved-attempt disposition and fresh intake pins.
-Live read-only inventory covers all 36 indexed IDs; 32 original files are hashed
-and works 1-4 remain unavailable. Alchemy/Tenderly independently verify all 36
-registrations; original-file coverage remains 32/36. See the checkpoint for tests
-and gaps; actual intake and the worker-role check still precede migration rollout.
+Current continuation (2026-10-24): use `C:\Projects\ArtSoul`, branch
+`codex/takeover-audit`. Latest application release is PR #332 (`a0f14f4`),
+tree-equivalent to tested candidate `195be55`. Candidate/merge CI pass:
+2211 Linux / 1952 Windows unit checks, zero failures, 2 / 18 skips recorded
+separately, and 46 contract tests on each OS. Nine upload assets and the private
+API boundary are verified on preview and apex. The October 24 same-source
+production redeployment activates the reviewed media flags and server pins;
+13 actual SIWE/HTTP checks pass. See the checkpoint for exact deployment/journals.
+
+The guarded implementation includes immutable preparation, one-time submission,
+two-RPC finalized recovery and revision-fenced reconciliation. PR #331 added
+explicit check-only recovery independent of current form/AI; PR #332 discovers
+saved drafts after reload without sending or making automatic requests. Its
+local browser opening was denied by a saved origin permission; do not bypass
+that restriction or claim a new native-device pass. Earlier accepted flows stand.
+
+Hosting access is restored. Both hosts are serviced and the worker's actual
+non-superuser `postgres`/BYPASSRLS identity and rollback rights are verified.
+The pre-application rollback body equalled migration 014; the reviewed media
+fence is now installed. Actual worker-method tests pass 37/37 without skips;
+the log is `output/audit/media-worker-reorg-2026-10-24.log`. Do not repeat access
+recovery or the broad host audit. The current protected full/schema backup and
+atomic six-migration rehearsal are retained under `docs/private/`.
+
+The owner delegates legacy coverage disposition: keep works 1-4 and their
+history as unavailable-original test exceptions, without fabricated hashes,
+deletion or a claim of complete byte coverage. The 32 available originals and
+new guarded uploads are covered; existing duplicate pairs remain. Mainnet
+cleanup/contracts are separate future decisions. Old verification snapshots
+are rehearsal evidence, never fresh authority for intake after a rewind.
+
+The six private media migrations and 32 historical identities have now committed
+and passed exact catalog/evidence checks. Fresh revision 0 preceded verification;
+all 36 receipts and 32 available originals were rechecked. Works 1-4 and all
+historical duplicates remain. A real Data API/storage service probe rejects a
+renamed duplicate and retains one deliberately unbroadcast test claim.
+
+Production activation and actual HTTP checks are complete. Next: the guarded
+browser/device publication and A-83 delayed-confirmation acceptance, followed by
+A-23's beta disposition. Preserve all attempt/claim/evidence records; no
+unknown or reverted attempt is automatically released. Completed website
+activation does not establish A-83's delayed-confirmation acceptance. See the top checkpoint
+for exact operation journals, application state, tests and the next bounded step.
 The owner's new desktop flicker/delay video is queued as TA-12; repairs are
 explicitly deferred behind existing phase work. See the checkpoint for boundaries.
 The owner accepts current iPhone visual behavior and browser Back; A-47/A-48/A-53/A-54/A-58/A-61/A-72
 are done. Preserve the completed native flows and consult the checkpoint for
-the two remaining formal rows (A-83/A-23) and additional TA-10 implementation work.
+the two remaining formal rows (A-83/A-23) and TA-10's remaining device acceptance.
 A-57 is accepted on October 23 using the published repair, ten regression checks,
 the owner's working-switch report and delegated engineering disposition.
 Robinhood/Base Sepolia compatibility remains explicitly unverified.
