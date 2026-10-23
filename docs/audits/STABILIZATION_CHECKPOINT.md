@@ -3,7 +3,46 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 24 media rollout (Canon 1/2/11; website protection active):
+October 24 native interruption acceptance and preparation feedback (Canon 2/11):
+
+- Same checkout and branch, starting HEAD `3c6d40e886ad5e9d62a000a55f22f7d0e1fe7649`
+  (PR #333). Candidate/merge CI pass: 2216 Linux / 1952 Windows unit checks,
+  zero failures, 2 / 18 skips; 46 contract tests on each OS. The apex deployment
+  `dpl_43yMW6Roqudc4zTikaEqmkdvqyoN` serves that merge, matches all nine checked
+  upload assets and preserves all eight reviewed media configuration entries.
+- The owner reports an actual iPhone interruption/return and refresh during
+  publication, followed by the second auction transaction without another
+  registration request. Two RPCs verify artwork 37 / auction 71, the expected
+  creator, pinned Core, successful receipts and no premature mint/floor.
+  Registration: `0xc45a2c70f9cfa9be0ff67a0ed51da739693b23a0402b4e92335fcca278e89ff1`.
+  Auction: `0x6ecb84dfd99dbaca85edecebaa5149d38145026404930e0d4baaf645fc5f1f5f`.
+  Read-only linkage verifies one matching indexed registration, the same original
+  bytes and immutable preparation, and the actual hash in the retained claim.
+  Evidence: `output/audit/interrupted-publication-37-2026-10-24.json` and
+  `docs/private/guarded-native-publication-37-2026-10-24.json`.
+- A-83 and the October 22 TA-10 website guard are accepted with those native
+  outcomes and existing timeout/no-replay regressions. Do not claim a captured
+  ethers TIMEOUT, exact offline duration or explicit Check publication use.
+  The claim remains claimed with its reported hash; no manual status/release
+  mutation or new signing was performed. A first read-only verifier run retained
+  an old expected ID; its failure and the corrected run are preserved separately.
+- A distinct pre-wallet refresh showed a file-read error. The exact phone
+  exception was not captured. TA-13 reproduces a classifier defect: successful
+  hashing left the stage at fingerprint during config/issue/prepare requests.
+  The minimal shared upload fix gives preparation its own progress/error message,
+  retaining genuine unreadable-file handling and saved-attempt priority. It
+  applies to desktop and mobile. The real handler/helper regression suite and
+  related publication/AI and document suites pass 74/74, zero failures/skips.
+  Production build passes (11 routes / 174 utilities); CI/release are pending.
+  Logs: output/audit/preparation-feedback-{focused,build}-2026-10-24.log. No protocol, economic or recovery-policy amendment.
+- Current formal count: 82 done / 1 in progress / 0 planned. A-23's final beta
+  decision remains open; TA-12 desktop polish is owner-deferred. Preserve all
+  earlier native acceptance. Unrelated authority-policy files, .codex and output
+  remain untracked and excluded from this repair.
+- Exactly next step: finish TA-13 build/CI/release verification, then record the
+  final A-23 readiness review against the actual remaining requirements.
+
+October 24 media rollout (historical stage; native acceptance above supersedes its remaining gate):
 
 - Work started in the same checkout at `195be55`; PR #332 is released as
   `a0f14f4`. After confirming ancestry and identical source trees, the branch

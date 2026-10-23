@@ -14,8 +14,11 @@ after PR #309 / #310, the owner's single-passkey confirmation and actual apex
 artwork-tools verification. The owner subsequently accepted native iPhone
 publication, X sharing, Donate/Report geometry, profile rendering, browser Back
 and the branded publication wait. Do not repeat those ceremonies.
-The remaining formal gates are A-83's real delayed-confirmation acceptance and
-A-23's final decision. A-57's classifier repair is accepted on October 23 under
+The October 24 native interruption/return and refresh with continuation to the
+second transaction accept A-83, corroborated by artwork 37 / auction 71 through
+two RPCs and the original immutable server preparation. No captured ethers
+TIMEOUT or explicit Check publication use is claimed. A-23's final decision
+remains open, following TA-13's preparation-error release verification. A-57's classifier repair is accepted on October 23 under
 the owner's delegated engineering disposition and already recorded working
 network-selection/publication outcomes. Robinhood/Base Sepolia compatibility
 remains UNVERIFIED: neither successful support nor the cause of its historical
@@ -24,7 +27,7 @@ a passed Robinhood device test. Additional
 TA-10 exact-file protection is active on the website with 32 verified historical
 identities and 13 passing real SIWE/HTTP checks. Works 1-4 remain explicit
 unavailable-original exceptions; direct contract calls can bypass the website
-guard. Guarded browser/device publication acceptance is still pending. TA-12
+guard. Guarded native publication is accepted by the evidence above. TA-12
 desktop display repairs are owner-deferred. See [Phase A close-out](../PHASE_A_CLOSE_OUT.md) for scope and
 evidence. The October 23 GitHub query returned zero open issues; that does not
 clear these recorded gaps or constitute a beta GO. No invitations or beta window

@@ -1,48 +1,27 @@
 # ArtSoul Project State
 
 Current continuation: [workspace](WORKSPACE.md), [checkpoint](audits/STABILIZATION_CHECKPOINT.md)
-and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-23. Implementation
-uses `C:\Projects\ArtSoul`; latest application release is PR #330 (`333e527`).
-Upload preparation, recovery and one-time submission are implemented and
-deployed behind three disabled flags; the live media schema remains inactive.
-The October 23 registration verifier is tested against two RPCs. Its local
-follow-up adds atomic block/finality anchor persistence with catalog/claim
-reconciliation, still disabled. The local
-rollback fence now rejects stale verification and preserves quarantined history;
-actual PostgreSQL concurrency/failure checks pass. Bounded indexed candidates now
-drive verified recovery of missing/replaced hashes. Browser preparation is now
-wired with immutable drafts and tested retries, still disabled and without
-registration permission. Bounded authenticated recovery now connects the
-browser to this verifier behind a separate disabled gate, with durable quotas,
-a shared deadline and 28 passing built-browser journeys. The subsequent one-time
-begin/registration handoff is locally connected behind a third default-off gate;
-targeted API/client/adapter checks and actual SQL pass. Consult the checkpoint
-for final build/CI evidence: candidate `363a463` and merge `333e527` both pass
-Linux/Windows CI, with 2173/1914 unit passes, zero failures, 2/18 skips and
-46 contract tests on each OS. Actual apex API and nine release assets match.
-Owner-only, revision-fenced legacy intake is now locally tested, including an
-actual PostgreSQL import/replay of 32 verified existing records. No live import
-or activation occurred; rollout and unresolved-attempt disposition remain open.
-The actual host worker role still needs read-only confirmation; pooler metadata
-is insufficient and the current console stops at Hetzner's security check.
-The read-only full indexed inventory
-covers 36 IDs, all registrations independently verified through Alchemy/Tenderly,
-with 32 current original files hashed and four historical originals unavailable.
-New desktop flicker/delay report TA-12 is explicitly
-deferred by the owner; it does not erase the accepted phone observations.
-A-57 is accepted on October 23 for the published classifier repair and recorded
-working wallet flows under the owner's delegated engineering disposition.
-Robinhood/Base Sepolia compatibility remains explicitly unverified; A-83/A-23
-are the remaining formal Phase A rows.
-The owner accepts the current iPhone visual behavior and browser Back, closing
-A-47/A-48/A-53/A-54/A-58/A-61/A-72. Earlier Admin/artwork release `9a2965f` is deployed.
-A-71 is separately accepted from the owner's explicit branded-wait observation.
-Report/Donate and the protected review queue are enabled; A-21 intake is accepted
-from the October 11 live evidence. A-22/A8 are accepted by the October 15
-reconciliation and published UI follow-up. The owner confirms one passkey closes
-the dialog; actual apex artwork tools open on the first click. Remaining phone/publishing criteria and the beta
-decision stay separate. Older dates and deployment SHAs below remain
-historical evidence; they are not the current release.
+and [Phase A close-out](PHASE_A_CLOSE_OUT.md), updated 2026-10-24. Implementation
+uses `C:\Projects\ArtSoul`; latest release is PR #333 (`3c6d40e`). Both CI jobs,
+production identity and nine upload assets are verified. Media preparation,
+submission and recovery are active with reviewed server pins; six private
+migrations and 32 historical media identities are installed. Works 1-4 remain
+explicit unavailable-original exceptions; direct contract calls are outside
+website duplicate protection. Both hosts are serviced and worker rights verified.
+
+The owner confirms native iPhone interruption/return and refresh continued to
+the auction transaction. Artwork 37 / auction 71 and one matching registration
+are corroborated through both RPCs and immutable media/preparation evidence.
+A-83 and the website guard are accepted; neither a captured ethers TIMEOUT nor
+explicit Check publication use is claimed. Formal A-23 remains open. TA-13's
+shared desktop/mobile preparation-error correction is locally tested and awaits
+CI/release verification after a successful build. TA-12 desktop display work is owner-deferred.
+
+Preserve completed publishing, iPhone visual/Back, wallet/OAuth, moderation,
+passkey/authenticator, donation and email acceptance. Android remains owner-waived
+/ not tested; Robinhood/Base Sepolia compatibility remains unverified. The
+checkpoint supplies exact evidence and next work; historical dates below do not
+describe the current branch, deployment or outstanding acceptance.
 
 Audit date: 2026-07-15
 Reconciled: 2026-08-20 against `main` at `0bbeec5` (merged PR #201)
@@ -154,7 +133,7 @@ Trust affects discovery only. It must never affect price, floor, ownership, sett
 ### Phase A: Stabilize Public Testnet - active
 
 **[Reconciled 2026-08-20]** The table below records the 2026-07-15 position. The
-current position is 81 `done`, 2 `in progress`, 0 `planned` across A-01 to A-83
+current position is 82 `done`, 1 `in progress`, 0 `planned` across A-01 to A-83
 in [`BACKLOG.md`](BACKLOG.md). Every "Remaining work" cell about wallet
 acceptance, diagnostics, confirmation depth, provenance, profile gating,
 migrations and secret rotation is closed with dated evidence. The cells that

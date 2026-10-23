@@ -238,6 +238,7 @@ let selectedFile = null;
             }
             const stageMessages = {
                 fingerprint: 'The selected file could not be read. Choose the file again and retry.',
+                publication_preparation: 'Artwork preparation was interrupted. Check your connection and try again. If a saved publication appears, select Check publication instead.',
                 media_upload: 'The artwork file could not be stored. Check your connection and try again.',
                 metadata_upload: 'The artwork details could not be stored. Please try again.',
                 wallet_init: 'The connected wallet could not be prepared for publishing. Reconnect it and try again.',
@@ -1298,6 +1299,8 @@ let selectedFile = null;
                     });
                 };
                 let result;
+                currentPublishStage = 'publication_preparation';
+                setTransactionButtonProcessing(uploadBtn, 'Preparing publication...');
                 const preparation = await prepareBrowserPublication({ file, fileHash, wallet: walletAddress,
                     details: { title, description, creatorValue: price, aiGuidance: guidance, duration }, assertCurrent,
                     onAttempt: attempt => {
