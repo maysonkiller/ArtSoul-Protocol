@@ -10,8 +10,8 @@ they disagree with this file, they win and this file is stale.
 
 Phase A stands at **81 done, 2 in progress, 0 planned** across A-01 to A-83.
 
-Latest code release: PR #330 (`333e527`), verified on the apex domain.
-Candidate and post-merge CI pass (Linux 2173 / Windows 1914 unit checks,
+Latest code release: PR #331 (`5f3127c`), verified on the apex domain.
+Candidate and post-merge CI pass (Linux 2194 / Windows 1935 unit checks,
 zero failures; 2 / 18 skips; 46 contract tests on each OS). The guarded media
 implementation described below is now published, but all three flags and the
 live media schema remain inactive. Publication is not duplicate-enforcement
@@ -93,10 +93,10 @@ October 23 remaining work, without repeating completed ceremonies:
    historical records pass, preserving three duplicate pairs and adding no
    synthetic publication attempts. All 36 historical registrations are verified
    through Alchemy/Tenderly, but works 1-4 still lack fetchable original files.
-   A subsequent local UI slice adds check-only recovery for a retained attempt
+   Published PR #331 adds check-only recovery for a retained attempt
    in the current page, independent of new form/AI input. It renews an expired
    wallet sign-in when explicitly clicked and cannot send another registration
-   or auction. Exact candidate validation/release is recorded in the checkpoint.
+   or auction. Candidate CI, 64 compiled-browser journeys and apex verification pass; see the checkpoint.
    Automatic recovery discovery after reload, missing-original disposition,
    actual worker role and reviewed rollout remain open; all new media schema
    remains inactive.

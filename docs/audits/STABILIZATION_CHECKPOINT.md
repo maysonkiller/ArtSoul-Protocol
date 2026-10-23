@@ -3,10 +3,11 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
+October 23 retained-publication UI follow-up (Canon 1/2/11; released):
 
-- Starting HEAD `2d017da`; the deployed application is still PR #330 until this
-  candidate's release is recorded. The current guarded flow can retain a lost
+- PR #331 is merged and deployed at `5f3127c0e44586ff3ee196f3b4425ff49c0e4ed5`.
+  Its tree equals tested candidate `151eb91`. Starting HEAD was `2d017da`.
+  Reproduction against PR #330 shows that the guarded flow can retain a lost
   begin/wallet attempt correctly while its form returns to "Ready to publish".
   A retry also depends on current form/AI values, despite the attempt's immutable
   metadata. This is a reproduced presentation/recovery issue, not new economics.
@@ -23,8 +24,20 @@ October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
   first-tap behavior. The accepted disabled legacy publishing path is unchanged.
 - Focused upload/publication/client checks pass 190/190, zero skips, in
   `output/audit/pending-publication-focused-2026-10-23.log`. Build/static checks
-  pass. The compiled Chromium/WebKit fixture and final release checks are being
-  rerun on this exact candidate; do not count earlier probe output as final.
+  pass. All 64 compiled Chromium/WebKit journeys pass at 390/1440px, including
+  changed/empty form fields, first tap, sign-in renewal/decline, lost begin,
+  wallet cancellation, storage/report failures, recovery outcomes and disabled
+  feature fallback protection. Evidence:
+  `output/audit/publication-check-ui-built-2026-10-23.json` and
+  `output/audit/publication-readiness-reproduction-2026-10-23.json`.
+- Candidate CI `39925981922` passes: Linux 2194 pass / 2 skips; Windows 1935
+  pass / 18 skips; zero failures and 46 contract tests on each OS. Post-merge
+  CI `39926519391` also passes with the same counts; logs are retained in
+  `output/audit/publication-check-main-ci-5f3127c-2026-10-23.log`. Deployment
+  `7273985149` succeeded; nine actual-apex assets match the tested build and
+  seven unauthenticated publication actions return 401/private-no-store; GET
+  returns 405. Evidence: `output/audit/publication-apex-5f3127c-2026-10-23.json`
+  and `output/audit/publication-check-boundary-apex-5f3127c-2026-10-23.json`.
 - Scope/remaining: this check shortcut retains context in the current page;
   automatic discovery after reload is not implemented. The durable browser/server
   journal remains intact, but cross-reload recovery UX, missing-original
@@ -33,8 +46,8 @@ October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
   This does not close A-83's real delayed-confirmation criterion or A-23.
 - Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
   Only the existing helper agent was reused for this slice/review; it is finished.
-  Next concrete step: finish the exact compiled-browser run, then publish only
-  after the candidate's required CI and release checks pass.
+  Next concrete step: add bounded recovery discovery from the existing durable
+  draft after reload, without renewed AI, mutable metadata or submission replay.
 
 October 23 PHP advisory triage (host inspection pending; owner-deferred):
 
