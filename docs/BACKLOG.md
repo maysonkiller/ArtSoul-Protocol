@@ -250,3 +250,26 @@ change; evidence is in the stabilization checkpoint.
 ## Intake Rule For Future Work
 
 When a new idea arrives, add one row with a stable ID, an in-repository or PR source, an evidence-based status, a canonical phase, and any founder dependency. If it conflicts with architecture, record the conflict and create a separate dated canon-amendment decision before implementation. UI ideas may evolve, but they still enter this backlog first so completed work is not unknowingly rebuilt.
+
+### October 24 post-Phase-A product intake
+
+The founder requests Saved items, grouped search, a configurable profile, compact
+notifications, shared Future controls, a text wordmark and truthful SOON labels.
+The [decision brief](architecture/POST_PHASE_A_PRODUCT_DIRECTION_2026-10-24.md)
+records source inspection, proposed behavior, architecture choices, canon drift,
+team/budget assumptions and fundraising preparation. These rows are planned,
+not implemented or deployed. Phase A acceptance is unchanged. Retained TA-12
+comes first; each implementation remains a separately verified backlog task.
+
+| ID | Item | Why/source | Status | Phase | Notes |
+| --- | --- | --- | --- | --- | --- |
+| B-13 | Add a reversible personal Saved list | October 24 founder request; decision brief sections 4-5 | planned | B | Shared cards/detail/profile; proposed private and rank-neutral semantics; preserve Watching and wallet isolation. |
+| B-14 | Extend gallery search into a grouped global search surface | October 24 founder request; decision brief section 5 | planned | B | Reuse current helpers; bounded public server search, real routes, accessibility and no fictitious collection/network support. |
+| B-15 | Reorganize profile identity, connected accounts and content views | October 24 founder request; decision brief section 4 | planned | B | Preserve current OAuth/email authentication, Sales data and public/private separation. |
+| B-16 | Add constrained responsive profile curation | October 24 founder prototype; decision brief sections 3-4 | planned | B | Templates, cover, selected works and ordering; no arbitrary HTML/styles or user-selected official aura. |
+| B-17 | Extend the private inbox with real auction lifecycle notifications | October 24 founder request; decision brief section 6 | planned | B | Reuse inbox/outbox patterns, define recipients/preferences, and validate actual event and deadline state. |
+| B-18 | Unify wordmark, Future controls and capability labels | October 24 founder request; decision brief section 4 | planned | B | Both themes for wordmark/SOON; preserve shared auth states, routes, Back, dialog geometry and reduced motion. |
+
+Contract extensibility and network planning remain under C-06/C1; canon
+reconciliation precedes those decisions. The draft cost model supports C-25;
+it creates no budget, funding commitment or external submission.

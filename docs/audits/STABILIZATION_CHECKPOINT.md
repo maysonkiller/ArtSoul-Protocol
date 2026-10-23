@@ -3,6 +3,27 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 post-Phase-A product direction (planning only):
+
+- Baseline remains the accepted production merge `46b385fcfdc231c17b70bcb86fffc88e37dfe45e`.
+  Same workspace and branch; unrelated untracked authority-policy files, .codex
+  and output remain preserved. No application, contract or production mutation.
+- Reviewed the founder's curved-profile HTML source and official OpenSea,
+  OpenZeppelin, ERC-2981 and Base funding references. The local file browser
+  preview was policy-blocked; no rendered-prototype acceptance or workaround.
+- Draft: docs/architecture/POST_PHASE_A_PRODUCT_DIRECTION_2026-10-24.md.
+  B-13 through B-18 record Saved, search, profile organization/curation,
+  notifications and shared theme controls as planned work. Canon reconciliation,
+  contract choices and illustrative staffing/cost models are explicit proposals;
+  no funding, new network, proxy topology or economic rule is approved by them.
+- Validation: 23 existing documentation checks pass, zero failure/skip;
+  Phase A count remains 83/0/0; budget arithmetic, source references and unique
+  new backlog IDs checked; independent bounded review found no blocker.
+  One reused reviewer completed. No new helper remains active.
+- Exactly next step: retain the TA-12 desktop display investigation as the next
+  implementation task, then implement B-13 Saved as one bounded shared-UI/API
+  slice. Do not reopen accepted Phase A device ceremonies or start a full rewrite.
+
 October 24 final Phase A engineering acceptance (Canon 17; no architecture change):
 
 - Work remains in C:\Projects\ArtSoul, branch codex/takeover-audit, HEAD
