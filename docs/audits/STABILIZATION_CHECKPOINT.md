@@ -3,6 +3,61 @@
 Updated: 2026-10-23. Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 23 retained-publication UI follow-up (Canon 1/2/11; local candidate):
+
+- Starting HEAD `2d017da`; the deployed application is still PR #330 until this
+  candidate's release is recorded. The current guarded flow can retain a lost
+  begin/wallet attempt correctly while its form returns to "Ready to publish".
+  A retry also depends on current form/AI values, despite the attempt's immutable
+  metadata. This is a reproduced presentation/recovery issue, not new economics.
+- A retained current-page attempt now has a dedicated "Check publication" action.
+  It uses the original wallet, Core, UUID and metadata URI independently of form
+  edits and AI expiry. Checking uses config/status, optional retained-hash report
+  and bounded recovery only; it cannot prepare, begin, register or create an
+  auction. Reverted, conflicting and unresolved outcomes have distinct inline
+  messages; a verified registration opens its exact existing artwork.
+- The explicit click reuses existing SIWE authentication if the session expired.
+  Cancellation preserves the check action; wallet/file changes fence late
+  responses. Optional UI notifications cannot suppress either durable hash
+  channel. Repeated readiness updates preserve the button's text node for WebKit
+  first-tap behavior. The accepted disabled legacy publishing path is unchanged.
+- Focused upload/publication/client checks pass 190/190, zero skips, in
+  `output/audit/pending-publication-focused-2026-10-23.log`. Build/static checks
+  pass. The compiled Chromium/WebKit fixture and final release checks are being
+  rerun on this exact candidate; do not count earlier probe output as final.
+- Scope/remaining: this check shortcut retains context in the current page;
+  automatic discovery after reload is not implemented. The durable browser/server
+  journal remains intact, but cross-reload recovery UX, missing-original
+  disposition (works 1-4), actual worker-role evidence and reviewed TA-10 rollout
+  remain open. All three media flags and the live media schema remain inactive.
+  This does not close A-83's real delayed-confirmation criterion or A-23.
+- Preserve unrelated untracked authority-policy files, `.codex/` and `output/`.
+  Only the existing helper agent was reused for this slice/review; it is finished.
+  Next concrete step: finish the exact compiled-browser run, then publish only
+  after the candidate's required CI and release checks pass.
+
+October 23 PHP advisory triage (host inspection pending; owner-deferred):
+
+- Official PHP and Hetzner notices confirm CVE-2026-109618 / CVE-2026-109619:
+  https://www.php.net/archive/2026.php#2026-10-21-5 and
+  https://status.hetzner.com/incident/f4144d55-38c3-48d1-8664-7a3429355cd7.
+  Ubuntu backport versions are recorded in
+  https://ubuntu.com/security/notices/USN-8948-1; do not compare a distribution
+  package against upstream semver alone.
+- The tracked ArtSoul repository has no PHP files or PHP/web-server/container
+  configuration, and its application/indexer use Node.js. This is repository
+  evidence only, not proof that PHP is absent from the Hetzner host or containers.
+- Both existing key-only SSH attempts were denied. The browser reaches Hetzner
+  Accounts login; the owner reports a ten-minute cooldown and explicitly defers
+  Hetzner until they report successful login. Do not retry login meanwhile.
+  No remote diagnostic command, package update or service restart was executed.
+- Read-only host inventory is prepared and syntax-checked in
+  `docs/private/inspect-php-host-2026-10-23.mjs` (packages, vendor versions,
+  services, process names, container inventory, PHP mappings and indexer health;
+  no credentials/configuration bodies). Actual host findings and any remediation
+  remain unverified. Resume this security check once owner access is available;
+  continue independent Phase A work in the meantime.
+
 October 23 A-57 disposition (Canon 1/17; documentation only):
 
 - Starting HEAD `49bd8c7`; code release remains PR #330 (`333e527`). The owner

@@ -93,8 +93,13 @@ October 23 remaining work, without repeating completed ceremonies:
    historical records pass, preserving three duplicate pairs and adding no
    synthetic publication attempts. All 36 historical registrations are verified
    through Alchemy/Tenderly, but works 1-4 still lack fetchable original files.
-   Missing-original disposition, unresolved-attempt UX, actual worker role and
-   reviewed rollout remain open; all new media schema remains inactive.
+   A subsequent local UI slice adds check-only recovery for a retained attempt
+   in the current page, independent of new form/AI input. It renews an expired
+   wallet sign-in when explicitly clicked and cannot send another registration
+   or auction. Exact candidate validation/release is recorded in the checkpoint.
+   Automatic recovery discovery after reload, missing-original disposition,
+   actual worker role and reviewed rollout remain open; all new media schema
+   remains inactive.
    These replays do not simulate or accept
    A-83's real receipt delay.
 3. **Recorded iPhone visual acceptance is complete** for A-47/A-53/A-54/A-58/A-61/A-72: the owner

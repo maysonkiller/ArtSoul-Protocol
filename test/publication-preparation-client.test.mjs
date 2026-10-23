@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { prepareBrowserPublication } from '../src/features/artwork/publication-preparation.js';
+import { checkBrowserPublication, prepareBrowserPublication } from '../src/features/artwork/publication-preparation.js';
 
 const wallet='0x'+'11'.repeat(20), core='0x'+'aa'.repeat(20), hash='ab'.repeat(32);
 const txHash='0x'+'dd'.repeat(32);
@@ -280,4 +280,153 @@ test('failure during wallet preflight does not consume an attempt and enabled su
     await assert.rejects(s.f.run(),/preflight failed/);assert(!s.f.requests.some(r=>r.action==='begin'));
     s.f.config={...s.f.config,recovery_enabled:false};
     await assert.rejects(s.f.run(),{code:'MEDIA_PREPARATION_UNAVAILABLE'});
+});
+
+function checkFixture() {
+    const publicationId=randomUUID(), metadataUri='https://storage.example/meta.json', requests=[];
+    let current=true, before=null;
+    const args={publicationId,wallet,coreAddress:core,metadataUri,assertCurrent(){
+        if(!current)throw Object.assign(Error('Wallet changed'),{code:'AUTHORIZATION_WALLET_CHANGED'});
+    }};
+    const responses={config:{success:true,enabled:true,chain_id:84532,core_address:core,can_submit:false,recovery_enabled:true},
+        status:{publication_id:publicationId,metadata_uri:metadataUri,claim_status:'claimed',can_submit:false,
+            submission_started_at:'2026-10-23T00:00:00Z',reported_transaction_hash:null},
+        recover:{success:true,publication_id:publicationId,state:'unresolved',can_submit:false}};
+    const dependencies={async request(body,owner){
+        assert.equal(owner,wallet);requests.push(structuredClone(body));before?.(body);
+        if(body.action==='report-transaction')return {...responses.status,reported_transaction_hash:body.transaction_hash,...responses.report};
+        assert(['config','status','recover'].includes(body.action),'checking must not prepare or authorize a send');
+        if(body.action!=='config')assert.deepEqual(body,{action:body.action,publication_id:publicationId});
+        return responses[body.action];
+    }};
+    return {args,responses,requests,dependencies,run:()=>checkBrowserPublication(args,dependencies),
+        set current(value){current=value;},set before(value){before=value;}};
+}
+
+test('check-only recovery needs no file, form, AI guidance or draft storage and preserves every outcome',async()=>{
+    for(const state of ['unresolved','reverted','conflict','registered']) {
+        const f=checkFixture();f.responses.recover.state=state;
+        if(state==='registered')f.responses.recover.registered_artwork_id='9007199254740993';
+        const result=await f.run();assert.equal(result.recovery.state,state);assert.equal(result.can_submit,false);
+        if(state==='registered')assert.equal(result.recovery.registered_artwork_id,'9007199254740993');
+        assert.deepEqual(f.requests.map(r=>r.action),['config','status','recover']);
+    }
+});
+
+test('check-only reports a retained local hash only for an existing unreported attempt',async()=>{
+    for(const existing of ['missing','same','not-started']) {
+        const f=checkFixture();f.args.reportedTransactionHash=txHash;
+        if(existing==='same')f.responses.status.reported_transaction_hash=txHash;
+        if(existing==='not-started')f.responses.status.submission_started_at=null;
+        const result=await f.run();assert.equal(result.can_submit,false);
+        assert.deepEqual(f.requests.map(r=>r.action),existing==='missing'
+            ?['config','status','report-transaction','recover']:['config','status','recover']);
+    }
+    const f=checkFixture();f.args.reportedTransactionHash=txHash;
+    f.responses.status.reported_transaction_hash='0x'+'ee'.repeat(32);
+    await assert.rejects(f.run(),{code:'MEDIA_PREPARATION_MISMATCH'});
+    assert.equal(f.requests.at(-1).action,'status');
+});
+
+test('check-only rejects invalid local scope before requests',async()=>{
+    for(const patch of [{publicationId:'invalid'},{wallet:'0x'+'00'.repeat(20)},
+        {coreAddress:'invalid'},{metadataUri:''},{assertCurrent:null}]) {
+        const f=checkFixture();Object.assign(f.args,patch);
+        await assert.rejects(f.run(),{code:'INVALID_MEDIA_PREPARATION'});assert.equal(f.requests.length,0);
+    }
+    const f=checkFixture();f.args.reportedTransactionHash='invalid';
+    await assert.rejects(f.run(),{code:'INVALID_TRANSACTION_HASH'});assert.equal(f.requests.length,0);
+});
+
+test('check-only disabled flags and changed deployment never fall back to publishing',async()=>{
+    for(const patch of [{enabled:false},{recovery_enabled:false},{chain_id:1},{core_address:wallet},
+        {can_submit:true},{success:false}]) {
+        const f=checkFixture();Object.assign(f.responses.config,patch);
+        await assert.rejects(f.run(),{code:'MEDIA_PREPARATION_UNAVAILABLE'});
+        assert.deepEqual(f.requests,[{action:'config'}]);
+    }
+});
+
+test('check-only rejects mismatched status and hash-report responses before recovery',async()=>{
+    for(const patch of [{publication_id:randomUUID()},{metadata_uri:'https://other.example/meta.json'},
+        {can_submit:true},{claim_status:'ready'},{reported_transaction_hash:'invalid'},{submission_started_at:true}]) {
+        const f=checkFixture();Object.assign(f.responses.status,patch);
+        await assert.rejects(f.run(),{code:'MEDIA_PREPARATION_MISMATCH'});assert.equal(f.requests.at(-1).action,'status');
+    }
+    for(const patch of [{reported_transaction_hash:null},{submission_started_at:null},{can_submit:true},
+        {metadata_uri:'https://other.example/meta.json'},{publication_id:randomUUID()}]) {
+        const f=checkFixture();f.args.reportedTransactionHash=txHash;f.responses.report=patch;
+        await assert.rejects(f.run(),{code:'MEDIA_PREPARATION_MISMATCH'});
+        assert.equal(f.requests.at(-1).action,'report-transaction');
+    }
+});
+
+test('check-only requires a verified decimal string artwork identifier and false submission permission',async()=>{
+    for(const patch of [{registered_artwork_id:36},{registered_artwork_id:'36/../other'},
+        {registered_artwork_id:'0'},{registered_artwork_id:'1'.repeat(79)},
+        {publication_id:randomUUID()},{state:'ready'},{can_submit:true},{success:false}]) {
+        const f=checkFixture();Object.assign(f.responses.recover,{state:'registered',registered_artwork_id:'36'},patch);
+        await assert.rejects(f.run(),{code:'MEDIA_PREPARATION_MISMATCH'});assert.equal(f.requests.at(-1).action,'recover');
+    }
+});
+
+test('check-only wallet drift or lost responses stops at each boundary without a new send',async()=>{
+    for(const step of ['config','status','report-transaction','recover']) {
+        for(const failure of ['wallet','network']) {
+            const f=checkFixture();f.args.reportedTransactionHash=txHash;
+            f.before=body=>{if(body.action===step){if(failure==='wallet')f.current=false;else throw Error('lost response');}};
+            await assert.rejects(f.run());assert.equal(f.requests.at(-1).action,step);
+            assert(!f.requests.some(r=>['begin','prepare','issue'].includes(r.action)));
+        }
+    }
+});
+
+test('attempt notification precedes begin and permits checking after lost permission or cancellation with changed details',async()=>{
+    for(const failure of ['begin','wallet']) {
+        const s=submissionFixture(),{f}=s;let attempt;
+        f.args.onAttempt=value=>{assert(!f.requests.some(r=>r.action==='begin'));attempt=value;};
+        if(failure==='begin')s.drop='begin';
+        else f.args.register=async({beforeSubmit})=>{await beforeSubmit();throw Object.assign(Error('Rejected'),{code:4001});};
+        await assert.rejects(f.run(),{code:'PUBLICATION_ATTEMPT_PENDING'});
+        assert.deepEqual(Object.keys(attempt),['publicationId','wallet','coreAddress','metadataUri','reportedTransactionHash']);
+        assert.equal(attempt.reportedTransactionHash,null);
+        const original=[...f.data.values()][0];f.requests.length=0;f.args.details={title:'Different'};f.args.file=null;
+        const result=await checkBrowserPublication({...attempt,assertCurrent:f.args.assertCurrent},f.dependencies);
+        assert.equal(result.recovery.state,'unresolved');assert.equal(s.sends,0);
+        assert.deepEqual(f.requests.map(r=>r.action),['config','status','recover']);
+        assert.equal([...f.data.values()][0],original);
+    }
+});
+
+test('existing attempts notify the UI before recovery with their original identity and returned hash',async()=>{
+    for(const claim of ['claimed','registered','conflict']) {
+        const f=fixture();f.pending=true;const request=f.dependencies.request;let attempt;
+        f.dependencies.request=async(...args)=>{
+            const result=await request(...args);
+            return args[0].action==='status'?{...result,claim_status:claim,reported_transaction_hash:txHash}:result;
+        };
+        f.args.onAttempt=value=>{attempt=value;};await f.run();
+        const draft=JSON.parse([...f.data.values()][0]);
+        assert.deepEqual(attempt,{publicationId:draft.publication_id,wallet,coreAddress:core,
+            metadataUri:draft.metadata_uri,reportedTransactionHash:txHash});
+    }
+});
+
+test('hash notifications cannot interrupt independent local and server hash retention',async()=>{
+    for(const failure of ['sync','async']) {
+        for(const brokenStorage of [false,true]) {
+            const s=submissionFixture(),{f}=s,notices=[],save=f.dependencies.storage.setItem;
+            f.args.onAttempt=value=>{
+                notices.push(value);if(failure==='sync')throw Error('UI failed');
+                return Promise.reject(Error('UI failed'));
+            };
+            if(brokenStorage)f.dependencies.storage.setItem=(key,value)=>{
+                if(JSON.parse(value).reported_transaction_hash)throw Error('Storage failed');save(key,value);
+            };
+            await f.run();assert.equal(s.reported,txHash);assert.equal(s.sends,1);
+            assert.equal(notices.length,2);assert.equal(notices[0].reportedTransactionHash,null);
+            assert.equal(notices[1].reportedTransactionHash,txHash);
+            if(!brokenStorage)assert.equal(JSON.parse([...f.data.values()][0]).reported_transaction_hash,txHash);
+        }
+    }
 });

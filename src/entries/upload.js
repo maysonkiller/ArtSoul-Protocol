@@ -2,7 +2,7 @@ import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
-import { prepareBrowserPublication } from '../features/artwork/publication-preparation.js';
+import { prepareBrowserPublication, checkBrowserPublication } from '../features/artwork/publication-preparation.js';
 import {
     ALLOWED_ARTWORK_MIME_TYPES,
     MAX_ARTWORK_UPLOAD_BYTES,
@@ -27,6 +27,9 @@ let selectedFile = null;
         // whether the pending record survives, and mapPublishError cannot see
         // the publish handler's local state.
         let submittedRegisterTxHash = '';
+        // Presentation context only. The existing server/browser journals retain
+        // the attempt; this lets the current page check it without fresh AI/form data.
+        let pendingPublicationAttempt = null;
 
         const AI_ANALYSIS_TIMEOUT_MS = 20000;
         const AI_PREVIEW_MAX_DATA_URL_LENGTH = 1800000;
@@ -540,6 +543,11 @@ let selectedFile = null;
         function updatePrePublishAction() {
             const action = document.getElementById('prePublishAction');
             if (!action) return;
+            if (currentPublicationAttempt()) {
+                action.style.display = 'none';
+                action.disabled = true;
+                return;
+            }
             const formError = getFormCompletionError();
             const currentKey = getAIValuationFormKey();
             const estimateCurrent = Boolean(latestAIValuation && latestAIValuationFormKey === currentKey);
@@ -558,6 +566,21 @@ let selectedFile = null;
             const button = document.getElementById('publishBtn');
             const hint = document.getElementById('publishReadinessHint');
             if (!button || !hint) return false;
+
+            const attempt = currentPublicationAttempt();
+            if (attempt) {
+                if (!uploading && button.textContent !== 'Check publication') button.textContent = 'Check publication';
+                button.dataset.publicationCheck = 'true';
+                button.disabled = uploading;
+                button.setAttribute('aria-disabled', String(uploading));
+                hint.textContent = attempt.message;
+                updatePrePublishAction();
+                return false;
+            }
+            if (!uploading && button.dataset.publicationCheck) {
+                delete button.dataset.publicationCheck;
+                button.textContent = 'Publish Artwork';
+            }
 
             const formError = getFormCompletionError();
             const currentKey = getAIValuationFormKey();
@@ -1004,8 +1027,72 @@ let selectedFile = null;
             updatePublishReadiness();
         }
 
+        function currentPublicationAttempt() {
+            const attempt = pendingPublicationAttempt;
+            return attempt && attempt.file === selectedFile &&
+                attempt.wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase()
+                ? attempt : null;
+        }
+
+        function publicationCheckMessage(result) {
+            switch (result?.recovery?.state || result?.claim_status) {
+                case 'reverted':
+                    return 'The registration transaction reverted. Your saved attempt is retained for review. Checking will not send another transaction.';
+                case 'conflict':
+                    return 'This file has conflicting publication records. Contact support before publishing it again. Checking will not send another transaction.';
+                case 'unresolved':
+                    return 'The previous publication attempt has not been confirmed. Check again later; do not publish the file again.';
+                default:
+                    return 'A publication attempt is saved. Check its result; do not publish the file again. Checking will not send another transaction.';
+            }
+        }
+
+        async function checkSavedPublication(attempt) {
+            const button = document.getElementById('publishBtn');
+            const originalMarkup = button.innerHTML;
+            const assertCurrent = () => {
+                if (currentPublicationAttempt() !== attempt) {
+                    throw createUploadError('PUBLICATION_CONTEXT_CHANGED', 'The wallet or selected file changed.');
+                }
+            };
+            uploading = true;
+            clearBlockingStep();
+            setTransactionButtonProcessing(button, 'Checking publication...');
+            try {
+                assertCurrent();
+                // The explicit click may renew SIWE, but never requests AI or
+                // registration. A wallet connection alone is not a server login.
+                const authenticated = await window.ensureAuthenticated?.();
+                assertCurrent();
+                if (!authenticated) throw createUploadError('AUTHORIZATION_REQUIRED', 'Wallet sign-in was not completed.');
+                const result = await checkBrowserPublication({ ...attempt, assertCurrent });
+                assertCurrent();
+                if (result.recovery?.state === 'registered') {
+                    navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${BASE_SEPOLIA_CHAIN_ID}:${result.recovery.registered_artwork_id}`));
+                    return;
+                }
+                attempt.message = publicationCheckMessage(result);
+            } catch (error) {
+                if (currentPublicationAttempt() === attempt) {
+                    const messages = {
+                        RATE_LIMITED: 'Please wait one minute before checking this publication again.',
+                        AUTHORIZATION_REQUIRED: 'Wallet sign-in was not completed. Select Check publication again and approve sign-in in your wallet.',
+                        UNAUTHENTICATED: 'Your sign-in expired. Select Check publication again to sign in with the creator wallet.',
+                        SESSION_WALLET_MISMATCH: 'Your signed-in wallet changed. Select Check publication again to sign in with the creator wallet.',
+                        MEDIA_PREPARATION_MISMATCH: 'The saved publication details do not match. Contact support.'
+                    };
+                    attempt.message = `${messages[error?.code] || 'Publication checking is temporarily unavailable. Try checking again later.'} Your attempt is retained; no new transaction was sent.`;
+                }
+            } finally {
+                uploading = false;
+                restoreTransactionButton(button, originalMarkup);
+            }
+        }
+
         async function handleUpload() {
             if (uploading) return;
+            const savedAttempt = currentPublicationAttempt();
+            if (savedAttempt) return checkSavedPublication(savedAttempt);
 
             const { title, price, description } = getUploadFormValues();
 
@@ -1134,6 +1221,10 @@ let selectedFile = null;
                 let result;
                 const preparation = await prepareBrowserPublication({ file, fileHash, wallet: walletAddress,
                     details: { title, description, creatorValue: price, aiGuidance: guidance, duration }, assertCurrent,
+                    onAttempt: attempt => {
+                        pendingPublicationAttempt = { ...attempt, file, message: publicationCheckMessage() };
+                        updatePublishReadiness();
+                    },
                     register: async prepared => {
                         publicationJournalActive = true;
                         const fileUpload = { url: prepared.mediaUrl, ipfsHash: prepared.mediaPath, path: prepared.mediaPath };
@@ -1143,6 +1234,8 @@ let selectedFile = null;
                     }
                 });
                 if (preparation) {
+                    const attempt = currentPublicationAttempt();
+                    if (attempt) attempt.message = publicationCheckMessage(preparation);
                     if (preparation.recovery?.state === 'registered') {
                         assertCurrent();
                         navigateAfterPublish(window.ArtSoulArtworkUrl.artworkPath(`v41:${BASE_SEPOLIA_CHAIN_ID}:${preparation.recovery.registered_artwork_id}`));
@@ -1339,7 +1432,7 @@ let selectedFile = null;
             } catch (error) {
                 console.error('Publish failed:', error);
                 const mapped = mapPublishError(error);
-                const errorMessage = `Publish failed: ${mapped.message}`;
+                const errorMessage = currentPublicationAttempt()?.message || `Publish failed: ${mapped.message}`;
 
                 // A submitted register with no artwork id yet is exactly the
                 // state this record exists to hold: the indexer will project the
