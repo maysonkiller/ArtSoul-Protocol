@@ -57,7 +57,7 @@ test('empty states render only after loading for all four tabs', () => {
   // first load still cannot reach them: hasSettledArtworks is false until a
   // fetch commits, so the compact loading branch owns that render.
   assert.match(profile, /selectedGallery === 'created' && 'No created artworks yet\.'/);
-  assert.match(profile, /selectedGallery === 'auction' && 'No live auctions right now\.'/);
+  assert.match(profile, /selectedGallery === 'auction' && 'No auctions to show\.'/);
   assert.match(profile, /selectedGallery === 'sold' && 'No completed sales yet\.'/);
   assert.match(profile, /selectedGallery === 'collected' && 'No collected NFTs yet\.'/);
   assert.match(profile, /const \[hasSettledArtworks, setHasSettledArtworks\] = useState\(false\);/);

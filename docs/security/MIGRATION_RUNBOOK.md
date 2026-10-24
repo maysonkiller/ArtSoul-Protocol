@@ -39,7 +39,7 @@ Verify against the database before applying or re-applying it.
 | `src/indexer/migrations/013_chain_scoped_v41_projections.sql` | Indexer sequence 13. Runner-managed. |
 | `src/indexer/migrations/014_schema_aware_reorg_rollback.sql` | Indexer sequence 14. **Applied to production** after backup; accepted as backlog A-14. |
 | `src/indexer/migrations/015_public_metrics_projection.sql` | Indexer sequence 15. **Applied to production** 2026-07-28; accepted as backlog A-26. |
-| `src/indexer/migrations/016_indexer_state_hash.sql` | Indexer sequence 16. **Prepared locally; not applied to production by this change.** Forward-only repair of the missing runtime column on fresh 001–015 installs. Preserves existing hashes, cursor rows, grants and RLS. See the fresh-bootstrap record below. |
+| `src/indexer/migrations/016_indexer_state_hash.sql` | Indexer sequence 16. **Released via PR #341 / `058d64d`; no live DDL required.** Forward-only repair of the missing runtime column on fresh 001–015 installs. Existing live column already matches. Preserves existing hashes, cursor rows, grants and RLS. See the fresh-bootstrap record below. |
 | `sql/migrations/a8a_moderation_passkey_foundation.sql` | A8 schema step 1. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. RG-03 activation remains open; see the dated A8 application record below. |
 | `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
 | `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
@@ -107,6 +107,11 @@ Read-only live inspection on October 24 at 13:29 UTC confirmed the existing
 `indexer_state.state_hash` already matches `VARCHAR(66) NOT NULL DEFAULT '0x0'`.
 No live DDL or state reset is needed. The forward file remains necessary for
 fresh installations and verified older databases lacking this column.
+
+PR #341 candidate `9820329` passed CI `40098495159`: Linux 2,308 checks / two
+platform skips, Windows 2,013 checks / 22 Docker skips, 46 contracts per OS;
+builds/static checks pass. Merged as `058d64d`. No production migrations were
+executed for this repair.
 
 ## Media Application Record (2026-10-24)
 

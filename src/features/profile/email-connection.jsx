@@ -122,16 +122,18 @@ export function EmailConnection({walletAddress}) {
 
   return (
     <section className="profile-email-connection" aria-label="Private email">
-      <p className="profile-connection-help">Email stays private. Your wallet signs you in.</p>
       {connection?.verified === true ? (
         <div className="profile-connection-row profile-email-summary">
-          <span className="profile-email-address">{connection.email}</span>
-          <span>Verified email</span>
-          <button type="button" className="btn-secondary" data-allow-rapid="true" disabled={busy} onClick={() => manage('disconnect')}>Disconnect email</button>
+          <span className="profile-connection-identity profile-email-identity">
+            <span className="profile-email-address">{connection.email}</span>
+            <span className="profile-email-status">Verified email</span>
+          </span>
+          <button type="button" className="profile-connection-remove" aria-label="Disconnect email" title="Disconnect email" data-allow-rapid="true" disabled={busy} onClick={() => manage('disconnect')}>✕</button>
         </div>
-      ) : connection?.available === false ? <p className="text-sm opacity-70">Email verification is not available yet.</p> : (
+      ) : connection?.available === false ? <p className="profile-connection-row" role="status">Email verification is not available yet.</p> : (
         <button type="button" className="profile-connection-row" data-allow-rapid="true" disabled={busy || !connection} onClick={() => manage('open')}>Connect email</button>
       )}
+      <p className="profile-connection-help">Email stays private. Your wallet signs you in.</p>
       {editing && (
         <form className="flex gap-3 flex-wrap mt-3" onSubmit={event => { event.preventDefault(); void manage('request'); }}>
           <label className="text-sm">Email address

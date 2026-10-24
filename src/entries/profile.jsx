@@ -33,10 +33,10 @@ const { useState, useEffect, useRef } = React;
         }
 
         const GALLERY_TYPES = [
-            { id: 'created', label: 'Created Artworks', icon: '', description: 'Artworks you created' },
-            { id: 'auction', label: 'Auctions', icon: '', description: 'Artwork currently in auction' },
-            { id: 'sold', label: 'Sales', icon: '', description: 'Completed sales' },
-            { id: 'collected', label: 'Owned NFTs', icon: '', description: 'NFTs you own' },
+            { id: 'created', label: 'Artworks', icon: '', description: 'Works created by this artist, including works not yet minted.' },
+            { id: 'auction', label: 'Auctions', icon: '', description: 'Auctions for works created by this artist.' },
+            { id: 'collected', label: 'Collected', icon: '', description: 'NFTs currently owned by this profile.' },
+            { id: 'sold', label: 'Activity', icon: '', description: 'Completed sales of works created by this artist.' },
         ];
 
         function TransactionProcessingLabel() {
@@ -1535,10 +1535,17 @@ const { useState, useEffect, useRef } = React;
                                             />
                                             <section className="profile-connections" aria-labelledby="profileConnectionsTitle">
                                                 <h2 id="profileConnectionsTitle">Connected accounts</h2>
-                                                <p className="profile-connection-help">Manage your accounts here. Account changes are saved immediately.</p>
+                                                <p className="profile-connection-help">Connecting or disconnecting an account takes effect immediately. Save Profile and Cancel apply only to your profile details.</p>
                                                 <div className="profile-connection-grid">
+                                                {emailVerificationEnabled && isOwnProfile && walletStateSettled && connectedWalletAddress && (
+                                                    <div className="profile-connection-provider">
+                                                        <h3 className="profile-connection-label">Email</h3>
+                                                        <EmailConnection key={connectedWalletAddress.toLowerCase()} walletAddress={connectedWalletAddress} />
+                                                    </div>
+                                                )}
                                                 {/* X (Twitter) OAuth */}
                                                 <div className="profile-connection-provider">
+                                                    <h3 className="profile-connection-label">X</h3>
                                                     {profile?.twitter_connected === true ? (
                                                         <div className={`profile-connection-row flex items-center justify-between px-4 py-2 rounded-lg max-w-full ${
                                                             isClassic ? 'bg-gray-700 border border-gray-600' : 'bg-cyan-900/50 border border-cyan-500/30'
@@ -1578,6 +1585,7 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                                 {/* Discord OAuth */}
                                                 <div className="profile-connection-provider">
+                                                    <h3 className="profile-connection-label">Discord</h3>
                                                     {profile?.discord_connected === true ? (
                                                         <div className={`profile-connection-row flex items-center justify-between px-4 py-2 rounded-lg max-w-full ${
                                                             isClassic ? 'bg-gray-700 border border-gray-600' : 'bg-purple-900/50 border border-purple-500/30'
@@ -1620,9 +1628,6 @@ const { useState, useEffect, useRef } = React;
                                                     )}
                                                 </div>
                                                 </div>
-                                                {emailVerificationEnabled && isOwnProfile && walletStateSettled && connectedWalletAddress && (
-                                                    <EmailConnection key={connectedWalletAddress.toLowerCase()} walletAddress={connectedWalletAddress} />
-                                                )}
                                             </section>
                                         </div>
                                     ) : (
@@ -1808,6 +1813,8 @@ const { useState, useEffect, useRef } = React;
                                 {[...GALLERY_TYPES, ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
                                     <button
                                         key={gallery.id}
+                                        type="button"
+                                        aria-pressed={selectedGallery === gallery.id}
                                         onClick={() => {
                                             if (gallery.id !== selectedGallery) {
                                                 // Keep the viewport filled while the old list
@@ -1845,11 +1852,15 @@ const { useState, useEffect, useRef } = React;
                                 : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30'
                         }`}>
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className={`text-xl font-bold ${
-                                    isClassic ? 'text-gray-100' : 'text-cyan-300'
-                                }`}>
-                                    {GALLERY_TYPES.find(g => g.id === selectedGallery)?.label}
-                                </h3>
+                                <div className="profile-gallery-heading">
+                                    <h3 className={`text-xl font-bold ${
+                                        isClassic ? 'text-gray-100' : 'text-cyan-300'
+                                    }`}>
+                                        {GALLERY_TYPES.find(g => g.id === selectedGallery)?.label}
+                                    </h3>
+                                    {selectedGallery === 'sold' && <h4 className="profile-activity-kind">Sales</h4>}
+                                    <p className="profile-gallery-description">{GALLERY_TYPES.find(g => g.id === selectedGallery)?.description}</p>
+                                </div>
                                 {artworksLoading ? (
                                     <span
                                         className={`profile-gallery-loading-note text-sm ${
@@ -1899,7 +1910,7 @@ const { useState, useEffect, useRef } = React;
                                         {myArtworks.length === 0 && (
                                             <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
                                                 {selectedGallery === 'created' && 'No created artworks yet.'}
-                                                {selectedGallery === 'auction' && 'No live auctions right now.'}
+                                                {selectedGallery === 'auction' && 'No auctions to show.'}
                                                 {selectedGallery === 'sold' && 'No completed sales yet.'}
                                                 {selectedGallery === 'collected' && 'No collected NFTs yet.'}
                                             </div>
