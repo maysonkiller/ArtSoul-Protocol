@@ -33,7 +33,7 @@ const features = [
   'launch_service_quotas', 'profile_email_verification', 'artist_support',
   'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
   'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks',
-  'public_artwork_search', 'public_artwork_search_current_round'
+  'public_artwork_search', 'public_artwork_search_current_round', 'profile_layouts'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [
@@ -41,7 +41,7 @@ const rpcOnly = [
   'artsoul_staff_totp_grants', 'artsoul_staff_totp_factors', 'artsoul_staff_totp_attempts',
   'artsoul_staff_authority_policy', 'artsoul_staff_authority_requests', 'artsoul_staff_authority_events',
   'artwork_media_catalog', 'artwork_media_publications', 'artwork_media_preparations', 'artwork_media_registration_evidence',
-  'artwork_media_chain_revisions', 'artwork_media_rewinds'
+  'artwork_media_chain_revisions', 'artwork_media_rewinds', 'profile_layouts'
 ];
 
 test('new table migrations must join the no-default-grant rehearsal', () => {

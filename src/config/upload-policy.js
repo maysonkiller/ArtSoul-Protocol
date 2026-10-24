@@ -1,6 +1,13 @@
 export const MAX_ARTWORK_UPLOAD_MB = 50;
 export const MAX_ARTWORK_UPLOAD_BYTES = MAX_ARTWORK_UPLOAD_MB * 1024 * 1024;
 export const MAX_METADATA_BYTES = 256 * 1024;
+export const MAX_PROFILE_COVER_BYTES = 5 * 1024 * 1024;
+export const PROFILE_COVER_MIME_EXTENSIONS = Object.freeze({
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp'
+});
 
 export const ARTWORK_MIME_EXTENSIONS = Object.freeze({
   'image/jpeg': 'jpg',

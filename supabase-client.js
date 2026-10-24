@@ -639,14 +639,14 @@ async function deleteArtwork(artworkId) {
 }
 
 // Storage Functions
-async function uploadSignedBlob({ blob, fileName, contentType, size, kind = 'media' }) {
+async function uploadSignedBlob({ blob, fileName, contentType, size, kind = 'media', wallet, signal }) {
     const signedUpload = await backendWrite('/api/upload/file', {
         kind,
         file_name: fileName || 'upload.bin',
         content_type: contentType,
         size
-    });
-    return uploadIssuedBlob({ blob, fileName, signedUpload });
+    }, 'POST', wallet ? { 'X-ArtSoul-Wallet': wallet } : {}, { signal });
+    return uploadIssuedBlob({ blob, fileName, signedUpload, signal });
 }
 
 async function uploadIssuedBlob({ blob, fileName, signedUpload, signal }) {
@@ -699,6 +699,19 @@ async function uploadFile(file, fileName) {
         kind: 'media'
     });
 
+    return signedUpload.public_url;
+}
+
+async function uploadProfileCover(file, walletAddress, { signal } = {}) {
+    const { PROFILE_COVER_MIME_EXTENSIONS, MAX_PROFILE_COVER_BYTES } = await import('./src/config/upload-policy.js');
+    const wallet = String(walletAddress || '').toLowerCase();
+    if (!/^0x[0-9a-f]{40}$/.test(wallet) || /^0x0{40}$/.test(wallet)) throw new Error('Connect the wallet for this profile.');
+    if (!(file instanceof File) || !Object.hasOwn(PROFILE_COVER_MIME_EXTENSIONS, file.type) ||
+        file.size <= 0 || file.size > MAX_PROFILE_COVER_BYTES) {
+        throw new Error('Choose a JPG, PNG, WebP or GIF cover up to 5 MB.');
+    }
+    const signedUpload = await uploadSignedBlob({ blob: file, fileName: file.name,
+        contentType: file.type, size: file.size, kind: 'profile-cover', wallet, signal });
     return signedUpload.public_url;
 }
 
@@ -1167,6 +1180,7 @@ window.ArtSoulDB = {
     requestPublication,
     uploadIssuedBlob,
     uploadFile,
+    uploadProfileCover,
     uploadMetadata,
     // Auctions
     createAuction,
