@@ -34,8 +34,13 @@ startup and polling both use this guarded range-processing path.
   the old concurrent scheduler. Correct dependent state takes precedence over
   that concurrency. These local measurements are not a production SLA.
 
-Exact-candidate full CI and production deployment are pending. Completed live
-projection rows are not automatically replayed by this patch.
+PR #340 candidate `ad96093` passed full CI `40097788978`: Linux 2,305 pass /
+2 platform skips, Windows 2,013 pass / 21 Docker skips, 46 contracts per OS,
+build/static/preview green. Merged as `c629356`. The existing Base worker received
+only the reviewed sync-engine file, preserving the B-14 search worker and all
+configuration. Deployed SHA-256:
+`d8a432b6d1b318734bca10d5577beca64e5519a3e4f01fd3fed79cfe3a8b1db5`.
+Completed live projection rows were not replayed by the patch.
 
 ## Bounded live reconciliation
 
@@ -47,19 +52,37 @@ block hash. Five NULL artwork pointers differ: 3 -> 3, 4 -> 4, 9 -> 9, 35 -> 67,
 auction registry records are completed and the artwork update block is still its
 registration block. Expiry alone must not clear a contract-active pointer.
 
-Reconciliation is pending. Require a protected before-image, fresh two-RPC/code/
-block agreement and canonical AuctionCreated receipts, then compare-and-set only
-those five pointers and their event update metadata. Do not replay completed
-events, alter counters/outbox, reset data, or invent finalization transactions.
-Afterwards repeat the full bounded comparison and check worker health/cursors.
+Reconciliation completed at 13:27 UTC after a protected, read-validated full
+database backup and a saved before-image. The Base worker was briefly stopped.
+Fresh two-RPC current-state/code/block agreement confirmed all five mappings;
+canonical AuctionCreated receipts were decoded from the archive-capable RPC.
+The second RPC could not serve the old receipts for #3/#4/#9 (its old-block API
+also reported unavailable), so two-source historical receipt coverage is not
+claimed. Both sources independently confirmed the current pinned contract state.
+
+A serializable compare-and-set transaction updated only the five missing
+pointers and the update block/time that their creation event should have written.
+No event replay, counters/outbox mutation, reset, transaction signing or expiry
+finalization occurred. After restart the worker caught up: confirmed block
+49,633,263, 12 blocks behind, healthy/synced, zero unresolved/failed/dead events;
+the indexed event total remains 204. Legacy Ethereum indexing remains stopped.
+
+Repeated bounded comparison of all 37 works, 71 auctions and four resale listings
+through both RPCs at block 49,632,252 returned **zero differences** in the compared
+fields. Actual public search still returns the two current live works #36/#37.
+Protected operation journals and before-images are under `docs/private/`; the
+public read-only verification report is under `output/audit/b02-projection-drift-*`.
+These journals must be reconciled rather than replayed on continuation.
 
 ## Separate finding and acceptance limits
 
 Fresh indexer migrations create the legacy `indexer_state` in migration 001;
 migration 012's `CREATE TABLE IF NOT EXISTS` does not add its runtime `state_hash`
-column. The disposable ordering fixture adds that documented column explicitly
-to isolate this defect. A separate forward migration and fresh-install regression
-are required; deployed databases are not changed by this finding.
+column. The initial ordering fixture added that column explicitly to isolate this
+defect. A separate forward migration 016 and fresh-install regression now remove
+the workaround; historical migrations remain immutable. Live read-only inspection
+confirmed the existing column already matches `VARCHAR(66) NOT NULL DEFAULT '0x0'`,
+so no live DDL or hash reset is required. See the migration runbook for its release.
 
 This engineering correction does not complete the B-02 independent-user beta
 journey gate. No real user's end-to-end transaction journey is claimed here.
