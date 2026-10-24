@@ -3,6 +3,29 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 TA-12 loading continuation:
+
+- Starting HEAD `e863b10`; same canonical workspace/branch. Preserve unrelated
+  `.codex/`, `output/` and the two untracked authority-policy files.
+- Live read-only Chrome measurements establish serial artwork -> Provenance
+  requests (2,721 ms main completion; history 2,725-3,935 ms), late default avatar
+  preparation and a 1,185 ms homepage projection request. These are baselines,
+  not measurements of the unpublished patch.
+- Local patch overlaps independent history and metadata/profile reads, retaining
+  all visibility/current-load/lifecycle/metric gates. Prepared public avatars
+  use a bounded in-memory cache; default preparation starts before Ownership.
+- Four new concurrency regressions fail before the patch and pass after it.
+  Final combined checks: 123 pass, zero failures/skips; build verifies 11 routes
+  and 174 utilities. Real local Chrome confirms old/new initial Ownership DOM
+  commits (2 loading labels versus 2 immediately ready identities) and remounts.
+- Bounded review found no blocker and finished. No helper is needed in background.
+  Evidence/scope: docs/audits/TA12_ARTWORK_LOADING_2026-10-24.md.
+- Saved in a separate local change; not deployed. Cold new portraits still need
+  download/decode. No protocol, authentication, database or contract mutation.
+- Exactly next step: prepare the bounded timer/Community/loading release, run
+  candidate CI and obtain production-release authorization before live acceptance;
+  then continue B-13. Do not reopen completed Phase A device ceremonies.
+
 October 24 Community action consolidation (B-19):
 
 - Starting HEAD `a818f2e`; same canonical workspace and branch. Existing unrelated

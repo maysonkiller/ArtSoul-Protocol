@@ -83,3 +83,31 @@ test('an unavailable transformation and original terminate after two requests', 
     await rejected;
     assert.equal(images.length, 2);
 });
+
+test('prepared avatars share in-flight decoding, expose only ready bitmaps, retry failures and bound memory', async () => {
+    const OriginalImage = globalThis.Image, images = [];
+    globalThis.Image = class { constructor() { images.push(this); } async decode() {} };
+    try {
+        const {prepareAvatar, readPreparedAvatar} = await import('../src/features/artwork/decoded-image.js?prepared-cache-test');
+        const first = prepareAvatar('/shared.png');
+        assert.equal(prepareAvatar('/shared.png'), first);
+        assert.equal(images.length, 1);
+        assert.equal(readPreparedAvatar('/shared.png'), '');
+        await images[0].onload(); await first;
+        assert.equal(readPreparedAvatar('/shared.png'), '/shared.png');
+        assert.equal(await prepareAvatar('/shared.png'), '/shared.png');
+        assert.equal(images.length, 1, 'a remount does not decode the same avatar again');
+        const failed = prepareAvatar('/failed.png');
+        images.at(-1).onerror(); await assert.rejects(failed);
+        const retry = prepareAvatar('/failed.png');
+        await images.at(-1).onload(); await retry;
+        assert.equal(readPreparedAvatar('/failed.png'), '/failed.png');
+        for (let i = 0; i < 64; i++) {
+            const pending = prepareAvatar('/unique-'+i+'.png');
+            assert.equal(readPreparedAvatar('/unique-'+i+'.png'), '');
+            await images.at(-1).onload(); await pending;
+        }
+        assert.equal(readPreparedAvatar('/shared.png'), '', 'old entries leave the bounded cache');
+        assert.equal(readPreparedAvatar('/unique-63.png'), '/unique-63.png');
+    } finally {globalThis.Image = OriginalImage;}
+});

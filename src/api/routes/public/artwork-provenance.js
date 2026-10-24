@@ -177,12 +177,23 @@ export default async function handler(req, res) {
     }
 
     const tokenId = protocolId(artwork.token_id);
-    const [auctions, settlements, resaleHistory, listingRows] = await Promise.all([
-      readRows(
-        'v41_auctions?select=chain_id,auction_id,artwork_id,creator,start_price,duration,block_number,transaction_hash,log_index,indexed_at' +
-        `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
-        `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
-      ),
+    const auctionsPromise = readRows(
+      'v41_auctions?select=chain_id,auction_id,artwork_id,creator,start_price,duration,block_number,transaction_hash,log_index,indexed_at' +
+      `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
+      `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+    );
+    const endingsPromise = auctionsPromise.then(auctions => {
+      const auctionIds = auctions.map(row => protocolId(row.auction_id)).filter(Boolean);
+      return auctionIds.length > 0
+        ? readRows(
+            'v41_auction_endings?select=chain_id,auction_id,winner,winning_bid,settlement_deadline,block_number,transaction_hash,log_index,indexed_at' +
+            `&chain_id=${chainFilter}&auction_id=in.(${auctionIds.join(',')})` +
+            `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+          )
+        : [];
+    });
+    const [auctions, settlements, resaleHistory, listingRows, endings] = await Promise.all([
+      auctionsPromise,
       readRows(
         'v41_settlements?select=chain_id,auction_id,artwork_id,winner,final_price,token_id,settlement_status,block_number,transaction_hash,log_index,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
@@ -200,17 +211,9 @@ export default async function handler(req, res) {
             'v41_resale_listings?select=chain_id,token_id,seller,price,active,block_number,transaction_hash,log_index,indexed_at' +
             `&chain_id=${chainFilter}&token_id=eq.${tokenId}&active=eq.true&limit=1`
           )
-        : []
+        : [],
+      endingsPromise
     ]);
-
-    const auctionIds = auctions.map(row => protocolId(row.auction_id)).filter(Boolean);
-    const endings = auctionIds.length > 0
-      ? await readRows(
-          'v41_auction_endings?select=chain_id,auction_id,winner,winning_bid,settlement_deadline,block_number,transaction_hash,log_index,indexed_at' +
-          `&chain_id=${chainFilter}&auction_id=in.(${auctionIds.join(',')})` +
-          `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
-        )
-      : [];
 
     const completedSettlement = latestCompletedSettlement(settlements);
     const latestResaleRow = latestResale(resaleHistory);

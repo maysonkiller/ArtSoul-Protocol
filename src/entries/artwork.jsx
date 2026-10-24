@@ -1,6 +1,6 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
-import { decodeAvatar, decodeImage } from '../features/artwork/decoded-image.js';
+import { prepareAvatar, readPreparedAvatar, decodeImage } from '../features/artwork/decoded-image.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
@@ -15,9 +15,12 @@ import '../../supabase-auth.js';
 
 const { useState, useEffect, useRef } = React;
 
+// Prepare the shared fallback while the artwork request is in flight, rather
+// than downloading/decoding it only after Ownership is already on screen.
+void prepareAvatar('/default-avatar.png').catch(() => {});
 
-function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevious = false) {
-    const [prepared, setPrepared] = useState({ source: '', url: '', failed: false });
+function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevious = false, readPrepared = () => '') {
+    const [prepared, setPrepared] = useState(() => ({ source, url: readPrepared(source), failed: false }));
     useEffect(() => {
         let active = true;
         if (!source) return () => { active = false; };
@@ -29,6 +32,8 @@ function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevi
         );
         return () => { active = false; };
     }, [source, fallback, prepare]);
+    const ready = readPrepared(source);
+    if (ready) return { source, url: ready, failed: false };
     return prepared.source === source || (keepPrevious && source && prepared.url)
         ? prepared : { url: '', failed: false };
 }
@@ -36,7 +41,7 @@ function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevi
 function OwnershipIdentity({ source, label, name, className, style, nameStyle, isClassic }) {
     // This component is keyed by wallet: keep the same person's decoded avatar
     // visible while a newer profile image is prepared, never across identities.
-    const image = useDecodedImage(source, '/default-avatar.png', decodeAvatar, true);
+    const image = useDecodedImage(source, '/default-avatar.png', prepareAvatar, true, readPreparedAvatar);
     return (
         <>
             {image.url ? <img src={image.url} alt={label} className={className} style={style} /> : (
@@ -1860,6 +1865,14 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             async function loadArtwork() {
                 const sequence = ++artworkLoadSequenceRef.current;
                 const isCurrent = () => sequence === artworkLoadSequenceRef.current;
+                // The URL already identifies this independent indexer read. Do
+                // not expose it until the artwork succeeds and this load is current.
+                const earlyProvenance = isV41CompositeId
+                    ? Promise.resolve().then(() => window.ArtSoulDB.getArtworkProvenance?.({
+                        chain_id: v41CompositeId.chainId,
+                        artwork_id: v41CompositeId.artworkId
+                    })).catch(() => null)
+                    : null;
                 try {
                     console.log('[Artwork] Loading artwork:', artworkId);
                     // Load from Supabase
@@ -2000,10 +2013,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         }
 
                         setProvenanceState(current => ({ ...current, status: 'loading' }));
-                        const projection = await window.ArtSoulDB.getArtworkProvenance?.({
-                            chain_id: data.chain_id,
-                            artwork_id: data.artwork_id
-                        });
+                        const projection = Number(data.chain_id) === v41CompositeId.chainId &&
+                            String(data.artwork_id) === String(v41CompositeId.artworkId)
+                            ? await earlyProvenance
+                            : await Promise.resolve().then(() => window.ArtSoulDB.getArtworkProvenance?.({
+                                chain_id: data.chain_id,
+                                artwork_id: data.artwork_id
+                            })).catch(() => null);
                         if (!isCurrent()) return;
                         setProvenanceState(projection
                             ? {

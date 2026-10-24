@@ -15,11 +15,12 @@ function tableOf(path) {
   return String(path).split('?')[0];
 }
 
-function loadHandler({ missDirectArtworkOnce = false } = {}) {
+function loadHandler({ missDirectArtworkOnce = false, beforeRead = async () => {}, readMetadata = async () => ({ name: 'Smoke Art', image: 'https://img.test/a.png' }) } = {}) {
   const calls = [];
   let directArtworkReads = 0;
   const supabaseRest = async (path) => {
     calls.push(path);
+    await beforeRead(tableOf(path));
     switch (tableOf(path)) {
       case 'v41_artworks':
         if (missDirectArtworkOnce && directArtworkReads++ === 0) {
@@ -72,7 +73,7 @@ function loadHandler({ missDirectArtworkOnce = false } = {}) {
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },
     getModerationAccess: async () => ({ canModerate: false }),
-    readArtworkMetadata: async () => ({ name: 'Smoke Art', image: 'https://img.test/a.png' }),
+    readArtworkMetadata: readMetadata,
     fetch: async () => ({ ok: true, json: async () => ({ name: 'Smoke Art', image: 'https://img.test/a.png' }) }),
     AbortController: class { constructor() { this.signal = {}; } abort() {} },
     setTimeout: () => 0,
@@ -94,6 +95,22 @@ function fakeRes() {
     json(payload) { this.body = payload; return this; }
   };
 }
+
+test('full-feed metadata and identities start before an unrelated slow lifecycle table finishes', async () => {
+  let release, metadataReads = 0;
+  const slow = new Promise(resolve => {release = resolve;});
+  const {handler, calls} = loadHandler({beforeRead: table => table === 'v41_bids' ? slow : undefined,
+    readMetadata: async () => {metadataReads++; return {name:'Parallel metadata', image:'https://img.test/a.png'};}});
+  const res = fakeRes(), work = handler({query:{}},res);
+  await new Promise(resolve => setImmediate(resolve));
+  const earlyMetadata = metadataReads, earlyIdentity = calls.some(path => tableOf(path) === 'profiles');
+  assert.equal(res.body, null, 'unresolved lifecycle data is not skipped');
+  release(); await work;
+  assert.equal(earlyMetadata, 1);
+  assert.equal(earlyIdentity, true);
+  assert.equal(res.body.data[0].title, 'Parallel metadata');
+  assert.equal(res.body.public_metrics.auctions_completed, 8);
+});
 
 test('cold-cache list response is CDN-cacheable and non-empty', async () => {
   const { handler, calls } = loadHandler();

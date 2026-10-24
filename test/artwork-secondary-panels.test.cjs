@@ -85,7 +85,7 @@ test('Ownership reveals the name and decoded avatar together, keeping the rest o
     const compiled = await transformWithOxc(pageFunction('useDecodedImage') + '\n' + pageFunction('OwnershipIdentity'),
         'ownership.jsx', {jsx: {runtime: 'classic'}});
     const render = vm.runInNewContext(compiled.code + '\nOwnershipIdentity;', {
-        React, ...h, decodeImage() {}, decodeAvatar: () => prepared.promise
+        React, ...h, decodeImage() {}, prepareAvatar: () => prepared.promise, readPreparedAvatar: () => ''
     });
     const props = {source: '/portrait.png', label: 'Creator', name: 'Artist', className: 'avatar-border', isClassic: true};
     let tree = h.render(() => render(props));
@@ -99,6 +99,25 @@ test('Ownership reveals the name and decoded avatar together, keeping the rest o
     assert.equal(nodes().find(n => n.type === 'img').props.src, '/decoded-portrait.png');
     assert.equal(nodes().some(n => n.props?.children?.includes('Artist')), true);
     assert.equal(nodes().some(n => n.props?.role === 'status'), false);
+    h.unmount();
+});
+
+test('a prepared Ownership avatar and name are present in the first render without a loading flash', async () => {
+    const {transformWithOxc} = await import('vite');
+    const h = hooks();
+    const React = {...h, createElement: (type, props, ...children) => ({type, props: {...props, children}})};
+    const compiled = await transformWithOxc(pageFunction('useDecodedImage') + '\n' + pageFunction('OwnershipIdentity'),
+        'ownership.jsx', {jsx: {runtime:'classic'}});
+    const ready = source => source === '/ready.png' ? '/decoded.png' : '';
+    const render = vm.runInNewContext(compiled.code + '\nOwnershipIdentity;', {
+        React, ...h, decodeImage() {}, prepareAvatar: source => Promise.resolve(ready(source)), readPreparedAvatar: ready
+    });
+    const nodes = descendants(h.render(() => render({source:'/ready.png',label:'Creator',name:'Artist'})));
+    assert.equal(nodes.find(node => node.type === 'img').props.src, '/decoded.png');
+    assert.equal(nodes.some(node => node.props?.children?.includes('Artist')), true);
+    assert.equal(nodes.some(node => node.props?.role === 'status'), false);
+    const other = descendants(h.render(() => render({source:'/other.png',label:'Creator',name:'Other artist'})));
+    assert.equal(other.find(node => node.type === 'img').props.src, '/decoded.png', 'same identity keeps its current picture while preparing an update');
     h.unmount();
 });
 

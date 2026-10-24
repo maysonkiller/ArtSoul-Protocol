@@ -814,6 +814,22 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
 async function buildProjectionSnapshot() {
   const warnings = [];
   const chainFilter = `in.(${PUBLIC_CHAIN_IDS.join(',')})`;
+  const artworksPromise = queryTable(
+    'v41_artworks',
+    'select=chain_id,artwork_id,creator,metadata_uri,minted,token_id,canonical_floor,active_auction_id,block_number,transaction_hash,indexed_at,last_updated_at' +
+      `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
+    warnings
+  );
+  // Metadata and public creator profiles only depend on the artwork rows, not
+  // on bids, settlements or metrics. Keep all lifecycle reads in the final gate.
+  const preload = {
+    metadataRows: artworksPromise.then(rows => Promise.all(rows.map(artwork => loadMetadataCached(artwork.metadata_uri)))),
+    publicIdentities: artworksPromise.then(rows => publicIdentitiesByAddress(rows.map(artwork => artwork.creator), warnings))
+  };
+  // Consume possible early rejections while the lifecycle queries are pending;
+  // projectTableData still receives the original promises and their failures.
+  preload.metadataRows.catch(() => {});
+  preload.publicIdentities.catch(() => {});
   const [
     v41Artworks,
     v41Auctions,
@@ -827,12 +843,7 @@ async function buildProjectionSnapshot() {
     artworkModerationVisibility,
     publicMetricRows
   ] = await Promise.all([
-    queryTable(
-      'v41_artworks',
-      'select=chain_id,artwork_id,creator,metadata_uri,minted,token_id,canonical_floor,active_auction_id,block_number,transaction_hash,indexed_at,last_updated_at' +
-        `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
-      warnings
-    ),
+    artworksPromise,
     queryTable(
       'v41_auctions',
       'select=chain_id,auction_id,artwork_id,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id' +
@@ -895,7 +906,7 @@ async function buildProjectionSnapshot() {
     artwork_moderation_visibility: artworkModerationVisibility
   };
 
-  return projectTableData(tableData, warnings, normalizePublicMetrics(publicMetricRows));
+  return projectTableData(tableData, warnings, normalizePublicMetrics(publicMetricRows), preload);
 }
 
 // One projection rebuild per instance per TTL window; every request inside the

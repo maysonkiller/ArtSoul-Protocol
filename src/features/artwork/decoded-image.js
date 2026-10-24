@@ -33,3 +33,31 @@ export async function decodeAvatar(source, createImage, resize = globalThis.wind
         return decodeImage(source, createImage);
     }
 }
+
+// Reuse prepared public avatars for repeated roles and remounts. Upload URLs
+// identify immutable files; a changed URL gets its own preparation. Keep this
+// bounded and in memory, with failures evicted so a later visit can retry.
+const preparedAvatars = new Map();
+const PREPARED_AVATAR_LIMIT = 64;
+
+export function readPreparedAvatar(source) {
+    return preparedAvatars.get(source)?.url || '';
+}
+
+export function prepareAvatar(source) {
+    const cached = preparedAvatars.get(source);
+    if (cached) return cached.promise;
+    if (preparedAvatars.size >= PREPARED_AVATAR_LIMIT) {
+        preparedAvatars.delete(preparedAvatars.keys().next().value);
+    }
+    const entry = { url: '', promise: null };
+    entry.promise = decodeAvatar(source).then(url => {
+        entry.url = url;
+        return url;
+    }, error => {
+        if (preparedAvatars.get(source) === entry) preparedAvatars.delete(source);
+        throw error;
+    });
+    preparedAvatars.set(source, entry);
+    return entry.promise;
+}
