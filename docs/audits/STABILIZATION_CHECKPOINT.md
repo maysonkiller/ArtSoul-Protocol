@@ -3,6 +3,37 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 PR #336 production acceptance (TA-12 / B-19):
+
+- Owner explicitly authorized merge/release of `3117def`. PR #336 merged as
+  `aac0db310a99f314b6a44466d5a25d85269ea603`; its tree is identical to the approved
+  candidate. This workspace fast-forwarded to that merge; unrelated untracked
+  files remain preserved. This acceptance update changes documentation only.
+- Production deployment `8f5EqBCPgT8yN5jvxxwDP8dVbaWo` is successful. Apex home,
+  gallery, profile and artwork reference the expected build assets and card v20.
+  Artwork JS/CSS match local build bytes; classic card source matches after
+  normalizing Windows/Linux line endings, exactly as the existing hash guard does.
+- Post-merge CI run `40080020913` passes: Linux 2229 unit checks / 2 platform
+  skips; Windows 1965 / 18 environment skips; 46 contracts per OS; both builds
+  and static checks. Candidate checks and its one local PostgreSQL-readiness
+  timeout followed by 37 passing isolated checks remain recorded in PR #336.
+- Actual apex Chrome: Ownership contains identities and no buttons; Community
+  contains Donate/history, Share, Report and Back. Donate/Report open and close
+  correctly; real history remains within 180px. At 390x844 both dialogs fit,
+  focus returns and no horizontal overflow remains after closing. This is a
+  Chrome viewport check, not a new native-iPhone/authentication ceremony.
+- Provenance starts at 2288 ms while the main projection ends at 3384 ms;
+  history finishes at 3522 ms. Homepage shows 5/45/5/0.0265 ETH and four populated
+  timers. Timings are individual samples, not a performance SLA; cold portraits
+  and fresh data still require network work. No contract/data/auth changes.
+- TA-12 and B-19 are done for the measured, bounded scope. Evidence and limits:
+  docs/audits/TA12_ARTWORK_LOADING_2026-10-24.md. Local screenshots/measurements:
+  output/audit/pr336-production-*. Independent release verifier completed.
+- Exactly next step: implement B-13 Saved as a separate bounded task, reusing
+  existing card/detail/profile controls and preserving Watching/Trust semantics
+  and wallet isolation. Do not reopen accepted Phase A ceremonies or announce a
+  beta invitation window; the cohort/operator/date gates remain unassigned.
+
 October 24 TA-12 loading continuation:
 
 - Starting HEAD `e863b10`; same canonical workspace/branch. Preserve unrelated

@@ -3,8 +3,8 @@
 Date: October 24, 2026. Starting HEAD: `e863b10`. Workspace:
 `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 
-Status: **implemented, tested and built locally; not deployed**. The earlier
-countdown fix is separate (`62fdb2a`); Community consolidation is `e863b10`.
+Status: **deployed and verified on the apex through PR #336**, merge `aac0db3`.
+The earlier countdown fix is separate (`62fdb2a`); Community consolidation is `e863b10`.
 Phase A engineering acceptance remains unchanged.
 
 ## Reproduction and causes
@@ -102,12 +102,46 @@ Local evidence is retained under `output/audit/`:
 `ta12-ownership-{classic,future,panels}-2026-10-24.png` and the fixture generator
 `ta12-ownership-fixture.mjs`. Raw local artifacts are not committed.
 
-## Remaining release work
+## Production acceptance
 
-Prepare a reviewed release with this bounded loading change, the earlier timer
-fix and Community consolidation; obtain production-release authorization, then
-repeat public timing and layout checks on that deployed version. Do not mark
-TA-12 deployed or claim a specific millisecond improvement from local mocks.
-After that bounded release, B-13 Saved is the next implementation slice.
-No database changes, signing, credentials or native owner ceremonies are needed
-for this patch. Rollback is by its isolated Git change, not by copying a tree.
+The owner approved candidate `3117deff6a08c583af69fe626cc5971eb0ec89d2`.
+[PR #336](https://github.com/maysonkiller/ArtSoul-Protocol/pull/336) merged at
+08:56:58 UTC as `aac0db310a99f314b6a44466d5a25d85269ea603`; the Git trees match.
+Production Vercel deployment `8f5EqBCPgT8yN5jvxxwDP8dVbaWo` succeeded.
+
+[Post-merge CI](https://github.com/maysonkiller/ArtSoul-Protocol/actions/runs/40080020913)
+completed at 08:59:52 UTC: Linux 2,229 unit checks passed / 2 Windows-only skips;
+Windows 1,965 passed / 18 Docker/PostgreSQL suite skips; 46 contract tests passed
+on each OS. Both builds and static checks passed. Linux ran the PostgreSQL suites.
+The candidate's initial cache-version failure was repaired in all four HTML
+consumers. Its extra local full run had one temporary-PostgreSQL readiness timeout;
+the isolated rerun passed all 37 checks, without weakening tests or timeouts.
+
+Read-only apex verification after release:
+
+- Home, gallery, profile and artwork asset references match the local build and
+  use card v20. Artwork bundle JS/CSS are byte-identical; the copied classic card
+  script matches after line-ending normalization (production LF, local CRLF).
+- Actual artwork 34 shows auction 66 as Sold, two participant rows, four indexed
+  timeline events and the relocated Community controls. Both participant images
+  are complete. No action button remains inside Ownership.
+- Provenance starts at 2,288 ms, before the main projection completes at 3,384 ms;
+  history completes at 3,522 ms. This proves overlap in production. Different
+  cache/network conditions prevent attributing an exact speed-up to these samples.
+- Donate and Report open/close from Community and return focus. Loaded donation
+  history is bounded to 180px with internal scrolling. At Chrome viewport
+  390x844, Donate is 343.4x766.8 and Report 343.4x683.9, both fully within bounds;
+  after close there are no open dialogs or horizontal page overflow. No donation,
+  complaint, social signal or wallet transaction was submitted.
+- Homepage metrics remain 5 artists / 45 auctions / 5 collectors / 0.0265 ETH;
+  four live card timers contain visible text and accessible labels. Its observed
+  56 ms projection response is a single cache-sensitive sample, not an SLA.
+
+Evidence: `output/audit/pr336-production-artifacts-2026-10-24.json`,
+`pr336-production-browser-2026-10-24.json`, `pr336-production-desktop-2026-10-24.png`
+and `pr336-production-mobile-donate-2026-10-24.png`; CI logs are linked above.
+This does not claim new native-iPhone, staff-factor or on-chain acceptance.
+
+TA-12 is complete for the measured causes; ordinary cold data/image loading
+remains. B-13 Saved is the next implementation slice. No database, contract,
+credential or architecture changes. Rollback is via reviewed Git changes.

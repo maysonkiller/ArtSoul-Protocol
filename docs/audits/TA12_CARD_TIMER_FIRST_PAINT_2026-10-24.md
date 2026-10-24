@@ -3,7 +3,7 @@
 Date: October 24, 2026. Baseline: `6321977`, canonical workspace
 `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 
-Status: **locally implemented and verified; not deployed**. This closes only
+Status: **deployed and verified in PR #336**, merge `aac0db3`. This closes only
 the timer-initialization cause within TA-12, not Ownership, Provenance or
 Protocol activity latency. Phase A acceptance stays unchanged.
 
@@ -59,3 +59,8 @@ records `22c0bb98360c89cc`. The earlier focused tests did not cover this release
 requirement. Seventeen cache/version, entry-priority and countdown checks now
 pass, and the build passes again. Candidate CI must pass on the corrected head
 before production authorization; the initial failing run is not accepted.
+
+Release accepted: corrected candidate `3117def` and source-identical merge
+`aac0db3` passed Linux/Windows CI and were published with owner authorization.
+The apex serves v20 on all four consumers; actual homepage cards show four
+populated live timers. See [release evidence](TA12_ARTWORK_LOADING_2026-10-24.md#production-acceptance).

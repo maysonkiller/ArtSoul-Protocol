@@ -34,7 +34,7 @@ This is the repository's durable work register. It consolidates verified complet
 
 | ID | Task | Evidence | Status | Scheduling | Remaining work |
 |---|---|---|---|---|---|
-| TA-12 | Inspect desktop artwork-section flicker and delayed activity, provenance and card timers | Owner report and local `Запись экрана 2026-10-23 004307.mp4`; [checkpoint](audits/STABILIZATION_CHECKPOINT.md) | in progress | Phase B follow-up after accepted Phase A | Very brief Ownership flash on artwork opening; slow Protocol activity and Provenance; late auction timers after refresh. Possible overlap is only a hypothesis. Frame review confirms Ownership loading text at 00:02.033-00:02.067, Provenance loading at 00:20.5-00:21.2, activity placeholders at 00:29.9-00:30.4 and an empty timer pill at 00:49.7-00:50.1. No overlap was established by the recording; the October 24 follow-up below supplies code and request evidence. Preserve the accepted iPhone results. Inspect the recording and actual layout/request behavior before a scoped patch; do not silently claim this observation resolved at beta close-out. **October 24 continuation:** the detached DOM countdown guard is reproduced and repaired locally, with failing-then-passing regression, 21 focused checks, build and five real-DOM browser checks. See [timer evidence](audits/TA12_CARD_TIMER_FIRST_PAINT_2026-10-24.md). The remaining loading paths are now also repaired locally: parallel validated Provenance, overlapping full-feed metadata/profile reads and prepared-avatar reuse. 123 regression checks and build pass; real Chrome confirms the repeated-avatar first-commit fix. See [loading evidence](audits/TA12_ARTWORK_LOADING_2026-10-24.md). Not deployed; candidate CI and release acceptance remain open. |
+| TA-12 | Inspect desktop artwork-section flicker and delayed activity, provenance and card timers | Owner October 23 recording; [release evidence](audits/TA12_ARTWORK_LOADING_2026-10-24.md#production-acceptance) | done | Phase B follow-up after accepted Phase A | PR #336 / `aac0db3` deployed with owner authorization. Detached timer initialization, serial history/metadata reads and repeated prepared-avatar loading are repaired. Candidate and post-merge Linux/Windows CI pass. Apex confirms card v20, populated timers, parallel Provenance and stable participant rows; normal network/image latency remains. No layout overlap was established as the cause. Native iPhone acceptance is not re-claimed by Chrome viewport checks. |
 
 ### Takeover intake — 2026-09-20
 
@@ -73,7 +73,7 @@ full audit. Delivery evidence is tracked in the stabilization checkpoint.
 | --- | --- | --- | --- |
 | TA-10 | Simplify linked social profiles and remove the manual X editor | done | Published profile editing groups social/email connections consistently, preserves OAuth proof and historical public links, and makes verified Discord/X navigable. Actual October 11 profile shows one verified link per provider. Further cross-device OAuth return evidence stays in RG-01. |
 | TA-11 | Add private wallet-bound email verification | done | Published wallet-bound verification and private profile control. The owner-provided screenshot showed Verified email; a read-only October 11 check confirmed verified_email is present with verified_at October 3, 06:56:12 UTC, without disclosing the address or token. Profile email is distinct from the project moderation-mail destination. |
-| TA-12 | Measure and reduce page-loading delays | in progress | Measured waits repaired locally; 123 checks/build pass. [Evidence](audits/TA12_ARTWORK_LOADING_2026-10-24.md). Candidate CI and deployment acceptance remain; wallet authorization and AI valuation unchanged. |
+| TA-12 | Measure and reduce page-loading delays | done | PR #336 / `aac0db3` deployed; measured waits repaired, tests/build/CI and apex checks pass. [Evidence](audits/TA12_ARTWORK_LOADING_2026-10-24.md#production-acceptance). Normal cold network/image latency remains; wallet authorization and AI valuation unchanged. |
 | TA-13 | Deliver the approved artist-support implementation earlier | done | The separate Base Sepolia contract, two actual 1-wei payments, indexed public UI and reversible message-only moderation are verified and activated. Donate shows the canonical creator address; all value goes to that creator, with any positive amount and optional message. No mainnet claim. See [October 11 acceptance](audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md). |
 
 Live moderation activation still depends on the operator-access decision: the
@@ -257,9 +257,9 @@ The founder requests Saved items, grouped search, a configurable profile, compac
 notifications, shared Future controls, a text wordmark and truthful SOON labels.
 The [decision brief](architecture/POST_PHASE_A_PRODUCT_DIRECTION_2026-10-24.md)
 records source inspection, proposed behavior, architecture choices, canon drift,
-team/budget assumptions and fundraising preparation. These rows are planned,
-not implemented or deployed. Phase A acceptance is unchanged. Retained TA-12
-comes first; each implementation remains a separately verified backlog task.
+team/budget assumptions and fundraising preparation. Individual row statuses
+distinguish proposals from deployed work. Phase A acceptance is unchanged;
+TA-12 and B-19 are now deployed, and B-13 is the next separately verified task.
 
 | ID | Item | Why/source | Status | Phase | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -269,7 +269,7 @@ comes first; each implementation remains a separately verified backlog task.
 | B-16 | Add constrained responsive profile curation | October 24 founder prototype; decision brief sections 3-4 | planned | B | Templates, cover, selected works and ordering; no arbitrary HTML/styles or user-selected official aura. |
 | B-17 | Extend the private inbox with real auction lifecycle notifications | October 24 founder request; decision brief section 6 | planned | B | Reuse inbox/outbox patterns, define recipients/preferences, and validate actual event and deadline state. |
 | B-18 | Unify wordmark, Future controls and capability labels | October 24 founder request; decision brief section 4 | planned | B | Both themes for wordmark/SOON; preserve shared auth states, routes, Back, dialog geometry and reduced motion. |
-| B-19 | Consolidate artwork actions in Community | October 24 explicit founder layout request | in progress | B | Implemented and verified locally; not deployed. Ownership retains identities; Community holds the existing actions with compact Trust, wrapping controls and bounded history. 70 checks and build pass; local browser matrix verifies both themes and desktop/mobile layouts. [Evidence](audits/B19_COMMUNITY_ACTIONS_2026-10-24.md). This bounded UI request precedes the remaining TA-12 measurement and B-13 implementation. |
+| B-19 | Consolidate artwork actions in Community | October 24 explicit founder layout request | done | B | PR #336 / `aac0db3` deployed and verified on the apex. Ownership retains identities; Community holds Donate/history, Share, Report, Back and permission-gated staff controls. Both themes checked locally; apex desktop and 390px Donate/Report open/close without horizontal overflow, real history bounded to 180px. [Evidence](audits/B19_COMMUNITY_ACTIONS_2026-10-24.md). |
 
 Contract extensibility and network planning remain under C-06/C1; canon
 reconciliation precedes those decisions. The draft cost model supports C-25;
