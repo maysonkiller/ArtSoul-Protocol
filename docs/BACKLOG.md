@@ -264,7 +264,7 @@ release verification; its database migration and activation remain unapplied.
 
 | ID | Item | Why/source | Status | Phase | Notes |
 | --- | --- | --- | --- | --- | --- |
-| B-13 | Add a reversible personal Saved list | October 24 founder request; decision brief sections 4-5 | local implementation; release checks | B | Shared card/detail controls and owner-only Saved tab; deployment-bound private API/table; Watching/Trust unchanged. Default-off, no live migration or activation. Evidence/rollout: `docs/audits/B13_SAVED_2026-10-24.md`. |
+| B-13 | Add a reversible personal Saved list | October 24 founder request; decision brief sections 4-5 | implemented/tested; awaiting release | B | PR #337 code candidate `40a7469`: Linux/Windows CI and preview build pass. Shared controls, private owner tab and deployment-bound API/table; Watching/Trust unchanged. Default-off, no live migration/activation. Evidence/rollout: `docs/audits/B13_SAVED_2026-10-24.md`. |
 | B-14 | Extend gallery search into a grouped global search surface | October 24 founder request; decision brief section 5 | planned | B | Reuse current helpers; bounded public server search, real routes, accessibility and no fictitious collection/network support. |
 | B-15 | Reorganize profile identity, connected accounts and content views | October 24 founder request; decision brief section 4 | planned | B | Preserve current OAuth/email authentication, Sales data and public/private separation. |
 | B-16 | Add constrained responsive profile curation | October 24 founder prototype; decision brief sections 3-4 | planned | B | Templates, cover, selected works and ordering; no arbitrary HTML/styles or user-selected official aura. |

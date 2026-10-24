@@ -16,14 +16,28 @@ October 24 B-13 Saved continuation (not deployed):
   real local Chrome synthetic-account flow pass. Review fixed stale-list errors
   and cross-deployment lookups; browser checks fixed small-card audio overlap.
   Evidence and exact activation/rollback: `docs/audits/B13_SAVED_2026-10-24.md`.
+- Saved code/tests are in `3b0b7bc` and `40a7469`; PR #337 is prepared:
+  https://github.com/maysonkiller/ArtSoul-Protocol/pull/337.
 - First full local run: 2252 passed, four failures. Corrected migration ledger,
   self-hardening classification and the stripped-import profile fixture; media
   reorg startup timed out under simultaneous Docker suites and passed isolated.
-  All four affected suites then passed (72 checks). Final bounded-concurrency
-  full run and candidate CI are still pending; do not report them as passed.
-- Exactly next step: finish the B-13 full-suite/build/CI and preview evidence,
-  then present its concrete migration/release request. Preserve the table/data
-  on rollback. Do not reopen accepted Phase A or start B-14 before this slice.
+  All four affected suites then passed (72 checks). Bounded local full run:
+  2292 pass / 3 failures, all profile viewport fixture missing window.location;
+  corrected with a history-state regression, 24 profile/state checks pass.
+  Final focused batch: 81 pass. These failed runs are not called green.
+- Candidate `40a7469` CI `40092155390` is green: Linux 2265 pass/2 platform
+  skips; Windows 1994 pass/19 Docker skips; 46 contracts per OS; builds/static
+  pass. Preview `ASF7JJKP2rMySj7xBwDLokj4aoXE` assets match local build on all
+  four surfaces; Saved disabled, anonymous API 401/private/no-store.
+- Chrome became blocked by another extension UI after local functional/geometry
+  checks. Owner is away from the PC and requested continuation without browser.
+  No final clean screenshot/preview UI pass is claimed. Browser viewport reset
+  and fixture tab cleanup must be retried when access resumes; local server is
+  stopped. Helpers are complete.
+- Exactly next step: obtain the concrete PR #337 migration/release authorization,
+  then follow the B13 activation procedure, inspect live core/indexer agreement,
+  migrate with backup, deploy/enable and verify the live Saved flow. Preserve
+  the table/data on rollback. Do not reopen Phase A or start B-14 before this slice.
 
 October 24 PR #336 production acceptance (TA-12 / B-19):
 
