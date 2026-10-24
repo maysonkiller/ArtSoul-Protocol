@@ -3,7 +3,27 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 24 B-02 consistency repair completed:
+October 24 B-15 released; B-16 in progress:
+
+- HEAD `aa747b7`, PR #342, same workspace and branch. B15 exact-candidate CI
+  `40098862160` passed (Linux 2312 / Windows 2017, 46 contracts each, documented
+  skips); READY deployment `dpl_7Qs9JzKAUhzqYn7KSpMkUzJieXpz` matches apex assets.
+  Public profile tabs/Activity and private-field absence checked in real Chrome.
+- Fresh-bootstrap repair PR #341 / `058d64d` released with passing CI. Existing
+  live state_hash already matches; no live DDL was needed. B02 repair remains
+  completed as below; do not replay completed private operation journals.
+- Uncommitted B16: constrained profile layout API/schema/editor, authenticated
+  cover upload and tests. Two existing helpers own backend and UI; root owns
+  integration/release. Preserve unrelated untracked `.codex/`, `output/` and
+  moderation-authority-policy files. No B16 live schema or feature activation yet.
+- Founder delegated selection policy: start with authored/currently-owned works,
+  retain creator attribution; NFT ownership is not copyright ownership. Legal
+  launch review remains separate. Routine Phase B PR/releases remain authorized.
+- Exactly next step: finish B16 integration/security/browser checks and full CI,
+  then back up/apply the additive schema and verify the released feature.
+  External beta journeys/operator window/Snapshot A gates remain open.
+
+Earlier October 24 B-02 consistency repair completed:
 
 - HEAD `c629356`, PR #340 merged; candidate `ad96093` passed full CI
   `40097788978` (Linux 2305 / Windows 2013, 46 contracts per OS, documented skips).

@@ -1,6 +1,6 @@
 # B15 profile organization
 
-Status: implemented and tested locally; not released by this work item.
+Status: implemented, tested, released and apex-verified on October 24, 2026.
 
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`. Work began
 at `ad960937a9234b694ea9300101219cfd3461d806`; the shared branch advanced to
@@ -60,4 +60,15 @@ controls, Activity/Sales and owner-only Saved all pass without horizontal overfl
 Screenshots were inspected under `output/playwright/b15-profile-*`. The fixture's
 only console error was its missing favicon; no application exception occurred.
 No live user session, OAuth ceremony or physical-device acceptance is claimed.
-Exact-candidate full CI, release and apex verification remain pending.
+PR #342 candidate `7df28f5` passed CI `40098862160`: Linux 2312 checks with
+two documented platform skips, Windows 2017 with 22 Docker-dependent skips,
+46 contract checks per OS, builds and static checks. Merge revision
+`aa747b77cb27299f7ac76985fe4c9360da803973` is READY in deployment
+`dpl_7Qs9JzKAUhzqYn7KSpMkUzJieXpz`.
+
+All eight apex page assets match the saved B15 build, and ten existing search
+queries pass. Anonymous production Chrome at 390px verified the four public
+tabs, Activity's Sales description, no private email/inbox/Saved, and no horizontal
+overflow. Screenshot: `output/playwright/b15-apex-activity-390.png`; bounded
+release results: `output/audit/b15-release-*.json`. No new owner OAuth ceremony
+or physical-device acceptance is claimed. The next slice is B16 curation.
