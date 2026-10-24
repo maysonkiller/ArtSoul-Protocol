@@ -17,6 +17,7 @@ class FakeElement {
     this.style = {};
     this.attributes = {};
     this.className = '';
+    this.isConnected = false;
     this.classList = {
       add: (...names) => {
         this.className = [this.className, ...names].filter(Boolean).join(' ');
@@ -105,12 +106,37 @@ test('DOM cards share one timer and keep their compact body structure', () => {
   const secondTimer = second.children.find(child => child.className === 'artsoul-card-countdown');
   assert.equal(firstTimer.attributes.role, 'timer');
   assert.equal(firstTimer.attributes['aria-live'], 'off');
+  assert.equal(firstTimer.textContent, '1m 00s', 'detached cards already contain their countdown before insertion');
+  assert.equal(firstTimer.attributes['aria-label'], 'Auction ends in 1m 00s');
+  assert.equal(secondTimer.textContent, '1m 00s');
+
+  firstTimer.isConnected = true;
+  secondTimer.isConnected = true;
+  clock.now += 1000;
+  intervals[0]();
+  assert.equal(firstTimer.textContent, '0m 59s');
 
   clock.now = future + 1;
   intervals[0]();
   assert.equal(firstTimer.textContent, 'Ended');
   assert.equal(secondTimer.textContent, 'Ended');
   assert.match(firstTimer.className, /is-ended/);
+  assert.deepEqual(cleared, [1]);
+});
+
+test('removed DOM countdowns stop updating and release their shared interval', () => {
+  const { api, intervals, cleared, clock } = loadRuntime();
+  const card = api.createCardElement({
+    id: 'removed', file_url: 'image.jpg', file_type: 'image',
+    auction_id: '7', auction_end_time: clock.now + 60000
+  });
+  const timer = card.children.find(child => child.className === 'artsoul-card-countdown');
+  timer.isConnected = true;
+  intervals[0]();
+  timer.isConnected = false;
+  clock.now += 1000;
+  intervals[0]();
+  assert.equal(timer.textContent, '1m 00s', 'detachment still prevents background writes');
   assert.deepEqual(cleared, [1]);
 });
 

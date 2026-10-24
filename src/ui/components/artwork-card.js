@@ -348,6 +348,10 @@
         pill.dataset.auctionEnd = String(info.endTime);
         pill.setAttribute('role', 'timer');
         pill.setAttribute('aria-live', 'off');
+        // Cards are built off-DOM. Paint the initial value before insertion;
+        // only later ticks should stop when the card is disconnected.
+        pill.textContent = info.label;
+        pill.setAttribute('aria-label', countdownAriaLabel(info.label));
 
         const update = (now = Date.now()) => {
             if ('isConnected' in pill && !pill.isConnected) return false;
@@ -358,7 +362,6 @@
             return label !== 'Ended';
         };
 
-        update();
         subscribeCountdown(update);
         return pill;
     }

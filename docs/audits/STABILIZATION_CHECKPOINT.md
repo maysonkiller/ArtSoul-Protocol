@@ -3,6 +3,27 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 Phase B continuation and effort estimate:
+
+- Starting HEAD `6321977`; canonical workspace and existing unrelated untracked
+  files preserved. Phase A remains accepted; no beta invitation window opened.
+- The product-direction brief sections 14-15 now distinguish actual intermittent
+  cadence from daily work, bounded collection delivery from future utilities,
+  and engineering from external/audit gates. All timing remains an estimate.
+- TA-12 timer cause reproduced in the real apex DOM and a failing regression:
+  the initial updater exits because the new card is not yet connected. Initial
+  text/label now render before insertion; later disconnected ticks still stop.
+- Local checks: 21 focused and 64 expanded card tests, 23 documentation checks
+  and build pass; five real-DOM Chrome fixture
+  checks pass after correcting a fixture asset path. No production deployment.
+  Details: docs/audits/TA12_CARD_TIMER_FIRST_PAINT_2026-10-24.md.
+- One bounded reviewer completed collection/scope and final diff review without
+  a blocker. No new agent remains
+  active. No contracts, economics, network targets or user credentials changed.
+- Exactly next step: measure the remaining TA-12 Ownership, Provenance and
+  Protocol activity loading paths, then complete that bounded release before
+  B-13 Saved. Do not mark all TA-12 symptoms fixed by the timer patch.
+
 October 24 post-Phase-A product direction (planning only):
 
 - Baseline remains the accepted production merge `46b385fcfdc231c17b70bcb86fffc88e37dfe45e`.
