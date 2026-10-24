@@ -3,7 +3,28 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 24 B-14 implementation in progress:
+October 24 B-14 production acceptance / B-02 consistency repair:
+
+- HEAD `a34a1f1`, PR #339; production `dpl_8trHgUyBGvZxEJEqsjzi4J1BXXAB` is READY.
+  The forward-only current-round migration is applied and verified: Live auctions
+  returns both #36/#70 and #37/#71, matching Gallery. Ten apex requests and all
+  eight built page assets pass. B-14 is implemented, released and accepted.
+- PR #339 exact-candidate CI `40096789715`: Linux 2297 pass / 2 platform skips,
+  Windows 2012 pass / 20 Docker skips, 46 contract checks per OS. Original search
+  migration remains immutable. Private backup/apply journals must not be replayed.
+- A separate read-only comparison of 37 works, 71 auctions and four resale listings
+  through both pinned Base Sepolia RPCs found five missing artwork auction pointers
+  (#3, #4, #9, #35, #36); other compared fields agree. Review event histories before
+  repair. No live projection rows have been changed by the search correction.
+- The actual PostgreSQL reproduction confirms concurrent indexer writes can commit
+  dependent events out of order. One helper is implementing sequential canonical
+  order with stop-on-first-failure and regression tests; root owns review/release
+  and a separately bounded data reconciliation. Preserve unrelated untracked files.
+- Exactly next step: review/test/release the B-02 ordering fix, then reconcile only
+  evidenced projection drift and verify both RPCs plus indexer health. B-15 profile
+  organization follows. External beta/operator/journey/Snapshot A gates remain open.
+
+Earlier B-14 preparation (superseded by acceptance above):
 
 - Update: PR #338 merged `58148fc`, production `dpl_HDJHyuhT8FqJ2Xtd8NHjeqoNdE2i`;
   exact-head CI green (Linux 2296/Windows 2012, 46 contracts each). Backed-up
