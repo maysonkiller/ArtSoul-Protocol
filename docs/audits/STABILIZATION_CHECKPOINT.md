@@ -3,6 +3,97 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 TA-12 loading continuation:
+
+- Starting HEAD `e863b10`; same canonical workspace/branch. Preserve unrelated
+  `.codex/`, `output/` and the two untracked authority-policy files.
+- Live read-only Chrome measurements establish serial artwork -> Provenance
+  requests (2,721 ms main completion; history 2,725-3,935 ms), late default avatar
+  preparation and a 1,185 ms homepage projection request. These are baselines,
+  not measurements of the unpublished patch.
+- Local patch overlaps independent history and metadata/profile reads, retaining
+  all visibility/current-load/lifecycle/metric gates. Prepared public avatars
+  use a bounded in-memory cache; default preparation starts before Ownership.
+- Four new concurrency regressions fail before the patch and pass after it.
+  Final combined checks: 123 pass, zero failures/skips; build verifies 11 routes
+  and 174 utilities. Real local Chrome confirms old/new initial Ownership DOM
+  commits (2 loading labels versus 2 immediately ready identities) and remounts.
+- Bounded review found no blocker and finished. No helper is needed in background.
+  Evidence/scope: docs/audits/TA12_ARTWORK_LOADING_2026-10-24.md.
+- Code saved in `8ffc96e`; draft PR #336 now contains the bounded timer,
+  Community and loading changes plus the prior proposal documents:
+  https://github.com/maysonkiller/ArtSoul-Protocol/pull/336.
+  Initial candidate CI caught a missing card runtime version bump: home, gallery,
+  profile and artwork now use v20 with the updated content-hash guard. Seventeen
+  focused release checks and the rebuilt artifact pass. Inspect the latest
+  head/checks before release; do not accept the initial failed candidate.
+  No production deployment. Cold new portraits still need download/decode.
+  No protocol, authentication, database or contract mutation.
+- Exactly next step: complete PR #336 candidate CI/preview review and obtain
+  production-release authorization before live acceptance; then continue B-13.
+  Do not reopen completed Phase A device ceremonies.
+
+October 24 Community action consolidation (B-19):
+
+- Starting HEAD `a818f2e`; same canonical workspace and branch. Existing unrelated
+  `.codex/`, `output/` and the two untracked authority-policy files preserved.
+- Founder-requested UI change implemented locally: Ownership retains identities;
+  Community holds the existing Donate/history, Share, Report, staff tools and Back.
+  Compact Trust header; wrapping controls, bounded history and short-window scroll
+  fallback replace the former 160px desktop constraint. No Trust/auth/economic change.
+- Validation: 70 selected regression/theme/Phase A evidence checks pass with zero
+  failure/skip; build verifies 11 routes and 174 utilities. Chrome local fixture
+  verified both themes, 1440/901/390/320 widths, staff visibility, native dialog
+  open/close/Escape and bounded 20-entry history. This is not a real-device retest.
+- One bounded reviewer completed with no blocker; no helper remains running.
+  Local evidence and exact scope: docs/audits/B19_COMMUNITY_ACTIONS_2026-10-24.md.
+- B-19 is saved in its own local commit (read `git log -1` for the exact HEAD).
+  No push, merge or deployment. Earlier timer commit `62fdb2a` is also unpublished.
+- Exactly next step: measure remaining TA-12 Ownership, Provenance and Protocol
+  activity request/render latency, then prepare the bounded release before B-13.
+
+October 24 Phase B continuation and effort estimate:
+
+- Starting HEAD `6321977`; canonical workspace and existing unrelated untracked
+  files preserved. Phase A remains accepted; no beta invitation window opened.
+- The product-direction brief sections 14-15 now distinguish actual intermittent
+  cadence from daily work, bounded collection delivery from future utilities,
+  and engineering from external/audit gates. All timing remains an estimate.
+- TA-12 timer cause reproduced in the real apex DOM and a failing regression:
+  the initial updater exits because the new card is not yet connected. Initial
+  text/label now render before insertion; later disconnected ticks still stop.
+- Local checks: 21 focused and 64 expanded card tests, 23 documentation checks
+  and build pass; five real-DOM Chrome fixture
+  checks pass after correcting a fixture asset path. No production deployment.
+  Details: docs/audits/TA12_CARD_TIMER_FIRST_PAINT_2026-10-24.md.
+- One bounded reviewer completed collection/scope and final diff review without
+  a blocker. No new agent remains
+  active. No contracts, economics, network targets or user credentials changed.
+- Exactly next step: measure the remaining TA-12 Ownership, Provenance and
+  Protocol activity loading paths, then complete that bounded release before
+  B-13 Saved. Do not mark all TA-12 symptoms fixed by the timer patch.
+
+October 24 post-Phase-A product direction (planning only):
+
+- Baseline remains the accepted production merge `46b385fcfdc231c17b70bcb86fffc88e37dfe45e`.
+  Same workspace and branch; unrelated untracked authority-policy files, .codex
+  and output remain preserved. No application, contract or production mutation.
+- Reviewed the founder's curved-profile HTML source and official OpenSea,
+  OpenZeppelin, ERC-2981 and Base funding references. The local file browser
+  preview was policy-blocked; no rendered-prototype acceptance or workaround.
+- Draft: docs/architecture/POST_PHASE_A_PRODUCT_DIRECTION_2026-10-24.md.
+  B-13 through B-18 record Saved, search, profile organization/curation,
+  notifications and shared theme controls as planned work. Canon reconciliation,
+  contract choices and illustrative staffing/cost models are explicit proposals;
+  no funding, new network, proxy topology or economic rule is approved by them.
+- Validation: 23 existing documentation checks pass, zero failure/skip;
+  Phase A count remains 83/0/0; budget arithmetic, source references and unique
+  new backlog IDs checked; independent bounded review found no blocker.
+  One reused reviewer completed. No new helper remains active.
+- Exactly next step: retain the TA-12 desktop display investigation as the next
+  implementation task, then implement B-13 Saved as one bounded shared-UI/API
+  slice. Do not reopen accepted Phase A device ceremonies or start a full rewrite.
+
 October 24 final Phase A engineering acceptance (Canon 17; no architecture change):
 
 - Work remains in C:\Projects\ArtSoul, branch codex/takeover-audit, HEAD

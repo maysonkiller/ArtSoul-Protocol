@@ -50,7 +50,7 @@ function page({ getArtwork, getLiveAuctionActivity, getProfile, getArtworkProven
   const writes = [];
   const context = vm.createContext({
     console: quiet, ZERO_ADDRESS, WEI_PER_ETH: 10n ** 18n,
-    artworkId: 'v41:84532:28', isV41CompositeId: true,
+    artworkId: 'v41:84532:28', isV41CompositeId: true, v41CompositeId: {chainId: 84532, artworkId: '28'},
     artwork: projection(), auction: null,
     artworkLoadSequenceRef: { current: 0 }, liveAuctionIdentityRef: { current: '' }, loadedArtworkIdRef: { current: null },
     bidCursorRef: { current: null }, bidPollInFlightRef: { current: false },
@@ -136,6 +136,35 @@ test('two artwork loads finishing in reverse order retain the latest artwork, au
   assert.equal(state.error, null);
   assert.equal(state.loading, false);
   assert.equal(api.document.title, 'Latest round - ArtSoul');
+});
+
+test('provenance starts alongside the artwork but cannot reveal a failed or still-pending artwork', async () => {
+  for (const fail of [false, true]) {
+    const artwork = deferred(), history = deferred(); let reads = 0;
+    const {page: api, state} = page({getArtwork: () => artwork.promise,
+      getArtworkProvenance: ({chain_id, artwork_id}) => {
+        assert.equal(chain_id, 84532); assert.equal(artwork_id, '28'); reads++; return history.promise;
+      }});
+    const work = api.loadArtwork();
+    await new Promise(resolve => setImmediate(resolve));
+    const startedWhileArtworkPending = reads;
+    history.resolve({events: [{kind:'indexed'}], complete:true});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(state.provenanceState.status, undefined, 'history is not revealed before the canonical artwork');
+    if (fail) artwork.reject(new Error('Artwork unavailable')); else artwork.resolve(projection());
+    await work;
+    assert.equal(startedWhileArtworkPending, 1, 'independent history request must not wait for artwork metadata');
+    assert.equal(reads, 1, 'the parallel response is reused');
+    assert.equal(state.provenanceState.status, fail ? undefined : 'ready');
+  }
+});
+
+test('a failed parallel provenance read does not fail the primary artwork', async () => {
+  const {page: api, state} = page({getArtwork: async () => projection(),
+    getArtworkProvenance: async () => {throw new Error('History temporarily unavailable');}});
+  assert.equal(await api.loadArtwork(), true);
+  assert.equal(state.loading, false);
+  assert.equal(state.provenanceState.status, 'unavailable');
 });
 
 test('an obsolete failed artwork read cannot replace a newer successful page with an error', async () => {

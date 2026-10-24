@@ -1,6 +1,6 @@
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { ArtworkPageSkeleton } from './loading-skeletons.jsx';
-import { decodeAvatar, decodeImage } from '../features/artwork/decoded-image.js';
+import { prepareAvatar, readPreparedAvatar, decodeImage } from '../features/artwork/decoded-image.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
@@ -15,9 +15,12 @@ import '../../supabase-auth.js';
 
 const { useState, useEffect, useRef } = React;
 
+// Prepare the shared fallback while the artwork request is in flight, rather
+// than downloading/decoding it only after Ownership is already on screen.
+void prepareAvatar('/default-avatar.png').catch(() => {});
 
-function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevious = false) {
-    const [prepared, setPrepared] = useState({ source: '', url: '', failed: false });
+function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevious = false, readPrepared = () => '') {
+    const [prepared, setPrepared] = useState(() => ({ source, url: readPrepared(source), failed: false }));
     useEffect(() => {
         let active = true;
         if (!source) return () => { active = false; };
@@ -29,6 +32,8 @@ function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevi
         );
         return () => { active = false; };
     }, [source, fallback, prepare]);
+    const ready = readPrepared(source);
+    if (ready) return { source, url: ready, failed: false };
     return prepared.source === source || (keepPrevious && source && prepared.url)
         ? prepared : { url: '', failed: false };
 }
@@ -36,7 +41,7 @@ function useDecodedImage(source, fallback = '', prepare = decodeImage, keepPrevi
 function OwnershipIdentity({ source, label, name, className, style, nameStyle, isClassic }) {
     // This component is keyed by wallet: keep the same person's decoded avatar
     // visible while a newer profile image is prepared, never across identities.
-    const image = useDecodedImage(source, '/default-avatar.png', decodeAvatar, true);
+    const image = useDecodedImage(source, '/default-avatar.png', prepareAvatar, true, readPreparedAvatar);
     return (
         <>
             {image.url ? <img src={image.url} alt={label} className={className} style={style} /> : (
@@ -1860,6 +1865,14 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             async function loadArtwork() {
                 const sequence = ++artworkLoadSequenceRef.current;
                 const isCurrent = () => sequence === artworkLoadSequenceRef.current;
+                // The URL already identifies this independent indexer read. Do
+                // not expose it until the artwork succeeds and this load is current.
+                const earlyProvenance = isV41CompositeId
+                    ? Promise.resolve().then(() => window.ArtSoulDB.getArtworkProvenance?.({
+                        chain_id: v41CompositeId.chainId,
+                        artwork_id: v41CompositeId.artworkId
+                    })).catch(() => null)
+                    : null;
                 try {
                     console.log('[Artwork] Loading artwork:', artworkId);
                     // Load from Supabase
@@ -2000,10 +2013,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         }
 
                         setProvenanceState(current => ({ ...current, status: 'loading' }));
-                        const projection = await window.ArtSoulDB.getArtworkProvenance?.({
-                            chain_id: data.chain_id,
-                            artwork_id: data.artwork_id
-                        });
+                        const projection = Number(data.chain_id) === v41CompositeId.chainId &&
+                            String(data.artwork_id) === String(v41CompositeId.artworkId)
+                            ? await earlyProvenance
+                            : await Promise.resolve().then(() => window.ArtSoulDB.getArtworkProvenance?.({
+                                chain_id: data.chain_id,
+                                artwork_id: data.artwork_id
+                            })).catch(() => null);
                         if (!isCurrent()) return;
                         setProvenanceState(projection
                             ? {
@@ -3458,7 +3474,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust" aria-label="Community signals">
                                         <div className="artwork-page-panel-heading">
                                             <h2>Community</h2>
-                                            {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
+                                            {trustScore > 0 && (
+                                                <span className="artwork-page-chip artwork-community-trust" title="Community signal for discovery. Does not affect price or ownership.">
+                                                    <span>Trust</span>
+                                                    <strong>{trustScore}<small>/100</small></strong>
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="artwork-page-signal-actions">
                                             <div className="artwork-page-signal-action">
@@ -3482,6 +3503,57 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 </button>
                                             </div>
                                         </div>
+                                    <div className="artwork-community-actions" aria-label="Artwork actions">
+                                        {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
+                                            <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
+                                                creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
+                                                initialOpen={openDonationFromCard}
+                                                onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                const intent = artworkShareIntent({ ...artwork, creator_name: creatorName });
+                                                if (intent) window.open(intent, '_blank', 'noopener,noreferrer,width=550,height=420');
+                                            }}
+                                            className="btn-secondary artwork-page-compact-action artwork-page-share"
+                                            title="Share on X"
+                                        >
+                                            Share on X
+                                        </button>
+                                        {reportingEnabled && (
+                                            <button
+                                                type="button"
+                                                ref={reportTriggerRef}
+                                                data-allow-rapid="true"
+                                                onClick={() => openArtworkReport()}
+                                                className="btn-secondary artwork-page-compact-action artwork-page-report"
+                                            >
+                                                Report
+                                            </button>
+                                        )}
+                                        {moderationAccess?.canModerate && (
+                                            <button type="button" ref={moderationTriggerRef} data-allow-rapid="true"
+                                                disabled={moderationBusy || moderationChecking}
+                                                className="btn-secondary artwork-page-compact-action"
+                                                onClick={async () => {
+                                                    if (moderationBusy || moderationChecking) return;
+                                                    setModerationChecking(true);
+                                                    try {
+                                                        if (await loadModerationVisibility(artwork, { interactive: true })) {
+                                                            moderationDialogRef.current?.showModal();
+                                                        }
+                                                    } finally { setModerationChecking(false); }
+                                                }}>{moderationChecking ? 'Checking access…' : 'Moderation tools'}</button>
+                                        )}
+                                        <button
+                                            onClick={() => window.history.back()}
+                                            className="btn-secondary artwork-page-compact-action artwork-mobile-back"
+                                        >
+                                            Back
+                                        </button>
+                                    </div>
+                                    {moderationMessage && !moderationAccess?.canModerate && <p role="status">{moderationMessage} <a href="/admin">Open Admin</a></p>}
+                                    {cardActionNotice && <p role="status">{cardActionNotice}</p>}
                                 </section>
 
                                 <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai" aria-label="Gemini analysis">
@@ -3512,7 +3584,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             <aside className="artwork-page-right">
                                 {moderationAccess?.canModerate && (
                                     <dialog ref={moderationDialogRef} className="artwork-moderation-dialog reauction-modal"
-                                        aria-label="Staff moderation" onClose={() => moderationTriggerRef.current?.focus()}>
+                                        aria-label="Staff moderation" onClose={() => moderationTriggerRef.current?.focus({ preventScroll: true })}>
                                     <section className="moderation-panel artwork-mobile-moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                             <div>
@@ -3613,57 +3685,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             })}
                                     </div>
 
-                                    <div className="artwork-ownership-actions">
-                                        <button
-                                            onClick={() => {
-                                                const intent = artworkShareIntent({ ...artwork, creator_name: creatorName });
-                                                if (intent) window.open(intent, '_blank', 'noopener,noreferrer,width=550,height=420');
-                                            }}
-                                            className="btn-secondary artwork-page-compact-action artwork-page-share"
-                                            title="Share on X"
-                                        >
-                                            Share on X
-                                        </button>
-                                        <button
-                                            onClick={() => window.history.back()}
-                                            className="btn-secondary artwork-page-compact-action artwork-mobile-back"
-                                        >
-                                            Back
-                                        </button>
-                                        {reportingEnabled && (
-                                            <button
-                                                type="button"
-                                                ref={reportTriggerRef}
-                                                data-allow-rapid="true"
-                                                onClick={() => openArtworkReport()}
-                                                className="btn-secondary artwork-page-compact-action artwork-page-report"
-                                            >
-                                                Report
-                                            </button>
-                                        )}
-                                        {moderationAccess?.canModerate && (
-                                            <button type="button" ref={moderationTriggerRef} data-allow-rapid="true"
-                                                disabled={moderationBusy || moderationChecking}
-                                                className="btn-secondary artwork-page-compact-action"
-                                                onClick={async () => {
-                                                    if (moderationBusy || moderationChecking) return;
-                                                    setModerationChecking(true);
-                                                    try {
-                                                        if (await loadModerationVisibility(artwork, { interactive: true })) {
-                                                            moderationDialogRef.current?.showModal();
-                                                        }
-                                                    } finally { setModerationChecking(false); }
-                                                }}>{moderationChecking ? 'Checking access…' : 'Moderation tools'}</button>
-                                        )}
-                                    </div>
-                                    {moderationMessage && !moderationAccess?.canModerate && <p role="status">{moderationMessage} <a href="/admin">Open Admin</a></p>}
-                                    {cardActionNotice && <p role="status">{cardActionNotice}</p>}
-                                    {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
-                                        <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
-                                            creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
-                                            initialOpen={openDonationFromCard}
-                                            onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
-                                    )}
                                 </div>
                                 {isV41CompositeId && (
                                     <section className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">

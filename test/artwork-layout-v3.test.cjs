@@ -34,13 +34,13 @@ test('profile identities and live bids are linked, named, timed, and newest firs
     assert.match(source, /Number\(right\.block_number \|\| 0\) - Number\(left\.block_number \|\| 0\)/);
 });
 
-test('desktop pins the complete left composition and scrolls the right rail', () => {
+test('desktop bounds Community expansion and keeps both rails reachable', () => {
     assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.artwork-page-root \{[\s\S]*?height: calc\(100dvh - var\(--site-header-height, 77px\)\);[\s\S]*?overflow: hidden;/);
-    assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.artwork-page-left \{[\s\S]*?position: sticky;[\s\S]*?"media context"[\s\S]*?"media ai"[\s\S]*?"trust trust"[\s\S]*?overflow: hidden;/);
+    assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.artwork-page-left \{[\s\S]*?position: sticky;[\s\S]*?"media context"[\s\S]*?"media ai"[\s\S]*?"trust trust"[\s\S]*?overflow-y: auto;/);
     assert.match(styles, /@media \(min-width: 901px\)[\s\S]*?\.artwork-page-right \{[\s\S]*?height: 100%;[\s\S]*?overflow-y: auto;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-context \{[\s\S]*?align-self: start;[\s\S]*?height: fit-content;/);
     assert.match(styles, /\.artwork-page-left \.artwork-detail-frame \{[\s\S]*?width: 100%;[\s\S]*?height: 100%;/);
-    assert.match(styles, /\.artwork-page-left \.artwork-page-trust \{[\s\S]*?width: 100%;[\s\S]*?height: 160px;/);
+    assert.match(styles, /\.artwork-page-left \.artwork-page-trust \{[\s\S]*?width: 100%;[\s\S]*?max-height: min\(320px, 40dvh\);[\s\S]*?overflow-y: auto;/);
 });
 
 test('title, description and details share one tight transparent card with Gemini below', () => {
@@ -127,13 +127,33 @@ test('Community aligns one number over each action without duplicate signal labe
     assert.match(styles, /\.artwork-page-signal-action strong \{[\s\S]*?width: 100%;[\s\S]*?text-align: center;/);
 });
 
-test('Ownership contains Share and Back while the header subtitle and V3 player skin are gone', () => {
+test('Community contains Share and Back while the header subtitle and V3 player skin are gone', () => {
     assert.doesNotMatch(html, /Artwork \/ Auction, ownership, and provenance/);
-    assert.match(source, /className="artwork-ownership-actions"/);
+    assert.match(source, /className="artwork-community-actions"/);
     assert.ok(source.indexOf('Share on X') < source.indexOf('artwork-mobile-back'));
     assert.doesNotMatch(source, /artwork-page-navigation/);
     assert.doesNotMatch(styles, /--c-media-glass/);
     assert.doesNotMatch(styles, /\.artwork-detail-video-shell::after/);
+});
+
+test('Community owns artwork actions while Ownership keeps only participant identities', () => {
+    const community = source.slice(source.indexOf('<section className="artwork-page-panel artwork-page-trust'),
+        source.indexOf('<section className="artwork-page-panel artwork-page-ai'));
+    const ownership = source.slice(source.indexOf('{/* Ownership Info - Three Roles */}'),
+        source.indexOf('<section className="artwork-page-panel artwork-page-provenance'));
+    for (const action of ['<ArtistSupport', 'artwork-page-share', 'artwork-page-report', 'artwork-mobile-back', 'Moderation tools']) {
+        assert.ok(community.includes(action), `${action} belongs to Community`);
+        assert.ok(!ownership.includes(action), `${action} must not crowd Ownership`);
+    }
+    assert.equal((source.match(/<ArtistSupport\b/g) || []).length, 1, 'one support instance preserves its state and lazy reads');
+    assert.doesNotMatch(ownership, /<button\b/);
+    assert.equal((ownership.match(/renderOwnershipRole\(/g) || []).length, 4);
+    assert.match(community, /reportingEnabled &&/);
+    assert.match(community, /moderationAccess\?\.canModerate &&/);
+    assert.match(community, /loadModerationVisibility\(artwork, \{ interactive: true \}\)/);
+    assert.match(community, /trustScore > 0 &&[\s\S]*?\{trustScore\}/);
+    assert.match(styles, /\.artwork-community-actions \{[^}]*flex-wrap: wrap;/);
+    assert.doesNotMatch(styles, /grid-template-rows: auto minmax\(0, 1fr\) 160px/);
 });
 
 test('ISO auction timestamps bypass the legacy helper Unknown result', () => {

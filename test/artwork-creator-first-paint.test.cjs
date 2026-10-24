@@ -34,7 +34,7 @@ test('the exact projection seeds creator identity before the first content frame
 
 test('ownership reveals a prepared identity together without a blank bordered avatar', () => {
   const ownership = detail.slice(detail.indexOf('function OwnershipIdentity'), detail.indexOf('const ZERO_ADDRESS'));
-  assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png', decodeAvatar, true\)/);
+  assert.match(ownership, /useDecodedImage\(source, '\/default-avatar\.png', prepareAvatar, true, readPreparedAvatar\)/);
   assert.match(ownership, /image\.url \? <img/);
   assert.match(ownership, /style=\{nameStyle\}>\{name\}/);
   assert.match(ownership, /role="status">Loading profile…/);

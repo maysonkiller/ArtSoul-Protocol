@@ -213,6 +213,29 @@ test('hidden artwork provenance is suppressed before lifecycle queries for publi
   });
 });
 
+test('auction endings start before a slow resale read completes without publishing partial history', async () => {
+  const {default: handler} = await import('../src/api/routes/public/artwork-provenance.js');
+  const originalFetch = global.fetch, requests = [];
+  let release;
+  const slow = new Promise(resolve => {release = resolve;});
+  global.fetch = async url => {
+    const {table} = tableFromUrl(url); requests.push(table);
+    if (table === 'v41_resale_history') await slow;
+    return jsonResponse(visibleFixtures[table] || []);
+  };
+  try {
+    const res = apiResponse();
+    const work = handler({method:'GET',query:{chain_id:'84532',artwork_id:'77'},headers:{}},res);
+    await new Promise(resolve => setImmediate(resolve));
+    const earlyEndings = requests.includes('v41_auction_endings');
+    assert.equal(res.body, null);
+    release(); await work;
+    assert.equal(earlyEndings, true);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.events.filter(event => event.type === 'auction_ended').length, 1);
+  } finally {release(); global.fetch = originalFetch;}
+});
+
 test('direct artwork lookup uses exact projection queries instead of the capped public snapshot', async () => {
   const { default: handler } = await import('../src/api/routes/public/artworks.js');
 

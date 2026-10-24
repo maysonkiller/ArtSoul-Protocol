@@ -1867,7 +1867,26 @@ body.future .gallery-filter-panel {
 }
 
 .artwork-page-trust .artwork-page-panel-heading {
-    justify-content: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.artwork-community-trust {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.artwork-community-trust strong {
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.artwork-community-trust small {
+    margin-left: 2px;
+    color: var(--c-text-muted);
+    font-size: 0.7rem;
+    font-weight: 400;
 }
 
 .artwork-page-signal-actions {
@@ -2061,8 +2080,9 @@ body.future .gallery-filter-panel {
     opacity: 0.58;
 }
 
-.artwork-ownership-actions {
+.artwork-community-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -2071,11 +2091,29 @@ body.future .gallery-filter-panel {
     border-top: 1px solid var(--c-border-soft);
 }
 
-.artwork-ownership-actions .artwork-page-compact-action {
-    min-width: 104px;
-    min-height: 38px !important;
-    flex: 1;
+.artwork-community-actions .artwork-page-compact-action {
+    min-width: 0;
+    min-height: 44px !important;
+    flex: 1 1 auto;
     align-self: auto;
+    white-space: normal;
+}
+
+.artwork-community-actions .artist-support {
+    flex: 1 1 240px;
+    min-width: 0;
+    margin-top: 0;
+}
+
+.artwork-community-actions .artist-support:has(.artist-support-history) {
+    flex-basis: 100%;
+}
+
+.artwork-community-actions .artist-support-history {
+    max-height: 180px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    text-align: left;
 }
 
 .artwork-page-provenance {
@@ -2215,7 +2253,7 @@ body.future .gallery-filter-panel {
         position: sticky;
         top: 0;
         grid-template-columns: minmax(0, 1.28fr) minmax(270px, 0.72fr);
-        grid-template-rows: auto minmax(0, 1fr) 160px;
+        grid-template-rows: auto minmax(100px, 1fr) auto;
         grid-template-areas:
             "media context"
             "media ai"
@@ -2223,7 +2261,9 @@ body.future .gallery-filter-panel {
         height: 100%;
         min-height: 0;
         gap: 11px;
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: auto;
+        scrollbar-width: thin;
     }
 
     .artwork-page-left .artwork-detail-stage { grid-area: media; }
@@ -2254,7 +2294,10 @@ body.future .gallery-filter-panel {
     .artwork-page-left .artwork-page-trust {
         box-sizing: border-box;
         width: 100%;
-        height: 160px;
+        min-height: 0;
+        max-height: min(320px, 40dvh);
+        overflow-y: auto;
+        scrollbar-width: thin;
     }
 
     .artwork-page-right {
@@ -2334,7 +2377,7 @@ body.future .gallery-filter-panel {
 @media (max-width: 1180px) and (min-width: 901px) {
     .artwork-page-left {
         grid-template-columns: minmax(0, 1.2fr) minmax(230px, 0.8fr);
-        grid-template-rows: auto minmax(0, 1fr) 160px;
+        grid-template-rows: auto minmax(100px, 1fr) auto;
         grid-template-areas:
             "media context"
             "media ai"
@@ -2528,17 +2571,6 @@ body.future .gallery-filter-panel {
         min-height: 42px !important;
         padding: 0.5rem 0.75rem !important;
         font-size: 0.82rem;
-    }
-
-    .artwork-ownership-actions {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .artwork-ownership-actions .artwork-page-compact-action {
-        min-width: 0;
-        min-height: 44px !important;
-        flex: 1;
     }
 
     .artwork-page-root .artwork-page-layout *,
