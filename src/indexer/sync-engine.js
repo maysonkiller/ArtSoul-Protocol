@@ -250,7 +250,12 @@ class IndexerSyncEngine {
     async syncHistoricalEvents(fromBlock, toBlock, options = {}) {
         console.log(`[IndexerSyncEngine] Syncing historical events from ${fromBlock} to ${toBlock}`);
 
-        const events = await this.eventListener.queryAllHistoricalEvents(fromBlock, toBlock);
+        // Projection handlers depend on earlier logs (including within one
+        // block). Keep their writes in canonical order, regardless of retrieval
+        // order or individual database query latency.
+        const events = [...await this.eventListener.queryAllHistoricalEvents(fromBlock, toBlock)]
+            .sort((left, right) => Number(left.blockNumber) - Number(right.blockNumber)
+                || Number(left.logIndex) - Number(right.logIndex));
 
         // Store block hashes for reorg detection. Free RPC historical catch-up can
         // skip empty-range backfill and keep hashes only for blocks with events;
@@ -280,19 +285,13 @@ class IndexerSyncEngine {
             }
         }
 
-        // Batch processing with adaptive concurrency based on DB backpressure
+        // Batches bound bookkeeping only. Projection writes must be sequential:
+        // an auction cannot be applied before its artwork registration commits.
         const BATCH_SIZE = 50;
-        let CONCURRENCY = 5;
-
-        // Check DB backpressure and adjust concurrency
-        if (this.db.isBackpressure()) {
-            CONCURRENCY = 2;
-            console.warn('[IndexerSyncEngine] DB backpressure detected, reducing concurrency to 2');
-        }
 
         // Update metrics
         if (this.metrics) {
-            this.metrics.updateConcurrency(CONCURRENCY);
+            this.metrics.updateConcurrency(1);
             this.metrics.updateBackpressure(this.db.isBackpressure());
         }
 
@@ -304,25 +303,11 @@ class IndexerSyncEngine {
         for (let i = 0; i < events.length; i += BATCH_SIZE) {
             const batch = events.slice(i, i + BATCH_SIZE);
 
-            // Recheck backpressure between batches
-            if (this.db.isBackpressure() && CONCURRENCY > 2) {
-                CONCURRENCY = 2;
-                console.warn('[IndexerSyncEngine] DB backpressure detected mid-sync, reducing concurrency to 2');
-                if (this.metrics) {
-                    this.metrics.updateConcurrency(CONCURRENCY);
-                    this.metrics.updateBackpressure(true);
-                }
-            } else if (!this.db.isBackpressure() && CONCURRENCY < 5) {
-                CONCURRENCY = 5;
-                console.log('[IndexerSyncEngine] DB backpressure cleared, restoring concurrency to 5');
-                if (this.metrics) {
-                    this.metrics.updateConcurrency(CONCURRENCY);
-                    this.metrics.updateBackpressure(false);
-                }
+            if (this.metrics) {
+                this.metrics.updateBackpressure(this.db.isBackpressure());
             }
 
-            // Process batch with concurrency limit
-            const results = await this._processBatchWithLimit(batch, CONCURRENCY);
+            const results = await this._processBatchInOrder(batch);
 
             processedCount += results.filter(r => r.success).length;
             for (const result of results) {
@@ -336,16 +321,15 @@ class IndexerSyncEngine {
                     error: result.error?.message
                 });
             }
+            // Do not start the next batch after an earlier event failed.
+            if (failedCount > 0) break;
         }
 
-        // FAIL CLOSED. Every event in the range is processed first so that all
-        // recoverable work lands and every failure is durably recorded in
-        // event_processing_registry, but no cursor may move while any event in
-        // the range is unprocessed. Throwing here — before last_indexed_block,
-        // last_confirmed_block, state_hash and total_events_indexed are
-        // touched — makes the next poll re-query the identical range instead
-        // of silently skipping the failed event. Already-completed events in
-        // that range are skipped idempotently by the registry claim check.
+        // FAIL CLOSED. Only the ordered prefix may commit; the failed event is
+        // durably recorded and the remaining suffix is not attempted. No cursor,
+        // state hash or event total moves until the entire range completes. The
+        // next poll re-queries that range, skips its completed prefix through the
+        // registry claim check, then retries the failure before any later log.
         if (failedCount > 0) {
             const rangeError = new IndexerRangeProcessingError({
                 fromBlock,
@@ -632,50 +616,30 @@ class IndexerSyncEngine {
         console.log(`[IndexerSyncEngine] Indexer state reset to block ${reorgBlock - 1}`);
     }
 
-    async _processBatchWithLimit(events, concurrency) {
+    async _processBatchInOrder(events) {
         const results = [];
-        const executing = [];
 
         for (const event of events) {
-            const promise = this._processEvent(event)
-                .then(() => {
-                    // Record successful event processing
-                    if (this.metrics) {
-                        this.metrics.recordEventProcessed(event.eventName, true);
-                    }
-                    return { success: true, event };
-                })
-                .catch(async (error) => {
-                    console.error(`[IndexerSyncEngine] Failed to process event at block ${event.blockNumber}:`, error);
+            try {
+                await this._processEvent(event);
+                if (this.metrics) {
+                    this.metrics.recordEventProcessed(event.eventName, true);
+                }
+                results.push({ success: true, event });
+            } catch (error) {
+                console.error(`[IndexerSyncEngine] Failed to process event at block ${event.blockNumber}:`, error);
 
-                    // Record failed event processing. The durable failure record
-                    // itself is written by processEvent's rollback handler
-                    // directly into event_processing_registry, which is the
-                    // single source of truth for event-processing failures.
-                    if (this.metrics) {
-                        this.metrics.recordEventProcessed(event.eventName, false);
-                    }
-
-                    return { success: false, event, error };
-                })
-                .finally(() => {
-                    // Remove from executing pool when done
-                    const index = executing.indexOf(promise);
-                    if (index > -1) {
-                        executing.splice(index, 1);
-                    }
-                });
-
-            results.push(promise);
-            executing.push(promise);
-
-            // Wait if we hit concurrency limit
-            if (executing.length >= concurrency) {
-                await Promise.race(executing);
+                // processEvent's rollback handler writes the owner-fenced
+                // durable failure to event_processing_registry.
+                if (this.metrics) {
+                    this.metrics.recordEventProcessed(event.eventName, false);
+                }
+                results.push({ success: false, event, error });
+                break;
             }
         }
 
-        return await Promise.all(results);
+        return results;
     }
 
     async _processEvent(event) {

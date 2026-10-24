@@ -233,9 +233,8 @@ function createFakeDatabase(options = {}) {
             async connect() {
                 // Row-level copy-on-write overlay. Only rows this transaction
                 // actually touched are buffered, so a COMMIT merges just those
-                // keys and cannot clobber a concurrent transaction's rows —
-                // which is what lets the suite run a failing and a healthy
-                // event in the same batch, as production does.
+                // keys without discarding previously committed events when a
+                // later event rolls back.
                 let overlay = null;
                 const txStore = {
                     get(key) {
@@ -431,11 +430,12 @@ test('the structured range error carries the range and the failing events', asyn
     );
 });
 
-test('the next poll retries the identical range and never double-applies a completed sibling', async () => {
-    const failing = makeEvent(1);
-    const healthy = makeEvent(2);
+test('the next poll retries the identical range without replaying the completed prefix or skipping the failed event', async () => {
+    const prefix = makeEvent(1);
+    const failing = makeEvent(2);
+    const suffix = makeEvent(3);
     const { engine, db, listener } = await createEngine({
-        events: [failing, healthy],
+        events: [prefix, failing, suffix],
         failures: { [`${failing.transactionHash}:0`]: 1 }
     });
 
@@ -444,8 +444,9 @@ test('the next poll retries the identical range and never double-applies a compl
         error => error.code === 'INDEXER_RANGE_INCOMPLETE'
     );
 
-    assert.equal(registryRow(db, healthy).processing_status, 'completed');
+    assert.equal(registryRow(db, prefix).processing_status, 'completed');
     assert.equal(registryRow(db, failing).processing_status, 'failed');
+    assert.equal(registryRow(db, suffix), undefined, 'later logs must remain unclaimed until the failure is retried');
     const handlerCallsAfterFirstPass = db.stats.handlerCalls.length;
 
     // Cursor did not move, so the production poll loop recomputes the same
@@ -460,15 +461,13 @@ test('the next poll retries the identical range and never double-applies a compl
         { fromBlock: 101, toBlock: 105 },
         { fromBlock: 101, toBlock: 105 }
     ]);
-    assert.equal(retried, 2, 'both events count as processed once the range completes');
+    assert.equal(retried, 3, 'all events count as processed once the range completes');
 
-    // The already-completed sibling was skipped by the registry claim check,
-    // so its handler ran exactly once across both passes.
-    const healthyCalls = db.stats.handlerCalls.filter(
-        call => call === `${healthy.transactionHash}:0`
-    );
-    assert.equal(healthyCalls.length, 1);
-    assert.equal(db.stats.handlerCalls.length, handlerCallsAfterFirstPass + 1);
+    // The registry skips the completed prefix, then retries the failed event
+    // before attempting the untouched suffix.
+    assert.deepEqual(db.stats.handlerCalls, [prefix, failing, failing, suffix]
+        .map(event => `${event.transactionHash}:0`));
+    assert.equal(db.stats.handlerCalls.length, handlerCallsAfterFirstPass + 2);
 });
 
 test('a live lease left by a crashed worker keeps the cursor pinned until it is reaped', async () => {
