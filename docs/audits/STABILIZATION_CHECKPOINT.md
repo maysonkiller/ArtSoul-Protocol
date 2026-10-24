@@ -23,7 +23,10 @@ October 24 TA-12 loading continuation:
 - Code saved in `8ffc96e`; draft PR #336 now contains the bounded timer,
   Community and loading changes plus the prior proposal documents:
   https://github.com/maysonkiller/ArtSoul-Protocol/pull/336.
-  Candidate CI/preview started; inspect the latest head/checks before release.
+  Initial candidate CI caught a missing card runtime version bump: home, gallery,
+  profile and artwork now use v20 with the updated content-hash guard. Seventeen
+  focused release checks and the rebuilt artifact pass. Inspect the latest
+  head/checks before release; do not accept the initial failed candidate.
   No production deployment. Cold new portraits still need download/decode.
   No protocol, authentication, database or contract mutation.
 - Exactly next step: complete PR #336 candidate CI/preview review and obtain

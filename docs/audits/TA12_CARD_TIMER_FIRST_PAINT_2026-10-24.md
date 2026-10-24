@@ -51,3 +51,11 @@ No additional privileges, wallet operations, data writes or deployment occurred.
 No canon ambiguity was resolved: this is display readiness only (sections 5/16/17).
 Next: measure remaining Ownership/provenance/activity paths separately and avoid
 attributing their delays to this timer bug or weakening auction freshness.
+
+Release follow-up (PR #336): full Linux CI caught an omitted cache-version bump
+for the changed classic card runtime. The four HTML consumers (home, gallery,
+profile, artwork) now load `artwork-card.js?v=20`; the normalized-content guard
+records `22c0bb98360c89cc`. The earlier focused tests did not cover this release
+requirement. Seventeen cache/version, entry-priority and countdown checks now
+pass, and the build passes again. Candidate CI must pass on the corrected head
+before production authorization; the initial failing run is not accepted.
