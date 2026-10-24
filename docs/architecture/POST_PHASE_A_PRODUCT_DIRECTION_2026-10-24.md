@@ -450,3 +450,116 @@ then take the first bounded B-13 Saved slice against the shared card and artwork
 surfaces. Keep the current accepted publication, OAuth, recovery and moderation
 paths as the regression baseline. The remainder of this document is a sequenced
 brief, not an instruction to rewrite the whole application at once.
+
+## 14. Remaining effort and delivery scenarios
+
+October 24 follow-up: the founder asks to continue Phase B and estimate the
+remaining work at the present cadence with GPT-6 Astra at the preferred high
+reasoning setting. This is a capacity estimate, not a release date or a model
+benchmark. No model or account setting was changed by this review.
+
+Evidence: the first-parent Git history has 51 commits/merges during October 1-24,
+on 12 distinct commit dates. Some are documentation, corrections or acceptance
+records, not new features. Commit dates are not tracked working hours. The
+September 20-October 24 takeover window is not all of Phase A: earlier accepted
+work reaches back into July. Do not estimate remaining hours by PR count or call
+the entire completed Phase A a five-week project.
+
+At this revision the detailed backlog has 18 B rows (2 done, 7 in progress,
+9 planned), 27 C rows (17 planned, 10 blocked-on-founder) and 6 planned D rows.
+Canonical B1-B5, C0-C15 and D1-D6 are grouped acceptance gates, not extra tasks to
+add to those totals. Existing runbooks and local scaffolds reduce implementation
+work, but do not close their real-operation acceptance gates.
+
+The following active-work estimates include implementation, tests, review,
+integration and likely repair, with one principal implementation stream and
+bounded specialist assistance. An active day means a substantive work-and-review
+session, not a commit or a promise of autonomous round-the-clock operation.
+
+| Phase | Remaining scope | Active work allowance | Rough effort index, completed A = 100 |
+| --- | --- | --- | --- |
+| B | Deferred display follow-up, remaining native journeys, controlled cohort operations, Saved/search/profile/notifications and feedback | 20-35 active days | 60-100 |
+| C | Architecture decisions, final Core/NFT/Genesis/pool/collections, indexer/UI integration, invariants, audit fixes and fresh rehearsal | 40-70 active days | 150-250 |
+| D | Snapshot/migration/deployment verification, custody handover, launch smoke checks and initial controlled rollout | 7-14 active days | 20-40 |
+
+The effort index is a low-confidence complexity judgement, not measured labor.
+C is the largest remaining engineering and security stage; D has less code but
+more consequential irreversible operations. D6 continuing growth has no finite
+completion date and is excluded from the initial-launch estimate.
+
+Calendar scenarios, assuming decisions, access and adequate model usage are
+available and scope is held stable:
+
+- **Present intermittent cadence:** approximately 3-4 active days per week;
+  B about 6-10 weeks, C about 12-20 weeks, D about 2-4 weeks: roughly **20-34 weeks
+  (5-8 months)** to an initial staged launch decision/rollout.
+- **Near-daily cadence:** approximately 5-6 active days per week; B about 4-7
+  weeks, C about 8-14 weeks, D about 2-3 weeks: roughly **14-24 weeks
+  (3.5-6 months)** after rounding for integration and observation.
+
+These are planning ranges, not best/worst-case guarantees. Recruitment, funding,
+counsel, auditor procurement/availability and substantive audit findings can add
+unbounded waiting. B's external feedback may take 8-12 elapsed weeks even where
+its engineering completes earlier. Snapshot notice needs at least two weeks;
+auctions/settlement and D's approved observation window take real elapsed time.
+Prepare external inputs concurrently, without claiming the next phase's exit
+before its gates pass. Broad new utilities, non-Base launches and repeated
+economic/design changes are excluded and require re-estimation. Reforecast
+after two weeks of actual B delivery using accepted slices and rework, not lines
+of code or number of agents.
+
+Official [GPT-6 Astra documentation](https://developers.openai.com/api/docs/models/gpt-6-astra)
+describes complex reasoning/coding capabilities, not a delivery-time multiplier
+for ArtSoul. The public API lists effort settings through `max`; this does not
+establish the meaning or speed of the owner's Codex `ultra` setting. Do not
+substitute another model or promise that a stronger setting removes independent
+audit, human/device approval or actual chain-time requirements.
+
+## 15. Collection module: finish one usable path, then extend it
+
+Current assets worth preserving:
+
+- `src/entries/collection-builder.jsx`: Collection -> Phases -> Review, browser
+  draft save/load, JSON import/export, replacement undo, dirty-leave protection
+  and phase editing/order.
+- `src/features/collections/launch-config.js`: bounded parsing, exact amounts,
+  timezones/schedules, allocations, price/eligibility descriptions and explicit
+  compatibility findings.
+- `contracts/launch/CollectionLaunch.sol` and `CollectionForge.sol`: isolated
+  local contracts and focused tests for phased allocation, funded auctions,
+  credits, configuration locking, unused supply and a separate craft output.
+
+This is meaningful draft/local infrastructure, not an end-to-end launch product.
+Publishing is disabled; listed networks have writes disabled. Verified deployment
+binding, reviewed constructor/owner/receiver policy, durable media and allowlist
+manifests, indexed projections and a real testnet rehearsal remain missing gates.
+Neither an AI-review endpoint nor a selectable draft option proves support.
+
+Proposed work order within the existing collection/C1 scope:
+
+1. Choose an actually supported template and use plain language. Keep advanced
+   settings collapsed; never present unsupported eligibility or royalty choices
+   as deployable.
+2. Complete media/metadata/rights entry, preview, resumable drafts and clear
+   browser-only versus account-synced saving. Account sync is new work.
+3. Show a visual schedule/allocation review with local time and explicit UTC,
+   overlaps, unused allocation and the collector's preview.
+4. Complete one supported flow from reviewed deployment through wallet
+   confirmation/recovery, indexer, public collection and creator dashboard.
+5. Extend utilities through versioned, capability-aware modules after separate
+   approval. Label each as contract-enforced, externally integrated or a creator
+   commitment; explain what a holder can do and who must deliver it.
+
+Possible later utility proposals: holder access to artist material/community;
+creator extras with explicit redemption terms; curated exhibitions; and the
+existing optional Forge path after its own terms/rehearsal. Transfer, revocation,
+single-use redemption, privacy and provider obligations must be decided before
+implementation. Ownership checks alone cannot guarantee physical delivery or
+third-party service. No yield, token, points or new Genesis entitlement is implied.
+Sold rights must not be arbitrarily rewritten by a new module.
+
+Generic Collection Launch, canonical Partner Collections (first auction then
+flat buy-now) and ordinary 1/1 auctions stay distinct. Collection improvements
+are included in C's estimate at a bounded first-release scope; an unlimited
+utility/app platform is not. No Solidity, economics or network activation is
+changed by this planning update.
