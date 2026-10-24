@@ -20,11 +20,15 @@ October 24 TA-12 loading continuation:
   commits (2 loading labels versus 2 immediately ready identities) and remounts.
 - Bounded review found no blocker and finished. No helper is needed in background.
   Evidence/scope: docs/audits/TA12_ARTWORK_LOADING_2026-10-24.md.
-- Saved in a separate local change; not deployed. Cold new portraits still need
-  download/decode. No protocol, authentication, database or contract mutation.
-- Exactly next step: prepare the bounded timer/Community/loading release, run
-  candidate CI and obtain production-release authorization before live acceptance;
-  then continue B-13. Do not reopen completed Phase A device ceremonies.
+- Code saved in `8ffc96e`; draft PR #336 now contains the bounded timer,
+  Community and loading changes plus the prior proposal documents:
+  https://github.com/maysonkiller/ArtSoul-Protocol/pull/336.
+  Candidate CI/preview started; inspect the latest head/checks before release.
+  No production deployment. Cold new portraits still need download/decode.
+  No protocol, authentication, database or contract mutation.
+- Exactly next step: complete PR #336 candidate CI/preview review and obtain
+  production-release authorization before live acceptance; then continue B-13.
+  Do not reopen completed Phase A device ceremonies.
 
 October 24 Community action consolidation (B-19):
 
