@@ -49,8 +49,45 @@ change is implied. Collection/network categories are absent until supported.
   No user Chrome profile, wallet/session or database was used. This is not a
   native iPhone acceptance test. Screenshots: `output/playwright/b14-search-*`.
 
-Full repository CI, production schema/worker rollout and real public API/UI
-acceptance are pending. Logs and fixture remain local under `output/audit/`.
+PR #338 (`f3e317e`, merged as `58148fc`) passed CI `40095824518`: Linux
+2,296 pass / 2 platform skips; Windows 2,012 pass / 20 Docker-suite skips;
+46 contracts on each OS. Build, static checks and preview passed.
+
+The original search schema and indexer are deployed, and the API is enabled on
+production `dpl_HDJHyuhT8FqJ2Xtd8NHjeqoNdE2i`. Eight page assets match the build;
+ten real apex search requests, pagination and malformed-query rejection pass.
+Saved remains enabled. Live anonymous Chrome verifies a 390px search dialog,
+real artwork navigation and browser Back without a retained modal or overflow.
+No native-device acceptance is claimed.
+
+Actual metadata coverage: 37 registrations, 33 ready and four unavailable old
+originals (#1-4), zero missing/pending rows. Ten bounded four-row batches were
+permitted; nine were needed (last empty). The existing worker remains healthy.
+Its launch configuration gained only the search-enrichment flag and the public
+Storage origin; existing secrets and contract mappings are unchanged. Database
+backup was read-validated, and runtime files/config were backed up separately.
+
+### Live acceptance correction
+
+Search initially returned one live result where Gallery returned two. Artwork
+#36 has a NULL indexed active-auction pointer; its latest round #70 is active.
+Two independent pinned-code RPC reads agree the contract maps #36 to #70.
+Candidate lookup incorrectly required a populated pointer while the existing
+public card serializer uses the latest indexed round. New forward migration
+`public_artwork_search_current_round.sql` aligns candidate selection with that
+serializer: select the latest round first, then test status/deadline. It never
+resurrects an older active round after a newer closed one. The already-applied
+original migration is unchanged; no live projection row repair is included.
+
+Forward repair validation: 24 search/API tests and 21 PostgreSQL grants/ledger
+checks passed. Forward migration/release verification is pending.
+
+Separate upstream observation for B-02: the registration row for #36 was indexed
+54ms after the later AuctionCreated row, and retained its original update block.
+This is consistent with concurrent dependency processing; reproduction and a
+bounded indexer repair are required before claiming the underlying drift fixed.
+The search correction alone is not that repair. Private read evidence remains
+under `output/audit/` and `docs/private/`, without credentials in public source.
 
 First full local unit run: 2,324 passed, one failure in the historical table
 classification check. Added the new self-hardening migration to that explicit
