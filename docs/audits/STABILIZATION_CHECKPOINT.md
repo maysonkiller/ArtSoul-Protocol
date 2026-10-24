@@ -3,6 +3,25 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 Community action consolidation (B-19):
+
+- Starting HEAD `a818f2e`; same canonical workspace and branch. Existing unrelated
+  `.codex/`, `output/` and the two untracked authority-policy files preserved.
+- Founder-requested UI change implemented locally: Ownership retains identities;
+  Community holds the existing Donate/history, Share, Report, staff tools and Back.
+  Compact Trust header; wrapping controls, bounded history and short-window scroll
+  fallback replace the former 160px desktop constraint. No Trust/auth/economic change.
+- Validation: 70 selected regression/theme/Phase A evidence checks pass with zero
+  failure/skip; build verifies 11 routes and 174 utilities. Chrome local fixture
+  verified both themes, 1440/901/390/320 widths, staff visibility, native dialog
+  open/close/Escape and bounded 20-entry history. This is not a real-device retest.
+- One bounded reviewer completed with no blocker; no helper remains running.
+  Local evidence and exact scope: docs/audits/B19_COMMUNITY_ACTIONS_2026-10-24.md.
+- B-19 is saved in its own local commit (read `git log -1` for the exact HEAD).
+  No push, merge or deployment. Earlier timer commit `62fdb2a` is also unpublished.
+- Exactly next step: measure remaining TA-12 Ownership, Provenance and Protocol
+  activity request/render latency, then prepare the bounded release before B-13.
+
 October 24 Phase B continuation and effort estimate:
 
 - Starting HEAD `6321977`; canonical workspace and existing unrelated untracked

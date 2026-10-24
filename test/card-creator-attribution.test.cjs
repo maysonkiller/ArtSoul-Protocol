@@ -130,7 +130,7 @@ test('detail page keeps the three roles as individually clickable profile links'
   assert.match(role, /href=\{`\/profile\?address=\$\{encodeURIComponent\(address\)\}`\}/);
   const panel = detail.slice(
     detail.indexOf('{/* Ownership Info - Three Roles */}'),
-    detail.indexOf('artwork-ownership-actions')
+    detail.indexOf('artwork-page-panel artwork-page-provenance')
   );
   assert.match(panel, /label: 'Creator'/);
   assert.match(panel, /label: 'First Collector'/);

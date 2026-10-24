@@ -3458,7 +3458,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust" aria-label="Community signals">
                                         <div className="artwork-page-panel-heading">
                                             <h2>Community</h2>
-                                            {trustScore > 0 && <span className="artwork-page-chip">Trust {trustScore}/100</span>}
+                                            {trustScore > 0 && (
+                                                <span className="artwork-page-chip artwork-community-trust" title="Community signal for discovery. Does not affect price or ownership.">
+                                                    <span>Trust</span>
+                                                    <strong>{trustScore}<small>/100</small></strong>
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="artwork-page-signal-actions">
                                             <div className="artwork-page-signal-action">
@@ -3482,6 +3487,57 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 </button>
                                             </div>
                                         </div>
+                                    <div className="artwork-community-actions" aria-label="Artwork actions">
+                                        {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
+                                            <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
+                                                creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
+                                                initialOpen={openDonationFromCard}
+                                                onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                const intent = artworkShareIntent({ ...artwork, creator_name: creatorName });
+                                                if (intent) window.open(intent, '_blank', 'noopener,noreferrer,width=550,height=420');
+                                            }}
+                                            className="btn-secondary artwork-page-compact-action artwork-page-share"
+                                            title="Share on X"
+                                        >
+                                            Share on X
+                                        </button>
+                                        {reportingEnabled && (
+                                            <button
+                                                type="button"
+                                                ref={reportTriggerRef}
+                                                data-allow-rapid="true"
+                                                onClick={() => openArtworkReport()}
+                                                className="btn-secondary artwork-page-compact-action artwork-page-report"
+                                            >
+                                                Report
+                                            </button>
+                                        )}
+                                        {moderationAccess?.canModerate && (
+                                            <button type="button" ref={moderationTriggerRef} data-allow-rapid="true"
+                                                disabled={moderationBusy || moderationChecking}
+                                                className="btn-secondary artwork-page-compact-action"
+                                                onClick={async () => {
+                                                    if (moderationBusy || moderationChecking) return;
+                                                    setModerationChecking(true);
+                                                    try {
+                                                        if (await loadModerationVisibility(artwork, { interactive: true })) {
+                                                            moderationDialogRef.current?.showModal();
+                                                        }
+                                                    } finally { setModerationChecking(false); }
+                                                }}>{moderationChecking ? 'Checking access…' : 'Moderation tools'}</button>
+                                        )}
+                                        <button
+                                            onClick={() => window.history.back()}
+                                            className="btn-secondary artwork-page-compact-action artwork-mobile-back"
+                                        >
+                                            Back
+                                        </button>
+                                    </div>
+                                    {moderationMessage && !moderationAccess?.canModerate && <p role="status">{moderationMessage} <a href="/admin">Open Admin</a></p>}
+                                    {cardActionNotice && <p role="status">{cardActionNotice}</p>}
                                 </section>
 
                                 <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai" aria-label="Gemini analysis">
@@ -3512,7 +3568,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             <aside className="artwork-page-right">
                                 {moderationAccess?.canModerate && (
                                     <dialog ref={moderationDialogRef} className="artwork-moderation-dialog reauction-modal"
-                                        aria-label="Staff moderation" onClose={() => moderationTriggerRef.current?.focus()}>
+                                        aria-label="Staff moderation" onClose={() => moderationTriggerRef.current?.focus({ preventScroll: true })}>
                                     <section className="moderation-panel artwork-mobile-moderation">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                             <div>
@@ -3613,57 +3669,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             })}
                                     </div>
 
-                                    <div className="artwork-ownership-actions">
-                                        <button
-                                            onClick={() => {
-                                                const intent = artworkShareIntent({ ...artwork, creator_name: creatorName });
-                                                if (intent) window.open(intent, '_blank', 'noopener,noreferrer,width=550,height=420');
-                                            }}
-                                            className="btn-secondary artwork-page-compact-action artwork-page-share"
-                                            title="Share on X"
-                                        >
-                                            Share on X
-                                        </button>
-                                        <button
-                                            onClick={() => window.history.back()}
-                                            className="btn-secondary artwork-page-compact-action artwork-mobile-back"
-                                        >
-                                            Back
-                                        </button>
-                                        {reportingEnabled && (
-                                            <button
-                                                type="button"
-                                                ref={reportTriggerRef}
-                                                data-allow-rapid="true"
-                                                onClick={() => openArtworkReport()}
-                                                className="btn-secondary artwork-page-compact-action artwork-page-report"
-                                            >
-                                                Report
-                                            </button>
-                                        )}
-                                        {moderationAccess?.canModerate && (
-                                            <button type="button" ref={moderationTriggerRef} data-allow-rapid="true"
-                                                disabled={moderationBusy || moderationChecking}
-                                                className="btn-secondary artwork-page-compact-action"
-                                                onClick={async () => {
-                                                    if (moderationBusy || moderationChecking) return;
-                                                    setModerationChecking(true);
-                                                    try {
-                                                        if (await loadModerationVisibility(artwork, { interactive: true })) {
-                                                            moderationDialogRef.current?.showModal();
-                                                        }
-                                                    } finally { setModerationChecking(false); }
-                                                }}>{moderationChecking ? 'Checking access…' : 'Moderation tools'}</button>
-                                        )}
-                                    </div>
-                                    {moderationMessage && !moderationAccess?.canModerate && <p role="status">{moderationMessage} <a href="/admin">Open Admin</a></p>}
-                                    {cardActionNotice && <p role="status">{cardActionNotice}</p>}
-                                    {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
-                                        <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
-                                            creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
-                                            initialOpen={openDonationFromCard}
-                                            onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
-                                    )}
                                 </div>
                                 {isV41CompositeId && (
                                     <section className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">

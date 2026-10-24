@@ -269,6 +269,7 @@ comes first; each implementation remains a separately verified backlog task.
 | B-16 | Add constrained responsive profile curation | October 24 founder prototype; decision brief sections 3-4 | planned | B | Templates, cover, selected works and ordering; no arbitrary HTML/styles or user-selected official aura. |
 | B-17 | Extend the private inbox with real auction lifecycle notifications | October 24 founder request; decision brief section 6 | planned | B | Reuse inbox/outbox patterns, define recipients/preferences, and validate actual event and deadline state. |
 | B-18 | Unify wordmark, Future controls and capability labels | October 24 founder request; decision brief section 4 | planned | B | Both themes for wordmark/SOON; preserve shared auth states, routes, Back, dialog geometry and reduced motion. |
+| B-19 | Consolidate artwork actions in Community | October 24 explicit founder layout request | in progress | B | Implemented and verified locally; not deployed. Ownership retains identities; Community holds the existing actions with compact Trust, wrapping controls and bounded history. 70 checks and build pass; local browser matrix verifies both themes and desktop/mobile layouts. [Evidence](audits/B19_COMMUNITY_ACTIONS_2026-10-24.md). This bounded UI request precedes the remaining TA-12 measurement and B-13 implementation. |
 
 Contract extensibility and network planning remain under C-06/C1; canon
 reconciliation precedes those decisions. The draft cost model supports C-25;
