@@ -29,6 +29,7 @@ import {
 } from '../src/api/routes/oauth.js';
 import profileHandler from '../src/api/routes/profile.js';
 import profileEmailHandler from '../src/api/routes/profile-email.js';
+import profileLayoutHandler from '../src/api/routes/profile-layout.js';
 import savedHandler from '../src/api/routes/saved.js';
 import publicArtworksHandler from '../src/api/routes/public/artworks.js';
 import publicArtworkProvenanceHandler from '../src/api/routes/public/artwork-provenance.js';
@@ -48,6 +49,7 @@ const ROUTES = new Map([
   ['auth/verify', verifyHandler],
   ['profile', profileHandler],
   ['profile/email', profileEmailHandler],
+  ['profile/layout', profileLayoutHandler],
   ['saved', savedHandler],
   ['discovery/like', likeHandler],
   ['discovery/signal', signalHandler],

@@ -5509,6 +5509,37 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .profile-gallery-panel > .flex:first-child { gap: 1rem; align-items: start; }
 .profile-gallery-panel > .flex:first-child > span { flex-shrink: 0; }
 
+.profile-layout { min-width: 0; margin-block: 1rem; }
+.profile-layout h2, .profile-layout h3 { margin: 0; color: var(--c-text); }
+.profile-layout h2 { font-size: 1.2rem; }
+.profile-layout h3 { font-size: 1rem; }
+.profile-layout-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; margin-block: 0.75rem; min-width: 0; }
+.profile-layout-help { margin-block: 0.5rem; color: var(--c-text-muted); font-size: 0.875rem; line-height: 1.5; }
+.profile-layout-editor { border: 1px solid var(--c-border); border-radius: 1rem; padding: clamp(0.75rem, 2vw, 1.5rem); background: var(--c-surface); }
+.profile-layout-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; }
+.profile-layout label { display: grid; gap: 0.375rem; min-width: 0; }
+.profile-layout input, .profile-layout select { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; padding: 0.625rem; border: 1px solid var(--c-border); border-radius: 0.5rem; color: var(--c-text); background: var(--c-surface); font: inherit; }
+.profile-layout button { max-width: 100%; min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+.profile-layout button:disabled { opacity: 0.6; cursor: not-allowed; }
+.profile-layout button:focus-visible, .profile-layout input:focus-visible, .profile-layout select:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+.profile-layout-section-editor { min-width: 0; margin-block: 1rem; border: 1px solid var(--c-border); border-radius: 0.75rem; padding: 0.75rem; }
+.profile-layout-selection { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.profile-layout-selection > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; min-width: 0; padding: 0.5rem; border-bottom: 1px solid var(--c-border); }
+.profile-layout-selection > li > span { min-width: 0; overflow-wrap: anywhere; flex: 1 1 12rem; }
+.profile-layout-selection .profile-layout-toolbar { margin: 0; }
+.profile-layout-picker { margin-top: 1rem; }
+.profile-layout-cover { position: relative; width: 100%; aspect-ratio: 4 / 1; max-height: 20rem; margin-block: 1rem; border: 1px solid var(--c-border); border-radius: 1rem; overflow: hidden; background: var(--c-surface); }
+.profile-layout-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.profile-curation { display: grid; gap: 1rem; min-width: 0; }
+.profile-curation h2 { margin-bottom: 0.75rem; overflow-wrap: anywhere; }
+.profile-curation-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: 0.75rem; }
+.profile-curation-pin .profile-curation-grid { grid-template-columns: minmax(0, 18rem); }
+.profile-curation-featured .profile-curation-pin .profile-curation-grid { grid-template-columns: minmax(0, 28rem); }
+@media (max-width: 480px) {
+    .profile-layout-cover { aspect-ratio: 2 / 1; }
+    .profile-curation-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Desktop only: the social chips (X / Discord) and the Edit Profile button
    stack in block flow with no gap, so the Future gradient button sat flush
    against the chips and its skewed edge overlapped the X chip. Give the edit

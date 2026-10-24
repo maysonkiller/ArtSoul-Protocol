@@ -169,6 +169,7 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     'collection_launch_services.sql',
     'profile_email_verification.sql',
     'saved_artworks.sql',
+    'profile_layouts.sql',
     'public_artwork_search.sql',
     'artwork_media_identity.sql',
     'artwork_media_preparation.sql',

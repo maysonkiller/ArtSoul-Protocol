@@ -2,6 +2,7 @@ import { allowMethods, sendError } from '../../backend.js';
 import { readReportingConfig } from '../../reporting-config.js';
 import { readDonationConfig } from '../../donation-config.js';
 import { readSavedConfig } from '../../saved-config.js';
+import { readProfileLayoutConfig } from '../../profile-layout-config.js';
 
 function readPublicConfig() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -20,7 +21,8 @@ function readPublicConfig() {
     emailVerificationEnabled: process.env.ARTSOUL_PROFILE_EMAIL_ENABLED === 'true',
     reportingEnabled: readReportingConfig().enabled,
     donations: readDonationConfig(),
-    saved: readSavedConfig()
+    saved: readSavedConfig(),
+    profileLayout: readProfileLayoutConfig()
   };
 }
 

@@ -2,6 +2,7 @@ import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { EmailConnection } from '../features/profile/email-connection.jsx';
+import { ProfileLayout } from '../features/profile/profile-layout.jsx';
 import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import { NotificationInbox } from '../features/moderation/notification-inbox.jsx';
@@ -1793,6 +1794,8 @@ const { useState, useEffect, useRef } = React;
                                 </div>
                             </div>
                         </div>
+
+                        <ProfileLayout wallet={profileAddress} isOwnProfile={isOwnProfile && walletStateSettled} availableArtworks={myArtworks} />
 
                         {isOwnProfile && walletStateSettled && connectedWalletAddress && (
                             <NotificationInbox key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} />
