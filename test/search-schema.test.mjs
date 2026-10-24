@@ -9,6 +9,7 @@ import { listIndexerMigrations } from '../scripts/apply-migrations.js';
 import { refreshSearchMetadata } from '../src/indexer/search-metadata.js';
 
 const migration = fs.readFileSync('sql/migrations/public_artwork_search.sql','utf8');
+const currentRoundMigration = fs.readFileSync('sql/migrations/public_artwork_search_current_round.sql','utf8');
 const container = `artsoul-search-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
 const A=`0x${'1'.repeat(40)}`,B=`0x${'2'.repeat(40)}`,C=`0x${'3'.repeat(40)}`,CORE=`0x${'4'.repeat(40)}`;
 function docker(...args) { return execFileSync('docker',args,{encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60000}).trim(); }
@@ -17,6 +18,8 @@ let available=false;try{available=docker('version','--format','{{.Server.Os}}')=
 test('search migration participates in the ledger and no-default-grants rehearsal',()=>{
   assert.match(fs.readFileSync('docs/security/MIGRATION_RUNBOOK.md','utf8'),/public_artwork_search\.sql/);
   assert.match(fs.readFileSync('test/data-api-grants-integration.test.cjs','utf8'),/'public_artwork_search'/);
+  assert.match(fs.readFileSync('docs/security/MIGRATION_RUNBOOK.md','utf8'),/public_artwork_search_current_round\.sql/);
+  assert.match(fs.readFileSync('test/data-api-grants-integration.test.cjs','utf8'),/'public_artwork_search_current_round'/);
 });
 
 test('indexed global search, visibility and metadata lifecycle in PostgreSQL 17',{
@@ -92,6 +95,25 @@ test('indexed global search, visibility and metadata lifecycle in PostgreSQL 17'
       SELECT 84532,n,n/10,$1,10000000000000,86400,now()+INTERVAL '1 day',CASE WHEN n=40 THEN now()-INTERVAL '1 second' ELSE now()+INTERVAL '1 day' END,
       'active',100,'0xauction'||n,0,100 FROM unnest(ARRAY[30,40,50,51]) n`,[A]);
     await pool.query(`UPDATE v41_artworks SET active_auction_id=CASE artwork_id WHEN 3 THEN 30 WHEN 4 THEN 40 WHEN 5 THEN 51 END WHERE artwork_id IN(3,4,5);`);
+    assert.deepEqual(await rpc('Alice','auctions'),['5','3']);
+  });
+  await t.test('forward repair matches the latest public round when mapping is absent or stale',async()=>{
+    await pool.query('UPDATE v41_artworks SET active_auction_id=NULL WHERE chain_id=84532 AND artwork_id=3');
+    assert.deepEqual(await rpc('Alice','auctions'),['5'],'the applied original misses a live round without its mapping');
+    await pool.query(currentRoundMigration);
+    assert.deepEqual(await rpc('Alice','auctions'),['5','3']);
+    assert.deepEqual(await rpc('#3','auctions'),['3']);
+    assert.equal((await pool.query('SELECT active_auction_id FROM v41_artworks WHERE chain_id=84532 AND artwork_id=3')).rows[0].active_auction_id,null,
+      'the migration repairs the read rule, not the indexer data');
+    await pool.query("UPDATE v41_auctions SET status='settled' WHERE chain_id=84532 AND auction_id=51");
+    await pool.query('UPDATE v41_artworks SET active_auction_id=50 WHERE chain_id=84532 AND artwork_id=5');
+    assert.deepEqual(await rpc('Alice','auctions'),['3'],'an older active mapped row cannot supersede a newer settled round');
+    assert.deepEqual(await rpc('#5','auctions'),[]);assert.deepEqual(await rpc('#5'),['5']);
+    const hydrated=(await pool.query('SELECT read_public_search_cards($1,$2) AS data',[['5'],CORE])).rows[0].data;
+    assert.equal(hydrated.auctions[0].auction_id,'51');assert.equal(hydrated.auctions[0].status,'settled');
+    await pool.query("UPDATE v41_auctions SET status='active',end_time=now()-INTERVAL '1 second' WHERE chain_id=84532 AND auction_id=51");
+    assert.deepEqual(await rpc('Alice','auctions'),['3'],'the latest active-but-expired round is not live');
+    await pool.query("UPDATE v41_auctions SET end_time=now()+INTERVAL '1 day' WHERE chain_id=84532 AND auction_id=51");
     assert.deepEqual(await rpc('Alice','auctions'),['5','3']);
   });
   await t.test('batch hydration preserves current owner, first collector and exact price without history truncation',async()=>{
@@ -213,7 +235,9 @@ test('indexed global search, visibility and metadata lifecycle in PostgreSQL 17'
     await assert.rejects(pool.query('SELECT read_public_search_cards($1,$2)',[[String(2n**256n)],CORE]),{code:'22023'});
     const before=(await pool.query('SELECT count(*)::INT AS total FROM artwork_search_metadata')).rows[0].total;
     await pool.query(migration);
+    await pool.query(currentRoundMigration);
     assert.equal((await pool.query('SELECT count(*)::INT AS total FROM artwork_search_metadata')).rows[0].total,before);
     assert.deepEqual(await rpc('Oldest'),['1']);
+    assert.deepEqual(await rpc('#3','auctions'),['3'],'fresh installs and reapplication retain the forward repair');
   });
 });

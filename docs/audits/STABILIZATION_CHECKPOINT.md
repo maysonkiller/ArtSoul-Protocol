@@ -5,6 +5,18 @@ Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 
 October 24 B-14 implementation in progress:
 
+- Update: PR #338 merged `58148fc`, production `dpl_HDJHyuhT8FqJ2Xtd8NHjeqoNdE2i`;
+  exact-head CI green (Linux 2296/Windows 2012, 46 contracts each). Backed-up
+  schema/worker and API activation completed. Real catalogue: 33 ready + four
+  old unavailable originals; ten apex queries/eight page assets verified.
+- Live acceptance caught one missed live round from a NULL indexed mapping.
+  Separate forward migration selects latest round before its live predicate;
+  original applied migration remains immutable. 24 + 21 regression checks pass.
+- Exactly next step: release/apply that bounded forward migration, repeat live
+  auction search against Gallery, then investigate the evidenced B-02 predecessor
+  ordering gap before the next profile organization slice. Do not call B-14 done
+  until the forward repair is applied and verified.
+
 - HEAD `c562b2d`; B-13 remains active at `79cb7d7`. Same unrelated untracked
   files are preserved. Owner authorized routine Phase B PR/release steps.
 - Shared eight-page search UI, public bounded API, service-only title projection
