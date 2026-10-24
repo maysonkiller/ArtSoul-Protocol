@@ -37,6 +37,7 @@ import publicConfigHandler from '../src/api/routes/public/config.js';
 import publicDonationsHandler from '../src/api/routes/public/donations.js';
 import publicIndexerStatusHandler from '../src/api/routes/public/indexer-status.js';
 import publicProfileHandler from '../src/api/routes/public/profile.js';
+import publicSearchHandler from '../src/api/routes/public/search.js';
 import uploadFileHandler from '../src/api/routes/upload/file.js';
 import uploadPublicationHandler from '../src/api/routes/upload/publication.js';
 
@@ -57,6 +58,7 @@ const ROUTES = new Map([
   ['public/donations', publicDonationsHandler],
   ['public/indexer-status', publicIndexerStatusHandler],
   ['public/profile', publicProfileHandler],
+  ['public/search', publicSearchHandler],
   ['upload/file', uploadFileHandler],
   ['upload/publication', uploadPublicationHandler],
   ['functions/ai/analyze', functionsAiAnalyzeHandler],

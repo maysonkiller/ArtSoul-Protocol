@@ -3,6 +3,23 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 B-14 implementation in progress:
+
+- HEAD `c562b2d`; B-13 remains active at `79cb7d7`. Same unrelated untracked
+  files are preserved. Owner authorized routine Phase B PR/release steps.
+- Shared eight-page search UI, public bounded API, service-only title projection
+  and opt-in existing indexer enrichment are implemented; no live search schema
+  or flag changes yet. Backend/full-corpus PostgreSQL and local UI checks pass.
+- Full local unit run: 2,324 pass / one classifier failure; fixed the new
+  self-hardening migration registry. Independent review found malformed JSONB
+  and premature batch rejection; fixed, with 23 real PostgreSQL/API checks and
+  30 classifier/state checks passing. Full CI of the final candidate is next.
+- Read-only live preflight passes: current production/core/code hashes agree;
+  Base indexer is healthy, 37 works, search table/flag absent. SSH works.
+- Exactly next step: finish regression/review and exact-candidate CI, then apply
+  the backed-up additive search schema, deploy/enrich the indexer, verify coverage
+  and release/activate B-14. Evidence: `audits/B14_GLOBAL_SEARCH_2026-10-24.md`.
+
 October 24 B-13 production completion:
 
 - Owner approved PR #337 migration/release/activation and routine future PRs and

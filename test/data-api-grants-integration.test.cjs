@@ -32,7 +32,8 @@ const features = [
   'a8g_staff_factor_setup', 'a8h_staff_factor_pgcrypto_resolution',
   'launch_service_quotas', 'profile_email_verification', 'artist_support',
   'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
-  'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks'
+  'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks',
+  'public_artwork_search'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [
@@ -94,6 +95,11 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
   `);
   const {listIndexerMigrations} = await import('../scripts/apply-migrations.js');
   for (const migration of listIndexerMigrations()) query(migration.sql);
+  // Profiles predate the reproducible indexer sequence. Model only its public
+  // and OAuth-owned columns needed by the indexed search migration.
+  query(`CREATE TABLE profiles(id UUID DEFAULT gen_random_uuid(),created_at TIMESTAMPTZ DEFAULT now(),
+    wallet_address TEXT PRIMARY KEY,username TEXT,bio TEXT,avatar_url TEXT,twitter_handle TEXT,
+    twitter_username TEXT,twitter_id TEXT,discord_username TEXT,discord_id TEXT);`);
   // This legacy feature precedes the final legacy classifier, unlike A8.
   query(fs.readFileSync('sql/migrations/phase18_artwork_moderation_visibility.sql', 'utf8'));
 
