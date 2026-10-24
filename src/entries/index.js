@@ -1,5 +1,6 @@
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
+import '../features/saved/saved-ui.js';
 import './react-runtime.js';
 
 let morphActive = false;

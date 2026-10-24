@@ -958,6 +958,15 @@ function getDirectProjectionSnapshot(lookup, fresh = false) {
   return promise;
 }
 
+// Reuse the exact public projection for bounded private bookmark hydration.
+// This helper never takes a staff session and never bypasses hidden visibility.
+export async function readVisibleArtworkCard(chain, artworkId) {
+  const snapshot = await getDirectProjectionSnapshot({ chain, artworkId });
+  if (snapshot.warnings.length) throw new Error('Artwork projection is unavailable');
+  const card = snapshot.cards.find(row => Number(row.chain_id) === chain && String(row.artwork_id) === artworkId);
+  return card && card.moderation_hidden !== true ? card : null;
+}
+
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
 

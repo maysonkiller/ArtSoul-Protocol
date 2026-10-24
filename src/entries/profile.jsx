@@ -2,6 +2,7 @@ import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { EmailConnection } from '../features/profile/email-connection.jsx';
+import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import { NotificationInbox } from '../features/moderation/notification-inbox.jsx';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
@@ -48,6 +49,7 @@ const { useState, useEffect, useRef } = React;
         }
 
         function ProfilePage({ initialSkeletonVisible = false }) {
+            const savedEnabled = useSavedEnabled();
             const initialViewAddress = getViewAddress();
             const initialWalletHint = getStoredWalletHint();
             const hasInitialWalletHint = /^0x[a-f0-9]{40}$/i.test(initialWalletHint);
@@ -197,10 +199,18 @@ const { useState, useEffect, useRef } = React;
             }, []);
 
             useEffect(() => {
-                if (profile) {
+                if (profile && selectedGallery !== 'saved') {
                     loadMyArtworks();
                 }
             }, [selectedGallery]);
+
+            useEffect(() => {
+                const showSaved = () => { if (savedEnabled && isOwnProfile && window.location.hash === '#saved') setSelectedGallery('saved'); };
+                showSaved();
+                if (!isOwnProfile && selectedGallery === 'saved') setSelectedGallery('created');
+                window.addEventListener('hashchange', showSaved);
+                return () => window.removeEventListener('hashchange', showSaved);
+            }, [savedEnabled, isOwnProfile]);
 
             useEffect(() => {
                 if (galleryPanelRef.current) galleryPanelRef.current.style.minHeight = '';
@@ -988,6 +998,7 @@ const { useState, useEffect, useRef } = React;
             const FULL_GALLERY_LIMIT = 200;
 
             async function fetchProfileArtworks(activeProfile, galleryType = selectedGallery, dbOverride = null, { limit = FULL_GALLERY_LIMIT } = {}) {
+                if (galleryType === 'saved') return { items: [], corpus: [] };
                 if (!activeProfile?.wallet_address) return { items: [], corpus: [] };
 
                 const walletAddress = activeProfile.wallet_address;
@@ -1018,6 +1029,7 @@ const { useState, useEffect, useRef } = React;
             }
 
             async function loadMyArtworks(profileOverride = null, { fresh = false } = {}) {
+                if (selectedGallery === 'saved') return;
                 const requestId = ++artworksRequestRef.current;
                 const activeProfile = profileOverride || profile;
                 const requestedGallery = selectedGallery;
@@ -1793,7 +1805,7 @@ const { useState, useEffect, useRef } = React;
                                 Profile Sections
                             </h2>
                             <div className="profile-section-tabs flex flex-wrap gap-3">
-                                {GALLERY_TYPES.map(gallery => (
+                                {[...GALLERY_TYPES, ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
                                     <button
                                         key={gallery.id}
                                         onClick={() => {
@@ -1804,6 +1816,9 @@ const { useState, useEffect, useRef } = React;
                                                 if (panel) panel.style.minHeight = `${Math.max(0, window.innerHeight - panel.getBoundingClientRect().top)}px`;
                                                 setArtworksLoading(true);
                                                 setSelectedGallery(gallery.id);
+                                                if (gallery.id === 'saved' || window.location.hash === '#saved') {
+                                                    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (gallery.id === 'saved' ? '#saved' : ''));
+                                                }
                                             }
                                         }}
                                         className={`px-6 py-3 rounded-lg font-medium transform hover:scale-105 transition-all ${
@@ -1823,6 +1838,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
 
                         {/* Gallery Content */}
+                        {selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList wallet={profile.wallet_address} />) : (
                         <div ref={galleryPanelRef} className={`profile-gallery-panel rounded-xl p-6 ${
                             isClassic
                                 ? 'bg-gray-800/50 border border-gray-700'
@@ -1892,6 +1908,7 @@ const { useState, useEffect, useRef } = React;
                                 )}
                             </div>
                         </div>
+                        )}
                     </main>
                 </div>
             );

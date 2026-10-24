@@ -2,6 +2,7 @@ import { React, createRoot } from './react-runtime.js';
 import { CardGridSkeleton } from './loading-skeletons.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
+import '../features/saved/saved-ui.js';
 
 const { useState, useEffect, useMemo, useRef } = React;
 

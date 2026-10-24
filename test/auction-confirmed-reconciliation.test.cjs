@@ -435,7 +435,8 @@ function publicProjection() {
   const future = '2099-01-01T00:00:00.000Z';
   const source = fs.readFileSync('src/api/routes/public/artworks.js', 'utf8')
     .replace(/^import[^\n]*\n/gm, '')
-    .replace('export default async function handler', 'this.handler = async function handler');
+    .replace('export default async function handler', 'this.handler = async function handler')
+    .replace(/^export (?!default)/gm, '');
   const context = vm.createContext({
     Date: time.Date, console: quiet, process: { env: {} },
     allowMethods: () => true,

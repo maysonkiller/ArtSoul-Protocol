@@ -22,7 +22,7 @@ test('the complete profile first render evaluates confirmation dependencies befo
     {connected: wallet, stored: wallet, settled: true, search: ''},
     {connected: '', stored: '', settled: true, search: '?address=' + wallet}
   ]) {
-    const scope = {React, URLSearchParams,
+    const scope = {React, URLSearchParams, useSavedEnabled: () => false,
       ProfilePageSkeleton: () => React.createElement('div', null, 'Profile loading'),
       window: {location: {search: fixture.search, hash: ''}, artsoulWalletStateSettled: fixture.settled,
         getCurrentWalletAddress: () => fixture.connected},

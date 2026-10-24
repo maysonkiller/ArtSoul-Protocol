@@ -3,6 +3,28 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 B-13 Saved continuation (not deployed):
+
+- Started from `8bb6d9e` in the same workspace/branch. Production is still
+  `aac0db3` (PR #336). Unrelated `.codex/`, `output/` and the two untracked
+  moderation-authority-policy files remain untouched and excluded.
+- Implemented separate private Saved: shared overlay + artwork header, owner
+  profile tab, wallet-bound idempotent API, deployment-scoped service-only table.
+  Existing Watching/Trust and overflow actions stay unchanged. No dependency.
+  Feature defaults off; no live migration, settings change or contract writes.
+- Focused frontend/API regressions, real disposable PostgreSQL/grants checks and
+  real local Chrome synthetic-account flow pass. Review fixed stale-list errors
+  and cross-deployment lookups; browser checks fixed small-card audio overlap.
+  Evidence and exact activation/rollback: `docs/audits/B13_SAVED_2026-10-24.md`.
+- First full local run: 2252 passed, four failures. Corrected migration ledger,
+  self-hardening classification and the stripped-import profile fixture; media
+  reorg startup timed out under simultaneous Docker suites and passed isolated.
+  All four affected suites then passed (72 checks). Final bounded-concurrency
+  full run and candidate CI are still pending; do not report them as passed.
+- Exactly next step: finish the B-13 full-suite/build/CI and preview evidence,
+  then present its concrete migration/release request. Preserve the table/data
+  on rollback. Do not reopen accepted Phase A or start B-14 before this slice.
+
 October 24 PR #336 production acceptance (TA-12 / B-19):
 
 - Owner explicitly authorized merge/release of `3117def`. PR #336 merged as
