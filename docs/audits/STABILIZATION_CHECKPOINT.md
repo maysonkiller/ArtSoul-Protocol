@@ -3,7 +3,25 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 24 B-14 production acceptance / B-02 consistency repair:
+October 24 B-02 consistency repair completed:
+
+- HEAD `c629356`, PR #340 merged; candidate `ad96093` passed full CI
+  `40097788978` (Linux 2305 / Windows 2013, 46 contracts per OS, documented skips).
+- Reviewed sync-engine deployed to the existing Base worker only. Search runtime
+  overlay/config preserved. Five missing auction pointers repaired with backup,
+  before-images, current two-RPC agreement and compare-and-set. No event replay.
+- Repeated comparison: 37 works / 71 auctions / four resales, zero differences in
+  compared fields. Worker restarted, confirmed cursor advances, healthy/synced,
+  zero unresolved/failed/dead events; legacy worker remains stopped.
+- Evidence: `audits/B02_INDEXER_ORDER_2026-10-24.md`; private operation journals
+  are complete and must not be replayed. Old receipt coverage limitation recorded.
+- Fresh-bootstrap migration 016 and B-15 profile organization are separately
+  prepared/tested but not yet released. Existing live state_hash already matches;
+  no live DDL is needed for 016. Unrelated untracked files remain untouched.
+- Exactly next step: release the tested fresh-bootstrap repair, then finish B-15
+  browser/release acceptance. B-02 real-user journeys remain an external gate.
+
+Earlier B-14 production acceptance / B-02 repair preparation:
 
 - HEAD `a34a1f1`, PR #339; production `dpl_8trHgUyBGvZxEJEqsjzi4J1BXXAB` is READY.
   The forward-only current-round migration is applied and verified: Live auctions
