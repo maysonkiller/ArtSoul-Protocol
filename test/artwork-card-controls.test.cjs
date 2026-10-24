@@ -97,6 +97,28 @@ test('React card leaves nested media and action keyboard activation to the focus
     }
 });
 
+test('Saved control is outside card metadata and isolates navigation until the feature is enabled', () => {
+    const { api, window } = loadDomCardRuntime();
+    const artwork = { chain_id: 84532, artwork_id: '34', file_type: 'image', file_url: 'image.png' };
+    const card = api.createCardElement(artwork);
+    const save = card.children.find(child => child.className === 'saved-button saved-button-overlay');
+    assert.ok(save);
+    assert.equal(save.hidden, true);
+    assert.equal(save['aria-pressed'], 'false');
+    assert.equal(save.dataset.savedArtwork, '34');
+    assert.equal(save.dataset.savedChain, '84532');
+    assert.ok(!card.children.find(child => child.className === 'artsoul-card-body').children.includes(save));
+    let toggled = null;
+    window.ArtSoulSaved = { toggle: control => { toggled = control; } };
+    const event = save.dispatch('click');
+    assert.equal(toggled, save);
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(event.propagationStopped, true);
+    assert.equal(api.createSavedControl({ artwork_id: 'pending:1', chain_id: 84532 }), null);
+    const detail = api.createSavedControl(artwork, { detail: true });
+    assert.equal(detail.className, 'saved-button saved-button-detail');
+});
+
 test('React card still opens when the card itself receives Enter or Space', () => {
     const { api, window } = loadDomCardRuntime();
     window.React = {

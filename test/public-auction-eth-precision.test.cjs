@@ -33,7 +33,8 @@ function endpoint(name, amount, bidAmounts = [amount]) {
   };
   const source = fs.readFileSync(`src/api/routes/public/${name}.js`, 'utf8')
     .replace(/^import[^\n]*\n/gm, '')
-    .replace('export default async function handler', 'this.handler = async function handler');
+    .replace('export default async function handler', 'this.handler = async function handler')
+    .replace(/^export (?!default)/gm, '');
   const context = vm.createContext({
     process: { env: {} }, console: { warn() {}, error() {}, log() {} },
     allowMethods: () => true,

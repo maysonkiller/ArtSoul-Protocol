@@ -32,7 +32,7 @@ const features = [
   'a8g_staff_factor_setup', 'a8h_staff_factor_pgcrypto_resolution',
   'launch_service_quotas', 'profile_email_verification', 'artist_support',
   'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
-  'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake'
+  'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [

@@ -3,9 +3,9 @@
 Date: October 24, 2026. Starting HEAD: `a818f2e`. Workspace:
 `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 
-Status: **implemented and verified locally; not deployed**. Phase A engineering
+Status: **deployed and verified through PR #336**, merge `aac0db3`. Phase A engineering
 acceptance is unchanged. This is the founder's explicitly requested Phase B UI
-slice, not completion of the beta or the remaining TA-12 loading investigation.
+slice; beta admission remains separate, and TA-12 has its own acceptance record.
 
 ## Request, baseline and change
 
@@ -73,7 +73,10 @@ handling or real iPhone Safari. Those flows were not changed or re-certified.
 
 ## Release and next step
 
-No push, merge, production deployment, database migration or contract change.
-Rollback is limited to this UI commit; previous timer work is separate.
-Next: measure the retained TA-12 Ownership, Provenance and Protocol activity
-loading paths before preparing a bounded release. B-13 Saved remains planned.
+The owner authorized PR #336 candidate `3117def`; merge `aac0db3` has the identical
+tree and was deployed to the apex on October 24. Post-merge Linux/Windows CI and
+actual apex desktop/390px dialog checks pass. Donate, Report and real history
+work in Community; Ownership contains identities only. No new transaction or
+complaint was submitted. See the [production acceptance](TA12_ARTWORK_LOADING_2026-10-24.md#production-acceptance)
+for exact deployment, checks and limitations. No database migration or contract
+change. B-19 is done; B-13 Saved is next after this completed TA-12 release.

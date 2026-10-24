@@ -12,6 +12,7 @@ import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligib
 import { classifyBidFailure } from '../features/auction/bid-error.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
+import '../features/saved/saved-ui.js';
 
 const { useState, useEffect, useRef } = React;
 
@@ -3446,6 +3447,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 <section className="artwork-page-panel artwork-page-context artwork-mobile-context">
                                     <header className="artwork-page-header">
                                         <h1 className="artwork-detail-title">{artwork.title}</h1>
+                                        {window.ArtSoulArtworkCard?.ReactSavedControl && React.createElement(window.ArtSoulArtworkCard.ReactSavedControl, { artwork, detail: true })}
                                     </header>
                                     <div className="artwork-page-description">
                                         <h2>Description</h2>

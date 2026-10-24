@@ -3,6 +3,73 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 24 B-13 Saved continuation (not deployed):
+
+- Started from `8bb6d9e` in the same workspace/branch. Production is still
+  `aac0db3` (PR #336). Unrelated `.codex/`, `output/` and the two untracked
+  moderation-authority-policy files remain untouched and excluded.
+- Implemented separate private Saved: shared overlay + artwork header, owner
+  profile tab, wallet-bound idempotent API, deployment-scoped service-only table.
+  Existing Watching/Trust and overflow actions stay unchanged. No dependency.
+  Feature defaults off; no live migration, settings change or contract writes.
+- Focused frontend/API regressions, real disposable PostgreSQL/grants checks and
+  real local Chrome synthetic-account flow pass. Review fixed stale-list errors
+  and cross-deployment lookups; browser checks fixed small-card audio overlap.
+  Evidence and exact activation/rollback: `docs/audits/B13_SAVED_2026-10-24.md`.
+- Saved code/tests are in `3b0b7bc` and `40a7469`; PR #337 is prepared:
+  https://github.com/maysonkiller/ArtSoul-Protocol/pull/337.
+- First full local run: 2252 passed, four failures. Corrected migration ledger,
+  self-hardening classification and the stripped-import profile fixture; media
+  reorg startup timed out under simultaneous Docker suites and passed isolated.
+  All four affected suites then passed (72 checks). Bounded local full run:
+  2292 pass / 3 failures, all profile viewport fixture missing window.location;
+  corrected with a history-state regression, 24 profile/state checks pass.
+  Final focused batch: 81 pass. These failed runs are not called green.
+- Candidate `40a7469` CI `40092155390` is green: Linux 2265 pass/2 platform
+  skips; Windows 1994 pass/19 Docker skips; 46 contracts per OS; builds/static
+  pass. Preview `ASF7JJKP2rMySj7xBwDLokj4aoXE` assets match local build on all
+  four surfaces; Saved disabled, anonymous API 401/private/no-store.
+- Chrome became blocked by another extension UI after local functional/geometry
+  checks. Owner is away from the PC and requested continuation without browser.
+  No final clean screenshot/preview UI pass is claimed. Browser viewport reset
+  and fixture tab cleanup must be retried when access resumes; local server is
+  stopped. Helpers are complete.
+- Exactly next step: obtain the concrete PR #337 migration/release authorization,
+  then follow the B13 activation procedure, inspect live core/indexer agreement,
+  migrate with backup, deploy/enable and verify the live Saved flow. Preserve
+  the table/data on rollback. Do not reopen Phase A or start B-14 before this slice.
+
+October 24 PR #336 production acceptance (TA-12 / B-19):
+
+- Owner explicitly authorized merge/release of `3117def`. PR #336 merged as
+  `aac0db310a99f314b6a44466d5a25d85269ea603`; its tree is identical to the approved
+  candidate. This workspace fast-forwarded to that merge; unrelated untracked
+  files remain preserved. This acceptance update changes documentation only.
+- Production deployment `8f5EqBCPgT8yN5jvxxwDP8dVbaWo` is successful. Apex home,
+  gallery, profile and artwork reference the expected build assets and card v20.
+  Artwork JS/CSS match local build bytes; classic card source matches after
+  normalizing Windows/Linux line endings, exactly as the existing hash guard does.
+- Post-merge CI run `40080020913` passes: Linux 2229 unit checks / 2 platform
+  skips; Windows 1965 / 18 environment skips; 46 contracts per OS; both builds
+  and static checks. Candidate checks and its one local PostgreSQL-readiness
+  timeout followed by 37 passing isolated checks remain recorded in PR #336.
+- Actual apex Chrome: Ownership contains identities and no buttons; Community
+  contains Donate/history, Share, Report and Back. Donate/Report open and close
+  correctly; real history remains within 180px. At 390x844 both dialogs fit,
+  focus returns and no horizontal overflow remains after closing. This is a
+  Chrome viewport check, not a new native-iPhone/authentication ceremony.
+- Provenance starts at 2288 ms while the main projection ends at 3384 ms;
+  history finishes at 3522 ms. Homepage shows 5/45/5/0.0265 ETH and four populated
+  timers. Timings are individual samples, not a performance SLA; cold portraits
+  and fresh data still require network work. No contract/data/auth changes.
+- TA-12 and B-19 are done for the measured, bounded scope. Evidence and limits:
+  docs/audits/TA12_ARTWORK_LOADING_2026-10-24.md. Local screenshots/measurements:
+  output/audit/pr336-production-*. Independent release verifier completed.
+- Exactly next step: implement B-13 Saved as a separate bounded task, reusing
+  existing card/detail/profile controls and preserving Watching/Trust semantics
+  and wallet isolation. Do not reopen accepted Phase A ceremonies or announce a
+  beta invitation window; the cohort/operator/date gates remain unassigned.
+
 October 24 TA-12 loading continuation:
 
 - Starting HEAD `e863b10`; same canonical workspace/branch. Preserve unrelated

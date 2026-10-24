@@ -207,7 +207,8 @@ function loadHandler({ fixtures = FIXTURES, calls = [], tableRead, metadataRead 
   const source = fs
     .readFileSync('src/api/routes/public/artworks.js', 'utf8')
     .replace(/^import[^\n]*\n/gm, '') // drop backend.js + moderation-access imports; inject mocks
-    .replace('export default async function handler', 'this.handler = async function handler');
+    .replace('export default async function handler', 'this.handler = async function handler')
+    .replace(/^export (?!default)/gm, '');
 
   const context = vm.createContext({
     allowMethods: () => true,

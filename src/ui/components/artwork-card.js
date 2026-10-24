@@ -498,6 +498,36 @@
         return menu;
     }
 
+    function createSavedControl(artwork = {}, { detail = false } = {}) {
+        const id = String(artwork.artwork_id || artwork.artworkId || artwork.blockchain_id || '');
+        const chain = Number(artwork.chain_id || artwork.chainId);
+        if (!/^[1-9][0-9]{0,77}$/.test(id) || !Number.isSafeInteger(chain)) return null;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = detail ? 'saved-button saved-button-detail' : 'saved-button saved-button-overlay';
+        button.hidden = true;
+        button.dataset.savedArtwork = id;
+        button.dataset.savedChain = String(chain);
+        button.setAttribute('aria-label', 'Save artwork');
+        button.setAttribute('aria-pressed', 'false');
+        button.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4z"/></svg>';
+        button.addEventListener('click', event => {
+            event.preventDefault(); event.stopPropagation();
+            void window.ArtSoulSaved?.toggle(button);
+        });
+        return button;
+    }
+
+    function ReactSavedControl({ artwork, detail = false }) {
+        const ref = window.React.useRef(null);
+        window.React.useEffect(() => {
+            const button = createSavedControl(artwork, { detail });
+            if (button) ref.current?.appendChild(button);
+            return () => button?.remove();
+        }, [artwork, detail]);
+        return window.React.createElement('span', { ref, className: 'artsoul-card-menu-host' });
+    }
+
     function ReactActionMenu({ artwork }) {
         const React = window.React;
         const ref = React.useRef(null);
@@ -754,6 +784,8 @@
         card.appendChild(createMediaElement(artwork, () => card.remove()));
         card.appendChild(body);
         if (menu) card.appendChild(menu);
+        const saved = href ? createSavedControl(artwork) : null;
+        if (saved) card.appendChild(saved);
         const countdown = createCountdownElement(artwork);
         if (countdown) card.appendChild(countdown);
         if (href) {
@@ -981,6 +1013,7 @@
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
             ),
             href || onOpen ? h(ReactActionMenu, { artwork }) : null,
+            href || onOpen ? h(ReactSavedControl, { artwork }) : null,
             h(ReactCountdown, { artwork }),
             href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
                 'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null
@@ -1009,6 +1042,8 @@
         createMediaElement,
         ReactCard,
         ReactMedia,
+        ReactSavedControl,
+        createSavedControl,
         ReactCountdown,
         cardActionItems,
         creatorLabel,
