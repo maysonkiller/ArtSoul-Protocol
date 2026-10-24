@@ -80,7 +80,17 @@ resurrects an older active round after a newer closed one. The already-applied
 original migration is unchanged; no live projection row repair is included.
 
 Forward repair validation: 24 search/API tests and 21 PostgreSQL grants/ledger
-checks passed. Forward migration/release verification is pending.
+checks passed. PR #339 candidate `9bca9d0` passed CI `40096789715`: Linux 2,297
+pass / 2 platform skips, Windows 2,012 pass / 20 Docker skips, 46 contract checks
+on each OS. The forward migration was applied transactionally on October 24 at
+13:11 UTC after a separate protected, read-validated backup. Live results changed
+from #37 only to #37 and #36; client grants remain denied, service access remains
+enabled, and the NULL source mapping was not modified.
+
+PR #339 merged as `a34a1f1`. Production `dpl_8trHgUyBGvZxEJEqsjzi4J1BXXAB` is
+READY; ten apex queries and all eight page asset checks pass again. Live-auction
+search returns two results, agreeing with Gallery. B-14 is accepted as deployed;
+the upstream projection repair below remains a separate B-02 task.
 
 Separate upstream observation for B-02: the registration row for #36 was indexed
 54ms after the later AuctionCreated row, and retained its original update block.
