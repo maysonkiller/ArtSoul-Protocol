@@ -5469,10 +5469,12 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .profile-connections { display: grid; gap: 0.75rem; }
 .profile-connections h2 { margin: 0; font-size: 1rem; font-weight: 600; }
 .profile-connection-help { margin: 0; color: var(--c-text-muted); font-size: 0.875rem; line-height: 1.5; }
-.profile-connection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.profile-connection-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 0.75rem; align-items: start; }
 .profile-connection-provider { min-width: 0; }
+.profile-connection-label { margin: 0 0 0.375rem; font-size: 0.875rem; font-weight: 600; color: var(--c-text-muted); }
 .profile-connections .profile-connection-row {
     display: flex;
+    margin: 0;
     align-items: center;
     gap: 0.625rem;
     width: 100%;
@@ -5491,10 +5493,21 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .profile-connection-identity { color: inherit; font: inherit; }
 .profile-connection-identity .truncate { white-space: normal; overflow-wrap: anywhere; }
 .profile-connection-remove { flex: 0 0 44px; width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--c-text-muted); font: inherit; }
+.profile-connections button.profile-connection-row { justify-content: center; }
+.profile-connections button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+.profile-connections button:disabled { opacity: 0.6; cursor: not-allowed; }
 .profile-email-connection { display: grid; gap: 0.5rem; }
-.profile-email-summary { flex-wrap: wrap; }
+.profile-email-identity { display: grid; gap: 0.125rem; min-width: 0; flex: 1; }
+.profile-email-status { color: var(--c-text-muted); font-size: 0.75rem; }
 .profile-email-address { min-width: 0; overflow-wrap: anywhere; }
-.profile-email-summary button { margin-left: auto; }
+.profile-email-connection form { min-width: 0; }
+.profile-email-connection form label { flex: 1 1 12rem; min-width: 0; }
+.profile-email-connection form button { max-width: 100%; white-space: normal; }
+.profile-gallery-heading { min-width: 0; }
+.profile-gallery-description { max-width: 48rem; margin: 0.375rem 0 0; color: var(--c-text-muted); font-size: 0.875rem; line-height: 1.5; }
+.profile-activity-kind { display: inline-block; margin: 0.625rem 0 0; padding: 0.25rem 0.625rem; border: 1px solid var(--c-border); border-radius: 0.5rem; background: var(--c-surface); color: var(--c-text); font-size: 0.875rem; font-weight: 600; }
+.profile-gallery-panel > .flex:first-child { gap: 1rem; align-items: start; }
+.profile-gallery-panel > .flex:first-child > span { flex-shrink: 0; }
 
 /* Desktop only: the social chips (X / Discord) and the Edit Profile button
    stack in block flow with no gap, so the Future gradient button sat flush
