@@ -3,7 +3,42 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 24 B-13 Saved continuation (not deployed):
+October 24 B-14 implementation in progress:
+
+- HEAD `c562b2d`; B-13 remains active at `79cb7d7`. Same unrelated untracked
+  files are preserved. Owner authorized routine Phase B PR/release steps.
+- Shared eight-page search UI, public bounded API, service-only title projection
+  and opt-in existing indexer enrichment are implemented; no live search schema
+  or flag changes yet. Backend/full-corpus PostgreSQL and local UI checks pass.
+- Full local unit run: 2,324 pass / one classifier failure; fixed the new
+  self-hardening migration registry. Independent review found malformed JSONB
+  and premature batch rejection; fixed, with 23 real PostgreSQL/API checks and
+  30 classifier/state checks passing. Full CI of the final candidate is next.
+- Read-only live preflight passes: current production/core/code hashes agree;
+  Base indexer is healthy, 37 works, search table/flag absent. SSH works.
+- Exactly next step: finish regression/review and exact-candidate CI, then apply
+  the backed-up additive search schema, deploy/enrich the indexer, verify coverage
+  and release/activate B-14. Evidence: `audits/B14_GLOBAL_SEARCH_2026-10-24.md`.
+
+October 24 B-13 production completion:
+
+- Owner approved PR #337 migration/release/activation and routine future PRs and
+  releases in the agreed Phase B scope without repeated permission questions.
+  This does not authorize mainnet, resets, new economics or external invitations.
+- Workspace/branch unchanged; HEAD `79cb7d7` is PR #337 merge, production
+  `dpl_CMe1Ybjih8aNdGnt3rkxuhjWuvdJ`. Same four unrelated untracked paths remain.
+- Full/schema backup read-validated; Core/indexer/two-RPC mapping checked; only
+  Saved schema applied. RLS/grants verified, deployed disabled then enabled.
+- CI `40092509176`: Linux 2265/Windows 1994 passed with documented skips;
+  46 contracts each. Four apex pages/card v21 match. Actual two-old-account
+  SIWE/HTTP rehearsal: 27 requests passed; test saves removed, both logged out.
+- Evidence and rollback: `docs/audits/B13_SAVED_2026-10-24.md`. Browser remains
+  unavailable per owner; no final screenshot/native-device acceptance claimed.
+- Exactly next step: B-14 bounded public global search (works/auctions/artists).
+  One helper owns backend; root owns shared UI. Beta cohort/window/operator and
+  official Snapshot A remain real external gates, not completed by UI releases.
+
+Earlier B-13 preparation record (superseded by completion above):
 
 - Started from `8bb6d9e` in the same workspace/branch. Production is still
   `aac0db3` (PR #336). Unrelated `.codex/`, `output/` and the two untracked
@@ -34,7 +69,7 @@ October 24 B-13 Saved continuation (not deployed):
   No final clean screenshot/preview UI pass is claimed. Browser viewport reset
   and fixture tab cleanup must be retried when access resumes; local server is
   stopped. Helpers are complete.
-- Exactly next step: obtain the concrete PR #337 migration/release authorization,
+- The preparation next step was to obtain PR #337 migration/release authorization,
   then follow the B13 activation procedure, inspect live core/indexer agreement,
   migrate with backup, deploy/enable and verify the live Saved flow. Preserve
   the table/data on rollback. Do not reopen Phase A or start B-14 before this slice.

@@ -668,7 +668,7 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
     resales: resaleByToken(tableData.v41_resale_listings),
     resaleHistory: latestResaleByToken(tableData.v41_resale_history),
     floors: floorByArtwork(tableData.v41_floor_history),
-    socialSignals: socialSignalsByArtwork(tableData.artwork_social_signals),
+    socialSignals: preload.socialSignals ?? socialSignalsByArtwork(tableData.artwork_social_signals),
     moderation: moderationVisibilityByArtwork(tableData.artwork_moderation_visibility),
     bids: bidsByAuction(tableData.v41_bids)
   };
@@ -965,6 +965,46 @@ export async function readVisibleArtworkCard(chain, artworkId) {
   if (snapshot.warnings.length) throw new Error('Artwork projection is unavailable');
   const card = snapshot.cards.find(row => Number(row.chain_id) === chain && String(row.artwork_id) === artworkId);
   return card && card.moderation_hidden !== true ? card : null;
+}
+
+// Bounded search hydration reuses the public serializer once. The RPC returns
+// per-work latest lifecycle rows and indexed metadata, not the latest-200 feed.
+export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
+  if (chain !== 84532 || !Array.isArray(artworkIds) || !artworkIds.length || artworkIds.length > 20 ||
+      artworkIds.some(id => typeof id !== 'string' || !/^[1-9][0-9]{0,77}$/.test(id) || BigInt(id) >= 2n ** 256n) ||
+      !/^0x[0-9a-f]{40}$/.test(coreAddress) || /^0x0{40}$/.test(coreAddress)) throw new Error('Invalid search page');
+  const ids = [...new Set(artworkIds)];
+  const data = await supabaseRest('rpc/read_public_search_cards', {
+    method: 'POST', body: { p_artwork_ids: ids, p_core_address: coreAddress }
+  });
+  if (!data || ['artworks','metadata','auctions','settlements','listings','resales','signals'].some(key => !Array.isArray(data[key])) ||
+      data.artworks.length > ids.length || data.metadata.length !== data.artworks.length || data.signals.length !== data.artworks.length ||
+      data.artworks.some(row => Number(row.chain_id) !== chain || !ids.includes(row.artwork_id))) throw new Error('Invalid search projection');
+  const warnings = [];
+  const snapshot = await projectTableData({
+    v41_artworks: data.artworks, v41_auctions: data.auctions, v41_settlements: data.settlements,
+    v41_resale_listings: data.listings, v41_resale_history: data.resales, v41_floor_history: [],
+    v41_bids: [], v41_trust_signals: [], artwork_social_signals: [], artwork_moderation_visibility: []
+  }, warnings, null, {
+    metadataRows: data.metadata,
+    socialSignals: new Map(data.artworks.map((row, index) => [keyFor(chain, row.artwork_id), data.signals[index]]))
+  });
+  if (warnings.length) throw new Error('Search profiles are unavailable');
+  // A hide/reorg/URI replacement during hydration must not return stale media.
+  const filter = `chain_id=eq.${chain}&artwork_id=in.(${ids.join(',')})&limit=${ids.length}`;
+  const [visibility, existing] = await Promise.all([
+    supabaseRest(`artwork_moderation_visibility?select=artwork_id::text,hidden&${filter}`),
+    supabaseRest(`v41_artworks?select=artwork_id::text,metadata_uri,transaction_hash&${filter}`)
+  ]);
+  if (!Array.isArray(visibility) || !Array.isArray(existing) ||
+      visibility.some(row => !ids.includes(row.artwork_id) || typeof row.hidden !== 'boolean') ||
+      existing.some(row => !ids.includes(row.artwork_id))) throw new Error('Search visibility is unavailable');
+  const hidden = new Set(visibility.filter(row => row.hidden).map(row => row.artwork_id));
+  const current = new Map(existing.map(row => [row.artwork_id, row]));
+  const cards = new Map(snapshot.cards.filter(card => !hidden.has(card.artwork_id) &&
+    current.get(card.artwork_id)?.metadata_uri === card.metadata_uri &&
+    current.get(card.artwork_id)?.transaction_hash === card.transaction_hash).map(card => [card.artwork_id, card]));
+  return ids.map(id => cards.get(id)).filter(Boolean);
 }
 
 export default async function handler(req, res) {

@@ -196,7 +196,7 @@ test('Saved projection reuse never grants a staff visibility exception or accept
   const module=fs.readFileSync('src/api/routes/public/artworks.js','utf8');
   const start=module.indexOf('export async function readVisibleArtworkCard');
   const end=module.indexOf('export default async function handler',start);
-  const code=module.slice(start,end).replace('export ','');
+  const code=module.slice(start,end).replace(/^export /gm,'');
   const card={chain_id:84532,artwork_id:'7',title:'Public'};
   for(const [snapshot,expected] of [[{cards:[card],warnings:[]},card],
     [{cards:[{...card,moderation_hidden:true}],warnings:[]},null],[{cards:[],warnings:[]},null],

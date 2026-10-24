@@ -237,6 +237,7 @@
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
+    <script type="module" src="/src/entries/search.js"></script>
 </head>
 <body>
     <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
@@ -248,7 +249,12 @@
                         <img src="/ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
                     </a>
                 </div>
-                <div class="site-header-center page-context" aria-hidden="true"></div>
+                <div class="site-header-center page-context">
+                    <button type="button" class="site-search-button" data-artsoul-search aria-label="Search ArtSoul" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
+                        <span>Search ArtSoul</span><kbd>Ctrl K</kbd>
+                    </button>
+                </div>
                 <div class="site-header-actions">
                     <div id="networkBadge"></div>
                     <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">

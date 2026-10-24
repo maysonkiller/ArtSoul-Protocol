@@ -396,17 +396,20 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 ))}
                             </div>
                             <div className="gallery-control-grid">
-                                {/* Search */}
+                                {/* A local gallery filter stays distinct from the complete server search. */}
+                                <div className="gallery-search-controls">
                                 <input
                                     type="text"
-                                    placeholder="Search title, creator, collection..."
+                                    placeholder="Filter loaded artworks..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     autoFocus={false}
                                     autoComplete="off"
-                                    aria-label="Search artworks"
+                                    aria-label="Filter loaded artworks"
                                     className="gallery-search-input rounded-lg"
                                 />
+                                <button type="button" className="gallery-search-all" onClick={() => window.dispatchEvent(new CustomEvent('artsoul:open-search', { detail: { query: searchQuery } }))}>Search all ArtSoul</button>
+                                </div>
 
                                 {/* Status Filter */}
                                 <select
@@ -490,9 +493,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 {loading
                                     ? 'Loading artworks...'
                                     : isSearchPending
-                                    ? 'Searching across all categories...'
+                                    ? 'Filtering loaded artworks...'
                                     : isGlobalSearch
-                                    ? `Showing ${filteredArtworks.length} results across all categories for “${debouncedSearchQuery.trim()}”`
+                                    ? `Showing ${filteredArtworks.length} loaded artworks for “${debouncedSearchQuery.trim()}”. Use Search all ArtSoul for older works and artists.`
                                     : `Showing ${filteredArtworks.length} artworks in ${GALLERY_TABS.find(tab => tab.id === activeTab)?.label || 'Discover'}`}
                             </div>
                         </div>

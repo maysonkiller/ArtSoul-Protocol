@@ -15,6 +15,7 @@ import {
     resolveHealthMaxBlocksBehind
 } from './health-policy.js';
 import { reapStaleEventProcessingLeases } from './event-processing-lease.js';
+import { refreshSearchMetadata } from './search-metadata.js';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +46,7 @@ function resolveProductionIndexerConfig() {
         chainId: chain.chainId,
         donationAddress: chain.donationAddress,
         chainSlug: chain.slug,
+        searchIndexEnabled: process.env.ARTSOUL_SEARCH_INDEX_ENABLED === 'true',
         startBlock: chain.startBlock,
         lockName: chain.lockName,
         confirmationDepth: chain.confirmationDepth,
@@ -106,6 +108,8 @@ class ProductionIndexer {
         this.leadershipLossInProgress = false;
         this.catchUpInProgress = false;
         this.confirmationTimer = null;
+        this.lastSearchMetadataAt = 0;
+        this.searchMetadataInFlight = null;
         // Set when startup fails to reconcile the persisted confirmation depth.
         // Surfaced by getHealth() so operators can see the drift without a
         // separate DB query; never corrupts or resets the cursor.
@@ -429,6 +433,7 @@ class ProductionIndexer {
 
         // Wait for current operations to complete (drain)
         console.log('[ProductionIndexer] Draining current operations...');
+        if (this.searchMetadataInFlight) await this.searchMetadataInFlight;
         await this._drainOperations();
 
         // Stop sync engine
@@ -614,11 +619,25 @@ class ProductionIndexer {
                 const checkpoint = await this._catchUpToSafeBlock('poll');
                 if (checkpoint) {
                     await this._processConfirmations(checkpoint.currentBlock);
+                    // Independent public-search enrichment never delays chain work.
+                    this._refreshSearchMetadata();
                 }
             } catch (error) {
                 console.error('[ProductionIndexer] Confirmation polling error:', error);
             }
         }, this.pollInterval);
+    }
+
+    _refreshSearchMetadata() {
+        if (!this.config.searchIndexEnabled || this.config.chainId !== 84532 ||
+            !this.isLeader || !this.isRunning || this.searchMetadataInFlight ||
+            Date.now() - this.lastSearchMetadataAt < 60000) return;
+        this.lastSearchMetadataAt = Date.now();
+        this.searchMetadataInFlight = refreshSearchMetadata(this.db, {
+            chainId: this.config.chainId, coreAddress: this.config.contractAddress
+        }).catch(() => {
+            console.warn('[ProductionIndexer] Search metadata refresh failed; chain indexing continues.');
+        }).finally(() => { this.searchMetadataInFlight = null; });
     }
 
     async _catchUpToSafeBlock(reason = 'poll') {
