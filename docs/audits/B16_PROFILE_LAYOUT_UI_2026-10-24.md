@@ -1,6 +1,6 @@
 # B16 profile layout UI
 
-Status: implemented and tested locally; release and activation pending.
+Status: implemented, released, activated and apex-verified on October 24, 2026.
 
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`. Started at
 `7df28f55cd3049221d24b0136e14a05762ba2500`; the shared branch advanced to
@@ -118,3 +118,43 @@ does not yet target a profile cover or section caption; extending notice/removal
 to those profile fields and defining unused-cover retention remain explicit
 operational/legal follow-ups before broader public use. Disabling the feature
 hides customization without deleting saved records or changing NFT state.
+
+## Release acceptance
+
+PR #343 candidate `37561cdd08d55fef16d755ac5f3d618c51813e87` passed CI
+`40100725543`: Linux 2352 checks with two documented platform skips; Windows
+2051 with 23 Docker-dependent skips; 46 contract checks on each OS; static checks
+and both builds passed. Local full run had 2346 passes and one disposable-Postgres
+startup timeout under concurrent load. That unchanged test passed all 37 checks
+when rerun alone; the exact-candidate Linux CI also passed it. Final local build
+passes. No failed check is counted as a pass.
+
+Before applying the additive migration, the protected full/schema backup was
+hashed and archive-read-validated (not restored). Full dump: 1,301,417 bytes,
+SHA-256 `32456edf3bb376fdc7b293d60a8a0547a4fe95699686051fe69001ce96cd4e59`.
+At 14:06 UTC only `profile_layouts.sql` was applied. Forced RLS, minimal table/RPC
+privileges, actual client-role denial, rollback-only service write rehearsal and
+zero feature rows were verified before commit. Existing data was not reset.
+
+Merge `3cf6b875974c476a4c46c8fe59560c72b89b4383` first shipped disabled, then
+the single production feature flag was enabled. Active READY deployment:
+`dpl_6aTdMwZjhAao6YxrVH8LyoCFyFcA`. All eight apex page assets match the final
+candidate build; ten existing search queries still pass. An earlier comparison
+used a pre-final-review local profile bundle; rebuilding the exact source fixed
+the reference mismatch, without changing deployed code.
+
+Actual SIWE/HTTP rehearsal with the two previously authorized old test accounts:
+28 requests passed, including a 1,485,791-byte project-logo cover upload,
+publication and public hydration, creator/current-collector eligibility,
+recipient isolation, foreign-wallet/origin/cover denial and stale-revision
+rejection. Both layouts were restored to defaults at revision 2 and both sessions
+logged out. The one known cover object is retained. No chain transaction,
+founder-wallet signature, email or moderation action occurred. This is real
+HTTP/Storage acceptance plus the isolated browser checks above, not a new physical
+phone/wallet handoff test.
+
+Private `layout-schema-apply`, `layout-env-enable` and `layout-http-probe`
+journals dated October 24 are complete and must not be replayed. Disable
+`ARTSOUL_PROFILE_LAYOUT_ENABLED` and redeploy to hide/reject this feature while
+retaining layouts for rollback. Profile-field moderation and unused-cover
+retention stay explicit operating follow-ups; the next implementation is B17.

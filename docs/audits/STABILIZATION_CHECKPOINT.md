@@ -3,7 +3,28 @@
 Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 24 B-15 released; B-16 in progress:
+October 24 B-16 released; B-17 started:
+
+- HEAD `3cf6b87`, PR #343, same workspace/branch. Candidate `37561cd` passed
+  CI `40100725543`: Linux 2352 / Windows 2051, 46 contracts per OS, documented
+  skips. Local full run had one Docker startup timeout; isolated 37 checks and
+  hosted exact-candidate run passed. Final build and eight apex assets match.
+- Profile layout schema applied after protected read-validated backup, then
+  deployed disabled and activated. READY `dpl_6aTdMwZjhAao6YxrVH8LyoCFyFcA`.
+  28 actual SIWE/HTTP/Storage checks pass; both old test profiles restored to
+  defaults/revision 2, logged out. No chain writes. One test-logo cover retained.
+- `audits/B16_PROFILE_LAYOUT_UI_2026-10-24.md` records evidence and limits.
+  Completed private layout schema/env/probe journals must not be replayed.
+  B20 records profile-content notice handling/unused-cover retention before
+  broader use; no legal clearance or new phone acceptance is claimed.
+- Two existing helpers now own B17 backend and UI. First slice: existing
+  confirmed auction-created/outbid events, private read state/in-app preferences.
+  No mock delivery worker or email enrollment. Full B17 also needs later
+  lifecycle/deadline categories; external beta gates remain open.
+- Preserve the four unrelated untracked paths as before. Exactly next step:
+  review B17 source evidence/API contract, implement and verify its first slice.
+
+Earlier October 24 B-15 released; B-16 in progress:
 
 - HEAD `aa747b7`, PR #342, same workspace and branch. B15 exact-candidate CI
   `40098862160` passed (Linux 2312 / Windows 2017, 46 contracts each, documented
