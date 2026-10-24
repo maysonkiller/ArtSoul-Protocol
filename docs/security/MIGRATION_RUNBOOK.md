@@ -7,7 +7,7 @@ This runbook is the authoritative operational path for the current ArtSoul repos
 | Location | Purpose | Treatment |
 | --- | --- | --- |
 | `sql/migrations/001_core_indexer_schema.sql` through `003_resilience_schema.sql` | Base indexer schema | First three migrations in the indexer sequence. Managed by `scripts/apply-migrations.js` for fresh or already-ledgered environments. |
-| `src/indexer/migrations/004_*.sql` through `015_*.sql` | Active indexer and V4.1 projections | Remaining twelve migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
+| `src/indexer/migrations/004_*.sql` through `016_*.sql` | Active indexer and V4.1 projections | Remaining thirteen migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
 | Other files in `sql/migrations/` | Feature, auth, AI, moderation, observability, and security changes | Manually reviewed migrations. Their production status must be recorded explicitly; filename order is not an execution plan. |
 | `migrations/001_ai_integration.sql` | Early AI integration migration | Historical/manual. Verify schema before use; do not assume it belongs to the indexer 001-014 sequence. |
 
@@ -39,6 +39,7 @@ Verify against the database before applying or re-applying it.
 | `src/indexer/migrations/013_chain_scoped_v41_projections.sql` | Indexer sequence 13. Runner-managed. |
 | `src/indexer/migrations/014_schema_aware_reorg_rollback.sql` | Indexer sequence 14. **Applied to production** after backup; accepted as backlog A-14. |
 | `src/indexer/migrations/015_public_metrics_projection.sql` | Indexer sequence 15. **Applied to production** 2026-07-28; accepted as backlog A-26. |
+| `src/indexer/migrations/016_indexer_state_hash.sql` | Indexer sequence 16. **Prepared locally; not applied to production by this change.** Forward-only repair of the missing runtime column on fresh 001–015 installs. Preserves existing hashes, cursor rows, grants and RLS. See the fresh-bootstrap record below. |
 | `sql/migrations/a8a_moderation_passkey_foundation.sql` | A8 schema step 1. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. RG-03 activation remains open; see the dated A8 application record below. |
 | `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
 | `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
@@ -78,6 +79,34 @@ Verify against the database before applying or re-applying it.
 | `migrations/001_ai_integration.sql` | Historical/manual, third tree. Its `001` prefix does **not** belong to the indexer sequence; the numbering collision with `sql/migrations/001_core_indexer_schema.sql` is real. Verify schema before any use. |
 
 The one-off scripts `scripts/apply-outbox-migration.js`, `scripts/apply-reorg-migration.js`, and `scripts/run-migration-009.js` are historical utilities. Do not use them for new environments because they do not provide a complete sequence, advisory lock, or checksum ledger.
+
+### Fresh indexer bootstrap repair (2026-10-24)
+
+Running the ordered 001–015 sequence on disposable PostgreSQL reproduced an
+initialization failure: `indexer_state.state_hash` did not exist. Migration 001
+creates the earlier table; 012 only creates a table if absent and therefore
+does not add its runtime column. Forward migration 016 adds the same `VARCHAR(66)
+NOT NULL DEFAULT '0x0'` column without editing either historical migration.
+The sentinel means no state hash has been stored; it does not reconstruct or
+validate historical block hashes. Existing stored hashes are preserved.
+
+The runner and psql setup entry both include 016. The regression covers a fresh
+runner installation, real engine initialization/confirmation, checksum-ledger
+rerun, and an existing populated table with unchanged cursors, hashes, RLS and
+ACLs. No new table, function, policy or grant is introduced, so no new security
+classification is required. Production remains a separate reviewed operation:
+verify its actual column and migration ledger, preserve a backup, and apply only
+the forward repair if needed; never replay 001–015 against an unledgered live
+database. Do not drop the column or reset state as routine rollback.
+
+Local validation: bootstrap and ordering PostgreSQL suites pass 11 checks with
+no fixture column workaround; security/migration-ledger/reorg/metrics suites
+pass 37 checks. No tests were skipped. This is not live migration evidence.
+
+Read-only live inspection on October 24 at 13:29 UTC confirmed the existing
+`indexer_state.state_hash` already matches `VARCHAR(66) NOT NULL DEFAULT '0x0'`.
+No live DDL or state reset is needed. The forward file remains necessary for
+fresh installations and verified older databases lacking this column.
 
 ## Media Application Record (2026-10-24)
 
@@ -270,7 +299,7 @@ If any post-application result is unexpected, roll back with the transaction or 
    export ARTSOUL_MIGRATION_ENVIRONMENT=preview
    ```
 
-3. List the exact 001-015 sequence and checksums without modifying the database:
+3. List the exact 001-016 sequence and checksums without modifying the database:
 
    ```bash
    node scripts/apply-migrations.js
@@ -302,7 +331,7 @@ direct PostgreSQL access is separate from the Data API used by ArtSoul's server.
 
 For a **new, empty environment only**:
 
-1. Create the reviewed legacy prerequisites and run indexer 001-015. Apply
+1. Create the reviewed legacy prerequisites and run indexer 001-016. Apply
    `phase18_artwork_moderation_visibility.sql` before the legacy classifier if
    moderation is part of that environment.
 2. Apply 18.7b **after those legacy tables exist, before A8 or other newer

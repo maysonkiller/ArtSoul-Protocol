@@ -69,10 +69,6 @@ test('canonical log order preserves dependent projections and stops at the first
     }
     await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
     for (const migration of listIndexerMigrations()) await pool.query(migration.sql);
-    // Migration 001 creates the legacy table before 012's CREATE IF NOT EXISTS,
-    // so fresh installs lack this documented runtime column. Keep the fixture
-    // representative of the runtime schema without changing migrations here.
-    await pool.query("ALTER TABLE indexer_state ADD COLUMN IF NOT EXISTS state_hash VARCHAR(66) NOT NULL DEFAULT '0x0'");
     await pool.query(`INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,
         confirmation_depth,last_indexed_at,started_at) VALUES(84532,$1,100,100,3,now(),now())`, [CORE]);
     const db = { pool, query: async (sql, params) => (await pool.query(sql, params)).rows, isBackpressure: () => false };

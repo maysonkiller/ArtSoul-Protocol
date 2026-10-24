@@ -19,6 +19,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 \i src/indexer/migrations/013_chain_scoped_v41_projections.sql
 \i src/indexer/migrations/014_schema_aware_reorg_rollback.sql
 \i src/indexer/migrations/015_public_metrics_projection.sql
+\i src/indexer/migrations/016_indexer_state_hash.sql
 
 -- Verify setup
 SELECT 'Extensions installed:' as status;
