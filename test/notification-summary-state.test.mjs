@@ -60,3 +60,13 @@ test('refresh failure clears old count instead of claiming zero unread',async()=
   let fail=false;const h=fixture(async()=>{if(fail)throw Error('offline');return Response.json(data());});h.model.configure({summaryEnabled:true});await h.model.refresh();fail=true;
   await h.model.refresh(true);assert.deepEqual(h.model.getState(),{status:'unavailable',count:null,complete:false});h.model.dispose();
 });
+
+test('saving a read retires stale requests without flashing or extending the verified badge',async()=>{
+  let pending;const h=fixture(()=>pending?pending.promise:Promise.resolve(Response.json(data())));
+  h.model.configure({summaryEnabled:true});await h.model.refresh();const expiry=h.timer;
+  pending=deferred();const old=h.model.refresh(true);h.model.cancelRefresh();
+  assert.equal(h.model.getState().count,3);assert.equal(h.timer,expiry);
+  pending.resolve(Response.json(data({auctionCount:99})));await old;
+  assert.equal(h.model.getState().count,3);expiry.fn();assert.equal(h.model.getState().count,null);
+  h.model.dispose();
+});

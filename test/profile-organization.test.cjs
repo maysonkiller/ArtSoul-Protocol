@@ -46,18 +46,11 @@ test('profile navigation orders the public sections and keeps Saved private', as
   }
 });
 
-test('compact notifications stay private in both profile display and edit views', async () => {
-  const locations = [...profile.matchAll(/\{isOwnProfile && walletStateSettled && connectedWalletAddress && \(\s*<NotificationInbox compact[^]*?\/>\s*\)\}/g)];
-  assert.equal(locations.length, 2);
-  for (const [markup] of locations) {
-    for (const override of [{}, {isOwnProfile: false}, {walletStateSettled: false}, {connectedWalletAddress: ''}]) {
-      const view = await fixture(markup, {isOwnProfile: true, walletStateSettled: true,
-        connectedWalletAddress: '0x' + '1'.repeat(40), NotificationInbox: () => null, ...override});
-      const inboxes = elements(view, item => typeof item.type === 'function');
-      assert.equal(inboxes.length, Object.keys(override).length ? 0 : 1);
-      if (inboxes.length) assert.equal(inboxes[0].props.compact, true);
-    }
-  }
+test('profile display and editing defer notifications to the single shared header', () => {
+  assert.doesNotMatch(profile, /NotificationInbox|notification-inbox\.jsx/);
+  const html = fs.readFileSync('profile.html', 'utf8');
+  assert.equal((html.match(/id="header-notifications"/g) || []).length, 1);
+  assert.match(html, /<div id="header-notifications" hidden><\/div>/);
 });
 
 test('Activity names the existing Sales subset without pretending to be a complete ledger', async () => {

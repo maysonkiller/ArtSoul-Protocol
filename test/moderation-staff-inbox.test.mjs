@@ -96,6 +96,43 @@ test('older recipient pages preserve staff notices without refetching the full q
   h.inbox.invalidate('auth'); assert.equal(h.state.staffReview, null);
 });
 
+test('a retained outcome can be marked read after an older page fails without losing its retry state', async () => {
+  const writes = [];
+  let state;
+  const inbox = createNotificationInbox({wallet: OWNER, getWallet: () => OWNER, onChange: value => {state = value;},
+    fetchPage: async (path, options) => {
+      assert.equal(options.headers['X-ArtSoul-Wallet'], OWNER);
+      assert.equal(options.credentials, 'same-origin');
+      assert.equal(options.cache, 'no-store');
+      if (options.method === 'PUT') {
+        assert.equal(path, '/api/moderation/notifications?v=2');
+        assert.equal(options.headers['Content-Type'], 'application/json');
+        const body = JSON.parse(options.body);
+        writes.push(body);
+        return Response.json({wallet: OWNER, updated: body.ids, read: body.read});
+      }
+      if (path.startsWith('/api/moderation/access?')) return Response.json({authenticated: true, eligible: false});
+      if (path === '/api/moderation/notifications?v=2&before=42') return Response.json({error: 'UNAVAILABLE'}, {status: 500});
+      assert.equal(path, '/api/moderation/notifications?v=2');
+      return Response.json({wallet: OWNER, items: [{id: '42', message: 'Your report was resolved.', read: false}], nextCursor: '42'});
+    }});
+  inbox.configure({summaryEnabled: true});
+  await inbox.load();
+  assert.equal(state.status, 'ready');
+  await inbox.load('42');
+  assert.equal(state.status, 'error');
+  assert.equal(state.retryCursor, '42');
+  assert.equal(state.items[0].read, false);
+  const retryState = {status: state.status, retryCursor: state.retryCursor, nextCursor: state.nextCursor};
+
+  await inbox.markRead('42', true);
+  assert.deepEqual(writes, [{action: 'read', ids: ['42'], read: true}]);
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].read, true);
+  assert.equal(state.pendingId, null);
+  assert.deepEqual({status: state.status, retryCursor: state.retryCursor, nextCursor: state.nextCursor}, retryState);
+});
+
 test('initial pagination stays unavailable until staff discovery finishes', async () => {
   const h = harness(), pending = deferred(); h.accessFetch = () => pending.promise;
   const loading = h.inbox.load(); await tick();

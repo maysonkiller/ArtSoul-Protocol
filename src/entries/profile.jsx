@@ -5,7 +5,6 @@ import { EmailConnection } from '../features/profile/email-connection.jsx';
 import { ProfileLayout } from '../features/profile/profile-layout.jsx';
 import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
-import { NotificationInbox } from '../features/moderation/notification-inbox.jsx';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
@@ -1630,9 +1629,6 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                                 </div>
                                             </section>
-                                            {isOwnProfile && walletStateSettled && connectedWalletAddress && (
-                                                <NotificationInbox compact key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} />
-                                            )}
                                         </div>
                                     ) : (
                                         <div>
@@ -1720,9 +1716,6 @@ const { useState, useEffect, useRef } = React;
                                                         </DiscordProfileLink>
                                                     )}
                                                 </div>
-                                                {isOwnProfile && walletStateSettled && connectedWalletAddress && (
-                                                    <NotificationInbox compact key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} />
-                                                )}
                                                 {isOwnProfile && (
                                                     <div className="profile-inline-edit-action">
                                                         <button onClick={startProfileEdit} className="btn-main">

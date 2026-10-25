@@ -3,6 +3,7 @@ import { createNotificationInbox } from './notification-inbox-state.js';
 import { createAuctionNotifications } from './auction-notifications-state.js';
 import { createNotificationSummary } from './notification-summary-state.js';
 import { notificationHeading } from './auction-notification-types.js';
+import { createNotificationReadQueue } from './notification-read-queue.js';
 
 const { useEffect, useRef, useState } = React;
 const activeWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
@@ -84,11 +85,12 @@ function UpcomingReminders({state, model, busy}) {
       const deadline = new Date(Number(item.deadline) * 1000);
       const validDeadline = Number.isFinite(deadline.getTime());
       return <li key={item.id} className={item.read ? 'notification-read' : 'notification-unread'}>
-        <div className="notification-item-heading"><strong>{item.type === 'payment_due' ? 'Payment due soon' : 'Auction ending soon'}</strong><span>{item.read ? 'Read' : 'Unread'}</span></div>
+        <details className="notification-message" onToggle={event => {if (event.currentTarget.open && !item.read) model?.openMessage(item.id);}}>
+        <summary><strong>{item.type === 'payment_due' ? 'Payment due soon' : 'Auction ending soon'}</strong><span className="notification-read-label">{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Read' : 'Unread'}</span></summary>
         {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id} · Auction #{item.auction_id}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
         <p>{item.message}</p>
         <p className="notification-help">{item.type === 'payment_due' ? 'Payment deadline' : 'Auction ends'}: {validDeadline ? <time dateTime={deadline.toISOString()}>{deadline.toLocaleString()}</time> : 'Deadline unavailable'}</p>
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.markRead([item.id], !item.read)}>{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Mark unread' : 'Mark read'}</button>
+        </details>
       </li>;
     })}</ul>}
     {ready && state.remindersCapped && <p className="notification-help">Showing the next 20 reminders. Open your auctions for the full list.</p>}
@@ -125,19 +127,19 @@ export function AuctionNotifications({state, model}) {
       {state.error && <p>{state.error}</p>}
     </div>
     {state.items.length > 0 && <ul className="notification-items">{state.items.map(item => <li key={item.id} className={item.read ? 'notification-read' : 'notification-unread'}>
-      <div className="notification-item-heading"><strong>{notificationHeading(item.type)}</strong><span>{item.read ? 'Read' : 'Unread'}</span></div>
+      <details className="notification-message" onToggle={event => {if (event.currentTarget.open && !item.read) model?.openMessage(item.id);}}>
+      <summary><strong>{notificationHeading(item.type)}</strong><span className="notification-read-label">{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Read' : 'Unread'}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
       {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id}{item.auction_id && ` · Auction #${item.auction_id}`}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
       <p className="notification-help">Base Sepolia{item.token_id != null && ` · NFT #${item.token_id}`}</p>
       <p>{item.message}</p>
-      <div className="notification-item-heading"><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.markRead([item.id], !item.read)}>{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Mark unread' : 'Mark read'}</button></div>
+      </details>
     </li>)}</ul>}
     {['error', 'unavailable'].includes(state.status) && <button type="button" className="btn-secondary" onClick={() => model?.load(state.retryCursor)}>Retry auction updates</button>}
     {state.status === 'ready' && state.nextCursor && <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.load(state.nextCursor)}>Load older auction updates</button>}
   </section></>;
 }
 
-export function NotificationInbox({ wallet, compact = false }) {
+export function NotificationInbox({ wallet, compact = false, header = false }) {
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState('personal');
   const [state, setState] = useState({ status: 'idle', items: [], nextCursor: null });
@@ -145,6 +147,8 @@ export function NotificationInbox({ wallet, compact = false }) {
   const auctions = useRef(null);
   const summary = useRef(null);
   const toggleButton = useRef(null);
+  const container = useRef(null);
+  const readQueue = useRef(null);
   const mutations = useRef(0);
   const openRef = useRef(false);
   const signInGeneration = useRef(0);
@@ -153,12 +157,18 @@ export function NotificationInbox({ wallet, compact = false }) {
   const [summaryEnabled, setSummaryEnabled] = useState(false);
   useEffect(() => {
     let clearing = false, active = true;
+    const queue = createNotificationReadQueue({canRun:()=>{
+      const personal=inbox.current?.getState(), auction=auctions.current?.getState();
+      return !['loading','idle'].includes(personal?.status) && !personal?.pendingId &&
+        auction?.status!=='loading' && !auction?.preferencesPending && !auction?.pendingIds.length;
+    },onIdle:()=>{if(!openRef.current){inbox.current?.invalidate();auctions.current?.invalidate();}}});
+    readQueue.current = queue;
     const clear = (status = 'auth') => {
       if (clearing) return;
-      clearing = true; setGroup('personal'); model.invalidate(status); auctionModel.invalidate(status); summaryModel.invalidate(status); clearing = false;
+      clearing = true; queue.reset(); setGroup('personal'); model.invalidate(status); auctionModel.invalidate(status); summaryModel.invalidate(status); clearing = false;
     };
-    const model = createNotificationInbox({ wallet, getWallet: activeWallet, onChange: next => {setState(next); if (next.status === 'auth') clear();} });
-    const auctionModel = createAuctionNotifications({wallet, getWallet: activeWallet, onChange: next => {setAuctionState(next); if (next.status === 'auth') clear();}});
+    const model = createNotificationInbox({ wallet, getWallet: activeWallet, onChange: next => {setState(next); if (next.status === 'auth') clear(); else void Promise.resolve().then(()=>queue.flush());} });
+    const auctionModel = createAuctionNotifications({wallet, getWallet: activeWallet, onChange: next => {setAuctionState(next); if (next.status === 'auth') clear(); else void Promise.resolve().then(()=>queue.flush());}});
     // This hint can deny passive loading after local logout; SIWE remains the authority.
     const hasAuthHint = () => String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase()===wallet.toLowerCase();
     const summaryModel = createNotificationSummary({wallet,getWallet:activeWallet,canRead:hasAuthHint,onChange:next=>{setSummaryState(next);if(next.status==='auth')clear();}});
@@ -175,17 +185,19 @@ export function NotificationInbox({ wallet, compact = false }) {
       if (document.visibilityState !== 'hidden') void summaryModel.refresh();
       if (openRef.current) {void model.load();void auctionModel.load();}
     }, () => {if (active) {auctionModel.invalidate('unavailable');summaryModel.invalidate('unavailable');}});
-    const onWalletChange = () => {signInGeneration.current++; clear();openRef.current=false;setOpen(false);};
+    const onPageHide = () => {signInGeneration.current++; clear();openRef.current=false;setOpen(false);};
+    const onWalletChange = () => {if(activeWallet()!==wallet.toLowerCase())onPageHide();};
     const onAuthChange = () => {clear();if(hasAuthHint() && document.visibilityState!=='hidden')void summaryModel.refresh(true);};
     const onStorage = event => { if (!event.key || event.key === 'artsoul_authenticated_wallet') {signInGeneration.current++; clear();} };
     const onPageShow = () => {if(hasAuthHint() && document.visibilityState!=='hidden')void summaryModel.refresh(true);};
     window.addEventListener('artsoul:wallet-state-changed', onWalletChange);
     window.addEventListener('artsoul:auth-state-changed', onAuthChange);
     window.addEventListener('storage', onStorage);
-    window.addEventListener('pagehide', onWalletChange);
+    window.addEventListener('pagehide', onPageHide);
     window.addEventListener('pageshow', onPageShow);
     return () => {
       active = false; signInGeneration.current++;
+      queue.reset();
       model.invalidate();
       auctionModel.dispose();
       summaryModel.dispose();
@@ -195,15 +207,21 @@ export function NotificationInbox({ wallet, compact = false }) {
       window.removeEventListener('artsoul:wallet-state-changed', onWalletChange);
       window.removeEventListener('artsoul:auth-state-changed', onAuthChange);
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener('pagehide', onWalletChange);
+      window.removeEventListener('pagehide', onPageHide);
       window.removeEventListener('pageshow', onPageShow);
     };
   }, [wallet]);
   useEffect(() => {
+    if (!header || !open) return;
+    const outside = event => {if (!container.current?.contains(event.target)) toggle(false);};
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [header, open]);
+  useEffect(() => {
     if (!open && !summaryEnabled) return;
     const model = auctions.current;
     const refresh = () => {
-      if (document.visibilityState === 'hidden') {model?.pauseReminders();summary.current?.invalidate();}
+      if (document.visibilityState === 'hidden') {if(!readQueue.current?.hasWork())model?.pauseReminders();summary.current?.invalidate();}
       else {
         if (!mutations.current) void summary.current?.refresh();
         if (open) void model?.refreshReminders();
@@ -219,7 +237,7 @@ export function NotificationInbox({ wallet, compact = false }) {
       document.removeEventListener('visibilitychange', refresh);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('online', refresh);
-      if (open) model?.pauseReminders();
+      if (open && !readQueue.current?.hasWork()) model?.pauseReminders();
     };
   }, [open, wallet, summaryEnabled]);
   async function signIn() {
@@ -236,7 +254,7 @@ export function NotificationInbox({ wallet, compact = false }) {
   async function mutate(operation) {
     const current = summary.current;
     mutations.current++;
-    current?.invalidate();
+    current?.cancelRefresh();
     try {await operation();}
     finally {
       if (current === summary.current) {
@@ -247,8 +265,8 @@ export function NotificationInbox({ wallet, compact = false }) {
   }
   function toggle(next = !openRef.current, restoreFocus = false) {
     openRef.current=next;setOpen(next);
-    if(next){inbox.current?.load();auctions.current?.load();summary.current?.refresh();}
-    else {setGroup('personal');signInGeneration.current++;inbox.current?.invalidate();auctions.current?.invalidate();}
+    if(next){if(!readQueue.current?.hasWork()){inbox.current?.load();auctions.current?.load();}summary.current?.refresh();}
+    else {setGroup('personal');signInGeneration.current++;if(!readQueue.current?.hasWork()){inbox.current?.invalidate();auctions.current?.invalidate();}}
     if(restoreFocus)toggleButton.current?.focus();
   }
   const visibleSummary = activeWallet()===wallet.toLowerCase() && summaryState.status==='ready';
@@ -259,20 +277,26 @@ export function NotificationInbox({ wallet, compact = false }) {
     ? `${summaryState.count>=100?'99+':summaryState.count} unread ${summaryState.count===1?'notification':'notifications'}`
     : 'Unread notifications. Some counts are temporarily unavailable.' : 'Notifications';
   const auctionActions = auctions.current && {...auctions.current,
+    openMessage:id=>readQueue.current?.add(`auction:${id}`,async()=>{
+      const model=auctions.current;
+      if(activeWallet()!==wallet.toLowerCase() || !model) return;
+      const current=model.getState();
+      if([...current.items,...current.reminders].some(item=>item.id===id && !item.read)) await mutate(()=>model.markRead([id],true));
+    }),
     markRead:(...args)=>mutate(()=>auctions.current?.markRead(...args)),
     setPreference:(...args)=>mutate(()=>auctions.current?.setPreference(...args)),
     setReminderMinutes:(...args)=>mutate(()=>auctions.current?.setReminderMinutes(...args))};
   return (
-    <section className={compact ? 'notification-inbox profile-notification-inbox' : 'notification-inbox rounded-xl p-5 mb-5'} style={compact ? undefined : { color: 'var(--c-text)', background: 'var(--c-surface)', border: '1px solid var(--c-border-soft)' }} aria-label="Your notifications">
-      <button ref={toggleButton} type="button" aria-expanded={open} aria-controls="profile-notifications" aria-label={unreadLabel} className="notification-toggle" onClick={() => toggle()}>
+    <section ref={container} className={header ? 'notification-inbox header-notification-inbox' : compact ? 'notification-inbox profile-notification-inbox' : 'notification-inbox rounded-xl p-5 mb-5'} style={compact || header ? undefined : { color: 'var(--c-text)', background: 'var(--c-surface)', border: '1px solid var(--c-border-soft)' }} aria-label="Your notifications">
+      <button ref={toggleButton} type="button" title="Notifications" aria-expanded={open} aria-controls="profile-notifications" aria-label={unreadLabel} className="notification-toggle" onClick={() => toggle()}>
         <span className="notification-toggle-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg>
           {hasUnread && <span className={`notification-badge${summaryState.complete?'':' notification-badge-dot'}`} aria-hidden="true">{summaryState.complete ? summaryState.count>=100?'99+':summaryState.count : null}</span>}
-        </span><span className="notification-toggle-label">Notifications</span>
-        <svg className="notification-toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </span>{!header && <><span className="notification-toggle-label">Notifications</span>
+        <svg className="notification-toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></>}
       </button>
       {open && <div id="profile-notifications" className="notification-panel" aria-busy={state.status === 'loading'} onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();toggle(false,true);}}}>
         <div className="notification-panel-heading"><div><h2>Notifications</h2><p className="notification-help">{visibleSummary && summaryState.complete && summaryState.count===0 ? 'Your personal updates are all read.' : 'Your private updates, in one place.'}</p></div>
-          <button className="notification-close" type="button" aria-label="Close notifications" onClick={()=>toggle(false,true)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+          <button className="notification-close" type="button" autoFocus={header} aria-label="Close notifications" onClick={()=>toggle(false,true)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
         </div>
         {summaryState.status==='unavailable' && <p className="notification-help">Unread counts are temporarily unavailable.</p>}
         {staff && <div className="notification-groups" role="group" aria-label="Notification categories">
@@ -314,14 +338,13 @@ export function NotificationInbox({ wallet, compact = false }) {
         </div>
         {state.items.length > 0 && <ul className="notification-items">
           {state.items.map(item => <li key={item.id} className={item.read===false?'notification-unread':'notification-read'}>
-            {typeof item.read==='boolean' && <div className="notification-item-heading"><strong>Moderation update</strong><span>{item.read?'Read':'Unread'}</span></div>}
+            <details className="notification-message" onToggle={event=>{if(event.currentTarget.open && item.read===false)readQueue.current?.add(`outcome:${item.id}`,()=>mutate(()=>inbox.current?.markRead(item.id,true)));}}>
+            <summary><strong>Report and artwork update</strong>{typeof item.read==='boolean' && <span className="notification-read-label">{state.pendingId===item.id?'Saving…':item.read?'Read':'Unread'}</span>}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
             <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>
               Artwork #{item.artwork_id} · {({'84532': 'Base Sepolia', '11155111': 'Ethereum Sepolia (legacy)', '8453': 'Base'})[item.chain_id] || `Chain ${item.chain_id}`}
             </a>
             <p>{item.message}</p>
-            <div className="notification-item-heading"><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
-              {typeof item.read==='boolean' && <button type="button" className="btn-secondary" disabled={Boolean(state.pendingId) || state.status!=='ready'} onClick={()=>mutate(()=>inbox.current?.markRead(item.id,!item.read))}>{state.pendingId===item.id?'Saving…':item.read?'Mark unread':'Mark read'}</button>}
-            </div>
+            </details>
           </li>)}
         </ul>}
         {['error', 'unavailable'].includes(state.status) && <button type="button" className="btn-main mt-3" onClick={() => inbox.current?.load(state.retryCursor)}>Retry</button>}
