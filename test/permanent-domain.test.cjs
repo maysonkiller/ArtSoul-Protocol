@@ -12,6 +12,11 @@ function read(relativePath) {
 }
 
 test('public pages publish canonical ArtSoul domain metadata', () => {
+  const socialImage = fs.readFileSync(path.join(root, 'artsoul-social-preview-v2.png'));
+  assert.equal(socialImage.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(socialImage.toString('ascii', 12, 16), 'IHDR');
+  assert.equal(socialImage.readUInt32BE(16), 1730);
+  assert.equal(socialImage.readUInt32BE(20), 909);
   const pages = new Map([
     ['index.html', `${canonicalOrigin}/`],
     ['gallery.html', `${canonicalOrigin}/gallery`],
@@ -24,7 +29,16 @@ test('public pages publish canonical ArtSoul domain metadata', () => {
   for (const [page, canonicalUrl] of pages) {
     const source = read(page);
     assert.match(source, new RegExp(`<link rel="canonical" href="${canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}">`));
-    assert.ok(source.includes(`${canonicalOrigin}/artsoul-social-preview.png?v=1`), `${page} must use the canonical social image`);
+    for (const tag of ['property="og:image"', 'name="twitter:image"']) {
+      assert.ok(source.includes(`${tag} content="${canonicalOrigin}/artsoul-social-preview-v2.png"`), `${page} must use the versioned canonical social image for ${tag}`);
+    }
+    assert.ok(!source.includes('artsoul-social-preview.png?v=1'), `${page} must not retain the old default image`);
+    assert.ok(source.includes(`property="og:image:width" content="${socialImage.readUInt32BE(16)}"`), `${page} must declare the actual PNG width`);
+    assert.ok(source.includes(`property="og:image:height" content="${socialImage.readUInt32BE(20)}"`), `${page} must declare the actual PNG height`);
+    assert.ok(source.includes('property="og:image:type" content="image/png"'));
+    for (const tag of ['property="og:image:alt"', 'name="twitter:image:alt"']) {
+      assert.ok(source.includes(`${tag} content="ArtSoul wordmark beside a cyan and violet glass sculpture on a dark background."`));
+    }
     assert.ok(source.includes(`content="${canonicalUrl}"`), `${page} must publish its canonical URL`);
   }
 });

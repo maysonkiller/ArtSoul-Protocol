@@ -25,6 +25,7 @@ const legacyRootAssets = [
     '1080x360.png',
     'ai-ui-styles.css',
     'artsoul-social-preview.png',
+    'artsoul-social-preview-v2.png',
     'ARTSOULlogo-clean.png',
     'ARTSOULlogo.png',
     'artwork-card-fixes.css',
