@@ -1,7 +1,7 @@
 # B17 private auction inbox: first slice
 
-Status: reviewed code, schema and worker deployed; staged HTTP acceptance and
-public activation pending.
+Status: first slice released and activated; staged and apex real-account HTTP
+acceptance passed. Later lifecycle categories remain unfinished.
 Workspace: `C:\Projects\ArtSoul`, `codex/takeover-audit`, starting HEAD `fec283b`.
 This resumes the preserved October 24 work after the profile/feed correction in
 PR #345. It does not complete all B17 lifecycle categories or Phase B.
@@ -140,4 +140,46 @@ No read-state/preferences mutation ran in the failed acceptance attempt. The
 private probe initially expected logout to revoke a manually retained stateless
 cookie. Its check now honors the response's clearing cookie; no product auth change
 is needed. Both diagnostic sessions then receive 401 without their cleared cookie.
-Actual acceptance must still pass on the corrected hosted route before activation.
+The corrected hosted route subsequently passed the acceptance below.
+
+### Corrected release and activation
+
+- PR #347 candidate `289b150` passed CI `40186814967`: Linux 2,434 passed / two
+  Windows-only skips; Windows 2,123 passed / 24 Docker/PostgreSQL skips; 46
+  contract tests per OS. Build and static checks passed. Merge: `daf8dfc`.
+- Local Vercel CLI route generation retains `...route` as a dynamic parameter,
+  explaining the extra query field. The exact rewrite fixes routing without
+  accepting extra user-selected identity fields.
+- The corrected dormant apex passed eight page-asset checks. Staged production
+  deployment `dpl_M8YJZVx6JjdLxWGYhSKRCpFsyo7Q` was then built from that exact
+  merge with the inbox flag enabled and automatic domain assignment disabled.
+  The apex remained disabled throughout staged acceptance.
+- Both staged and apex acceptance passed 43 HTTP interactions each using the
+  existing disposable creator/collector accounts: real SIWE, distinct source-proven
+  auction-66 items, guest/wallet/origin denial, atomic rejection of foreign/mixed
+  read IDs, read/unread persistence, category filtering, stale preference conflict,
+  pagination and logout. The actual frontend state module performed read/unread
+  writes against the live API and cleared its list after cookie removal.
+- Test read state and category defaults were restored. Preference revisions
+  advanced from zero to two on staged acceptance and to four on apex acceptance;
+  revisions were not reset. Both sessions were cleared after each run. No chain
+  transaction, email enrollment or user-owned browser session was used.
+- The single production flag was persisted, then the already-tested deployment
+  was promoted. The authoritative apex alias record resolves to the exact staged
+  deployment; the deployment's shorter alias list is not treated as authoritative.
+  Eight apex asset lists and the v23 card runtime match the retained build.
+- Post-activation indexer health is healthy/synced, confirmed block 50022261,
+  zero unresolved, failed or dead events. Existing search/donation behavior and
+  chain/economics are unchanged.
+
+Evidence: `output/audit/b17-routing-api-2026-10-25.log`,
+`b17-routing-config-2026-10-25.log`, `b17-routing-ci-2026-10-25.log`, and
+`b17-active-release-*.json`. Protected operational journals retain backup,
+source recovery, staged/apex HTTP results and the one-flag activation receipt.
+No secret values appear in this report.
+
+This is real HTTP/client persistence acceptance, not a new physical-device test,
+a newly emitted auction event, or acceptance of later lifecycle notifications.
+The next B17 slice is to map actual indexed bid/end/settlement events to the
+approved recipients and current auction round before adding producers; deadline
+reminders require extension and stale-round tests. Phase B remains open.
