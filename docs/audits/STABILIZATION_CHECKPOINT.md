@@ -3,7 +3,24 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 profile/feed refinement released:
+October 25 B17 first-slice integration prepared:
+
+- Starting HEAD `fec283b`, same canonical workspace/branch. Stash
+  `abea37274cb45283f49f012ead2cd9ef56218765` restored once. Inbox conflict was
+  resolved by preserving compact presentation and the saved privacy/state logic;
+  the retained stash is recovery only and must not be applied again.
+- Private route/config now wired; exact chain revision fences pagination after
+  rollback. Added 64 client/API/component checks and 10 real PostgreSQL checks;
+  bootstrap/grants/migration checks and build also pass. New category stays hidden
+  with the default-off flag. Existing moderation remains available.
+- Evidence and explicit deployment/activation gates:
+  `audits/B17_AUCTION_INBOX_2026-10-25.md`. No live schema, worker, backfill or
+  feature activation. Unrelated moderation-authority files remain untouched.
+- Exactly next step: run exact-candidate CI for this disabled first slice, then
+  complete the backed-up schema/source-stamping worker and real-account acceptance
+  before activation. Later lifecycle categories and Phase B exit remain open.
+
+Earlier October 25 profile/feed refinement released:
 
 - Starting HEAD `8a6230e`, same canonical workspace/branch; deployed baseline
   PR #344 / `d844349`. Full 86.7-second recording and supplied prototype reviewed.

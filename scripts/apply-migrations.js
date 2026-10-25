@@ -14,7 +14,7 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const INDEXER_BASE_MIGRATION_DIR = path.resolve(SCRIPT_DIR, '../sql/migrations');
 export const INDEXER_MIGRATION_DIR = path.resolve(SCRIPT_DIR, '../src/indexer/migrations');
 const EXPECTED_FIRST_MIGRATION = 1;
-const EXPECTED_LAST_MIGRATION = 16;
+const EXPECTED_LAST_MIGRATION = 17;
 const MIGRATION_LOCK_ID = 1_533_548_723;
 
 export function migrationChecksum(contents) {
