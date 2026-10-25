@@ -6,8 +6,10 @@ Date: 2026-10-25. Workspace: `C:\Projects\ArtSoul`, branch
 ## Scope and reproduced defects
 
 The founder's mobile screenshot shows the final Saved tab clipped by a horizontal
-tab strip. Chromium reproduces the overflow at 390px. Narrow layouts now wrap the
-five tabs within the content panel, while wider layouts keep the normal row.
+tab strip. Chromium reproduces the overflow at 390px. PR #349 initially wrapped
+the tabs on narrow screens. The founder rejected the additional row after release;
+the follow-up keeps all five tabs in one compact row. This is a layout correction,
+not a change to profile sections or permissions.
 
 The founder explicitly retired the separate profile cover image. Remove its
 editor, rendering, upload authorization and dead client upload wiring. Existing
@@ -60,14 +62,82 @@ economic change, event replay or synthetic production notification is introduced
   rejection of replacement and no hidden image fetch during saves.
 - Isolated Chromium: 320/390/768/1440px, Classic and Future, tab/editor bounds and
   editing actions exercised. This is not a new physical iPhone acceptance claim.
-- Full candidate CI, final build, deployed assets, live migration/worker and v2
-  activation remain to be recorded. The v1 inbox is already active.
+- The subsequent one-row correction (PR #351, `9e3ac5c`) also passes 17 focused
+  profile checks and 32 browser cases: 320/360/375/390/414/430/768/1440px, both
+  themes, Arial fallback and loaded Inter. All 160 tab selections retain full
+  labels/borders in one row, no horizontal overflow, and 44px button height.
+  Only mobile navigation CSS changes; the desktop row remains unchanged.
+  CI `40192029775` passed: Linux 2,472 unit checks / two documented skips;
+  Windows 2,135 / 26 documented skips; 46 contract checks per platform and both
+  builds. Merge `297e5bd` is deployed and its eight apex asset lists verified.
+- PR #349 candidate `616201f`: CI `40189933729` passed on Linux (2,455 unit
+  checks, two documented skips) and Windows (2,133, 25 documented skips), plus
+  46 contract tests on each platform. Builds and static checks passed. Local
+  full-suite PostgreSQL startup timed out once; the isolated affected file then
+  passed all 37 checks. The successful CI is the exact-candidate evidence.
+- Merge `618b648` was released with v2 disabled. Eight deployed asset lists and
+  the shared card runtime match the reviewed build. Protected full/schema backup
+  was read-validated, the additive migration rehearsed with rollback, then
+  committed once. Existing v1 functions and preference/read data were preserved.
+- Five notifications for the old artwork-34 / auction-66 rehearsal were recovered
+  from events 182, 183, 185, 189 and 190, after exact receipts/logs/code/block
+  verification through both RPCs. Two missing source fields were restored from
+  those receipts. Registry, cursor and projections were not replayed or reset.
+  These are historical facts with original dates, not new-event acceptance.
+- Staged deployment `dpl_8v8beSVup2gta2xbo7vAcPdpyWKb` passed real SIWE, HTTP and
+  64 actual HTTP/client interactions with three old test accounts: recipient isolation,
+  read/unread persistence, lifecycle filtering, v1-compatible preference writes,
+  stale revisions and retired cover rejection. Test preferences/read state were
+  restored and all three browser-session cookies cleared. No chain transaction.
+- After both worker restarts, a fresh stage of merge `297e5bd`,
+  `dpl_2zshSqJeP5qxevFQbU3Q7ecNvJ3q`, passed all 64 real-account interactions.
+  The production capability was then persisted and this exact deployment promoted
+  to the apex. The same 64 interactions passed there, with restored preferences,
+  read state and cleared test-session cookies. Eight asset lists, shared runtime,
+  alias and enabled v2 config match. The final indexer check was healthy/synced at
+  confirmed block 50044332 with zero unresolved/failed/dead events.
 
 Rollout: back up and read-validate the database; rehearse the additive migration
 inside a rollback; preserve v1 function hashes and existing preferences; release
 the tested source with v2 disabled; apply the reviewed migration and source-only
 worker update; verify a staged v2 deployment with actual signed test accounts;
 only then enable/promote and verify the apex. Preserve every operation journal.
+
+These steps are now complete for this slice. Do not replay the committed schema,
+receipt recovery, source/connection update or flag journals. The first staged
+deployment predates the compact-tab correction and must not be promoted over the
+final build. Disabling `ARTSOUL_AUCTION_LIFECYCLE_ENABLED` and deploying the current
+source hides v2 without deleting history; v1 remains supported. Do not destructively
+reverse the additive schema or restore stale data as a UI rollback.
+
+Interpretations are explicit: compact one-row mobile tabs supersede the initial
+wrap; cover retirement preserves stored references/objects; no optional arbitrary
+palette is introduced; personal notices are confirmed historical facts, not new
+rights or automatic actions. Official project identity and broadcast eligibility
+remain undecided. No economic, contract, aura or mainnet rule was amended.
+
+## Indexer restart finding
+
+The source-only lifecycle worker restart exposed an existing session-lock defect:
+acquisition and unlock used shared pool queries, and the runtime connection used
+Supavisor transaction mode (6543). The stopped worker's database backend retained
+the advisory lock while the replacement stayed a follower. Its idle session
+expired naturally about five minutes later; indexing then caught up with zero
+unresolved errors. Two guarded cleanup attempts did not establish a successful
+manual termination and must not be described as one or replayed against a new PID.
+
+The correction keeps acquisition, ownership checks, heartbeat and release on one
+checked-out client, fences on connection loss, and rejects recognized transaction
+pooler endpoints. The runtime change is explicit and limited to this worker's
+Base Sepolia environment: the same host, credentials and verified TLS on port
+5432. A read-only connection test already verified backend affinity across
+transactions. Supabase documents this as the persistent-backend session mode:
+[Connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres).
+PR #350 passed 24 focused checks and full CI. The worker-local override and two
+controlled restarts are verified: the second stop released both lock and registry
+in 375ms, then the new process advanced with zero unresolved/failed/dead events.
+The shared environment, chain data and other services stay intact. Details and
+rollback boundaries: `INDEXER_SESSION_LOCK_2026-10-25.md`.
 
 ## Remaining Phase B work
 
