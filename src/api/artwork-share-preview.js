@@ -12,7 +12,8 @@ export function renderArtworkPreview(artwork) {
     const image = allowedArtworkUrl(artwork.image || artwork.poster_url ||
         (['image','gif'].includes(artwork.media_type) ? artwork.media_url : ''))?.href;
     // A non-visual work without a poster cannot acquire a fabricated artwork image.
-    const previewImage = image || `${ORIGIN}/default-avatar.png`;
+    const previewImage = image || `${ORIGIN}/artsoul-social-preview-v2.png`;
+    const imageAlt = image ? details.imageAlt : 'ArtSoul wordmark beside a cyan and violet glass sculpture on a dark background.';
     const title = `${details.title} — ${details.creator}`;
     const description = details.context + ' · ArtSoul Protocol';
     return `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -22,12 +23,13 @@ export function renderArtworkPreview(artwork) {
 <meta property="og:type" content="website"><meta property="og:site_name" content="ArtSoul">
 <meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}">
 <meta property="og:url" content="${escape(details.url)}"><meta property="og:image" content="${escape(previewImage)}">
-<meta property="og:image:alt" content="${escape(image ? details.imageAlt : 'ArtSoul')}">
+<meta property="og:image:alt" content="${escape(imageAlt)}">
+${image ? '' : '<meta property="og:image:width" content="1730"><meta property="og:image:height" content="909"><meta property="og:image:type" content="image/png">'}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escape(title)}"><meta name="twitter:description" content="${escape(description)}">
-<meta name="twitter:image" content="${escape(previewImage)}"><meta name="twitter:image:alt" content="${escape(image ? details.imageAlt : 'ArtSoul')}">
+<meta name="twitter:image" content="${escape(previewImage)}"><meta name="twitter:image:alt" content="${escape(imageAlt)}">
 </head><body><main><h1>${escape(title)}</h1><p>${escape(description)}</p>
-<img src="${escape(previewImage)}" alt="${escape(image ? details.imageAlt : 'ArtSoul')}" width="600">
+<img src="${escape(previewImage)}" alt="${escape(imageAlt)}" width="600">
 <p><a href="${escape(details.url)}">Open artwork on ArtSoul</a></p></main></body></html>`;
 }
 

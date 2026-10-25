@@ -58,9 +58,21 @@ test('crawler HTML exposes the actual work image and escapes every user-controll
     assert.match(html,/A &amp; B/);
     const unsafe=renderArtworkPreview({...artwork,image:'https://127.0.0.1/private'});
     assert.doesNotMatch(unsafe,/127\.0\.0\.1/);
-    assert.match(unsafe,/default-avatar\.png/);
-    assert.match(renderArtworkPreview({...artwork,media_type:'audio',image:null,media_url:'https://example.com/music.mp3'}),
-        /twitter:image:alt" content="ArtSoul"/,'missing audio cover is identified as the site image');
+    assert.match(unsafe,/artsoul-social-preview-v2\.png/);
+    const audio=renderArtworkPreview({...artwork,media_type:'audio',image:null,media_url:'https://example.com/music.mp3'});
+    assert.match(audio,
+        /twitter:image:alt" content="ArtSoul wordmark beside a cyan and violet glass sculpture on a dark background\."/,'missing audio cover is identified as the site image');
+    for(const tag of ['property="og:image"','name="twitter:image"']) {
+        assert.ok(audio.includes(`${tag} content="https://artsoulprotocol.com/artsoul-social-preview-v2.png"`));
+    }
+    assert.doesNotMatch(audio,/default-avatar\.png|music\.mp3/);
+    assert.match(audio,/property="og:image:width" content="1730"/);
+    assert.match(audio,/property="og:image:height" content="909"/);
+    assert.match(audio,/property="og:image:type" content="image\/png"/);
+    const poster=renderArtworkPreview({...artwork,media_type:'video',image:null,poster_url:artwork.image});
+    assert.ok(poster.includes(`property="og:image" content="${artwork.image}"`));
+    assert.doesNotMatch(poster,/artsoul-social-preview/,'an artwork poster stays ahead of the shared fallback');
+    assert.doesNotMatch(poster,/og:image:width|og:image:height|og:image:type/,'fallback dimensions and MIME type do not describe an individual artwork');
 });
 
 test('preview always reads a guest projection without caller cookies or extra query filters', async () => {
