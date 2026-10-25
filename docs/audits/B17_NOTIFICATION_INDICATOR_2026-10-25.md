@@ -177,5 +177,17 @@ Both theme screenshots were inspected. This does not claim a new physical
 iPhone test or a live staff-factor ceremony. Evidence: `output/audit/header-notifications-*`
 and `output/playwright/header-notifications-{classic,future}-390.png`.
 
-Release verification is pending for this follow-up. B17 official announcement
-policy and B18 final design remain open.
+Released through [PR #361](https://github.com/maysonkiller/ArtSoul-Protocol/pull/361),
+merge `2e13b5a`. Final candidate `c6a9b0c` / CI `40207767230` passed Linux 2,617
+tests (two documented skips), Windows 2,244 (29 documented skips), 46 contract
+tests per platform, builds and static checks. The initial preview also passed
+an eight-page guest browser flow: hidden bell, no private notification request,
+and public config available after wallet restoration settled.
+
+Final preview `dpl_Cq97JVGspKuP2pXKtZB1WxYfo6Wv` and apex
+`dpl_BKC4E4BAjHdtw1e46abzxbMDp72v` match eight page asset lists and 18 direct/dynamic
+profile/header assets byte-for-byte. Apex summary/lifecycle/reminder config is
+active; anonymous summary, recipient-outcome and staff-queue requests return
+401 with private/no-store caching. No live recipient data was mutated.
+Browser/server closed and helpers finished. B17 official announcement policy
+and B18 final design remain open.

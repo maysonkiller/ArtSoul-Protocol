@@ -3,7 +3,7 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 shared-header notifications prepared (base HEAD `efa147f`):
+October 25 shared-header notifications released (implementation HEAD `2e13b5a`, PR #361):
 
 - Bell moved from Profile to all eight connected-wallet headers. Individual
   disclosure opens mark messages read; serial saves survive panel close while
@@ -11,9 +11,17 @@ October 25 shared-header notifications prepared (base HEAD `efa147f`):
 - 249 focused tests, build and 30 Chromium responsive/theme cases pass. No
   API/schema, contract, permissions or mainnet changes. Unrelated untracked
   authority-policy files, `.codex/` and `output/` are preserved.
+- Final candidate `c6a9b0c` / CI `40207767230`: Linux 2,617 and Windows 2,244
+  tests passed, documented skips, 46 contract tests per platform, builds and
+  static checks. Initial preview guest browser flow passed on all eight pages.
+- Final preview `dpl_Cq97JVGspKuP2pXKtZB1WxYfo6Wv` and apex
+  `dpl_BKC4E4BAjHdtw1e46abzxbMDp72v` match eight page asset lists and 18 direct/
+  dynamic assets. Apex config is active; all three private probes deny guests.
+  No live data mutations or new phone/factor ceremony. Browser/server closed;
+  helpers finished; no tracked implementation diff remains.
 - Interpretation and evidence: `audits/B17_NOTIFICATION_INDICATOR_2026-10-25.md`.
-- Exactly next step: finish PR CI and verify the preview/apex release artifacts
-  for this header slice before returning to the B17 announcement-source policy.
+- Exactly next step: resolve the official announcement-source/publishing policy
+  for the remaining B17 slice. B18 and broader Phase B gates remain open.
 
 October 25 notification groups released (implementation HEAD `7258846`, PR #359):
 
