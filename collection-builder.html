@@ -35,6 +35,7 @@
     <script src="/voice-commands.js?v=1" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script type="module" src="/src/entries/search.js"></script>
+    <script type="module" src="/src/entries/header-notifications.js"></script>
 </head>
 <body>
     <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
@@ -54,6 +55,7 @@
                 </div>
                 <div class="site-header-actions">
                     <div id="networkBadge"></div>
+                    <div id="header-notifications" hidden></div>
                     <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">

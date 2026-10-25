@@ -13,6 +13,11 @@ export function createNotificationSummary({wallet, getWallet, onChange, fetchPag
     publish({status, count: null, complete: false});
   }
   function configure(config) {enabled = config?.summaryEnabled === true; invalidate(enabled ? 'idle' : 'disabled');}
+  function cancelRefresh() {
+    // Keep the last verified count until its normal expiry while a read saves.
+    // Only a fresh summary may replace it; privacy invalidation still clears it.
+    generation++; controller?.abort(); controller = null; pending = false;
+  }
   async function refresh(force = false) {
     if (disposed || !enabled) return;
     if (!owns()) {invalidate('auth'); return;}
@@ -47,5 +52,5 @@ export function createNotificationSummary({wallet, getWallet, onChange, fetchPag
     } catch {if (current()) invalidate('unavailable');}
     finally {clearTimeout(timeout); if (epoch===generation) pending=false;}
   }
-  return {configure,refresh,invalidate,getState:()=>state,dispose(){invalidate('disabled');disposed=true;}};
+  return {configure,refresh,invalidate,cancelRefresh,getState:()=>state,dispose(){invalidate('disabled');disposed=true;}};
 }

@@ -87,7 +87,7 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
   }
   async function markRead(id,read) {
     if (!owner || getWallet().toLowerCase()!==owner) {invalidate('auth');return;}
-    if (!readEnabled || state.status!=='ready' || state.pendingId || typeof read!=='boolean' || !state.items.some(item=>item.id===id)) return;
+    if (!readEnabled || !['ready','error'].includes(state.status) || state.pendingId || typeof read!=='boolean' || !state.items.some(item=>item.id===id)) return;
     const request=++generation;controller?.abort();controller=new AbortController();
     const current=()=>request===generation && getWallet().toLowerCase()===owner;
     publish({...state,pendingId:id,error:''});
@@ -104,5 +104,5 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
     } catch {if(current())publish({...state,error:'Read state could not be saved. Please try again.'});}
     finally {clearTimeout(timeout);if(current())publish({...state,pendingId:null});}
   }
-  return {load,invalidate,markRead,configure(config){const next=config?.summaryEnabled===true;if(next!==readEnabled){readEnabled=next;invalidate();}}};
+  return {getState:()=>state,load,invalidate,markRead,configure(config){const next=config?.summaryEnabled===true;if(next!==readEnabled){readEnabled=next;invalidate();}}};
 }

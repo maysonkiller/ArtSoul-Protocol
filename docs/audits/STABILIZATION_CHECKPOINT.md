@@ -3,6 +3,18 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 25 shared-header notifications prepared (base HEAD `efa147f`):
+
+- Bell moved from Profile to all eight connected-wallet headers. Individual
+  disclosure opens mark messages read; serial saves survive panel close while
+  logout/account changes discard queued work. Personal/Moderation remain separate.
+- 249 focused tests, build and 30 Chromium responsive/theme cases pass. No
+  API/schema, contract, permissions or mainnet changes. Unrelated untracked
+  authority-policy files, `.codex/` and `output/` are preserved.
+- Interpretation and evidence: `audits/B17_NOTIFICATION_INDICATOR_2026-10-25.md`.
+- Exactly next step: finish PR CI and verify the preview/apex release artifacts
+  for this header slice before returning to the B17 announcement-source policy.
+
 October 25 notification groups released (implementation HEAD `7258846`, PR #359):
 
 - Personal is the default group; eligible staff also get Moderation. Personal

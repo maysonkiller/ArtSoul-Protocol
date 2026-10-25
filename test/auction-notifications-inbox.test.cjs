@@ -13,9 +13,9 @@ const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child =
   : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
 
 async function harness(fetchPage, enabled = true, summaryEnabled = false, configPromise = null) {
-  const [{transformWithOxc}, {createAuctionNotifications}, {createNotificationInbox}, {notificationHeading}, {createNotificationSummary}] = await Promise.all([
+  const [{transformWithOxc}, {createAuctionNotifications}, {createNotificationInbox}, {notificationHeading}, {createNotificationSummary}, {createNotificationReadQueue}] = await Promise.all([
     import('vite'), import('../src/features/moderation/auction-notifications-state.js'),
-    import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/auction-notification-types.js'), import('../src/features/moderation/notification-summary-state.js')]);
+    import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/auction-notification-types.js'), import('../src/features/moderation/notification-summary-state.js'), import('../src/features/moderation/notification-read-queue.js')]);
   const values = [], refs = [], effects = [], listeners = new Map();
   let si, ri, ei, pending;
   const state = {wallet: A, authenticatedWallet:A, calls: [], authenticate: async () => true};
@@ -23,7 +23,7 @@ async function harness(fetchPage, enabled = true, summaryEnabled = false, config
     useState(initial) {const i = si++; if (!(i in values)) values[i] = initial; return [values[i], value => {values[i] = typeof value === 'function' ? value(values[i]) : value;}];},
     useRef(initial) {return refs[ri++] ||= {current: initial};},
     useEffect(fn, deps) {const i = ei++, old = effects[i]; if (!old || deps.some((d,j) => d !== old.deps[j])) pending.push(() => {old?.cleanup?.(); effects[i] = {deps, cleanup: fn()};});}},
-    notificationHeading, createNotificationSummary:options=>createNotificationSummary({...options,fetchPage:fetcher}), createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage: fetcher}),
+    notificationHeading, createNotificationReadQueue, createNotificationSummary:options=>createNotificationSummary({...options,fetchPage:fetcher}), createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage: fetcher}),
     createNotificationInbox: options => createNotificationInbox({...options, fetchPage: fetcher}),
     document: {visibilityState: 'visible', addEventListener() {}, removeEventListener() {}},
     window: {getCurrentWalletAddress: () => state.wallet, ensureAuthenticated: () => state.authenticate(),
@@ -116,6 +116,61 @@ test('personal unread badge and staff pending count retain separate meanings', a
   h.unmount();
 });
 
+test('rapid message opens serialize personal read writes without losing the next message', async () => {
+  const first=deferred(),writes=[];
+  const h=await harness(async(url,options)=>{
+    if(url.includes('summary=1'))return summaryReply();
+    if(options.method==='PUT'){
+      const body=JSON.parse(options.body);writes.push(body.ids[0]);
+      if(writes.length===1)await first.promise;
+      return Response.json({wallet:A,updated:body.ids,read:true});
+    }
+    if(url.includes('moderation/notifications'))return Response.json({wallet:A,items:['1','2'].map(id=>({id,chain_id:'84532',artwork_id:'34',created_at:'2026-10-25T10:00:00Z',read:false,message:'Outcome '+id})),nextCursor:null});
+    return response(url);
+  },true,true);
+  h.toggle();await tick();
+  const messages=elements(h.render(),n=>n.type==='details' && n.props.className==='notification-message');
+  messages[0].props.onToggle({currentTarget:{open:true}});
+  messages[1].props.onToggle({currentTarget:{open:true}});
+  await tick();assert.deepEqual(writes,['1']);assert.match(h.html(),/1 unread notification/);
+  first.resolve();await tick();await tick();assert.deepEqual(writes,['1','2']);
+  assert.equal((h.html().match(/notification-read-label">Read/g)||[]).length,2);h.unmount();
+});
+
+test('same-wallet network updates keep the open notification panel',async()=>{
+  const h=await harness(async url=>response(url));h.toggle();await tick();
+  h.event('artsoul:wallet-state-changed');assert.match(h.html(),/id="profile-notifications"/);
+  assert.match(h.html(),/Private auction update/);h.unmount();
+});
+
+for (const clearAccess of [false, true]) {
+  test(clearAccess ? 'logout discards queued reads and ignores a late save' : 'closing the panel lets already opened messages finish saving', async () => {
+    const first=deferred(), writes=[], saved=new Set();
+    const h=await harness(async(url,options)=>{
+      if(url.includes('summary=1'))return summaryReply();
+      if(options.method==='PUT'){
+        const body=JSON.parse(options.body);writes.push(body.ids[0]);
+        if(writes.length===1)await first.promise;
+        body.ids.forEach(id=>saved.add(id));
+        return Response.json({wallet:A,updated:body.ids,read:true});
+      }
+      if(url.includes('moderation/notifications'))return Response.json({wallet:A,items:['1','2'].map(id=>({id,chain_id:'84532',artwork_id:'34',created_at:'2026-10-25T10:00:00Z',read:saved.has(id),message:'Outcome '+id})),nextCursor:null});
+      return response(url);
+    },true,true);
+    h.toggle();await tick();
+    const messages=elements(h.render(),n=>n.type==='details' && n.props.className==='notification-message');
+    messages.forEach(message=>message.props.onToggle({currentTarget:{open:true}}));
+    await tick();assert.deepEqual(writes,['1']);
+    h.toggle();assert.doesNotMatch(h.html(),/Outcome 1|Outcome 2/);
+    if(clearAccess){h.state.authenticatedWallet='';h.event('artsoul:auth-state-changed');}
+    first.resolve();await tick();await tick();
+    assert.deepEqual(writes,clearAccess?['1']:['1','2']);
+    assert.doesNotMatch(h.html(),/Outcome 1|Outcome 2/);
+    if(!clearAccess){h.toggle();await tick();assert.equal((h.html().match(/notification-read-label">Read/g)||[]).length,2);}
+    h.unmount();
+  });
+}
+
 test('compact presentation loads both categories only when explicitly opened and preserves its bell', async () => {
   const h = await harness(async url => response(url));
   assert.equal(h.state.calls.length, 0); assert.match(h.html(), /profile-notification-inbox/); assert.match(h.html(), /<svg/);
@@ -159,13 +214,15 @@ test('disabled auction notifications stay absent while the existing moderation i
   const html = h.html(); assert.match(html, /Private moderation update/); assert.doesNotMatch(html, /auction-notifications-heading|not been activated/); h.unmount();
 });
 
-test('unavailable artworks have no action link and read controls express the next action', async () => {
+test('opening an unread activity marks it read without linking unavailable artwork', async () => {
   const h = await harness(async url => response(url)); const actions = [];
   const state = {status: 'ready', pendingIds: [], preferencesPending: false, preferences: {auction_created: true, outbid: true},
-    items: [{id: '3', type: 'outbid', artworkAvailable: false, artwork_id: '34', auction_id: '66', read: true, created_at: '2026-10-25T10:00:00Z', message: 'Private update'}]};
-  const view = h.scope.Category({state, model: {markRead: (...args) => actions.push(args)}});
-  const html = renderToStaticMarkup(view); assert.match(html, /Currently unavailable/); assert.doesNotMatch(html, /href=/); assert.match(html, /Mark unread/);
-  elements(view, n => n.type === 'button')[0].props.onClick(); assert.deepEqual(JSON.parse(JSON.stringify(actions)), [[['3'], false]]); h.unmount();
+    items: [{id: '3', type: 'outbid', artworkAvailable: false, artwork_id: '34', auction_id: '66', read: false, created_at: '2026-10-25T10:00:00Z', message: 'Private update'}]};
+  const view = h.scope.Category({state, model: {openMessage: id => actions.push(id)}});
+  const html = renderToStaticMarkup(view); assert.match(html, /Currently unavailable/); assert.doesNotMatch(html, /href=|Mark unread|Mark read/);
+  const message=elements(view,n=>n.type==='details' && n.props.className==='notification-message')[0];
+  message.props.onToggle({currentTarget:{open:false}});assert.equal(actions.length,0);
+  message.props.onToggle({currentTarget:{open:true}}); assert.deepEqual(actions, ['3']); h.unmount();
 });
 
 test('resale activity shows the NFT and network without inventing an auction identifier', async () => {

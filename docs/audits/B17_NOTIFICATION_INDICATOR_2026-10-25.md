@@ -136,3 +136,46 @@ skips), 46 contract tests per platform, builds and static checks. Preview
 assets byte-for-byte. Active apex config and anonymous denial on summary,
 recipient outcomes and staff queue endpoints passed. No live recipient state
 was changed or factor ceremony replayed. Browser/server and helper are finished.
+
+## Shared header and opening-to-read (October 25 follow-up)
+
+The founder moves the inbox from Profile into the shared header, beside search
+and account controls. Bible section 11 and visual/theme part 16 apply; this is
+presentation and existing recipient-owned read state, not a role or API change.
+
+- One icon-only bell appears on all eight product headers after an actual wallet
+  connection settles. Cached profile hints cannot show it. The guest path does
+  not import the inbox or request private notifications. Profile no longer mounts
+  a duplicate inbox in either view or edit mode.
+- Clicking a message opens its contents and saves its read state. Opening the
+  panel or switching Personal/Moderation does not mark unseen messages read.
+  Read messages stay in history; reopening them never makes them unread.
+- Rapid opens are serialized across activity, reminders and personal outcomes.
+  Closing the panel lets already-opened messages finish saving; then private
+  panel contents are cleared. Wallet/auth changes, pagehide and unmount discard
+  queued work and invalidate responses. A failed older-page request does not
+  prevent marking an already loaded personal outcome read.
+- The last verified unread badge stays visible during a save, without extending
+  its original validity. A fresh summary follows acknowledged writes. Failed
+  writes retain unread state and expose the existing error/retry flow.
+- The panel is bounded to the viewport, scrolls internally, closes on outside
+  click or Escape, and returns focus on explicit close. Narrow mobile headers
+  retain search, bell, avatar and shortened wallet in one row. Colors remain
+  theme variables; existing reduced-motion behavior remains.
+
+Interpretations: "read on click" means opening that individual message, not
+deleting it or reading the whole inbox. Staff queue notices remain workflow
+items, not personal unread messages. Both groups and profile curation stay.
+
+Local verification: 249 focused tests and the production build passed. Chromium
+checked 14 Classic/Future header/panel layouts (320–1440 pixels), plus four
+expanded-content portrait/landscape cases with reduced motion, individual reads,
+unchanged-wallet events, disconnect, outside close and keyboard focus return.
+Twelve further checks at 769–961 pixels cover both themes at header breakpoints;
+the keyboard shortcut hint yields space to the search label on narrow desktops.
+Both theme screenshots were inspected. This does not claim a new physical
+iPhone test or a live staff-factor ceremony. Evidence: `output/audit/header-notifications-*`
+and `output/playwright/header-notifications-{classic,future}-390.png`.
+
+Release verification is pending for this follow-up. B17 official announcement
+policy and B18 final design remain open.

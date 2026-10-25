@@ -87,16 +87,16 @@ test('unavailable and disabled reminder lists never render stale deadline items'
   assert.match(initial, /aria-busy="true"/);
 });
 
-test('reminder read controls use existing identifiers and unavailable artwork stays unlinked', async () => {
+test('opening a reminder uses its existing identifier and unavailable artwork stays unlinked', async () => {
   const scope = await components(), calls = [];
-  const state = inboxState({reminders: [reminder({read: true, artworkAvailable: false})]});
-  const view = scope.Upcoming({state, busy: false, model: {markRead: (...args) => calls.push(args)}});
+  const state = inboxState({reminders: [reminder({read: false, artworkAvailable: false})]});
+  const view = scope.Upcoming({state, busy: false, model: {openMessage: id => calls.push(id)}});
   const html = renderToStaticMarkup(view);
   assert.match(html, /Currently unavailable/); assert.doesNotMatch(html, /href=/);
-  elements(view, node => node.type === 'button' && node.props.children === 'Mark unread')[0].props.onClick();
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [[[state.reminders[0].id], false]]);
+  elements(view, node => node.type === 'details')[0].props.onToggle({currentTarget:{open:true}});
+  assert.deepEqual(calls, [state.reminders[0].id]);
   const busy = renderToStaticMarkup(scope.Upcoming({state: {...state, pendingIds: [state.reminders[0].id]}, busy: true, model: {}}));
-  assert.match(busy, /disabled=""[^>]*>Saving…/);
+  assert.match(busy, /Saving…/); assert.doesNotMatch(busy, /Mark read|Mark unread/);
 });
 
 test('the off toggle is independent of time editing and activity hidden state ignores reminder preferences', async () => {
@@ -159,9 +159,72 @@ test('disabled or saving preferences cannot submit a reminder draft', async () =
   }
 });
 
+test('rapid reminder opens finish both saves after closing while the first write is pending', async t => {
+  const [{createAuctionNotifications}, {createNotificationInbox}, {createNotificationSummary}, {createNotificationReadQueue}] = await Promise.all([
+    import('../src/features/moderation/auction-notifications-state.js'), import('../src/features/moderation/notification-inbox-state.js'),
+    import('../src/features/moderation/notification-summary-state.js'), import('../src/features/moderation/notification-read-queue.js')]);
+  const wallet = '0x' + 'a'.repeat(40), tick = () => new Promise(resolve => setImmediate(resolve));
+  const values = [], refs = [], effects = [], writes = [], saved = new Set();
+  let si, ri, ei, pending, auctionState, releaseFirst;
+  const firstWrite = new Promise(resolve => {releaseFirst = resolve;});
+  const rows = ['4', '5'].map((id, index) => reminder({id, auction_id: String(66 + index),
+    deadline: String(Date.parse('2026-10-25T10:00:00Z') / 1000 + 1800)}));
+  const fetchPage = async (url, options) => {
+    if (options.method === 'PUT') {
+      const body = JSON.parse(options.body);
+      writes.push({id: body.ids[0], signal: options.signal});
+      if (writes.length === 1) await firstWrite;
+      assert.equal(options.signal.aborted, false, 'closing must not abort an opened reminder save');
+      assert.equal(body.read, true);
+      saved.add(body.ids[0]);
+      return Response.json({wallet, updated: body.ids, read: true});
+    }
+    if (url === '/api/notifications?v=3') return Response.json({wallet, items: [], nextCursor: null,
+      preferences: {...inboxState().preferences}, preferencesRevision: 0, chainRevision: '0',
+      serverTime: '2026-10-25T10:00:00.000Z', reminderMinutes: [60], remindersAvailable: true,
+      remindersCapped: false, reminders: rows.map(row => ({...row, read: saved.has(row.id)}))});
+    if (url.startsWith('/api/moderation/access')) return Response.json({authenticated: true, eligible: false});
+    return Response.json({wallet, items: [], nextCursor: null});
+  };
+  const scope = await components({...React,
+    useState(initial) {const i = si++; if (!(i in values)) values[i] = typeof initial === 'function' ? initial() : initial;
+      return [values[i], value => {values[i] = typeof value === 'function' ? value(values[i]) : value;}];},
+    useRef(initial) {return refs[ri++] ||= {current: initial};},
+    useEffect(fn, deps) {const i = ei++, old = effects[i]; if (!old || deps.some((value, index) => value !== old.deps[index])) {
+      pending.push(() => {old?.cleanup?.(); effects[i] = {deps, cleanup: fn()};});}}
+  }, {document: {visibilityState: 'visible', addEventListener() {}, removeEventListener() {}},
+    window: {getCurrentWalletAddress: () => wallet, addEventListener() {}, removeEventListener() {}, setInterval() {return 1;}, clearInterval() {},
+      ArtSoulPublicConfig: {load: async () => ({auctionNotifications: {enabled: true, lifecycleEnabled: true,
+        remindersEnabled: true, chainId: 84532, coreAddress: rows[0].core_address}})}}, createNotificationReadQueue,
+    createNotificationSummary: options => createNotificationSummary({...options, fetchPage}),
+    createNotificationInbox: options => createNotificationInbox({...options, fetchPage}),
+    createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage,
+      onChange: state => {auctionState = state; options.onChange(state);}})});
+  const render = () => {si = ri = ei = 0; pending = []; const view = scope.Inbox({wallet, compact: true}); pending.forEach(fn => fn()); return view;};
+  const toggle = () => {elements(render(), node => node.type === 'button' && node.props['aria-controls'] === 'profile-notifications')[0].props.onClick(); return render();};
+  t.after(() => effects.forEach(effect => effect.cleanup?.()));
+  render(); await tick(); toggle(); await tick();
+  assert.equal(auctionState.reminders.length, 2);
+  const category = elements(render(), node => node.type === scope.Category)[0];
+  const upcoming = elements(scope.Category(category.props), node => node.type === scope.Upcoming)[0];
+  const messages = elements(scope.Upcoming(upcoming.props), node => node.type === 'details');
+  for (const message of messages) message.props.onToggle({currentTarget: {open: true}});
+  await tick();
+  assert.deepEqual(writes.map(write => write.id), ['4']);
+  const closed = toggle();
+  assert.equal(elements(closed, node => node.props.id === 'profile-notifications').length, 0);
+  releaseFirst(); await tick(); await tick();
+  assert.deepEqual(writes.map(write => write.id), ['4', '5']);
+  assert.deepEqual([...saved], ['4', '5']);
+  assert.deepEqual(auctionState.reminders, [], 'closed private models clear after queued saves finish');
+  toggle(); await tick();
+  assert.equal(auctionState.reminders.length, 2);
+  assert.ok(auctionState.reminders.every(row => row.read), 'reopening retains both acknowledged read states');
+});
+
 test('reminder polling runs only while open and visible, resumes on focus and removes listeners on close', async t => {
-  const [{createAuctionNotifications}, {createNotificationInbox}, {createNotificationSummary}] = await Promise.all([
-    import('../src/features/moderation/auction-notifications-state.js'), import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/notification-summary-state.js')]);
+  const [{createAuctionNotifications}, {createNotificationInbox}, {createNotificationSummary}, {createNotificationReadQueue}] = await Promise.all([
+    import('../src/features/moderation/auction-notifications-state.js'), import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/notification-summary-state.js'), import('../src/features/moderation/notification-read-queue.js')]);
   const wallet = '0x' + 'a'.repeat(40), core = '0x' + 'c'.repeat(40), tick = () => new Promise(resolve => setImmediate(resolve));
   const values = [], refs = [], effects = [], listeners = new Map(), intervals = new Map();
   let si = 0, ri = 0, ei = 0, pending = [], timerId = 0, reads = 0, auctionState, delayNext = false, release;
@@ -189,7 +252,7 @@ test('reminder polling runs only while open and visible, resumes on focus and re
     useRef(initial) {return refs[ri++] ||= {current: initial};},
     useEffect(fn, deps) {const i = ei++, old = effects[i]; if (!old || deps.some((value, index) => value !== old.deps[index])) {
       pending.push(() => {old?.cleanup?.(); effects[i] = {deps, cleanup: fn()};});}}
-  }, {window, document,
+  }, {window, document, createNotificationReadQueue,
     createNotificationSummary: options => createNotificationSummary({...options,fetchPage}),
     createNotificationInbox: options => createNotificationInbox({...options, fetchPage}),
     createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage,
