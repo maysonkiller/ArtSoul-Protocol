@@ -1,6 +1,7 @@
 import { React } from '../../entries/react-runtime.js';
 import { createNotificationInbox } from './notification-inbox-state.js';
 import { createAuctionNotifications } from './auction-notifications-state.js';
+import { notificationHeading } from './auction-notification-types.js';
 
 const { useEffect, useRef, useState } = React;
 const activeWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
@@ -9,26 +10,28 @@ export function AuctionNotifications({state, model}) {
   if (state.status === 'disabled') return null;
   const busy = state.preferencesPending || state.pendingIds.length > 0;
   return <section className="notification-category" aria-labelledby="auction-notifications-heading" aria-busy={state.status === 'loading' || busy}>
-    <h3 id="auction-notifications-heading">Auctions</h3>
-    <p className="notification-help">Confirmed auction creation and outbid updates. Open the artwork to see its current state.</p>
+    <h3 id="auction-notifications-heading">Your activity</h3>
+    <p className="notification-help">Recorded updates for your wallet. Open an artwork to see its current state.</p>
     {state.preferences && <details className="notification-settings"><summary>Notification settings</summary><fieldset className="notification-preferences" disabled={busy || state.status === 'loading'}>
       <legend>Updates shown in this inbox</legend>
       <label><input type="checkbox" checked={state.preferences.auction_created} onChange={event => model?.setPreference('auction_created', event.target.checked)} />Show auction creation updates</label>
       <label><input type="checkbox" checked={state.preferences.outbid} onChange={event => model?.setPreference('outbid', event.target.checked)} />Show outbid updates</label>
+      {typeof state.preferences.lifecycle === 'boolean' && <label><input type="checkbox" checked={state.preferences.lifecycle} onChange={event => model?.setPreference('lifecycle', event.target.checked)} />Show bids, auction results, purchases and sales</label>}
       <p className="notification-help">These settings hide or show existing updates without deleting them. They apply only to this inbox and do not subscribe you to email.</p>
     </fieldset></details>}
     <div role="status" aria-live="polite">
       {state.status === 'loading' && <p>Loading auction updates…</p>}
       {state.status === 'auth' && <p>Sign in with your connected wallet to view auction updates.</p>}
       {state.status === 'unavailable' && <p>Auction notifications are temporarily unavailable.</p>}
-      {state.status === 'ready' && state.items.length === 0 && <p>{state.preferences && !state.preferences.auction_created && !state.preferences.outbid ? 'Both auction categories are hidden. Enable one above to see its updates.' : 'No auction updates to show.'}</p>}
+      {state.status === 'ready' && state.items.length === 0 && <p>{state.preferences && Object.values(state.preferences).every(value => !value) ? 'Activity updates are hidden. Enable a category above to see its updates.' : 'No activity updates to show.'}</p>}
       {state.preferencesPending && <p>Saving notification settings…</p>}
       {state.notice && <p>{state.notice}</p>}
       {state.error && <p>{state.error}</p>}
     </div>
     {state.items.length > 0 && <ul className="notification-items">{state.items.map(item => <li key={item.id} className={item.read ? 'notification-read' : 'notification-unread'}>
-      <div className="notification-item-heading"><strong>{item.type === 'outbid' ? 'Your bid was surpassed' : 'Auction created'}</strong><span>{item.read ? 'Read' : 'Unread'}</span></div>
-      {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id} · Auction #{item.auction_id}</a> : <span>Artwork #{item.artwork_id} · Auction #{item.auction_id} · Currently unavailable</span>}
+      <div className="notification-item-heading"><strong>{notificationHeading(item.type)}</strong><span>{item.read ? 'Read' : 'Unread'}</span></div>
+      {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id}{item.auction_id && ` · Auction #${item.auction_id}`}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
+      <p className="notification-help">Base Sepolia{item.token_id != null && ` · NFT #${item.token_id}`}</p>
       <p>{item.message}</p>
       <div className="notification-item-heading"><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
         <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.markRead([item.id], !item.read)}>{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Mark unread' : 'Mark read'}</button></div>

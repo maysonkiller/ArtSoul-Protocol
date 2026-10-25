@@ -195,3 +195,55 @@ test('a pending write prevents duplicate writes and pagination until it is ackno
   delayed.resolve({wallet: A, updated: ['3'], read: true}); await pending;
   assert.equal(m.state.items[0].read, true); assert.deepEqual(m.state.pendingIds, []);
 });
+
+test('lifecycle opt-in preserves exact NFT and amount fields and uses v2 for every read and write', async () => {
+  const calls = [], preferences = {...prefs, lifecycle: true};
+  let revision = 0, saved = false;
+  const resale = row('8', {type: 'resale_purchased', auction_id: null, token_id: '9007199254740993',
+    amount_wei: '10000000000000000001', settlement_deadline: null});
+  const m = fixture(async (url, options) => {
+    calls.push(url);
+    if (options.method === 'GET') return reply(preferences.lifecycle ? [{...resale, read: saved}] : [], {preferences: {...preferences}, preferencesRevision: revision});
+    const payload = JSON.parse(options.body);
+    if (payload.action === 'read') {saved = payload.read; return Response.json({wallet: A, updated: payload.ids, read: saved});}
+    assert.equal(payload.expected_revision, revision);
+    Object.assign(preferences, payload.preferences); revision++;
+    return Response.json({wallet: A, preferences: {...preferences}, preferencesRevision: revision});
+  });
+  m.model.configure({enabled: true, lifecycleEnabled: true, chainId: 84532, coreAddress: CORE});
+  await m.model.load(); assert.equal(m.state.status, 'ready');
+  assert.equal(m.state.items[0].token_id, '9007199254740993');
+  assert.equal(m.state.items[0].amount_wei, '10000000000000000001');
+  await m.model.markRead(['8'], true); await m.model.load(); assert.equal(m.state.items[0].read, true);
+  await m.model.setPreference('lifecycle', false); assert.equal(m.state.items.length, 0);
+  await m.model.setPreference('lifecycle', true); assert.equal(m.state.items[0].read, true);
+  assert.ok(calls.every(url => url === '/api/notifications?v=2'));
+  m.switchWallet(); assert.equal(m.state.items.length, 0); assert.equal(m.state.status, 'auth');
+});
+
+test('v2 rejects malformed lifecycle identity and cannot show rows from a disabled category', async () => {
+  const good = row('8', {type: 'auction_won', token_id: null, amount_wei: '10', settlement_deadline: '1800000000'});
+  for (const change of [{auction_id: null}, {token_id: undefined}, {amount_wei: 10},
+    {settlement_deadline: '0'}, {settlement_deadline: '999999999999999999999'}, {type: 'unapproved_notice'}]) {
+    const m = fixture(async () => reply([{...good, ...change}], {preferences: {...prefs, lifecycle: true}}));
+    m.model.configure({enabled: true, lifecycleEnabled: true, chainId: 84532, coreAddress: CORE});
+    await m.model.load(); assert.equal(m.state.status, 'error'); assert.deepEqual(m.state.items, []);
+  }
+  const m = fixture(async () => reply([good], {preferences: {...prefs, lifecycle: false}}));
+  m.model.configure({enabled: true, lifecycleEnabled: true, chainId: 84532, coreAddress: CORE});
+  await m.model.load(); assert.equal(m.state.status, 'error'); assert.deepEqual(m.state.items, []);
+});
+
+test('disabling lifecycle capability retires its history and resumes the old inbox protocol', async () => {
+  const urls = [];
+  const m = fixture(async url => {
+    urls.push(url);
+    return url.includes('v=2') ? reply([row('3', {token_id: null, amount_wei: null, settlement_deadline: null})],
+      {preferences: {...prefs, lifecycle: true}}) : reply([row('2')]);
+  });
+  m.model.configure({enabled: true, lifecycleEnabled: true, chainId: 84532, coreAddress: CORE});
+  await m.model.load(); assert.equal(m.state.items[0].id, '3');
+  m.model.configure({enabled: true, chainId: 84532, coreAddress: CORE});
+  assert.deepEqual(m.state.items, []); await m.model.load();
+  assert.deepEqual(urls, ['/api/notifications?v=2', '/api/notifications']); assert.equal(m.state.items[0].id, '2');
+});

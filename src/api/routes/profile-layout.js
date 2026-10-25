@@ -1,9 +1,7 @@
 import { allowMethods, normalizeWallet, requireWallet, sendError, supabaseRest, getPublicStorageUrl } from '../backend.js';
 import { publicOrigin, readBoundedJson, serviceError } from '../launch-services.js';
-import { fetchArtworkResource } from '../safe-artwork-fetch.js';
 import { readProfileLayoutConfig } from '../profile-layout-config.js';
 import { readVisibleArtworkCards } from './public/artworks.js';
-import { PROFILE_COVER_MIME_EXTENSIONS, MAX_PROFILE_COVER_BYTES } from '../../config/upload-policy.js';
 import { defaultProfileLayout, validateProfileLayout, layoutArtworks, canFeatureArtwork } from '../../features/profile/profile-layout.js';
 
 const fail = (code, message, status = 400) => serviceError(code, message, status);
@@ -20,24 +18,6 @@ export function profileCoverPath(wallet, url) {
     throw fail('INVALID_PROFILE_COVER', 'Choose a cover uploaded for this profile.');
   }
   return `profile-covers/${wallet}/${filename}`;
-}
-
-export async function verifyProfileCover(wallet, url) {
-  const path = profileCoverPath(wallet, url);
-  if (!path) return;
-  const resource = await fetchArtworkResource(url, { maxBytes: MAX_PROFILE_COVER_BYTES, timeoutMs: 10000,
-    acceptContentType: type => Object.hasOwn(PROFILE_COVER_MIME_EXTENSIONS, type) });
-  const bytes = resource?.data;
-  const type = resource?.mimeType;
-  const matches = bytes && (
-    (type === 'image/jpeg' && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) ||
-    (type === 'image/png' && bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) ||
-    (type === 'image/gif' && /^(GIF87a|GIF89a)$/.test(bytes.subarray(0, 6).toString('ascii'))) ||
-    (type === 'image/webp' && bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP')
-  );
-  if (!matches || !path.endsWith(`.${PROFILE_COVER_MIME_EXTENSIONS[type]}`)) {
-    throw fail('PROFILE_COVER_UNAVAILABLE', 'The cover could not be verified. Choose an image and try again.', 422);
-  }
 }
 
 async function readLayout(wallet) {
@@ -94,7 +74,11 @@ export default async function handler(req, res) {
     if (new Set(cards.map(card => String(card.artwork_id))).size !== selected.length) {
       throw fail('PROFILE_ARTWORK_UNAVAILABLE', 'A selected work is unavailable for this profile. Remove it and save again.', 409);
     }
-    await verifyProfileCover(wallet, layout.cover_url);
+    // Cover images are retired. Preserve historical data without fetching an
+    // invisible image or accepting a new cover through an older client.
+    const previous = await readLayout(wallet);
+    if (previous.revision !== body.expected_revision) throw fail('LAYOUT_CONFLICT', 'This layout changed in another tab. Reload its latest version before saving.', 409);
+    if (layout.cover_url !== previous.layout.cover_url) throw fail('PROFILE_COVER_RETIRED', 'Profile cover images are no longer supported. Reload the profile editor.', 410);
     const saved = await supabaseRest('rpc/save_profile_layout', { method: 'POST',
       body: { p_wallet_address: wallet, p_expected_revision: body.expected_revision, p_layout: layout } });
     if (saved?.saved === false) throw fail('LAYOUT_CONFLICT', 'This layout changed in another tab. Reload its latest version before saving.', 409);
@@ -105,7 +89,7 @@ export default async function handler(req, res) {
   } catch (error) {
     if (!['UNAUTHENTICATED', 'SESSION_WALLET_MISMATCH', 'PROFILE_LAYOUT_DISABLED', 'INVALID_PROFILE_LAYOUT_QUERY',
       'INVALID_ORIGIN', 'JSON_REQUIRED', 'BODY_TOO_LARGE', 'INVALID_JSON', 'INVALID_PROFILE_LAYOUT', 'INVALID_PROFILE_COVER',
-      'PROFILE_COVER_UNAVAILABLE', 'PROFILE_LAYOUT_DEPLOYMENT_MISMATCH', 'PROFILE_ARTWORK_UNAVAILABLE', 'LAYOUT_CONFLICT'].includes(error?.code)) {
+      'PROFILE_COVER_RETIRED', 'PROFILE_LAYOUT_DEPLOYMENT_MISMATCH', 'PROFILE_ARTWORK_UNAVAILABLE', 'LAYOUT_CONFLICT'].includes(error?.code)) {
       error = fail('PROFILE_LAYOUT_UNAVAILABLE', 'Profile customization is temporarily unavailable. Please try again.', 503);
     }
     sendError(res, error);

@@ -3,11 +3,9 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { allowMethods, normalizeWallet, requireWallet, sendError, supabaseRest, getPublicStorageUrl, setWalletSession } from '../src/api/backend.js';
 import { publicOrigin, readBoundedJson, serviceError } from '../src/api/launch-services.js';
-import { fetchArtworkResource } from '../src/api/safe-artwork-fetch.js';
 import { readProfileLayoutConfig } from '../src/api/profile-layout-config.js';
-import { PROFILE_COVER_MIME_EXTENSIONS, MAX_PROFILE_COVER_BYTES } from '../src/config/upload-policy.js';
 import { defaultProfileLayout, validateProfileLayout, layoutArtworks, canFeatureArtwork } from '../src/features/profile/profile-layout.js';
-import { profileCoverPath, verifyProfileCover } from '../src/api/routes/profile-layout.js';
+import { profileCoverPath } from '../src/api/routes/profile-layout.js';
 
 const A = `0x${'1'.repeat(40)}`, B = `0x${'2'.repeat(40)}`, CORE = `0x${'3'.repeat(40)}`, OLD = `0x${'4'.repeat(40)}`;
 const item = id => ({ chain_id: 84532, core_address: CORE, artwork_id: String(id) });
@@ -22,11 +20,11 @@ function response() { return { statusCode: 200, headers: {}, body: null, setHead
   status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; return this; }, end() {} }; }
 function handler(hydrate) {
   const names = ['allowMethods','normalizeWallet','requireWallet','sendError','supabaseRest','getPublicStorageUrl','publicOrigin',
-    'readBoundedJson','serviceError','fetchArtworkResource','readProfileLayoutConfig','readVisibleArtworkCards',
-    'PROFILE_COVER_MIME_EXTENSIONS','MAX_PROFILE_COVER_BYTES','defaultProfileLayout','validateProfileLayout','layoutArtworks','canFeatureArtwork'];
+    'readBoundedJson','serviceError','readProfileLayoutConfig','readVisibleArtworkCards',
+    'defaultProfileLayout','validateProfileLayout','layoutArtworks','canFeatureArtwork'];
   return new Function(...names, source)(allowMethods,normalizeWallet,requireWallet,sendError,supabaseRest,getPublicStorageUrl,
-    publicOrigin,readBoundedJson,serviceError,fetchArtworkResource,readProfileLayoutConfig,hydrate,
-    PROFILE_COVER_MIME_EXTENSIONS,MAX_PROFILE_COVER_BYTES,defaultProfileLayout,validateProfileLayout,layoutArtworks,canFeatureArtwork);
+    publicOrigin,readBoundedJson,serviceError,readProfileLayoutConfig,hydrate,
+    defaultProfileLayout,validateProfileLayout,layoutArtworks,canFeatureArtwork);
 }
 
 test('profile layout API protects writes and separates metadata from current public cards', async t => {
@@ -69,6 +67,7 @@ test('profile layout API protects writes and separates metadata from current pub
   });
   await t.test('CAS write submits the authenticated wallet and never silently overwrites a conflicting revision', async () => {
     globalThis.fetch = async (input, options) => {
+      if (options.method === 'GET') return Response.json([{revision: 2, layout: base}]);
       assert.equal(new URL(input).pathname.split('/').at(-1), 'save_profile_layout');
       const body = JSON.parse(options.body);
       assert.deepEqual(body, { p_wallet_address: A, p_expected_revision: 2, p_layout: base });
@@ -76,10 +75,10 @@ test('profile layout API protects writes and separates metadata from current pub
     };
     assert.deepEqual((await call({ method: 'PUT', body: { expected_revision: 2, layout: base } })).body,
       { wallet: A, revision: 3, layout: base });
-    globalThis.fetch = async () => Response.json({ saved: false });
+    globalThis.fetch = async (_, options) => Response.json(options.method === 'GET' ? [{revision: 2, layout: base}] : { saved: false });
     const conflict = await call({ method: 'PUT', body: { expected_revision: 2, layout: base } });
     assert.equal(conflict.statusCode, 409); assert.equal(conflict.body.error, 'LAYOUT_CONFLICT');
-    globalThis.fetch = async () => Response.json({ saved: true, wallet: B, revision: 3, layout: base });
+    globalThis.fetch = async (_, options) => Response.json(options.method === 'GET' ? [{revision: 2, layout: base}] : { saved: true, wallet: B, revision: 3, layout: base });
     assert.equal((await call({ method: 'PUT', body: { expected_revision: 2, layout: base } })).statusCode, 503);
   });
   await t.test('selection hydration is one bounded public batch and uses server ownership rather than submitted labels', async () => {
@@ -89,7 +88,7 @@ test('profile layout API protects writes and separates metadata from current pub
       { artwork_id: '1', chain_id: 84532, creator: A, current_owner_address: B },
       { artwork_id: '2', chain_id: 84532, creator: B, minted: true, current_owner_address: A }
     ]; };
-    globalThis.fetch = async (_, options) => Response.json({ saved: true, wallet: A, revision: 1, layout: JSON.parse(options.body).p_layout });
+    globalThis.fetch = async (_, options) => Response.json(options.method === 'GET' ? [] : { saved: true, wallet: A, revision: 1, layout: JSON.parse(options.body).p_layout });
     assert.equal((await call({ method: 'PUT', body: { expected_revision: 0, layout }, hydrate })).statusCode, 200);
     assert.deepEqual(hydrated, [[84532, ['1', '2'], CORE]]);
     globalThis.fetch = noAccess;
@@ -124,38 +123,33 @@ test('profile layout API protects writes and separates metadata from current pub
     assert.equal(Object.hasOwn(result.body, 'layout'), false);
     assert.equal((await call({ query: { address: A, view: 'artworks' }, hydrate: async () => { throw new Error('secret internal failure'); } })).statusCode, 503);
   });
-  await t.test('cover verification rejects foreign URLs, redirects, non-raster bytes and oversized streams before saving', async () => {
+  await t.test('retired covers preserve historical metadata without fetching storage or accepting replacements', async () => {
     const path = `profile-covers/${A}/12345678-1234-1234-1234-123456789abc.png`;
     const url = getPublicStorageUrl('artworks', path);
     assert.equal(profileCoverPath(A, url), path);
     for (const bad of [url.replace(A, B), `${url}?x=1`, `${url}#x`, url.replace('.png', '.svg'), url.replace('layout.example.test', 'evil.test'),
       url.replace('profile-covers/', 'uploads/'), url.replace('/12345678-', '/%2e%2e/12345678-')]) assert.throws(() => profileCoverPath(A, bad));
-    const signature = Buffer.from([137,80,78,71,13,10,26,10]);
-    let reads = 0;
-    globalThis.fetch = async (input, options) => { reads++; assert.equal(String(input), url); assert.equal(options.redirect, 'error');
-      return new Response(signature, { headers: { 'Content-Type': 'image/png' } }); };
-    await verifyProfileCover(A, url); assert.equal(reads, 1);
-    for (const [mime, extension, bytes] of [
-      ['image/jpeg', 'jpg', Buffer.from([0xff, 0xd8, 0xff])],
-      ['image/gif', 'gif', Buffer.from('GIF89a')],
-      ['image/webp', 'webp', Buffer.from('RIFFxxxxWEBP')]
-    ]) {
-      const rasterUrl = url.replace(/\.png$/, `.${extension}`);
-      globalThis.fetch = async input => { assert.equal(String(input), rasterUrl); return new Response(bytes, { headers: { 'Content-Type': mime } }); };
-      await verifyProfileCover(A, rasterUrl);
-      globalThis.fetch = async () => new Response(bytes, { headers: { 'Content-Type': mime } });
-      await assert.rejects(verifyProfileCover(A, url), { code: 'PROFILE_COVER_UNAVAILABLE' });
+    const historical = {...base, cover_url: url};
+    let writes = 0;
+    globalThis.fetch = async (input, options) => {
+      assert.match(new URL(input).pathname, /^\/rest\/v1\/(profile_layouts|rpc\/save_profile_layout)$/);
+      if (options.method === 'GET') return Response.json([{revision: 4, layout: historical}]);
+      writes++;
+      const submitted = JSON.parse(options.body).p_layout;
+      assert.equal(submitted.cover_url, url);
+      return Response.json({saved: true, wallet: A, revision: 5, layout: submitted});
+    };
+    const changed = {...historical, template: 'featured'};
+    assert.equal((await call({method: 'PUT', body: {expected_revision: 4, layout: changed}})).statusCode, 200);
+    assert.equal(writes, 1);
+    for (const cover_url of [null, url.replace('.png', '.jpg'), url.replace(A, B)]) {
+      const retired = await call({method: 'PUT', body: {expected_revision: 4, layout: {...historical, cover_url}}});
+      assert.equal(retired.statusCode, 410); assert.equal(retired.body.error, 'PROFILE_COVER_RETIRED');
     }
-    for (const mode of ['svg', 'wrong-bytes', 'header-size', 'stream-size', 'redirect']) {
-      globalThis.fetch = async () => {
-        if (mode === 'redirect') throw new Error('redirect rejected');
-        const bytes = mode === 'stream-size' ? Buffer.alloc(MAX_PROFILE_COVER_BYTES + 1) : Buffer.from('<svg/>');
-        return new Response(bytes, { headers: { 'Content-Type': mode === 'svg' ? 'image/svg+xml' : 'image/png',
-          ...(mode === 'header-size' ? { 'Content-Length': String(MAX_PROFILE_COVER_BYTES + 1) } : {}) } });
-      };
-      await assert.rejects(verifyProfileCover(A, url), { code: 'PROFILE_COVER_UNAVAILABLE' });
-    }
-    globalThis.fetch = noAccess;
-    assert.equal((await call({ method: 'PUT', body: { expected_revision: 0, layout: { ...base, cover_url: url.replace(A, B) } } })).body.error, 'INVALID_PROFILE_COVER');
+    const stale = await call({method: 'PUT', body: {expected_revision: 3, layout: historical}});
+    assert.equal(stale.statusCode, 409); assert.equal(writes, 1);
+    globalThis.fetch = async (_, options) => {assert.equal(options.method, 'GET'); return Response.json([]);};
+    const newCover = await call({method: 'PUT', body: {expected_revision: 0, layout: historical}});
+    assert.equal(newCover.statusCode, 410);
   });
 });
