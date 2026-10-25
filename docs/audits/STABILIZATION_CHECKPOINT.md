@@ -1,7 +1,27 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-24 (local time). Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 25 Saved interaction and card expiry regression:
+
+- Starting HEAD `bf290ff`, same canonical workspace/branch. Founder-reported
+  Saved cross-surface failures reproduced against the actual capture guard:
+  it disabled the control before its own listener. The shared control now
+  uses the existing exemption while its store retains pending-write protection.
+- Timer/body expiry synchronization, distinct theme-aware bookmark plus/check
+  feedback and mobile search alignment are included in the bounded correction.
+  Evidence: `audits/B13_SAVED_INTERACTION_2026-10-25.md`.
+- B17 remains unfinished and unapplied. Its thirteen files are preserved in the
+  named Git stash `Preserve unfinished B17 while fixing Saved interactions`;
+  exact recovery copies and its separate CSS block are in ignored
+  `output/recovery/b17-paused-2026-10-25`. Restore after exact-candidate release
+  verification. Unrelated moderation-authority files remain untouched.
+- `VOICE_AND_NETWORK_FOLLOWUP_2026-10-25.md` records ordinary-user assistant
+  expansion and future network discussion. No automatic signing, admin command,
+  new provider, network activation or contract/economic change was introduced.
+- Exactly next step: finish the bounded correction's build/CI, release it,
+  verify apex assets/mobile geometry, then restore the preserved B17 diff.
 
 October 24 B-16 released; B-17 started:
 

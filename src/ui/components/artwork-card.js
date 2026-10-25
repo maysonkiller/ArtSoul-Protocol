@@ -247,10 +247,10 @@
         );
     }
 
-    function statusInfo(artwork = {}) {
+    function statusInfo(artwork = {}, now = Date.now()) {
         const status = normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state || artwork.nft_status);
         const endTime = toTimestamp(artwork.auction_end_time || artwork.end_time || artwork.endTime);
-        const expired = Boolean(endTime && endTime <= Date.now());
+        const expired = Boolean(endTime && endTime <= now);
         const hasBid = hasWinnerOrBid(artwork);
         const minted = isMinted(artwork);
         const noBids = status.includes('no_bid');
@@ -261,9 +261,9 @@
         // date, depending on which projection built the card.
         const rawDeadline = artwork.settlement_deadline ?? artwork.settlementDeadline ?? artwork.winner_deadline;
         const settlementDeadline = toTimestamp(Number(rawDeadline) || rawDeadline);
-        const settlementClosed = Boolean(settlementDeadline && Date.now() > settlementDeadline + SETTLEMENT_CLOCK_MARGIN_MS);
+        const settlementClosed = Boolean(settlementDeadline && now > settlementDeadline + SETTLEMENT_CLOCK_MARGIN_MS);
         const pendingCreated = toTimestamp(artwork.created_at || artwork.createdAt || artwork.saved_at || artwork.savedAt);
-        const recentPending = artwork.source === 'pending_indexer' && (!pendingCreated || Date.now() - pendingCreated <= RECENT_PENDING_MS);
+        const recentPending = artwork.source === 'pending_indexer' && (!pendingCreated || now - pendingCreated <= RECENT_PENDING_MS);
 
         if (recentPending) return { key: 'finalizing', label: 'Finalizing...' };
         if (isListedForSale(artwork)) return { key: 'listed', label: 'For sale' };
@@ -307,7 +307,7 @@
 
     function countdownInfo(artwork = {}, now = Date.now()) {
         const endTime = auctionEndTimestamp(artwork);
-        if (!endTime || statusInfo(artwork).key !== 'live') return null;
+        if (!endTime || statusInfo(artwork, now).key !== 'live') return null;
         return { endTime, label: formatAuctionCountdown(endTime, now) };
     }
 
@@ -339,7 +339,7 @@
         return label === 'Ended' ? 'Auction ended' : `Auction ends in ${label}`;
     }
 
-    function createCountdownElement(artwork = {}) {
+    function createCountdownElement(artwork = {}, onEnd = null) {
         const info = countdownInfo(artwork);
         if (!info) return null;
 
@@ -359,6 +359,7 @@
             pill.textContent = label;
             pill.className = `artsoul-card-countdown${label === 'Ended' ? ' is-ended' : ''}`;
             pill.setAttribute('aria-label', countdownAriaLabel(label));
+            if (label === 'Ended') onEnd?.(now);
             return label !== 'Ended';
         };
 
@@ -434,9 +435,9 @@
         return items;
     }
 
-    function cardDetailsText(artwork) {
+    function cardDetailsText(artwork, now = Date.now()) {
         return [artwork.title || 'Untitled Artwork', `Creator: ${creatorLabel(artwork)}`,
-            `Status: ${statusInfo(artwork).label}`, formatPrice(artwork)].filter(Boolean).join('\n');
+            `Status: ${statusInfo(artwork, now).label}`, formatPrice(artwork)].filter(Boolean).join('\n');
     }
 
     // Both renderers use this disclosure; opening it only reads cached public
@@ -506,11 +507,14 @@
         button.type = 'button';
         button.className = detail ? 'saved-button saved-button-detail' : 'saved-button saved-button-overlay';
         button.hidden = true;
+        // Saved serializes its own requests; the generic capture guard would
+        // disable this button before its handler gets to inspect the click.
+        button.dataset.allowRapid = 'true';
         button.dataset.savedArtwork = id;
         button.dataset.savedChain = String(chain);
         button.setAttribute('aria-label', 'Save artwork');
         button.setAttribute('aria-pressed', 'false');
-        button.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4z"/></svg>';
+        button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="saved-icon-shape" d="M7 3.5h10a2 2 0 0 1 2 2v15l-7-4-7 4v-15a2 2 0 0 1 2-2Z"/><path class="saved-icon-add" d="M9 9h6m-3-3v6"/><path class="saved-icon-check" d="m8.5 9 2.3 2.3 4.7-4.6"/></svg>';
         button.addEventListener('click', event => {
             event.preventDefault(); event.stopPropagation();
             void window.ArtSoulSaved?.toggle(button);
@@ -786,10 +790,21 @@
         if (menu) card.appendChild(menu);
         const saved = href ? createSavedControl(artwork) : null;
         if (saved) card.appendChild(saved);
-        const countdown = createCountdownElement(artwork);
+        let link = null;
+        const countdown = createCountdownElement(artwork, now => {
+            // The clock changes presentation even before an indexer response.
+            // Keep the body and accessible label in step with the same timer.
+            const next = statusInfo(artwork, now);
+            badge.className = `artsoul-card-status artsoul-card-status-${next.key}`;
+            badge.textContent = next.label;
+            if (link) {
+                link.title = cardDetailsText(artwork, now);
+                link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
+            }
+        });
         if (countdown) card.appendChild(countdown);
         if (href) {
-            const link = document.createElement('a');
+            link = document.createElement('a');
             link.className = 'artsoul-card-link';
             link.href = href;
             link.title = cardDetailsText(artwork);
@@ -948,7 +963,7 @@
         );
     }
 
-    function ReactCountdown({ artwork = {} }) {
+    function ReactCountdown({ artwork = {}, onEnd = null }) {
         const React = window.React;
         const h = React.createElement;
         const endTime = auctionEndTimestamp(artwork);
@@ -962,9 +977,10 @@
             return subscribeCountdown(now => {
                 const label = formatAuctionCountdown(next.endTime, now);
                 setDisplay({ endTime: next.endTime, label });
+                if (label === 'Ended') onEnd?.(now);
                 return label !== 'Ended';
             });
-        }, [endTime, activeAuctionId(artwork), isMinted(artwork), normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state)]);
+        }, [endTime, activeAuctionId(artwork), isMinted(artwork), normalize(artwork.status || artwork.auction_state || artwork.lifecycle_state), onEnd]);
 
         if (!display || display.endTime !== endTime) return null;
         return h('span', {
@@ -979,6 +995,9 @@
     function ReactCard({ artwork = {}, href = '', onOpen = null, actions = null, onStartAuction = null, respectHidden = true, minimal = false, surface = '' }) {
         const React = window.React;
         const h = React.createElement;
+        // Only refresh the card at expiry; ordinary second ticks stay local
+        // to the countdown and do not rerender media or Saved controls.
+        const [, refreshAuctionState] = React.useState(0);
         const [mediaUnavailable, setMediaUnavailable] = React.useState(false);
         React.useEffect(() => setMediaUnavailable(false), [mediaUrl(artwork)]);
         if (respectHidden !== false && isHidden(artwork)) return null;
@@ -1014,7 +1033,7 @@
             ),
             href || onOpen ? h(ReactActionMenu, { artwork }) : null,
             href || onOpen ? h(ReactSavedControl, { artwork }) : null,
-            h(ReactCountdown, { artwork }),
+            h(ReactCountdown, { artwork, onEnd: refreshAuctionState }),
             href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
                 'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null
         );
