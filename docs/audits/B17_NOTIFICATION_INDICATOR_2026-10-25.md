@@ -171,6 +171,8 @@ Local verification: 249 focused tests and the production build passed. Chromium
 checked 14 Classic/Future header/panel layouts (320–1440 pixels), plus four
 expanded-content portrait/landscape cases with reduced motion, individual reads,
 unchanged-wallet events, disconnect, outside close and keyboard focus return.
+Twelve further checks at 769–961 pixels cover both themes at header breakpoints;
+the keyboard shortcut hint yields space to the search label on narrow desktops.
 Both theme screenshots were inspected. This does not claim a new physical
 iPhone test or a live staff-factor ceremony. Evidence: `output/audit/header-notifications-*`
 and `output/playwright/header-notifications-{classic,future}-390.png`.

@@ -8,7 +8,7 @@ October 25 shared-header notifications prepared (base HEAD `efa147f`):
 - Bell moved from Profile to all eight connected-wallet headers. Individual
   disclosure opens mark messages read; serial saves survive panel close while
   logout/account changes discard queued work. Personal/Moderation remain separate.
-- 249 focused tests, build and 18 Chromium responsive/theme cases pass. No
+- 249 focused tests, build and 30 Chromium responsive/theme cases pass. No
   API/schema, contract, permissions or mainnet changes. Unrelated untracked
   authority-policy files, `.codex/` and `output/` are preserved.
 - Interpretation and evidence: `audits/B17_NOTIFICATION_INDICATOR_2026-10-25.md`.
