@@ -62,10 +62,32 @@ Local evidence is under `output/audit/notification-badge-*` and
 
 ## Release status
 
-Prepared locally; CI, protected backup, rollback rehearsal, additive migration,
-staged real-account acceptance and public activation are still pending at this
-checkpoint. Do not describe this document as proof of a live release. No worker
-restart, chain transaction or past journal replay is required for this change.
+Released through [PR #355](https://github.com/maysonkiller/ArtSoul-Protocol/pull/355),
+merge `f7ccbee`. Candidate `c07b61d` / CI `40201679037` passed Linux 2,586 tests
+(two documented skips), Windows 2,213 tests (29 documented skips), 46 contract
+tests on each platform, builds and static checks.
+
+A fresh protected full/schema backup was archive-read validated. Rollback
+rehearsal and additive application preserved all 78 existing public function
+bodies/owners/ACLs, relevant table access controls, preference rows, auction read
+state and moderation rows. The new summary performed no data writes. Anonymous
+and authenticated database roles cannot execute either new RPC.
+
+Staged deployment `dpl_DBn4ocdcU7pMB96q4NtLfavefNtG` passed 83 real SIWE/API/client
+interactions before promotion, then the apex passed the same 83 interactions.
+Three old test accounts were used; auction read/unread changed summary totals,
+and two accounts also exercised real recipient-owned moderation read state.
+The third had no eligible unread personal moderation row; none was fabricated.
+Guest, mismatched-wallet, foreign-ID and wrong-origin requests were rejected.
+Every touched read state was restored and read back; preferences and their
+revisions were unchanged, and all three test sessions were logged out after
+each run. No chain transaction, due-time reminder or phone acceptance is claimed.
+
+Only `ARTSOUL_NOTIFICATION_SUMMARY_ENABLED=true` was added to production settings;
+other settings were preserved. Eight page asset lists, the shared card runtime,
+public config and private endpoint denial match the exact released source. No
+worker restart or prior operation replay occurred. Private backup, schema,
+release, flag and HTTP journals are terminal and must not be replayed.
 
 B17 official project-announcement source/publishing policy and B18 final design
 remain open. This slice does not close all of Phase B.

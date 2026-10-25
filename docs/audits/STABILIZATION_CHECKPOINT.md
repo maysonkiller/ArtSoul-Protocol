@@ -3,17 +3,29 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 B17 unread indicator prepared (base HEAD `31acdd9`):
+October 25 B17 unread indicator activated (release HEAD `f7ccbee`, PR #355):
 
-- Owner requested a red count/dot and polished notification hierarchy. Changes
-  remain in the canonical checkout, on `codex/takeover-audit`; unrelated untracked
-  authority-policy files, `.codex/` and `output/` remain intact.
-- Private summary, recipient-owned moderation read state and both-theme badge
-  are implemented. 105 focused tests, 26 PostgreSQL/privilege tests, build and
-  16 browser size/zoom cases pass. No physical phone acceptance claimed.
-- Exactly next step: commit the reviewed candidate, run CI and complete the
-  protected-backup/staged-acceptance release gates before enabling the summary
-  flag. Do not replay completed reminder journals or restart the worker.
+- Red unread count/dot and consistent notification hierarchy are live in Classic
+  and Future. Closed profile control loads only a private summary. Explicit read
+  actions update counts; closing does not silently mark unseen messages read.
+- Candidate `c07b61d` / CI `40201679037`: Linux 2,586 / Windows 2,213 passed,
+  documented skips, 46 contracts each, builds/static checks. Local evidence:
+  105 focused tests, 26 PostgreSQL/privilege checks, 16 browser size/zoom cases
+  and 64 badge variants. No new physical phone acceptance claimed.
+- Protected full/schema backup, read validation and rollback rehearsal preceded
+  additive migration; all 78 existing public RPCs, ACLs and existing rows were
+  preserved. No worker restart. Staged deployment `dpl_DBn4ocdcU7pMB96q4NtLfavefNtG`
+  passed 83 real old-account interactions, then passed the same 83 on the apex.
+  Three sessions logged out; read states restored and read back, preferences and
+  revisions unchanged. Two accounts covered moderation marking; the third had no
+  eligible unread row. No new chain transaction or due-time reminder claimed.
+- Summary flag enabled only after staged acceptance; eight assets/runtime/config
+  and private endpoint denials match the release. All notification-summary and
+  earlier reminder journals are terminal; do not replay. Unrelated untracked
+  authority-policy files, `.codex/` and `output/` remain intact. Helpers finished.
+- Exactly next step: settle the pending official announcement-source/publishing
+  policy for the final B17 slice. B18 retains the founder's restrained, readable,
+  consistent visual direction. Phase B exit gates remain open.
   Evidence: `audits/B17_NOTIFICATION_INDICATOR_2026-10-25.md`.
 
 October 25 B17 personal reminders activated (release HEAD `1392b5b`, PR #353):
