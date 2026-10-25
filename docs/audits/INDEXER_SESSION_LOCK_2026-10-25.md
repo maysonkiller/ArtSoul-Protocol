@@ -29,8 +29,24 @@ backend configuration: [Supabase Postgres connections](https://supabase.com/docs
   across transactions using 5432 and the existing `verify-full` TLS mode.
 - No storage-layout, auction economy, event handler or cursor change is involved.
 
-Operational acceptance remains separate: preserve a protected configuration/source
-backup, change only the Base Sepolia worker's connection override, permit bounded
-graceful shutdown, and verify two restarts with actual advisory/registry release
-and advancing healthy indexing. Record that result in the lifecycle audit before
-enabling the new notification capability. Other worker environments remain intact.
+## Operational acceptance
+
+PR #350, candidate `efb30c0`, passed CI `40191749569` on Linux and Windows,
+including builds and contract suites, before merge `7836805`. The source-only
+worker update preserved a protected copy of both changed files and the previous
+Base Sepolia environment. Only that worker gained a DATABASE_URL override on
+5432; shared configuration, search/donation settings and source stayed pinned.
+PM2 now permits a 45-second graceful shutdown, longer than the runner's bounded
+30-second drain. It does not deliberately delay shutdown.
+
+Both controlled restarts passed. The second stop took 375ms; a live database check
+between stop and start found no advisory lock and no leader registry row. The new
+process became leader and advanced to confirmed block 50042192 with zero unresolved,
+failed or dead events. PM2 configuration was saved after verification. No database
+backend was forcibly terminated, and no event/cursor was replayed or reset.
+
+The private journal `lifecycle-lock-worker-rollout-2026-10-25.json` has terminal
+status `TWICE_RESTARTED_HEALTHY_LOCK_RELEASE_VERIFIED`; do not replay its mutation
+steps. Private backup/configuration values stay outside Git. A rollback of this
+lock fix must retain session mode: reverting to transaction mode would reintroduce
+the known failure.

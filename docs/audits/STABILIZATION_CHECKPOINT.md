@@ -3,24 +3,36 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 profile and B17 lifecycle slice in progress (starting HEAD `4482e5d`):
+October 25 profile and B17 lifecycle activated (HEAD `297e5bd`, PR #351 merge):
 
-- Current founder request: wrap mobile Saved tabs; remove separate cover images;
-  compact the curation editor; extend personal protocol notifications. No arbitrary
-  palette or official-project identity is inferred. The project-source question
-  remains pending. Work remains in the canonical checkout.
-- Two bounded helpers finished/reviewed the profile and backend work; no broad
-  audit restart. Existing unrelated untracked moderation-authority files preserved.
-- Prepared v2 lifecycle schema/API/client uses a separate default-off capability;
-  v1 remains compatible. 54 backend PostgreSQL/indexer/grant checks and 96 combined
-  API/state/profile/grant-ledger checks pass. Both-theme 320/390/768/1440px isolated
-  Chromium verified tab bounds/editor actions; no new physical-phone claim.
-- Fresh read-validated protected full/schema backup exists in ignored
-  `docs/private/phase-b-db-backup-lifecycle-2026-10-25`. No new live DDL/worker/flag
-  change yet. The first-slice journals remain completed and must not be replayed.
-- Exactly next step: finish exact-candidate CI and backed-up additive migration
-  rehearsal, then release/verify the profile fixes and gate v2 activation on real
-  staged acceptance. Evidence: `audits/B17_LIFECYCLE_PROFILE_2026-10-25.md`.
+- PR #349 released the compact editor and retired separate covers; historical
+  cover metadata is retained. Latest founder correction replaces the wrapped
+  mobile tabs with one compact row. PR #351 is released; 32 Chromium cases across
+  eight widths/both themes/two font states and 160 tab clicks pass. No new physical
+  iPhone claim. The project-wide official source question remains pending.
+- The protected full/schema backup was read-validated, additive v2 migration
+  rehearsed then applied once, and five receipt-proven old auction-66 notifications
+  recovered without replaying events/cursor/projections. Original dates retained.
+  Staged and apex acceptance each passed 64 real SIWE/HTTP/client interactions
+  for three old test accounts; read state/preferences restored and all three
+  test-session cookies cleared. No new chain transaction or phone test claimed.
+- A real restart exposed the old pool/session advisory-lock mismatch. PR #350
+  passed 24 focused tests and full CI; explicit worker-only session mode and two
+  restarts now pass. Second stop released both lock and registry in 375ms, new
+  process advanced to confirmed block 50042192, zero unresolved/failed/dead events.
+  Shared configuration is unchanged. No backend termination or event reset.
+- Completed private schema/recovery/worker/flag journals must not be replayed. V2
+  is active on the apex through `dpl_2zshSqJeP5qxevFQbU3Q7ecNvJ3q`, exact source
+  `297e5bd`. Eight asset lists/runtime/config/alias verified. Final worker healthy
+  at confirmed block 50044332, zero failures. The earlier staged build predates
+  the new tab fix and must not be promoted. Unrelated untracked files remain intact;
+  both helpers have finished and their isolated browser/server are closed.
+- Exactly next step: implement B17 deadline reminders from current-round/end-time
+  evidence with extension and duplicate guards. Project-wide announcements still
+  require an explicit official source; B18 final redesign and Phase B exit gates
+  remain open. Do not restart Phase A or infer beta/Snapshot completion.
+  Evidence: `audits/B17_LIFECYCLE_PROFILE_2026-10-25.md` and
+  `audits/INDEXER_SESSION_LOCK_2026-10-25.md`.
 
 October 25 B17 first slice activated (HEAD `daf8dfc`):
 
