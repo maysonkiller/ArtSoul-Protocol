@@ -3,7 +3,29 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 B17 rollout checkpoint (HEAD `8a34716`):
+October 25 B17 first slice activated (HEAD `daf8dfc`):
+
+- PR #347 fixes the staged routing defect without weakening query validation.
+  Candidate `289b150` / CI `40186814967`: Linux 2,434 / Windows 2,123 passed,
+  documented skips, 46 contracts each; builds/static checks pass.
+- Staged `dpl_M8YJZVx6JjdLxWGYhSKRCpFsyo7Q` from exact merge `daf8dfc` passed
+  43 real-account HTTP checks before the production flag was persisted and this
+  same deployment was promoted. All 43 checks then passed on the apex. The actual
+  client read/unread state was exercised against the live API. No chain transaction.
+- Read state/default preferences restored; test preference revisions are now four.
+  Both test sessions were cleared after each run. The apex alias, eight asset
+  lists, v23 runtime and enabled config were verified; indexer healthy/synced at
+  confirmed block 50022261, zero unresolved/failed/dead events.
+- Do not replay schema, source recovery, worker or flag journals. Failed attempts
+  remain archived. `audits/B17_AUCTION_INBOX_2026-10-25.md` records actual limits.
+  Unrelated untracked moderation-authority files remain untouched. No helper agent
+  is running; no browser/test server was left running by this block.
+- Exactly next step: map real bid/end/settlement event sources and approved
+  recipients for the next B17 slice, including extensions/current-round guards;
+  first-slice activation does not close all B17 or Phase B. Full redesign and the
+  Future account control remain the final B18 pass.
+
+Earlier October 25 B17 rollout checkpoint (HEAD `8a34716`):
 
 - PR #346 candidate `4fa43b5` passed final CI `40185201858`: Linux 2,433,
   Windows 2,122, documented skips, 46 contracts each. Eight dormant apex asset
