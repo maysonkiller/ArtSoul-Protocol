@@ -78,6 +78,7 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
   await pool.query('CREATE TABLE public.outbox_events (correlation_id TEXT, idempotency_key TEXT);');
   await pool.query(migration('src/indexer/migrations/014_schema_aware_reorg_rollback.sql'));
   await pool.query(migration('src/indexer/migrations/015_public_metrics_projection.sql'));
+  await pool.query(migration('src/indexer/migrations/017_event_contract_provenance.sql'));
   await pool.query(`INSERT INTO public.v41_public_metrics
     (chain_id,artists_onboarded,auctions_completed,unique_collectors,settled_volume_wei) VALUES (84532,4,5,6,7);`);
   migrationSql = migration('sql/migrations/artist_support.sql');
@@ -176,7 +177,7 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
 
   await t.test('foreign deployment rolls back event and projection atomically and records a retryable failed lease', async () => {
     const event = {...await fromLog(5), contractAddress: CORE};
-    await assert.rejects(engine.processEvent(event), /outside the configured deployment/);
+    await assert.rejects(engine.processEvent(event), /Event contract source does not match its configured listener/);
     assert.equal((await pool.query('SELECT * FROM public.contract_events WHERE transaction_hash=$1', [hash(5)])).rowCount, 0);
     assert.equal((await pool.query('SELECT * FROM public.artwork_donations WHERE transaction_hash=$1', [hash(5)])).rowCount, 0);
     assert.equal((await pool.query('SELECT processing_status FROM public.event_processing_registry WHERE transaction_hash=$1', [hash(5)])).rows[0].processing_status, 'failed');
