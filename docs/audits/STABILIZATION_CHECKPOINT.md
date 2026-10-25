@@ -3,6 +3,24 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 25 owner-prioritized social banner released (HEAD `49136fd`, PR #357):
+
+- New versioned brand PNG replaces the textured default on six OG/X metadata
+  entries and the no-poster API fallback. Actual artwork images/posters remain
+  unchanged. Original generated image/provenance preserved; legacy asset retained.
+- 12 focused tests, build and six packaged metadata sets pass. Candidate `f218e79`
+  / CI `40203263793` passed both platforms and 46 contracts each. Preview and apex
+  each passed 18 metadata requests with browser/Telegram/X user agents, exact
+  asset hash/dimensions/MIME, retained old asset and real artwork #34 image.
+- Apex deployment `dpl_23JV9dg3AYw5XCWPWwFX1DK4ekgr` verified. No social message,
+  theme/contract/database change or mainnet action. Third-party cache refresh is
+  not confirmed. New art direction and full Imagegen prompt are recorded in
+  `design/SOCIAL_PREVIEW_2026-10-25.md`. The broader B18 redesign remains open.
+- Canonical checkout/branch unchanged; no tracked unfinished code. Unrelated
+  untracked authority-policy files, `.codex/` and `output/` remain intact. Helper
+  finished. Exactly next step: settle the pending official announcement-source
+  policy for the remaining B17 slice; do not restart accepted Phase A work.
+
 October 25 B17 unread indicator activated (release HEAD `f7ccbee`, PR #355):
 
 - Red unread count/dot and consistent notification hierarchy are live in Classic
