@@ -7,7 +7,7 @@ This runbook is the authoritative operational path for the current ArtSoul repos
 | Location | Purpose | Treatment |
 | --- | --- | --- |
 | `sql/migrations/001_core_indexer_schema.sql` through `003_resilience_schema.sql` | Base indexer schema | First three migrations in the indexer sequence. Managed by `scripts/apply-migrations.js` for fresh or already-ledgered environments. |
-| `src/indexer/migrations/004_*.sql` through `016_*.sql` | Active indexer and V4.1 projections | Remaining thirteen migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
+| `src/indexer/migrations/004_*.sql` through `017_*.sql` | Active indexer and V4.1 projections | Remaining fourteen migrations in the same sequence. Managed by `scripts/apply-migrations.js`. |
 | Other files in `sql/migrations/` | Feature, auth, AI, moderation, observability, and security changes | Manually reviewed migrations. Their production status must be recorded explicitly; filename order is not an execution plan. |
 | `migrations/001_ai_integration.sql` | Early AI integration migration | Historical/manual. Verify schema before use; do not assume it belongs to the indexer 001-014 sequence. |
 
@@ -40,6 +40,8 @@ Verify against the database before applying or re-applying it.
 | `src/indexer/migrations/014_schema_aware_reorg_rollback.sql` | Indexer sequence 14. **Applied to production** after backup; accepted as backlog A-14. |
 | `src/indexer/migrations/015_public_metrics_projection.sql` | Indexer sequence 15. **Applied to production** 2026-07-28; accepted as backlog A-26. |
 | `src/indexer/migrations/016_indexer_state_hash.sql` | Indexer sequence 16. **Released via PR #341 / `058d64d`; no live DDL required.** Forward-only repair of the missing runtime column on fresh 001–015 installs. Existing live column already matches. Preserves existing hashes, cursor rows, grants and RLS. See the fresh-bootstrap record below. |
+| `src/indexer/migrations/017_event_contract_provenance.sql` | Indexer sequence 17. **Prepared and locally tested; live application pending.** Adds nullable actual event-source address and a bounded auction-history index. Historical unknown sources stay NULL; never populate them from current configuration. Apply before deploying source-stamping workers. |
+| `sql/migrations/auction_notifications.sql` | **Prepared and locally tested; live application pending.** B17 private confirmed auction-created/outbid history, read state and category preferences. Requires migration 017 and `artwork_media_reorg.sql`; explicit grants and forced RLS restrict browser access. Keep `ARTSOUL_AUCTION_NOTIFICATIONS_ENABLED` off until protected backup, actual event-source proof and two-account HTTP acceptance. See `audits/B17_AUCTION_INBOX_2026-10-25.md`. |
 | `sql/migrations/a8a_moderation_passkey_foundation.sql` | A8 schema step 1. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. RG-03 activation remains open; see the dated A8 application record below. |
 | `sql/migrations/a8b_artwork_report_intake.sql` | A8 schema step 2. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Public reporting remains disabled. |
 | `sql/migrations/a8c_protocol_admin_review.sql` | A8 schema step 3. **Applied 2026-09-30; dormant.** Previously recorded as unapplied/founder-gated. Protocol Admin remains disabled. |
