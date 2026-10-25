@@ -24,6 +24,22 @@ export default async function handler(req,res) {
       throw fail('SESSION_WALLET_MISMATCH','Sign in with your connected wallet to view notifications.',401);
     }
     const config = readAuctionNotificationConfig();
+    if (req.query?.summary !== undefined) {
+      if (req.method !== 'GET' || req.query.summary !== '1' || Object.keys(req.query).some(key => !['summary','route'].includes(key))) {
+        throw fail('INVALID_NOTIFICATION_CURSOR','Choose a valid notification view.');
+      }
+      if (!config.summaryEnabled) throw fail('NOTIFICATIONS_UNAVAILABLE','Notification counts are not available yet.',503);
+      const data = await supabaseRest('rpc/read_notification_summary',{method:'POST',body:{p_wallet:wallet,p_core:config.coreAddress,
+        p_auctions:config.enabled,p_lifecycle:config.lifecycleEnabled === true,p_reminders:config.remindersEnabled === true}});
+      const counts = ['auctionCount','moderationCount','reminderCount'];
+      if (!data || counts.some(key => !Number.isInteger(data[key]) || data[key]<0 || data[key]>100) ||
+        typeof data.remindersAvailable !== 'boolean' || !Number.isFinite(Date.parse(data.serverTime)) ||
+        !(config.enabled ? validChainRevision(data.chainRevision) : data.chainRevision === null) || !validRevision(data.preferencesRevision) ||
+        (data.nextReminderDeadline !== null && (!validUint(data.nextReminderDeadline) || Number(data.nextReminderDeadline)*1000<=Date.parse(data.serverTime))) ||
+        (!data.remindersAvailable && (data.reminderCount || data.nextReminderDeadline !== null)) ||
+        (data.reminderCount>0)!==(data.nextReminderDeadline!==null)) throw new Error('Invalid notification summary');
+      return res.status(200).json({wallet,...Object.fromEntries([...counts,'remindersAvailable','serverTime','nextReminderDeadline','chainRevision','preferencesRevision'].map(key=>[key,data[key]]))});
+    }
     if (!config.enabled) throw fail('AUCTION_NOTIFICATIONS_DISABLED','Auction notifications are not active yet.',503);
     const reminders = req.query?.v === '3';
     const lifecycle = req.query?.v === '2' || reminders;

@@ -12,23 +12,24 @@ const deferred = () => {let resolve; const promise = new Promise(done => {resolv
 const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child => elements(child, predicate))
   : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
 
-async function harness(fetchPage, enabled = true) {
-  const [{transformWithOxc}, {createAuctionNotifications}, {createNotificationInbox}, {notificationHeading}] = await Promise.all([
+async function harness(fetchPage, enabled = true, summaryEnabled = false, configPromise = null) {
+  const [{transformWithOxc}, {createAuctionNotifications}, {createNotificationInbox}, {notificationHeading}, {createNotificationSummary}] = await Promise.all([
     import('vite'), import('../src/features/moderation/auction-notifications-state.js'),
-    import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/auction-notification-types.js')]);
+    import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/auction-notification-types.js'), import('../src/features/moderation/notification-summary-state.js')]);
   const values = [], refs = [], effects = [], listeners = new Map();
   let si, ri, ei, pending;
-  const state = {wallet: A, calls: [], authenticate: async () => true};
+  const state = {wallet: A, authenticatedWallet:A, calls: [], authenticate: async () => true};
   const scope = {React: {...React,
     useState(initial) {const i = si++; if (!(i in values)) values[i] = initial; return [values[i], value => {values[i] = typeof value === 'function' ? value(values[i]) : value;}];},
     useRef(initial) {return refs[ri++] ||= {current: initial};},
     useEffect(fn, deps) {const i = ei++, old = effects[i]; if (!old || deps.some((d,j) => d !== old.deps[j])) pending.push(() => {old?.cleanup?.(); effects[i] = {deps, cleanup: fn()};});}},
-    notificationHeading, createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage: fetcher}),
+    notificationHeading, createNotificationSummary:options=>createNotificationSummary({...options,fetchPage:fetcher}), createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage: fetcher}),
     createNotificationInbox: options => createNotificationInbox({...options, fetchPage: fetcher}),
     document: {visibilityState: 'visible', addEventListener() {}, removeEventListener() {}},
     window: {getCurrentWalletAddress: () => state.wallet, ensureAuthenticated: () => state.authenticate(),
+      SupabaseAuth:{getAuthenticatedWallet:()=>state.authenticatedWallet},
       setInterval() {return 1;}, clearInterval() {},
-      ArtSoulPublicConfig: {load: async () => ({auctionNotifications: {enabled, chainId: 84532, coreAddress: CORE}})},
+      ArtSoulPublicConfig: {load: async () => configPromise || ({auctionNotifications: {enabled, summaryEnabled, chainId: 84532, coreAddress: CORE}})},
       addEventListener(name, fn) {if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn);},
       removeEventListener(name, fn) {listeners.get(name)?.delete(fn);}}};
   async function fetcher(url, options) {state.calls.push(url); return fetchPage(url, options);}
@@ -112,4 +113,38 @@ test('resale activity shows the NFT and network without inventing an auction ide
   assert.match(html, /Your activity/); assert.match(html, /Your NFT sold/);
   assert.match(html, /Base Sepolia.*NFT #6/); assert.match(html, /href="\/artwork\/v41:84532:34"/);
   assert.doesNotMatch(html, /Auction #|auction #null/); h.unmount();
+});
+
+const summaryReply = (patch={}) => Response.json({wallet:A,auctionCount:1,moderationCount:0,reminderCount:0,
+  remindersAvailable:true,serverTime:'2026-10-25T12:00:00Z',nextReminderDeadline:null,chainRevision:'0',preferencesRevision:0,...patch});
+test('badge appears before opening, keeps its count when closed, and excludes staff review contents', async () => {
+  const h=await harness(async url=>url.includes('summary=1')?summaryReply():url.includes('moderation/notifications')?
+    Response.json({wallet:A,items:[],nextCursor:null}):response(url),true,true);
+  assert.deepEqual(h.state.calls,['/api/notifications?summary=1']);assert.match(h.html(),/notification-badge/);
+  assert.match(h.html(),/1 unread notification/);assert.doesNotMatch(h.html(),/Private auction update|Reports awaiting review/);
+  h.toggle();await tick();h.toggle();assert.match(h.html(),/1 unread notification/);h.unmount();
+});
+test('badge shows 99+ only for a saturated verified total and a dot for partial availability', async () => {
+  for(const [patch,label,dot] of [[{auctionCount:100},'99+ unread notifications',false],[{remindersAvailable:false},'Unread notifications.',true]]) {
+    const h=await harness(async()=>summaryReply(patch),true,true);const html=h.html();
+    assert.ok(html.includes(label));assert.equal(html.includes('notification-badge-dot'),dot);h.unmount();
+  }
+  const h=await harness(async()=>summaryReply({auctionCount:0}),true,true);assert.doesNotMatch(h.html(),/notification-badge/);h.unmount();
+});
+test('Back navigation revalidates a same-wallet badge but local logout never repaints it', async () => {
+  const h=await harness(async()=>summaryReply(),true,true);assert.match(h.html(),/notification-badge/);
+  h.event('pagehide');assert.doesNotMatch(h.html(),/notification-badge/);
+  h.event('pageshow');await tick();assert.match(h.html(),/notification-badge/);
+  h.state.authenticatedWallet='';h.event('artsoul:auth-state-changed');const requests=h.state.calls.length;
+  h.event('pageshow');h.event('focus');await tick();assert.equal(h.state.calls.length,requests);assert.doesNotMatch(h.html(),/notification-badge/);
+  h.state.authenticatedWallet=A;h.event('artsoul:auth-state-changed');await tick();assert.match(h.html(),/notification-badge/);h.unmount();
+});
+test('config arriving after opening retires the legacy moderation response and reloads read controls', async () => {
+  const config=deferred(),legacy=deferred();
+  const h=await harness(async url=>url==='/api/moderation/notifications'?legacy.promise:
+    url.includes('summary=1')?summaryReply():url==='/api/moderation/notifications?v=2'?
+    Response.json({wallet:A,items:[{id:'2',chain_id:'84532',artwork_id:'34',created_at:'2026-10-25T11:00:00Z',message:'Current moderation',read:false}],nextCursor:null}):response(url),true,true,config.promise);
+  h.toggle();config.resolve({auctionNotifications:{enabled:true,summaryEnabled:true,chainId:84532,coreAddress:CORE}});await tick();
+  legacy.resolve(Response.json({wallet:A,items:[{id:'1',message:'Obsolete legacy result'}],nextCursor:null}));await tick();
+  assert.match(h.html(),/Current moderation/);assert.doesNotMatch(h.html(),/Obsolete legacy result|Notifications could not be loaded/);h.unmount();
 });
