@@ -3224,7 +3224,6 @@ body.future .resale-modal {
 .saved-button[hidden] { display: none; }
 .saved-button { border-radius: 14px; transition: background-color .15s, border-color .15s; }
 .saved-icon-check { display: none; }
-.saved-button[aria-pressed="true"] .saved-icon-add { display: none; }
 .saved-button[aria-pressed="true"] .saved-icon-check { display: initial; }
 .saved-button[aria-pressed="true"] { border-color: var(--c-accent); background: var(--c-accent); color: var(--c-bg); }
 .saved-button[aria-pressed="true"] .saved-icon-shape { fill: currentColor; fill-opacity: .12; }
@@ -5458,6 +5457,9 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     }
 }
 
+.profile-social-action-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.profile-social-action-row > .profile-inline-edit-action { margin-top: 0; }
+
 .profile-social-links {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5513,6 +5515,21 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .profile-email-connection form label { flex: 1 1 12rem; min-width: 0; }
 .profile-email-connection form button { max-width: 100%; white-space: normal; }
 .profile-gallery-heading { min-width: 0; }
+.profile-collection-panel { min-width: 0; border: 1px solid var(--c-border-soft); border-radius: 0.75rem; background: var(--c-surface); color: var(--c-text); }
+.profile-collection-panel > .saved-list { border: 0; background: transparent; }
+.profile-sections-nav { padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--c-border-soft); }
+.profile-section-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.profile-content-tab { min-height: 44px; padding: 0.5rem 0.875rem; border: 1px solid transparent; border-radius: 0.625rem; color: var(--c-text-muted); background: transparent; font: inherit; font-weight: 600; }
+.profile-content-tab:hover { color: var(--c-text); background: var(--c-surface-strong); }
+.profile-content-tab[aria-pressed="true"] { color: var(--c-accent); border-color: var(--c-accent); background: var(--c-surface-strong); }
+.profile-content-tab:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+.profile-notification-inbox { min-width: 0; color: var(--c-text); }
+.profile-notification-inbox > button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 44px; padding: 0.5rem 0.75rem; border: 1px solid var(--c-border); border-radius: 0.625rem; color: var(--c-text); background: var(--c-surface); }
+.profile-notification-inbox > button[aria-expanded="true"] { color: var(--c-accent); border-color: var(--c-accent); }
+.profile-notification-inbox > button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+.profile-notification-inbox:has(> button[aria-expanded="true"]) { flex-basis: 100%; }
+.profile-notification-inbox > #profile-notifications { max-height: min(24rem, 60dvh); overflow: auto; overscroll-behavior: contain; padding: 1rem; border: 1px solid var(--c-border-soft); border-radius: 0.75rem; background: var(--c-surface); overflow-wrap: anywhere; }
+.profile-notification-inbox svg { flex-shrink: 0; }
 .profile-gallery-description { max-width: 48rem; margin: 0.375rem 0 0; color: var(--c-text-muted); font-size: 0.875rem; line-height: 1.5; }
 .profile-activity-kind { display: inline-block; margin: 0.625rem 0 0; padding: 0.25rem 0.625rem; border: 1px solid var(--c-border); border-radius: 0.5rem; background: var(--c-surface); color: var(--c-text); font-size: 0.875rem; font-weight: 600; }
 .profile-gallery-panel > .flex:first-child { gap: 1rem; align-items: start; }
@@ -5947,24 +5964,16 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         padding: 0.85rem !important;
     }
 
-    .profile-sections-nav {
-        margin-bottom: 0.9rem !important;
-    }
-
-    .profile-sections-nav h2 {
-        margin-bottom: 0.7rem !important;
-        font-size: 1.15rem !important;
-    }
-
     .profile-section-tabs {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
         gap: 0.5rem !important;
     }
 
     .profile-section-tabs > button {
-        min-width: 0;
-        min-height: 40px;
+        flex: 0 0 auto;
+        min-height: 44px;
         padding: 0.45rem 0.55rem !important;
         font-size: 0.78rem;
         line-height: 1.15;

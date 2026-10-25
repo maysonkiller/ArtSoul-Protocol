@@ -3,7 +3,27 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 Saved interaction and card expiry correction released:
+October 25 profile/feed refinement prepared (release verification pending):
+
+- Starting HEAD `8a6230e`, same canonical workspace/branch; deployed baseline
+  PR #344 / `d844349`. Full 86.7-second recording and supplied prototype reviewed.
+- Remove only the Saved plus, retain selected check and synchronization; shared
+  runtime v23. Private notifications move beside social links; content tabs and
+  artwork list share one panel. Public feed reuses proven indexed metadata for
+  this project's non-upsert uploads, with bounded fallback and no new schema.
+- Evidence and exact validation limits:
+  `audits/PROFILE_FEED_REFINEMENT_2026-10-25.md`.
+- B17 is preserved in stash `abea37274cb45283f49f012ead2cd9ef56218765`; restore
+  it after release, integrating the compact inbox prop and retaining its logic.
+  Earlier recovery copies/stash remain. Do not apply both stashes or discard the
+  unrelated moderation-authority files. No B17 database/worker rollout occurred.
+- Cross-chain payment research is discussion only. NFT origin and payment source
+  are distinct; no network, contract or economic change is enabled. Full visual
+  redesign and Future account controls remain the final B18 pass.
+- Exactly next step: finish database rechecks and exact-candidate CI, release and
+  verify this bounded correction, then restore B17 for the next implementation.
+
+Earlier October 25 Saved interaction and card expiry correction released:
 
 - Starting HEAD `bf290ff`, same canonical workspace/branch. Founder-reported
   Saved cross-surface failures reproduced against the actual capture guard:

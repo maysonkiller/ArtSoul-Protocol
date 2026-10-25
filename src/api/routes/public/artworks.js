@@ -1,6 +1,6 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
-import { readArtworkMetadata } from '../../safe-artwork-fetch.js';
+import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
@@ -136,6 +136,47 @@ async function loadMetadataCached(metadataUri) {
     metadataCache.set(key, metadata);
   }
   return metadata;
+}
+
+async function loadFeedMetadata(artworks) {
+  const core = normalizeText(process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA).toLowerCase();
+  const storagePrefix = normalizeText(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL).replace(/\/$/, '') +
+    '/storage/v1/object/public/artworks/';
+  const candidates = artworks.filter(artwork => chainId(artwork.chain_id) === CANONICAL_PUBLIC_CHAIN_ID &&
+    /^[1-9][0-9]{0,77}$/.test(String(artwork.artwork_id)) && BigInt(artwork.artwork_id) < 2n ** 256n &&
+    /^0x[0-9a-f]{64}$/i.test(String(artwork.transaction_hash)) &&
+    String(artwork.metadata_uri).startsWith(storagePrefix) && allowedArtworkUrl(artwork.metadata_uri));
+  const indexed = new Map();
+  if (process.env.ARTSOUL_SEARCH_ENABLED === 'true' && /^0x[0-9a-f]{40}$/.test(core) && core !== ZERO_ADDRESS) {
+    // The existing read-only RPC checks the configured core, confirmed cursor,
+    // current registration URI/transaction, and moderation visibility in one
+    // database snapshot. Reuse that proof instead of fetching every original
+    // metadata file again whenever a list's server instance starts cold. Only
+    // this project's non-upsert upload store qualifies; external originals
+    // retain their existing read behavior.
+    await Promise.all(Array.from({ length: Math.ceil(candidates.length / 20) }, async (_, page) => {
+      const batch = candidates.slice(page * 20, page * 20 + 20);
+      const originals = new Map(batch.map(artwork => [String(artwork.artwork_id), artwork]));
+      try {
+        const data = await supabaseRest('rpc/read_public_search_cards', {
+          method: 'POST', body: { p_artwork_ids: [...originals.keys()], p_core_address: core },
+          signal: AbortSignal.timeout(1500)
+        });
+        if (!Array.isArray(data?.artworks) || !Array.isArray(data?.metadata) ||
+            data.artworks.length !== data.metadata.length || data.artworks.length > originals.size ||
+            new Set(data.artworks.map(row => row?.artwork_id)).size !== data.artworks.length) return;
+        data.artworks.forEach((row, index) => {
+          const original = originals.get(row?.artwork_id), metadata = data.metadata[index];
+          if (!original || chainId(row.chain_id) !== CANONICAL_PUBLIC_CHAIN_ID ||
+              row.metadata_uri !== original.metadata_uri || row.transaction_hash !== original.transaction_hash ||
+              String(row.block_number) !== String(original.block_number) ||
+              !metadata || typeof metadata !== 'object' || Array.isArray(metadata) || !Object.keys(metadata).length) return;
+          indexed.set(original, metadata);
+        });
+      } catch { /* Optional enrichment must not make older deployments unavailable. */ }
+    }));
+  }
+  return Promise.all(artworks.map(artwork => indexed.get(artwork) ?? loadMetadataCached(artwork.metadata_uri)));
 }
 
 function getMediaType(metadata = {}, mediaUrl = '') {
@@ -823,7 +864,7 @@ async function buildProjectionSnapshot() {
   // Metadata and public creator profiles only depend on the artwork rows, not
   // on bids, settlements or metrics. Keep all lifecycle reads in the final gate.
   const preload = {
-    metadataRows: artworksPromise.then(rows => Promise.all(rows.map(artwork => loadMetadataCached(artwork.metadata_uri)))),
+    metadataRows: artworksPromise.then(loadFeedMetadata),
     publicIdentities: artworksPromise.then(rows => publicIdentitiesByAddress(rows.map(artwork => artwork.creator), warnings))
   };
   // Consume possible early rejections while the lifecycle queries are pending;

@@ -1630,6 +1630,9 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                                 </div>
                                             </section>
+                                            {isOwnProfile && walletStateSettled && connectedWalletAddress && (
+                                                <NotificationInbox compact key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} />
+                                            )}
                                         </div>
                                     ) : (
                                         <div>
@@ -1717,6 +1720,9 @@ const { useState, useEffect, useRef } = React;
                                                         </DiscordProfileLink>
                                                     )}
                                                 </div>
+                                                {isOwnProfile && walletStateSettled && connectedWalletAddress && (
+                                                    <NotificationInbox compact key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} />
+                                                )}
                                                 {isOwnProfile && (
                                                     <div className="profile-inline-edit-action">
                                                         <button onClick={startProfileEdit} className="btn-main">
@@ -1797,21 +1803,9 @@ const { useState, useEffect, useRef } = React;
 
                         <ProfileLayout wallet={profileAddress} isOwnProfile={isOwnProfile && walletStateSettled} availableArtworks={myArtworks} />
 
-                        {isOwnProfile && walletStateSettled && connectedWalletAddress && (
-                            <NotificationInbox key={connectedWalletAddress.toLowerCase()} wallet={connectedWalletAddress} />
-                        )}
-
+                        <section className="profile-collection-panel" aria-label="Profile artworks">
                         {/* Gallery Tabs */}
-                        <div className={`profile-sections-nav rounded-xl p-6 mb-6 ${
-                            isClassic
-                                ? 'bg-gray-800/50 border border-gray-700'
-                                : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30'
-                        }`}>
-                            <h2 className={`text-2xl font-bold mb-4 ${
-                                isClassic ? 'text-gray-100' : ''
-                            }`}>
-                                Profile Sections
-                            </h2>
+                        <nav className="profile-sections-nav" aria-label="Profile content">
                             <div className="profile-section-tabs flex flex-wrap gap-3">
                                 {[...GALLERY_TYPES, ...(savedEnabled && isOwnProfile ? [{ id: 'saved', label: 'Saved', icon: '' }] : [])].map(gallery => (
                                     <button
@@ -1831,29 +1825,17 @@ const { useState, useEffect, useRef } = React;
                                                 }
                                             }
                                         }}
-                                        className={`px-6 py-3 rounded-lg font-medium transform hover:scale-105 transition-all ${
-                                            selectedGallery === gallery.id
-                                                ? isClassic
-                                                    ? 'bg-gray-600 text-white'
-                                                    : 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white neon-border'
-                                                : isClassic
-                                                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                    : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
-                                        }`}
+                                        className="profile-content-tab"
                                     >
                                         {gallery.icon} {gallery.label}
                                     </button>
                                 ))}
                             </div>
-                        </div>
+                        </nav>
 
                         {/* Gallery Content */}
                         {selectedGallery === 'saved' ? (isOwnProfile && savedEnabled && <SavedList wallet={profile.wallet_address} />) : (
-                        <div ref={galleryPanelRef} className={`profile-gallery-panel rounded-xl p-6 ${
-                            isClassic
-                                ? 'bg-gray-800/50 border border-gray-700'
-                                : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30'
-                        }`}>
+                        <div ref={galleryPanelRef} className="profile-gallery-panel p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="profile-gallery-heading">
                                     <h3 className={`text-xl font-bold ${
@@ -1923,6 +1905,7 @@ const { useState, useEffect, useRef } = React;
                             </div>
                         </div>
                         )}
+                        </section>
                     </main>
                 </div>
             );

@@ -84,3 +84,59 @@ Interpretation log: ordinary assistant actions are an approved product direction
 automatic signing remains C-27 research, not authorized implementation. Multiple
 networks/stablecoins remain a design discussion; no canon economics or contract
 behavior is amended by this note.
+
+### Clarification: pay from another chain, keep the artwork on its origin
+
+The October 25 clarification asks for payment-source flexibility, not an NFT
+bridge. Base, Ethereum, Robinhood and Rialo remain evaluation priorities rather
+than activated targets. Arc is an interoperability candidate, not a required
+intermediate chain or a replacement home for every artwork.
+
+Official sources checked October 25:
+
+- [Arc's September 23 announcement](https://www.arc.io/blog/introducing-interop-on-arc-crosschain-liquidity-without-the-complexity)
+  says mainnet and its interoperability services are live. Older March material
+  describing Arc as testnet is superseded. [Arc connection documentation](https://docs.arc.io/arc/references/connect-to-arc)
+  identifies USDC as native gas. No network configuration is changed here.
+- [CCTP](https://developers.circle.com/cctp) transfers supported assets and can
+  trigger destination actions. This does not make arbitrary native tokens or
+  arbitrary ArtSoul auction calls automatically compatible.
+- [Gateway](https://developers.circle.com/gateway) provides a deposited unified
+  balance per asset; it does not exchange one asset for another. Its fast spending
+  claim applies after the balance is established. Deposits have separate finality
+  requirements. [The current support matrix](https://developers.circle.com/gateway/references/supported-blockchains)
+  includes USDC on Base, Ethereum and Arc, but does not list Robinhood or Rialo.
+  Absence from this matrix is not a claim about every other provider.
+
+Recommended sequence (proposed, not implemented):
+
+1. Keep one catalog and deployment-scoped artwork identity. Separately show
+   **Artwork network**, **Pay from**, **Pay with**, recipient, total cost and
+   estimated arrival before approval. Only show routes that have been verified.
+2. First prototype funding the buyer's own destination wallet. Route a supported
+   stablecoin, convert only with a bounded quote where necessary, then let that
+   wallet perform the existing destination transaction. The NFT, canonical
+   price, floor, deposit and settlement rules remain on the artwork chain.
+   This is less seamless but compatible with the current caller model.
+3. Only then consider an atomic destination checkout for eligible buy-now sales.
+   Auctions additionally need confirmed deposits before the bid deadline and
+   payment before settlement expiry. A source-chain transfer is never an accepted
+   bid or completed purchase. Do not promise instant first-time funding.
+4. Native-token payment needs a separately evaluated swap/route provider with
+   available liquidity; Circle's asset transport alone is not that swap. Compare
+   supported routes, permission scope, total fees, outage recovery and refunds
+   before choosing an integration. Avoid building a custom bridge.
+
+The current `ArtSoulCore` records the bidder as `msg.sender` and requires the
+same winner to settle. A relay calling it directly would become the bidder or
+fail settlement. Any later on-behalf-of adapter must bind buyer, destination,
+chain, contract, artwork/auction, amount, nonce and expiry to explicit signatures,
+and prove who receives the NFT/refund. It requires a reviewed contract design and
+new test deployment; no silent caller substitution or wallet delegation.
+
+Failure cases for that later rehearsal: expired quote, insufficient destination
+amount after fees, source reorg, duplicate relay, partial route, auction ending
+in transit, rejected destination transaction, wrong recipient, cancelled intent
+and recoverable unspent funds. No transfer is called successful until the
+destination receipt and protocol state prove it. Adding a payment network and
+deploying ArtSoul contracts there are separate decisions.
