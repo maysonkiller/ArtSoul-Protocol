@@ -160,8 +160,8 @@ test('disabled or saving preferences cannot submit a reminder draft', async () =
 });
 
 test('reminder polling runs only while open and visible, resumes on focus and removes listeners on close', async t => {
-  const [{createAuctionNotifications}, {createNotificationInbox}] = await Promise.all([
-    import('../src/features/moderation/auction-notifications-state.js'), import('../src/features/moderation/notification-inbox-state.js')]);
+  const [{createAuctionNotifications}, {createNotificationInbox}, {createNotificationSummary}] = await Promise.all([
+    import('../src/features/moderation/auction-notifications-state.js'), import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/notification-summary-state.js')]);
   const wallet = '0x' + 'a'.repeat(40), core = '0x' + 'c'.repeat(40), tick = () => new Promise(resolve => setImmediate(resolve));
   const values = [], refs = [], effects = [], listeners = new Map(), intervals = new Map();
   let si = 0, ri = 0, ei = 0, pending = [], timerId = 0, reads = 0, auctionState, delayNext = false, release;
@@ -190,6 +190,7 @@ test('reminder polling runs only while open and visible, resumes on focus and re
     useEffect(fn, deps) {const i = ei++, old = effects[i]; if (!old || deps.some((value, index) => value !== old.deps[index])) {
       pending.push(() => {old?.cleanup?.(); effects[i] = {deps, cleanup: fn()};});}}
   }, {window, document,
+    createNotificationSummary: options => createNotificationSummary({...options,fetchPage}),
     createNotificationInbox: options => createNotificationInbox({...options, fetchPage}),
     createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage,
       onChange: state => {auctionState = state; options.onChange(state);}})});

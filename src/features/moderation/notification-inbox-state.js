@@ -3,6 +3,7 @@
 export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage = fetch }) {
   const owner = wallet.toLowerCase();
   let generation = 0, controller;
+  let readEnabled = false;
   let state = { status: 'idle', items: [], nextCursor: null, retryCursor: null, staffReview: null };
   const publish = next => { state = next; onChange(state); };
   function invalidate(status = 'idle') {
@@ -60,7 +61,10 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
         credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
         headers: { 'X-ArtSoul-Wallet': owner }
       };
-      const response = await fetchPage(`/api/moderation/notifications${cursor ? `?before=${encodeURIComponent(cursor)}` : ''}`, options);
+      const query = new URLSearchParams();
+      if (readEnabled) query.set('v','2');
+      if (cursor) query.set('before',cursor);
+      const response = await fetchPage(`/api/moderation/notifications${query.size ? '?'+query : ''}`, options);
       if (!current()) return;
       if (response.status === 401) { invalidate('auth'); return; }
       if ([404, 503].includes(response.status)) { invalidate('unavailable'); return; }
@@ -69,6 +73,7 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
       if (!current()) return;
       if (data.wallet !== owner) { invalidate('auth'); return; }
       if (!Array.isArray(data.items)) throw new Error('Invalid notifications response');
+      if (readEnabled && data.items.some(item=>typeof item.read!=='boolean')) throw new Error('Invalid read state');
       const items = [...state.items];
       for (const item of data.items) if (!items.some(existing => existing.id === item.id)) items.push(item);
       publish({ status: cursor ? 'ready' : 'loading', items, nextCursor: data.nextCursor || null, retryCursor: null, staffReview: state.staffReview });
@@ -80,5 +85,24 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
       if (current()) publish({ ...state, status: 'error' });
     }
   }
-  return { load, invalidate };
+  async function markRead(id,read) {
+    if (!owner || getWallet().toLowerCase()!==owner) {invalidate('auth');return;}
+    if (!readEnabled || state.status!=='ready' || state.pendingId || typeof read!=='boolean' || !state.items.some(item=>item.id===id)) return;
+    const request=++generation;controller?.abort();controller=new AbortController();
+    const current=()=>request===generation && getWallet().toLowerCase()===owner;
+    publish({...state,pendingId:id,error:''});
+    const active=controller, timeout=setTimeout(()=>active.abort(),15000);
+    try {
+      const response=await fetchPage('/api/moderation/notifications?v=2',{method:'PUT',credentials:'same-origin',cache:'no-store',signal:active.signal,
+        headers:{'X-ArtSoul-Wallet':owner,'Content-Type':'application/json'},body:JSON.stringify({action:'read',ids:[id],read})});
+      if (!current()) return;
+      if (response.status===401) {invalidate('auth');return;}
+      const data=await response.json();
+      if (!current()) return;
+      if (!response.ok || active.signal.aborted || data.wallet!==owner || data.read!==read || !Array.isArray(data.updated) || data.updated.length!==1 || data.updated[0]!==id) throw new Error('Read state unavailable');
+      publish({...state,items:state.items.map(item=>item.id===id?{...item,read}:item)});
+    } catch {if(current())publish({...state,error:'Read state could not be saved. Please try again.'});}
+    finally {clearTimeout(timeout);if(current())publish({...state,pendingId:null});}
+  }
+  return {load,invalidate,markRead,configure(config){const next=config?.summaryEnabled===true;if(next!==readEnabled){readEnabled=next;invalidate();}}};
 }

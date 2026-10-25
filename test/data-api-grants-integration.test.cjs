@@ -34,7 +34,7 @@ const features = [
   'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
   'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks',
   'public_artwork_search', 'public_artwork_search_current_round', 'profile_layouts', 'auction_notifications', 'auction_notification_lifecycle',
-  'auction_notification_reminders'
+  'auction_notification_reminders', 'notification_summary'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [

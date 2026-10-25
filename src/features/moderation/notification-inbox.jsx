@@ -1,6 +1,7 @@
 import { React } from '../../entries/react-runtime.js';
 import { createNotificationInbox } from './notification-inbox-state.js';
 import { createAuctionNotifications } from './auction-notifications-state.js';
+import { createNotificationSummary } from './notification-summary-state.js';
 import { notificationHeading } from './auction-notification-types.js';
 
 const { useEffect, useRef, useState } = React;
@@ -141,49 +142,71 @@ export function NotificationInbox({ wallet, compact = false }) {
   const [state, setState] = useState({ status: 'idle', items: [], nextCursor: null });
   const inbox = useRef(null);
   const auctions = useRef(null);
+  const summary = useRef(null);
+  const toggleButton = useRef(null);
+  const mutations = useRef(0);
   const openRef = useRef(false);
   const signInGeneration = useRef(0);
   const [auctionState, setAuctionState] = useState({status: 'disabled', items: [], pendingIds: [], preferences: null});
+  const [summaryState, setSummaryState] = useState({status:'disabled',count:null,complete:false});
+  const [summaryEnabled, setSummaryEnabled] = useState(false);
   useEffect(() => {
     let clearing = false, active = true;
     const clear = (status = 'auth') => {
       if (clearing) return;
-      clearing = true; model.invalidate(status); auctionModel.invalidate(status); clearing = false;
+      clearing = true; model.invalidate(status); auctionModel.invalidate(status); summaryModel.invalidate(status); clearing = false;
     };
     const model = createNotificationInbox({ wallet, getWallet: activeWallet, onChange: next => {setState(next); if (next.status === 'auth') clear();} });
     const auctionModel = createAuctionNotifications({wallet, getWallet: activeWallet, onChange: next => {setAuctionState(next); if (next.status === 'auth') clear();}});
+    // This hint can deny passive loading after local logout; SIWE remains the authority.
+    const hasAuthHint = () => String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase()===wallet.toLowerCase();
+    const summaryModel = createNotificationSummary({wallet,getWallet:activeWallet,canRead:hasAuthHint,onChange:next=>{setSummaryState(next);if(next.status==='auth')clear();}});
     inbox.current = model;
     auctions.current = auctionModel;
+    summary.current = summaryModel;
+    mutations.current = 0;
     Promise.resolve(window.ArtSoulPublicConfig?.load?.()).then(config => {
       if (!active) return;
       auctionModel.configure(config?.auctionNotifications);
-      if (openRef.current) void auctionModel.load();
-    }, () => {if (active) auctionModel.invalidate('unavailable');});
-    const onWalletChange = () => {signInGeneration.current++; clear();};
-    const onAuthChange = () => clear();
+      model.configure(config?.auctionNotifications);
+      summaryModel.configure(config?.auctionNotifications);
+      setSummaryEnabled(config?.auctionNotifications?.summaryEnabled===true);
+      if (document.visibilityState !== 'hidden') void summaryModel.refresh();
+      if (openRef.current) {void model.load();void auctionModel.load();}
+    }, () => {if (active) {auctionModel.invalidate('unavailable');summaryModel.invalidate('unavailable');}});
+    const onWalletChange = () => {signInGeneration.current++; clear();openRef.current=false;setOpen(false);};
+    const onAuthChange = () => {clear();if(hasAuthHint() && document.visibilityState!=='hidden')void summaryModel.refresh(true);};
     const onStorage = event => { if (!event.key || event.key === 'artsoul_authenticated_wallet') {signInGeneration.current++; clear();} };
+    const onPageShow = () => {if(hasAuthHint() && document.visibilityState!=='hidden')void summaryModel.refresh(true);};
     window.addEventListener('artsoul:wallet-state-changed', onWalletChange);
     window.addEventListener('artsoul:auth-state-changed', onAuthChange);
     window.addEventListener('storage', onStorage);
     window.addEventListener('pagehide', onWalletChange);
+    window.addEventListener('pageshow', onPageShow);
     return () => {
       active = false; signInGeneration.current++;
       model.invalidate();
       auctionModel.dispose();
+      summaryModel.dispose();
       inbox.current = null;
       auctions.current = null;
+      summary.current = null;
       window.removeEventListener('artsoul:wallet-state-changed', onWalletChange);
       window.removeEventListener('artsoul:auth-state-changed', onAuthChange);
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('pagehide', onWalletChange);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, [wallet]);
   useEffect(() => {
-    if (!open) return;
+    if (!open && !summaryEnabled) return;
     const model = auctions.current;
     const refresh = () => {
-      if (document.visibilityState === 'hidden') model?.pauseReminders();
-      else void model?.refreshReminders();
+      if (document.visibilityState === 'hidden') {model?.pauseReminders();summary.current?.invalidate();}
+      else {
+        if (!mutations.current) void summary.current?.refresh();
+        if (open) void model?.refreshReminders();
+      }
     };
     const timer = window.setInterval(refresh, 30000);
     document.addEventListener('visibilitychange', refresh);
@@ -195,9 +218,9 @@ export function NotificationInbox({ wallet, compact = false }) {
       document.removeEventListener('visibilitychange', refresh);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('online', refresh);
-      model?.pauseReminders();
+      if (open) model?.pauseReminders();
     };
-  }, [open, wallet]);
+  }, [open, wallet, summaryEnabled]);
   async function signIn() {
     const model = inbox.current;
     const auctionModel = auctions.current;
@@ -205,20 +228,50 @@ export function NotificationInbox({ wallet, compact = false }) {
     try {
       const authenticated = await window.ensureAuthenticated?.();
       if (authenticated && generation === signInGeneration.current && openRef.current && model === inbox.current && auctionModel === auctions.current && activeWallet() === wallet.toLowerCase()) {
-        await Promise.all([model.load(), auctionModel.load()]);
+        await Promise.all([model.load(), auctionModel.load(), summary.current?.refresh(true)]);
       }
     } catch { if (generation === signInGeneration.current && model === inbox.current) {model.invalidate('auth'); auctionModel?.invalidate('auth');} }
   }
+  async function mutate(operation) {
+    const current = summary.current;
+    mutations.current++;
+    current?.invalidate();
+    try {await operation();}
+    finally {
+      if (current === summary.current) {
+        mutations.current--;
+        if (!mutations.current && document.visibilityState!=='hidden') void current?.refresh(true);
+      }
+    }
+  }
+  function toggle(next = !openRef.current, restoreFocus = false) {
+    openRef.current=next;setOpen(next);
+    if(next){inbox.current?.load();auctions.current?.load();summary.current?.refresh();}
+    else {signInGeneration.current++;inbox.current?.invalidate();auctions.current?.invalidate();}
+    if(restoreFocus)toggleButton.current?.focus();
+  }
+  const visibleSummary = activeWallet()===wallet.toLowerCase() && summaryState.status==='ready';
+  const hasUnread = visibleSummary && summaryState.count>0;
+  const unreadLabel = hasUnread ? summaryState.complete
+    ? `${summaryState.count>=100?'99+':summaryState.count} unread ${summaryState.count===1?'notification':'notifications'}`
+    : 'Unread notifications. Some counts are temporarily unavailable.' : 'Notifications';
+  const auctionActions = auctions.current && {...auctions.current,
+    markRead:(...args)=>mutate(()=>auctions.current?.markRead(...args)),
+    setPreference:(...args)=>mutate(()=>auctions.current?.setPreference(...args)),
+    setReminderMinutes:(...args)=>mutate(()=>auctions.current?.setReminderMinutes(...args))};
   return (
     <section className={compact ? 'notification-inbox profile-notification-inbox' : 'notification-inbox rounded-xl p-5 mb-5'} style={compact ? undefined : { color: 'var(--c-text)', background: 'var(--c-surface)', border: '1px solid var(--c-border-soft)' }} aria-label="Your notifications">
-      <button type="button" aria-expanded={open} aria-controls="profile-notifications" className="font-semibold" onClick={() => {
-        const next = !openRef.current;
-        openRef.current = next; setOpen(next);
-        if (next) {inbox.current?.load(); auctions.current?.load();}
-        else {signInGeneration.current++; inbox.current?.invalidate(); auctions.current?.invalidate();}
-      }}>{compact && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg>}Notifications</button>
-      {open && <div id="profile-notifications" className="mt-3" aria-busy={state.status === 'loading'}>
-        <p className="text-sm opacity-70 mb-3">Your private updates. Visible only to your signed-in wallet.</p>
+      <button ref={toggleButton} type="button" aria-expanded={open} aria-controls="profile-notifications" aria-label={unreadLabel} className="notification-toggle" onClick={() => toggle()}>
+        <span className="notification-toggle-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg>
+          {hasUnread && <span className={`notification-badge${summaryState.complete?'':' notification-badge-dot'}`} aria-hidden="true">{summaryState.complete ? summaryState.count>=100?'99+':summaryState.count : null}</span>}
+        </span><span className="notification-toggle-label">Notifications</span>
+        <svg className="notification-toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      {open && <div id="profile-notifications" className="notification-panel" aria-busy={state.status === 'loading'} onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();toggle(false,true);}}}>
+        <div className="notification-panel-heading"><div><h2>Notifications</h2><p className="notification-help">{visibleSummary && summaryState.complete && summaryState.count===0 ? 'All caught up. Your past updates stay below.' : 'Your private updates, in one place.'}</p></div>
+          <button className="notification-close" type="button" aria-label="Close notifications" onClick={()=>toggle(false,true)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+        </div>
+        {summaryState.status==='unavailable' && <p className="notification-help">Unread counts are temporarily unavailable.</p>}
         {state.staffReview && <section className="mb-3" aria-label="Staff review notices">
           <h3 className="font-semibold">Reports awaiting review</h3>
           {state.staffReview.status === 'disabled' && <p>The review workspace is not active yet.</p>}
@@ -234,7 +287,7 @@ export function NotificationInbox({ wallet, compact = false }) {
             </ul>}
           </>}
         </section>}
-        <AuctionNotifications state={auctionState} model={auctions.current} />
+        <AuctionNotifications state={auctionState} model={auctionActions} />
         <section className="notification-category" aria-labelledby="moderation-notifications-heading">
         <h3 id="moderation-notifications-heading">Moderation</h3>
         <p className="notification-help">Updates about your reports, artworks and donation messages.</p>
@@ -243,19 +296,23 @@ export function NotificationInbox({ wallet, compact = false }) {
           {state.status === 'auth' && <p>Sign in with your connected wallet to view notifications.</p>}
           {state.status === 'unavailable' && <p>Notifications are not available right now. Please try again later.</p>}
           {state.status === 'error' && <p>Notifications could not be loaded. Please try again.</p>}
+          {state.error && <p>{state.error}</p>}
           {state.status === 'ready' && state.items.length === 0 && <p>{state.staffReview ? 'No personal updates yet.' : 'No notifications yet.'}</p>}
         </div>
-        {state.items.length > 0 && <ul className="space-y-3 mt-3">
-          {state.items.map(item => <li key={item.id}>
+        {state.items.length > 0 && <ul className="notification-items">
+          {state.items.map(item => <li key={item.id} className={item.read===false?'notification-unread':'notification-read'}>
+            {typeof item.read==='boolean' && <div className="notification-item-heading"><strong>Moderation update</strong><span>{item.read?'Read':'Unread'}</span></div>}
             <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>
               Artwork #{item.artwork_id} · {({'84532': 'Base Sepolia', '11155111': 'Ethereum Sepolia (legacy)', '8453': 'Base'})[item.chain_id] || `Chain ${item.chain_id}`}
             </a>
             <p>{item.message}</p>
-            <time className="text-xs opacity-70" dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
+            <div className="notification-item-heading"><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time>
+              {typeof item.read==='boolean' && <button type="button" className="btn-secondary" disabled={Boolean(state.pendingId) || state.status!=='ready'} onClick={()=>mutate(()=>inbox.current?.markRead(item.id,!item.read))}>{state.pendingId===item.id?'Saving…':item.read?'Mark unread':'Mark read'}</button>}
+            </div>
           </li>)}
         </ul>}
         {['error', 'unavailable'].includes(state.status) && <button type="button" className="btn-main mt-3" onClick={() => inbox.current?.load(state.retryCursor)}>Retry</button>}
-        {state.status === 'ready' && state.nextCursor && <button type="button" className="btn-main mt-3" onClick={() => inbox.current?.load(state.nextCursor)}>Load older notifications</button>}
+        {state.status === 'ready' && state.nextCursor && <button type="button" className="btn-main mt-3" disabled={Boolean(state.pendingId)} onClick={() => inbox.current?.load(state.nextCursor)}>Load older notifications</button>}
         </section>
         {(state.status === 'auth' || auctionState.status === 'auth') && <button type="button" className="btn-main mt-3" onClick={signIn}>Sign in to view</button>}
       </div>}
