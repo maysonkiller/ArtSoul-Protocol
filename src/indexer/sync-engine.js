@@ -828,9 +828,20 @@ class IndexerSyncEngine {
                 }
             }
 
+            // Only the log's actual source proves its deployment. Never fill
+            // missing historical provenance from the current configuration.
+            let sourceAddress = null;
+            if (event.contractAddress !== undefined && event.contractAddress !== null) {
+                sourceAddress = String(event.contractAddress).toLowerCase();
+                const expectedSource = String(event.eventName === 'Donation'
+                    ? this.eventListener.donationAddress : this.eventListener.contractAddress).toLowerCase();
+                if (!/^0x[0-9a-f]{40}$/.test(sourceAddress) || /^0x0{40}$/.test(sourceAddress) || sourceAddress !== expectedSource) {
+                    throw new Error('Event contract source does not match its configured listener');
+                }
+            }
             await client.query(
-                `INSERT INTO contract_events (chain_id, event_name, artwork_id, block_number, transaction_hash, log_index, event_data, indexed_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `INSERT INTO contract_events (chain_id, event_name, artwork_id, block_number, transaction_hash, log_index, event_data, indexed_at${sourceAddress ? ', contract_address' : ''})
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8${sourceAddress ? ', $9' : ''})
                  ON CONFLICT (chain_id, transaction_hash, log_index) DO NOTHING`,
                 [
                     this._chainIdString(),
@@ -840,7 +851,8 @@ class IndexerSyncEngine {
                     event.transactionHash,
                     event.logIndex,
                     this._serializeEventData(event.eventData),
-                    new Date(this._getEventTimestamp(event))
+                    new Date(this._getEventTimestamp(event)),
+                    ...(sourceAddress ? [sourceAddress] : [])
                 ]
             );
 

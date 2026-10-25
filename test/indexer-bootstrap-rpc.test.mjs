@@ -64,9 +64,9 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
         assert.equal(state.last_indexed_block, 101);
         assert.equal(state.last_confirmed_block, 101);
         assert.equal(state.state_hash, `0x${crypto.createHash('sha256').update(blockHash).digest('hex')}`);
-        assert.equal(applied.migrations.length, 16);
+        assert.equal(applied.migrations.length, 17);
         const ledger = (await fresh.query('SELECT * FROM artsoul_schema_migrations ORDER BY migration_id')).rows;
-        assert.equal(ledger.length, 16);
+        assert.equal(ledger.length, 17);
         assert.deepEqual(ledger.map(row => [row.migration_id, row.sha256]), migrations.map(row => [row.id, row.checksum]));
         const before = (await fresh.query('SELECT * FROM indexer_state ORDER BY chain_id')).rows;
         const repeated = await applyIndexerMigrations(options);

@@ -1,6 +1,6 @@
 # Profile controls and public feed refinement
 
-Status: implemented locally; release verification pending.
+Status: released and apex-verified in PR #345 / `8fdf58f`.
 Workspace: `C:\Projects\ArtSoul`, `codex/takeover-audit`, starting HEAD `8a6230e`.
 The deployed baseline was PR #344 / `d844349`.
 
@@ -104,3 +104,25 @@ its pending state/privacy changes. B17 is not complete or applied to the databas
 Full redesign, prototype-style Future account controls and page transitions stay
 in the final B18 pass after the remaining functional Phase B work. Phase B as a
 whole is not closed by this correction.
+
+## Release evidence
+
+- Candidate `78819e921fb0748f626b62298a08808a055a05e2` passed CI `40182431768`:
+  Linux 2,378 passed / two Windows-only skips; Windows 2,077 passed / 23
+  Docker/PostgreSQL skips. No failures. Both ran all 46 contract checks and built
+  successfully. Linux exercised the PostgreSQL scenarios skipped on Windows.
+- The exact-candidate preview was READY. Real public profile content tabs and
+  private-inbox absence for a visitor were verified at 390 px without horizontal
+  overflow. A WalletConnect analytics request received 403 in the preview;
+  no application error or wallet-flow success is inferred from that request.
+- PR #345 merged as `8fdf58f27d56bd1ede27a075cbc71f94698c5114`.
+  READY production `dpl_AptqwLcaQyEFGYmPDGDAifTBnWMg`, immutable deployment
+  `artsoul-3cbj0ekdn-maysonkiller-be9112b5.vercel.app`, serves the same SHA.
+- All eight apex page asset lists match the saved final build. Shared v23 runtime
+  SHA256 is `ef343be5c814bd8a11f528d0b693ef7c0fe0cf133590c76d70a6c1d40c69746b`.
+  Guest Saved API remains 401/private-no-store and active Saved config is 84532.
+- Actual apex homepage at 390 px shows all four metrics and 16 artwork links,
+  no plus SVG and no horizontal overflow. Two public feed requests took about
+  1.00/1.03 seconds in this browser run; this is an observation, not a speed SLA.
+- No new physical-device test, authenticated write, schema/worker deployment,
+  contract transaction or network activation was performed for this release.

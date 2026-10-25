@@ -131,12 +131,12 @@ test('the credentialed standalone API uses an exact CORS allowlist', () => {
   assert.match(standaloneServer, /apiOrigins\.has\(origin\)/);
 });
 
-test('the indexer migration runner covers the complete 001 through 016 sequence', async () => {
+test('the indexer migration runner covers the complete 001 through 017 sequence', async () => {
   const { listIndexerMigrations } = await modules;
   const migrations = listIndexerMigrations();
   assert.deepEqual(
     migrations.map(migration => migration.number),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
   );
 
   const setupSql = fs.readFileSync(path.join(REPO_ROOT, 'src/indexer/setup-database.sql'), 'utf8');
@@ -170,6 +170,7 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     'profile_email_verification.sql',
     'saved_artworks.sql',
     'profile_layouts.sql',
+    'auction_notifications.sql',
     'public_artwork_search.sql',
     'artwork_media_identity.sql',
     'artwork_media_preparation.sql',

@@ -31,6 +31,7 @@ import profileHandler from '../src/api/routes/profile.js';
 import profileEmailHandler from '../src/api/routes/profile-email.js';
 import profileLayoutHandler from '../src/api/routes/profile-layout.js';
 import savedHandler from '../src/api/routes/saved.js';
+import auctionNotificationsHandler from '../src/api/routes/notifications.js';
 import publicArtworksHandler from '../src/api/routes/public/artworks.js';
 import publicArtworkProvenanceHandler from '../src/api/routes/public/artwork-provenance.js';
 import publicAuctionLiveHandler from '../src/api/routes/public/auction-live.js';
@@ -51,6 +52,7 @@ const ROUTES = new Map([
   ['profile/email', profileEmailHandler],
   ['profile/layout', profileLayoutHandler],
   ['saved', savedHandler],
+  ['notifications', auctionNotificationsHandler],
   ['discovery/like', likeHandler],
   ['discovery/signal', signalHandler],
   ['public/artworks', publicArtworksHandler],

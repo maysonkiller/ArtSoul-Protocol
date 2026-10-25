@@ -3,6 +3,7 @@ import { readReportingConfig } from '../../reporting-config.js';
 import { readDonationConfig } from '../../donation-config.js';
 import { readSavedConfig } from '../../saved-config.js';
 import { readProfileLayoutConfig } from '../../profile-layout-config.js';
+import { readAuctionNotificationConfig } from '../../auction-notification-config.js';
 
 function readPublicConfig() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -22,7 +23,8 @@ function readPublicConfig() {
     reportingEnabled: readReportingConfig().enabled,
     donations: readDonationConfig(),
     saved: readSavedConfig(),
-    profileLayout: readProfileLayoutConfig()
+    profileLayout: readProfileLayoutConfig(),
+    auctionNotifications: readAuctionNotificationConfig()
   };
 }
 

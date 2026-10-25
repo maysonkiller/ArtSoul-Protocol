@@ -5536,6 +5536,23 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .profile-gallery-panel > .flex:first-child > span { flex-shrink: 0; }
 
 .profile-layout { min-width: 0; margin-block: 1rem; }
+.notification-inbox { min-width: 0; }
+.notification-category { margin-block: 1rem; padding-top: 1rem; border-top: 1px solid var(--c-border); min-width: 0; }
+.notification-category h3 { font-size: 1rem; font-weight: 600; }
+.notification-help { color: var(--c-text-muted); font-size: 0.875rem; line-height: 1.5; margin-block: 0.5rem; }
+.notification-settings > summary { min-height: 44px; padding-block: 0.625rem; cursor: pointer; color: var(--c-accent); }
+.notification-settings > summary:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+.notification-preferences { display: grid; gap: 0.5rem; margin-block: 0.75rem; padding: 0.75rem; border: 1px solid var(--c-border); border-radius: 0.75rem; min-width: 0; }
+.notification-preferences label { display: flex; gap: 0.625rem; align-items: center; min-height: 44px; }
+.notification-preferences input { flex: 0 0 auto; width: 1.1rem; height: 1.1rem; accent-color: var(--c-accent); }
+.notification-items { list-style: none; margin-block: 0.75rem; padding: 0; display: grid; gap: 0.75rem; }
+.notification-items > li { padding: 0.75rem; border: 1px solid var(--c-border); border-radius: 0.75rem; overflow-wrap: anywhere; min-width: 0; }
+.notification-items .notification-unread { border-inline-start: 3px solid var(--c-accent); }
+.notification-item-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.625rem; }
+.notification-item-heading time, .notification-item-heading > span { color: var(--c-text-muted); font-size: 0.875rem; }
+.notification-inbox button { max-width: 100%; min-height: 44px; white-space: normal; }
+.notification-inbox button:disabled { opacity: 0.6; cursor: not-allowed; }
+.notification-inbox button:focus-visible, .notification-inbox input:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
 .profile-layout h2, .profile-layout h3 { margin: 0; color: var(--c-text); }
 .profile-layout h2 { font-size: 1.2rem; }
 .profile-layout h3 { font-size: 1rem; }
