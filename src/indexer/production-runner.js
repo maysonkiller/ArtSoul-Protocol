@@ -458,7 +458,8 @@ class ProductionIndexer {
         while (Date.now() - startTime < maxWait) {
             // Check if any operations are in progress
             const poolMetrics = this.db.getPoolMetrics();
-            const activeQueries = poolMetrics.totalCount - poolMetrics.idleCount;
+            // The dedicated leadership session stays open until release below.
+            const activeQueries = Math.max(0, poolMetrics.totalCount - poolMetrics.idleCount - this.distributedLock.getPinnedClientCount());
 
             if (activeQueries === 0) {
                 console.log('[ProductionIndexer] All operations drained');
