@@ -514,7 +514,7 @@
         button.dataset.savedChain = String(chain);
         button.setAttribute('aria-label', 'Save artwork');
         button.setAttribute('aria-pressed', 'false');
-        button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="saved-icon-shape" d="M7 3.5h10a2 2 0 0 1 2 2v15l-7-4-7 4v-15a2 2 0 0 1 2-2Z"/><path class="saved-icon-add" d="M9 9h6m-3-3v6"/><path class="saved-icon-check" d="m8.5 9 2.3 2.3 4.7-4.6"/></svg>';
+        button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="saved-icon-shape" d="M7 3.5h10a2 2 0 0 1 2 2v15l-7-4-7 4v-15a2 2 0 0 1 2-2Z"/><path class="saved-icon-check" d="m8.5 9 2.3 2.3 4.7-4.6"/></svg>';
         button.addEventListener('click', event => {
             event.preventDefault(); event.stopPropagation();
             void window.ArtSoulSaved?.toggle(button);

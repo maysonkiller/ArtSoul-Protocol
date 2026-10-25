@@ -39,6 +39,23 @@ test('profile navigation orders the public sections and keeps Saved private', as
         ['Artworks', 'Auctions', 'Collected', 'Activity', ...(isOwnProfile && savedEnabled ? ['Saved'] : [])]);
       assert.deepEqual(buttons.map(button => button.key), ['created', 'auction', 'collected', 'sold', ...(isOwnProfile && savedEnabled ? ['saved'] : [])]);
       assert.deepEqual(buttons.filter(button => button.props['aria-pressed']).map(button => button.key), ['sold']);
+      assert.doesNotMatch(render(view), /Profile Sections/);
+      const navigation = elements(view, item => item.type === 'nav')[0];
+      assert.equal(navigation.props['aria-label'], 'Profile content');
+    }
+  }
+});
+
+test('compact notifications stay private in both profile display and edit views', async () => {
+  const locations = [...profile.matchAll(/\{isOwnProfile && walletStateSettled && connectedWalletAddress && \(\s*<NotificationInbox compact[^]*?\/>\s*\)\}/g)];
+  assert.equal(locations.length, 2);
+  for (const [markup] of locations) {
+    for (const override of [{}, {isOwnProfile: false}, {walletStateSettled: false}, {connectedWalletAddress: ''}]) {
+      const view = await fixture(markup, {isOwnProfile: true, walletStateSettled: true,
+        connectedWalletAddress: '0x' + '1'.repeat(40), NotificationInbox: () => null, ...override});
+      const inboxes = elements(view, item => typeof item.type === 'function');
+      assert.equal(inboxes.length, Object.keys(override).length ? 0 : 1);
+      if (inboxes.length) assert.equal(inboxes[0].props.compact, true);
     }
   }
 });

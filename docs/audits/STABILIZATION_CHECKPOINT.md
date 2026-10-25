@@ -3,7 +3,27 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 Saved interaction and card expiry regression:
+October 25 profile/feed refinement prepared (release verification pending):
+
+- Starting HEAD `8a6230e`, same canonical workspace/branch; deployed baseline
+  PR #344 / `d844349`. Full 86.7-second recording and supplied prototype reviewed.
+- Remove only the Saved plus, retain selected check and synchronization; shared
+  runtime v23. Private notifications move beside social links; content tabs and
+  artwork list share one panel. Public feed reuses proven indexed metadata for
+  this project's non-upsert uploads, with bounded fallback and no new schema.
+- Evidence and exact validation limits:
+  `audits/PROFILE_FEED_REFINEMENT_2026-10-25.md`.
+- B17 is preserved in stash `abea37274cb45283f49f012ead2cd9ef56218765`; restore
+  it after release, integrating the compact inbox prop and retaining its logic.
+  Earlier recovery copies/stash remain. Do not apply both stashes or discard the
+  unrelated moderation-authority files. No B17 database/worker rollout occurred.
+- Cross-chain payment research is discussion only. NFT origin and payment source
+  are distinct; no network, contract or economic change is enabled. Full visual
+  redesign and Future account controls remain the final B18 pass.
+- Exactly next step: finish database rechecks and exact-candidate CI, release and
+  verify this bounded correction, then restore B17 for the next implementation.
+
+Earlier October 25 Saved interaction and card expiry correction released:
 
 - Starting HEAD `bf290ff`, same canonical workspace/branch. Founder-reported
   Saved cross-surface failures reproduced against the actual capture guard:
@@ -12,16 +32,26 @@ October 25 Saved interaction and card expiry regression:
 - Timer/body expiry synchronization, distinct theme-aware bookmark plus/check
   feedback and mobile search alignment are included in the bounded correction.
   Evidence: `audits/B13_SAVED_INTERACTION_2026-10-25.md`.
-- B17 remains unfinished and unapplied. Its thirteen files are preserved in the
+- B17 remains unfinished and unapplied. Its thirteen files were preserved in the
   named Git stash `Preserve unfinished B17 while fixing Saved interactions`;
   exact recovery copies and its separate CSS block are in ignored
-  `output/recovery/b17-paused-2026-10-25`. Restore after exact-candidate release
-  verification. Unrelated moderation-authority files remain untouched.
+  `output/recovery/b17-paused-2026-10-25`. They are restored after exact-candidate
+  release verification below. Unrelated moderation-authority files remain untouched.
 - `VOICE_AND_NETWORK_FOLLOWUP_2026-10-25.md` records ordinary-user assistant
   expansion and future network discussion. No automatic signing, admin command,
   new provider, network activation or contract/economic change was introduced.
-- Exactly next step: finish the bounded correction's build/CI, release it,
-  verify apex assets/mobile geometry, then restore the preserved B17 diff.
+- PR #344 is merged as `d844349`; candidate `e575ecb` passed CI `40178674740`
+  (Linux 2356 / Windows 2055, documented skips; 46 contracts each). Local build,
+  eight apex assets, exact v22 runtime and mobile/search checks pass. READY
+  production `dpl_EpGMYxhUvsUtESGb7epuKWeZ5cqQ` serves that merge. No new
+  physical-phone or real authenticated browser write is claimed.
+- B17 is restored after release verification from stash
+  `10bf7beb07dc3293079c8bb8fcd5676e696d9bf6`, with its separate CSS restored
+  from the recovery snapshot. Preserve it; it is not in the released artifact.
+- Exactly next step: review B17's current source-contract proof/schema/API
+  integration against the preserved before-images, then finish its regression
+  tests before any migration or worker rollout. The new assistant direction is
+  B21; multi-network/payment architecture remains discussion.
 
 October 24 B-16 released; B-17 started:
 

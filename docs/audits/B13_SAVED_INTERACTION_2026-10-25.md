@@ -2,7 +2,9 @@
 
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Starting HEAD: `bf290ff`; published baseline: PR #343 / `3cf6b87`.
-Status: local correction; release evidence follows below.
+Released via PR #344, candidate `e575ecb`, merge
+`d844349172ae87a7f2caadbf9d4572fbd979ae0f` on October 25, 2026.
+Production: READY `dpl_EpGMYxhUvsUtESGb7epuKWeZ5cqQ`.
 
 ## Reproduction and cause
 
@@ -60,6 +62,32 @@ database, economic or new network change is part of this correction.
   Saved API/state, shared card click isolation, countdowns, cache versions,
   search state and unchanged voice/WebMCP guards. Log:
   `output/audit/saved-regression-focused-2026-10-25.log`.
+
+## Release verification
+
+- Exact-candidate CI `40178674740` passed: Linux 2,356 tests / two platform
+  skips; Windows 2,055 tests / 23 Docker-suite skips; zero failures and 46
+  passing contract tests per OS. Static checks and hosted preview passed.
+- Final local build passed 11 routes / 174 Tailwind utilities. Eight apex route
+  asset lists match that exact build. The served v22 card runtime hash is
+  `9704fbfff46efb525550d1df331206f67de39f91a7fb77445d4a86a0ea400c8e`.
+  Saved remains enabled on Base Sepolia; unauthenticated reads return 401 with
+  private/no-store headers. No feature activation or migration was needed.
+- Actual apex Chrome at 390 px: no horizontal overflow; search/account gap
+  8 px; artwork 36 (the screenshot's Web 3 Rialo test) shows No bids in Gallery
+  and global search. Artwork 37 remains Live with its current countdown.
+  Clicking Saved as guest reaches the real Connect Wallet dialog without any
+  account selection/signature. After cancellation, the existing connection
+  timeout releases the control; this is not immediate cancellation UX and is
+  retained as a follow-up observation, not concealed as a new successful login.
+- Fixture viewport checks at 320/390/768/1024/1440 px found no header overlap
+  or horizontal overflow. Local fixture hot reload produced development-only
+  createRoot warnings before clean reload; no clean-fixture failure is claimed
+  resolved by production code. Test browsers and dev server were closed.
+- This release has no new physical-phone/SIWE write acceptance. The cross-surface
+  write journey is a real-component, isolated-API browser check; historical
+  27 real two-account API checks remain separately dated in the original B13
+  report. Phase B's remaining gates and B17 work are not closed by this patch.
 
 Interpretations: Saved remains private and distinct from Watching/Trust. The
 bookmark's plus/check are interaction feedback, not verification badges.

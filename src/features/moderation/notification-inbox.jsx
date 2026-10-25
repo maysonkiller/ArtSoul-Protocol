@@ -4,7 +4,7 @@ import { createNotificationInbox } from './notification-inbox-state.js';
 const { useEffect, useRef, useState } = React;
 const activeWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
 
-export function NotificationInbox({ wallet }) {
+export function NotificationInbox({ wallet, compact = false }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState({ status: 'idle', items: [], nextCursor: null });
   const inbox = useRef(null);
@@ -34,12 +34,12 @@ export function NotificationInbox({ wallet }) {
     } catch { if (model === inbox.current) model.invalidate('auth'); }
   }
   return (
-    <section className="rounded-xl p-5 mb-5" style={{ color: 'var(--c-text)', background: 'var(--c-surface)', border: '1px solid var(--c-border-soft)' }} aria-label="Your notifications">
+    <section className={compact ? 'profile-notification-inbox' : 'rounded-xl p-5 mb-5'} style={compact ? undefined : { color: 'var(--c-text)', background: 'var(--c-surface)', border: '1px solid var(--c-border-soft)' }} aria-label="Your notifications">
       <button type="button" aria-expanded={open} aria-controls="profile-notifications" className="font-semibold" onClick={() => {
         setOpen(!open);
         if (!open) inbox.current?.load();
         else inbox.current?.invalidate();
-      }}>Notifications</button>
+      }}>{compact && <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg>}Notifications</button>
       {open && <div id="profile-notifications" className="mt-3" aria-busy={state.status === 'loading'}>
         <p className="text-sm opacity-70 mb-3">Moderation updates about your reports and artworks. Visible only to your signed-in wallet.</p>
         {state.staffReview && <section className="mb-3" aria-label="Staff review notices">
