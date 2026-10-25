@@ -95,3 +95,35 @@ remain open. This slice does not close all of Phase B.
 Design references: [Apple notifications guidance](https://developer.apple.com/design/human-interface-guidelines/notifications)
 for meaningful, current badges and [WAI disclosure pattern](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/)
 for the expandable control. No claim is made about an invented industry trend.
+
+## Personal and staff groups (October 25 follow-up)
+
+The founder requests separate personal and moderation groups in the same inbox.
+This presentation change touches Bible section 11 and visual/theme part 16;
+existing roles, factor checks, recipient rules and database/API behavior remain.
+
+- Personal opens by default. It contains auction updates, reminders and outcomes
+  about the user's own reports, artworks and donation messages, including when
+  that user is also staff.
+- Moderation appears only after the existing server-confirmed staff eligibility
+  check. It contains the bounded queue notice or its existing verification,
+  disabled or unavailable state. Complaint decisions remain in Admin.
+- The red unread badge remains personal. Pending staff reports have a separate
+  neutral count labelled "reports awaiting review"; they are not unread messages.
+- Switching groups does not mark messages read, reset pagination or discard an
+  unfinished reminder-settings draft. Closing or invalidating the wallet/auth
+  context clears private contents and returns the selection to Personal.
+- Ordinary users retain their personal report outcomes without a staff control.
+  Profile selections and layout editing are deliberately unchanged, as requested.
+
+Interpretation recorded: "moderation messages" means staff review notices, not
+the recipient's own report outcomes. This separates responsibilities without
+withholding personal notices or creating a new role or unread-status definition.
+
+Local verification: 81 focused tests passed; production build passed. The actual
+React component in a Chromium fixture passed 20 size/theme/zoom cases (320–1440
+pixels and 400% zoom), keyboard switching/close/focus return, read-count changes,
+preserved reminder drafts, eligible/unverified/ordinary states and auth reset.
+Screenshots were inspected in Classic and Future. This is not a new physical
+iPhone or live staff-factor ceremony. Evidence: `output/audit/notification-groups-*`
+and `output/playwright/notification-groups-*`.

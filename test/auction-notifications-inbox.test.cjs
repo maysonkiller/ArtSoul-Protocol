@@ -51,6 +51,71 @@ function response(url) {
   return Response.json({wallet: A, items: [{id: '1', chain_id: '84532', artwork_id: '34', created_at: '2026-10-25T10:00:00Z', message: 'Private moderation update'}], nextCursor: null});
 }
 
+function staffResponse(url, verified = true) {
+  if (url.startsWith('/api/moderation/access')) return Response.json({authenticated: true, eligible: true, enabled: true, access: {stepUpActive: verified}});
+  if (url.includes('review-queue')) return Response.json({data: {reports: [{id: '11111111-1111-4111-8111-111111111111', created_at: '2026-10-25T10:00:00Z'}]}});
+  return response(url);
+}
+
+const groupButton = (h, name) => elements(h.render(), n => n.type === 'button' && elements(n.props.children, child => child.type === 'span' && child.props.children === name).length)[0];
+
+test('staff inbox separates personal messages from the review queue without marking either read', async () => {
+  const methods = [];
+  const h = await harness(async (url, options) => {methods.push(options.method || 'GET'); return staffResponse(url);});
+  h.toggle(); await tick();
+  assert.match(h.html(), /Private auction update|Private moderation update/);
+  assert.doesNotMatch(h.html(), /id="staff-notifications"|Report 11111111/);
+  assert.equal(groupButton(h, 'Personal').props['aria-pressed'], true);
+  groupButton(h, 'Moderation').props.onClick();
+  assert.equal(groupButton(h, 'Moderation').props['aria-pressed'], true);
+  assert.match(h.html(), /Reports awaiting review|Report 11111111/);
+  assert.equal(elements(h.render(), n => n.props.id === 'personal-notifications')[0].props.hidden, true);
+  groupButton(h, 'Personal').props.onClick();
+  assert.equal(elements(h.render(), n => n.props.id === 'personal-notifications')[0].props.hidden, false);
+  assert.match(h.html(), /Private moderation update/);
+  assert.doesNotMatch(h.html(), /Report 11111111/);
+  assert.ok(methods.every(method => method === 'GET')); h.unmount();
+});
+
+test('ordinary users keep their own report results without a staff category', async () => {
+  const h = await harness(async url => response(url)); h.toggle(); await tick();
+  assert.match(h.html(), /Your reports and artwork updates|Private moderation update/);
+  assert.doesNotMatch(h.html(), /Notification categories|staff-notifications|Reports awaiting review/);
+  assert.equal(h.state.calls.some(url => url.includes('review-queue')), false); h.unmount();
+});
+
+test('unverified staff see the sign-in link only in Moderation and no queue details', async () => {
+  const h = await harness(async url => staffResponse(url, false)); h.toggle(); await tick();
+  assert.doesNotMatch(h.html(), /Verify admin access/);
+  groupButton(h, 'Moderation').props.onClick(); assert.match(h.html(), /Verify admin access/);
+  assert.doesNotMatch(h.html(), /Report 11111111/);
+  assert.equal(elements(h.render(), n => n.props.id === 'personal-notifications')[0].props.hidden, true);
+  assert.equal(h.state.calls.some(url => url.includes('review-queue')), false); h.unmount();
+});
+
+test('closing or invalidating access resets the category and cannot retain a staff panel', async () => {
+  let eligible = true;
+  const h = await harness(async url => eligible ? staffResponse(url) : response(url)); h.toggle(); await tick();
+  groupButton(h, 'Moderation').props.onClick(); h.toggle(); h.toggle(); await tick();
+  assert.equal(groupButton(h, 'Personal').props['aria-pressed'], true);
+  groupButton(h, 'Moderation').props.onClick(); eligible = false; h.event('artsoul:auth-state-changed');
+  assert.doesNotMatch(h.html(), /staff-notifications|Report 11111111|Notification categories/);
+  h.toggle(); h.toggle(); await tick();
+  assert.doesNotMatch(h.html(), /Notification categories|Report 11111111/);
+  assert.match(h.html(), /Private moderation update/); h.unmount();
+});
+
+test('personal unread badge and staff pending count retain separate meanings', async () => {
+  const h = await harness(async url => url.includes('summary=1') ? summaryReply({auctionCount: 3, moderationCount: 2}) :
+    url.includes('moderation/notifications') ? Response.json({wallet: A, items: [], nextCursor: null}) : staffResponse(url), true, true);
+  h.toggle(); await tick();
+  assert.match(h.html(), /5 unread notifications/);
+  assert.match(h.html(), /1 report awaiting review/);
+  assert.doesNotMatch(h.html(), /6 unread notifications/);
+  groupButton(h, 'Moderation').props.onClick(); assert.match(h.html(), /5 unread notifications/);
+  h.unmount();
+});
+
 test('compact presentation loads both categories only when explicitly opened and preserves its bell', async () => {
   const h = await harness(async url => response(url));
   assert.equal(h.state.calls.length, 0); assert.match(h.html(), /profile-notification-inbox/); assert.match(h.html(), /<svg/);
