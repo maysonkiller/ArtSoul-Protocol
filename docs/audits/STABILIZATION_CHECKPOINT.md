@@ -3,7 +3,34 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 B17 first-slice integration prepared:
+October 25 B17 rollout checkpoint (HEAD `8a34716`):
+
+- PR #346 candidate `4fa43b5` passed final CI `40185201858`: Linux 2,433,
+  Windows 2,122, documented skips, 46 contracts each. Eight dormant apex asset
+  lists match; new inbox remains disabled on the apex.
+- Schema applied once after protected backup and rollback rehearsal. Source-only
+  worker update is healthy/advancing and retains verified TLS, search, donations
+  and the existing launch configuration. Do not replay these completed journals.
+- Separate dual-RPC receipt proof restored 14 exact historical source addresses;
+  71 unproven rows remain NULL. Real creator/outbid collector each have one eligible
+  auction-66 item. No new transaction or future-log acceptance is claimed.
+- Staged deployment `dpl_FGWh4ktJdK6nE2KzAqohuqmMWZTP` uses the same reviewed
+  production source with no automatic domain assignment. Temporary preview-only
+  flag removed. Existing protected vault can run the bounded private HTTP probe.
+- Staged real-account acceptance caught a routing defect before activation:
+  `/api/notifications` returns 400 while the same session against the explicit
+  catch-all destination returns 200. Add the missing exact Vercel rewrite without
+  weakening the route's query/identity checks. No read/preference mutation ran.
+- The private probe's logout check was also corrected to honor the clearing
+  Set-Cookie response; existing signed cookies are stateless. It must not claim
+  revocation of a copied cookie. The diagnostic confirmed guest denial after
+  clearing both test sessions.
+- Exactly next step: release the tested routing correction with the flag still
+  off, create a fresh staged deployment, then complete real-account acceptance
+  before production flag/promotion. Read and archive failed journals before retry;
+  do not repeat schema/source/worker operations.
+
+Earlier October 25 B17 first-slice integration prepared:
 
 - Starting HEAD `fec283b`, same canonical workspace/branch. Stash
   `abea37274cb45283f49f012ead2cd9ef56218765` restored once. Inbox conflict was
