@@ -5995,18 +5995,24 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         padding: 0.85rem !important;
     }
 
+    .profile-sections-nav {
+        padding-inline: 0.5rem !important;
+    }
+
     .profile-section-tabs {
-        display: grid !important;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.75rem), 1fr));
-        gap: 0.375rem !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 0.125rem !important;
     }
 
     .profile-section-tabs > button {
+        flex: 1 1 auto;
         min-width: 0;
         min-height: 44px;
-        padding: 0.45rem 0.55rem !important;
-        font-size: 0.78rem;
+        padding: 0.45rem 0.125rem !important;
+        font-size: clamp(0.6875rem, 3vw, 0.8125rem);
         line-height: 1.15;
+        white-space: nowrap;
         transform: none !important;
     }
 
