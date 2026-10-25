@@ -259,21 +259,20 @@ class IndexerSyncEngine {
                 || Number(left.logIndex) - Number(right.logIndex));
 
         // Store block hashes for reorg detection. Free RPC historical catch-up can
-        // skip empty-range backfill and keep hashes only for blocks with events;
-        // this reduces reorg protection for empty historical ranges only.
+        // skip empty-range backfill, retaining event blocks and the range boundary.
+        // The boundary header proves confirmed-data freshness even on a quiet chain.
         if (this._shouldSkipEmptyBlockHashBackfill()) {
-            const eventBlockNumbers = [...new Set(
-                events
-                    .map(event => Number(event.blockNumber))
+            const retainedBlockNumbers = [...new Set(
+                [...events.map(event => Number(event.blockNumber)), Number(toBlock)]
                     .filter(Number.isSafeInteger)
             )].sort((a, b) => a - b);
 
             console.warn(
                 `[IndexerSyncEngine] Skipping empty block hash backfill for historical catch-up ` +
-                `${fromBlock}-${toBlock}; storing ${eventBlockNumbers.length} event block hashes only.`
+                `${fromBlock}-${toBlock}; storing ${retainedBlockNumbers.length} event/boundary block hashes only.`
             );
 
-            await this._storeBlockHashesForBlocks(eventBlockNumbers);
+            await this._storeBlockHashesForBlocks(retainedBlockNumbers);
         } else {
             await this._storeBlockHashes(fromBlock, toBlock);
         }

@@ -15,6 +15,11 @@ October 25 B17 personal reminders (starting HEAD `5b03cfb`, not released yet):
   scripts use new reminder journals and must not replay completed lifecycle work.
   Unrelated untracked moderation-authority files remain intact. Evidence:
   `audits/B17_REMINDERS_2026-10-25.md`.
+- Backup/read validation and a rollback-only rehearsal passed. Live rehearsal
+  exposed missing quiet-range boundary headers under the worker's existing skip
+  optimization. The bounded correction retains one boundary plus event blocks;
+  18 Engine/SQL checks pass. Initial candidate CI passed; final CI is required
+  before the source-only guarded worker rollout and feature activation.
 - Exactly next step: complete full CI, release dormant source, then backed-up
   migration rehearsal and real-account staged acceptance before activation.
   Official announcement source and final B18/Phase B exit gates remain open.
