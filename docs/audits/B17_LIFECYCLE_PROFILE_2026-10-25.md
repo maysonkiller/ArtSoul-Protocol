@@ -143,7 +143,9 @@ rollback boundaries: `INDEXER_SESSION_LOCK_2026-10-25.md`.
 
 Project-wide announcements need an explicit official source, not an assumption
 that staff-wallet artwork is official. They are not enabled by this slice.
-Deadline reminders require separate extension/current-round-aware producers.
+Personal deadline reminders were subsequently implemented and activated through
+PR #353, reusing read-time materialization with extension/current-round guards.
+See `B17_REMINDERS_2026-10-25.md` for release evidence and due-time/phone limits.
 Broader profile-content notice handling, assistant expansion, final B18 redesign,
 external beta cohort and the durable Snapshot A gates remain open. Phase B is not
 complete merely because these implementation checks pass.
