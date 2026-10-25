@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import handler from '../src/api/routes/notifications.js';
 import dispatch from '../api/[...route].js';
 import publicConfigHandler from '../src/api/routes/public/config.js';
@@ -141,6 +142,24 @@ test('auction notification API keeps private history and changes bound to the si
     }
     storage(page([row('2', {transaction_hash: `0x${'D'.repeat(64)}`})]));
     assert.equal((await call()).body.items[0].transaction_hash, `0x${'d'.repeat(64)}`);
+  });
+
+  await t.test('hosted notification URL explicitly rewrites to the validated private route with its cursor intact', async () => {
+    const config = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+    const rewrites = config.rewrites.filter(rule => rule.source === '/api/notifications');
+    assert.equal(rewrites.length, 1, 'implicit catch-all routing adds query fields rejected by the private API');
+    assert.equal(rewrites[0].destination, '/api/[...route]?route=notifications');
+    const destination = new URL(rewrites[0].destination, ORIGIN);
+    for (const before of [undefined, '9007199254740993']) {
+      const query = Object.fromEntries(destination.searchParams);
+      if (before !== undefined) query.before = before;
+      storage(page([]));
+      const result = await call({url: destination.pathname, query, routed: true});
+      assert.equal(result.statusCode, 200);
+      assert.deepEqual(requests[0].body, {p_wallet: A, p_core: CORE, p_before: before ?? null});
+    }
+    await rejected({url: destination.pathname, query: {route: 'notifications', wallet: B}, routed: true},
+      400, 'INVALID_NOTIFICATION_CURSOR');
   });
 
   await t.test('GET preserves BIGINT cursors and returns at most twenty rows plus a next-page cursor', async () => {

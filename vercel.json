@@ -131,6 +131,10 @@
       "destination": "/api/[...route]?route=profile"
     },
     {
+      "source": "/api/notifications",
+      "destination": "/api/[...route]?route=notifications"
+    },
+    {
       "source": "/api/artworks",
       "destination": "/api/[...route]?route=artworks"
     },
