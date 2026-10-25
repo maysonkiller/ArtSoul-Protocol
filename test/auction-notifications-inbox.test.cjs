@@ -13,9 +13,9 @@ const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child =
   : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
 
 async function harness(fetchPage, enabled = true) {
-  const [{transformWithOxc}, {createAuctionNotifications}, {createNotificationInbox}] = await Promise.all([
+  const [{transformWithOxc}, {createAuctionNotifications}, {createNotificationInbox}, {notificationHeading}] = await Promise.all([
     import('vite'), import('../src/features/moderation/auction-notifications-state.js'),
-    import('../src/features/moderation/notification-inbox-state.js')]);
+    import('../src/features/moderation/notification-inbox-state.js'), import('../src/features/moderation/auction-notification-types.js')]);
   const values = [], refs = [], effects = [], listeners = new Map();
   let si, ri, ei, pending;
   const state = {wallet: A, calls: [], authenticate: async () => true};
@@ -23,7 +23,7 @@ async function harness(fetchPage, enabled = true) {
     useState(initial) {const i = si++; if (!(i in values)) values[i] = initial; return [values[i], value => {values[i] = typeof value === 'function' ? value(values[i]) : value;}];},
     useRef(initial) {return refs[ri++] ||= {current: initial};},
     useEffect(fn, deps) {const i = ei++, old = effects[i]; if (!old || deps.some((d,j) => d !== old.deps[j])) pending.push(() => {old?.cleanup?.(); effects[i] = {deps, cleanup: fn()};});}},
-    createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage: fetcher}),
+    notificationHeading, createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage: fetcher}),
     createNotificationInbox: options => createNotificationInbox({...options, fetchPage: fetcher}),
     window: {getCurrentWalletAddress: () => state.wallet, ensureAuthenticated: () => state.authenticate(),
       ArtSoulPublicConfig: {load: async () => ({auctionNotifications: {enabled, chainId: 84532, coreAddress: CORE}})},
@@ -98,4 +98,16 @@ test('unavailable artworks have no action link and read controls express the nex
   const view = h.scope.Category({state, model: {markRead: (...args) => actions.push(args)}});
   const html = renderToStaticMarkup(view); assert.match(html, /Currently unavailable/); assert.doesNotMatch(html, /href=/); assert.match(html, /Mark unread/);
   elements(view, n => n.type === 'button')[0].props.onClick(); assert.deepEqual(JSON.parse(JSON.stringify(actions)), [[['3'], false]]); h.unmount();
+});
+
+test('resale activity shows the NFT and network without inventing an auction identifier', async () => {
+  const h = await harness(async url => response(url));
+  const state = {status: 'ready', pendingIds: [], preferencesPending: false,
+    preferences: {auction_created: true, outbid: true, lifecycle: true}, items: [{id: '3', type: 'resale_sold',
+      chain_id: '84532', artworkAvailable: true, artwork_id: '34', auction_id: null, token_id: '6',
+      read: false, created_at: '2026-10-25T10:00:00Z', message: 'Your NFT was sold.'}]};
+  const html = renderToStaticMarkup(h.scope.Category({state, model: {}}));
+  assert.match(html, /Your activity/); assert.match(html, /Your NFT sold/);
+  assert.match(html, /Base Sepolia.*NFT #6/); assert.match(html, /href="\/artwork\/v41:84532:34"/);
+  assert.doesNotMatch(html, /Auction #|auction #null/); h.unmount();
 });

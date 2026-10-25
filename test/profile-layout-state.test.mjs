@@ -14,7 +14,6 @@ function harness() {
   const state = {wallet: WALLET, authenticated: WALLET, revision: 0, layout: defaultProfileLayout(), reads: [], writes: [], auth: 0, snapshots: [], cards: []};
   const deps = {
     wallet: WALLET, getWallet: () => state.wallet, authenticate: async () => {state.auth++; return true;},
-    uploadCover: async () => 'https://storage.example/profile-covers/fixture.png',
     request: async (url, options) => {
       if (options.method === 'PUT') {state.writes.push({options, body: JSON.parse(options.body)}); state.layout = JSON.parse(options.body).layout; state.revision++;}
       else state.reads.push({url, options});
@@ -22,7 +21,7 @@ function harness() {
     },
     onChange: value => state.snapshots.push(value)
   };
-  const controller = createProfileLayoutState({...deps, authenticate: () => deps.authenticate(), uploadCover: (...args) => deps.uploadCover(...args), request: (...args) => deps.request(...args)});
+  const controller = createProfileLayoutState({...deps, authenticate: () => deps.authenticate(), request: (...args) => deps.request(...args)});
   return {state, deps, controller};
 }
 
@@ -69,13 +68,10 @@ test('save sends the exact wallet and expected revision while preview and restor
   assert.equal(h.controller.getState().layout.template, 'featured'); assert.equal(h.state.writes.length, 1);
 });
 
-test('cancel during authentication prevents a later save or upload from starting', async () => {
-  for (const action of ['save', 'upload']) {
-    const h = harness(), auth = deferred(); await h.controller.load(); h.controller.edit(); h.deps.authenticate = () => auth.promise;
-    let uploads = 0; h.deps.uploadCover = async () => {uploads++; return 'https://storage.example/image.png';};
-    const pending = h.controller[action]({}); await tick(); h.controller.cancel(); auth.resolve(true); await pending;
-    assert.equal(h.state.writes.length, 0); assert.equal(uploads, 0); assert.equal(h.controller.getState().editing, false);
-  }
+test('cancel during authentication prevents a later save from starting', async () => {
+  const h = harness(), auth = deferred(); await h.controller.load(); h.controller.edit(); h.deps.authenticate = () => auth.promise;
+  const pending = h.controller.save(); await tick(); h.controller.cancel(); auth.resolve(true); await pending;
+  assert.equal(h.state.writes.length, 0); assert.equal(h.controller.getState().editing, false);
 });
 
 test('an A to B to A account transition retires an operation still waiting for sign-in', async () => {
@@ -91,13 +87,15 @@ test('the expected missing-session event during sign-in does not cancel the init
   await h.controller.save(); assert.equal(h.state.writes.length, 1);
 });
 
-test('cancelled cover upload cannot overwrite a new draft and receives an abort signal', async () => {
-  const h = harness(), upload = deferred(); await h.controller.load(); h.controller.edit();
-  let signal; h.deps.uploadCover = (file, wallet, options) => {assert.equal(wallet, WALLET); signal = options.signal; return upload.promise;};
-  const pending = h.controller.upload({name: 'cover.png'}); await tick();
-  h.controller.cancel(); assert.equal(signal.aborted, true); h.controller.edit();
-  h.controller.change(value => ({...value, template: 'featured'})); upload.resolve('https://storage.example/old.png'); await pending;
-  assert.equal(h.controller.getState().draft.cover_url, null); assert.equal(h.controller.getState().draft.template, 'featured');
+test('retired cover upload is unavailable while an existing cover value survives layout edits', async () => {
+  const h = harness();
+  h.state.layout.cover_url = 'https://storage.example/profile-covers/historical.png';
+  await h.controller.load(); h.controller.edit();
+  assert.equal(typeof h.controller.upload, 'undefined');
+  h.controller.change(value => ({...value, template: 'featured'})); await h.controller.save();
+  assert.equal(h.state.writes.length, 1);
+  assert.equal(h.state.writes[0].body.layout.cover_url, 'https://storage.example/profile-covers/historical.png');
+  assert.equal(h.controller.getState().layout.template, 'featured');
 });
 
 test('same-wallet sign-out retires a sent save without repainting private editor state', async () => {

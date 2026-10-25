@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import { readProfileLayoutConfig } from '../../profile-layout-config.js';
 import {
   allowMethods,
   getPublicStorageUrl,
@@ -13,9 +12,7 @@ import {
   ARTWORK_MIME_EXTENSIONS,
   MAX_ARTWORK_UPLOAD_BYTES,
   MAX_ARTWORK_UPLOAD_MB,
-  MAX_METADATA_BYTES,
-  MAX_PROFILE_COVER_BYTES,
-  PROFILE_COVER_MIME_EXTENSIONS
+  MAX_METADATA_BYTES
 } from '../../../config/upload-policy.js';
 
 const ARTWORKS_BUCKET = 'artworks';
@@ -30,6 +27,7 @@ const SAFE_ERROR_MESSAGES = {
   STORAGE_SIGNED_UPLOAD_FAILED: 'Upload storage authorization failed.',
   INVALID_UPLOAD_PAYLOAD: 'Upload request is invalid.',
   SIGNED_UPLOAD_URL_MISSING: 'Upload storage did not return an upload URL.',
+  PROFILE_COVER_RETIRED: 'Profile cover uploads are no longer available.',
   UNAUTHENTICATED: 'Please authenticate with your connected wallet.'
 };
 
@@ -59,10 +57,6 @@ export function buildMetadataStoragePath(wallet, fileName) {
   const safeName = sanitizeFilename(fileName, 'json').replace(/\.[^.]+$/, '.json');
   const nonce = crypto.randomUUID();
   return `metadata/${wallet}/${Date.now()}-${nonce}-${safeName}`;
-}
-
-export function buildProfileCoverStoragePath(wallet, contentType) {
-  return `profile-covers/${wallet}/${crypto.randomUUID()}.${PROFILE_COVER_MIME_EXTENSIONS[contentType]}`;
 }
 
 function invalidPayload(res, reason, message) {
@@ -95,6 +89,9 @@ function sendUploadError(res, error) {
 }
 
 export async function createSignedArtworkUpload(path, contentType, kind = 'media', options = {}) {
+  if (kind === 'profile-cover') {
+    throw Object.assign(new Error(SAFE_ERROR_MESSAGES.PROFILE_COVER_RETIRED), {code: 'PROFILE_COVER_RETIRED', statusCode: 410});
+  }
   assertServiceRoleKey();
   const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
   const signed = await supabaseStorageRest(
@@ -117,8 +114,7 @@ export async function createSignedArtworkUpload(path, contentType, kind = 'media
     signed_upload_url: url,
     public_url: getPublicStorageUrl(ARTWORKS_BUCKET, path),
     content_type: contentType,
-    max_size: kind === 'metadata' ? MAX_METADATA_BYTES
-      : kind === 'profile-cover' ? MAX_PROFILE_COVER_BYTES : MAX_ARTWORK_UPLOAD_BYTES
+    max_size: kind === 'metadata' ? MAX_METADATA_BYTES : MAX_ARTWORK_UPLOAD_BYTES
   };
 }
 
@@ -129,26 +125,15 @@ export default async function handler(req, res) {
     const wallet = requireWallet(req);
     const body = await readJson(req);
     const kind = String(body.kind || body.upload_kind || 'media').trim().toLowerCase();
+    if (kind === 'profile-cover') {
+      return res.status(410).json({error: 'PROFILE_COVER_RETIRED', message: SAFE_ERROR_MESSAGES.PROFILE_COVER_RETIRED});
+    }
     const fileName = String(body.file_name || body.fileName || '').trim();
     const contentType = String(body.content_type || body.contentType || '').trim().toLowerCase();
     const size = Number(body.size || body.file_size || 0);
     const isMetadata = kind === 'metadata';
-    const isCover = kind === 'profile-cover';
 
-    if (isCover) {
-      if (!readProfileLayoutConfig().enabled) {
-        return res.status(503).json({ error: 'PROFILE_LAYOUT_DISABLED', message: 'Profile customization is not available yet.' });
-      }
-      if (String(req.headers?.['x-artsoul-wallet'] || '').toLowerCase() !== wallet) {
-        return res.status(401).json({ error: 'SESSION_WALLET_MISMATCH', message: 'Sign in with the wallet for this profile.' });
-      }
-      if (!Object.hasOwn(PROFILE_COVER_MIME_EXTENSIONS, contentType)) {
-        return invalidPayload(res, 'UNSUPPORTED_COVER_TYPE', 'Choose a JPG, PNG, WebP or GIF cover.');
-      }
-      if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_PROFILE_COVER_BYTES) {
-        return invalidPayload(res, 'INVALID_COVER_SIZE', 'The cover must be between 1 byte and 5 MB.');
-      }
-    } else if (isMetadata) {
+    if (isMetadata) {
       if (contentType !== METADATA_CONTENT_TYPE) {
         return invalidPayload(
           res,
@@ -185,10 +170,10 @@ export default async function handler(req, res) {
 
     assertServiceRoleKey();
 
-    const path = isCover ? buildProfileCoverStoragePath(wallet, contentType) : isMetadata
+    const path = isMetadata
       ? buildMetadataStoragePath(wallet, fileName || 'metadata.json')
       : buildStoragePath(wallet, fileName, contentType);
-    res.status(200).json(await createSignedArtworkUpload(path, contentType, isCover ? 'profile-cover' : isMetadata ? 'metadata' : 'media'));
+    res.status(200).json(await createSignedArtworkUpload(path, contentType, isMetadata ? 'metadata' : 'media'));
   } catch (error) {
     sendUploadError(res, error);
   }

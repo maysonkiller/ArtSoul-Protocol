@@ -16,7 +16,7 @@ const env = {
   NEXT_PUBLIC_SUPABASE_URL: 'https://auction-inbox.example.test', SUPABASE_SERVICE_ROLE_KEY: 'local-service-fixture',
   SUPABASE_ANON_KEY: 'local-anon-fixture', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'local-anon-fixture',
   ARTSOUL_AUCTION_NOTIFICATIONS_ENABLED: 'true', ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: CORE,
-  ARTSOUL_PUBLIC_ORIGIN: ORIGIN, API_ALLOWED_ORIGINS: ''
+  ARTSOUL_PUBLIC_ORIGIN: ORIGIN, API_ALLOWED_ORIGINS: '', ARTSOUL_AUCTION_LIFECYCLE_ENABLED: ''
 };
 function response() {
   return {headers: {}, statusCode: 200, body: null,
@@ -172,6 +172,72 @@ test('auction notification API keeps private history and changes bound to the si
       assert.equal(result.body.items.length, Math.min(length, 20));
       assert.equal(result.body.nextCursor, length === 21 ? String(before - 20n) : null);
     }
+  });
+
+  await t.test('lifecycle capability is explicit and old clients keep their original page shape', async () => {
+    await rejected({query: {v: '2'}}, 503);
+    for (const v of ['1', '3', 2, ['2'], '']) await rejected({query: {v}}, 400);
+    process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED = 'true';
+    try {
+      assert.equal(readAuctionNotificationConfig().lifecycleEnabled, true);
+      storage(page([row()]));
+      const old = await call();
+      assert.equal(old.statusCode, 200);
+      assert.equal(requests[0].url.pathname, '/rest/v1/rpc/read_auction_notifications');
+      assert.deepEqual(old.body.preferences, PREFERENCES);
+      assert.equal(Object.hasOwn(old.body.items[0], 'token_id'), false);
+    } finally {process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED = '';}
+  });
+
+  await t.test('lifecycle pages distinguish an auction win from a completed purchase and a resale', async () => {
+    process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED = 'true';
+    const preferences = {...PREFERENCES, lifecycle: true};
+    const detail = {token_id: null, amount_wei: null, settlement_deadline: null};
+    const kinds = ['auction_created', 'outbid', 'bid_received', 'auction_won', 'auction_ended',
+      'purchase_completed', 'sale_completed', 'payment_missed', 'sale_unpaid', 'resale_purchased', 'resale_sold'];
+    try {
+      for (const type of kinds) {
+        const item = row('2', {...detail, type,
+          ...(['bid_received','auction_won'].includes(type) ? {amount_wei: '20000000000000000'} : {}),
+          ...(type === 'auction_won' ? {settlement_deadline: '1800000000'} : {}),
+          ...(['purchase_completed','sale_completed','resale_purchased','resale_sold'].includes(type)
+            ? {token_id: '9007199254740993', amount_wei: '20000000000000000'} : {}),
+          ...(type.startsWith('resale_') ? {auction_id: null} : {})});
+        storage(page([item], {preferences}));
+        const result = await call({query: {v: '2'}});
+        assert.equal(result.statusCode, 200, type);
+        assert.equal(requests[0].url.pathname, '/rest/v1/rpc/read_auction_notifications_v2');
+        assert.equal(result.body.items[0].token_id, item.token_id);
+        assert.equal(result.body.items[0].auction_id, item.auction_id);
+        assert.equal(result.body.items[0].amount_wei, item.amount_wei);
+        if (type === 'auction_won') assert.match(result.body.items[0].message, /requires payment before an NFT is minted/);
+        if (type === 'purchase_completed') assert.match(result.body.items[0].message, /was minted to you/);
+        if (type.startsWith('resale_')) assert.doesNotMatch(result.body.items[0].message, /auction #null/);
+      }
+      for (const change of [{token_id: undefined}, {amount_wei: 2}, {settlement_deadline: '-1'},
+        {type: 'auction_won'}, {type: 'resale_sold', auction_id: '3'}, {type: 'sale_completed'}]) {
+        storage(page([row('2', {...detail, ...change})], {preferences}));
+        assert.equal((await call({query: {v: '2'}})).statusCode, 503);
+      }
+    } finally {process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED = '';}
+  });
+
+  await t.test('v2 writes retain session scope and exact three-category compare-and-swap', async () => {
+    process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED = 'true';
+    try {
+      storage({updated: true, ids: ['2'], read: true});
+      assert.equal((await call({query: {v: '2'}, method: 'PUT', body: readBody})).statusCode, 200);
+      assert.equal(requests[0].url.pathname, '/rest/v1/rpc/mark_auction_notifications_v2');
+      assert.equal(requests[0].body.p_wallet, A);
+      const preferences = {...PREFERENCES, lifecycle: false};
+      storage({saved: true, preferences, preferencesRevision: 4});
+      assert.equal((await call({query: {v: '2'}, method: 'PUT', body: {...preferencesBody, preferences}})).statusCode, 200);
+      assert.equal(requests[0].url.pathname, '/rest/v1/rpc/save_auction_notification_preferences_v2');
+      assert.deepEqual(requests[0].body, {p_wallet: A, p_core: CORE, p_revision: 3, p_created: true, p_outbid: true, p_lifecycle: false});
+      await rejected({query: {v: '2'}, method: 'PUT', body: preferencesBody}, 400);
+      await rejected({method: 'PUT', body: {...preferencesBody, preferences}}, 400);
+      await rejected({query: {v: '2', wallet: B}, method: 'PUT', body: readBody}, 400);
+    } finally {process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED = '';}
   });
 
   await t.test('malformed cursors and query-selected identity or deployment cannot reach storage', async () => {

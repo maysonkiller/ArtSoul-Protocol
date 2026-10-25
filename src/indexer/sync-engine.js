@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { enqueueAIJob } from '../queue.js';
 import { projectDonation } from './donation-events.js';
 import cacheService from '../services/cache-service.js';
@@ -876,6 +877,7 @@ class IndexerSyncEngine {
             if (handler) {
                 await handler(event, client);
             }
+            await this._writeAuctionLifecycleNotificationsTx(event, client);
             if (event.eventName === 'Donation') {
                 let timestamp = event.timestamp;
                 if (timestamp === undefined || timestamp === null) {
@@ -989,9 +991,12 @@ class IndexerSyncEngine {
      * Write side effect to outbox (inside transaction)
      * Ensures side effects only execute after successful commit
      */
-    async _writeToOutbox(client, eventType, aggregateType, aggregateId, payload, correlationId) {
+    async _writeToOutbox(client, eventType, aggregateType, aggregateId, payload, correlationId, recipientKey = null) {
         const scopedCorrelationId = `${this._chainIdString()}-${correlationId}`;
-        const idempotencyKey = `${scopedCorrelationId}-${eventType}`;
+        // Keep v1 keys unchanged and new recipient-specific keys within VARCHAR(100).
+        const idempotencyKey = recipientKey
+            ? `notification-v2-${createHash('sha256').update(`${scopedCorrelationId}-${eventType}-${recipientKey}`).digest('hex')}`
+            : `${scopedCorrelationId}-${eventType}`;
 
         await client.query(
             `INSERT INTO outbox_events (
@@ -1008,6 +1013,57 @@ class IndexerSyncEngine {
                 idempotencyKey
             ]
         );
+    }
+
+    async _writeAuctionLifecycleNotificationsTx(event, client) {
+        const supported = ['BidPlaced', 'AuctionEnded', 'SettlementCompleted', 'SettlementDefaulted', 'ResaleCompleted'];
+        if (!supported.includes(event.eventName) || !event.contractAddress) return;
+        const source = String(event.contractAddress).toLowerCase();
+        const data = event.eventData;
+        const resale = event.eventName === 'ResaleCompleted';
+        let auctionId = this._asString(data.auctionId);
+        let creationBoundary = [event.blockNumber, event.logIndex];
+        if (resale) {
+            // Resolve token identity from its original mint event, never mutable
+            // artwork ownership or the currently active auction projection.
+            const settlement = (await client.query(
+                `SELECT contract_address, event_data, block_number, log_index FROM contract_events
+                 WHERE chain_id = $1 AND event_name = 'SettlementCompleted' AND event_data->>'tokenId' = $2
+                   AND (block_number, log_index) < ($3, $4)
+                 ORDER BY block_number, log_index LIMIT 1`,
+                [this._chainIdString(), this._asString(data.tokenId), event.blockNumber, event.logIndex]
+            )).rows[0];
+            if (!settlement || settlement.contract_address !== source) return;
+            auctionId = settlement.event_data.auctionId;
+            creationBoundary = [settlement.block_number, settlement.log_index];
+        }
+        const creation = (await client.query(
+            `SELECT contract_address, event_data FROM contract_events
+             WHERE chain_id = $1 AND event_name = 'AuctionCreated' AND event_data->>'auctionId' = $2
+               AND (block_number, log_index) < ($3, $4)
+             ORDER BY block_number DESC, log_index DESC LIMIT 1`,
+            [this._chainIdString(), auctionId, ...creationBoundary]
+        )).rows[0];
+        if (!creation || creation.contract_address !== source) return;
+        const { creator, artworkId } = creation.event_data;
+        let recipients;
+        switch (event.eventName) {
+            case 'BidPlaced': recipients = [['bid_received', creator]]; break;
+            case 'AuctionEnded': recipients = this._isZeroAddress(data.winner)
+                ? [['auction_ended', creator]] : [['auction_won', data.winner]]; break;
+            case 'SettlementCompleted': recipients = [['purchase_completed', data.winner], ['sale_completed', creator]]; break;
+            case 'SettlementDefaulted': recipients = [['payment_missed', data.winner], ['sale_unpaid', creator]]; break;
+            case 'ResaleCompleted': recipients = [['resale_purchased', data.buyer], ['resale_sold', data.seller]]; break;
+        }
+        for (const [type, address] of recipients) {
+            const recipient = String(address).toLowerCase();
+            if (!/^0x[0-9a-f]{40}$/.test(recipient) || this._isZeroAddress(recipient)) continue;
+            await this._writeToOutbox(client, 'notification', resale ? 'resale' : 'auction',
+                resale ? this._asString(data.tokenId) : auctionId,
+                { type, recipient, artworkId, auctionId: resale ? null : auctionId,
+                    tokenId: resale || event.eventName === 'SettlementCompleted' ? this._asString(data.tokenId) : null },
+                `${event.transactionHash}-${event.logIndex}`, `${type}-${recipient}`);
+        }
     }
 
     /**

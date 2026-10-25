@@ -1,0 +1,45 @@
+// Shared private-inbox vocabulary. These are recorded events, not current actions.
+export const LEGACY_NOTIFICATION_TYPES = ['auction_created', 'outbid'];
+export const LIFECYCLE_NOTIFICATION_TYPES = [
+  'bid_received', 'auction_won', 'auction_ended', 'purchase_completed', 'sale_completed',
+  'payment_missed', 'sale_unpaid', 'resale_purchased', 'resale_sold'
+];
+export const notificationPreference = type => LEGACY_NOTIFICATION_TYPES.includes(type) ? type : 'lifecycle';
+export const notificationHeading = type => ({
+  auction_created: 'Auction created', outbid: 'Your bid was surpassed', bid_received: 'New bid on your artwork',
+  auction_won: 'You won the auction', auction_ended: 'Auction ended without bids',
+  purchase_completed: 'Purchase completed', sale_completed: 'Your artwork sold',
+  payment_missed: 'Payment was not completed', sale_unpaid: 'Auction payment was not completed',
+  resale_purchased: 'NFT purchased', resale_sold: 'Your NFT sold'
+})[type] || 'Auction update';
+
+export function notificationMessage(item) {
+  const auction = `auction #${item.auction_id}`, artwork = `artwork #${item.artwork_id}`;
+  return ({
+    auction_created: `You created ${auction} for ${artwork}.`,
+    outbid: `Your bid was surpassed in ${auction} for ${artwork}.`,
+    bid_received: `A bid was placed in ${auction} for your ${artwork}.`,
+    auction_won: `You won ${auction}. Winning requires payment before an NFT is minted. Open the artwork to check the current payment status.`,
+    auction_ended: `Your ${auction} ended without bids. No NFT was minted.`,
+    purchase_completed: `Payment for ${auction} completed and NFT #${item.token_id} was minted to you.`,
+    sale_completed: `Payment for your ${artwork} completed in ${auction}.`,
+    payment_missed: `The unpaid settlement for ${auction} was finalized as a default.`,
+    sale_unpaid: `The unpaid settlement for your ${auction} was finalized as a default.`,
+    resale_purchased: `You purchased NFT #${item.token_id} for ${artwork}.`,
+    resale_sold: `Your NFT #${item.token_id} for ${artwork} was sold.`
+  })[item.type];
+}
+
+const uint = value => typeof value === 'string' && /^(0|[1-9][0-9]{0,77})$/.test(value) && BigInt(value) < 2n ** 256n;
+export function validLifecycleFields(item) {
+  if (![LEGACY_NOTIFICATION_TYPES, LIFECYCLE_NOTIFICATION_TYPES].some(types => types.includes(item.type))) return false;
+  if (![item.token_id, item.amount_wei, item.settlement_deadline].every(value => value === null || uint(value))) return false;
+  if (item.type.startsWith('resale_')) {
+    if (item.auction_id !== null || item.token_id === null || item.amount_wei === null) return false;
+  } else if (!uint(item.auction_id) || item.auction_id === '0') return false;
+  if (['purchase_completed', 'sale_completed'].includes(item.type) && (item.token_id === null || item.amount_wei === null)) return false;
+  if (['bid_received', 'auction_won'].includes(item.type) && item.amount_wei === null) return false;
+  if (item.type === 'auction_won' && (item.settlement_deadline === null || item.settlement_deadline === '0' ||
+    BigInt(item.settlement_deadline) > 8640000000000n)) return false;
+  return true;
+}

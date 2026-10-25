@@ -702,19 +702,6 @@ async function uploadFile(file, fileName) {
     return signedUpload.public_url;
 }
 
-async function uploadProfileCover(file, walletAddress, { signal } = {}) {
-    const { PROFILE_COVER_MIME_EXTENSIONS, MAX_PROFILE_COVER_BYTES } = await import('./src/config/upload-policy.js');
-    const wallet = String(walletAddress || '').toLowerCase();
-    if (!/^0x[0-9a-f]{40}$/.test(wallet) || /^0x0{40}$/.test(wallet)) throw new Error('Connect the wallet for this profile.');
-    if (!(file instanceof File) || !Object.hasOwn(PROFILE_COVER_MIME_EXTENSIONS, file.type) ||
-        file.size <= 0 || file.size > MAX_PROFILE_COVER_BYTES) {
-        throw new Error('Choose a JPG, PNG, WebP or GIF cover up to 5 MB.');
-    }
-    const signedUpload = await uploadSignedBlob({ blob: file, fileName: file.name,
-        contentType: file.type, size: file.size, kind: 'profile-cover', wallet, signal });
-    return signedUpload.public_url;
-}
-
 async function uploadMetadata(metadata, fileName = 'metadata.json') {
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
         throw new Error('A valid metadata object is required');
@@ -1180,7 +1167,6 @@ window.ArtSoulDB = {
     requestPublication,
     uploadIssuedBlob,
     uploadFile,
-    uploadProfileCover,
     uploadMetadata,
     // Auctions
     createAuction,

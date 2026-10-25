@@ -11,14 +11,15 @@ const config = {chainId: 84532, coreAddress: core, selectionPolicy: 'owned-or-cr
 const pointer = id => ({chain_id: 84532, core_address: core, artwork_id: String(id)});
 const card = (id, extra = {}) => ({source: 'v41_projection', chain_id: 84532, artwork_id: String(id), title: `Work ${id}`, creator: wallet, ...extra});
 
-async function components() {
+async function components(states) {
   const helpers = await import('../src/features/profile/profile-layout-state.js');
   const layoutHelpers = await import('../src/features/profile/profile-layout.js');
   const search = await import('../src/features/search/search-state.js');
-  const upload = await import('../src/config/upload-policy.js');
   const {transformWithOxc} = await import('vite');
   const compiled = await transformWithOxc(source.replace(/^import[\s\S]*?;\r?\n/gm, '').replace(/\bexport /g, ''), 'profile-layout-fixture.jsx', {jsx: {runtime: 'classic'}});
-  const scope = {...layoutHelpers, ...helpers, ...search, ...upload, React, decodeImage: async url => url,
+  let stateIndex = 0;
+  const runtime = states ? {...React, useState: initial => [states[stateIndex++] ?? initial, () => {}], useRef: value => ({current: value}), useMemo: create => create(), useEffect: () => {}} : React;
+  const scope = {...layoutHelpers, ...helpers, ...search, React: runtime,
     window: {ArtSoulArtworkCard: {ReactCard: ({artwork, href, surface}) => React.createElement('article', {'data-id': artwork.artwork_id, 'data-surface': surface}, React.createElement('a', {href}, artwork.title)), detailHref: art => '/artwork/' + art.artwork_id}}};
   vm.runInNewContext(compiled.code + '\nthis.Preview = ProfileLayoutPreview; this.Editor = LayoutEditor;', scope);
   return scope;
@@ -39,18 +40,62 @@ test('public profile selections keep shared cards and omit hidden, absent and ol
   assert.doesNotMatch(html, /Saved|Email|Notifications|Customize profile/);
 });
 
-test('editor exposes explicit draft controls, keyboard ordering and constrained cover input', async () => {
+test('editor groups sections and keeps artwork picking out of the initial form', async () => {
   const h = await components();
-  const draft = {version: 1, template: 'default', cover_url: null, pinned: pointer(1), sections: [
+  const draft = {version: 1, template: 'default', cover_url: 'https://example.com/historical-cover.png', pinned: pointer(1), sections: [
     {id: 'first', label: 'First', artworks: [pointer(1), pointer(2)]}, {id: 'second', label: 'Second', artworks: []}
   ]};
   const html = renderToStaticMarkup(React.createElement(h.Editor, {state: {draft, preview: false, busy: '', error: '', conflict: false},
     controller: {}, cards: [card(1), card(2)], config, wallet, candidates: []}));
-  for (const label of ['Preview', 'Save layout', 'Cancel', 'Restore default', 'Move section up', 'Move section down', 'Move up', 'Move down']) assert.ok(html.includes(label), label);
-  assert.match(html, /type="file" accept="image\/jpeg,image\/png,image\/gif,image\/webp"/);
+  for (const label of ['Preview', 'Save layout', 'Cancel', 'Restore default', 'Move section up', 'Move section down', 'Move Work 1 up', 'Move Work 2 down']) assert.ok(html.includes(label), label);
+  assert.equal((html.match(/<details/g) || []).length, 2);
+  assert.doesNotMatch(html, /<details[^>]* open|type="file"|role="search"|historical-cover|Profile cover|Cover image/);
   assert.doesNotMatch(html, /type="url"|type="color"|contenteditable|draggable|Saved|Discord|Email/);
   assert.match(html, /Creator credits stay visible/);
-  assert.match(html, /permission to display/);
+  assert.match(html, /Change artwork/);
+  assert.match(html, /Add artworks/);
+});
+
+test('historical cover data does not render an image or an empty public selection panel', async () => {
+  const h = await components();
+  const layout = {version: 1, template: 'default', cover_url: 'https://example.com/historical-cover.png', pinned: null, sections: []};
+  assert.equal(renderToStaticMarkup(React.createElement(h.Preview, {layout, config, cards: []})), '');
+  layout.pinned = pointer(1);
+  const html = renderToStaticMarkup(React.createElement(h.Preview, {layout, config, cards: [card(1)]}));
+  assert.match(html, /data-id="1"/);
+  assert.doesNotMatch(html, /historical-cover|Profile cover|<img/);
+  assert.equal(layout.cover_url, 'https://example.com/historical-cover.png');
+});
+
+test('artwork picker exposes one contextual action for a pin or a selected section', async () => {
+  const draft = {version: 1, template: 'default', cover_url: null, pinned: pointer(1), sections: [{id: 'works', label: 'Works', artworks: [pointer(1)]}]};
+  for (const picker of ['pin', 'section:works']) {
+    const h = await components([null, '', picker, 'works', '']);
+    const html = renderToStaticMarkup(h.Editor({state: {draft}, controller: {}, cards: [card(1), card(2)], config, wallet, candidates: [card(1), card(2)]}));
+    assert.match(html, /role="search"/);
+    assert.match(html, /Done choosing/);
+    assert.match(html, picker === 'pin' ? /Choose your pinned artwork/ : /Add to Works/);
+    assert.match(html, picker === 'pin' ? /Pinned/ : /Added/);
+    assert.doesNotMatch(html, picker === 'pin' ? />Add artwork<|>Added</ : />Pin artwork<|>Pinned</);
+  }
+});
+
+test('restoring visible layout defaults preserves the retired cover value', async () => {
+  const h = await components([]);
+  const draft = {version: 1, template: 'featured', cover_url: 'https://example.com/historical-cover.png', pinned: pointer(1), sections: [{id: 'works', label: 'Works', artworks: [pointer(2)]}]};
+  let next;
+  const tree = h.Editor({state: {draft}, controller: {change: update => {next = update(draft);}}, cards: [card(1), card(2)], config, wallet, candidates: []});
+  function findButton(node) {
+    if (!node || typeof node !== 'object') return null;
+    if (node.type === 'button' && node.props.children === 'Restore default') return node;
+    return React.Children.toArray(node.props?.children).map(findButton).find(Boolean);
+  }
+  findButton(tree).props.onClick();
+  assert.equal(next.cover_url, draft.cover_url);
+  assert.equal(next.template, 'default');
+  assert.equal(next.pinned, null);
+  assert.deepEqual(Array.from(next.sections), []);
+  assert.equal(draft.template, 'featured');
 });
 
 test('preview contains only selected public content and keeps save/cancel available', async () => {

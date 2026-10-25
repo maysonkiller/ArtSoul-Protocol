@@ -1,7 +1,7 @@
-const TYPES = ['auction_created', 'outbid'];
+import {LEGACY_NOTIFICATION_TYPES, LIFECYCLE_NOTIFICATION_TYPES, notificationPreference,
+  validLifecycleFields} from './auction-notification-types.js';
 const bigintId = value => typeof value === 'string' && /^[1-9][0-9]{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
 const protocolId = value => typeof value === 'string' && /^[1-9][0-9]{0,77}$/.test(value) && BigInt(value) < 2n ** 256n;
-const preferencesValid = value => value && Object.keys(value).length === 2 && TYPES.every(type => typeof value[type] === 'boolean');
 const revisionValid = value => Number.isInteger(value) && value >= 0 && value <= 2147483647;
 const chainRevisionValid = value => typeof value === 'string' && /^(0|[1-9][0-9]{0,77})$/.test(value);
 const empty = (status = 'idle') => ({status, items: [], nextCursor: null, retryCursor: null, preferences: null,
@@ -12,6 +12,10 @@ const empty = (status = 'idle') => ({status, items: [], nextCursor: null, retryC
 export function createAuctionNotifications({wallet, getWallet, onChange, fetchPage = fetch, requestTimeoutMs = 20000}) {
   const owner = String(wallet || '').toLowerCase();
   let generation = 0, controller, disposed = false, config = {enabled: false}, state = empty();
+  const preferenceKeys = () => config.lifecycleEnabled ? [...LEGACY_NOTIFICATION_TYPES, 'lifecycle'] : LEGACY_NOTIFICATION_TYPES;
+  const preferencesValid = value => value && Object.keys(value).length === preferenceKeys().length &&
+    preferenceKeys().every(key => typeof value[key] === 'boolean');
+  const endpoint = (cursor = null) => `/api/notifications${config.lifecycleEnabled ? '?v=2' : ''}${cursor ? `${config.lifecycleEnabled ? '&' : '?'}before=${cursor}` : ''}`;
   const owns = () => /^0x[0-9a-f]{40}$/.test(owner) && String(getWallet() || '').toLowerCase() === owner;
   const publish = patch => {if (!disposed) {state = {...state, ...patch}; onChange(state);} };
   const busy = () => state.preferencesPending || state.pendingIds.length > 0;
@@ -47,8 +51,8 @@ export function createAuctionNotifications({wallet, getWallet, onChange, fetchPa
     } finally {clearTimeout(timeout);}
   }
   function itemValid(item) {
-    return item && bigintId(item.id) && TYPES.includes(item.type) && item.chain_id === '84532' && item.core_address === config.coreAddress &&
-      protocolId(item.artwork_id) && protocolId(item.auction_id) && /^0x[0-9a-f]{64}$/.test(item.transaction_hash || '') &&
+    return item && bigintId(item.id) && (LEGACY_NOTIFICATION_TYPES.includes(item.type) || (config.lifecycleEnabled && LIFECYCLE_NOTIFICATION_TYPES.includes(item.type))) && item.chain_id === '84532' && item.core_address === config.coreAddress &&
+      protocolId(item.artwork_id) && (config.lifecycleEnabled ? validLifecycleFields(item) : protocolId(item.auction_id)) && /^0x[0-9a-f]{64}$/.test(item.transaction_hash || '') &&
       Number.isFinite(Date.parse(item.created_at)) && typeof item.message === 'string' && item.message.length <= 1000 &&
       typeof item.read === 'boolean' && typeof item.artworkAvailable === 'boolean';
   }
@@ -59,13 +63,13 @@ export function createAuctionNotifications({wallet, getWallet, onChange, fetchPa
     const operation = begin();
     publish({status: 'loading', items: cursor ? state.items : [], nextCursor: cursor ? state.nextCursor : null, retryCursor: cursor, error: ''});
     try {
-      const body = await api(`/api/notifications${cursor ? `?before=${cursor}` : ''}`, operation);
+      const body = await api(endpoint(cursor), operation);
       if (!body || !operation.current()) return;
       if (!Array.isArray(body.items) || body.items.length > 20 || !body.items.every(itemValid) ||
           new Set(body.items.map(item => item.id)).size !== body.items.length ||
           !preferencesValid(body.preferences) || !revisionValid(body.preferencesRevision) || !chainRevisionValid(body.chainRevision) ||
           (body.nextCursor !== null && (!bigintId(body.nextCursor) || !body.items.length || body.nextCursor !== body.items.at(-1).id)) ||
-          body.items.some(item => !body.preferences[item.type] || (cursor && BigInt(item.id) >= BigInt(cursor)))) throw new Error('Auction notifications returned an invalid response. Please reload.');
+          body.items.some(item => !body.preferences[notificationPreference(item.type)] || (cursor && BigInt(item.id) >= BigInt(cursor)))) throw new Error('Auction notifications returned an invalid response. Please reload.');
       if (cursor && (body.preferencesRevision !== state.preferencesRevision || body.chainRevision !== state.chainRevision)) {
         publish({items: [], nextCursor: null, notice: 'Auction history or settings changed. The latest updates are shown below.'});
         await load(); return;
@@ -85,7 +89,7 @@ export function createAuctionNotifications({wallet, getWallet, onChange, fetchPa
     const operation = begin();
     publish({status: 'ready', pendingIds: ids, error: '', notice: '', retryCursor: null});
     try {
-      const body = await api('/api/notifications', operation, {action: 'read', ids, read});
+      const body = await api(endpoint(), operation, {action: 'read', ids, read});
       if (!body || !operation.current()) return;
       if (body.read !== read || !Array.isArray(body.updated) || body.updated.length !== ids.length || new Set(body.updated).size !== ids.length || body.updated.some(id => !ids.includes(id))) throw new Error('The read state could not be verified. Reload notifications.');
       publish({items: state.items.map(item => ids.includes(item.id) ? {...item, read} : item)});
@@ -101,16 +105,16 @@ export function createAuctionNotifications({wallet, getWallet, onChange, fetchPa
   }
   async function setPreference(type, enabled) {
     if (!owns()) {invalidate('auth'); return;}
-    if (!config.enabled || busy() || !TYPES.includes(type) || typeof enabled !== 'boolean' || !preferencesValid(state.preferences) || !revisionValid(state.preferencesRevision)) return;
+    if (!config.enabled || busy() || !preferenceKeys().includes(type) || typeof enabled !== 'boolean' || !preferencesValid(state.preferences) || !revisionValid(state.preferencesRevision)) return;
     const preferences = {...state.preferences, [type]: enabled}, expectedRevision = state.preferencesRevision;
     const operation = begin();
     publish({status: 'ready', preferencesPending: true, error: '', notice: '', retryCursor: null});
     try {
-      const body = await api('/api/notifications', operation, {action: 'preferences', expected_revision: expectedRevision, preferences});
+      const body = await api(endpoint(), operation, {action: 'preferences', expected_revision: expectedRevision, preferences});
       if (!body || !operation.current()) return;
-      if (!preferencesValid(body.preferences) || TYPES.some(key => body.preferences[key] !== preferences[key]) || body.preferencesRevision !== expectedRevision + 1) throw new Error('Notification settings could not be verified. Reload before trying again.');
+      if (!preferencesValid(body.preferences) || preferenceKeys().some(key => body.preferences[key] !== preferences[key]) || body.preferencesRevision !== expectedRevision + 1) throw new Error('Notification settings could not be verified. Reload before trying again.');
       publish({preferences: body.preferences, preferencesRevision: body.preferencesRevision, preferencesPending: false,
-        items: state.items.filter(item => preferences[item.type]), nextCursor: null, notice: 'Notification settings saved.'});
+        items: state.items.filter(item => preferences[notificationPreference(item.type)]), nextCursor: null, notice: 'Notification settings saved.'});
       await load();
     } catch (error) {
       if (operation.current()) {

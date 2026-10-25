@@ -29,7 +29,7 @@ export function moveProfileItem(items, index, direction) {
 
 // Public layout reads and private edit operations have separate generations.
 // Cancelling, signing out or switching accounts retires every outstanding edit.
-export function createProfileLayoutState({wallet, request = fetch, getWallet, authenticate, uploadCover, onChange = () => {}}) {
+export function createProfileLayoutState({wallet, request = fetch, getWallet, authenticate, onChange = () => {}}) {
   wallet = String(wallet || '').toLowerCase();
   let generation = 0, editGeneration = 0, disposed = false, authenticating = false;
   const controllers = new Set();
@@ -113,19 +113,11 @@ export function createProfileLayoutState({wallet, request = fetch, getWallet, au
       if (selectedProfileArtworkKeys(body.layout).size) await readCards(body.revision, generation);
     });
   }
-  async function upload(file) {
-    await operate('uploading', async (signal, current) => {
-      const url = await uploadCover(file, wallet, {signal});
-      if (!current()) return;
-      if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('The cover upload could not be verified.');
-      publish({draft: {...state.draft, cover_url: url}});
-    });
-  }
   function authChanged(authenticatedWallet) {
     if (!owns() || (String(authenticatedWallet || '').toLowerCase() !== wallet && !authenticating)) cancel();
     else if (authenticatedWallet && String(authenticatedWallet).toLowerCase() !== wallet) cancel();
   }
-  return {getState: () => state, load, edit, change, cancel, save, upload, authChanged,
+  return {getState: () => state, load, edit, change, cancel, save, authChanged,
     preview: value => {if (owns() && state.editing && !state.busy) publish({preview: Boolean(value)});},
     dispose: () => {disposed = true; cancel(); generation++;}};
 }
