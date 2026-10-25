@@ -3,7 +3,7 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 profile/feed refinement prepared (release verification pending):
+October 25 profile/feed refinement released:
 
 - Starting HEAD `8a6230e`, same canonical workspace/branch; deployed baseline
   PR #344 / `d844349`. Full 86.7-second recording and supplied prototype reviewed.
@@ -13,6 +13,10 @@ October 25 profile/feed refinement prepared (release verification pending):
   this project's non-upsert uploads, with bounded fallback and no new schema.
 - Evidence and exact validation limits:
   `audits/PROFILE_FEED_REFINEMENT_2026-10-25.md`.
+- PR #345 / `8fdf58f` is released. Candidate `78819e9` passed CI `40182431768`:
+  Linux 2,378 / Windows 2,077 checks, documented skips; 46 contracts per OS.
+  READY `dpl_AptqwLcaQyEFGYmPDGDAifTBnWMg`; eight apex assets and shared v23
+  runtime match the final build. Real homepage/public-profile read checks pass.
 - B17 is preserved in stash `abea37274cb45283f49f012ead2cd9ef56218765`; restore
   it after release, integrating the compact inbox prop and retaining its logic.
   Earlier recovery copies/stash remain. Do not apply both stashes or discard the
@@ -20,8 +24,12 @@ October 25 profile/feed refinement prepared (release verification pending):
 - Cross-chain payment research is discussion only. NFT origin and payment source
   are distinct; no network, contract or economic change is enabled. Full visual
   redesign and Future account controls remain the final B18 pass.
-- Exactly next step: finish database rechecks and exact-candidate CI, release and
-  verify this bounded correction, then restore B17 for the next implementation.
+- B17 review identified missing route/config wiring and a stale-page risk when
+  a reorg invalidates notifications already shown. Historical logs without actual
+  contract provenance must remain unavailable, not inferred from configuration.
+- Exactly next step: restore B17 without losing compact presentation, wire its
+  private endpoint/config, and add source/reorg/session regression coverage before
+  any notification migration, worker deployment or activation.
 
 Earlier October 25 Saved interaction and card expiry correction released:
 
