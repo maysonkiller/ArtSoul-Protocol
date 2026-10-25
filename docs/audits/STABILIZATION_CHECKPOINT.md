@@ -3,26 +3,35 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 25 B17 personal reminders (starting HEAD `5b03cfb`, not released yet):
+October 25 B17 personal reminders activated (release HEAD `1392b5b`, PR #353):
 
 - Founder approved default one-hour reminder and up to three personal times
-  within 24 hours. Additive v3 API/schema/current reminder view is implemented;
-  v1/v2 history stays compatible. No worker, email or protocol change.
+  within 24 hours. Additive v3 API/schema/current reminder view is live;
+  v1/v2 history stays compatible. No new service, email or protocol change.
 - 95 focused API/client/component checks, 38 PostgreSQL/Engine checks and 12
   browser layout cases pass. Review caught a hidden-tab revision race; regression
   tests now cover both reminder refresh and historical-page reload paths.
-- Source/flag/schema are not yet deployed or activated. Protected preparation
-  scripts use new reminder journals and must not replay completed lifecycle work.
-  Unrelated untracked moderation-authority files remain intact. Evidence:
-  `audits/B17_REMINDERS_2026-10-25.md`.
-- Backup/read validation and a rollback-only rehearsal passed. Live rehearsal
-  exposed missing quiet-range boundary headers under the worker's existing skip
-  optimization. The bounded correction retains one boundary plus event blocks;
-  18 Engine/SQL checks pass. Initial candidate CI passed; final CI is required
-  before the source-only guarded worker rollout and feature activation.
-- Exactly next step: complete full CI, release dormant source, then backed-up
-  migration rehearsal and real-account staged acceptance before activation.
-  Official announcement source and final B18/Phase B exit gates remain open.
+- Final candidate `5b2b3f8` / CI `40198290401` passed Linux 2,537 / Windows 2,177
+  tests, documented skips, 46 contracts each, builds and static checks. A fresh
+  protected backup/read validation and rollback rehearsal preceded the additive
+  schema application. Existing v1/v2 functions and preference/read data preserved.
+- Live rehearsal exposed missing quiet-range boundary headers under the existing
+  worker's skip optimization. The reviewed correction retains one boundary plus
+  event blocks; 18 Engine/SQL checks pass. One guarded source-only rollout passed;
+  session-mode access, TLS and other overlays are unchanged. Do not reset checkout.
+- Checked staged deployment `dpl_9cdsgQLymGPxYVwEFXXxPf6ArP2G` was promoted after
+  105 real-account acceptance steps; the apex passed the same 105 steps. Each run
+  restored preferences/read state and cleared test cookies for three old accounts.
+  Eight assets/runtime/config match. No transaction or phone acceptance claimed.
+- Indexer healthy at confirmed/indexed block 50,070,973 with zero failures. Actual
+  auction 71 is a source-proven 24-hour candidate; the three old test accounts had
+  no due reminders. This is not a live due-time delivery/read-marking claim.
+  Completed reminder/schema/worker/flag journals must not be replayed. Unrelated
+  untracked moderation-authority files remain intact. All helpers have finished.
+  Evidence: `audits/B17_REMINDERS_2026-10-25.md`.
+- Exactly next step: settle the pending official announcement-source/publishing
+  policy before implementing the final B17 slice. B18 and Phase B exit gates
+  remain open; do not restart Phase A or infer beta/Snapshot completion.
 
 October 25 profile and B17 lifecycle activated (HEAD `297e5bd`, PR #351 merge):
 
