@@ -30,8 +30,21 @@ Asset inspected at full size. Twelve existing sharing/domain tests pass. Build
 passes (11 HTML routes, 175 Tailwind utilities); all six packaged metadata sets
 match the actual PNG dimensions, and the packaged asset is byte-identical to the
 generator output. Evidence: `output/audit/social-preview-v2-evidence-2026-10-25.json`
-and adjacent test/build logs. CI, preview and apex verification remain release
-gates. No claim is made that Telegram or another app refreshed an existing card.
+and adjacent test/build logs.
+
+Released through PR #357, merge `49136fd`. Candidate `f218e79` / CI `40203263793`
+passed Linux 2,586 tests (two documented skips), Windows 2,213 tests (29 documented
+skips), 46 contract tests each, builds and static checks.
+
+The preview and apex each passed 18 metadata requests (six pages with browser,
+TelegramBot and Twitterbot user agents), exact PNG hash/MIME/dimensions, retained
+legacy image and a real artwork #34 crawler preview that still uses its own
+image. Apex release deployment: `dpl_23JV9dg3AYw5XCWPWwFX1DK4ekgr`. Evidence:
+`output/audit/social-preview-v2-preview-*.json` and
+`output/audit/social-preview-v2-apex-*.json`. The first private verifier run lacked
+its public storage-origin configuration; it was corrected, then passed without
+an application change. No social message was sent or existing message edited.
+No claim is made that Telegram or another app refreshed an existing card.
 
 Reference: [Open Graph structured image properties](https://ogp.me/#structured)
 define pixel dimensions, MIME type and descriptive alternative text.
