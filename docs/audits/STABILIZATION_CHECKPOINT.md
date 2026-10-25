@@ -3,6 +3,22 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 25 B17 personal reminders (starting HEAD `5b03cfb`, not released yet):
+
+- Founder approved default one-hour reminder and up to three personal times
+  within 24 hours. Additive v3 API/schema/current reminder view is implemented;
+  v1/v2 history stays compatible. No worker, email or protocol change.
+- 95 focused API/client/component checks, 38 PostgreSQL/Engine checks and 12
+  browser layout cases pass. Review caught a hidden-tab revision race; regression
+  tests now cover both reminder refresh and historical-page reload paths.
+- Source/flag/schema are not yet deployed or activated. Protected preparation
+  scripts use new reminder journals and must not replay completed lifecycle work.
+  Unrelated untracked moderation-authority files remain intact. Evidence:
+  `audits/B17_REMINDERS_2026-10-25.md`.
+- Exactly next step: complete full CI, release dormant source, then backed-up
+  migration rehearsal and real-account staged acceptance before activation.
+  Official announcement source and final B18/Phase B exit gates remain open.
+
 October 25 profile and B17 lifecycle activated (HEAD `297e5bd`, PR #351 merge):
 
 - PR #349 released the compact editor and retired separate covers; historical

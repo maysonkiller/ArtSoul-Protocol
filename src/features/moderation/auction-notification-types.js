@@ -4,13 +4,27 @@ export const LIFECYCLE_NOTIFICATION_TYPES = [
   'bid_received', 'auction_won', 'auction_ended', 'purchase_completed', 'sale_completed',
   'payment_missed', 'sale_unpaid', 'resale_purchased', 'resale_sold'
 ];
+export const REMINDER_TYPES = ['auction_ending', 'payment_due'];
+export function validReminderMinutes(values, sorted = false) {
+  return Array.isArray(values) && values.length > 0 && values.length <= 3 &&
+    values.every(value => Number.isInteger(value) && value >= 1 && value <= 1440) &&
+    new Set(values).size === values.length && (!sorted || values.every((value,index) => index === 0 || value > values[index-1]));
+}
+export function validReminderFields(item, serverTime, minutes) {
+  const now = Date.parse(serverTime);
+  return REMINDER_TYPES.includes(item?.type) && typeof item.deadline === 'string' && /^[1-9][0-9]{0,12}$/.test(item.deadline) &&
+    Number(item.deadline) <= 8640000000000 && Number.isFinite(now) && Number(item.deadline)*1000 > now &&
+    minutes.includes(item.offset_minutes) && Number(item.deadline)*1000-now <= item.offset_minutes*60000 &&
+    Date.parse(item.created_at) <= now;
+}
 export const notificationPreference = type => LEGACY_NOTIFICATION_TYPES.includes(type) ? type : 'lifecycle';
 export const notificationHeading = type => ({
   auction_created: 'Auction created', outbid: 'Your bid was surpassed', bid_received: 'New bid on your artwork',
   auction_won: 'You won the auction', auction_ended: 'Auction ended without bids',
   purchase_completed: 'Purchase completed', sale_completed: 'Your artwork sold',
   payment_missed: 'Payment was not completed', sale_unpaid: 'Auction payment was not completed',
-  resale_purchased: 'NFT purchased', resale_sold: 'Your NFT sold'
+  resale_purchased: 'NFT purchased', resale_sold: 'Your NFT sold',
+  auction_ending: 'Auction ending soon', payment_due: 'Auction payment due soon'
 })[type] || 'Auction update';
 
 export function notificationMessage(item) {
@@ -26,7 +40,9 @@ export function notificationMessage(item) {
     payment_missed: `The unpaid settlement for ${auction} was finalized as a default.`,
     sale_unpaid: `The unpaid settlement for your ${auction} was finalized as a default.`,
     resale_purchased: `You purchased NFT #${item.token_id} for ${artwork}.`,
-    resale_sold: `Your NFT #${item.token_id} for ${artwork} was sold.`
+    resale_sold: `Your NFT #${item.token_id} for ${artwork} was sold.`,
+    auction_ending: `The current deadline for ${auction} is approaching. Open the artwork to check its latest state.`,
+    payment_due: `Payment for ${auction} is due before the current deadline. An NFT is minted only after successful payment.`
   })[item.type];
 }
 
