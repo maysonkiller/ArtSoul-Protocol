@@ -5545,6 +5545,17 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .notification-preferences { display: grid; gap: 0.5rem; margin-block: 0.75rem; padding: 0.75rem; border: 1px solid var(--c-border); border-radius: 0.75rem; min-width: 0; }
 .notification-preferences label { display: flex; gap: 0.625rem; align-items: center; min-height: 44px; }
 .notification-preferences input { flex: 0 0 auto; width: 1.1rem; height: 1.1rem; accent-color: var(--c-accent); }
+.notification-reminder-form { min-width: 0; }
+.notification-reminder-form > fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.notification-reminder-form legend { padding: 0; font-weight: 600; }
+.notification-reminder-row { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) 44px; align-items: end; gap: 0.375rem; margin-block: 0.75rem; min-width: 0; }
+.notification-preferences .notification-reminder-row label { display: grid; gap: 0.25rem; min-width: 0; font-size: 0.875rem; }
+.notification-reminder-row input, .notification-reminder-row select { width: 100%; min-width: 0; height: 44px; padding: 0.375rem; border: 1px solid var(--c-border); border-radius: 0.5rem; color: var(--c-text); background: var(--c-surface); font: inherit; font-size: 1rem; }
+.notification-reminder-row .notification-reminder-remove { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; }
+.notification-reminder-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-block: 0.75rem; }
+.notification-reminder-row select:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
+.notification-reminder-row input[aria-invalid="true"] { border-style: dashed; }
+.notification-reminder-form > fieldset:disabled { opacity: 0.6; }
 .notification-items { list-style: none; margin-block: 0.75rem; padding: 0; display: grid; gap: 0.75rem; }
 .notification-items > li { padding: 0.75rem; border: 1px solid var(--c-border); border-radius: 0.75rem; overflow-wrap: anywhere; min-width: 0; }
 .notification-items .notification-unread { border-inline-start: 3px solid var(--c-accent); }

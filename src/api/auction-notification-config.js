@@ -4,5 +4,6 @@ export function readAuctionNotificationConfig() {
   return { enabled: process.env.ARTSOUL_AUCTION_NOTIFICATIONS_ENABLED === 'true' && valid,
     chainId: 84532, coreAddress: valid ? coreAddress : null,
     ...(process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED === 'true' && valid && process.env.ARTSOUL_AUCTION_NOTIFICATIONS_ENABLED === 'true'
-      ? {lifecycleEnabled: true} : {}) };
+      ? {lifecycleEnabled: true,
+        ...(process.env.ARTSOUL_AUCTION_REMINDERS_ENABLED === 'true' ? {remindersEnabled: true} : {})} : {}) };
 }

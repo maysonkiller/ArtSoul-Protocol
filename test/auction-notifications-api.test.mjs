@@ -176,7 +176,8 @@ test('auction notification API keeps private history and changes bound to the si
 
   await t.test('lifecycle capability is explicit and old clients keep their original page shape', async () => {
     await rejected({query: {v: '2'}}, 503);
-    for (const v of ['1', '3', 2, ['2'], '']) await rejected({query: {v}}, 400);
+    await rejected({query: {v: '3'}}, 503);
+    for (const v of ['1', '4', 2, ['2'], '']) await rejected({query: {v}}, 400);
     process.env.ARTSOUL_AUCTION_LIFECYCLE_ENABLED = 'true';
     try {
       assert.equal(readAuctionNotificationConfig().lifecycleEnabled, true);

@@ -6,10 +6,101 @@ import { notificationHeading } from './auction-notification-types.js';
 const { useEffect, useRef, useState } = React;
 const activeWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
 
+function reminderRows(minutes) {
+  return (Array.isArray(minutes) && minutes.length ? minutes : [60]).map(value => ({
+    amount: String(value % 60 === 0 ? value / 60 : value), unit: value % 60 === 0 ? 'hours' : 'minutes'
+  }));
+}
+
+function normalizeReminderTimes(rows) {
+  if (!rows.length || rows.length > 3) return {error: 'Choose between one and three reminder times.'};
+  const minutes = [];
+  for (const row of rows) {
+    const value = String(row.amount).trim().replace(',', '.');
+    const parts = value.match(/^(\d+)(?:\.(\d+))?$/);
+    if (!['minutes', 'hours'].includes(row.unit) || value.length > 12 || !parts) {
+      return {error: 'Use whole minutes between 1 minute and 24 hours. For example, 30 minutes or 1.5 hours.'};
+    }
+    const scale = 10n ** BigInt(parts[2]?.length || 0);
+    const converted = BigInt(parts[1] + (parts[2] || '')) * (row.unit === 'hours' ? 60n : 1n);
+    if (converted % scale !== 0n || converted < scale || converted > 1440n * scale) {
+      return {error: 'Use whole minutes between 1 minute and 24 hours. For example, 30 minutes or 1.5 hours.'};
+    }
+    minutes.push(Number(converted / scale));
+  }
+  if (new Set(minutes).size !== minutes.length) return {error: 'Choose a different time for each reminder.'};
+  return {minutes: minutes.sort((a, b) => a - b)};
+}
+
+function ReminderSettings({minutes, enabled, busy, model}) {
+  const savedKey = (Array.isArray(minutes) && minutes.length ? minutes : [60]).join(',');
+  const [rows, setRows] = useState(() => reminderRows(minutes));
+  const [error, setError] = useState('');
+  useEffect(() => {setRows(reminderRows(minutes)); setError('');}, [savedKey]);
+  const normalized = normalizeReminderTimes(rows);
+  const unchanged = normalized.minutes?.join(',') === savedKey;
+  const update = (index, patch) => {setRows(values => values.map((row, position) => position === index ? {...row, ...patch} : row)); setError('');};
+  return <form className="notification-reminder-form" noValidate onSubmit={event => {
+    event.preventDefault();
+    if (busy || !enabled) return;
+    const result = normalizeReminderTimes(rows);
+    if (result.error) {setError(result.error); return;}
+    setError('');
+    if (!unchanged) void model?.setReminderMinutes(result.minutes);
+  }}>
+    <fieldset disabled={busy || !enabled} aria-describedby="auction-reminder-times-help">
+      <legend>Remind me before each deadline</legend>
+      <p className="notification-help" id="auction-reminder-times-help">Up to three times, from 1 minute to 24 hours before an auction ends or a payment is due. Default: 1 hour.</p>
+      {rows.map((row, index) => <div className="notification-reminder-row" key={index}>
+        <label>Time<input type="text" inputMode="decimal" maxLength={12} value={row.amount} aria-label={`Reminder ${index + 1} time`} aria-invalid={Boolean(error)} aria-describedby={error ? 'auction-reminder-times-error' : undefined} onChange={event => update(index, {amount: event.target.value})} /></label>
+        <label>Unit<select value={row.unit} aria-label={`Reminder ${index + 1} unit`} onChange={event => update(index, {unit: event.target.value})}><option value="minutes">Minutes</option><option value="hours">Hours</option></select></label>
+        <button type="button" className="btn-secondary notification-reminder-remove" aria-label={`Remove reminder ${index + 1}`} disabled={rows.length === 1} onClick={() => {setRows(values => values.filter((_, position) => position !== index)); setError('');}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+      </div>)}
+      <div className="notification-reminder-actions">
+        <button type="button" className="btn-secondary" disabled={rows.length >= 3} onClick={() => {setRows(values => [...values, {amount: '', unit: 'minutes'}]); setError('');}}>Add reminder</button>
+        <button type="submit" className="btn-secondary" disabled={unchanged}>Save reminder times</button>
+      </div>
+      {error && <p id="auction-reminder-times-error" role="alert">{error}</p>}
+    </fieldset>
+  </form>;
+}
+
+function UpcomingReminders({state, model, busy}) {
+  const ready = state.preferences.reminders && state.remindersStatus === 'ready';
+  const checking = ['idle', 'loading'].includes(state.remindersStatus);
+  return <section className="notification-category notification-upcoming" aria-labelledby="upcoming-reminders-heading" aria-busy={checking || busy}>
+    <h3 id="upcoming-reminders-heading">Upcoming</h3>
+    <p className="notification-help">Checked while Notifications is open. In-app only, with no email or push notifications. Saving an artwork does not subscribe you.</p>
+    <div role="status" aria-live="polite">
+      {!state.preferences.reminders && <p>Reminders are off. Enable them in Notification settings.</p>}
+      {state.preferences.reminders && checking && <p>Checking upcoming deadlines…</p>}
+      {state.preferences.reminders && state.remindersStatus === 'unavailable' && <p>Upcoming reminders are temporarily unavailable.</p>}
+      {ready && state.reminders.length === 0 && <p>No upcoming deadlines within your reminder times.</p>}
+    </div>
+    {ready && state.reminders.length > 0 && <ul className="notification-items">{state.reminders.map(item => {
+      const deadline = new Date(Number(item.deadline) * 1000);
+      const validDeadline = Number.isFinite(deadline.getTime());
+      return <li key={item.id} className={item.read ? 'notification-read' : 'notification-unread'}>
+        <div className="notification-item-heading"><strong>{item.type === 'payment_due' ? 'Payment due soon' : 'Auction ending soon'}</strong><span>{item.read ? 'Read' : 'Unread'}</span></div>
+        {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id} · Auction #{item.auction_id}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
+        <p>{item.message}</p>
+        <p className="notification-help">{item.type === 'payment_due' ? 'Payment deadline' : 'Auction ends'}: {validDeadline ? <time dateTime={deadline.toISOString()}>{deadline.toLocaleString()}</time> : 'Deadline unavailable'}</p>
+        <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.markRead([item.id], !item.read)}>{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Mark unread' : 'Mark read'}</button>
+      </li>;
+    })}</ul>}
+    {ready && state.remindersCapped && <p className="notification-help">Showing the next 20 reminders. Open your auctions for the full list.</p>}
+    {state.preferences.reminders && state.remindersStatus === 'unavailable' && <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.refreshReminders()}>Retry reminders</button>}
+  </section>;
+}
+
 export function AuctionNotifications({state, model}) {
   if (state.status === 'disabled') return null;
   const busy = state.preferencesPending || state.pendingIds.length > 0;
-  return <section className="notification-category" aria-labelledby="auction-notifications-heading" aria-busy={state.status === 'loading' || busy}>
+  const hasReminders = typeof state.preferences?.reminders === 'boolean' && Array.isArray(state.reminders);
+  return <>{hasReminders && <UpcomingReminders state={state} model={model} busy={busy} />}
+    <section className="notification-category" aria-labelledby="auction-notifications-heading" aria-busy={state.status === 'loading' || busy}>
     <h3 id="auction-notifications-heading">Your activity</h3>
     <p className="notification-help">Recorded updates for your wallet. Open an artwork to see its current state.</p>
     {state.preferences && <details className="notification-settings"><summary>Notification settings</summary><fieldset className="notification-preferences" disabled={busy || state.status === 'loading'}>
@@ -17,13 +108,17 @@ export function AuctionNotifications({state, model}) {
       <label><input type="checkbox" checked={state.preferences.auction_created} onChange={event => model?.setPreference('auction_created', event.target.checked)} />Show auction creation updates</label>
       <label><input type="checkbox" checked={state.preferences.outbid} onChange={event => model?.setPreference('outbid', event.target.checked)} />Show outbid updates</label>
       {typeof state.preferences.lifecycle === 'boolean' && <label><input type="checkbox" checked={state.preferences.lifecycle} onChange={event => model?.setPreference('lifecycle', event.target.checked)} />Show bids, auction results, purchases and sales</label>}
+      {hasReminders && <>
+        <label><input type="checkbox" checked={state.preferences.reminders} onChange={event => model?.setPreference('reminders', event.target.checked)} />Show upcoming deadline reminders</label>
+        <ReminderSettings minutes={state.reminderMinutes} enabled={state.preferences.reminders} busy={busy} model={model} />
+      </>}
       <p className="notification-help">These settings hide or show existing updates without deleting them. They apply only to this inbox and do not subscribe you to email.</p>
     </fieldset></details>}
     <div role="status" aria-live="polite">
       {state.status === 'loading' && <p>Loading auction updates…</p>}
       {state.status === 'auth' && <p>Sign in with your connected wallet to view auction updates.</p>}
       {state.status === 'unavailable' && <p>Auction notifications are temporarily unavailable.</p>}
-      {state.status === 'ready' && state.items.length === 0 && <p>{state.preferences && Object.values(state.preferences).every(value => !value) ? 'Activity updates are hidden. Enable a category above to see its updates.' : 'No activity updates to show.'}</p>}
+      {state.status === 'ready' && state.items.length === 0 && <p>{state.preferences && ['auction_created', 'outbid', 'lifecycle'].every(key => !state.preferences[key]) ? 'Activity updates are hidden. Enable a category above to see its updates.' : 'No activity updates to show.'}</p>}
       {state.preferencesPending && <p>Saving notification settings…</p>}
       {state.notice && <p>{state.notice}</p>}
       {state.error && <p>{state.error}</p>}
@@ -38,7 +133,7 @@ export function AuctionNotifications({state, model}) {
     </li>)}</ul>}
     {['error', 'unavailable'].includes(state.status) && <button type="button" className="btn-secondary" onClick={() => model?.load(state.retryCursor)}>Retry auction updates</button>}
     {state.status === 'ready' && state.nextCursor && <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.load(state.nextCursor)}>Load older auction updates</button>}
-  </section>;
+  </section></>;
 }
 
 export function NotificationInbox({ wallet, compact = false }) {
@@ -83,6 +178,26 @@ export function NotificationInbox({ wallet, compact = false }) {
       window.removeEventListener('pagehide', onWalletChange);
     };
   }, [wallet]);
+  useEffect(() => {
+    if (!open) return;
+    const model = auctions.current;
+    const refresh = () => {
+      if (document.visibilityState === 'hidden') model?.pauseReminders();
+      else void model?.refreshReminders();
+    };
+    const timer = window.setInterval(refresh, 30000);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    refresh();
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      model?.pauseReminders();
+    };
+  }, [open, wallet]);
   async function signIn() {
     const model = inbox.current;
     const auctionModel = auctions.current;

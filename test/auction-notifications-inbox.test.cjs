@@ -25,7 +25,9 @@ async function harness(fetchPage, enabled = true) {
     useEffect(fn, deps) {const i = ei++, old = effects[i]; if (!old || deps.some((d,j) => d !== old.deps[j])) pending.push(() => {old?.cleanup?.(); effects[i] = {deps, cleanup: fn()};});}},
     notificationHeading, createAuctionNotifications: options => createAuctionNotifications({...options, fetchPage: fetcher}),
     createNotificationInbox: options => createNotificationInbox({...options, fetchPage: fetcher}),
+    document: {visibilityState: 'visible', addEventListener() {}, removeEventListener() {}},
     window: {getCurrentWalletAddress: () => state.wallet, ensureAuthenticated: () => state.authenticate(),
+      setInterval() {return 1;}, clearInterval() {},
       ArtSoulPublicConfig: {load: async () => ({auctionNotifications: {enabled, chainId: 84532, coreAddress: CORE}})},
       addEventListener(name, fn) {if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn);},
       removeEventListener(name, fn) {listeners.get(name)?.delete(fn);}}};
