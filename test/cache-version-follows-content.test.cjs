@@ -20,7 +20,7 @@ const fs = require('node:fs');
 const RUNTIME = {
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 7, sha256: 'fac3e3baca90f002' },
-  'src/ui/components/artwork-card.js': { version: 21, sha256: 'a9278886ab324fbf' },
+  'src/ui/components/artwork-card.js': { version: 22, sha256: '9704fbfff46efb52' },
   'contracts-integration.js': { version: 14, sha256: 'cf2b0ea01d557fa6' },
   'modal-system.js': { version: 1, sha256: '73be2dadc241ea78' },
   'webmcp-tools.js': { version: 4, sha256: '0b6e7d5cd51be343' },

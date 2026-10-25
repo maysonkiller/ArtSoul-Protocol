@@ -59,7 +59,7 @@ function loadRuntime() {
     { window, document, Date: FakeDate }
   );
   vm.runInNewContext(source, { window, document, Date: FakeDate });
-  return { api: window.ArtSoulArtworkCard, intervals, cleared, clock };
+  return { api: window.ArtSoulArtworkCard, intervals, cleared, clock, window };
 }
 
 test('countdown formatting is compact, deterministic, and never negative', () => {
@@ -121,7 +121,31 @@ test('DOM cards share one timer and keep their compact body structure', () => {
   assert.equal(firstTimer.textContent, 'Ended');
   assert.equal(secondTimer.textContent, 'Ended');
   assert.match(firstTimer.className, /is-ended/);
+  const firstBadge = first.children[1].children[2].children[0];
+  assert.equal(firstBadge.textContent, 'No bids', 'expiry must update the status as well as the timer');
+  assert.equal(firstBadge.className, 'artsoul-card-status artsoul-card-status-ended_no_bids');
+  const firstLink = first.children.find(child => child.className === 'artsoul-card-link');
+  assert.match(firstLink.title, /Status: No bids/);
+  assert.doesNotMatch(firstLink.attributes['aria-label'], /Live/);
   assert.deepEqual(cleared, [1]);
+});
+
+test('expiry with a bid changes the card status and a replacement round starts live', () => {
+  const { api, intervals, clock } = loadRuntime();
+  const artwork = { id: '34', file_url: 'image.jpg', file_type: 'image', auction_id: '66',
+    auction_end_time: clock.now + 1000, current_bid: '0.011', current_bidder: `0x${'1'.repeat(40)}` };
+  const previous = api.createCardElement(artwork);
+  const timer = previous.children.find(child => child.className === 'artsoul-card-countdown');
+  timer.isConnected = true;
+  clock.now += 1000;
+  intervals[0]();
+  assert.equal(timer.textContent, 'Ended');
+  assert.equal(previous.children[1].children[2].children[0].textContent, 'Awaiting payment');
+
+  const replacement = api.createCardElement({ ...artwork, auction_id: '67', auction_end_time: clock.now + 86400000,
+    current_bid: '0', current_bidder: '' });
+  assert.equal(replacement.children[1].children[2].children[0].textContent, 'Live');
+  assert.equal(replacement.children.find(child => child.className === 'artsoul-card-countdown').textContent, '1d 00h');
 });
 
 test('removed DOM countdowns stop updating and release their shared interval', () => {
@@ -141,11 +165,62 @@ test('removed DOM countdowns stop updating and release their shared interval', (
 });
 
 test('shared React countdown is used by both common and profile cards', () => {
-  assert.match(source, /function ReactCountdown\(\{ artwork = \{\} \}\)/);
-  assert.match(source, /h\(ReactCountdown, \{ artwork \}\)/);
+  assert.match(source, /function ReactCountdown\(\{ artwork = \{\}, onEnd = null \}\)/);
+  assert.match(source, /h\(ReactCountdown, \{ artwork, onEnd: refreshAuctionState \}\)/);
   assert.match(source, /ReactCountdown,/);
   assert.match(profile, /SharedCard = window.ArtSoulArtworkCard\?\.ReactCard/);
   assert.match(profile, /<SharedCard\s+artwork=\{artwork\}/);
+});
+
+test('status and countdown use the same supplied clock at the deadline boundary', () => {
+  const { api, clock } = loadRuntime();
+  const artwork = { auction_id: '66', auction_end_time: clock.now + 1000 };
+  assert.equal(api.statusInfo(artwork, clock.now).label, 'Live');
+  assert.equal(api.countdownInfo(artwork, clock.now).label, '0m 01s');
+  assert.equal(api.statusInfo(artwork, clock.now + 1000).label, 'No bids');
+  assert.equal(api.countdownInfo(artwork, clock.now + 1000), null);
+});
+
+test('React countdown retires the previous round and refreshes its card once at the new expiry', () => {
+  const { api, window, intervals, cleared, clock } = loadRuntime();
+  let initialized = false, value, dependencies, cleanup, effect;
+  window.React = {
+    createElement: (tag, props, text) => ({ tag, props, text }),
+    useState(initial) {
+      if (!initialized) { value = initial(); initialized = true; }
+      return [value, next => { value = next; }];
+    },
+    useEffect(callback, next) {
+      if (!dependencies || next.some((item, index) => item !== dependencies[index])) {
+        dependencies = next; effect = callback;
+      }
+    }
+  };
+  const endedAt = [];
+  const onEnd = now => endedAt.push(now);
+  const render = artwork => {
+    const result = api.ReactCountdown({ artwork, onEnd });
+    if (effect) { cleanup?.(); cleanup = effect(); effect = undefined; }
+    return result;
+  };
+  const previous = { auction_id: '66', auction_end_time: clock.now + 1000 };
+  assert.equal(render(previous).text, '0m 01s');
+  clock.now += 500;
+  const replacement = { auction_id: '67', auction_end_time: clock.now + 10000 };
+  assert.equal(render(replacement), null, 'an old timer must not paint during a round change');
+  assert.equal(render(replacement).text, '0m 10s');
+  clock.now += 1000;
+  intervals.at(-1)();
+  assert.deepEqual(endedAt, [], 'the superseded round must not expire the replacement');
+  assert.equal(render(replacement).text, '0m 09s');
+  clock.now = replacement.auction_end_time;
+  intervals.at(-1)();
+  assert.equal(render(replacement).text, 'Ended');
+  assert.deepEqual(endedAt, [clock.now]);
+  intervals.at(-1)();
+  assert.deepEqual(endedAt, [clock.now], 'the expiry callback runs once');
+  cleanup?.();
+  assert.deepEqual(cleared, [1, 2]);
 });
 
 test('countdown is a height-neutral theme-safe media overlay', () => {

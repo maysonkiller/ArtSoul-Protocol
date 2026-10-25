@@ -216,6 +216,24 @@ test('ordinary action buttons still receive the existing double-click protection
     assert.equal(button.disabled, false);
 });
 
+test('Saved owns its pending guard and reaches its handler after the global capture guard', () => {
+    const { api, window } = loadDomCardRuntime();
+    const guard = loadActualClickGuard();
+    for (const detail of [false, true]) {
+        const button = api.createSavedControl({ chain_id: 84532, artwork_id: '34' }, { detail });
+        let writes = 0;
+        window.ArtSoulSaved = { toggle(control) { if (!control.disabled) writes++; } };
+        // The real document listener runs in capture, before the target handler.
+        guard.click(button);
+        button.dispatch('click');
+        assert.equal(writes, 1, 'Saved must receive the first click on every surface');
+        guard.click(button);
+        button.dispatch('click');
+        assert.equal(writes, 2, 'a subsequent click can remove the same bookmark');
+    }
+    assert.equal(guard.timers.length, 0);
+});
+
 test('card media keeps the uniform square frame and cover crop', () => {
     assert.match(css, /\.artsoul-card-media\s*\{[\s\S]*?aspect-ratio:\s*1\s*\/\s*1;/);
     assert.match(css, /\.artsoul-card-media-object\s*\{[\s\S]*?object-fit:\s*cover;/);
