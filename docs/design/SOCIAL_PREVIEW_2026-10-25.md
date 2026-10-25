@@ -51,4 +51,3 @@ On the right, one exceptional abstract sculptural artwork: a fluid, thin folded 
 
 Mood: quiet luxury, advanced art technology, confident editorial design, not cyberpunk. Avoid charts, chain logos, coins, hexagons, grids, stars, particle clouds, smoke, mountains, paint splashes, boxes, NFT characters, clichés and promotional claims. No drop shadows on type, no bevelled letters, no excessive gradients. Make the final image ready for a real Telegram/X/Open Graph website card.
 ```
-
