@@ -127,3 +127,12 @@ preserved reminder drafts, eligible/unverified/ordinary states and auth reset.
 Screenshots were inspected in Classic and Future. This is not a new physical
 iPhone or live staff-factor ceremony. Evidence: `output/audit/notification-groups-*`
 and `output/playwright/notification-groups-*`.
+
+Released in PR #359, merge `7258846`. Candidate `1316178` / CI `40204868576`
+passed Linux 2,591 tests (two documented skips), Windows 2,218 (29 documented
+skips), 46 contract tests per platform, builds and static checks. Preview
+`dpl_C5LdYvhoePkMGa9N8ARXGyuLRBHp` and apex
+`dpl_4jkDhRN82VJdKkK59u6ZC699EDEM` match eight page asset lists and all 17 profile
+assets byte-for-byte. Active apex config and anonymous denial on summary,
+recipient outcomes and staff queue endpoints passed. No live recipient state
+was changed or factor ceremony replayed. Browser/server and helper are finished.

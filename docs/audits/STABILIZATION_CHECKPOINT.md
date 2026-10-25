@@ -3,6 +3,26 @@
 Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 25 notification groups released (implementation HEAD `7258846`, PR #359):
+
+- Personal is the default group; eligible staff also get Moderation. Personal
+  report outcomes remain available to ordinary users. Pending staff reviews are
+  labelled separately from the personal unread total. Profile selections stay.
+- 81 focused tests, build and 20 Chromium theme/size/zoom cases passed, including
+  preserved reminder drafts, keyboard controls and invalidated access. Candidate
+  `1316178` / CI `40204868576`: Linux 2,591 and Windows 2,218 passing tests,
+  documented skips, 46 contract tests each and static/build checks passed.
+- Preview `dpl_C5LdYvhoePkMGa9N8ARXGyuLRBHp` and apex
+  `dpl_4jkDhRN82VJdKkK59u6ZC699EDEM` match all eight page asset lists and 17
+  profile assets byte-for-byte. Apex notification config is active and all three
+  probed private endpoints deny anonymous reads. No API/schema/role/session
+  changes, live mutations or new physical-phone/factor ceremony were needed.
+- Browser/server closed; helper finished. Unrelated untracked authority-policy
+  files, `.codex/` and `output/` preserved. Evidence and interpretation:
+  `audits/B17_NOTIFICATION_INDICATOR_2026-10-25.md`, follow-up section.
+- Exactly next step: resolve the official announcement-source/publishing policy
+  for the remaining B17 slice. B18 and broader Phase B gates remain open.
+
 October 25 owner-prioritized social banner released (HEAD `49136fd`, PR #357):
 
 - New versioned brand PNG replaces the textured default on six OG/X metadata
