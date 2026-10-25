@@ -139,6 +139,7 @@ export function AuctionNotifications({state, model}) {
 
 export function NotificationInbox({ wallet, compact = false }) {
   const [open, setOpen] = useState(false);
+  const [group, setGroup] = useState('personal');
   const [state, setState] = useState({ status: 'idle', items: [], nextCursor: null });
   const inbox = useRef(null);
   const auctions = useRef(null);
@@ -154,7 +155,7 @@ export function NotificationInbox({ wallet, compact = false }) {
     let clearing = false, active = true;
     const clear = (status = 'auth') => {
       if (clearing) return;
-      clearing = true; model.invalidate(status); auctionModel.invalidate(status); summaryModel.invalidate(status); clearing = false;
+      clearing = true; setGroup('personal'); model.invalidate(status); auctionModel.invalidate(status); summaryModel.invalidate(status); clearing = false;
     };
     const model = createNotificationInbox({ wallet, getWallet: activeWallet, onChange: next => {setState(next); if (next.status === 'auth') clear();} });
     const auctionModel = createAuctionNotifications({wallet, getWallet: activeWallet, onChange: next => {setAuctionState(next); if (next.status === 'auth') clear();}});
@@ -247,11 +248,13 @@ export function NotificationInbox({ wallet, compact = false }) {
   function toggle(next = !openRef.current, restoreFocus = false) {
     openRef.current=next;setOpen(next);
     if(next){inbox.current?.load();auctions.current?.load();summary.current?.refresh();}
-    else {signInGeneration.current++;inbox.current?.invalidate();auctions.current?.invalidate();}
+    else {setGroup('personal');signInGeneration.current++;inbox.current?.invalidate();auctions.current?.invalidate();}
     if(restoreFocus)toggleButton.current?.focus();
   }
   const visibleSummary = activeWallet()===wallet.toLowerCase() && summaryState.status==='ready';
   const hasUnread = visibleSummary && summaryState.count>0;
+  const staff = state.staffReview;
+  const activeGroup = staff && group === 'moderation' ? 'moderation' : 'personal';
   const unreadLabel = hasUnread ? summaryState.complete
     ? `${summaryState.count>=100?'99+':summaryState.count} unread ${summaryState.count===1?'notification':'notifications'}`
     : 'Unread notifications. Some counts are temporarily unavailable.' : 'Notifications';
@@ -268,12 +271,21 @@ export function NotificationInbox({ wallet, compact = false }) {
         <svg className="notification-toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       {open && <div id="profile-notifications" className="notification-panel" aria-busy={state.status === 'loading'} onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();toggle(false,true);}}}>
-        <div className="notification-panel-heading"><div><h2>Notifications</h2><p className="notification-help">{visibleSummary && summaryState.complete && summaryState.count===0 ? 'All caught up. Your past updates stay below.' : 'Your private updates, in one place.'}</p></div>
+        <div className="notification-panel-heading"><div><h2>Notifications</h2><p className="notification-help">{visibleSummary && summaryState.complete && summaryState.count===0 ? 'Your personal updates are all read.' : 'Your private updates, in one place.'}</p></div>
           <button className="notification-close" type="button" aria-label="Close notifications" onClick={()=>toggle(false,true)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
         </div>
         {summaryState.status==='unavailable' && <p className="notification-help">Unread counts are temporarily unavailable.</p>}
-        {state.staffReview && <section className="mb-3" aria-label="Staff review notices">
-          <h3 className="font-semibold">Reports awaiting review</h3>
+        {staff && <div className="notification-groups" role="group" aria-label="Notification categories">
+          <button type="button" aria-pressed={activeGroup === 'personal'} aria-controls="personal-notifications" onClick={() => setGroup('personal')}>
+            <span>Personal</span>{hasUnread && <span className={`notification-group-count${summaryState.complete ? '' : ' notification-group-dot'}`} aria-label={unreadLabel}>{summaryState.complete ? summaryState.count>=100?'99+':summaryState.count : null}</span>}
+          </button>
+          <button type="button" aria-pressed={activeGroup === 'moderation'} aria-controls={activeGroup === 'moderation' ? 'staff-notifications' : undefined} onClick={() => setGroup('moderation')}>
+            <span>Moderation</span>{staff.status === 'ready' && staff.count > 0 && <span className="notification-group-count notification-queue-count" aria-label={`${staff.count}${staff.capped ? '+' : ''} ${staff.count === 1 ? 'report' : 'reports'} awaiting review`}>{staff.count}{staff.capped ? '+' : ''}</span>}
+          </button>
+        </div>}
+        {activeGroup === 'moderation' && <section id="staff-notifications" className="notification-category" aria-labelledby="staff-notifications-heading">
+          <h3 id="staff-notifications-heading">Reports awaiting review</h3>
+          <p className="notification-help">Your moderation workspace. Review and resolve reports in Admin. This queue is separate from your personal unread messages.</p>
           {state.staffReview.status === 'disabled' && <p>The review workspace is not active yet.</p>}
           {state.staffReview.status === 'verify' && <p><a className="underline" href="/admin">Verify admin access</a> to check reports awaiting review.</p>}
           {state.staffReview.status === 'unavailable' && <p>Review notices are temporarily unavailable. <a className="underline" href="/admin">Open Admin panel</a></p>}
@@ -287,9 +299,10 @@ export function NotificationInbox({ wallet, compact = false }) {
             </ul>}
           </>}
         </section>}
+        <div id="personal-notifications" hidden={activeGroup !== 'personal'}>
         <AuctionNotifications state={auctionState} model={auctionActions} />
         <section className="notification-category" aria-labelledby="moderation-notifications-heading">
-        <h3 id="moderation-notifications-heading">Moderation</h3>
+        <h3 id="moderation-notifications-heading">Your reports and artwork updates</h3>
         <p className="notification-help">Updates about your reports, artworks and donation messages.</p>
         <div role="status" aria-live="polite">
           {state.status === 'loading' && <p>Loading notifications…</p>}
@@ -314,6 +327,7 @@ export function NotificationInbox({ wallet, compact = false }) {
         {['error', 'unavailable'].includes(state.status) && <button type="button" className="btn-main mt-3" onClick={() => inbox.current?.load(state.retryCursor)}>Retry</button>}
         {state.status === 'ready' && state.nextCursor && <button type="button" className="btn-main mt-3" disabled={Boolean(state.pendingId)} onClick={() => inbox.current?.load(state.nextCursor)}>Load older notifications</button>}
         </section>
+        </div>
         {(state.status === 'auth' || auctionState.status === 'auth') && <button type="button" className="btn-main mt-3" onClick={signIn}>Sign in to view</button>}
       </div>}
     </section>

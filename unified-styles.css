@@ -5554,6 +5554,15 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .notification-panel-heading h2, .notification-panel-heading h3, .notification-category h3 { margin: 0; background: none; -webkit-text-fill-color: currentColor; color: var(--c-text); text-shadow: none; animation: none; font-size: 1rem; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; }
 .notification-inbox .notification-close { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 1px solid transparent; border-radius: 0.625rem; color: var(--c-text-muted); background: transparent; cursor: pointer; }
 .notification-close svg { width: 18px; height: 18px; }
+.notification-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.25rem; padding: 0.25rem; margin-bottom: 1rem; border: 1px solid var(--c-border-soft); border-radius: 0.875rem; background: var(--c-surface-muted); }
+.notification-panel > [hidden] { display: none; }
+.notification-groups > button { display: flex; align-items: center; justify-content: center; gap: 0.375rem; min-width: 0; padding: 0.5rem; border: 1px solid transparent; border-radius: 0.625rem; background: transparent; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 600; line-height: 1.4; cursor: pointer; }
+.notification-groups > button[aria-pressed="true"] { border-color: var(--c-border); background: var(--c-surface); color: var(--c-text); }
+.future .notification-groups > button[aria-pressed="true"] { border-color: var(--c-accent); color: var(--c-accent); }
+.notification-group-count { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 1.125rem; height: 1.125rem; padding-inline: 0.25rem; border-radius: 999px; background: var(--c-notification-alert); color: var(--c-notification-on-alert); font-size: 0.625rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.notification-group-dot { min-width: 0; width: 0.5rem; height: 0.5rem; padding: 0; }
+.notification-queue-count { background: var(--c-surface-strong); color: var(--c-text); }
+.notification-groups ~ .notification-category, #personal-notifications > .notification-category:first-of-type { margin-top: 0.75rem; padding-top: 0; border-top: 0; }
 .notification-category { margin-block: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--c-border-soft); min-width: 0; }
 .notification-panel > .notification-category:first-of-type { margin-top: 0.75rem; padding-top: 0; border-top: 0; }
 .notification-category:last-child { margin-bottom: 0; }
