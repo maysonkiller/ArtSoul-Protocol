@@ -38,7 +38,7 @@ function harness({speech = false, execute = async () => JSON.stringify({count: 1
     localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)},
     confirm: () => {prompts++; return true;},
     speechSynthesis: {cancel() {}, speak: value => spoken.push(value.text)},
-    ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_artworks', 'buy_resale_listing', 'get_my_activity'].map(name => ({name,
+    ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_artworks', 'buy_resale_listing', 'get_my_activity', 'add_to_saved', 'remove_from_saved'].map(name => ({name,
       execute: args => {calls.push({name, args}); return execute(args);}
     }))}
   };
@@ -74,8 +74,26 @@ test('opening, typing, examples and language selection never start the microphon
   assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
 });
 
+test('typed favorites commands show confirmed state while low-confidence speech and late account answers are fenced', async () => {
+  const h = harness({speech: true, execute: async () => JSON.stringify({updated: true, artwork_id: '34', saved: true})});
+  h.open(); h.submit('save artwork 34'); await flush();
+  assert.deepEqual(h.calls, [{name: 'add_to_saved', args: {artwork_id: '34'}}]);
+  assert.equal(h.get('.artsoul-voice-answer').textContent, 'Artwork 34 is in Saved.');
+  assert.equal(h.spoken.length, 0); assert.equal(h.sessions.length, 0);
+  h.get('.artsoul-voice-mic').fire('click');
+  h.sessions[0].onresult({results: [[{transcript: 'remove artwork 34 from saved', confidence: .2}]]}); await flush();
+  assert.equal(h.calls.length, 1);
+  let finish;
+  const late = harness({execute: () => new Promise(resolve => {finish = resolve;})});
+  late.connect('0x' + 'a'.repeat(40)); late.open(); late.submit('remove artwork 34 from saved');
+  late.connect('0x' + 'b'.repeat(40));
+  finish(JSON.stringify({updated: true, artwork_id: '34', saved: false})); await flush();
+  assert.doesNotMatch(late.get('.artsoul-voice-answer').textContent, /34|removed/);
+});
+
 test('double submit and closing/reopening cannot replay an in-flight wallet request', async () => {
   let finish; const h = harness({execute: () => new Promise(resolve => {finish = resolve;})});
+  assert.equal(h.get('.artsoul-voice-send').dataset.allowRapid, 'true', 'native form submission bypasses the global capture guard');
   h.open(); h.submit('buy artwork 31'); h.submit('buy artwork 31');
   assert.equal(h.calls.length, 1); assert.equal(h.get('input').disabled, true);
   h.get('.artsoul-voice-close').fire('click'); h.open(); h.submit('buy artwork 31');

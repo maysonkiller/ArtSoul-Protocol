@@ -2,7 +2,7 @@ import { createSavedStore, savedKey } from './saved-state.js';
 
 export const currentSavedWallet = () => String(window.getCurrentWalletAddress?.() || window.currentWalletAddress || '').toLowerCase();
 const listeners = new Set();
-let config = { enabled: false }, scheduled = false, walletRevision = 0;
+let config = { enabled: false }, scheduled = false, walletRevision = 0, contextRevision = 0;
 const requested = new Set();
 const operations = new Map();
 export const savedStore = createSavedStore({ getWallet: currentSavedWallet, onChange: state => {
@@ -100,8 +100,37 @@ async function toggle(button) {
   } catch { notice('Sign-in was not completed. Please try again.'); }
   finally { if (operations.get(key) === operation) operations.delete(key); paint(); }
 }
-window.ArtSoulSaved = { toggle, scheduleScan };
+// Commands express a desired state, never a toggle. They use the existing
+// session without opening a wallet or resuming automatically after sign-in.
+export async function setSavedArtwork(artworkId, value) {
+  const revision = contextRevision, wallet = currentSavedWallet();
+  const changed = () => revision !== contextRevision || wallet !== currentSavedWallet();
+  const failure = reason => ({ updated: false, reason });
+  if (typeof artworkId !== 'string' || typeof value !== 'boolean' || !/^[1-9][0-9]{0,77}$/.test(artworkId) || BigInt(artworkId) >= 2n ** 256n) {
+    return failure('Use one artwork number from its page URL.');
+  }
+  if (!/^0x[0-9a-f]{40}$/.test(wallet)) return failure('Connect and sign in with your wallet, then repeat the command.');
+  await savedConfig;
+  if (changed()) return failure('Account changed. Repeat the command for the current account.');
+  const item = { chain_id: config.chainId, core_address: config.coreAddress, artwork_id: artworkId };
+  const key = savedKey(item);
+  if (!config.enabled || !key) return failure('Saved is unavailable. Please try again.');
+  if (operations.has(key) || savedStore.getState().pending.has(key)) return failure('This artwork is being updated. Wait for it to finish, then repeat the command.');
+  const operation = Symbol();
+  operations.set(key, operation);
+  paint();
+  try {
+    const ok = await savedStore.set(item, value);
+    if (changed()) return failure('Account or sign-in changed. Repeat the command for the current account.');
+    if (!ok) return failure(savedStore.getState().status === 'auth'
+      ? 'Sign in with your wallet on the site, then repeat the command.'
+      : 'Saved could not be updated. Please try again.');
+    return { updated: true, artwork_id: artworkId, saved: value, url: '/profile#saved' };
+  } finally { if (operations.get(key) === operation) operations.delete(key); paint(); }
+}
+window.ArtSoulSaved = { toggle, scheduleScan, setArtwork: setSavedArtwork };
 const invalidate = event => {
+  contextRevision++;
   if (event?.type === 'artsoul:wallet-state-changed') { walletRevision++; operations.clear(); }
   requested.clear(); savedStore.invalidate();
   document.getElementById('saved-feedback')?.remove();

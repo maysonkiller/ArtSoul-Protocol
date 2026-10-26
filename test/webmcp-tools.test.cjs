@@ -92,7 +92,9 @@ test('the ArtSoul tools are registered when the browser supports WebMCP', async 
     'buy_resale_listing',
     'withdraw_pending_funds',
     'revoke_wallet_access',
-    'prepare_artwork_registration'
+    'prepare_artwork_registration',
+    'add_to_saved',
+    'remove_from_saved'
   ]);
   assert.equal(typeof win.ArtSoulWebMCP.register, 'function');
 });
@@ -110,6 +112,45 @@ test('one rejected descriptor does not cost the other tools', async () => {
   const names = await win.ArtSoulWebMCP.register(modelContext, tools);
   assert.equal(names.includes('search_artworks'), false);
   assert.equal(accepted.length, tools.length - 1);
+});
+
+test('Saved tools pass explicit desired state to the shared preference adapter without opening a wallet', async () => {
+  const calls = [];
+  const tools = toolsFrom(load(), {
+    setSavedArtwork: async (id, saved) => { calls.push([id, saved]); return { updated: true, artwork_id: id, saved }; },
+    fetchJson: () => assert.fail('no separate API path'),
+    loadWalletRuntime: () => assert.fail('no wallet runtime'),
+    confirmAction: () => assert.fail('no transaction approval')
+  });
+  for (const name of ['add_to_saved', 'add_to_saved', 'remove_from_saved', 'remove_from_saved']) {
+    const result = JSON.parse(await tools.get(name).execute({ artwork_id: '34' }));
+    assert.equal(result.updated, true);
+    assert.equal(result.saved, name === 'add_to_saved');
+  }
+  assert.deepEqual(calls, [['34', true], ['34', true], ['34', false], ['34', false]]);
+});
+
+test('Saved tools refuse ambiguous identifiers and additional input before calling the adapter', async () => {
+  const tools = toolsFrom(load(), { setSavedArtwork: () => assert.fail('invalid Saved command') });
+  for (const name of ['add_to_saved', 'remove_from_saved']) {
+    for (const input of [null, {}, { artwork_id: 34 }, { artwork_id: '0' }, { artwork_id: '034' },
+      { artwork_id: '-1' }, { artwork_id: '34,35' }, { artwork_id: ['34'] }, { artwork_id: ' 34' },
+      { artwork_id: (2n ** 256n).toString() }, { artwork_id: '34', auction_id: '66' }, { artwork_id: '34', saved: false }]) {
+      assert.equal(JSON.parse(await tools.get(name).execute(input)).updated, false);
+    }
+  }
+});
+
+test('Saved tools retain auth/busy failures and resolve the current page singleton at execution time', async () => {
+  const win = load(), deps = win.ArtSoulWebMCP.browserDependencies();
+  const tools = toolsFrom(win, deps);
+  assert.equal(JSON.parse(await tools.get('add_to_saved').execute({ artwork_id: '34' })).updated, false);
+  const calls = [];
+  win.ArtSoulSaved = { setArtwork: async (...args) => { calls.push(args); return { updated: false, reason: 'Sign in first.' }; } };
+  assert.deepEqual(JSON.parse(await tools.get('add_to_saved').execute({ artwork_id: '34' })), { updated: false, reason: 'Sign in first.' });
+  win.ArtSoulSaved = { setArtwork: async (...args) => { calls.push(args); return { updated: false, reason: 'Update in progress.' }; } };
+  assert.deepEqual(JSON.parse(await tools.get('remove_from_saved').execute({ artwork_id: '34' })), { updated: false, reason: 'Update in progress.' });
+  assert.deepEqual(calls, [['34', true], ['34', false]]);
 });
 
 test('every tool declares a JSON Schema so the agent never guesses an input', () => {

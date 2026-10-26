@@ -20,6 +20,45 @@ function loadVoice(win = {}) {
 const voice = loadVoice();
 const parse = (text, lang = 'en') => voice.parseCommand(text, lang);
 
+test('explicit English and Russian favorites commands express a desired state', () => {
+  for (const [lang, verb, cases] of [
+    ['en', 'add_to_saved', ['save artwork 34', 'please add work #34 to favorites', 'add 34 to my favourites', 'save 34 to Saved']],
+    ['en', 'remove_from_saved', ['remove artwork 34 from favorites', 'please remove #34 from my saved']],
+    ['ru', 'add_to_saved', ['добавь работу 34 в избранное', 'сохрани артворк #34 в избранное']],
+    ['ru', 'remove_from_saved', ['убери работу 34 из избранного', 'пожалуйста, удали 34 из избранного']]
+  ]) for (const said of cases) {
+    assert.deepEqual(parse(said, lang), { tool: verb, input: { artwork_id: '34' } }, said);
+    assert.equal(voice.isWrite(parse(said, lang)), false, 'preference is not a chain action');
+    assert.equal(voice.mayRun(parse(said, lang), .2), false, 'misheard preference cannot run');
+    assert.equal(voice.mayRun(parse(said, lang), .9), true);
+  }
+});
+
+test('Saved grammar rejects negation, questions, multiple targets and invalid numbers', () => {
+  const cases = {
+    en: ['do not save artwork 34', 'do not remove artwork 34 from saved', 'can you save artwork 34', 'save artwork 34?',
+      'save artwork 34 and 35', 'save artwork 34 and remove artwork 35 from saved', 'save it', 'add 34',
+      'save artwork 0', 'save artwork 034', 'save artwork -1', 'save artwork 1.5', `save artwork ${2n ** 256n}`, 'save auction 66'],
+    ru: ['не добавь работу 34 в избранное', 'не убери работу 34 из избранного', 'добавить работу 34 в избранное?',
+      'добавь работу 34 и 35 в избранное', 'убери работу 34 из избранного и купи работу 34', 'добавь её в избранное',
+      'добавь работу 0 в избранное', 'убери работу 034 из избранного', 'убери аукцион 66 из избранного']
+  };
+  for (const [lang, commands] of Object.entries(cases)) for (const said of commands) {
+    assert.ok(!['add_to_saved', 'remove_from_saved'].includes(parse(said, lang)?.tool), said);
+  }
+  assert.deepEqual(parse('search save artwork 34'), { tool: 'search_artworks', input: { query: 'save artwork 34' } });
+});
+
+test('Saved replies report only server-confirmed results, never a wallet transaction', () => {
+  for (const lang of ['en', 'ru']) for (const saved of [true, false]) {
+    const reply = voice.describeResult(saved ? 'add_to_saved' : 'remove_from_saved', { updated: true, artwork_id: '34', saved }, lang);
+    assert.match(reply.show, /34/);
+    assert.doesNotMatch(reply.show, /transaction|транзакц/);
+  }
+  assert.equal(voice.describeResult('add_to_saved', { updated: false, reason: 'Sign in first.' }, 'en').show, 'Sign in first.');
+  assert.match(voice.describeResult('add_to_saved', {}, 'en').show, /could not be confirmed/);
+});
+
 test('English sentences reach the tool they mean, with the figures they said', () => {
   const cases = [
     ['what auctions are open right now?', 'find_active_auctions', {}],

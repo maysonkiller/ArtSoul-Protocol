@@ -18,7 +18,7 @@ tools hand over those answers, and nothing else.
 
 ## The two rules the layer does not break
 
-**The agent never signs.** Reading is fully automatic. Every write goes as far as
+**The agent never signs.** Reading is fully automatic. Every chain write goes as far as
 a website can: it opens the person's wallet with the transaction, and the wallet
 asks them to approve it. That last click cannot be delegated from a page — no
 website can make a wallet approve anything — and it is where the boundary
@@ -98,10 +98,28 @@ economics.
 | `withdraw_pending_funds` | Withdraws proceeds, royalties and returned deposits to the same wallet | `ArtSoulContracts.getPendingWithdrawal`, `withdraw` |
 | `revoke_wallet_access` | Takes away the agent's wallet access in this browser | — |
 | `prepare_artwork_registration` | Validates details, then opens the publish page for the person to sign | — |
+| `add_to_saved` | Saves one explicitly identified artwork to the signed-in account's private list | Existing Saved store and `/api/saved` |
+| `remove_from_saved` | Removes that artwork from the same list, including an already absent item | Existing Saved store and `/api/saved` |
 
-No new API route was added. Every tool reads an endpoint the product already
-serves, which keeps the public egress pattern (server projection plus CDN cache)
-exactly as it was.
+No new API route was added. Public reads retain the existing projection/CDN path;
+Saved uses the existing private, no-store API with the expected wallet header.
+
+### Private Saved commands (B-21)
+
+On Home, Gallery, Artwork and Profile, `add_to_saved` and `remove_from_saved`
+reuse the singleton that paints every Saved button and refreshes the profile
+list. They require one canonical artwork ID from its page URL, not a title,
+auction ID or token ID. The active deployment comes from public configuration.
+Repeating a command sends the same desired boolean; it never toggles the item.
+Concurrent changes to the same artwork report busy. Success requires the server
+acknowledgement for the same account and sign-in context.
+
+These reversible preferences do not open a wallet or grant transaction access.
+A guest or expired session must sign in through the ordinary site controls and
+repeat the command; the assistant never resumes it automatically. Saved remains
+private and does not affect Trust, ranking, prices or email subscriptions.
+Other pages give an explicit availability response rather than navigating or
+creating another store. Administrative commands remain excluded.
 
 ## Answering completely, so the agent stops re-deriving
 
@@ -128,7 +146,7 @@ Speech is recognised and spoken by the browser. ArtSoul makes no request from
 that file and never receives audio; in Chrome the browser sends it to Google,
 and the person is told before the microphone first opens. The microphone opens
 only on a click, for one sentence, and closes when the tab is hidden. A wallet
-command the recogniser hears with low confidence is not run. Browsers without
+command or Saved change the recogniser hears with low confidence is not run. Browsers without
 speech recognition can use the text composer. The header launcher opens the
 panel without starting audio. Typed replies are silent. English and Russian
 remain the supported command grammars, not an unrestricted multilingual AI.
@@ -140,6 +158,11 @@ Examples, in English or Russian: "what auctions are open" / «какие аук�
 открыты», "bid 0.05 on artwork 31" / «ставка 0,05 на работу 31», "my activity" /
 «мой профиль», "stop using my wallet" / «стоп, не трогай кошелёк». Say "help" or
 «помощь» for the rest.
+
+Saved examples: "save artwork 34" / «добавь работу 34 в избранное» and
+"remove artwork 34 from favorites" / «убери работу 34 из избранного».
+Negations, questions, multiple IDs and incomplete Saved commands never choose
+an action by extracting a phrase. Search terms remain data.
 
 ## Cost to an ordinary visitor
 

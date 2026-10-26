@@ -9,7 +9,7 @@
  *
  * Two rules this file does not break:
  *
- * 1. The agent never signs. Reading is fully automatic. Every write goes as far
+ * 1. The agent never signs. Reading is fully automatic. Every chain write goes as far
  *    as a website can: it opens the person's wallet with the transaction, and
  *    the wallet asks them to approve it. That last click is theirs and cannot be
  *    delegated from here - a website cannot make a wallet approve anything, and
@@ -1508,6 +1508,28 @@
             }
         };
 
+        // Private, reversible preferences use the same store as every Saved
+        // button. They never authorize a wallet action or infer an artwork ID.
+        const savedTools = [['add_to_saved', true], ['remove_from_saved', false]].map(([name, saved]) => ({
+            name,
+            description: `${saved ? 'Add' : 'Remove'} one artwork ${saved ? 'to' : 'from'} the connected account's private Saved list. ` +
+                'Requires an existing signed-in session. Use the exact artwork number, not an auction or token ID. ' +
+                'Repeated requests preserve the requested state; no transaction, Trust change or email subscription.',
+            inputSchema: { type: 'object', additionalProperties: false,
+                properties: { artwork_id: { type: 'string', pattern: '^[1-9][0-9]{0,77}$', description: 'The exact artwork number from its page URL.' } },
+                required: ['artwork_id'] },
+            execute: async input => {
+                const id = input?.artwork_id;
+                if (!input || Object.keys(input).some(key => key !== 'artwork_id') || typeof id !== 'string' ||
+                    !/^[1-9][0-9]{0,77}$/.test(id) || BigInt(id) >= 2n ** 256n) {
+                    return JSON.stringify({ updated: false, reason: 'Use one artwork number from its page URL.' });
+                }
+                const update = deps.setSavedArtwork;
+                if (typeof update !== 'function') return JSON.stringify({ updated: false, reason: 'Open Gallery, Profile or an artwork to use Saved.' });
+                return JSON.stringify(await update(id, saved));
+            }
+        }));
+
         return [
             searchArtworks,
             findActiveAuctions,
@@ -1527,7 +1549,8 @@
             buyResaleListing,
             withdrawPendingFunds,
             revokeWalletAccess,
-            prepareArtworkRegistration
+            prepareArtworkRegistration,
+            ...savedTools
         ];
     }
 
@@ -1589,7 +1612,9 @@
                 return response.json();
             },
             openPath: (path) => window.location.assign(path),
-            readContracts: () => window.ArtSoulContracts || null
+            readContracts: () => window.ArtSoulContracts || null,
+            setSavedArtwork: (id, saved) => window.ArtSoulSaved?.setArtwork?.(id, saved) ||
+                { updated: false, reason: 'Open Gallery, Profile or an artwork to use Saved. If it is still loading, try again shortly.' }
         };
     }
 

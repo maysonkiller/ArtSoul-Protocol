@@ -1,6 +1,6 @@
 # Voice, agent tools and future network scope
 
-Status: first text/header slice under verification October 26; broader expansion planned.
+Status: first text/header slice released; explicit Saved slice under verification October 26; broader expansion planned.
 Source: founder requests of October 25, 2026. Related: B-08, B-09, B-12,
 B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
 
@@ -29,6 +29,10 @@ B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
    semantics for commands rather than a retry-sensitive toggle. Add navigation
    and clarification for missing artwork/query. Do not build a second list or
    a separate search corpus for the assistant.
+   The October 26 Saved candidate uses the shared store and existing signed-in
+   session, with strict IDs, explicit desired state and account/auth fences.
+   Global artwork/artist search reuse remains the next contained slice. See
+   `audits/B21_SAVED_COMMANDS_2026-10-26.md` for the actual verification boundary.
 3. Prepare publish drafts in the existing upload form. The person chooses the
    file, reviews title/description/price, completes authorization and signs the
    existing registration/auction transactions. Resume the existing durable
