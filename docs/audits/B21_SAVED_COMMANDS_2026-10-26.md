@@ -38,24 +38,31 @@ No new dependency or model/provider integration.
   store or background assistant import is added to creation/docs pages.
 - These are private reversible preferences. No implicit email subscription,
   public favorite count, unrestricted language understanding or admin action.
+- Hosted browser reproduction found the generic capture-phase click guard
+  disabled Send before native form submission on Gallery. Send now bypasses
+  that generic guard, retaining the command panel's own pending lock. Repeated
+  submit and close/reopen still cannot duplicate an in-flight request.
 
 ## Verification
 
-- Focused command/Saved/API/card group: 170 passed, zero failed/skipped.
-  Command: `node --test test/saved-commands.test.mjs test/saved-state.test.mjs
+- Final focused command/Saved/API/card/cache group: 175 passed, zero failed/skipped.
+  Command: `node --test test/cache-version-follows-content.test.cjs test/saved-commands.test.mjs test/saved-state.test.mjs
   test/saved-api.test.mjs test/voice-commands.test.cjs test/webmcp-tools.test.cjs
   test/webmcp-agent-actions.test.cjs test/command-panel.test.cjs
   test/artwork-card-controls.test.cjs`.
 - `npm run build` passes, including HTML-entry and Tailwind validation.
 - Browser: eight theme/width combinations (Classic/Future, 320/390/768/1440).
   Real command parser, tool adapter, singleton, card/detail controls and React
-  SavedList run against a synthetic private transport. Repeated add/remove,
+  SavedList, including the real global click guard, run against a synthetic private transport. Repeated add/remove,
   cross-surface removal, English/Russian commands and panel bounds pass. Additional
   held-response checks pass for account switching, collision and expired auth.
   The initial fixture lacked the existing artwork URL helper; adding that fixture
   dependency resolved its render error, with no application workaround.
-- Evidence: `output/audit/b21-saved-focused.log`, `b21-saved-build.log`,
-  `b21-saved-browser.log`; screenshots `output/playwright/b21-saved-*.png`.
+- Initial CI 40317130816 failed only the two cache-pin checks on each platform;
+  the page versions had changed but the expected hashes had not. The pins were
+  updated without weakening their assertions. Final candidate CI remains pending.
+- Evidence: `output/audit/b21-saved-focused-final.log`, `b21-saved-build-final.log`,
+  `b21-saved-browser-final.log`; screenshots `output/playwright/b21-saved-*.png`.
   No new physical-phone, microphone-service, native WebMCP client, wallet-signature
   or live-account mutation acceptance is claimed by these fixture checks.
 

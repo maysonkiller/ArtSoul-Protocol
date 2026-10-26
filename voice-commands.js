@@ -392,6 +392,9 @@
         const input = panel.querySelector('input');
         const mic = panel.querySelector('.artsoul-voice-mic');
         const send = panel.querySelector('.artsoul-voice-send');
+        // The global capture guard disables submit buttons before their native
+        // form action. This panel already owns the pending-command lock.
+        send.dataset.allowRapid = 'true';
         const close = panel.querySelector('.artsoul-voice-close');
 
         function label() {

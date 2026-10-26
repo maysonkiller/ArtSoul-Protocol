@@ -93,6 +93,7 @@ test('typed favorites commands show confirmed state while low-confidence speech 
 
 test('double submit and closing/reopening cannot replay an in-flight wallet request', async () => {
   let finish; const h = harness({execute: () => new Promise(resolve => {finish = resolve;})});
+  assert.equal(h.get('.artsoul-voice-send').dataset.allowRapid, 'true', 'native form submission bypasses the global capture guard');
   h.open(); h.submit('buy artwork 31'); h.submit('buy artwork 31');
   assert.equal(h.calls.length, 1); assert.equal(h.get('input').disabled, true);
   h.get('.artsoul-voice-close').fire('click'); h.open(); h.submit('buy artwork 31');
