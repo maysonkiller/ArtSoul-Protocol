@@ -3,7 +3,7 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B24 founder-priority continuation, based on `55cca68`, prepared locally:
+October 26 B24 founder-priority continuation, PR #375 RELEASED, merge `eecd340`:
 
 - Shared restricted-action explanations preserve creator/highest-bidder and
   resale guards, distinguish busy states, and keep Donate/Report drafts intact.
@@ -18,7 +18,14 @@ October 26 B24 founder-priority continuation, based on `55cca68`, prepared local
   proposed only in `../architecture/PLATFORM_MILESTONES_2026-10-26.md` (B25).
 - Preserve unrelated authority-policy files, `.codex/` and `output/`. No signer,
   database migration, mainnet, contract or economics changes.
-- Exactly next step: verify candidate CI and release B24; then resume B21
+- CI40366520845 passes: Linux2814/two skips, Windows2419/32 skips, 49 contracts
+  each; post-merge CI40367228430 also passes. Preview/apex eight routes/39 assets
+  and 12 browser explanation cases each pass. No real financial writes.
+- Real public-profile read exposed conditional grid activation after statistics
+  load (1168px ->576px identity width). A one-selector follow-up reserves the
+  same short-desktop columns before statistics; no placeholder data. Six DOM
+  experiments, 104 focused checks and build pass; CSS pins advance to56.
+- Exactly next step: finish the hydration follow-up CI/release, then resume B21
   Donate/Report preparation through existing review dialogs.
 
 October 26 future-contract design continuation MERGED in PR #374,
