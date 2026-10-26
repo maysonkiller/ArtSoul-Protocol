@@ -3,23 +3,34 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B22 workflow follow-up IN PROGRESS, started at `b9be502`:
+October 26 B22 workflow follow-up RELEASED: PR #365, candidate `25ae246`,
+production merge `cc87dcd` (started at `b9be502`):
 
-- Current tracked diff: header bell prepaint and early server eligibility; New/All
+- Released: header bell prepaint and early server eligibility; New/All
   personal inbox, top settings, selected recipient-only removal; public artwork
   staff controls removed; Donate contains History; clearer search scope; protected
-  Admin artwork catalog and revision-bound hide/restore under implementation.
+  Admin artwork catalog and revision-bound hide/restore. No contract/economic change.
 - No new checkout. Unrelated untracked authority-policy files, `.codex/`, `output/`
   remain untouched. Recovery: `output/audit/b22-inprogress-recovery.patch`.
-- Header185, notifications269, current UI74, artwork/Donate72 focused checks pass.
-  Eight inbox +64 header browser cases and two Donate widths pass. Final full CI,
-  catalog browser checks, guarded schema rollout and publication still pending.
-- Two additive schema files are local only: notification inbox dismissal and
-  staff artwork catalog/visibility guard. No real data was removed or hidden.
+- Header185, notifications269, UI74, artwork/Donate72, catalog77, final repaired102
+  and PostgreSQL journey12 groups pass (overlapping; do not sum). Eight inbox,
+  eight catalog, 64 header browser cases and two Donate widths pass. Final CI
+  40306352050: Linux 2,685 pass/two skips; Windows 2,298/31 skips; zero failures;
+  46 contracts each; builds/static pass. Broad local suite was stopped during
+  resource contention, not counted as a pass.
+- Both schema files applied after separate protected backups and rollback
+  rehearsals: inbox dismissal 10:27 UTC, catalog 10:30 UTC. Do not replay apply
+  journals. Source records, grants, roles and audit history were preserved.
+- Staged and apex eight-page/35-asset verification passes. Real-account HTTP
+  acceptance passes 56 steps on each, with test inbox state restored and all
+  three old test sessions logged out; no transactions or founder signatures.
+  Staged/apex browser32 each pass. Native phone/factor or real visibility mutation is
+  not inferred. No tracked implementation diff remains.
 - Evidence: `audits/B22_INBOX_AND_MODERATION_2026-10-26.md`.
-- Exactly next step: finish catalog UI/session verification, then run the final
-  candidate checks and guarded backup/schema/release workflow. Do not call this
-  Phase B complete or repeat the previous full audit.
+- Exactly next step: B-21 explicit Saved add/remove commands using the existing
+  state/API with account isolation. Official announcement source is deferred;
+  broader assistant, favorite totals and B18 final visuals remain separate.
+  Do not call Phase B complete or repeat the previous full audit.
 
 October 26 B21/header follow-up released: PR #363, implementation `e0f6560`,
 production merge/current code HEAD `3e71338` (started at `6f0fc49`):
