@@ -1,0 +1,24 @@
+.explained-action[aria-disabled="true"] { cursor: help; }
+dialog.action-explanation {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    box-sizing: border-box;
+    width: min(420px, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    padding: 1.25rem;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--c-border);
+    border-radius: 1rem;
+    background: var(--c-surface);
+    color: var(--c-text);
+    text-align: left;
+}
+dialog.action-explanation::backdrop { background: color-mix(in srgb, var(--c-bg) 78%, transparent); }
+.action-explanation-heading { display: flex; align-items: center; gap: .75rem; }
+.action-explanation-heading h2 { margin: 0; font-size: 1.125rem; line-height: 1.4; font-weight: 600; }
+.action-explanation-symbol { display: grid; place-items: center; flex: 0 0 1.75rem; height: 1.75rem; border: 1px solid var(--c-border); border-radius: 50%; font-style: italic; }
+.action-explanation p { margin: 1rem 0 1.25rem; font-size: 1rem; line-height: 1.55; overflow-wrap: anywhere; }
+.action-explanation > button { min-height: 44px; min-width: 88px; }

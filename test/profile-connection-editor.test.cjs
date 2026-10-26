@@ -9,7 +9,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 const source = fs.readFileSync('src/entries/profile.jsx', 'utf8').replace(/\r\n/g, '\n');
 const emailSource = fs.readFileSync('src/features/profile/email-connection.jsx', 'utf8');
 const editorStart = source.indexOf('{editMode ? (');
-const editorEnd = source.indexOf(') : (\n                                        <div>\n                                            <h1', editorStart);
+const editorEnd = source.indexOf(') : (\n                                        <div className="profile-display-details">\n                                            <h1', editorStart);
 
 test('the complete profile first render evaluates confirmation dependencies before every loading or guest return', async () => {
   const { transformWithOxc } = await import('vite');

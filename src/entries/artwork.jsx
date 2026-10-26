@@ -10,6 +10,7 @@ import { artworkShareIntent } from '../features/artwork/artwork-sharing.js';
 
 import { getOwnerResaleEligibility, validateResalePrice } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
+import { ExplainedAction } from '../ui/explained-action.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
@@ -2843,6 +2844,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const winnerAddress = currentHighestBidder || artwork.auction_winner_address;
             const creatorAddress = artwork.creator_id || artwork.creator;
             const bidIdentityBlocked = walletRenderState.settled && (isSameAddress(connectedWalletAddress, creatorAddress) || isSameAddress(connectedWalletAddress, currentHighestBidder));
+            const bidRestriction = !bidIdentityBlocked ? '' : isSameAddress(connectedWalletAddress, creatorAddress)
+                ? 'This connected wallet created the artwork. Creators cannot bid on their own auctions. Other collectors can place bids; no wallet request will be sent.'
+                : 'Your connected wallet already has the highest bid. You can bid again if another collector outbids you. No additional deposit is needed while you are leading.';
             const ownerAddress = artwork.current_owner_address;
             const connectedWalletOwnsArtwork = walletRenderState.settled &&
                 isSameAddress(connectedWalletAddress, ownerAddress);
@@ -3006,15 +3010,18 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             >
                                                 Cancel
                                             </button>
-                                            <button
+                                            <ExplainedAction
                                                 type="submit"
                                                 className="btn-main"
-                                                disabled={reportBusy || !artworkReport.details.trim() || !artworkReport.goodFaithConfirmed}
+                                                disabled={reportBusy}
+                                                explanationTitle="Complete your report"
+                                                contextKey={connectedWalletAddress}
+                                                reason={!artworkReport.details.trim() ? 'Describe the concern in the report details so the moderation team can review it.' : !artworkReport.goodFaithConfirmed ? 'Confirm that this report is made in good faith before submitting it for review.' : ''}
                                                 data-allow-rapid="true"
                                                 aria-busy={reportBusy}
                                             >
                                                 {reportBusy ? 'Submitting...' : 'Submit report'}
-                                            </button>
+                                            </ExplainedAction>
                                         </div>
                                     </form>
                                 )}
@@ -3346,15 +3353,19 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </div>
                                             <div className="artwork-page-signal-action">
                                                 <strong>{socialSignals.wouldBuy || 0}</strong>
-                                                <button onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.would_buy}>
+                                                <ExplainedAction onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'}
+                                                    contextKey={connectedWalletAddress} explanationTitle="Your interest is recorded"
+                                                    reason={interactionState.would_buy ? 'Your Would Buy signal is already recorded for this artwork. It expresses interest, not a bid or a purchase. It cannot be submitted again from this wallet.' : ''}>
                                                     {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
-                                                </button>
+                                                </ExplainedAction>
                                             </div>
                                             <div className="artwork-page-signal-action">
                                                 <strong>{socialSignals.watching || 0}</strong>
-                                                <button onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'} disabled={interactionState.watching}>
+                                                <ExplainedAction onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'}
+                                                    contextKey={connectedWalletAddress} explanationTitle="Your interest is recorded"
+                                                    reason={interactionState.watching ? 'Your Watching signal is already recorded for this artwork. It cannot be submitted again from this wallet. Use Favorites to add or remove the artwork from your private list.' : ''}>
                                                     {interactionState.watching ? 'Watching Saved' : 'Watching'}
-                                                </button>
+                                                </ExplainedAction>
                                             </div>
                                         </div>
                                     <div className="artwork-community-actions" aria-label="Artwork actions">
@@ -3682,16 +3693,19 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                         ? `Pay now: ${formatWeiToEth(enteredBidDepositWei, 18)} ETH deposit plus gas on Base Sepolia. The deposit is max(10% of your bid, 0.01 ETH), rounded up to wei. Fully refundable if you are outbid.`
                                                         : 'Your deposit is 10% of the bid or 0.01 ETH minimum. It is fully refundable if you are outbid.'}
                                                 </div>
-                                                <button
+                                                <ExplainedAction
                                                     onClick={handlePlaceBid}
                                                     className="btn-main w-full artwork-page-primary-action"
-                                                    disabled={isTransactionActionPending('bid') || bidIdentityBlocked}
+                                                    disabled={isTransactionActionPending('bid')}
+                                                    reason={bidRestriction}
+                                                    contextKey={connectedWalletAddress}
+                                                    explanationTitle={isSameAddress(connectedWalletAddress, creatorAddress) ? 'You are the creator' : 'You are already leading'}
                                                     aria-busy={isTransactionActionPending('bid')}
                                                 >
                                                     {isTransactionActionPending('bid')
                                                         ? <TransactionProcessingLabel />
                                                         : bidIdentityBlocked ? (isSameAddress(connectedWalletAddress, creatorAddress) ? 'Creators cannot bid on their own artwork' : 'You are already the highest bidder') : 'Review Bid and Deposit'}
-                                                </button>
+                                                </ExplainedAction>
                                             </div>
                                         )}
 
@@ -3818,11 +3832,16 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 <p>
                                                     List this minted NFT at or above its canonical floor of {resaleFloorPrice || 'pending'} ETH.
                                                 </p>
-                                                <button
+                                                <ExplainedAction
                                                     type="button"
                                                     onClick={openResaleListingModal}
                                                     className="btn-main w-full artwork-page-primary-action"
-                                                    disabled={!resaleEligibility.canList || isTransactionActionPending('resale-list')}
+                                                    disabled={isTransactionActionPending('resale-list')}
+                                                    reason={resaleEligibility.canList ? '' : resaleEligibility.reason === 'wrong_chain'
+                                                        ? 'This NFT is on Base Sepolia. Switch your connected wallet to Base Sepolia before listing it. No transaction has been requested.'
+                                                        : 'The confirmed floor price is still loading. Listing will become available when it is known, so you can review the correct minimum price.'}
+                                                    contextKey={connectedWalletAddress}
+                                                    explanationTitle={resaleEligibility.reason === 'wrong_chain' ? 'Switch network to continue' : 'Waiting for the floor price'}
                                                     aria-busy={isTransactionActionPending('resale-list')}
                                                 >
                                                     {isTransactionActionPending('resale-list')
@@ -3832,7 +3851,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                             : resaleEligibility.reason === 'floor_unavailable'
                                                                 ? 'Floor Price Loading'
                                                                 : 'List NFT'}
-                                                </button>
+                                                </ExplainedAction>
                                             </div>
                                         )}
 
@@ -3840,14 +3859,18 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             <div className="artwork-auction-next-step mt-4">
                                                 <p>This NFT is listed for {artwork.sale_price} ETH.</p>
                                                 <div className="flex flex-wrap gap-2 mt-3">
-                                                    {connectedWalletOwnsArtwork && <button type="button" className="btn-main" onClick={() => openResaleListingModal('edit')}
-                                                        disabled={walletRenderState.chainId !== 84532 || isTransactionActionPending('resale-list')}>
+                                                    {connectedWalletOwnsArtwork && <ExplainedAction type="button" className="btn-main" onClick={() => openResaleListingModal('edit')}
+                                                        reason={walletRenderState.chainId !== 84532 ? 'Switch your connected wallet to Base Sepolia to change this listing. No transaction has been requested.' : ''}
+                                                        explanationTitle="Switch network to continue" contextKey={connectedWalletAddress}
+                                                        disabled={isTransactionActionPending('resale-list')}>
                                                         Change price
-                                                    </button>}
-                                                    {connectedWalletIsSeller && <button type="button" className="btn-secondary" onClick={() => openResaleListingModal('cancel')}
-                                                        disabled={walletRenderState.chainId !== 84532 || isTransactionActionPending('resale-list')}>
+                                                    </ExplainedAction>}
+                                                    {connectedWalletIsSeller && <ExplainedAction type="button" className="btn-secondary" onClick={() => openResaleListingModal('cancel')}
+                                                        reason={walletRenderState.chainId !== 84532 ? 'Switch your connected wallet to Base Sepolia to remove this listing. No transaction has been requested.' : ''}
+                                                        explanationTitle="Switch network to continue" contextKey={connectedWalletAddress}
+                                                        disabled={isTransactionActionPending('resale-list')}>
                                                         Remove from sale
-                                                    </button>}
+                                                    </ExplainedAction>}
                                                 </div>
                                                 {walletRenderState.chainId !== 84532 && <p>Switch to Base Sepolia to manage this listing.</p>}
                                             </div>

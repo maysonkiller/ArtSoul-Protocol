@@ -6,6 +6,7 @@ import {
     MAX_DRAFT_ITEMS, MECHANISMS, parseDraft, reviewConfig, saveDraft, scheduleTimestamp, UNUSED_SUPPLY
 } from '../features/collections/launch-config.js';
 import '../features/collections/collections.css';
+import { ExplainedAction } from '../ui/explained-action.jsx';
 
 const { useEffect, useRef, useState } = React;
 const STEPS = ['Collection', 'Phases', 'Review'];
@@ -222,7 +223,8 @@ function Builder() {
                         <p className="launch-help">Imported utility, crafting, creator earnings and support fields are preserved in your export. This first draft editor does not activate them or verify their enforcement.</p>
                         <dl className="launch-definition"><div><dt>Creator earnings proposal</dt><dd>{draft.creatorEarnings.bps} bps</dd></div><div><dt>Support proposal</dt><dd>{draft.support.bps} bps · {draft.support.destination}</dd></div><div><dt>Crafting proposal</dt><dd>{draft.crafting.enabled ? `${draft.crafting.inputCount} inputs; ${draft.crafting.outputMaxSupply} outputs maximum` : 'Not enabled'}</dd></div></dl>
                     </div></details>
-                    <div className="launch-footer"><h3>Publishing is unavailable</h3>{review.deploymentBlockers.map(item => <p className="launch-finding" key={item}>{item}</p>)}<button type="button" disabled>Publish unavailable</button></div>
+                    <div className="launch-footer"><h3>Publishing is unavailable</h3>{review.deploymentBlockers.map(item => <p className="launch-finding" key={item}>{item}</p>)}<ExplainedAction explanationTitle="This collection is a draft"
+                        reason="Collection publishing is not enabled yet. You can review and save this draft. A supported deployment and its launch settings must be verified before a collection can accept payments.">Publish unavailable</ExplainedAction></div>
                 </>}
                 <div className="launch-footer launch-row"><button type="button" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>{step < STEPS.length - 1 ? <button type="button" className="launch-primary" onClick={() => setStep(step + 1)}>Continue to {STEPS[step + 1].toLowerCase()}</button> : <button type="button" className="launch-primary" onClick={save}>Save reviewed draft</button>}</div>
             </section>

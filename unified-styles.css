@@ -5568,6 +5568,37 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .profile-gallery-panel > .flex:first-child { gap: 1rem; align-items: start; }
 .profile-gallery-panel > .flex:first-child > span { flex-shrink: 0; }
 
+/* Short laptop viewports keep the profile summary beside its statistics,
+   leaving room for the first artwork row without shrinking cards or controls. */
+@media (min-width: 1024px) and (max-height: 850px) {
+    .profile-page-main { padding-top: 0.75rem !important; }
+    .profile-hero:not(.is-editing) { padding: 0.75rem !important; margin-bottom: 0.75rem !important; }
+    .profile-display-details:has(> .profile-stat-grid) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: 1rem;
+        align-items: start;
+    }
+    .profile-display-details > :not(.profile-stat-grid) { grid-column: 1; min-width: 0; }
+    .profile-display-details > .profile-stat-grid {
+        grid-column: 2;
+        grid-row: 1 / span 4;
+        margin-top: 0 !important;
+        gap: 0.5rem !important;
+    }
+    .profile-display-details .profile-stat-card { padding: 0.625rem !important; }
+    .profile-display-details .profile-social-action-row { flex-wrap: nowrap; gap: 0.5rem; }
+    .profile-display-details .profile-social-links { flex: 1 1 0; width: auto; min-width: 0; gap: 0.5rem !important; }
+    .profile-display-details .profile-social-links .truncate { white-space: normal; overflow-wrap: anywhere; }
+    .profile-display-details .profile-inline-edit-action { flex: 0 0 auto; }
+    .profile-display-details .profile-inline-edit-action .btn-main { min-height: 44px; padding: 0.5rem 0.875rem; }
+    .profile-sections-nav { padding: 0.25rem 1rem; }
+    .profile-gallery-panel { padding: 0.75rem 1rem !important; }
+    .profile-gallery-panel > .flex:first-child { margin-bottom: 0.75rem !important; }
+    .profile-gallery-heading { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.75rem; row-gap: 0.25rem; }
+    .profile-gallery-description { margin: 0; }
+}
+
 .profile-layout { min-width: 0; margin-block: 1rem; }
 .notification-inbox { min-width: 0; color: var(--c-text); }
 .notification-inbox > .notification-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 0.625rem; min-height: 48px; padding: 0.5rem 0.75rem; border: 1px solid var(--c-border-soft); border-radius: 0.875rem; background: var(--c-surface); color: var(--c-text); font: inherit; font-weight: 600; line-height: 1.25; text-align: start; cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
