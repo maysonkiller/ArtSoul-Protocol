@@ -99,8 +99,8 @@ test('normal artwork re-auctions have no attempt cap and use one createAuction t
     assert.doesNotMatch(createSource, /attempt|retry.?count|max.?auction|limit/i);
 });
 
-test('staff controls remain gated and live bid polling remains intact', () => {
-    assert.match(artworkPage, /moderationAccess\?\.canModerate && \(/);
+test('public artwork has no staff controls and live bid polling remains intact', () => {
+    assert.doesNotMatch(artworkPage, /moderationAccess|Moderation tools|\/api\/moderation\/(?:access|artwork-visibility)/);
     assert.doesNotMatch(artworkPage, /Verify Staff Access/);
     assert.match(artworkPage, /refreshLiveBidActivity/);
     assert.match(artworkPage, /data-testid="live-auction-bid-feed"/);

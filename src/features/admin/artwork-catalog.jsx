@@ -79,10 +79,12 @@ export function AdminArtworkCatalog({ api, isSessionCurrent, onAccessError, onRe
             })});
             if (!isCurrent(token)) return;
             setDecision(null);
-            await load(cursorRef.current);
+            const refreshed = await load(cursorRef.current);
             if (!mounted.current || !isSessionCurrent()) return;
             onChanged();
-            setMessage('Visibility decision recorded.');
+            if (!refreshed) { setPage({artworks:[],next:null}); setLoaded(false); }
+            setMessage(refreshed ? 'Visibility decision recorded.'
+                : 'Decision recorded. Refresh artworks before making another decision.');
         } catch(error) {
             if (!isCurrent(token)) return;
             if (error.status === 409) {

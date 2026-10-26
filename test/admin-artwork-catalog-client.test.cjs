@@ -56,3 +56,18 @@ test('conflicting decisions close their dialog and refresh without replaying the
   assert.equal(h.decision(),undefined);assert.equal(h.calls.length,3);assert.equal(h.changed(),0);
   assert.ok(h.nodes().some(node=>node.props?.role==='status'&&text(node)==='This artwork changed.'));
 });
+
+test('a recorded decision with a failed refresh clears stale cards and asks for a read-only retry',async()=>{
+  let reads=0;
+  const h=await harness(async path=>{
+    if(path==='artwork-visibility')return {success:true};
+    if(++reads>1)throw Object.assign(new Error('Temporary catalog failure.'),{status:500});
+    return {data:{artworks:[row()],next:null}};
+  });
+  await tick();h.update();h.button('Hide artwork').props.onClick();h.update();
+  await h.decision().props.onSubmit('Reviewed evidence.');h.update();
+  assert.equal(h.decision(),undefined);assert.equal(h.nodes().some(node=>node.type==='article'),false);
+  assert.equal(h.changed(),1);assert.equal(h.calls.filter(call=>call.path==='artwork-visibility').length,1);
+  assert.ok(h.nodes().some(node=>node.props?.role==='status'&&text(node)==='Decision recorded. Refresh artworks before making another decision.'));
+  assert.equal(h.button('Refresh artworks').props.disabled,false);
+});
