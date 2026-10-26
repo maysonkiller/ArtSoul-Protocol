@@ -3,6 +3,20 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 B22 profile polish and social-preview follow-up prepared
+(started at `a7abe68`):
+
+- Compact labeled name/bio fields, native hints, bounded desktop form width,
+  calmer Future editor border and compact public name/bio. Exact legacy
+  social-image redirect to the approved v2 PNG; artwork previews unchanged.
+- Local125 tests, build and eight before/after browser cases pass. Evidence:
+  `audits/B22_PROFILE_POLISH_2026-10-26.md`. Local interface-design skill created
+  and validated. No data/schema/auth/economics changes.
+- Tracked diff is this follow-up plus shared CSS pins. Preserve unrelated
+  untracked authority-policy files, `.codex/` and `output/`.
+- Exactly next action: candidate CI/preview, then release and verify the old
+  image URL redirect and exact deployed assets. B21 remains pending afterward.
+
 October 26 B22 history layout follow-up RELEASED in PR #369, candidate
 `454fa70`, production merge `581a736` (started at `890af55`):
 
