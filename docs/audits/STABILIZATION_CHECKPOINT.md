@@ -3,6 +3,18 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 homepage banner follow-up, local candidate started at `bca32be`:
+
+- Live before-change 32 metadata/12 image/three HTTP-www alias checks already
+  return v2; the founder's Telegram screenshot still caches the root preview.
+- Removed obsolete image source; Vite derives its compatibility filename from
+  the approved v2. New build check reproduced stale bytes, then passed. Local
+  domain/sharing13 and full build pass. No logo or artwork media changes.
+- Evidence/interpretation: `audits/B22_PROFILE_POLISH_2026-10-26.md`, homepage
+  follow-up. Preserve unrelated authority-policy files, `.codex/`, `output/`.
+- Exactly next step: publish this bounded correction after CI/preview checks,
+  verify apex, then resume B21 Donate/Report. Telegram cache refresh unclaimed.
+
 October 26 video search follow-up RELEASED in PR #371, candidate `16513ab`,
 production merge `fb05b45` (started at `03f7134`):
 

@@ -84,3 +84,32 @@ Scope: October 26 owner screenshot and request; canon section 16 (presentation).
   `docs/private/profile-social-apex-1793022651639.json`,
   `output/audit/profile-polish-public-{preview,apex}.log` and
   `output/audit/profile-polish-ci-final.log`.
+
+## Homepage banner follow-up
+
+The founder's later Telegram screenshot identifies the exact stale URL `/`;
+`/artwork/32` already shows the approved glass-sculpture image. Before this
+patch, 32 live page requests (eight paths, browser/Telegram/X/Facebook agents),
+12 image requests and three HTTP/www aliases all returned the approved v2
+metadata or matching PNG bytes. Evidence:
+`output/audit/social-banner-apex-1793025555032.json`.
+
+One obsolete artifact remained: Vite copied the old JPEG bytes from
+`artsoul-social-preview.png` behind the hosting redirect. The source is now
+removed; the build derives that compatibility filename from the single v2
+source, so static hosting also returns the approved picture. The exact Vercel
+redirect remains. Logos and artwork-specific media are unchanged. Scope is
+Bible section 16 display/metadata only, with no architecture amendment.
+
+The new build assertion failed on the previous dist with `Obsolete social
+preview in dist: artsoul-social-preview.png`, then passed after the change.
+Local domain/artwork-sharing tests: 13 passed; full build: 11 routes and 173
+Tailwind utilities passed. Both output image files match the approved SHA-256
+above. Logs: `output/audit/social-banner-{regression-before,tests,build}.log`.
+
+Interpretation: removing the old banner means removing its bytes while keeping
+old URLs compatible. It does not mean replacing actual artwork media. Telegram
+can retain previously generated page previews independently of our HTTP
+responses. No Telegram message or cache-refresh bot action has been performed;
+refresh of the user's stored preview is not claimed. Release verification is
+pending at this checkpoint.
