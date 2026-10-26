@@ -547,6 +547,15 @@ test('later resale receipt wins within the same block, then expires', () => {
   assert.equal(db.applyConfirmedAuctionUpdate(resaleRow()).sale_price, '0.1');
 });
 
+test('same-block indexed listing state wins over an earlier local receipt', () => {
+  for (const active of [false, true]) {
+    const {db} = client();
+    db.recordConfirmedResale(resaleReceipt({active,price:active?'0.2':'0',transaction_index:1}));
+    const indexed = resaleRow({resale_updated_block:100,status:active?'sold':'for_sale',sale_price:active?'0':'2'});
+    assert.deepEqual(db.applyConfirmedAuctionUpdate(indexed), indexed, 'later same-block chain state cannot be replaced');
+  }
+});
+
 test('a listing receipt never resurrects a hidden artwork', async () => {
   const {db} = client({reply: () => ({data:[],suppressed_artwork_ids:['v41:84532:28']})});
   db.recordConfirmedResale(resaleReceipt({active:true,price:'0.1'}));

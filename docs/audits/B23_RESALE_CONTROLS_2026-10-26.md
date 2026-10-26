@@ -20,7 +20,10 @@ executable bytecode and canonical block-hash calls. No user listing changed.
   work; integer wei comparison rejects even one wei below floor. Failed wallet
   requests retain the editor; success requires a confirmed receipt.
 - A bounded two-minute receipt bridge updates detail/profile/gallery/homepage
-  while indexing catches up. Later indexed blocks win. It cannot alter owner,
+  while indexing catches up. Same/later indexed blocks win, since the public
+  projection does not expose within-block transaction order. Review reproduced
+  an earlier cancel overriding a later same-block relist; regression added.
+  It cannot alter owner,
   floor, visibility or provenance. Longer indexer outages remain outages.
 - Worker reads up to eight active/inactive listing tuples per poll at the
   indexed confirmed block hash using EIP-1898 `requireCanonical`. Conditional

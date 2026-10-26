@@ -262,9 +262,9 @@ function applyConfirmedResaleUpdate(row) {
         item.artwork_id === String(row.artwork_id || row.blockchain_id) && item.token_id === String(row.token_id));
     const authority = update?.active ? row.current_owner_address : (row.resale_seller || row.current_owner_address);
     if (!update || !row.minted || String(authority).toLowerCase() !== update.seller.toLowerCase() ||
-        Number(row.resale_updated_block || 0) > update.block_number) return row;
-    if (Number(row.resale_updated_block || 0) === update.block_number &&
-        (row.status === 'for_sale') === update.active && (!update.active || String(row.sale_price) === update.price)) return row;
+        Number(row.resale_updated_block || 0) >= update.block_number) return row;
+    // The API does not expose transaction order within a block. An indexed
+    // observation at this block wins, including a later relist or cancellation.
     // Never change ownership, floor, metadata, moderation or provenance from browser storage.
     return { ...row, status: update.active ? 'for_sale' : 'sold', sale_price: update.active ? update.price : '0', resale_seller: update.seller, pending_resale_sync: true };
 }
