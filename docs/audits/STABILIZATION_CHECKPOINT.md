@@ -3,7 +3,8 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 future-contract design continuation (started at `b4ca252`):
+October 26 future-contract design continuation MERGED in PR #374,
+candidate `afcfe40`, merge `a914282` (started at `b4ca252`):
 
 - Founder requests extensible replacement contracts, complete collection/auction/
   resale paths and future payments from other networks. C-06 research is in
@@ -27,6 +28,10 @@ October 26 future-contract design continuation (started at `b4ca252`):
   links with zero newly missing targets. Two pre-existing B-05/B-06 references
   to absent `testnet/B06_SNAPSHOT_A_REHEARSAL_2026-09-14.md` remain flagged;
   missing historical evidence was not reconstructed or claimed to exist.
+- Exact candidate CI40358199782 passes: Linux2808/two skips, Windows2413/32 skips,
+  49 contract tests each; zero failures, both builds and static checks pass.
+  The merge tree equals the tested candidate. No new runtime/contract capability
+  is claimed; these existing contract tests do not prove the proposed replacement.
 - Exactly next step: resume B21 Donate/Report preparation through existing
   dialogs with visible review/submission; carry C1 decisions into later sign-off.
 
