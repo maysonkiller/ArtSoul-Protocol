@@ -1,6 +1,6 @@
 # B23: Minted NFT sale management
 
-Status: implemented and tested locally; release verification pending.
+Status: released in PR #373; candidate `171ac62`, production merge `960794b`.
 Workspace: `C:\Projects\ArtSoul`, `codex/takeover-audit`, started at `56536ec`.
 
 ## Reproduction and cause
@@ -61,8 +61,37 @@ this artwork's canonical floor, not the cheapest listing in a collection.
 Preview menus retain Donate/Report/transaction; owner controls live on detail.
 An explicit cancellation event for future contracts is a proposal only.
 
-## Release gate
+## Release verification
 
-Full CI and exact preview, then bounded worker rollout with source backups,
-health/canonical listing checks, and exact website deployment verification.
-Never cancel an existing user's sale as a release probe.
+- Exact-candidate CI40350911939 passed: Linux 2,808 unit checks / two skips,
+  Windows 2,413 / 32 skips, zero failures; 49 contract tests on each platform.
+  Post-merge CI40352342602 also passed. Earlier stale local assertions are
+  superseded by these clean exact-candidate runs, not silently counted as green.
+- Preview and apex: eight HTML routes, 37 asset hashes, protected guest API
+  denial and the production alias binding to `960794b` verified. Four owner
+  flows each on the deployed preview/apex pass in Classic/Future at 390/1440px,
+  with synthetic wallet/API responses, zero page errors and no real writes.
+- Worker released before the website, with a journal and previous-source
+  backup. Health remained healthy across advancing confirmed boundaries;
+  unresolved errors and resale reconciliation errors are zero/null. Unrelated
+  sources, environment files, process configuration and inactive legacy worker
+  remain unchanged. No database migration, reset or manual listing edit.
+- Both independent Base Sepolia RPCs agreed with all four indexed listing
+  tuples at confirmed block 50537988 and the pinned contract code hash. Two
+  active sales remain. Original event transaction/block/log fields are intact.
+- Live public-data browser checks on artwork 18 / token 3 and artwork 32 /
+  token 5 pass for a guest and a synthetic owner identity. Owner dialogs show
+  the actual listing prices (0.05 / 0.1 ETH) and canonical floors (0.01 /
+  0.0001 ETH); guests do not see edit/cancel controls. Editors were closed
+  without submission. The initial probe used the wrong expected buyer label
+  (`Buy NFT`); correcting it to the actual `Buy Now` label passed unchanged code.
+- No user's listing was cancelled/repriced, no real wallet was signed, and no
+  native phone acceptance is claimed. Signed cancellation/relisting is covered
+  on the disposable contract chain; a future owner-run testnet journey remains
+  useful acceptance evidence, not a completed action in this release.
+
+Private rollout/evidence: `docs/private/resale-worker-stage-20261026/`,
+`output/audit/resale-worker-rollout.json`, `resale-worker-after.json`,
+`resale-*-browser.log`, `b23-resale-*.json`. Remote source backup and journal:
+`/root/artsoul-resale-20261026/` on the existing indexer host. Do not replay apply.
+Next Phase B slice: B21 Donate/Report preparation through existing review dialogs.

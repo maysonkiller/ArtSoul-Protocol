@@ -3,18 +3,28 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B23 resale controls IN PROGRESS (started at `56536ec`):
+October 26 B23 resale controls RELEASED in PR #373, candidate `171ac62`,
+production merge `960794b` (started at `56536ec`):
 
 - Owner price/floor editor and seller cancellation, exact wei validation,
   native dialog, all-surface receipt bridge and bounded confirmed-state worker
   reconciliation implemented. Canon architecture unchanged.
 - Local contract22, adapter20, UI/API106 and indexer84/leadership21 groups pass
-  (overlapping counts); build and four theme/viewport flows pass. Details in
-  `audits/B23_RESALE_CONTROLS_2026-10-26.md`. Full unit run is in progress.
-- No production deployment or actual NFT listing mutation yet. Preserve
-  unrelated authority-policy untracked files, `.codex/`, `output/`.
-- Exactly next step: finish full checks and preview, then deploy the reviewed
-  worker with rollback backup before releasing owner controls.
+  (overlapping counts); same-block receipt regression56 and build pass. Exact
+  CI40350911939: Linux2808/two skips, Windows2413/32 skips, 49 contracts each.
+  Post-merge CI40352342602 passes. Full details/limits in
+  `audits/B23_RESALE_CONTROLS_2026-10-26.md`.
+- Indexer rollout completed with source backup/journal before website release.
+  Healthy advancing boundaries, zero unresolved errors; two RPCs agree with
+  four listing tuples at block50537988. Env/provenance preserved. Do not replay
+  the rollout script. No real NFT listing was mutated or wallet signed.
+- Preview/apex eight-route/37-asset/guest-denial checks and alias binding pass;
+  four owner flows per deployment pass with synthetic wallet/API. Live public
+  data for artwork18/32 passes guest/owner-dialog checks without submission.
+  Native phone or signed Base Sepolia acceptance is not claimed.
+- Preserve unrelated authority-policy untracked files, `.codex/`, `output/`.
+- Exactly next step: resume B21 Donate/Report preparation through existing
+  dialogs with visible review/submission. Phase B is still in progress.
 
 October 26 homepage banner follow-up RELEASED: PR #372, candidate `d4bc3f6`,
 production merge `5ba1901` (started at `bca32be`):
