@@ -98,7 +98,44 @@ function UpcomingReminders({state, model, busy}) {
   </section>;
 }
 
-export function AuctionNotifications({state, model}) {
+function AuctionMessage({item, state, model}) {
+  return <li className={item.read ? 'notification-read' : 'notification-unread'}>
+    <details className="notification-message" onToggle={event => {if (event.currentTarget.open && !item.read) model?.openMessage(item.id);}}>
+    <summary><strong>{notificationHeading(item.type)}</strong><span className="notification-read-label">{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Read' : 'Unread'}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
+    {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id}{item.auction_id && ` · Auction #${item.auction_id}`}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
+    <p className="notification-help">Base Sepolia{item.token_id != null && ` · NFT #${item.token_id}`}</p>
+    <p>{item.message}</p>
+    </details>
+  </li>;
+}
+
+function ReportMessage({item, state, onOpen}) {
+  return <li className={item.read===false?'notification-unread':'notification-read'}>
+    <details className="notification-message" onToggle={event=>{if(event.currentTarget.open && item.read===false)onOpen?.(item.id);}}>
+    <summary><strong>Report and artwork update</strong>{typeof item.read==='boolean' && <span className="notification-read-label">{state.pendingId===item.id?'Saving…':item.read?'Read':'Unread'}</span>}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
+    <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>
+      Artwork #{item.artwork_id} · {({'84532': 'Base Sepolia', '11155111': 'Ethereum Sepolia (legacy)', '8453': 'Base'})[item.chain_id] || `Chain ${item.chain_id}`}
+    </a>
+    <p>{item.message}</p>
+    </details>
+  </li>;
+}
+
+export function PersonalHistory({activity, reports, model, onReportOpen}) {
+  const items = [...activity.items.map(item => ({item, source: 'activity'})),
+    ...reports.items.map(item => ({item, source: 'report'}))];
+  items.sort((a, b) => (Date.parse(b.item.created_at) || 0) - (Date.parse(a.item.created_at) || 0)
+    || `${a.source}:${a.item.id}`.localeCompare(`${b.source}:${b.item.id}`));
+  if (!items.length) return null;
+  return <section className="notification-category" aria-label="Latest personal updates">
+    <h3>Latest updates</h3>
+    <ul className="notification-items">{items.map(({item, source}) => source === 'activity'
+      ? <AuctionMessage key={`activity:${item.id}`} item={item} state={activity} model={model} />
+      : <ReportMessage key={`report:${item.id}`} item={item} state={reports} onOpen={onReportOpen} />)}</ul>
+  </section>;
+}
+
+export function AuctionNotifications({state, model, history = true}) {
   if (state.status === 'disabled') return null;
   const busy = state.preferencesPending || state.pendingIds.length > 0;
   const hasReminders = typeof state.preferences?.reminders === 'boolean' && Array.isArray(state.reminders);
@@ -126,14 +163,7 @@ export function AuctionNotifications({state, model}) {
       {state.notice && <p>{state.notice}</p>}
       {state.error && <p>{state.error}</p>}
     </div>
-    {state.items.length > 0 && <ul className="notification-items">{state.items.map(item => <li key={item.id} className={item.read ? 'notification-read' : 'notification-unread'}>
-      <details className="notification-message" onToggle={event => {if (event.currentTarget.open && !item.read) model?.openMessage(item.id);}}>
-      <summary><strong>{notificationHeading(item.type)}</strong><span className="notification-read-label">{state.pendingIds.includes(item.id) ? 'Saving…' : item.read ? 'Read' : 'Unread'}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
-      {item.artworkAvailable ? <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>Artwork #{item.artwork_id}{item.auction_id && ` · Auction #${item.auction_id}`}</a> : <span>Artwork #{item.artwork_id} · Currently unavailable</span>}
-      <p className="notification-help">Base Sepolia{item.token_id != null && ` · NFT #${item.token_id}`}</p>
-      <p>{item.message}</p>
-      </details>
-    </li>)}</ul>}
+    {history && state.items.length > 0 && <ul className="notification-items">{state.items.map(item => <AuctionMessage key={item.id} item={item} state={state} model={model} />)}</ul>}
     {['error', 'unavailable'].includes(state.status) && <button type="button" className="btn-secondary" onClick={() => model?.load(state.retryCursor)}>Retry auction updates</button>}
     {state.status === 'ready' && state.nextCursor && <button type="button" className="btn-secondary" disabled={busy} onClick={() => model?.load(state.nextCursor)}>Load older auction updates</button>}
   </section></>;
@@ -324,7 +354,9 @@ export function NotificationInbox({ wallet, compact = false, header = false }) {
           </>}
         </section>}
         <div id="personal-notifications" hidden={activeGroup !== 'personal'}>
-        <AuctionNotifications state={auctionState} model={auctionActions} />
+        <PersonalHistory activity={auctionState} reports={state} model={auctionActions}
+          onReportOpen={id=>readQueue.current?.add(`outcome:${id}`,()=>mutate(()=>inbox.current?.markRead(id,true)))} />
+        <AuctionNotifications state={auctionState} model={auctionActions} history={false} />
         <section className="notification-category" aria-labelledby="moderation-notifications-heading">
         <h3 id="moderation-notifications-heading">Your reports and artwork updates</h3>
         <p className="notification-help">Updates about your reports, artworks and donation messages.</p>
@@ -336,17 +368,6 @@ export function NotificationInbox({ wallet, compact = false, header = false }) {
           {state.error && <p>{state.error}</p>}
           {state.status === 'ready' && state.items.length === 0 && <p>{state.staffReview ? 'No personal updates yet.' : 'No notifications yet.'}</p>}
         </div>
-        {state.items.length > 0 && <ul className="notification-items">
-          {state.items.map(item => <li key={item.id} className={item.read===false?'notification-unread':'notification-read'}>
-            <details className="notification-message" onToggle={event=>{if(event.currentTarget.open && item.read===false)readQueue.current?.add(`outcome:${item.id}`,()=>mutate(()=>inbox.current?.markRead(item.id,true)));}}>
-            <summary><strong>Report and artwork update</strong>{typeof item.read==='boolean' && <span className="notification-read-label">{state.pendingId===item.id?'Saving…':item.read?'Read':'Unread'}</span>}<time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString()}</time></summary>
-            <a className="underline" href={`/artwork/v41:${item.chain_id}:${item.artwork_id}`}>
-              Artwork #{item.artwork_id} · {({'84532': 'Base Sepolia', '11155111': 'Ethereum Sepolia (legacy)', '8453': 'Base'})[item.chain_id] || `Chain ${item.chain_id}`}
-            </a>
-            <p>{item.message}</p>
-            </details>
-          </li>)}
-        </ul>}
         {['error', 'unavailable'].includes(state.status) && <button type="button" className="btn-main mt-3" onClick={() => inbox.current?.load(state.retryCursor)}>Retry</button>}
         {state.status === 'ready' && state.nextCursor && <button type="button" className="btn-main mt-3" disabled={Boolean(state.pendingId)} onClick={() => inbox.current?.load(state.nextCursor)}>Load older notifications</button>}
         </section>

@@ -1388,6 +1388,7 @@ body.future .gallery-filter-panel {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
     margin-bottom: 1rem;
+    align-items: start;
 }
 
 .gallery-search-input,
@@ -1419,6 +1420,9 @@ body.future .gallery-filter-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
 }
+
+.gallery-filter-actions { align-items: start; }
+.gallery-filter-actions > button { min-height: 44px; padding: 0.5rem 0.75rem; }
 
 .gallery-price-grid {
     gap: 1rem;
@@ -5058,11 +5062,10 @@ body.future .site-header {
     overflow: visible !important;
 }
 
-/* Side columns stay equal so the centre column remains centred. They track the
-   account button (180px) plus its 8px gutter — see the account-button block. */
+/* Static header controls reserve their width before any account/API loading. */
 .site-header-row {
     display: grid !important;
-    grid-template-columns: 188px minmax(0, 1fr) 188px;
+    grid-template-columns: auto minmax(0, 1fr);
     min-width: 0;
     min-height: 56px;
     align-items: center;
@@ -5081,8 +5084,8 @@ body.future .site-header {
     justify-self: start;
 }
 
-.site-header-center {
-    display: flex;
+.site-header .site-header-center {
+    display: none !important;
     width: 100%;
     align-items: center;
     justify-content: center;
@@ -5095,6 +5098,7 @@ body.future .site-header {
     align-items: center;
     justify-content: flex-end;
     justify-self: end;
+    gap: 0.5rem;
 }
 
 .site-header .logo-link {
@@ -5454,6 +5458,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 }
 
 @media (max-width: 360px) {
+    .site-header-shell { padding-inline: 6px !important; }
     #artworkGallery,
     .gallery-results-grid,
     .profile-artwork-grid.grid {
@@ -5566,26 +5571,12 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .notification-message > summary:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 4px; border-radius: 0.25rem; }
 .notification-message > a { display: inline-block; margin-block: 0.625rem; text-underline-offset: 0.2em; }
 .notification-message > p { margin-block: 0.5rem; }
-#header-notifications[hidden] { display: none; }
+#header-notifications[hidden] { display: block; visibility: hidden; }
 #header-notifications { flex: 0 0 44px; width: 44px; height: 44px; }
-.site-header-row:has(#header-notifications:not([hidden])) { grid-template-columns: 240px minmax(0, 1fr) 240px; }
-.site-header-actions:has(#header-notifications:not([hidden])) { gap: 0.5rem; }
 .header-notification-inbox > .notification-toggle { width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; }
 .header-notification-inbox .notification-toggle-icon { flex: 0 0 20px; width: 20px; height: 20px; }
 .header-notification-inbox .notification-badge { inset-block-start: -0.5rem; inset-inline-end: -0.625rem; }
 .header-notification-inbox > #profile-notifications { position: fixed; inset-inline-end: var(--site-gutter, 1rem); top: calc(var(--site-header-height, 80px) + 0.5rem); z-index: 120; width: min(26rem, calc(100% - 2 * var(--site-gutter, 1rem))); max-height: calc(100dvh - var(--site-header-height, 80px) - 1.5rem); margin: 0; text-align: start; box-shadow: 0 0.75rem 2rem var(--c-surface-muted); }
-@media (min-width: 769px) and (max-width: 960px) {
-    .site-header:has(#header-notifications:not([hidden])) .site-search-button kbd { display: none; }
-}
-@media (max-width: 768px) {
-    .site-header-row:has(#header-notifications:not([hidden])) { grid-template-columns: 40px minmax(44px, 1fr) auto; }
-}
-@media (max-width: 360px) {
-    .site-header:has(#header-notifications:not([hidden])) #navButtons,
-    .site-header:has(#header-notifications:not([hidden])) #navButtons .avatar-dropdown-container,
-    .site-header:has(#header-notifications:not([hidden])) #navButtons .avatar-button { width: 128px !important; min-width: 128px !important; max-width: 128px !important; }
-    .site-header:has(#header-notifications:not([hidden])) #navButtons .avatar-info { width: 68px !important; min-width: 0 !important; max-width: 68px !important; flex-basis: 68px !important; }
-}
 .notification-groups > button { display: flex; align-items: center; justify-content: center; gap: 0.375rem; min-width: 0; padding: 0.5rem; border: 1px solid transparent; border-radius: 0.625rem; background: transparent; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 600; line-height: 1.4; cursor: pointer; }
 .notification-groups > button[aria-pressed="true"] { border-color: var(--c-border); background: var(--c-surface); color: var(--c-text); }
 .future .notification-groups > button[aria-pressed="true"] { border-color: var(--c-accent); color: var(--c-accent); }
@@ -5709,13 +5700,13 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     }
 
     .site-header-row {
-        grid-template-columns: 40px minmax(0, 1fr) 168px;
+        grid-template-columns: 40px minmax(0, 1fr);
         min-height: 44px;
         gap: 0.5rem;
     }
 
     .site-header-center:empty {
-        display: block !important;
+        display: none !important;
     }
 
     .site-header .logo-link {
@@ -6503,19 +6494,17 @@ body.future .publish-step-wanted {
     box-shadow: 0 0 16px var(--c-glow-strong);
 }
 
-/* B-09 voice commands. A push-to-talk button in the bottom-left corner, which no
-   other fixed element uses, kept below every modal so a dialog always covers it.
+/* B-09/B-21 commands. A static header launcher, kept below every modal.
    Theme colours only through variables, per canon 16. */
 .artsoul-voice-button {
-    position: fixed;
-    left: max(14px, env(safe-area-inset-left));
-    bottom: max(14px, env(safe-area-inset-bottom));
+    position: relative;
     z-index: 110;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
     border: 1px solid var(--c-border);
     border-radius: 999px;
     background: var(--c-surface-strong);
@@ -6551,18 +6540,22 @@ body.future .artsoul-voice-button.is-listening {
     }
 }
 
-.artsoul-voice-panel {
+.artsoul-voice-panel[role="dialog"] {
     position: fixed;
-    left: max(14px, env(safe-area-inset-left));
-    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 58px);
+    right: max(14px, env(safe-area-inset-right));
+    top: calc(var(--site-header-height, 80px) + 0.5rem);
     z-index: 110;
-    width: min(360px, calc(100vw - 28px));
-    max-height: 45vh;
+    box-sizing: border-box;
+    width: min(400px, calc(100% - 28px));
+    max-width: calc(100% - 28px);
+    margin: 0;
+    max-height: min(620px, calc(100dvh - var(--site-header-height, 80px) - 1.5rem));
+    overscroll-behavior: contain;
     overflow-y: auto;
     padding: 10px 12px 12px;
     border: 1px solid var(--c-border);
     border-radius: 12px;
-    background: var(--c-surface-strong);
+    background: var(--c-bg);
     color: var(--c-text);
     font-size: 0.9rem;
 }
@@ -6572,12 +6565,26 @@ body.future .artsoul-voice-button.is-listening {
     gap: 6px;
     justify-content: flex-end;
     margin-bottom: 6px;
+    align-items: center;
+}
+
+.artsoul-voice-panel[hidden] { display: none; }
+
+.artsoul-voice-panel-head h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    background: none;
+    color: var(--c-text);
+    -webkit-text-fill-color: currentColor;
 }
 
 .artsoul-voice-lang,
 .artsoul-voice-close {
-    min-width: 32px;
-    min-height: 32px;
+    min-width: 40px;
+    min-height: 40px;
     border: 1px solid var(--c-border-soft);
     border-radius: 8px;
     background: transparent;
@@ -6601,25 +6608,61 @@ body.future .artsoul-voice-button.is-listening {
     overflow-wrap: anywhere;
 }
 
-.artsoul-voice-spacer {
-    display: none;
+.artsoul-voice-hint,
+.artsoul-voice-support,
+.artsoul-voice-examples p {
+    color: var(--c-text-muted);
+    line-height: 1.5;
+    margin: 10px 0;
 }
 
-@media (max-width: 768px) {
-    .artsoul-voice-spacer {
-        display: block;
-        height: calc(76px + env(safe-area-inset-bottom));
-    }
+.artsoul-voice-form label { display: block; margin-bottom: 6px; }
+.artsoul-voice-form input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+    font-size: 16px;
 }
+.artsoul-voice-form input::placeholder { color: var(--c-text-muted); }
+.artsoul-voice-controls { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.artsoul-voice-controls button {
+    flex: 1;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+    cursor: pointer;
+}
+.artsoul-voice-controls .artsoul-voice-send {
+    border-color: var(--c-accent);
+    background: var(--c-accent);
+    color: var(--c-bg);
+}
+.artsoul-voice-panel :is(button, input, summary):focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+.artsoul-voice-panel :disabled { opacity: .55; cursor: not-allowed; }
+.artsoul-voice-examples summary { cursor: pointer; padding: 10px 0; }
+
 /* One public search entry; the account shell and its reserved width stay intact. */
 .site-search-button {
     display: flex; align-items: center; justify-content: center; gap: .65rem;
-    width: min(100%, 320px); min-width: 44px; min-height: 44px; padding: .5rem .8rem;
+    width: 44px; height: 44px; flex: 0 0 44px; min-width: 44px; min-height: 44px; padding: .5rem;
     color: var(--c-text); background: var(--c-surface); border: 1px solid var(--c-border-soft);
     border-radius: 999px; font: inherit; cursor: pointer; white-space: nowrap;
 }
 .site-search-button svg { flex: 0 0 22px; }
-.site-search-button kbd { font: inherit; font-size: .75rem; color: var(--c-text-muted); margin-left: auto; }
 .site-search-button:hover { border-color: var(--c-accent); }
 .site-search-button:focus-visible, .artsoul-search-dialog :focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
 dialog.artsoul-search-dialog {
@@ -6655,10 +6698,25 @@ dialog.artsoul-search-dialog {
 .gallery-search-controls { min-width: 0; }
 .gallery-search-all { margin-top: .3rem; min-height: 36px; padding: .3rem .6rem; font: inherit; font-size: .8rem; color: var(--c-text); background: var(--c-surface); border: 1px solid var(--c-border-soft); border-radius: .5rem; cursor: pointer; }
 @media (max-width: 768px) {
-    .site-header-center:has(.site-search-button) { justify-content: flex-end; }
-    .site-search-button { width: 44px; padding: .5rem; }
-    .site-search-button span, .site-search-button kbd { display: none; }
+    .site-header-actions { gap: 0.25rem; }
     dialog.artsoul-search-dialog { padding: .9rem; }
     .artsoul-search-categories button { padding: .4rem .6rem; }
     .artsoul-search-image { width: 44px; height: 44px; flex-basis: 44px; }
+}
+
+@media (max-width: 480px) {
+    .site-header #navButtons,
+    .site-header #navButtons .avatar-dropdown-container,
+    .site-header #navButtons .avatar-button { width: 144px !important; min-width: 144px !important; max-width: 144px !important; }
+    .site-header #navButtons .avatar-info { width: 84px !important; min-width: 0 !important; max-width: 84px !important; flex-basis: 84px !important; }
+    .site-header #navButtons .avatar-info > div { width: 100% !important; max-width: 100% !important; }
+    .site-header #navButtons .avatar-dropdown-arrow,
+    .site-header #navButtons .menu-chevron { display: none; }
+    .site-header-row { gap: 0.25rem; }
+}
+@media (max-width: 360px) {
+    .site-header #navButtons,
+    .site-header #navButtons .avatar-dropdown-container,
+    .site-header #navButtons .avatar-button { width: 100px !important; min-width: 100px !important; max-width: 100px !important; }
+    .site-header #navButtons .avatar-info { width: 48px !important; max-width: 48px !important; flex-basis: 48px !important; }
 }

@@ -183,6 +183,8 @@ function ProtocolAdminPage() {
     const [accessState, setAccessState] = useState('loading');
     const [access, setAccess] = useState(null);
     const [queueStatus, setQueueStatus] = useState('pending_review');
+    const [queueTarget, setQueueTarget] = useState(null);
+    const queueTargetRef = useRef(null);
     const [data, setData] = useState({ reports: [], events: [], hidden: [], moderationLog: [], notifications: [] });
     const [section, setSection] = useState('queue');
     const [busy, setBusy] = useState(false);
@@ -225,6 +227,8 @@ function ProtocolAdminPage() {
         let lastAuthenticated = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
         const clearSession = () => {
             completedSignIn.current = '';
+            queueTargetRef.current = null;
+            setQueueTarget(null);
             setupEpoch.current++;
             accessRequest.current++;
             openedSetupFor.current = '';
@@ -313,7 +317,9 @@ function ProtocolAdminPage() {
         if (readySession.current?.epoch !== epoch || readySession.current.wallet !== wallet) return false;
         let result;
         try {
-            result = await api(`review-queue?status=${encodeURIComponent(status)}`);
+            const target = queueTargetRef.current;
+            result = await api(`review-queue?status=${encodeURIComponent(status)}` + (target
+                ? `&chainId=${encodeURIComponent(target.chain_id)}&artworkId=${encodeURIComponent(target.artwork_id)}` : ''));
         } catch (error) {
             if (!sessionIsCurrent(epoch, wallet) || request !== queueRequest.current) return false;
             throw error;
@@ -427,10 +433,12 @@ function ProtocolAdminPage() {
         setPasskeyOpen(true);
     };
 
-    const changeQueueStatus = async status => {
+    const changeQueueStatus = async (status, target = queueTargetRef.current) => {
         const epoch = setupEpoch.current, wallet = currentSetupWallet();
         if (readySession.current?.epoch !== epoch || readySession.current.wallet !== wallet) return;
         setQueueStatus(status);
+        queueTargetRef.current = target;
+        setQueueTarget(target);
         queueStatusRef.current = status;
         setBusy(true);
         setMessage('');
@@ -551,6 +559,10 @@ function ProtocolAdminPage() {
                             ))}
                         </div>
                     </div>
+                    {queueTarget && <p className="protocol-admin-message">
+                        Reports for artwork {queueTarget.artwork_id} · Chain {queueTarget.chain_id}. Resolve each active report to restore the artwork.
+                        {' '}<button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => changeQueueStatus(queueStatus, null)}>Show all reports</button>
+                    </p>}
                     {groups.length === 0 ? <p className="protocol-admin-empty">No reports in this state.</p> : groups.map(group => (
                         <article key={group.key} className="protocol-admin-group">
                             <header>
@@ -592,12 +604,16 @@ function ProtocolAdminPage() {
             {ready && activeSection === 'hidden' && (
                 <section aria-labelledby="hiddenTitle">
                     <h2 id="hiddenTitle">Hidden artwork</h2>
+                    <p>Review the active reports to restore an artwork. It stays hidden until all active restrictions are resolved.</p>
                     <div className="protocol-admin-ledger">
                         {data.hidden.length === 0 ? <p>No hidden artwork.</p> : data.hidden.map(item => (
                             <div key={`${item.chain_id}:${item.artwork_id}`}>
                                 <strong>Artwork {item.artwork_id}</strong>
                                 <span>Chain {item.chain_id}</span>
                                 <span>{item.hidden_reason || 'No reason recorded'}</span>
+                                <button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => {
+                                    setSection('queue'); void changeQueueStatus('actioned', item);
+                                }}>Review to restore</button>
                             </div>
                         ))}
                     </div>

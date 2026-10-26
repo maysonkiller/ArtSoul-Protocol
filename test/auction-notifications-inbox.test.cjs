@@ -10,6 +10,7 @@ const source = fs.readFileSync('src/features/moderation/notification-inbox.jsx',
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => {let resolve; const promise = new Promise(done => {resolve = done;}); return {promise, resolve};};
 const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child => elements(child, predicate))
+  : React.isValidElement(node) && ['PersonalHistory', 'AuctionMessage', 'ReportMessage'].includes(node.type?.name) ? elements(node.type(node.props), predicate)
   : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
 
 async function harness(fetchPage, enabled = true, summaryEnabled = false, configPromise = null) {
@@ -34,7 +35,7 @@ async function harness(fetchPage, enabled = true, summaryEnabled = false, config
       removeEventListener(name, fn) {listeners.get(name)?.delete(fn);}}};
   async function fetcher(url, options) {state.calls.push(url); return fetchPage(url, options);}
   const {code} = await transformWithOxc(source, 'notification-fixture.jsx', {jsx: {runtime: 'classic'}});
-  vm.runInNewContext(code + '\nthis.Inbox = NotificationInbox; this.Category = AuctionNotifications;', scope);
+  vm.runInNewContext(code + '\nthis.Inbox = NotificationInbox; this.Category = AuctionNotifications; this.History = PersonalHistory;', scope);
   const h = {state, scope, render() {si = ri = ei = 0; pending = []; const view = scope.Inbox({wallet: A, compact: true}); pending.forEach(fn => fn()); return view;},
     event(name, detail = {}) {[...(listeners.get(name) || [])].forEach(fn => fn(detail));},
     unmount() {effects.forEach(effect => effect.cleanup?.());},
@@ -56,6 +57,20 @@ function staffResponse(url, verified = true) {
   if (url.includes('review-queue')) return Response.json({data: {reports: [{id: '11111111-1111-4111-8111-111111111111', created_at: '2026-10-25T10:00:00Z'}]}});
   return response(url);
 }
+
+test('personal activity and report outcomes share newest-first history without moving an opened read item', async () => {
+  const h = await harness(response);
+  const activity = {items:[{id:'1',type:'auction_created',created_at:'2026-10-26T10:00:00Z',chain_id:84532,artwork_id:37,read:false,message:'Newest activity'}],pendingIds:[]};
+  const reports = {items:[{id:'1',created_at:'2026-10-26T11:00:00Z',chain_id:84532,artwork_id:37,read:false,message:'Newest report'},
+    {id:'2',created_at:'2026-10-25T10:00:00Z',chain_id:84532,artwork_id:37,read:true,message:'Old report'}]};
+  const render = () => renderToStaticMarkup(React.createElement(h.scope.History,{activity,reports}));
+  let html = render(); assert.ok(html.indexOf('Newest report') < html.indexOf('Newest activity'));
+  assert.ok(html.indexOf('Newest activity') < html.indexOf('Old report'));
+  reports.items[0].read = true; html = render();
+  assert.ok(html.indexOf('Newest report') < html.indexOf('Newest activity'));
+  assert.equal((html.match(/Newest report/g)||[]).length,1);
+  h.unmount();
+});
 
 const groupButton = (h, name) => elements(h.render(), n => n.type === 'button' && elements(n.props.children, child => child.type === 'span' && child.props.children === name).length)[0];
 
@@ -129,7 +144,7 @@ test('rapid message opens serialize personal read writes without losing the next
     return response(url);
   },true,true);
   h.toggle();await tick();
-  const messages=elements(h.render(),n=>n.type==='details' && n.props.className==='notification-message');
+  const messages=elements(h.render(),n=>n.type==='details' && n.props.className==='notification-message' && elements(n,c=>c.type==='strong' && c.props.children==='Report and artwork update').length);
   messages[0].props.onToggle({currentTarget:{open:true}});
   messages[1].props.onToggle({currentTarget:{open:true}});
   await tick();assert.deepEqual(writes,['1']);assert.match(h.html(),/1 unread notification/);
@@ -158,7 +173,7 @@ for (const clearAccess of [false, true]) {
       return response(url);
     },true,true);
     h.toggle();await tick();
-    const messages=elements(h.render(),n=>n.type==='details' && n.props.className==='notification-message');
+    const messages=elements(h.render(),n=>n.type==='details' && n.props.className==='notification-message' && elements(n,c=>c.type==='strong' && c.props.children==='Report and artwork update').length);
     messages.forEach(message=>message.props.onToggle({currentTarget:{open:true}}));
     await tick();assert.deepEqual(writes,['1']);
     h.toggle();assert.doesNotMatch(h.html(),/Outcome 1|Outcome 2/);

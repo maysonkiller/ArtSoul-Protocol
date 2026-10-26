@@ -1,6 +1,6 @@
 # Voice, agent tools and future network scope
 
-Status: reviewed direction and scoped follow-up, not a deployed expansion.
+Status: first text/header slice under verification October 26; broader expansion planned.
 Source: founder requests of October 25, 2026. Related: B-08, B-09, B-12,
 B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
 
@@ -11,8 +11,8 @@ B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
   Each financial action retains the existing visible review and wallet signature.
 - `voice-commands.js` maps English/Russian phrases to those same tools and
   uses browser speech recognition/synthesis. It is a command grammar, not a
-  multilingual conversational assistant. The current button depends on browser
-  speech support; it does not provide an always-available text composer.
+  multilingual conversational assistant. The October 26 candidate adds a text
+  composer without requiring browser speech support; the microphone is optional.
 - New global search, Saved, profile curation, Donate, Report and publication
   preparation are not all exposed through that command layer. B-12's real agent
   journey acceptance remains open; passing parser tests does not close it.
@@ -22,6 +22,9 @@ B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
 1. Provide one accessible text-and-voice panel in both themes. Text remains
    available without microphone support. Show the interpreted request, progress,
    cancel/retry and the actual outcome. Preserve state on mobile wallet return.
+   The October 26 candidate covers the shared panel and existing tool set, with
+   account/late-answer fencing and explicit microphone activation. It does not
+   add durable command replay across reloads or claim new phone/speech acceptance.
 2. Reuse the current search API and Saved store, with explicit `save`/`remove`
    semantics for commands rather than a retry-sensitive toggle. Add navigation
    and clarification for missing artwork/query. Do not build a second list or
