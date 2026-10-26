@@ -1,6 +1,6 @@
 # B-21 global search commands
 
-Status: implemented and locally verified; candidate release pending.
+Status: released in PR #368, candidate `9840a5b`, production merge `276d894`.
 Canonical checkout `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, starting
 production merge `91b223f`. The preceding Saved release is recorded separately.
 
@@ -53,11 +53,27 @@ role, network, provider or dependency changes.
 - Initial candidate CI 40321256423 found two additional old stylesheet-pin
   assertions in artwork-layout and guest-avatar tests on both platforms. Updated
   those pins to version 51; application behavior did not change for that repair.
+- Repair group: 104 passed. Final exact-candidate CI 40321830522 passes:
+  Linux 2,747 passed/two skipped; Windows 2,360 passed/31 skipped; zero failures,
+  46 contract tests per platform, builds and static checks pass.
+- Final preview and apex verification passes for eight pages and 36 assets.
+  Apex evidence: `b21-search-apex-276d894ec466-1793017539204.json`.
+- Real preview browser: 16 cases on Home/Gallery/Artwork/Profile, both themes,
+  390/1440px. Search is disabled in Preview; it reports unavailability without
+  inventing matches, retains clarification/retry and performs zero API writes.
+- Five read-only cases run the real helper against the apex public API: exact
+  artwork 34, title, artist, auction and no-match searches preserve live groups,
+  canonical links and `hasMore`. This does not enable search in Preview.
+- Real apex browser: 16 cases on the same four pages, two themes and widths.
+  Actual artwork and artist searches return correct links; query clarification
+  clears old results, Escape closes, and neither page nor panel overflows.
+  Zero API writes. This is desktop-browser viewport coverage, not a new phone test.
 - Evidence: `output/audit/b21-search-focused-final.log`,
-  `b21-search-build-final.log`, `b21-search-browser.log`,
+  `b21-search-build-final.log`, `b21-search-browser.log`, `b21-search-pin-repair.log`,
+  `b21-search-final-ci.log`, `b21-search-final-preview-browser.log`,
+  `b21-search-live-api.json`, `b21-search-apex-browser.log`,
   `output/playwright/b21-search-*.png`.
-- Exact candidate CI, hosted real API/browser and release verification pending.
-  No native microphone, phone, WebMCP-client or wallet acceptance is inferred.
+- No native microphone, phone, WebMCP-client or wallet acceptance is inferred.
 
 Exactly next implementation after release: B-21 preparation of Donate/Report
 through existing dialogs, preserving deliberate review and submission. Publication
