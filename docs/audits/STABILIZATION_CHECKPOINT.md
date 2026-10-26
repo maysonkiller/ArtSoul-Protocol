@@ -3,19 +3,25 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 video search follow-up IN PROGRESS (started at `03f7134`):
+October 26 video search follow-up RELEASED in PR #371, candidate `16513ab`,
+production merge `fb05b45` (started at `03f7134`):
 
 - Reviewed full `IMG_2580.MP4`: mobile search scrolling/height confirmed;
   exact key behind the observed dismissal remains unproven.
 - Implemented fixed search controls, visual-viewport bounds, deliberate backdrop
   dismissal, public pages/docs search and links that open exact docs sections.
   All eight headers and existing voice/WebMCP search share the same public scope.
-- Search/docs 41 checks, voice/WebMCP/docs116 checks, eight browser geometry and
-  keyboard-state cases, and 11-route/173-utility build pass. Full unit/CI and
-  hosted release checks pending. Evidence: `audits/B22_SEARCH_VIDEO_2026-10-26.md`.
+- Final focused252/cache5, eight browser keyboard-state cases, and
+  11-route/173-utility build pass. CI40339786910 passes: Linux2771/two skips,
+  Windows2384/31 skips, 46 contracts each. Initial local PostgreSQL startup
+  timeout passed unchanged isolated retry37; stale cache manifest repaired.
+- Exact preview/apex eight-page/36-asset verification and 16 browser cases on
+  each deployment pass with zero API writes/script errors. Live `lys`, `#34`
+  and `fees` searches pass. Evidence: `audits/B22_SEARCH_VIDEO_2026-10-26.md`.
 - Preserve unrelated untracked authority-policy files, `.codex/`, `output/`.
-  Exactly next step: finish exact-candidate checks, release and verify search.
-  Then resume B21 Donate/Report preparation. No native iPhone acceptance claimed.
+  No implementation diff remains. Owned browsers/local server are closed;
+  helper is finished. Exactly next step: resume B21 Donate/Report preparation
+  with visible review/submission. No new native iPhone acceptance claimed.
 
 October 26 B22 profile polish and social-preview follow-up RELEASED in PR #370,
 candidate `2e15408`, production merge `f7d9fa2` (started at `a7abe68`):
