@@ -779,10 +779,17 @@ class ArtSoulContracts {
     async listResale(id, priceEth, onStep, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
+        await this.assertExpectedWallet(options);
         const tokenId = await this.resolveTokenId(id, options);
+        const artworkId = await this.coreContract.tokenToArtwork(tokenId);
         const price = this.parseEth(priceEth);
         const coreAddress = await this.coreContract.getAddress();
         const seller = await this.signer.getAddress();
+        const [owner, artwork] = await Promise.all([
+            this.nftContract.ownerOf(tokenId), this.getArtworkStruct(artworkId)
+        ]);
+        if (owner.toLowerCase() !== seller.toLowerCase()) throw new Error('Only the current NFT owner can change its listing.');
+        if (price <= 0n || price < artwork.canonicalFloor) throw new Error('The price is below this NFT\'s canonical floor.');
         const [approved, approvedForAll] = await Promise.all([
             this.nftContract.getApproved(tokenId),
             this.nftContract.isApprovedForAll(seller, coreAddress)
@@ -793,16 +800,49 @@ class ArtSoulContracts {
 
         if (needsApproval) {
             onStep?.({ step: 1, totalSteps });
+            await this.assertExpectedWallet(options);
             const approveTx = await this.nftContract.approve(coreAddress, tokenId);
             console.log('Approving Core for resale...', approveTx.hash);
-            await approveTx.wait();
+            await this.waitForConfirmedTransaction(approveTx);
         }
 
         onStep?.({ step: totalSteps, totalSteps });
+        await this.assertExpectedWallet(options);
         const tx = await this.coreContract.listResale(tokenId, price);
         console.log('Listing resale...', tx.hash);
-        await tx.wait();
-        return tx.hash;
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        this.publishResaleReceipt(receipt, { artworkId, tokenId, seller, active: true, price: this.formatEth(price) });
+        return receipt.hash || tx.hash;
+    }
+
+    async cancelResale(id, options = {}) {
+        await this.ensureBaseSepoliaWrite();
+        this.ensureCore();
+        await this.assertExpectedWallet(options);
+        const tokenId = await this.resolveTokenId(id, options);
+        const [listing, seller, artworkId] = await Promise.all([
+            this.coreContract.resaleListings(tokenId), this.signer.getAddress(), this.coreContract.tokenToArtwork(tokenId)
+        ]);
+        if (!listing.active) throw new Error('This NFT is no longer listed for sale.');
+        if (listing.seller.toLowerCase() !== seller.toLowerCase()) throw new Error('Only the seller can remove this listing.');
+        await this.assertExpectedWallet(options);
+        const tx = await this.coreContract.cancelResale(tokenId);
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        this.publishResaleReceipt(receipt, { artworkId, tokenId, seller, active: false, price: '0' });
+        return receipt.hash || tx.hash;
+    }
+
+    publishResaleReceipt(receipt, { artworkId, tokenId, seller, active, price }) {
+        try {
+            window.ArtSoulDB?.recordConfirmedResale?.({
+                chain_id: 84532, artwork_id: String(artworkId), token_id: String(tokenId),
+                transaction_hash: receipt.hash, block_number: Number(receipt.blockNumber),
+                transaction_index: Number(receipt.index || 0),
+                seller, active, price
+            });
+        } catch (error) {
+            console.warn('Listing confirmed; local refresh notice could not be saved.', error);
+        }
     }
 
     async buyResale(id, priceEth, options = {}) {

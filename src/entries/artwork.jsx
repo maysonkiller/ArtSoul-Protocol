@@ -8,7 +8,7 @@ import { ArtistSupport } from '../features/artwork/artist-support.jsx';
 import '../features/artwork/artwork-dialogs.css';
 import { artworkShareIntent } from '../features/artwork/artwork-sharing.js';
 
-import { getOwnerResaleEligibility } from '../features/marketplace/resale-eligibility.js';
+import { getOwnerResaleEligibility, validateResalePrice } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
@@ -372,6 +372,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [reauctionEstimateState, setReauctionEstimateState] = useState('idle');
             const [reauctionEstimate, setReauctionEstimate] = useState(null);
             const [isResaleModalOpen, setIsResaleModalOpen] = useState(false);
+            const resaleDialogRef = useRef(null);
+            const [resaleModalMode, setResaleModalMode] = useState('list');
             const [resaleModalPrice, setResaleModalPrice] = useState('');
             const [resaleModalError, setResaleModalError] = useState('');
             const [resaleModalStepLabel, setResaleModalStepLabel] = useState('');
@@ -393,7 +395,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 amount: '0',
                 message: ''
             });
-            const [confirmedResaleListing, setConfirmedResaleListing] = useState(false);
+            const [resaleNotice, setResaleNotice] = useState('');
             const bidPollInFlightRef = useRef(false);
             const bidCursorRef = useRef(null);
             const artworkLoadSequenceRef = useRef(0);
@@ -655,18 +657,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
             useEffect(() => {
                 if (!isResaleModalOpen) return undefined;
-                const previousOverflow = document.body.style.overflow;
-                document.body.style.overflow = 'hidden';
-                const closeOnEscape = event => {
-                    if (event.key === 'Escape' && !transactionActionsRef.current.has('resale-list')) {
-                        setIsResaleModalOpen(false);
-                    }
-                };
-                window.addEventListener('keydown', closeOnEscape);
-                return () => {
-                    window.removeEventListener('keydown', closeOnEscape);
-                    document.body.style.overflow = previousOverflow;
-                };
+                const dialog = resaleDialogRef.current;
+                dialog?.showModal();
+                return () => { if (dialog?.open) dialog.close(); };
             }, [isResaleModalOpen]);
 
             useEffect(() => {
@@ -1714,8 +1707,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             useEffect(() => {
                 const refresh = () => { void loadArtwork(); };
                 window.addEventListener('artsoul:auction-confirmed', refresh);
+                window.addEventListener('artsoul:resale-confirmed', refresh);
                 return () => {
                     window.removeEventListener('artsoul:auction-confirmed', refresh);
+                    window.removeEventListener('artsoul:resale-confirmed', refresh);
                     artworkLoadSequenceRef.current++;
                 };
             }, [artworkId]);
@@ -2535,26 +2530,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }
 
             function validateResaleModalPrice(rawValue, floorPrice) {
-                const normalized = normalizeResalePriceInput(rawValue);
-                if (!normalized) {
-                    return { valid: false, normalized, error: 'Enter a resale price.' };
-                }
-                const numeric = Number(normalized);
-                if (!Number.isFinite(numeric) || numeric <= 0) {
-                    return { valid: false, normalized, error: 'Enter a valid ETH amount.' };
-                }
-                if (numeric < floorPrice) {
-                    return {
-                        valid: false,
-                        normalized,
-                        error: `Listing price must be at least the canonical floor of ${floorPrice} ETH.`
-                    };
-                }
-                return { valid: true, normalized, numeric, error: '' };
+                return validateResalePrice(rawValue, floorPrice);
             }
 
-            async function openResaleListingModal() {
+            async function openResaleListingModal(mode = 'list') {
                 if (!ensureArtworkWriteEnabled()) return;
+                if (!['list', 'edit', 'cancel'].includes(mode)) mode = 'list';
 
                 const walletAddress = connectedWalletAddress || window.currentWalletAddress || window.getCurrentWalletAddress?.() || await window.ensureWalletConnected?.();
                 if (!walletAddress) return;
@@ -2565,8 +2546,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     return;
                 }
 
-                if (!isSameAddress(walletAddress, artwork.current_owner_address)) {
-                    alert('Only the current NFT owner can create a resale listing.');
+                const requiredAddress = mode === 'cancel' ? artwork.resale_seller : artwork.current_owner_address;
+                if (!isSameAddress(walletAddress, requiredAddress)) {
+                    alert(mode === 'cancel' ? 'Only the listing seller can remove it from sale.' : 'Only the current NFT owner can create a resale listing.');
                     return;
                 }
 
@@ -2576,13 +2558,15 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     artwork.final_price
                 );
                 const floorPrice = Number(defaultPrice || 0);
-                if (!Number.isFinite(floorPrice) || floorPrice <= 0) {
+                if (mode !== 'cancel' && (!Number.isFinite(floorPrice) || floorPrice <= 0)) {
                     alert('The canonical floor price is unavailable. Wait for the settlement projection to finish updating.');
                     return;
                 }
 
-                setResaleModalPrice(String(defaultPrice));
+                setResaleModalMode(mode);
+                setResaleModalPrice(String(mode === 'edit' ? artwork.sale_price : (defaultPrice || '')));
                 setResaleModalError('');
+                setResaleNotice('');
                 setResaleModalStepLabel('');
                 setIsResaleModalOpen(true);
             }
@@ -2596,7 +2580,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             function handleResaleModalPriceChange(rawValue) {
                 setResaleModalPrice(rawValue);
                 if (!resaleModalError) return;
-                const floorPrice = Number(resaleFloorPrice || 0);
+                const floorPrice = String(resaleFloorPrice || '0');
                 const validation = validateResaleModalPrice(rawValue, floorPrice);
                 setResaleModalError(validation.valid ? '' : validation.error);
             }
@@ -2610,16 +2594,17 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 if (!ensureArtworkWriteEnabled()) return;
                 const submitWalletAddress = await getLiveProviderAccount();
                 if (!submitWalletAddress) {
-                    setResaleModalError('Connect your wallet to list this NFT.');
+                    setResaleModalError('Connect your wallet to manage this listing.');
                     return;
                 }
-                if (!isSameAddress(submitWalletAddress, artwork.current_owner_address)) {
-                    setResaleModalError('Only the current NFT owner can create a resale listing.');
+                const requiredAddress = resaleModalMode === 'cancel' ? artwork.resale_seller : artwork.current_owner_address;
+                if (!isSameAddress(submitWalletAddress, requiredAddress)) {
+                    setResaleModalError(resaleModalMode === 'cancel' ? 'Only the listing seller can remove it from sale.' : 'Only the current NFT owner can create a resale listing.');
                     return;
                 }
 
-                const floorPrice = Number(resaleFloorPrice || 0);
-                const validation = validateResaleModalPrice(resaleModalPrice, floorPrice);
+                const floorPrice = String(resaleFloorPrice || '0');
+                const validation = resaleModalMode === 'cancel' ? { valid: true } : validateResaleModalPrice(resaleModalPrice, floorPrice);
                 if (!validation.valid) {
                     setResaleModalError(validation.error);
                     return;
@@ -2647,7 +2632,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         return;
                     }
 
-                    await window.ArtSoulContracts.listResale(
+                    const options = { idType: 'artwork', expectedWallet: submitWalletAddress, expectedChainId: 84532 };
+                    if (resaleModalMode === 'cancel') {
+                        setResaleModalStepLabel('Confirm removal from sale in your wallet');
+                        await window.ArtSoulContracts.cancelResale(protocolArtworkId, options);
+                    } else await window.ArtSoulContracts.listResale(
                         protocolArtworkId,
                         validation.normalized,
                         ({ step, totalSteps }) => {
@@ -2657,18 +2646,18 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                     : 'Confirm the listing in your wallet'
                             );
                         },
-                        { idType: 'artwork' }
+                        options
                     );
 
-                    setConfirmedResaleListing(true);
                     setIsResaleModalOpen(false);
-                    alert('NFT listed for resale. Public state will update shortly.');
+                    setResaleNotice(resaleModalMode === 'cancel' ? 'Removed from sale. NFT ownership is unchanged.'
+                        : resaleModalMode === 'edit' ? 'Listing price updated.' : 'NFT listed for sale.');
                     await loadArtwork();
                 } catch (error) {
                     console.error('Resale listing failed:', error);
                     const message = getTransactionErrorMessage(
                         error,
-                        'The resale listing could not be created. Please try again.'
+                        'The listing change could not be completed. Please try again.'
                     );
                     setResaleModalError(message);
                 } finally {
@@ -2857,6 +2846,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const ownerAddress = artwork.current_owner_address;
             const connectedWalletOwnsArtwork = walletRenderState.settled &&
                 isSameAddress(connectedWalletAddress, ownerAddress);
+            const connectedWalletIsSeller = walletRenderState.settled &&
+                isSameAddress(connectedWalletAddress, artwork.resale_seller);
             const resaleEligibility = getOwnerResaleEligibility({
                 walletSettled: walletRenderState.settled,
                 walletAddress: connectedWalletAddress,
@@ -2865,7 +2856,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 minted: mintedArtwork,
                 tokenId: artwork.token_id || artwork.tokenId,
                 floorPrice: resaleFloorPrice,
-                activeListing: listedForResale || confirmedResaleListing,
+                activeListing: listedForResale,
                 activeAuction: liveAuction
             });
             const tokenExplorerUrl = mintedArtwork ? getTokenExplorerUrl(artwork) : '';
@@ -3143,7 +3134,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         </div>
                     )}
                     {isResaleModalOpen && (() => {
-                        const floorPrice = Number(resaleFloorPrice || 0);
+                        const floorPrice = String(resaleFloorPrice || '0');
+                        const removing = resaleModalMode === 'cancel';
+                        const actionLabel = removing ? 'Remove from sale' : resaleModalMode === 'edit' ? 'Update price' : 'List NFT';
                         const resaleTokenId = artwork.token_id || artwork.tokenId;
                         // Owner comes from the indexer projection only — never from the
                         // connected wallet, even though listing is gated to the owner.
@@ -3153,23 +3146,17 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             : 'Unavailable';
                         const resalePending = isTransactionActionPending('resale-list');
                         return (
-                            <div
-                                className="resale-modal-backdrop"
-                                role="presentation"
-                                onMouseDown={event => {
-                                    if (event.target === event.currentTarget) closeResaleListingModal();
-                                }}
-                            >
-                                <section
+                                <dialog
+                                    ref={resaleDialogRef}
                                     className="resale-modal"
-                                    role="dialog"
                                     aria-modal="true"
                                     aria-labelledby="resaleModalTitle"
+                                    onCancel={event => { event.preventDefault(); closeResaleListingModal(); }}
                                 >
                                     <div className="resale-modal-header">
                                         <div>
                                             <p className="resale-modal-eyebrow">Resale listing</p>
-                                            <h2 id="resaleModalTitle">List NFT for resale</h2>
+                                            <h2 id="resaleModalTitle">{removing ? 'Remove NFT from sale?' : resaleModalMode === 'edit' ? 'Change listing price' : 'List NFT for resale'}</h2>
                                         </div>
                                         <button
                                             type="button"
@@ -3205,6 +3192,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         </div>
                                     </dl>
 
+                                    {removing ? (
+                                        <p>The listing is removed after your transaction confirms. NFT ownership stays unchanged; the current owner can list it again later.</p>
+                                    ) : <>
                                     <label className="resale-field-label" htmlFor="resaleModalPrice">
                                         Resale price (ETH) — minimum {floorPrice} ETH
                                     </label>
@@ -3220,6 +3210,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         aria-describedby={resaleModalError ? 'resaleModalError' : undefined}
                                         autoFocus
                                     />
+                                    <button type="button" className="btn-secondary mt-2" disabled={resalePending}
+                                        onClick={() => handleResaleModalPriceChange(floorPrice)}>
+                                        Use floor price
+                                    </button>
+                                    </>}
+                                    <p className="text-sm mt-3">Confirm in your wallet. Network fees apply.</p>
                                     {resaleModalError && (
                                         <p id="resaleModalError" className="resale-modal-error" role="alert">
                                             {resaleModalError}
@@ -3249,11 +3245,10 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         >
                                             {resalePending
                                                 ? <TransactionProcessingLabel />
-                                                : 'List NFT'}
+                                                : actionLabel}
                                         </button>
                                     </div>
-                                </section>
-                            </div>
+                                </dialog>
                         );
                     })()}
                     {/* Content */}
@@ -3841,13 +3836,26 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             </div>
                                         )}
 
-                                        {listedForResale && connectedWalletOwnsArtwork && (
+                                        {listedForResale && (connectedWalletOwnsArtwork || connectedWalletIsSeller) && artworkWriteEnabled && (
                                             <div className="artwork-auction-next-step mt-4">
-                                                <p>Your NFT is already listed for {artwork.sale_price} ETH.</p>
+                                                <p>This NFT is listed for {artwork.sale_price} ETH.</p>
+                                                <div className="flex flex-wrap gap-2 mt-3">
+                                                    {connectedWalletOwnsArtwork && <button type="button" className="btn-main" onClick={() => openResaleListingModal('edit')}
+                                                        disabled={walletRenderState.chainId !== 84532 || isTransactionActionPending('resale-list')}>
+                                                        Change price
+                                                    </button>}
+                                                    {connectedWalletIsSeller && <button type="button" className="btn-secondary" onClick={() => openResaleListingModal('cancel')}
+                                                        disabled={walletRenderState.chainId !== 84532 || isTransactionActionPending('resale-list')}>
+                                                        Remove from sale
+                                                    </button>}
+                                                </div>
+                                                {walletRenderState.chainId !== 84532 && <p>Switch to Base Sepolia to manage this listing.</p>}
                                             </div>
                                         )}
 
-                                        {listedForResale && !connectedWalletOwnsArtwork && artworkWriteEnabled && (
+                                        {resaleNotice && <p className="mt-3" role="status">{resaleNotice}</p>}
+
+                                        {listedForResale && !connectedWalletOwnsArtwork && !connectedWalletIsSeller && artworkWriteEnabled && (
                                             <div className="mt-6">
                                                 <button
                                                     onClick={handleDirectPurchase}

@@ -795,11 +795,13 @@ const { useState, useEffect, useRef } = React;
 
             useEffect(() => {
                 const refresh = () => { if (profile?.wallet_address) void loadMyArtworks(null, {fresh: true}); };
-                const onVisible = () => { if (document.visibilityState === 'visible' && window.ArtSoulDB?.confirmedAuctionUpdates?.().length) refresh(); };
+                const onVisible = () => { if (document.visibilityState === 'visible' && (window.ArtSoulDB?.confirmedAuctionUpdates?.().length || window.ArtSoulDB?.confirmedResaleUpdates?.().length)) refresh(); };
                 window.addEventListener('artsoul:auction-confirmed', refresh);
+                window.addEventListener('artsoul:resale-confirmed', refresh);
                 document.addEventListener('visibilitychange', onVisible);
                 return () => {
                     window.removeEventListener('artsoul:auction-confirmed', refresh);
+                    window.removeEventListener('artsoul:resale-confirmed', refresh);
                     document.removeEventListener('visibilitychange', onVisible);
                 };
             }, [profile?.wallet_address, selectedGallery]);

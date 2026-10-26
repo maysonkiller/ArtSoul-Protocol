@@ -34,11 +34,14 @@ const ERROR_SIGNATURES = {
   GenesisAlreadyMinted: "GenesisAlreadyMinted()",
   GenesisSoldOut: "GenesisSoldOut()",
   InvalidAuctionDuration: "InvalidAuctionDuration()",
+  IncorrectSettlementPayment: "IncorrectSettlementPayment(uint256)",
   NotArtworkCreator: "NotArtworkCreator()",
   NotAuctionWinner: "NotAuctionWinner()",
+  NotTokenOwner: "NotTokenOwner()",
   OwnableUnauthorizedAccount: "OwnableUnauthorizedAccount(address)",
   PriceBelowCanonicalFloor: "PriceBelowCanonicalFloor(uint256)",
   ProjectNFTAlreadyMinted: "ProjectNFTAlreadyMinted()",
+  ResaleUnavailable: "ResaleUnavailable()",
   SettlementStillActive: "SettlementStillActive()",
   TransferFailed: "TransferFailed()",
   UnauthorizedCore: "UnauthorizedCore()",
@@ -637,6 +640,105 @@ describe("ArtSoul V4.1 protocol", function () {
   });
 
   describe("resale rules", function () {
+    it("reprices an active listing in either direction, accepts the exact floor, and rejects prices below it", async function () {
+      const ctx = await deployProtocol();
+      const { core, nft, bidder, buyer } = ctx;
+      const seller = await bidder.getAddress();
+      await settlePrimaryAuction(ctx);
+      await mine(nft.connect(bidder).approve(await core.getAddress(), 1));
+      await mine(core.connect(bidder).listResale(1, TWO_ETH));
+
+      for (const price of [ethers.parseEther("3"), ethers.parseEther("1.5"), ONE_ETH]) {
+        const previousPrice = (await core.resaleListings(1)).price;
+        const receipt = await mine(core.connect(bidder).listResale(1, price));
+        const listed = await expectEvent(receipt, core, "ResaleListed");
+        expect(listed.args.tokenId).to.equal(1n);
+        expect(listed.args.seller).to.equal(seller);
+        expect(listed.args.price).to.equal(price);
+
+        const listing = await core.resaleListings(1);
+        expect(listing.active).to.equal(true);
+        expect(listing.seller).to.equal(seller);
+        expect(listing.price).to.equal(price);
+        expect(await nft.ownerOf(1)).to.equal(seller);
+        expect((await core.artworks(1)).canonicalFloor).to.equal(ONE_ETH);
+        await expectRevert(
+          core.connect(buyer).buyResale(1, { value: previousPrice }),
+          "IncorrectSettlementPayment"
+        );
+      }
+
+      await expectRevert(
+        core.connect(bidder).listResale(1, ONE_ETH - 1n),
+        "PriceBelowCanonicalFloor"
+      );
+      const preserved = await core.resaleListings(1);
+      expect(preserved.active).to.equal(true);
+      expect(preserved.seller).to.equal(seller);
+      expect(preserved.price).to.equal(ONE_ETH);
+      expect(await nft.ownerOf(1)).to.equal(seller);
+      expect((await core.artworks(1)).canonicalFloor).to.equal(ONE_ETH);
+
+      await mine(core.connect(buyer).buyResale(1, { value: ONE_ETH }));
+      expect(await nft.ownerOf(1)).to.equal(await buyer.getAddress());
+      expect((await core.artworks(1)).canonicalFloor).to.equal(ONE_ETH);
+    });
+
+    it("prevents the creator, administrator, and other accounts from repricing the collector's listing", async function () {
+      const ctx = await deployProtocol();
+      const { core, nft, bidder, artist, owner, buyer, outsider } = ctx;
+      const seller = await bidder.getAddress();
+      await settlePrimaryAuction(ctx);
+      await mine(nft.connect(bidder).approve(await core.getAddress(), 1));
+      await mine(core.connect(bidder).listResale(1, TWO_ETH));
+
+      for (const account of [artist, owner, buyer, outsider]) {
+        await expectRevert(core.connect(account).listResale(1, ONE_ETH), "NotTokenOwner");
+      }
+      const listing = await core.resaleListings(1);
+      expect(listing.active).to.equal(true);
+      expect(listing.seller).to.equal(seller);
+      expect(listing.price).to.equal(TWO_ETH);
+      expect(await nft.ownerOf(1)).to.equal(seller);
+      expect((await core.artworks(1)).canonicalFloor).to.equal(ONE_ETH);
+    });
+
+    it("allows only the seller to cancel, blocks repeat cancellation and purchase, and permits relisting", async function () {
+      const ctx = await deployProtocol();
+      const { core, nft, bidder, artist, owner, buyer, outsider, treasury } = ctx;
+      const seller = await bidder.getAddress();
+      await settlePrimaryAuction(ctx);
+      await mine(nft.connect(bidder).approve(await core.getAddress(), 1));
+      await mine(core.connect(bidder).listResale(1, TWO_ETH));
+      const recipients = await Promise.all([bidder, artist, treasury].map(account => account.getAddress()));
+      const creditsBefore = await Promise.all(recipients.map(address => core.pendingWithdrawals(address)));
+
+      for (const account of [artist, owner, buyer, outsider]) {
+        await expectRevert(core.connect(account).cancelResale(1), "NotTokenOwner");
+      }
+      expect((await core.resaleListings(1)).active).to.equal(true);
+      await mine(core.connect(bidder).cancelResale(1));
+      expect((await core.resaleListings(1)).active).to.equal(false);
+      await expectRevert(core.connect(bidder).cancelResale(1), "ResaleUnavailable");
+      await expectRevert(core.connect(buyer).buyResale(1, { value: TWO_ETH }), "ResaleUnavailable");
+      expect(await nft.ownerOf(1)).to.equal(seller);
+      expect((await core.artworks(1)).canonicalFloor).to.equal(ONE_ETH);
+      expect(await Promise.all(recipients.map(address => core.pendingWithdrawals(address))))
+        .to.deep.equal(creditsBefore);
+
+      const relistPrice = ethers.parseEther("1.5");
+      const relistReceipt = await mine(core.connect(bidder).listResale(1, relistPrice));
+      await expectEvent(relistReceipt, core, "ResaleListed");
+      const relisted = await core.resaleListings(1);
+      expect(relisted.active).to.equal(true);
+      expect(relisted.seller).to.equal(seller);
+      expect(relisted.price).to.equal(relistPrice);
+      await mine(core.connect(buyer).buyResale(1, { value: relistPrice }));
+      expect(await nft.ownerOf(1)).to.equal(await buyer.getAddress());
+      expect((await core.resaleListings(1)).active).to.equal(false);
+      expect((await core.artworks(1)).canonicalFloor).to.equal(ONE_ETH);
+    });
+
     it("rejects below-floor resale and settles above-floor resale with royalty and platform fee", async function () {
       const ctx = await deployProtocol();
       const { core, nft, artist, bidder, buyer, treasury } = ctx;

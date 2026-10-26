@@ -227,6 +227,48 @@ async function backendRead(path) {
 
 // Receipt-backed UI bridge, never authorization or indexer history. Records
 // are scoped to one artwork/chain, bounded, and expire after the cache window.
+const RESALE_SYNC_KEY = 'artsoul_confirmed_resales_v1';
+let confirmedResaleMemory = [];
+function confirmedResaleUpdates() {
+    let stored = [];
+    try { stored = JSON.parse(window.localStorage.getItem(RESALE_SYNC_KEY) || '[]'); } catch { /* memory fallback */ }
+    const latest = new Map();
+    for (const item of [...(Array.isArray(stored) ? stored : []), ...confirmedResaleMemory]) {
+        if (!item || item.chain_id !== 84532 || !/^[1-9][0-9]{0,77}$/.test(item.artwork_id) ||
+            !/^[1-9][0-9]{0,77}$/.test(item.token_id) || !/^0x[0-9a-f]{40}$/i.test(item.seller) ||
+            !/^0x[0-9a-f]{64}$/i.test(item.transaction_hash) || typeof item.active !== 'boolean' ||
+            !Number.isSafeInteger(item.block_number) || item.block_number <= 0 ||
+            !Number.isSafeInteger(item.transaction_index) || item.transaction_index < 0 ||
+            !/^\d{1,60}(?:\.\d{1,18})?$/.test(item.price) || (item.active && Number(item.price) <= 0) ||
+            !Number.isFinite(item.confirmed_at) || item.confirmed_at > Date.now() || Date.now() - item.confirmed_at >= 120000) continue;
+        const key = `${item.chain_id}:${item.artwork_id}`;
+        const prior = latest.get(key);
+        if (!prior || item.block_number > prior.block_number ||
+            (item.block_number === prior.block_number && item.transaction_index >= prior.transaction_index)) latest.set(key, item);
+    }
+    confirmedResaleMemory = [...latest.values()].slice(-20);
+    return confirmedResaleMemory;
+}
+
+function recordConfirmedResale(record) {
+    confirmedResaleMemory = [...confirmedResaleUpdates(), { ...record, confirmed_at: Date.now() }];
+    const valid = confirmedResaleUpdates();
+    try { window.localStorage.setItem(RESALE_SYNC_KEY, JSON.stringify(valid)); } catch { /* memory fallback */ }
+    window.dispatchEvent(new CustomEvent('artsoul:resale-confirmed'));
+}
+
+function applyConfirmedResaleUpdate(row) {
+    const update = confirmedResaleUpdates().find(item => item.chain_id === Number(row.chain_id) &&
+        item.artwork_id === String(row.artwork_id || row.blockchain_id) && item.token_id === String(row.token_id));
+    const authority = update?.active ? row.current_owner_address : (row.resale_seller || row.current_owner_address);
+    if (!update || !row.minted || String(authority).toLowerCase() !== update.seller.toLowerCase() ||
+        Number(row.resale_updated_block || 0) >= update.block_number) return row;
+    // The API does not expose transaction order within a block. An indexed
+    // observation at this block wins, including a later relist or cancellation.
+    // Never change ownership, floor, metadata, moderation or provenance from browser storage.
+    return { ...row, status: update.active ? 'for_sale' : 'sold', sale_price: update.active ? update.price : '0', resale_seller: update.seller, pending_resale_sync: true };
+}
+
 const AUCTION_SYNC_KEY = 'artsoul_confirmed_auctions_v1';
 const AUCTION_SYNC_TTL = 10 * 60 * 1000;
 let confirmedAuctionMemory = [];
@@ -271,6 +313,7 @@ function recordConfirmedAuction(record) {
 }
 
 function applyConfirmedAuctionUpdate(row) {
+    row = applyConfirmedResaleUpdate(row);
     const update = confirmedAuctionUpdates().find(item => String(item.artwork_id) === String(row.artwork_id || row.blockchain_id) && item.chain_id === Number(row.chain_id));
     if (!update) return row;
     const indexedId = BigInt(row.auction_id || row.active_auction_id || 0);
@@ -294,7 +337,7 @@ function applyConfirmedAuctionUpdate(row) {
 async function applyConfirmedAuctionUpdates(rows, options = {}, suppressedIds = []) {
     const suppressed = new Set(suppressedIds);
     let result = rows.map(applyConfirmedAuctionUpdate);
-    const updates = confirmedAuctionUpdates().filter(item =>
+    const updates = [...confirmedAuctionUpdates(), ...confirmedResaleUpdates()].filter(item =>
         !suppressed.has(`v41:${item.chain_id}:${item.artwork_id}`) &&
         (!options.chain_id || Number(options.chain_id) === item.chain_id) &&
         (!options.id || options.id === `v41:${item.chain_id}:${item.artwork_id}` || String(options.id) === item.artwork_id) &&
@@ -329,6 +372,7 @@ async function applyConfirmedAuctionUpdates(rows, options = {}, suppressedIds = 
 
 window.addEventListener('storage', event => {
     if (event.key === AUCTION_SYNC_KEY) window.dispatchEvent(new CustomEvent('artsoul:auction-confirmed'));
+    if (event.key === RESALE_SYNC_KEY) window.dispatchEvent(new CustomEvent('artsoul:resale-confirmed'));
 });
 
 async function getPublicProjectionArtworks(options = {}, throwOnUnavailable = false) {
@@ -1139,6 +1183,8 @@ async function updateAuction(auctionId, updates) {
 window.ArtSoulDB = {
     invalidateProfileCache,
     recordConfirmedAuction,
+    recordConfirmedResale,
+    confirmedResaleUpdates,
     applyConfirmedAuctionUpdate,
     confirmedAuctionUpdates,
     initSupabase,

@@ -137,8 +137,8 @@ const FIXTURES = {
     }
   ],
   v41_resale_listings: [
-    { chain_id: 84532, token_id: '500', active: true, price: `3${ETH}`, seller: FIRST_COLLECTOR },
-    { chain_id: 84532, token_id: '600', active: false, price: `3${ETH}`, seller: FIRST_COLLECTOR }
+    { chain_id: 84532, token_id: '500', active: true, price: `3${ETH}`, seller: FIRST_COLLECTOR, last_updated_block: 220 },
+    { chain_id: 84532, token_id: '600', active: false, price: `3${ETH}`, seller: FIRST_COLLECTOR, last_updated_block: 230 }
   ],
   v41_resale_history: [
     {
@@ -304,6 +304,8 @@ test('active resale listing keeps Owner = seller and First Collector stable', as
   const card = cardById(body, 'v41:84532:5');
   assert.equal(card.status, 'for_sale');
   assert.equal(card.sale_price, '3');
+  assert.equal(card.resale_seller, FIRST_COLLECTOR);
+  assert.equal(card.resale_updated_block, 220);
   assert.equal(card.auction_winner_address, FIRST_COLLECTOR);
   assert.equal(card.current_owner_address, FIRST_COLLECTOR);
 });
@@ -314,6 +316,8 @@ test('completed resales move Owner to the latest buyer while First Collector nev
   assert.equal(card.status, 'sold');
   assert.equal(card.auction_winner_address, FIRST_COLLECTOR);
   assert.equal(card.current_owner_address, RESALE_BUYER_2);
+  assert.equal(card.sale_price, '0', 'inactive listings never expose a price for purchase');
+  assert.equal(card.resale_updated_block, 230, 'eventless cancellation carries its observed block');
 });
 
 test('owner filter matches indexer-backed ownership, not creators or sellers', async () => {

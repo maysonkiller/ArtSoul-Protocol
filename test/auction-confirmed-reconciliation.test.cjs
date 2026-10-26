@@ -505,3 +505,64 @@ test('fresh exact lookup bypasses the projection TTL, coalesces one second, and 
   await api.read({ ...direct, fresh: '1' });
   assert.equal(api.calls.filter(path => path.startsWith('v41_artworks?') && path.includes('artwork_id=eq.28')).length, 3);
 });
+const OWNER = `0x${'56'.repeat(20)}`;
+const resaleRow = (extra = {}) => row({ minted: true, token_id: '6', current_owner_address: OWNER,
+  status: 'for_sale', sale_price: '0.1', resale_updated_block: 99, ...extra });
+const resaleReceipt = (extra = {}) => ({ chain_id: CHAIN, artwork_id: '28', token_id: '6', seller: OWNER,
+  active: false, price: '0', transaction_hash: HASH, block_number: 100, transaction_index: 2, ...extra });
+
+test('confirmed cancellation reaches every public read and survives a separate tab', async () => {
+  const store = new Map();
+  const first = client({store, reply: () => ({data: [resaleRow()]})});
+  first.db.recordConfirmedResale(resaleReceipt());
+  for (const options of [{}, {owner: OWNER}, {artwork_id: '28'}]) {
+    const rows = await first.db.getPublicProjectionArtworks(options);
+    assert.equal(rows[0].status, 'sold'); assert.equal(rows[0].sale_price, '0');
+  }
+  assert.equal((await first.db.getPublicProjectionArtworks({view:'marketplace'})).length, 0);
+  const other = client({store});
+  assert.equal(other.db.applyConfirmedAuctionUpdate(resaleRow()).status, 'sold');
+  assert.equal(first.events.at(-1).type, 'artsoul:resale-confirmed');
+});
+
+test('listing bridge cannot replace ownership, floor, another token or newer chain state', () => {
+  const {db} = client();
+  db.recordConfirmedResale(resaleReceipt({current_owner_address:'attacker',canonical_floor:'9000'}));
+  const original = resaleRow({canonical_floor:'0.01'});
+  const updated = db.applyConfirmedAuctionUpdate(original);
+  assert.equal(updated.current_owner_address, OWNER); assert.equal(updated.canonical_floor, '0.01');
+  for (const patch of [{token_id:'7'}, {chain_id:11155111}, {minted:false},
+    {current_owner_address:CREATOR}, {resale_updated_block:101}]) {
+    const value = resaleRow(patch); assert.deepEqual(db.applyConfirmedAuctionUpdate(value), value);
+  }
+});
+
+test('later resale receipt wins within the same block, then expires', () => {
+  const time = clock(), {db} = client({time});
+  db.recordConfirmedResale(resaleReceipt());
+  db.recordConfirmedResale(resaleReceipt({transaction_index:3,active:true,price:'0.2'}));
+  db.recordConfirmedResale(resaleReceipt({transaction_index:1}));
+  assert.equal(db.applyConfirmedAuctionUpdate(resaleRow()).sale_price, '0.2');
+  time.advance(120001);
+  assert.equal(db.applyConfirmedAuctionUpdate(resaleRow()).sale_price, '0.1');
+});
+
+test('same-block indexed listing state wins over an earlier local receipt', () => {
+  for (const active of [false, true]) {
+    const {db} = client();
+    db.recordConfirmedResale(resaleReceipt({active,price:active?'0.2':'0',transaction_index:1}));
+    const indexed = resaleRow({resale_updated_block:100,status:active?'sold':'for_sale',sale_price:active?'0':'2'});
+    assert.deepEqual(db.applyConfirmedAuctionUpdate(indexed), indexed, 'later same-block chain state cannot be replaced');
+  }
+});
+
+test('a listing receipt never resurrects a hidden artwork', async () => {
+  const {db} = client({reply: () => ({data:[],suppressed_artwork_ids:['v41:84532:28']})});
+  db.recordConfirmedResale(resaleReceipt({active:true,price:'0.1'}));
+  assert.equal((await db.getPublicProjectionArtworks({view:'marketplace'})).length, 0);
+});
+
+test('confirmed resale stays visible with blocked browser storage', () => {
+  const {db} = client({storageFails:true}); db.recordConfirmedResale(resaleReceipt());
+  assert.equal(db.applyConfirmedAuctionUpdate(resaleRow()).status, 'sold');
+});

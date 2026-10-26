@@ -3,7 +3,21 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 homepage banner follow-up, local candidate started at `bca32be`:
+October 26 B23 resale controls IN PROGRESS (started at `56536ec`):
+
+- Owner price/floor editor and seller cancellation, exact wei validation,
+  native dialog, all-surface receipt bridge and bounded confirmed-state worker
+  reconciliation implemented. Canon architecture unchanged.
+- Local contract22, adapter20, UI/API106 and indexer84/leadership21 groups pass
+  (overlapping counts); build and four theme/viewport flows pass. Details in
+  `audits/B23_RESALE_CONTROLS_2026-10-26.md`. Full unit run is in progress.
+- No production deployment or actual NFT listing mutation yet. Preserve
+  unrelated authority-policy untracked files, `.codex/`, `output/`.
+- Exactly next step: finish full checks and preview, then deploy the reviewed
+  worker with rollback backup before releasing owner controls.
+
+October 26 homepage banner follow-up RELEASED: PR #372, candidate `d4bc3f6`,
+production merge `5ba1901` (started at `bca32be`):
 
 - Live before-change 32 metadata/12 image/three HTTP-www alias checks already
   return v2; the founder's Telegram screenshot still caches the root preview.
@@ -12,8 +26,12 @@ October 26 homepage banner follow-up, local candidate started at `bca32be`:
   domain/sharing13 and full build pass. No logo or artwork media changes.
 - Evidence/interpretation: `audits/B22_PROFILE_POLISH_2026-10-26.md`, homepage
   follow-up. Preserve unrelated authority-policy files, `.codex/`, `output/`.
-- Exactly next step: publish this bounded correction after CI/preview checks,
-  verify apex, then resume B21 Donate/Report. Telegram cache refresh unclaimed.
+- CI40342569351 passes: Linux2771/two skips, Windows2384/31 skips,
+  46 contracts each. Preview/apex eight-route/36-asset checks, 32 metadata and
+  12 image checks each pass. Apex deployment binding and HTTP/www aliases pass.
+- No implementation diff remains. Helper finished, no owned servers/browsers
+  started. Exactly next step: resume B21 Donate/Report preparation with visible
+  review/submission. Telegram cache refresh remains unclaimed.
 
 October 26 video search follow-up RELEASED in PR #371, candidate `16513ab`,
 production merge `fb05b45` (started at `03f7134`):

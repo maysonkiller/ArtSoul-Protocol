@@ -241,7 +241,7 @@ test('every artwork write-action section is gated on the Base write predicate', 
   // B-11: closing an expired settlement is a write too.
   assert.match(artworkSource, /\{artworkWriteEnabled && settlementExpired && \(/);
   assert.match(artworkSource, /\{artworkWriteEnabled && resaleEligibility\.showOwnerAction && \(/);
-  assert.match(artworkSource, /\{listedForResale && !connectedWalletOwnsArtwork && artworkWriteEnabled && \(/);
+  assert.match(artworkSource, /\{listedForResale && !connectedWalletOwnsArtwork && !connectedWalletIsSeller && artworkWriteEnabled && \(/);
 });
 
 test('every artwork write handler re-checks the legacy guard at execution time', () => {
@@ -291,7 +291,8 @@ test('resale submit re-checks owner and chain; buyer can never self-purchase', (
   const confirm = extractFunction(artworkSource, 'confirmResaleListing');
   assert.match(confirm, /ensureArtworkWriteEnabled\(\)/);
   assert.match(confirm, /await getLiveProviderAccount\(\)/);
-  assert.match(confirm, /isSameAddress\(submitWalletAddress, artwork\.current_owner_address\)/);
+  assert.match(confirm, /resaleModalMode === 'cancel' \? artwork\.resale_seller : artwork\.current_owner_address/);
+  assert.match(confirm, /isSameAddress\(submitWalletAddress, requiredAddress\)/);
   // The stale rendered/window account snapshot never authorizes the submit.
   assert.doesNotMatch(confirm, /connectedWalletAddress|window\.currentWalletAddress|getCurrentWalletAddress/);
   const purchase = extractFunction(artworkSource, 'purchaseResaleOnce');
@@ -312,14 +313,17 @@ function liveAccountProvider(accounts) {
   };
 }
 
-async function runConfirmResaleListing({ liveAccounts, owner, staleAccount }) {
+async function runConfirmResaleListing({ liveAccounts, owner, staleAccount, seller, mode = 'list' }) {
+  const { validateResalePrice } = await import('../src/features/marketplace/resale-eligibility.js');
   const calls = { errors: [], began: [] };
   const sandbox = vm.createContext({
     window: { web3Modal: liveAccountProvider(liveAccounts) },
-    artwork: { current_owner_address: owner, token_id: '7', minted: true },
+    artwork: { current_owner_address: owner, resale_seller: seller, token_id: '7', minted: true },
     connectedWalletAddress: staleAccount,
     resaleFloorPrice: '1',
     resaleModalPrice: '2',
+    resaleModalMode: mode,
+    validateResalePrice,
     setResaleModalError: (message) => calls.errors.push(message),
     setResaleModalStepLabel: () => {},
     // Stop after the authorization phase: begin returning false proves the
@@ -340,6 +344,14 @@ async function runConfirmResaleListing({ liveAccounts, owner, staleAccount }) {
   await sandbox.exported.confirmResaleListing();
   return calls;
 }
+
+test('cancellation follows the listing seller even after ownership changes', async () => {
+  const allowed = await runConfirmResaleListing({ liveAccounts: [COLLECTOR], owner: BIDDER, seller: COLLECTOR, mode: 'cancel' });
+  assert.deepEqual(allowed.began, ['resale-list']);
+  const blocked = await runConfirmResaleListing({ liveAccounts: [BIDDER], owner: BIDDER, seller: COLLECTOR, mode: 'cancel' });
+  assert.equal(blocked.began.length, 0);
+  assert.match(blocked.errors[0], /listing seller/);
+});
 
 test('stale rendered owner cannot list when the live provider account differs', async () => {
   // UI still shows owner A (stale render), but the wallet switched to B.
@@ -444,7 +456,7 @@ test('a missing live provider account blocks the purchase gracefully', async () 
 
 const eligibilitySandbox = vm.createContext({ exported: {} });
 vm.runInContext(
-  eligibilitySource.replace(/^export /gm, '') + '\nexported.getOwnerResaleEligibility = getOwnerResaleEligibility;',
+  eligibilitySource.replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '') + '\nexported.getOwnerResaleEligibility = getOwnerResaleEligibility;',
   eligibilitySandbox,
   { filename: 'resale-eligibility.js (stripped ESM)' }
 );
@@ -489,6 +501,7 @@ test('every contract write entry point calls the shared Base Sepolia guard first
     'claimSettlementDefault',
     'withdraw',
     'listResale',
+    'cancelResale',
     'buyResale'
   ]) {
     const body = contractsSource.slice(
