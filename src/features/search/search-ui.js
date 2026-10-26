@@ -1,7 +1,8 @@
 import { SEARCH_CATEGORIES, canSearch, normalizeSearchQuery, createSearchState, readSearchHistory, writeSearchHistory } from './search-state.js';
+import { getSiteSearchEntry } from './site-content-search.js';
 
-const labels = { all: 'All', artworks: 'Artworks', auctions: 'Live auctions', artists: 'Artist profiles' };
-let dialog, input, results, status, tabs, returnFocus, timer, opening = false;
+const labels = { all: 'All', artworks: 'Artworks', auctions: 'Live auctions', artists: 'People', pages: 'Pages', docs: 'Documentation' };
+let dialog, input, results, status, tabs, content, returnFocus, timer, opening = false, releaseViewport;
 let deadlineTimer, deadlineUpdates = [];
 let category = 'all';
 let storage; try { storage = window.localStorage; } catch { /* Storage is optional. */ }
@@ -24,10 +25,33 @@ function rememberView(kind, id) {
 }
 function artworkHref(id) { return window.ArtSoulArtworkUrl.artworkPath(`v41:84532:${id}`); }
 function close() { if (dialog?.open) dialog.close(); }
-function chooseCategory(next) { category = next; rememberQuery(); state.search(input.value, category); }
+function closeForNavigation(event) {
+    const link = event.currentTarget;
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey ||
+        (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+    close();
+}
+function chooseCategory(next) { category = next; clearTimeout(timer); content.scrollTop = 0; rememberQuery(); state.search(input.value, category); }
 function setQuery(query) {
-    input.value = query; clearTimeout(timer); state.reset(query, category);
+    input.value = query; content.scrollTop = 0; clearTimeout(timer); state.reset(query, category);
     if (canSearch(query)) timer = setTimeout(() => state.search(query, category), 250);
+}
+function bindViewport() {
+    releaseViewport?.();
+    const viewport = window.visualViewport;
+    const update = () => {
+        const height = viewport?.height ?? window.innerHeight;
+        dialog.style.setProperty('--search-viewport-height', `${height}px`);
+        dialog.style.setProperty('--search-viewport-top', `${viewport?.offsetTop ?? 0}px`);
+        dialog.classList.toggle('is-compact', height < 480);
+    };
+    update();
+    viewport?.addEventListener('resize', update); viewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    releaseViewport = () => {
+        viewport?.removeEventListener('resize', update); viewport?.removeEventListener('scroll', update);
+        window.removeEventListener('resize', update); releaseViewport = undefined;
+    };
 }
 function createDialog() {
     dialog = element('dialog', 'artsoul-search-dialog'); dialog.id = 'artsoul-search-dialog'; dialog.setAttribute('aria-labelledby', 'artsoul-search-title');
@@ -36,11 +60,11 @@ function createDialog() {
     const dismiss = button('Close', close, 'artsoul-search-close'); dismiss.setAttribute('aria-label', 'Close search');
     header.append(title, dismiss);
     const form = element('form', 'artsoul-search-form'); form.setAttribute('role', 'search');
-    const label = element('label', 'artsoul-search-label', 'All artworks and artist profiles · title, name, wallet or artwork number'); label.htmlFor = 'artsoul-search-input';
+    const label = element('label', 'artsoul-search-label', 'Art, people and documentation'); label.htmlFor = 'artsoul-search-input';
     input = element('input'); input.id = 'artsoul-search-input'; input.type = 'search'; input.maxLength = 100; input.autocomplete = 'off';
-    input.placeholder = 'Search art and artist profiles'; input.enterKeyHint = 'search'; input.setAttribute('autocapitalize', 'none'); input.spellcheck = false;
+    input.placeholder = 'Search all ArtSoul'; input.enterKeyHint = 'search'; input.setAttribute('autocapitalize', 'none'); input.spellcheck = false;
     input.addEventListener('input', () => setQuery(input.value));
-    input.addEventListener('keydown', event => { if (event.key === 'ArrowDown') { const link = results.querySelector('a'); if (link) { event.preventDefault(); link.focus(); } } });
+    input.addEventListener('keydown', event => { if (!event.isComposing && event.keyCode !== 229 && event.key === 'ArrowDown') { const link = results.querySelector('a'); if (link) { event.preventDefault(); link.focus(); } } });
     const submit = element('button', 'artsoul-search-submit', 'Search'); submit.type = 'submit';
     form.append(label, input, submit);
     form.addEventListener('submit', event => { event.preventDefault(); clearTimeout(timer); rememberQuery(); state.search(input.value, category); });
@@ -55,13 +79,21 @@ function createDialog() {
         if (current === 0 && event.key === 'ArrowUp') input.focus();
         else links[Math.max(0, Math.min(links.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)))].focus();
     });
-    dialog.append(header, form, tabs, status, results); document.body.append(dialog);
+    content = element('div', 'artsoul-search-content'); content.append(tabs, status, results);
+    dialog.append(header, form, content); document.body.append(dialog);
     // Search inputs consume their first Escape to clear text in some browsers.
     // Closing the dialog must still take one press from any control.
-    dialog.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); close(); } });
-    dialog.addEventListener('click', event => { if (event.target === dialog) { const r = dialog.getBoundingClientRect();
-        if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); } });
-    dialog.addEventListener('close', () => { clearTimeout(timer); clearInterval(deadlineTimer); deadlineUpdates = []; state.cancel(); returnFocus?.isConnected && returnFocus.focus({ preventScroll: true }); });
+    dialog.addEventListener('keydown', event => { if (!event.isComposing && event.keyCode !== 229 && event.key === 'Escape') { event.preventDefault(); close(); } });
+    const outside = event => { const r = dialog.getBoundingClientRect(); return event.target === dialog &&
+        (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom); };
+    let backdropPointer = false;
+    dialog.addEventListener('pointerdown', event => { backdropPointer = outside(event); });
+    dialog.addEventListener('pointercancel', () => { backdropPointer = false; });
+    dialog.addEventListener('click', event => {
+        const deliberate = event.detail > 0 && backdropPointer && outside(event);
+        backdropPointer = false; if (deliberate) close();
+    });
+    dialog.addEventListener('close', () => { releaseViewport?.(); backdropPointer = undefined; input.blur(); clearTimeout(timer); clearInterval(deadlineTimer); deadlineUpdates = []; state.cancel(); returnFocus?.isConnected && returnFocus.focus({ preventScroll: true }); });
     window.addEventListener('pagehide', close);
 }
 function addImage(link, candidate, fallback) {
@@ -75,7 +107,11 @@ function resultLink(item, key) {
     const link = element('a', 'artsoul-search-result');
     const text = element('span', 'artsoul-search-result-text');
     let id;
-    if (key === 'artists') {
+    if (key === 'pages' || key === 'docs') {
+        const entry = getSiteSearchEntry(key, item.id); if (!entry) return null;
+        id = item.id; link.href = entry.url;
+        text.append(element('strong', '', entry.title), element('span', '', item.excerpt));
+    } else if (key === 'artists') {
         id = String(item.wallet_address || '').toLowerCase(); if (!/^0x[0-9a-f]{40}$/.test(id)) return null;
         link.href = '/profile?address=' + encodeURIComponent(id);
         addImage(link, item.avatar_url, '/default-avatar.png');
@@ -99,30 +135,32 @@ function resultLink(item, key) {
         }
         link.title = [item.title || `Artwork #${id}`, creator, lifecycle, price].filter(Boolean).join(' — ');
     }
-    link.append(text); link.addEventListener('click', () => rememberView(key === 'artists' ? 'artist' : 'artwork', id)); return link;
+    link.append(text); link.addEventListener('click', event => { rememberView(key === 'artists' ? 'artist' : ['pages', 'docs'].includes(key) ? key : 'artwork', id); closeForNavigation(event); }); return link;
 }
 function renderRecent() {
     history = readSearchHistory(storage);
-    if (!history.queries.length && !history.views.length) { status.textContent = 'Find art and artists. Search by title, name, address or #number.'; return; }
+    if (!history.queries.length && !history.views.length) { status.textContent = 'Find art, people, pages and documentation. Try a title, topic, address or #number.'; return; }
     const heading = element('div', 'artsoul-search-group-heading'); heading.append(element('h3', '', 'On this browser'), button('Clear history', () => {
         history = { queries: [], views: [] }; try { storage?.removeItem('artsoul_search_history'); } catch {} render(state.getState());
     })); results.append(heading);
     if (history.queries.length) { results.append(element('h4', '', 'Recent searches')); const list = element('div', 'artsoul-search-recents');
         for (const query of history.queries) list.append(button(query, () => { input.value = query; state.search(query, category); })); results.append(list); }
     if (history.views.length) { results.append(element('h4', '', 'Recently opened from search'));
-        for (const view of history.views) { const link = element('a', 'artsoul-search-recent-link', view.kind === 'artwork' ? `Artwork #${view.id}` : `Artist ${view.id.slice(0, 8)}…${view.id.slice(-6)}`);
-            link.href = view.kind === 'artwork' ? artworkHref(view.id) : '/profile?address=' + encodeURIComponent(view.id); results.append(link); }
+        for (const view of history.views) { const entry = getSiteSearchEntry(view.kind, view.id);
+            const link = element('a', 'artsoul-search-recent-link', entry?.title || (view.kind === 'artwork' ? `Artwork #${view.id}` : `Artist ${view.id.slice(0, 8)}…${view.id.slice(-6)}`));
+            link.href = entry?.url || (view.kind === 'artwork' ? artworkHref(view.id) : '/profile?address=' + encodeURIComponent(view.id));
+            link.addEventListener('click', closeForNavigation); results.append(link); }
     }
 }
 function render(value) {
     if (!dialog?.open) return;
+    dialog.dataset.searchCategory = category;
     deadlineUpdates = [];
     for (const tab of tabs.children) tab.setAttribute('aria-pressed', String(tab.dataset.category === category));
     results.replaceChildren(); results.setAttribute('aria-busy', String(['loading', 'more'].includes(value.status)));
     status.textContent = '';
     if (value.status === 'idle') { if (input.value.trim()) status.textContent = canSearch(input.value) ? 'Searching…' : 'Enter at least two characters or an artwork number.'; else renderRecent(); return; }
-    if (value.status === 'loading') { status.textContent = 'Searching…'; return; }
-    if (value.status === 'error') { status.textContent = value.error; results.append(button('Try again', () => state.search(input.value, category))); return; }
+    if (value.status === 'error') results.append(button('Retry artwork search', () => state.search(input.value, category)));
     let count = 0;
     for (const key of SEARCH_CATEGORIES.slice(1)) {
         const group = value.groups[key]; if (!group.items.length) continue;
@@ -133,7 +171,8 @@ function render(value) {
         for (const item of group.items) { const link = resultLink(item, key); if (link) { section.append(link); count++; } }
         results.append(section);
     }
-    status.textContent = count ? `${count} ${category === 'all' ? 'matches' : labels[category].toLowerCase()} shown.` : 'No matches. Try another title, artist or artwork number.';
+    status.textContent = value.status === 'loading' ? 'Searching art and people…' : value.status === 'error' ? value.error + (count ? ' Available pages and documentation are shown below.' : '') :
+        count ? `${count} ${category === 'all' ? 'matches' : labels[category].toLowerCase()} shown.` : 'No matches. Try another title, name, topic or artwork number.';
     if (value.nextCursor) { const more = button(value.status === 'more' ? 'Loading…' : 'Load more', () => state.search(input.value, category, true)); more.disabled = value.status === 'more'; results.append(more); }
 }
 async function open(query) {
@@ -144,14 +183,14 @@ async function open(query) {
         if (!window.ArtSoulArtworkCard) await import('../../ui/components/artwork-card.js');
         if (!dialog) createDialog();
         for (const control of dialog.querySelectorAll('input, form button, .artsoul-search-categories button')) control.disabled = false;
-        dialog.showModal(); input.focus({ preventScroll: true });
+        bindViewport(); dialog.showModal(); content.scrollTop = 0; input.focus({ preventScroll: true });
         if (typeof query === 'string') input.value = query.slice(0, 100);
         state.reset(input.value, category);
         if (canSearch(input.value)) state.search(input.value, category);
         clearInterval(deadlineTimer); deadlineTimer = setInterval(() => deadlineUpdates.forEach(update => update()), 1000);
     } catch {
         if (!dialog) createDialog();
-        if (!dialog.open) dialog.showModal();
+        if (!dialog.open) { bindViewport(); dialog.showModal(); }
         for (const control of dialog.querySelectorAll('input, form button, .artsoul-search-categories button')) control.disabled = true;
         status.textContent = 'Search could not load. Close this window and try again.';
     } finally { opening = false; }

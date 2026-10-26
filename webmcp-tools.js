@@ -303,13 +303,14 @@
 
         const searchCatalog = {
             name: 'search_catalog',
-            description: 'Search the same public artwork, live-auction and artist-profile catalog as Search ArtSoul. ' +
-                'Grouped first-page results only, with explicit hasMore; no total-count claim. Read-only, no wallet or automatic navigation.',
+            description: 'Search the same public artworks, live auctions, artist profiles, site pages and protocol documentation as Search ArtSoul. ' +
+                'Grouped first-page results only, with explicit hasMore; no total-count claim. A warning marks partial results when the artwork catalog is unavailable. ' +
+                'Read-only, no private administration data, wallet or automatic navigation.',
             inputSchema: {
                 type: 'object', additionalProperties: false,
                 properties: {
-                    query: { type: 'string', maxLength: 100, description: 'Artwork title/number, artist name or public wallet address.' },
-                    category: { type: 'string', enum: ['all', 'artworks', 'auctions', 'artists'] }
+                    query: { type: 'string', maxLength: 100, description: 'Artwork title/number, artist name, public wallet address, page name or protocol documentation topic.' },
+                    category: { type: 'string', enum: ['all', 'artworks', 'auctions', 'artists', 'pages', 'docs'] }
                 }, required: ['query']
             },
             execute: async input => {

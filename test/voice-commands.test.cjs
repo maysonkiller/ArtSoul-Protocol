@@ -25,11 +25,21 @@ test('global search keeps query text as data, supports public categories and ask
     ['en', 'Find artists Vera', {query: 'Vera', category: 'artists'}],
     ['en', 'search artworks Moon 🌙', {query: 'Moon 🌙', category: 'artworks'}],
     ['en', 'look for auctions Moon', {query: 'Moon', category: 'auctions'}],
+    ['en', 'search docs fees', {query: 'fees', category: 'docs'}],
+    ['en', 'find documentation deposits', {query: 'deposits', category: 'docs'}],
+    ['en', 'search in docs buy artwork 34', {query: 'buy artwork 34', category: 'docs'}],
+    ['en', 'find pages gallery', {query: 'gallery', category: 'pages'}],
+    ['en', 'search page profile', {query: 'profile', category: 'pages'}],
     ['en', 'find artwork 34', {query: 'artwork 34'}],
     ['en', 'search buy artwork 34 & category=artists', {query: 'buy artwork 34 & category=artists'}],
     ['ru', 'найди автора Vera', {query: 'Vera', category: 'artists'}],
     ['ru', 'найди работы Луна', {query: 'Луна', category: 'artworks'}],
     ['ru', 'найди аукционы Луна', {query: 'Луна', category: 'auctions'}],
+    ['ru', 'найди документацию fees', {query: 'fees', category: 'docs'}],
+    ['ru', 'найди в документации deposits', {query: 'deposits', category: 'docs'}],
+    ['ru', 'ищи по документации оплати работу 34', {query: 'оплати работу 34', category: 'docs'}],
+    ['ru', 'найди страницы gallery', {query: 'gallery', category: 'pages'}],
+    ['ru', 'поиск страницу profile', {query: 'profile', category: 'pages'}],
     ['ru', 'найди убери работу 34 из избранного', {query: 'убери работу 34 из избранного'}]
   ]) {
     assert.deepEqual(parse(phrase, lang), {tool: 'search_catalog', input});
@@ -56,6 +66,41 @@ test('global search distinguishes grouped matches shown from totals and does not
   for (const group of Object.values(result.groups)) {group.items = []; group.hasMore = false;}
   assert.match(voice.describeResult('search_catalog', result, 'en').show, /No matches/);
   assert.match(voice.describeResult('search_catalog', {error: 'Search unavailable'}, 'en').show, /unavailable/);
+});
+
+test('public page and documentation replies label partial results without speaking their content', () => {
+  const result = {category: 'all', warning: 'Search is temporarily unavailable.', groups: {
+    artworks: {items: [], hasMore: false}, auctions: {items: [], hasMore: false}, artists: {items: [], hasMore: false},
+    pages: {items: [{id: 'gallery', title: 'Explore Art', url: '/gallery'}], hasMore: false},
+    docs: {items: [{id: 'fees', title: '<img src=x> Fees', url: '/docs-protocol#fees'}], hasMore: true}
+  }};
+  for (const language of ['en', 'ru']) {
+    const reply = voice.describeResult('search_catalog', result, language);
+    assert.equal(reply.links.length, 2);
+    assert.deepEqual(reply.links.map(item => item.url), ['/gallery', '/docs-protocol#fees']);
+    assert.match(reply.links[1].label, /<img src=x> Fees/);
+    assert.doesNotMatch(reply.links[1].label, /undefined|#fees/);
+    assert.doesNotMatch(reply.say, /Explore Art|<img|Fees/);
+    assert.match(reply.show, language === 'en' ? /Pages: 1 · Documentation: 1/ : /Страницы: 1 · Документация: 1/);
+    assert.match(reply.show, language === 'en' ? /Only matching pages and documentation/ : /только найденные страницы и документация/);
+    assert.match(reply.show, language === 'en' ? /More matches/ : /Есть ещё результаты/);
+  }
+  delete result.warning;
+  assert.doesNotMatch(voice.describeResult('search_catalog', result, 'en').show, /unavailable/);
+});
+
+test('new public groups remain optional for older results but malformed groups are rejected', () => {
+  const result = {category: 'docs', groups: {
+    artworks: {items: [], hasMore: false}, auctions: {items: [], hasMore: false}, artists: {items: [], hasMore: false}
+  }};
+  assert.match(voice.describeResult('search_catalog', result, 'en').show, /No matches/);
+  for (const invalid of [null, {}, {items: 'not an array'}]) {
+    result.groups.docs = invalid;
+    assert.match(voice.describeResult('search_catalog', result, 'en').show, /could not be completed/);
+  }
+  result.groups.docs = {items: Array.from({length: 21}, (_, i) => ({title: 'Section ' + i, url: '/docs-protocol#fees'})), hasMore: true};
+  const reply = voice.describeResult('search_catalog', result, 'en');
+  assert.equal(reply.links.length, 20); assert.match(reply.show, /Documentation: 20/);
 });
 
 test('explicit English and Russian favorites commands express a desired state', () => {

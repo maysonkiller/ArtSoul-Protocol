@@ -6731,10 +6731,16 @@ body.future .artsoul-voice-button.is-listening {
 .site-search-button:hover { border-color: var(--c-accent); }
 .site-search-button:focus-visible, .artsoul-search-dialog :focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
 dialog.artsoul-search-dialog {
-    box-sizing: border-box; margin: auto; width: min(760px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem);
-    max-height: calc(100dvh - 2rem); padding: 1.25rem; overflow-y: auto; overscroll-behavior: contain;
+    box-sizing: border-box; position: fixed; inset: auto 0; top: var(--search-viewport-top, 0px);
+    margin: clamp(1rem, calc((var(--search-viewport-height, 100dvh) - 680px) / 2), 4rem) auto 0;
+    width: min(760px, calc(100vw - 2rem)); max-width: calc(100vw - 2rem);
+    height: min(680px, calc(var(--search-viewport-height, 100dvh) - 2rem));
+    max-height: calc(var(--search-viewport-height, 100dvh) - 2rem); padding: 1.25rem; overflow: hidden;
     color: var(--c-text); background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 1rem;
 }
+dialog.artsoul-search-dialog[open] { display: flex; flex-direction: column; }
+.artsoul-search-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: .25rem; }
+.artsoul-search-heading, .artsoul-search-form { flex: 0 0 auto; }
 .artsoul-search-dialog::backdrop { background: color-mix(in srgb, var(--c-bg) 84%, transparent); }
 .artsoul-search-dialog * { box-sizing: border-box; }
 .artsoul-search-heading, .artsoul-search-group-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
@@ -6760,12 +6766,20 @@ dialog.artsoul-search-dialog {
 .artsoul-search-recents button { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
 .artsoul-search-recent-link { display: block; padding: .6rem; color: var(--c-text); overflow-wrap: anywhere; }
 .artsoul-search-results h4 { margin: .8rem 0 .5rem; font-size: .9rem; color: var(--c-text-muted); }
+.artsoul-search-dialog:not([data-search-category="all"]) .artsoul-search-group > .artsoul-search-group-heading { display: none; }
+.artsoul-search-dialog.is-compact .artsoul-search-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.artsoul-search-dialog.is-compact .artsoul-search-status { margin: .4rem 0; }
+.artsoul-search-dialog.is-compact .artsoul-search-group { margin-top: .25rem; }
 .gallery-search-controls { min-width: 0; }
 .gallery-search-all { margin-top: .3rem; min-height: 36px; padding: .3rem .6rem; font: inherit; font-size: .8rem; color: var(--c-text); background: var(--c-surface); border: 1px solid var(--c-border-soft); border-radius: .5rem; cursor: pointer; }
 @media (max-width: 768px) {
     .site-header-actions { gap: 0.25rem; }
-    dialog.artsoul-search-dialog { padding: .9rem; }
-    .artsoul-search-categories button { padding: .4rem .6rem; }
+    dialog.artsoul-search-dialog { padding: .75rem; }
+    .artsoul-search-heading h2 { font-size: 1.1rem; }
+    .artsoul-search-form { margin: .5rem 0; }
+    .artsoul-search-categories { flex-wrap: nowrap; overflow-x: auto; padding: .2rem 0; scrollbar-width: none; }
+    .artsoul-search-categories::-webkit-scrollbar { display: none; }
+    .artsoul-search-categories button { flex: 0 0 auto; padding: .4rem .6rem; }
     .artsoul-search-image { width: 44px; height: 44px; flex-basis: 44px; }
 }
 

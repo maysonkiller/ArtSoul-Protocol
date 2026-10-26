@@ -126,11 +126,13 @@
             : /^(?:search(?: for)?|find|look for)(?:\s+(.*))?$/i.exec(normalized);
         if (search) {
             if (!search[1]) return { searchPrompt: true };
-            const scoped = language === 'ru' ? /^(автора|художника|профили|работы|аукционы)\s+(.+)$/i.exec(search[1])
-                : /^(artists|profiles|artworks|auctions)\s+(.+)$/i.exec(search[1]);
+            const scoped = language === 'ru' ? /^(?:(?:в|по)\s+)?(автора|художника|профили|работы|аукционы|документацию|документации|документация|документы|страницу|страницы|страницах)\s+(.+)$/i.exec(search[1])
+                : /^(?:in\s+)?(artists|profiles|artworks|auctions|docs|documentation|pages|page)\s+(.+)$/i.exec(search[1]);
             if (!scoped) return { tool: 'search_catalog', input: { query: search[1] } };
             const kind = scoped[1].toLowerCase();
-            const category = ['artworks', 'работы'].includes(kind) ? 'artworks' : ['auctions', 'аукционы'].includes(kind) ? 'auctions' : 'artists';
+            const category = ['artworks', 'работы'].includes(kind) ? 'artworks' : ['auctions', 'аукционы'].includes(kind) ? 'auctions'
+                : ['docs', 'documentation', 'документацию', 'документации', 'документация', 'документы'].includes(kind) ? 'docs'
+                : ['pages', 'page', 'страницу', 'страницы', 'страницах'].includes(kind) ? 'pages' : 'artists';
             return { tool: 'search_catalog', input: { query: scoped[2], category } };
         }
         for (const [ruleLang, pattern, build] of GRAMMAR) {
@@ -173,7 +175,7 @@
             noSpeech: 'Voice is unavailable in this browser. You can type instead.',
             working: 'Working… If your wallet opens, review the request there. Closing this panel does not cancel a submitted transaction.',
             empty: 'Enter a command first.', changed: 'Wallet changed. Enter a new command for this account.',
-            searchPrompt: 'What would you like to find? Try "search moon" or "find artists Vera".',
+            searchPrompt: 'What would you like to find? Try "search moon", "find artists Vera" or "search docs fees".',
             tooLong: 'Use one command of up to 300 characters.',
             listening: 'Listening… say one command.',
             notHeard: 'Nothing was heard. Press the microphone and try again.',
@@ -183,7 +185,7 @@
             unavailable: 'Commands are not available on this page.',
             notice: 'Voice commands use your browser\'s speech recognition. In Chrome, the audio is sent to Google to be transcribed. ArtSoul does not record, store or receive it.\n\nTurn on voice commands?',
             micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
-            help: 'Try: "search moon", "find artists Vera", "find auctions moon", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+            help: 'Try: "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
                 '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
             submitted: 'Done. The wallet approved it and the transaction was sent.',
@@ -200,7 +202,7 @@
             noSpeech: 'Голос недоступен в этом браузере. Можно написать команду.',
             working: 'Выполняется… Если откроется кошелёк, проверьте запрос в нём. Закрытие этого окна не отменяет отправленную транзакцию.',
             empty: 'Сначала введите команду.', changed: 'Кошелёк изменён. Введите новую команду для этого аккаунта.',
-            searchPrompt: 'Что найти? Например: «найди луна» или «найди автора Vera».',
+            searchPrompt: 'Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».',
             tooLong: 'Введите одну команду длиной до 300 символов.',
             listening: 'Слушаю… скажите одну команду.',
             notHeard: 'Ничего не услышано. Нажмите микрофон и попробуйте снова.',
@@ -210,7 +212,7 @@
             unavailable: 'Команды недоступны на этой странице.',
             notice: 'Голосовые команды используют распознавание речи вашего браузера. В Chrome звук отправляется в Google для распознавания. ArtSoul его не записывает, не хранит и не получает.\n\nВключить голосовые команды?',
             micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
-            help: 'Скажите: «найди луна», «найди автора Vera», «найди аукционы луна», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
+            help: 'Скажите: «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
                 '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
             submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
@@ -246,24 +248,32 @@
 
         switch (tool) {
         case 'search_catalog': {
-            const labels = ru ? { artworks: 'Работы', auctions: 'Аукционы', artists: 'Авторы' }
-                : { artworks: 'Artworks', auctions: 'Auctions', artists: 'Artists' };
+            const labels = ru ? { artworks: 'Работы', auctions: 'Аукционы', artists: 'Авторы', pages: 'Страницы', docs: 'Документация' }
+                : { artworks: 'Artworks', auctions: 'Auctions', artists: 'Artists', pages: 'Pages', docs: 'Documentation' };
             const lines = [], links = [];
             let more = false;
-            for (const key of ['artworks', 'auctions', 'artists']) {
+            for (const key of ['artworks', 'auctions', 'artists', 'pages', 'docs']) {
                 const group = data.groups?.[key];
+                if (group === undefined && ['pages', 'docs'].includes(key)) continue;
                 if (!Array.isArray(group?.items)) return { say: t.error('Invalid search response.'), show: 'Search could not be completed. Please try again.' };
                 const items = group.items.slice(0, data.category === 'all' ? 5 : 20);
                 if (items.length) lines.push(`${labels[key]}: ${items.length}`);
                 more ||= group.hasMore === true;
-                for (const item of items) links.push({ url: item.url, label: key === 'artists'
-                    ? `${labels[key]} · ${item.name} · ${item.wallet_address}`
-                    : `${labels[key]} · ${item.title} (#${item.artwork_id}) · ${item.creator}` });
+                for (const item of items) {
+                    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+                    links.push({ url: item.url, label: ['pages', 'docs'].includes(key)
+                        ? `${labels[key]} · ${typeof item.title === 'string' ? item.title : labels[key]}`
+                        : key === 'artists' ? `${labels[key]} · ${item.name} · ${item.wallet_address}`
+                        : `${labels[key]} · ${item.title} (#${item.artwork_id}) · ${item.creator}` });
+                }
             }
             const head = lines.length ? `${ru ? 'Показано' : 'Shown'}: ${lines.join(' · ')}.`
                 : (ru ? 'Совпадений нет. Попробуйте другое название, имя или номер работы.' : 'No matches. Try another title, artist or artwork number.');
             const tail = more ? (ru ? 'Есть ещё результаты. Откройте поиск через лупу и выберите категорию.' : 'More matches are available. Open Search ArtSoul and choose a category.') : '';
-            return { say: [head, tail].filter(Boolean).join(' '), show: [head, tail].filter(Boolean).join('\n'), links };
+            const warning = typeof data.warning === 'string' && data.warning.trim()
+                ? (ru ? 'Результаты по работам, аукционам и авторам недоступны. Показаны только найденные страницы и документация.'
+                    : 'Artwork, auction and artist results are unavailable. Only matching pages and documentation are shown.') : '';
+            return { say: [head, warning, tail].filter(Boolean).join(' '), show: [head, warning, tail].filter(Boolean).join('\n'), links };
         }
         case 'add_to_saved':
         case 'remove_from_saved': {
@@ -456,10 +466,18 @@
             resultsEl.replaceChildren();
             for (const item of links) {
                 // Results are untrusted text; links are only canonical public
-                // identities, never URLs supplied by artwork metadata.
+                // identities and public pages, never arbitrary metadata URLs.
                 const id = /^\/artwork\/([1-9][0-9]{0,77})$/.exec(item.url || '');
-                if (!(id && BigInt(id[1]) < 2n ** 256n) && !/^\/profile\?address=0x[0-9a-f]{40}$/.test(item.url || '')) continue;
+                const page = ['/', '/gallery', '/upload', '/profile', '/docs-protocol'].includes(item.url)
+                    || /^\/docs-protocol#[a-z][a-z0-9-]*$/.test(item.url || '');
+                if (!(id && BigInt(id[1]) < 2n ** 256n) && !/^\/profile\?address=0x[0-9a-f]{40}$/.test(item.url || '') && !page) continue;
                 const link = document.createElement('a'); link.href = item.url; link.textContent = item.label;
+                link.addEventListener('click', event => {
+                    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+                    // Leave native navigation and same-page hash listeners intact.
+                    if (!panel.hidden) closePanel();
+                });
                 resultsEl.appendChild(link);
             }
         }

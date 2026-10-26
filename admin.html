@@ -22,7 +22,7 @@
     <script src="/header-prepaint.js?v=8"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=53">
+    <link rel="stylesheet" href="/unified-styles.css?v=54">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <script src="/storage-image.js?v=3" defer></script>
@@ -36,6 +36,7 @@
     <script src="/avatar-dropdown.js?v=57" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
+    <script type="module" src="/src/entries/search.js"></script>
 </head>
 <body class="protocol-admin-page">
     <script>document.body.classList.add(document.documentElement.classList.contains('future') ? 'future' : 'classic');</script>
@@ -50,6 +51,9 @@
                 <div class="site-header-center page-context"></div>
                 <div class="site-header-actions">
                     <div id="networkBadge"></div>
+                    <button type="button" class="site-search-button" data-artsoul-search aria-label="Search ArtSoul" title="Search ArtSoul (Ctrl K)" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
+                    </button>
                     <div id="header-notifications" hidden>
                         <section class="notification-inbox header-notification-inbox" aria-label="Your notifications">
                             <button type="button" class="notification-toggle" data-notification-preview title="Notifications" aria-label="Notifications" aria-expanded="false" aria-controls="profile-notifications" onclick="this.parentElement.parentElement.dataset.notificationRequested=this.parentElement.parentElement.dataset.notificationWallet;this.setAttribute('aria-busy','true')">

@@ -21,6 +21,7 @@ function harness({speech = false, execute = async () => JSON.stringify(searchRes
       const node = {...events(), attrs: {}, hidden: false, disabled: false, value: '', textContent: '', dataset: {},
         children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); },
         setAttribute(key, value) { this.attrs[key] = value; },
+        hasAttribute(key) { return Object.hasOwn(this.attrs, key); },
         focus() { document.activeElement = this; },
         classList: {toggle() {}},
         querySelector(selector) {
@@ -101,6 +102,60 @@ test('missing search terms request clarification without fetching or opening a w
   const h = harness(); h.open(); h.submit('search'); await flush();
   assert.match(h.get('.artsoul-voice-answer').textContent, /What would you like to find/);
   assert.equal(h.calls.length, 0); assert.equal(h.prompts(), 0);
+});
+
+test('page and documentation command links allow only public routes and safe section anchors', async () => {
+  const data = structuredClone(searchResult);
+  data.groups.artworks.items = [];
+  const allowed = ['/', '/gallery', '/upload', '/profile', '/docs-protocol', '/docs-protocol#fees', '/docs-protocol#what-is-artsoul'];
+  const rejected = ['/admin', '/profile?email=private@example.test', '/gallery?redirect=/admin', '/docs-protocol#fees<script>',
+    '/docs-protocol#../admin', '/docs-protocol/../admin', '//evil.test/docs-protocol', 'https://evil.test/docs-protocol#fees',
+    'javascript:alert(1)', '/docs-protocol%23fees', '/docs-protocol#fees\n'];
+  data.category = 'docs';
+  data.groups.pages = {items: allowed.slice(0, 5).map(url => ({title: 'Public page', url})), hasMore: false};
+  data.groups.docs = {items: [...allowed.slice(5), ...rejected].map(url => ({title: '<img onerror=alert(1)>', url})), hasMore: false};
+  data.warning = 'Catalog unavailable';
+  const h = harness({execute: async () => JSON.stringify(data)}); h.open(); h.submit('search docs fees'); await flush();
+  const results = h.get('.artsoul-voice-results');
+  assert.deepEqual(h.calls, [{name: 'search_catalog', args: {query: 'fees', category: 'docs'}}]);
+  assert.deepEqual(results.children.map(link => link.href), allowed);
+  assert.match(results.children[5].textContent, /<img onerror=alert\(1\)>/);
+  assert.equal(results.children[5].innerHTML, undefined);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /Only matching pages and documentation/);
+  assert.equal(h.prompts(), 0);
+});
+
+test('a normal docs result activation closes commands once and preserves native hash navigation', async () => {
+  const data = structuredClone(searchResult); data.groups.artworks.items = [];
+  data.groups.docs = {items: [{title: 'Fees', url: '/docs-protocol#fees'}], hasMore: false};
+  const h = harness({execute: async () => JSON.stringify(data)}); h.open(); h.submit('search docs fees'); await flush();
+  const link = h.get('.artsoul-voice-results').children[0], launcher = h.get('.artsoul-voice-button');
+  let closes = 0;
+  const focus = launcher.focus; launcher.focus = () => {closes++; focus.call(launcher);};
+  const event = {button: 0, detail: 0,
+    preventDefault() {assert.fail('Native hash navigation must remain available');},
+    stopPropagation() {assert.fail('The docs page must receive the repeated-anchor click');}};
+  link.fire('click', event);
+  assert.equal(h.get('.artsoul-voice-panel').hidden, true);
+  assert.equal(launcher.attrs['aria-expanded'], 'false'); assert.equal(h.document.activeElement, launcher);
+  assert.equal(link.href, '/docs-protocol#fees'); assert.equal(closes, 1);
+  link.fire('click', event); assert.equal(closes, 1, 'an already hidden panel is not closed again');
+  assert.deepEqual(h.calls, [{name: 'search_catalog', args: {query: 'fees', category: 'docs'}}]);
+  assert.equal(h.prompts(), 0); assert.equal(h.sessions.length, 0);
+});
+
+test('new-tab, modified, download and prevented result clicks leave the command panel open', async () => {
+  const h = harness(); h.open(); h.submit('search moon'); await flush();
+  const link = h.get('.artsoul-voice-results').children[0];
+  for (const flags of [{ctrlKey: true}, {metaKey: true}, {shiftKey: true}, {altKey: true}, {button: 1}, {defaultPrevented: true}]) {
+    link.fire('click', {button: 0, ...flags});
+    assert.equal(h.get('.artsoul-voice-panel').hidden, false);
+  }
+  link.target = '_blank'; link.fire('click', {button: 0});
+  assert.equal(h.get('.artsoul-voice-panel').hidden, false);
+  link.target = ''; link.setAttribute('download', ''); link.fire('click', {button: 0});
+  assert.equal(h.get('.artsoul-voice-panel').hidden, false);
+  assert.equal(h.calls.length, 1); assert.equal(h.prompts(), 0);
 });
 
 test('completed requests restore focus lost when Send was disabled, without stealing external focus', async () => {

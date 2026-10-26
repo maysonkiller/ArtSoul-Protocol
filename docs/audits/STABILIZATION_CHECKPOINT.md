@@ -3,6 +3,20 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 video search follow-up IN PROGRESS (started at `03f7134`):
+
+- Reviewed full `IMG_2580.MP4`: mobile search scrolling/height confirmed;
+  exact key behind the observed dismissal remains unproven.
+- Implemented fixed search controls, visual-viewport bounds, deliberate backdrop
+  dismissal, public pages/docs search and links that open exact docs sections.
+  All eight headers and existing voice/WebMCP search share the same public scope.
+- Search/docs 41 checks, voice/WebMCP/docs116 checks, eight browser geometry and
+  keyboard-state cases, and 11-route/173-utility build pass. Full unit/CI and
+  hosted release checks pending. Evidence: `audits/B22_SEARCH_VIDEO_2026-10-26.md`.
+- Preserve unrelated untracked authority-policy files, `.codex/`, `output/`.
+  Exactly next step: finish exact-candidate checks, release and verify search.
+  Then resume B21 Donate/Report preparation. No native iPhone acceptance claimed.
+
 October 26 B22 profile polish and social-preview follow-up RELEASED in PR #370,
 candidate `2e15408`, production merge `f7d9fa2` (started at `a7abe68`):
 

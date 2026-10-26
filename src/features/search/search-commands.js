@@ -8,7 +8,7 @@ const text = value => typeof value === 'string' ? value : '';
 export async function searchCatalog(input, { request } = {}) {
     if (!input || Array.isArray(input) || typeof input !== 'object' ||
         Object.keys(input).some(key => !['query', 'category'].includes(key)) || typeof input.query !== 'string') {
-        return { error: 'Provide a search query and an optional category: all, artworks, auctions or artists.' };
+        return { error: 'Provide a search query and an optional category: all, artworks, auctions, artists, pages or docs.' };
     }
     const query = normalizeSearchQuery(input.query), category = input.category ?? 'all';
     if (!canSearch(query) || !SEARCH_CATEGORIES.includes(category)) {
@@ -17,13 +17,16 @@ export async function searchCatalog(input, { request } = {}) {
     const state = createSearchState({ request });
     await state.search(query, category);
     const result = state.getState();
-    if (result.status !== 'ready') return { error: result.error || 'Search could not be completed. Please try again.' };
+    const partial = result.status === 'error' && ['pages', 'docs'].some(key => result.groups[key].items.length);
+    if (result.status !== 'ready' && !partial) return { error: result.error || 'Search could not be completed. Please try again.' };
     const groups = {};
     for (const key of SEARCH_CATEGORIES.slice(1)) {
         const source = result.groups[key];
         const items = [];
         for (const item of source.items) {
-            if (key === 'artists') {
+            if (key === 'pages' || key === 'docs') {
+                items.push({ id: item.id, title: item.title, excerpt: item.excerpt, url: item.url });
+            } else if (key === 'artists') {
                 const address = text(item.wallet_address).toLowerCase();
                 if (!/^0x[0-9a-f]{40}$/.test(address)) return { error: 'Search returned an invalid profile. Please try again.' };
                 items.push({ wallet_address: address, name: text(item.username) || address,
@@ -37,6 +40,6 @@ export async function searchCatalog(input, { request } = {}) {
         }
         groups[key] = { items, hasMore: source.hasMore };
     }
-    return { query, category, chain: 'Base Sepolia', groups,
+    return { query, category, chain: 'Base Sepolia', groups, ...(partial ? { warning: result.error } : {}),
         note: 'These are the matches shown, not total counts. Artwork and auction groups can overlap. Use Search ArtSoul for more results.' };
 }

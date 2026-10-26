@@ -178,7 +178,7 @@ test('malformed, mismatched and oversized responses are errors rather than empty
 test('zero matches remain a successful result while HTTP and network failures stay explicit', async () => {
   const empty = await searchCatalog({ query: 'Moon' }, { request: async () => response(body('Moon')) });
   assert.equal(empty.error, undefined);
-  assert.deepEqual(empty.groups, { artworks: group(), auctions: group(), artists: group() });
+  assert.deepEqual(empty.groups, { artworks: group(), auctions: group(), artists: group(), pages: group(), docs: group() });
   for (const status of [400, 401, 503]) {
     let readBody = false;
     const result = await searchCatalog({ query: 'Moon' }, {
