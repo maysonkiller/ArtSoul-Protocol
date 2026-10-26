@@ -49,6 +49,7 @@
         'buy_resale_listing',
         'withdraw_pending_funds'
     ]);
+    const SAVED_TOOLS = ['add_to_saved', 'remove_from_saved'];
 
     // Recognisers write numbers as digits: "31", "0.05", and in Russian "0,05".
     const AMOUNT = '(\\d+(?:[.,]\\d{1,18})?)';
@@ -65,6 +66,9 @@
      */
     const GRAMMAR = [
         // --- English ---------------------------------------------------------
+        ['en', new RegExp(`^(?:please\\s+)?save\\s+${EN_WORK}${ID}(?:\\s+to\\s+(?:my\\s+)?(?:saved|favou?rites))?$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
+        ['en', new RegExp(`^(?:please\\s+)?add\\s+${EN_WORK}${ID}\\s+to\\s+(?:my\\s+)?(?:saved|favou?rites)$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
+        ['en', new RegExp(`^(?:please\\s+)?remove\\s+${EN_WORK}${ID}\\s+from\\s+(?:my\\s+)?(?:saved|favou?rites)$`), m => ({ tool: 'remove_from_saved', input: { artwork_id: m[1] } })],
         ['en', /^(help|commands|what can (i|you) (say|do))\b/, () => ({ help: true })],
         ['en', /\b(stop|revoke|forget)\b.*\bwallet\b|\bdon'?t (touch|use) my wallet\b|^stop$/, () => ({ tool: 'revoke_wallet_access', input: {} })],
         ['en', new RegExp(`\\bbid\\s+(?:of\\s+)?${AMOUNT}(?:\\s*eth)?\\s+on\\s+${EN_WORK}${ID}`), m => ({ tool: 'place_bid', input: { artwork_id: m[2], bid_eth: amount(m[1]) } })],
@@ -86,6 +90,8 @@
         ['en', /^(?:search(?: for)?|find|look for)\s+(.+)$/, m => ({ tool: 'search_artworks', input: { query: m[1].trim() } })],
 
         // --- Russian ---------------------------------------------------------
+        ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:сохрани|добавь)\\s+${RU_WORK}${ID}\\s+в\\s+избранное$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
+        ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:убери|удали)\\s+${RU_WORK}${ID}\\s+из\\s+избранного$`), m => ({ tool: 'remove_from_saved', input: { artwork_id: m[1] } })],
         ['ru', /^(помощь|команды|что (можно|ты умеешь))/, () => ({ help: true })],
         ['ru', /(стоп|отключи|не трогай|забудь).*кош[её]л|^стоп$/, () => ({ tool: 'revoke_wallet_access', input: {} })],
         ['ru', new RegExp(`(?:ставк[а-я]*|поставь)\\s+${AMOUNT}(?:\\s*eth|\\s*эфир[а-я]*)?\\s+на\\s+${RU_WORK}${ID}`), m => ({ tool: 'place_bid', input: { artwork_id: m[2], bid_eth: amount(m[1]) } })],
@@ -125,6 +131,7 @@
             const match = pattern.exec(heard);
             if (!match) continue;
             const command = build(match);
+            if (SAVED_TOOLS.includes(command.tool) && (/\?/.test(transcript) || !/^[1-9][0-9]{0,77}$/.test(command.input.artwork_id) || BigInt(command.input.artwork_id) >= 2n ** 256n)) return null;
             if (isWrite(command)) {
                 // Never execute a financial phrase extracted from a negation,
                 // question, multiple requests, truncated number or quoted text.
@@ -144,7 +151,7 @@
 
     /** Whether a heard command may run, given the recogniser's own confidence. */
     function mayRun(command, confidence) {
-        if (!isWrite(command)) return true;
+        if (!isWrite(command) && !SAVED_TOOLS.includes(command?.tool)) return true;
         const value = Number(confidence);
         return !(Number.isFinite(value) && value > 0 && value < WRITE_CONFIDENCE);
     }
@@ -163,12 +170,12 @@
             listening: 'Listening… say one command.',
             notHeard: 'Nothing was heard. Press the microphone and try again.',
             notUnderstood: heard => `"${heard}" is not a command I know. Open Examples or type "help".`,
-            unsure: heard => `I am not sure I heard "${heard}" correctly, and it would open your wallet. Please say it again.`,
+            unsure: heard => `I am not sure I heard "${heard}" correctly. Please repeat the action.`,
             heard: heard => `Heard: "${heard}"`,
             unavailable: 'Commands are not available on this page.',
             notice: 'Voice commands use your browser\'s speech recognition. In Chrome, the audio is sent to Google to be transcribed. ArtSoul does not record, store or receive it.\n\nTurn on voice commands?',
             micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
-            help: 'Try: "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+            help: 'Try: "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
                 '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
             submitted: 'Done. The wallet approved it and the transaction was sent.',
@@ -189,12 +196,12 @@
             listening: 'Слушаю… скажите одну команду.',
             notHeard: 'Ничего не услышано. Нажмите микрофон и попробуйте снова.',
             notUnderstood: heard => `«${heard}» — такой команды нет. Откройте примеры или напишите «помощь».`,
-            unsure: heard => `Не уверен, что расслышал «${heard}», а эта команда открывает кошелёк. Повторите, пожалуйста.`,
+            unsure: heard => `Не уверен, что расслышал «${heard}». Повторите действие, пожалуйста.`,
             heard: heard => `Услышано: «${heard}»`,
             unavailable: 'Команды недоступны на этой странице.',
             notice: 'Голосовые команды используют распознавание речи вашего браузера. В Chrome звук отправляется в Google для распознавания. ArtSoul его не записывает, не хранит и не получает.\n\nВключить голосовые команды?',
             micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
-            help: 'Скажите: «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
+            help: 'Скажите: «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
                 '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
             submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
@@ -223,12 +230,20 @@
         if (data.error) return { say: t.error(data.error), show: data.error };
         if (data.connected === false) return { say: t.noWallet, show: data.reason || t.noWallet };
         if (data.submitted === true) return { say: t.submitted, show: `${t.submitted}${data.transaction_hash ? ` ${data.transaction_hash}` : ''}` };
-        if (data.submitted === false || data.prepared === false || data.opened === false) {
+        if (data.submitted === false || data.prepared === false || data.opened === false || data.updated === false) {
             const reason = data.reason || '';
             return { say: t.refused(reason), show: reason };
         }
 
         switch (tool) {
+        case 'add_to_saved':
+        case 'remove_from_saved': {
+            if (data.updated !== true || typeof data.saved !== 'boolean') return { say: t.error('Saved could not be confirmed.'), show: 'Saved could not be confirmed. Please try again.' };
+            const text = ru
+                ? `Работа ${data.artwork_id} ${data.saved ? 'в избранном' : 'убрана из избранного'}.`
+                : `Artwork ${data.artwork_id} ${data.saved ? 'is in Saved' : 'is removed from Saved'}.`;
+            return { say: text, show: text };
+        }
         case 'find_active_auctions': {
             const items = Array.isArray(data.auctions) ? data.auctions : [];
             const top = items.slice(0, 3).map(item =>

@@ -3,6 +3,19 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 B21 explicit Saved commands prepared from `a5ad479`:
+
+- Explicit add/remove tools and English/Russian commands reuse the existing
+  singleton and authenticated API. No implicit sign-in, toggle-on-retry, new
+  schema, economics, contract or role changes. Shared controls/list stay in sync.
+- Focused tests 170/170 and build pass. Eight local browser theme/width cases
+  plus account/busy/401 checks pass against synthetic transport; no new phone,
+  microphone or live-account mutation acceptance is claimed.
+- Evidence: `audits/B21_SAVED_COMMANDS_2026-10-26.md`. Preserve unrelated untracked
+  authority-policy files, `.codex/` and `output/`. Exact-candidate CI/release pending.
+- Exactly next action: complete candidate CI and deployment verification for this
+  Saved slice; then B-21 global public artwork/artist search reuse.
+
 October 26 B22 workflow follow-up RELEASED: PR #365, candidate `25ae246`,
 production merge `cc87dcd` (started at `b9be502`):
 
