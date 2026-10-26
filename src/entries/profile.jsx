@@ -1509,29 +1509,32 @@ const { useState, useEffect, useRef } = React;
                                 {/* Profile Info */}
                                 <div className="profile-identity-copy flex-1 min-w-0">
                                     {editMode ? (
-                                        <div className="space-y-4">
-                                            <input
-                                                type="text"
-                                                value={editableProfile?.username || ''}
-                                                onChange={(e) => setProfileDraft({ ...editableProfile, username: e.target.value })}
-                                                placeholder="Your Name"
-                                                className={`w-full px-4 py-3 rounded-lg text-2xl font-bold ${
-                                                    isClassic
-                                                        ? 'bg-gray-700 border border-gray-600 text-gray-100'
-                                                        : 'bg-gray-800/50 border border-cyan-500/30 text-cyan-100'
-                                                } outline-none`}
-                                            />
-                                            <textarea
-                                                value={editableProfile?.bio || ''}
-                                                onChange={(e) => setProfileDraft({ ...editableProfile, bio: e.target.value })}
-                                                placeholder="Tell us about yourself..."
-                                                rows={3}
-                                                className={`w-full px-4 py-3 rounded-lg ${
-                                                    isClassic
-                                                        ? 'bg-gray-700 border border-gray-600 text-gray-100'
-                                                        : 'bg-gray-800/50 border border-cyan-500/30 text-cyan-100'
-                                                } outline-none`}
-                                            />
+                                        <div className="profile-identity-editor">
+                                            <div className="profile-detail-field">
+                                                <label htmlFor="profileName">Name</label>
+                                                <input
+                                                    id="profileName"
+                                                    name="nickname"
+                                                    type="text"
+                                                    autoComplete="nickname"
+                                                    value={editableProfile?.username || ''}
+                                                    onChange={(e) => setProfileDraft({ ...editableProfile, username: e.target.value })}
+                                                    placeholder="Your name or nickname"
+                                                    className="profile-detail-input"
+                                                />
+                                            </div>
+                                            <div className="profile-detail-field">
+                                                <label htmlFor="profileBio">Bio</label>
+                                                <textarea
+                                                    id="profileBio"
+                                                    name="bio"
+                                                    value={editableProfile?.bio || ''}
+                                                    onChange={(e) => setProfileDraft({ ...editableProfile, bio: e.target.value })}
+                                                    placeholder="A little about you and your art"
+                                                    rows={2}
+                                                    className="profile-detail-input"
+                                                />
+                                            </div>
                                             <section className="profile-connections" aria-labelledby="profileConnectionsTitle">
                                                 <h2 id="profileConnectionsTitle">Connected accounts</h2>
                                                 <p className="profile-connection-help">Connecting or disconnecting an account takes effect immediately. Save Profile and Cancel apply only to your profile details.</p>
@@ -1631,7 +1634,7 @@ const { useState, useEffect, useRef } = React;
                                         </div>
                                     ) : (
                                         <div>
-                                            <h1 className={`text-xl md:text-3xl font-bold mb-1 break-words ${
+                                            <h1 className={`profile-display-name font-bold mb-1 break-words ${
                                                 isClassic ? 'text-gray-100' : ''
                                             }`}>
                                                 {resolvedProfileName}
@@ -1673,9 +1676,7 @@ const { useState, useEffect, useRef } = React;
                                                     )}
                                                 </div>
                                             )}
-                                            <p className={`text-sm md:text-base mb-3 break-words ${
-                                                isClassic ? 'text-gray-400' : 'text-purple-300'
-                                            }`}>
+                                            <p className="profile-display-bio">
                                                 {profile?.bio || 'No bio yet'}
                                             </p>
                                             <div className="profile-social-action-row">

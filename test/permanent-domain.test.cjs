@@ -54,6 +54,23 @@ test('runtime defaults use the canonical origin and retain a bounded rollback or
   }
 });
 
+test('old default-image links redirect to the approved image without changing artwork media', () => {
+  const {redirects} = JSON.parse(read('vercel.json'));
+  const alias = redirects.find(route => route.source === '/artsoul-social-preview.png');
+  assert.deepEqual(alias, {
+    source: '/artsoul-social-preview.png', destination: '/artsoul-social-preview-v2.png', permanent: true
+  });
+  // The exact path is unconditional: old metadata with or without ?v=1 works
+  // for every crawler, while no artwork or media-storage path is redirected.
+  for (const path of ['/artsoul-social-preview.png', '/artsoul-social-preview.png?v=1']) {
+    assert.equal(new URL(path, canonicalOrigin).pathname, alias.source);
+  }
+  assert.notEqual(alias.source, alias.destination);
+  assert.ok(read('vite.config.js').includes("'artsoul-social-preview-v2.png'"));
+  assert.equal(fs.readFileSync(path.join(root, alias.destination.slice(1))).subarray(0, 8).toString('hex'),
+    '89504e470d0a1a0a', 'the target is a real PNG, matching its served MIME type');
+});
+
 test('active operator documentation points to the canonical domain', () => {
   for (const file of [
     'README.md',

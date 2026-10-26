@@ -52,6 +52,11 @@
   ],
   "redirects": [
     {
+      "source": "/artsoul-social-preview.png",
+      "destination": "/artsoul-social-preview-v2.png",
+      "permanent": true
+    },
+    {
       "source": "/artwork",
       "has": [
         { "type": "header", "key": "user-agent", "value": ".*[Tt]witterbot.*" },
