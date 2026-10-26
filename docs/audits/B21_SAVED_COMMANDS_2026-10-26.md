@@ -58,6 +58,14 @@ No new dependency or model/provider integration.
   held-response checks pass for account switching, collision and expired auth.
   The initial fixture lacked the existing artwork URL helper; adding that fixture
   dependency resolved its render error, with no application workaround.
+- Final cleanup found another fixture defect: `performance-utils.js` was loaded
+  as a classic script despite exporting ES modules, so the original fixture run
+  did not actually exercise its click guard. Corrected to `type="module"`,
+  asserted `PerformanceUtils` readiness and repeated all eight Saved cases plus
+  account/busy/401 checks on released `276d894`: pass, zero page script errors.
+  `b21-saved-real-guard-browser.log` supersedes the earlier fixture guard claim.
+  The original hosted Gallery reproduction and subsequent hosted passes remain
+  valid. This correction changes no application code.
 - Initial CI 40317130816 failed only the two cache-pin checks on each platform;
   the page versions had changed but the expected hashes had not. The pins were
   updated without weakening their assertions. Final candidate CI 40318543328

@@ -2113,17 +2113,6 @@ body.future .gallery-filter-panel {
     margin-top: 0;
 }
 
-.artwork-community-actions .artist-support:has(.artist-support-history) {
-    flex-basis: 100%;
-}
-
-.artwork-community-actions .artist-support-history {
-    max-height: 180px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    text-align: left;
-}
-
 .artwork-page-provenance {
     display: grid;
     gap: 10px;

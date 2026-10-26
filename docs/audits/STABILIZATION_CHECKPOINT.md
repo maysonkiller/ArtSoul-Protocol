@@ -3,18 +3,40 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B21 global search prepared from `91b223f`:
+October 26 B22 history layout follow-up, starting at `890af55`:
+
+- Removed the old inline Donate-history scrollbar and background Community
+  width change. One content scroll region with separate title/close/tabs;
+  readable history, bounded pagination and deliberate position resets.
+- Local final tests187, build, ten Donate browser cases and 12 other-history
+  checks pass. Evidence: `audits/B22_HISTORY_LAYOUT_2026-10-26.md`.
+- No contract, schema, economics, role or authentication changes. Existing
+  provenance/right-column and mobile page scrolling remain accessible.
+- Exactly next action: exact-candidate CI and release verification for this
+  layout follow-up, then resume B21 Donate/Report preparation.
+
+October 26 B21 global search RELEASED: PR #368, candidate `9840a5b`, production
+merge `276d894` (started at `91b223f`):
 
 - Ordinary search commands use the shared public catalog/state, with artwork,
   live-auction and artist groups, safe links and honest first-page counts.
   Legacy bounded `search_artworks` remains for compatibility only. No new
   dependency, schema, economics or wallet behavior.
-- Focused 239/239, build and eight local browser theme/width cases pass. Send
-  focus loss found in browser and repaired. No new native phone/speech acceptance.
+- Focused 239/239, pin-repair104, build and eight local browser theme/width cases
+  pass. Final CI 40321830522: Linux 2,747 pass/two skips; Windows 2,360/31 skips,
+  zero failures, 46 contract tests each. Send focus loss found and repaired.
+- Exact preview/apex eight-page/36-asset checks pass. Preview browser16 confirms
+  disabled-search feedback; five real public API cases and apex browser16 prove
+  actual artwork/artist links and query changes, with zero API writes.
+  No new native phone/speech/WebMCP-client acceptance. No implementation diff.
+- Final fixture cleanup corrected the performance utility's ES-module tag;
+  eight Saved and eight search cases were repeated with the real guard loaded
+  and zero page script errors. Use `b21-{saved,search}-real-guard-browser.log`
+  for this claim; original hosted checks remain valid. Application code unchanged.
 - Evidence: `audits/B21_GLOBAL_SEARCH_COMMANDS_2026-10-26.md`. Preserve unrelated
   authority-policy files, `.codex/` and `output/`.
-- Exactly next action: exact-candidate CI, hosted public API/browser and release
-  verification; then B-21 Donate/Report preparation through existing dialogs.
+- Exactly next action: B-21 Donate/Report preparation through existing dialogs,
+  keeping explicit review/submission. Do not repeat the Saved/global-search release.
 
 October 26 B21 explicit Saved commands RELEASED: PR #367, candidate `d7cfad7`,
 production merge `91b223f` (started at `a5ad479`):
