@@ -111,5 +111,19 @@ Interpretation: removing the old banner means removing its bytes while keeping
 old URLs compatible. It does not mean replacing actual artwork media. Telegram
 can retain previously generated page previews independently of our HTTP
 responses. No Telegram message or cache-refresh bot action has been performed;
-refresh of the user's stored preview is not claimed. Release verification is
-pending at this checkpoint.
+refresh of the user's stored preview is not claimed.
+
+Released as PR #372, candidate `d4bc3f6`, production merge `5ba1901`.
+CI `40342569351` passed: Linux 2,771/two skips, Windows 2,384/31 skips,
+zero failures, 46 contracts on each. Exact preview and apex eight-route/
+36-asset verification passed; Vercel's apex alias independently points to the
+ready deployment of this merge. Each deployment also passed 32 metadata and
+12 image checks, with three HTTP/www aliases checked on apex.
+Evidence: `output/audit/social-banner-ci.log`,
+`output/audit/social-banner-preview-1793025949376.json`,
+`output/audit/social-banner-apex-1793026243584.json`,
+`output/audit/social-banner-production-binding.json`,
+`docs/private/b22-search-video-preview-d4bc3f610449-1793025930193.json`,
+`docs/private/b22-search-video-apex-5ba1901860f5-1793026229186.json`.
+No implementation diff remains. Resume B21 Donate/Report preparation next;
+this follow-up does not declare Phase B complete.
