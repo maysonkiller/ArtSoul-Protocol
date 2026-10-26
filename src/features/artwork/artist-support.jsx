@@ -2,6 +2,7 @@ import { React } from '../../entries/react-runtime.js';
 import { parseUserEthAmount } from '../auction/eth-amount.js';
 import { donationMessageState } from './donation-message.js';
 import { donationIdentityKey, donationOperations } from './donation-operation.js';
+import { ExplainedAction } from '../../ui/explained-action.jsx';
 import './artist-support.css';
 
 const { useEffect, useRef, useState } = React;
@@ -221,7 +222,11 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                 <label className="artist-support-check"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={busy}/> I understand this is voluntary, irreversible and non-refundable.</label>
                 {error && <p role="alert">{error}</p>}
                 <div className="reauction-modal-actions"><button type="button" data-allow-rapid="true" className="btn-secondary" onClick={close} disabled={busy}>Cancel</button>
-                    <button type="submit" data-allow-rapid="true" className="btn-main" disabled={busy || !accepted || !messageState.valid}>{busy ? 'Waiting for your wallet…' : 'Confirm in wallet'}</button></div>
+                    <ExplainedAction type="submit" data-allow-rapid="true" className="btn-main" disabled={busy} contextKey={identity}
+                        explanationTitle="Before you donate"
+                        reason={!messageState.valid ? 'Use a shorter message with valid text (up to 140 characters).' : !accepted ? 'Confirm that you understand this donation is voluntary, irreversible and non-refundable. Then you can review and confirm it in your wallet.' : ''}>
+                        {busy ? 'Waiting for your wallet…' : 'Confirm in wallet'}
+                    </ExplainedAction></div>
             </form>}
             </div>
             </div>

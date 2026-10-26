@@ -1635,7 +1635,7 @@ const { useState, useEffect, useRef } = React;
                                             </section>
                                         </div>
                                     ) : (
-                                        <div>
+                                        <div className="profile-display-details">
                                             <h1 className={`profile-display-name font-bold mb-1 break-words ${
                                                 isClassic ? 'text-gray-100' : ''
                                             }`}>

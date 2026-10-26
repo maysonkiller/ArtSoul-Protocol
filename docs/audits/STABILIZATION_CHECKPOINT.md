@@ -3,7 +3,26 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 future-contract design continuation (started at `b4ca252`):
+October 26 B24 founder-priority continuation, based on `55cca68`, prepared locally:
+
+- Shared restricted-action explanations preserve creator/highest-bidder and
+  resale guards, distinguish busy states, and keep Donate/Report drafts intact.
+  Short laptop profile viewing is denser; no global zoom or mobile card shrink.
+- Build and 33 action/auction/resale tests pass; 29 profile checks, 30 rendered
+  profile cases, 12 artwork explanation cases, four resale flows and four
+  collection cases pass. Browser wallet/API responses are synthetic.
+- Initial full local run: six outdated markup/pin/component-harness expectations
+  and one temporary PostgreSQL startup failure. Corrected harnesses/pins pass
+  117 checks; unchanged PostgreSQL suite passes separately (37 checks).
+- Details: `B24_ACTION_EXPLANATIONS_2026-10-26.md`. Milestone notifications are
+  proposed only in `../architecture/PLATFORM_MILESTONES_2026-10-26.md` (B25).
+- Preserve unrelated authority-policy files, `.codex/` and `output/`. No signer,
+  database migration, mainnet, contract or economics changes.
+- Exactly next step: verify candidate CI and release B24; then resume B21
+  Donate/Report preparation through existing review dialogs.
+
+October 26 future-contract design continuation MERGED in PR #374,
+candidate `afcfe40`, merge `a914282` (started at `b4ca252`):
 
 - Founder requests extensible replacement contracts, complete collection/auction/
   resale paths and future payments from other networks. C-06 research is in
@@ -27,6 +46,10 @@ October 26 future-contract design continuation (started at `b4ca252`):
   links with zero newly missing targets. Two pre-existing B-05/B-06 references
   to absent `testnet/B06_SNAPSHOT_A_REHEARSAL_2026-09-14.md` remain flagged;
   missing historical evidence was not reconstructed or claimed to exist.
+- Exact candidate CI40358199782 passes: Linux2808/two skips, Windows2413/32 skips,
+  49 contract tests each; zero failures, both builds and static checks pass.
+  The merge tree equals the tested candidate. No new runtime/contract capability
+  is claimed; these existing contract tests do not prove the proposed replacement.
 - Exactly next step: resume B21 Donate/Report preparation through existing
   dialogs with visible review/submission; carry C1 decisions into later sign-off.
 

@@ -39,7 +39,7 @@ test('donation history stays inside Donate, reads only its open tab, and ignores
     const h = hooks(), calls = [], response = deferred();
     const React = {...h, createElement: (type, props, ...children) => ({type, props: {...props, children}})};
     const render = vm.runInNewContext(compiled.code + '\nArtistSupport;', {
-        React, AbortController, fetch: (url, options) => {calls.push({url, options}); return response.promise;},
+        React, ExplainedAction: 'ExplainedAction', AbortController, fetch: (url, options) => {calls.push({url, options}); return response.promise;},
         donationIdentityKey: () => 'fixture', donationOperations: {read() {}, subscribe: () => () => {}},
         donationMessageState: () => ({valid: true}), console,
         document: {querySelector: () => null}, window: {requestAnimationFrame: fn => fn()}
@@ -96,7 +96,7 @@ test('Donate tabs support keyboard navigation and history preserves exact messag
     let applyOperation;
     const React = {...h, createElement: (type, props, ...children) => ({type, props: {...props, children}})};
     const render = vm.runInNewContext(compiled.code + '\nArtistSupport;', {
-        React, AbortController,
+        React, ExplainedAction: 'ExplainedAction', AbortController,
         fetch: async (url, options) => { reads.push({url, options}); return {ok: true, json: async () => ({
             creator: 'creator', contract_address: 'contract', donations: [donation], top: donation, next_offset: null
         })}; },
