@@ -1,6 +1,6 @@
 # B24 — compact laptop profile and actionable restriction explanations
 
-Status: implemented and locally verified; release evidence follows below.
+Status: primary slice released; a narrow profile hydration follow-up is prepared.
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, starting commit
 `55cca68`. This is one bounded Phase B slice, not completion of Phase B.
 
@@ -75,7 +75,26 @@ release notices still await the separately designated creator address.
 
 ## Release evidence
 
-Pending exact-candidate CI, deployment and artifact verification.
+PR #375 released candidate `0028aed`, merge `eecd340`. CI40366520845 passed:
+Linux2814/two skips, Windows2419/32 skips, 49 contract tests each, both builds and
+static checks. Post-merge CI40367228430 also passed. The merge tree equals the
+tested candidate. Preview and apex verification match eight routes and 39 assets;
+five private API guest-denial checks pass. Twelve explanation scenarios each on
+preview and apex pass with synthetic API/wallet data and zero page exceptions.
 
-Next step: finish this reviewed release, then resume B21 Donate/Report command
+Real public-profile read-only inspection confirms the compact layout and no
+horizontal overflow. It exposed a further hydration issue: `discoveryProfile`
+arrives after identity data, and `:has(.profile-stat-grid)` changed the identity
+column from 1168px to 576px when statistics appeared at 1366px. The follow-up
+reserves the short-desktop columns before statistics arrive. No invented/loading
+statistics are rendered. Long content still scrolls naturally.
+
+Follow-up validation: production build and 104 focused checks pass. Six real-DOM
+experiments (Classic/Future x 390/1280/1366px) with the proposed CSS preserve the
+identity/social width while statistics are removed/reinserted, with no overflow.
+Evidence: `output/audit/b24-profile-hydration-browser.log`. This controlled DOM
+experiment is not a claim of new device or signed acceptance. The source/pin
+follow-up uses CSS version56; its exact CI and release remain pending.
+
+Next step: finish the hydration follow-up release, then resume B21 Donate/Report command
 preparation through existing visible dialogs, without automated signing.

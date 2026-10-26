@@ -5573,7 +5573,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 @media (min-width: 1024px) and (max-height: 850px) {
     .profile-page-main { padding-top: 0.75rem !important; }
     .profile-hero:not(.is-editing) { padding: 0.75rem !important; margin-bottom: 0.75rem !important; }
-    .profile-display-details:has(> .profile-stat-grid) {
+    .profile-display-details {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         column-gap: 1rem;
