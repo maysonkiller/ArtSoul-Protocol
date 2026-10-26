@@ -79,7 +79,8 @@ economics.
 
 | Tool | What it answers | Reads |
 | --- | --- | --- |
-| `search_artworks` | Published works by free text, creator or lifecycle status | `/api/public/artworks` |
+| `search_catalog` | Global artwork, live-auction and artist-profile search; bounded grouped results with `hasMore`, no total-count claim | Shared Search ArtSoul state and `/api/public/search` |
+| `search_artworks` | Legacy compatibility tool: filters at most 200 recent cards by free text, creator or lifecycle status; prefer `search_catalog` | `/api/public/artworks` |
 | `find_active_auctions` | What is open for bidding right now, soonest deadline first | `/api/public/artworks?view=auctions` |
 | `get_artwork` | The whole public record of one work: description, owner, prices, community signals | `/api/public/artworks` |
 | `get_auction_state` | Status, current bid, bidder, bid count, end time, settlement deadline | `/api/public/auction-live` |

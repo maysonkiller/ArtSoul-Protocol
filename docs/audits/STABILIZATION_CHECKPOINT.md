@@ -3,18 +3,34 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B21 explicit Saved commands prepared from `a5ad479`:
+October 26 B21 global search prepared from `91b223f`:
+
+- Ordinary search commands use the shared public catalog/state, with artwork,
+  live-auction and artist groups, safe links and honest first-page counts.
+  Legacy bounded `search_artworks` remains for compatibility only. No new
+  dependency, schema, economics or wallet behavior.
+- Focused 239/239, build and eight local browser theme/width cases pass. Send
+  focus loss found in browser and repaired. No new native phone/speech acceptance.
+- Evidence: `audits/B21_GLOBAL_SEARCH_COMMANDS_2026-10-26.md`. Preserve unrelated
+  authority-policy files, `.codex/` and `output/`.
+- Exactly next action: exact-candidate CI, hosted public API/browser and release
+  verification; then B-21 Donate/Report preparation through existing dialogs.
+
+October 26 B21 explicit Saved commands RELEASED: PR #367, candidate `d7cfad7`,
+production merge `91b223f` (started at `a5ad479`):
 
 - Explicit add/remove tools and English/Russian commands reuse the existing
   singleton and authenticated API. No implicit sign-in, toggle-on-retry, new
   schema, economics, contract or role changes. Shared controls/list stay in sync.
-- Focused tests 170/170 and build pass. Eight local browser theme/width cases
-  plus account/busy/401 checks pass against synthetic transport; no new phone,
-  microphone or live-account mutation acceptance is claimed.
+- Focused tests 175/175 and build pass. Eight local browser theme/width cases
+  plus account/busy/401 checks pass against synthetic transport. Preview/apex
+  guest browser 16 cases each, eight-page/36-asset verification pass. Final CI
+  40318543328: Linux 2,725 pass/two skips; Windows 2,338/31; zero failures,
+  46 contract tests each. Send's native-submit/global-click-guard conflict fixed.
+  No new phone, microphone or live-account mutation acceptance is claimed.
 - Evidence: `audits/B21_SAVED_COMMANDS_2026-10-26.md`. Preserve unrelated untracked
-  authority-policy files, `.codex/` and `output/`. Exact-candidate CI/release pending.
-- Exactly next action: complete candidate CI and deployment verification for this
-  Saved slice; then B-21 global public artwork/artist search reuse.
+  authority-policy files, `.codex/` and `output/`. No tracked implementation diff.
+- Exactly next action: B-21 global public artwork/artist search reuse.
 
 October 26 B22 workflow follow-up RELEASED: PR #365, candidate `25ae246`,
 production merge `cc87dcd` (started at `b9be502`):

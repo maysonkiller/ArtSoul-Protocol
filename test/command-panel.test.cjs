@@ -3,8 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const source = fs.readFileSync('voice-commands.js', 'utf8');
 const flush = () => new Promise(resolve => setImmediate(resolve));
+const searchResult = { category: 'all', groups: {
+  artworks: {items: [{title: 'Moon', artwork_id: '31', creator: 'Vera', url: '/artwork/31'}], hasMore: false},
+  auctions: {items: [], hasMore: false}, artists: {items: [], hasMore: false}
+}};
 
-function harness({speech = false, execute = async () => JSON.stringify({count: 1, results: [{title: 'Moon', artwork_id: '31'}]})} = {}) {
+function harness({speech = false, execute = async () => JSON.stringify(searchResult)} = {}) {
   const nodes = new Map(), calls = [], sessions = [], spoken = [], storage = new Map();
   let prompts = 0;
   const events = () => ({listeners: new Map(),
@@ -15,6 +19,7 @@ function harness({speech = false, execute = async () => JSON.stringify({count: 1
     querySelector: selector => nodes.get(selector),
     createElement() {
       const node = {...events(), attrs: {}, hidden: false, disabled: false, value: '', textContent: '', dataset: {},
+        children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); },
         setAttribute(key, value) { this.attrs[key] = value; },
         focus() { document.activeElement = this; },
         classList: {toggle() {}},
@@ -38,7 +43,7 @@ function harness({speech = false, execute = async () => JSON.stringify({count: 1
     localStorage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)},
     confirm: () => {prompts++; return true;},
     speechSynthesis: {cancel() {}, speak: value => spoken.push(value.text)},
-    ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_artworks', 'buy_resale_listing', 'get_my_activity', 'add_to_saved', 'remove_from_saved'].map(name => ({name,
+    ArtSoulWebMCP: {browserDependencies: () => ({}), createTools: () => ['search_catalog', 'buy_resale_listing', 'get_my_activity', 'add_to_saved', 'remove_from_saved'].map(name => ({name,
       execute: args => {calls.push({name, args}); return execute(args);}
     }))}
   };
@@ -62,8 +67,8 @@ test('no microphone support still exposes a labelled keyboard composer without r
   assert.equal(h.get('.artsoul-voice-mic').disabled, true);
   assert.equal(h.get('.artsoul-voice-support').hidden, false);
   h.submit('search moon'); await flush();
-  assert.deepEqual(h.calls, [{name: 'search_artworks', args: {query: 'moon'}}]);
-  assert.match(h.get('.artsoul-voice-answer').textContent, /Found 1/);
+  assert.deepEqual(h.calls, [{name: 'search_catalog', args: {query: 'moon'}}]);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /Shown: Artworks: 1/);
   assert.equal(h.prompts(), 0); assert.equal(h.spoken.length, 0);
 });
 
@@ -72,6 +77,41 @@ test('opening, typing, examples and language selection never start the microphon
   h.ru.fire('click'); assert.equal(h.get('h2').textContent, 'Команды ArtSoul');
   h.submit('помощь'); await flush();
   assert.equal(h.calls.length, 0); assert.equal(h.sessions.length, 0); assert.equal(h.prompts(), 0);
+});
+
+test('search results are safe text links and clear on another request or account change', async () => {
+  const data = structuredClone(searchResult);
+  data.groups.artworks.items = [
+    {title: '<img src=x onerror=alert(1)>', artwork_id: '34', creator: 'Vera', url: '/artwork/34'},
+    {title: 'Unsafe', artwork_id: '35', url: 'https://evil.test/'},
+    {title: 'Script', artwork_id: '36', url: 'javascript:alert(1)'}
+  ];
+  const h = harness({execute: async () => JSON.stringify(data)}); h.open(); h.submit('search moon'); await flush();
+  const results = h.get('.artsoul-voice-results');
+  assert.equal(results.children.length, 1);
+  assert.equal(results.children[0].href, '/artwork/34');
+  assert.match(results.children[0].textContent, /<img/);
+  assert.equal(results.children[0].innerHTML, undefined);
+  h.submit('help'); await flush(); assert.equal(results.children.length, 0);
+  h.submit('search moon'); await flush(); assert.equal(results.children.length, 1);
+  h.connect('0x' + 'a'.repeat(40)); assert.equal(results.children.length, 0);
+});
+
+test('missing search terms request clarification without fetching or opening a wallet', async () => {
+  const h = harness(); h.open(); h.submit('search'); await flush();
+  assert.match(h.get('.artsoul-voice-answer').textContent, /What would you like to find/);
+  assert.equal(h.calls.length, 0); assert.equal(h.prompts(), 0);
+});
+
+test('completed requests restore focus lost when Send was disabled, without stealing external focus', async () => {
+  for (const lost of [true, false]) {
+    let finish; const h = harness({execute: () => new Promise(resolve => {finish = resolve;})});
+    h.open(); h.submit('search moon');
+    const previous = lost ? h.document.body : {};
+    h.document.activeElement = previous;
+    finish(JSON.stringify(searchResult)); await flush();
+    assert.equal(h.document.activeElement, lost ? h.get('input') : previous);
+  }
 });
 
 test('typed favorites commands show confirmed state while low-confidence speech and late account answers are fenced', async () => {
@@ -108,7 +148,7 @@ test('a late response does not reopen a closed panel or speak after closing', as
   h.open(); h.get('.artsoul-voice-mic').fire('click');
   h.sessions[0].onresult({results: [[{transcript: 'search moon', confidence: 1}]]});
   h.get('.artsoul-voice-close').fire('click');
-  finish(JSON.stringify({count: 1, results: []})); await flush();
+  finish(JSON.stringify(searchResult)); await flush();
   assert.equal(h.get('.artsoul-voice-panel').hidden, true); assert.equal(h.spoken.length, 0);
   assert.equal(h.document.activeElement, h.get('.artsoul-voice-button'));
 });
@@ -118,9 +158,9 @@ test('closing and reopening does not restore permission to speak an old pending 
   h.open(); h.get('.artsoul-voice-mic').fire('click');
   h.sessions[0].onresult({results: [[{transcript: 'search moon', confidence: 1}]]});
   h.get('.artsoul-voice-close').fire('click'); h.open();
-  finish(JSON.stringify({count: 1, results: []})); await flush();
+  finish(JSON.stringify(searchResult)); await flush();
   assert.equal(h.spoken.length, 0);
-  assert.match(h.get('.artsoul-voice-answer').textContent, /Found 1/);
+  assert.match(h.get('.artsoul-voice-answer').textContent, /Shown: Artworks: 1/);
 });
 
 test('long typed or spoken requests are rejected, never truncated into a wallet action', async () => {
@@ -196,7 +236,7 @@ test('financial commands reject negation, questions, compound actions and trunca
     ['en', ['do not buy artwork 31', 'can you buy artwork 31', 'buy artwork 31 and withdraw', 'buy artwork 31 for 0.2.3', 'pay not for artwork 31', 'bid 0.01 on artwork 31 or 32', 'withdraw then buy artwork 1']],
     ['ru', ['не купи работу 31', 'не надо оплати работу 31', 'купи работу 31 и выведи деньги', 'оплати не работу 31', 'ставка 0,01 на работу 31 или 32', 'выведи деньги завтра']]
   ]) for (const phrase of phrases) assert.equal(api.isWrite(api.parseCommand(phrase, lang)), false, phrase);
-  assert.deepEqual(api.parseCommand('search buy artwork 31', 'en'), {tool: 'search_artworks', input: {query: 'buy artwork 31'}});
-  assert.deepEqual(api.parseCommand('найди аукцион', 'ru'), {tool: 'search_artworks', input: {query: 'аукцион'}});
+  assert.deepEqual(api.parseCommand('search buy artwork 31', 'en'), {tool: 'search_catalog', input: {query: 'buy artwork 31'}});
+  assert.deepEqual(api.parseCommand('найди аукцион', 'ru'), {tool: 'search_catalog', input: {query: 'аукцион'}});
   assert.equal(api.parseCommand('grant admin to wallet', 'en'), null);
 });
