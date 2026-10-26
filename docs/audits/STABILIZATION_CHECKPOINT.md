@@ -17,6 +17,10 @@ merge `276d894` (started at `91b223f`):
   disabled-search feedback; five real public API cases and apex browser16 prove
   actual artwork/artist links and query changes, with zero API writes.
   No new native phone/speech/WebMCP-client acceptance. No implementation diff.
+- Final fixture cleanup corrected the performance utility's ES-module tag;
+  eight Saved and eight search cases were repeated with the real guard loaded
+  and zero page script errors. Use `b21-{saved,search}-real-guard-browser.log`
+  for this claim; original hosted checks remain valid. Application code unchanged.
 - Evidence: `audits/B21_GLOBAL_SEARCH_COMMANDS_2026-10-26.md`. Preserve unrelated
   authority-policy files, `.codex/` and `output/`.
 - Exactly next action: B-21 Donate/Report preparation through existing dialogs,

@@ -47,6 +47,12 @@ role, network, provider or dependency changes.
   tools, search state, links and global click guard with synthetic public API
   responses. Mixed groups, distinct artists, literal metadata, category changes,
   missing-query clarification, Russian commands, Escape and panel bounds pass.
+- Final cleanup found the fixture loaded the exported performance module as a
+  classic script. Corrected its module tag and required `PerformanceUtils`
+  readiness; all eight cases pass again on released `276d894`, with zero page
+  script errors. `b21-search-real-guard-browser.log` supersedes the original
+  fixture claim about the global click guard. Hosted preview/apex evidence is
+  unaffected; no application code changed for this correction.
 - Initial focused run had one stale stylesheet-pin expectation; updated to the
   new shared CSS version without changing the ordering assertion. Initial
   browser run exposed the focus issue above; rerun passes after its regression fix.
