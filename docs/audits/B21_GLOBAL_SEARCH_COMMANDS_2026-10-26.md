@@ -50,6 +50,9 @@ role, network, provider or dependency changes.
 - Initial focused run had one stale stylesheet-pin expectation; updated to the
   new shared CSS version without changing the ordering assertion. Initial
   browser run exposed the focus issue above; rerun passes after its regression fix.
+- Initial candidate CI 40321256423 found two additional old stylesheet-pin
+  assertions in artwork-layout and guest-avatar tests on both platforms. Updated
+  those pins to version 51; application behavior did not change for that repair.
 - Evidence: `output/audit/b21-search-focused-final.log`,
   `b21-search-build-final.log`, `b21-search-browser.log`,
   `output/playwright/b21-search-*.png`.
