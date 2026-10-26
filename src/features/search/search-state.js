@@ -1,4 +1,6 @@
-export const SEARCH_CATEGORIES = ['all', 'artworks', 'auctions', 'artists'];
+import { SITE_SEARCH_CATEGORIES, searchSiteContent, getSiteSearchEntry } from './site-content-search.js';
+export const REMOTE_SEARCH_CATEGORIES = ['artworks', 'auctions', 'artists'];
+export const SEARCH_CATEGORIES = ['all', ...REMOTE_SEARCH_CATEGORIES, ...SITE_SEARCH_CATEGORIES];
 export const normalizeSearchQuery = value => String(value || '').trim().replace(/\s+/gu, ' ');
 export function canSearch(value) {
     const query = normalizeSearchQuery(value);
@@ -24,7 +26,12 @@ export function createSearchState({ request = fetch, onChange = () => {} } = {})
         const before = append ? state.nextCursor : null;
         cancel(); const current = sequence; controller = new AbortController();
         const activeController = controller, signal = activeController.signal;
-        publish({ query, category, status: append ? 'more' : 'loading', error: '', ...(append ? {} : { groups: emptyGroups(), nextCursor: null }) });
+        const localGroups = searchSiteContent(query, category);
+        if (SITE_SEARCH_CATEGORIES.includes(category)) {
+            publish({ query, category, groups: { ...emptyGroups(), ...localGroups }, nextCursor: null, status: 'ready', error: '' });
+            return;
+        }
+        publish({ query, category, status: append ? 'more' : 'loading', error: '', ...(append ? {} : { groups: { ...emptyGroups(), ...localGroups }, nextCursor: null }) });
         let timedOut = false;
         const timeout = setTimeout(() => { timedOut = true; activeController.abort(); }, 20000);
         try {
@@ -37,8 +44,8 @@ export function createSearchState({ request = fetch, onChange = () => {} } = {})
             if (body.query !== query || body.category !== category || !body.groups ||
                 (body.nextCursor !== null && typeof body.nextCursor !== 'string') ||
                 (before && before === body.nextCursor)) throw new Error('Search returned an invalid response. Please try again.');
-            const groups = emptyGroups();
-            for (const key of SEARCH_CATEGORIES.slice(1)) {
+            const groups = { ...emptyGroups(), ...localGroups };
+            for (const key of REMOTE_SEARCH_CATEGORIES) {
                 const group = body.groups[key];
                 if (!Array.isArray(group?.items) || group.items.some(item => !item || typeof item !== 'object') ||
                     group.items.length > (category === 'all' ? 5 : 20) || typeof group.hasMore !== 'boolean') throw new Error('Search returned an invalid response. Please try again.');
@@ -63,7 +70,8 @@ export function readSearchHistory(storage) {
         return {
             queries: (Array.isArray(value.queries) ? value.queries : []).filter(q => typeof q === 'string' && canSearch(q)).slice(0, 6),
             views: (Array.isArray(value.views) ? value.views : []).filter(v => v && typeof v.id === 'string' &&
-                ((v.kind === 'artwork' && /^[1-9][0-9]{0,77}$/.test(v.id)) || (v.kind === 'artist' && /^0x[0-9a-f]{40}$/.test(v.id)))).slice(0, 6)
+                ((v.kind === 'artwork' && /^[1-9][0-9]{0,77}$/.test(v.id)) || (v.kind === 'artist' && /^0x[0-9a-f]{40}$/.test(v.id)) ||
+                    Boolean(getSiteSearchEntry(v.kind, v.id)))).slice(0, 6)
         };
     } catch { return { queries: [], views: [] }; }
 }

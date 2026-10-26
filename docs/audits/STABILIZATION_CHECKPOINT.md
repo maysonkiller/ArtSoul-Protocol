@@ -3,8 +3,22 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B22 profile polish and social-preview follow-up prepared
-(started at `a7abe68`):
+October 26 video search follow-up IN PROGRESS (started at `03f7134`):
+
+- Reviewed full `IMG_2580.MP4`: mobile search scrolling/height confirmed;
+  exact key behind the observed dismissal remains unproven.
+- Implemented fixed search controls, visual-viewport bounds, deliberate backdrop
+  dismissal, public pages/docs search and links that open exact docs sections.
+  All eight headers and existing voice/WebMCP search share the same public scope.
+- Search/docs 41 checks, voice/WebMCP/docs116 checks, eight browser geometry and
+  keyboard-state cases, and 11-route/173-utility build pass. Full unit/CI and
+  hosted release checks pending. Evidence: `audits/B22_SEARCH_VIDEO_2026-10-26.md`.
+- Preserve unrelated untracked authority-policy files, `.codex/`, `output/`.
+  Exactly next step: finish exact-candidate checks, release and verify search.
+  Then resume B21 Donate/Report preparation. No native iPhone acceptance claimed.
+
+October 26 B22 profile polish and social-preview follow-up RELEASED in PR #370,
+candidate `2e15408`, production merge `f7d9fa2` (started at `a7abe68`):
 
 - Compact labeled name/bio fields, native hints, bounded desktop form width,
   calmer Future editor border and compact public name/bio. Exact legacy
@@ -12,10 +26,17 @@ October 26 B22 profile polish and social-preview follow-up prepared
 - Local125 tests, build and eight before/after browser cases pass. Evidence:
   `audits/B22_PROFILE_POLISH_2026-10-26.md`. Local interface-design skill created
   and validated. No data/schema/auth/economics changes.
-- Tracked diff is this follow-up plus shared CSS pins. Preserve unrelated
-  untracked authority-policy files, `.codex/` and `output/`.
-- Exactly next action: candidate CI/preview, then release and verify the old
-  image URL redirect and exact deployed assets. B21 remains pending afterward.
+- Exact preview/apex eight-route/36-asset verification passes, along with ten
+  metadata/four image-alias checks and eight real public-profile browser cases
+  on each deployment. Telegram's own stored-message cache is not controlled.
+- CI40332708745 passed: Linux2748/two skips, Windows2361/31 skips, zero failures,
+  46 contracts each. Initial Windows PowerShell self-test timeouts passed on
+  unchanged retry; local focused8 passed. No tests weakened.
+- No implementation diff remains; release notes only. Preserve unrelated
+  untracked authority-policy files, `.codex/` and `output/`. Owned test browser
+  and local Vite server are closed. No helper agent remains active.
+- Exactly next action: B21 Donate/Report preparation through existing dialogs
+  with deliberate review/submission. Phase B remains in progress.
 
 October 26 B22 history layout follow-up RELEASED in PR #369, candidate
 `454fa70`, production merge `581a736` (started at `890af55`):

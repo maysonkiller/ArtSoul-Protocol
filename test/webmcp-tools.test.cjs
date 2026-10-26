@@ -168,6 +168,9 @@ test('catalog tool delegates to global search without falling back to card scans
   const deps = win.ArtSoulWebMCP.browserDependencies();
   const tool = toolsFrom(win, deps).get('search_catalog');
   assert.equal(tool.inputSchema.additionalProperties, false);
+  assert.deepEqual(tool.inputSchema.properties.category.enum, ['all', 'artworks', 'auctions', 'artists', 'pages', 'docs']);
+  assert.match(tool.description, /site pages and protocol documentation/);
+  assert.match(tool.description, /partial results/);
   assert.match(JSON.parse(await tool.execute({query: 'Vera'})).error, /Open Gallery/);
   win.ArtSoulSearch = {query: async input => {calls.push(input); return {query: input.query, groups: {artists: {items: []}}};}};
   const result = JSON.parse(await tool.execute({query: 'Vera', category: 'artists'}));
@@ -175,6 +178,20 @@ test('catalog tool delegates to global search without falling back to card scans
   assert.deepEqual(calls, [{query: 'Vera', category: 'artists'}]);
   const missing = toolsFrom(win, {fetchJson() {throw Error('No card scans');}}).get('search_catalog');
   assert.match(JSON.parse(await missing.execute({query: 'Moon'})).error, /Open Gallery/);
+});
+
+test('public page and docs tools preserve partial results without requests to staff or wallet APIs', async () => {
+  const win = load(), calls = [];
+  const tool = toolsFrom(win, {searchCatalog: async input => {
+    calls.push(input);
+    return {query: input.query, category: input.category, groups: {docs: {items: [{title: 'Fees', url: '/docs-protocol#fees'}], hasMore: false}}, warning: 'Catalog unavailable'};
+  }, fetchJson() {throw Error('No fallback requests');}, wallet() {throw Error('No wallet action');}}).get('search_catalog');
+  for (const category of ['pages', 'docs']) {
+    const result = JSON.parse(await tool.execute({query: 'fees', category}));
+    assert.equal(result.category, category); assert.equal(result.warning, 'Catalog unavailable');
+    assert.equal(result.groups.docs.items[0].url, '/docs-protocol#fees');
+  }
+  assert.deepEqual(calls, [{query: 'fees', category: 'pages'}, {query: 'fees', category: 'docs'}]);
 });
 
 test('search_artworks matches free text and caps the result count', async () => {

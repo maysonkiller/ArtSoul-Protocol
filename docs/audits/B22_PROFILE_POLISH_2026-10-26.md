@@ -1,6 +1,8 @@
 # Profile form and social preview follow-up
 
-Status: implemented and locally checked; candidate release verification pending.
+Status: released in [PR #370](https://github.com/maysonkiller/ArtSoul-Protocol/pull/370).
+Candidate `2e1540834c3e1381863ee6c42b43dca301d056b3`; production merge
+`f7d9fa2744d672dbf4ceef43e73f38fad7e79a01`.
 
 Workspace: `C:\Projects\ArtSoul`, `codex/takeover-audit`, started at `a7abe68`.
 Scope: October 26 owner screenshot and request; canon section 16 (presentation).
@@ -53,5 +55,32 @@ Scope: October 26 owner screenshot and request; canon section 16 (presentation).
   cache-refresh message was sent; the exact cached URL in the user's message
   was not independently observed.
 - No contract, economics, schema, authentication or authorization changes.
-- Next step: exact candidate CI/preview, authorized release and public asset /
-  legacy redirect verification; then resume B21 Donate/Report preparation.
+- Next step: resume B21 Donate/Report preparation through existing dialogs,
+  keeping deliberate review and submission. Phase B is not declared complete.
+
+## Release verification
+
+- CI run `40332708745` passed: Linux 2,748 unit tests/two skips, Windows
+  2,361/31 skips, zero failures; 46 contract tests on each platform.
+  First Windows attempt hit two 20-second PowerShell self-test timeouts in
+  unchanged wallet-import tests. A local focused rerun passed all eight tests;
+  the failed CI job then passed unchanged on attempt two. No skip, timeout or
+  assertion was weakened.
+- Preview and apex match the exact candidate: eight routes, 36 assets, expected
+  guest access denials. Main-site release is verified, not just the local build.
+- Each deployment passed ten metadata requests (five generic routes, browser
+  and Telegram user agents) and four old-image redirect checks (plain and
+  `?v=1` URLs, both agents). Each returned 308 to the approved v2 PNG; fetched
+  bytes match local SHA-256
+  `e9b79a3f14cfdd417a0bcd3765264ca2629644620b7764293b27cc2839787fc2`.
+- Real public-profile browser checks passed eight theme/width cases on preview
+  and eight on apex: no page overflow, header overlap, page script errors or
+  API writes. These are public read checks, not a fresh authenticated save or
+  native iPhone test. Existing WalletConnect telemetry returned an unrelated
+  403; no application exception resulted.
+- Evidence: `docs/private/b22-profile-polish-preview-2e1540834c3e-1793022070101.json`,
+  `docs/private/b22-profile-polish-apex-f7d9fa2744d6-1793022637973.json`,
+  `docs/private/profile-social-preview-1793022152833.json`,
+  `docs/private/profile-social-apex-1793022651639.json`,
+  `output/audit/profile-polish-public-{preview,apex}.log` and
+  `output/audit/profile-polish-ci-final.log`.

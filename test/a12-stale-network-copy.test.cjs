@@ -18,7 +18,7 @@ test('public and preview footers identify only the active testnet and canonical 
 
 test('public documentation matches the Base-only network and Genesis trust canon', () => {
   const readme = read('README.md');
-  const protocolDocs = read('src/entries/docs-protocol.jsx');
+  const protocolDocs = read('src/content/protocol-docs.js');
 
   assert.match(readme, /Base Sepolia is the only active product testnet/);
   assert.match(readme, /Base is the canonical production chain/);
