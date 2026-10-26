@@ -74,6 +74,7 @@ test('the ArtSoul tools are registered when the browser supports WebMCP', async 
   const win = load({ modelContext: { registerTool: async (tool) => registered.push(tool.name) } });
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(registered, [
+    'search_catalog',
     'search_artworks',
     'find_active_auctions',
     'get_artwork',
@@ -160,6 +161,20 @@ test('every tool declares a JSON Schema so the agent never guesses an input', ()
     assert.equal(tool.inputSchema.type, 'object', `${tool.name} needs an object schema`);
     assert.equal(typeof tool.execute, 'function');
   }
+});
+
+test('catalog tool delegates to global search without falling back to card scans or wallet actions', async () => {
+  const win = load(), calls = [];
+  const deps = win.ArtSoulWebMCP.browserDependencies();
+  const tool = toolsFrom(win, deps).get('search_catalog');
+  assert.equal(tool.inputSchema.additionalProperties, false);
+  assert.match(JSON.parse(await tool.execute({query: 'Vera'})).error, /Open Gallery/);
+  win.ArtSoulSearch = {query: async input => {calls.push(input); return {query: input.query, groups: {artists: {items: []}}};}};
+  const result = JSON.parse(await tool.execute({query: 'Vera', category: 'artists'}));
+  assert.equal(result.query, 'Vera');
+  assert.deepEqual(calls, [{query: 'Vera', category: 'artists'}]);
+  const missing = toolsFrom(win, {fetchJson() {throw Error('No card scans');}}).get('search_catalog');
+  assert.match(JSON.parse(await missing.execute({query: 'Moon'})).error, /Open Gallery/);
 });
 
 test('search_artworks matches free text and caps the result count', async () => {

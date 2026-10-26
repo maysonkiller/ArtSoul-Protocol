@@ -31,8 +31,10 @@ B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
    a separate search corpus for the assistant.
    The October 26 Saved release (PR #367 / `91b223f`) uses the shared store and existing signed-in
    session, with strict IDs, explicit desired state and account/auth fences.
-   Global artwork/artist search reuse remains the next contained slice. See
-   `audits/B21_SAVED_COMMANDS_2026-10-26.md` for the actual verification boundary.
+   Global artwork/artist search now reuses the same public state/API in a locally
+   verified candidate, with first-page groups, safe links and no automatic target
+   selection. See `audits/B21_SAVED_COMMANDS_2026-10-26.md` and
+   `audits/B21_GLOBAL_SEARCH_COMMANDS_2026-10-26.md` for actual release boundaries.
 3. Prepare publish drafts in the existing upload form. The person chooses the
    file, reviews title/description/price, completes authorization and signs the
    existing registration/auction transactions. Resume the existing durable

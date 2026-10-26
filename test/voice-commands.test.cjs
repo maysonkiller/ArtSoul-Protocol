@@ -20,6 +20,44 @@ function loadVoice(win = {}) {
 const voice = loadVoice();
 const parse = (text, lang = 'en') => voice.parseCommand(text, lang);
 
+test('global search keeps query text as data, supports public categories and asks for a missing query', () => {
+  for (const [lang, phrase, input] of [
+    ['en', 'Find artists Vera', {query: 'Vera', category: 'artists'}],
+    ['en', 'search artworks Moon 🌙', {query: 'Moon 🌙', category: 'artworks'}],
+    ['en', 'look for auctions Moon', {query: 'Moon', category: 'auctions'}],
+    ['en', 'find artwork 34', {query: 'artwork 34'}],
+    ['en', 'search buy artwork 34 & category=artists', {query: 'buy artwork 34 & category=artists'}],
+    ['ru', 'найди автора Vera', {query: 'Vera', category: 'artists'}],
+    ['ru', 'найди работы Луна', {query: 'Луна', category: 'artworks'}],
+    ['ru', 'найди аукционы Луна', {query: 'Луна', category: 'auctions'}],
+    ['ru', 'найди убери работу 34 из избранного', {query: 'убери работу 34 из избранного'}]
+  ]) {
+    assert.deepEqual(parse(phrase, lang), {tool: 'search_catalog', input});
+    assert.equal(voice.isWrite(parse(phrase, lang)), false);
+  }
+  assert.deepEqual(parse('search'), {searchPrompt: true});
+  assert.deepEqual(parse('найди', 'ru'), {searchPrompt: true});
+});
+
+test('global search distinguishes grouped matches shown from totals and does not speak user metadata', () => {
+  const wallet = '0x' + 'a'.repeat(40);
+  const result = {category: 'all', groups: {
+    artworks: {items: [{title: '<img src=x>', artwork_id: '34', creator: 'Vera', url: '/artwork/34'}], hasMore: true},
+    auctions: {items: [], hasMore: false},
+    artists: {items: [{name: 'Vera', wallet_address: wallet, url: '/profile?address=' + wallet}], hasMore: false}
+  }};
+  const reply = voice.describeResult('search_catalog', result, 'en');
+  assert.match(reply.show, /Shown: Artworks: 1 · Artists: 1/);
+  assert.match(reply.show, /More matches/);
+  assert.doesNotMatch(reply.say, /Vera|0x|img/);
+  assert.equal(reply.links.length, 2);
+  assert.match(reply.links[1].label, /0xaaaa/);
+  assert.match(voice.describeResult('search_catalog', result, 'ru').show, /Показано: Работы: 1/);
+  for (const group of Object.values(result.groups)) {group.items = []; group.hasMore = false;}
+  assert.match(voice.describeResult('search_catalog', result, 'en').show, /No matches/);
+  assert.match(voice.describeResult('search_catalog', {error: 'Search unavailable'}, 'en').show, /unavailable/);
+});
+
 test('explicit English and Russian favorites commands express a desired state', () => {
   for (const [lang, verb, cases] of [
     ['en', 'add_to_saved', ['save artwork 34', 'please add work #34 to favorites', 'add 34 to my favourites', 'save 34 to Saved']],
@@ -46,7 +84,7 @@ test('Saved grammar rejects negation, questions, multiple targets and invalid nu
   for (const [lang, commands] of Object.entries(cases)) for (const said of commands) {
     assert.ok(!['add_to_saved', 'remove_from_saved'].includes(parse(said, lang)?.tool), said);
   }
-  assert.deepEqual(parse('search save artwork 34'), { tool: 'search_artworks', input: { query: 'save artwork 34' } });
+  assert.deepEqual(parse('search save artwork 34'), { tool: 'search_catalog', input: { query: 'save artwork 34' } });
 });
 
 test('Saved replies report only server-confirmed results, never a wallet transaction', () => {
@@ -67,7 +105,7 @@ test('English sentences reach the tool they mean, with the figures they said', (
     ['what is the status of artwork 31', 'get_auction_state', { artwork_id: '31' }],
     ['my activity', 'get_my_activity', {}],
     ['open artwork 31', 'open_artwork', { artwork_id: '31' }],
-    ['search moon', 'search_artworks', { query: 'moon' }],
+    ['search moon', 'search_catalog', { query: 'moon' }],
     ['place a bid of 0.05 on artwork 31', 'place_bid', { artwork_id: '31', bid_eth: '0.05' }],
     ['bid 0.05 eth on 31', 'place_bid', { artwork_id: '31', bid_eth: '0.05' }],
     ['pay for artwork 30', 'complete_settlement', { artwork_id: '30' }],
@@ -92,7 +130,7 @@ test('Russian sentences reach the same tools, and a spoken comma is a decimal po
     ['кто владелец работы 19', 'get_artwork_provenance', { artwork_id: '19' }],
     ['мой профиль', 'get_my_activity', {}],
     ['открой работу 31', 'open_artwork', { artwork_id: '31' }],
-    ['найди луна', 'search_artworks', { query: 'луна' }],
+    ['найди луна', 'search_catalog', { query: 'луна' }],
     ['поставь ставку 0,05 на работу 31', 'place_bid', { artwork_id: '31', bid_eth: '0.05' }],
     ['оплати работу 30', 'complete_settlement', { artwork_id: '30' }],
     ['закрой расчёт по работе 30', 'close_expired_settlement', { artwork_id: '30' }],

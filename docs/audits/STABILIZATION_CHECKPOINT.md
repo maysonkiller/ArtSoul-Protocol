@@ -3,6 +3,19 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 B21 global search prepared from `91b223f`:
+
+- Ordinary search commands use the shared public catalog/state, with artwork,
+  live-auction and artist groups, safe links and honest first-page counts.
+  Legacy bounded `search_artworks` remains for compatibility only. No new
+  dependency, schema, economics or wallet behavior.
+- Focused 239/239, build and eight local browser theme/width cases pass. Send
+  focus loss found in browser and repaired. No new native phone/speech acceptance.
+- Evidence: `audits/B21_GLOBAL_SEARCH_COMMANDS_2026-10-26.md`. Preserve unrelated
+  authority-policy files, `.codex/` and `output/`.
+- Exactly next action: exact-candidate CI, hosted public API/browser and release
+  verification; then B-21 Donate/Report preparation through existing dialogs.
+
 October 26 B21 explicit Saved commands RELEASED: PR #367, candidate `d7cfad7`,
 production merge `91b223f` (started at `a5ad479`):
 

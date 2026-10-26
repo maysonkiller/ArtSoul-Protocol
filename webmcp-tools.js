@@ -264,7 +264,7 @@
                 'Search published ArtSoul artworks on Base Sepolia by free text, artwork number, creator or lifecycle ' +
                 'status. Answers come from ArtSoul\'s own indexer, which reconstructs state from confirmed Base ' +
                 'events and is the source the site itself renders, so no separate contract read is needed. ' +
-                'Read-only.',
+                'Legacy bounded listing: filters up to 200 recent cards, not the full catalog. Prefer search_catalog for global search. Read-only.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -298,6 +298,23 @@
                     count: matched.length,
                     results: matched.slice(0, clampLimit(args.limit)).map(summarize)
                 });
+            }
+        };
+
+        const searchCatalog = {
+            name: 'search_catalog',
+            description: 'Search the same public artwork, live-auction and artist-profile catalog as Search ArtSoul. ' +
+                'Grouped first-page results only, with explicit hasMore; no total-count claim. Read-only, no wallet or automatic navigation.',
+            inputSchema: {
+                type: 'object', additionalProperties: false,
+                properties: {
+                    query: { type: 'string', maxLength: 100, description: 'Artwork title/number, artist name or public wallet address.' },
+                    category: { type: 'string', enum: ['all', 'artworks', 'auctions', 'artists'] }
+                }, required: ['query']
+            },
+            execute: async input => {
+                if (typeof deps.searchCatalog !== 'function') return JSON.stringify({ error: 'Open Gallery, Profile or an artwork to search ArtSoul.' });
+                return JSON.stringify(await deps.searchCatalog(input));
             }
         };
 
@@ -1531,6 +1548,7 @@
         }));
 
         return [
+            searchCatalog,
             searchArtworks,
             findActiveAuctions,
             getArtwork,
@@ -1613,6 +1631,8 @@
             },
             openPath: (path) => window.location.assign(path),
             readContracts: () => window.ArtSoulContracts || null,
+            searchCatalog: input => window.ArtSoulSearch?.query?.(input) ||
+                { error: 'Open Gallery, Profile or an artwork to search ArtSoul. If it is still loading, try again shortly.' },
             setSavedArtwork: (id, saved) => window.ArtSoulSaved?.setArtwork?.(id, saved) ||
                 { updated: false, reason: 'Open Gallery, Profile or an artwork to use Saved. If it is still loading, try again shortly.' }
         };

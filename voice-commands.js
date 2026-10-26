@@ -87,7 +87,6 @@
         ['en', new RegExp(`\\b(?:open|show)\\s+(?:me\\s+)?${EN_WORK}${ID}`), m => ({ tool: 'open_artwork', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`\\b(?:tell me about|about|details|info)\\b.*?${ID}`), m => ({ tool: 'get_artwork', input: { artwork_id: m[1] } })],
         ['en', /\bauctions?\b/, () => ({ tool: 'find_active_auctions', input: {} })],
-        ['en', /^(?:search(?: for)?|find|look for)\s+(.+)$/, m => ({ tool: 'search_artworks', input: { query: m[1].trim() } })],
 
         // --- Russian ---------------------------------------------------------
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:сохрани|добавь)\\s+${RU_WORK}${ID}\\s+в\\s+избранное$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
@@ -110,12 +109,12 @@
         ['ru', new RegExp(`(?:открой|покажи)\\s+${RU_WORK}${ID}`), m => ({ tool: 'open_artwork', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`(?:расскажи|инфо|подробн)[а-я]*.*?${ID}`), m => ({ tool: 'get_artwork', input: { artwork_id: m[1] } })],
         ['ru', /аукцион/, () => ({ tool: 'find_active_auctions', input: {} })],
-        ['ru', /^(?:найди|поиск|ищи)\s+(.+)$/, m => ({ tool: 'search_artworks', input: { query: m[1].trim() } })]
     ];
 
     /** A spoken sentence to one tool call, or null when nothing matched. */
     function parseCommand(transcript, lang) {
-        const heard = String(transcript == null ? '' : transcript)
+        const normalized = String(transcript == null ? '' : transcript).replace(/\s+/g, ' ').trim();
+        const heard = normalized
             .toLowerCase()
             .replace(/[?!.]+$/g, '')
             .replace(/\s+/g, ' ')
@@ -123,9 +122,17 @@
         if (!heard || heard.length > 300) return null;
         const language = lang === 'ru' ? 'ru' : 'en';
         // A search term is data, even when it contains a wallet command.
-        const search = language === 'ru' ? /^(?:найди|поиск|ищи)\s+(.+)$/.exec(heard)
-            : /^(?:search(?: for)?|find|look for)\s+(.+)$/.exec(heard);
-        if (search) return { tool: 'search_artworks', input: { query: search[1] } };
+        const search = language === 'ru' ? /^(?:найди|поиск|ищи)(?:\s+(.*))?$/i.exec(normalized)
+            : /^(?:search(?: for)?|find|look for)(?:\s+(.*))?$/i.exec(normalized);
+        if (search) {
+            if (!search[1]) return { searchPrompt: true };
+            const scoped = language === 'ru' ? /^(автора|художника|профили|работы|аукционы)\s+(.+)$/i.exec(search[1])
+                : /^(artists|profiles|artworks|auctions)\s+(.+)$/i.exec(search[1]);
+            if (!scoped) return { tool: 'search_catalog', input: { query: search[1] } };
+            const kind = scoped[1].toLowerCase();
+            const category = ['artworks', 'работы'].includes(kind) ? 'artworks' : ['auctions', 'аукционы'].includes(kind) ? 'auctions' : 'artists';
+            return { tool: 'search_catalog', input: { query: scoped[2], category } };
+        }
         for (const [ruleLang, pattern, build] of GRAMMAR) {
             if (ruleLang !== language) continue;
             const match = pattern.exec(heard);
@@ -166,6 +173,7 @@
             noSpeech: 'Voice is unavailable in this browser. You can type instead.',
             working: 'Working… If your wallet opens, review the request there. Closing this panel does not cancel a submitted transaction.',
             empty: 'Enter a command first.', changed: 'Wallet changed. Enter a new command for this account.',
+            searchPrompt: 'What would you like to find? Try "search moon" or "find artists Vera".',
             tooLong: 'Use one command of up to 300 characters.',
             listening: 'Listening… say one command.',
             notHeard: 'Nothing was heard. Press the microphone and try again.',
@@ -175,7 +183,7 @@
             unavailable: 'Commands are not available on this page.',
             notice: 'Voice commands use your browser\'s speech recognition. In Chrome, the audio is sent to Google to be transcribed. ArtSoul does not record, store or receive it.\n\nTurn on voice commands?',
             micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
-            help: 'Try: "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+            help: 'Try: "search moon", "find artists Vera", "find auctions moon", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
                 '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
             submitted: 'Done. The wallet approved it and the transaction was sent.',
@@ -192,6 +200,7 @@
             noSpeech: 'Голос недоступен в этом браузере. Можно написать команду.',
             working: 'Выполняется… Если откроется кошелёк, проверьте запрос в нём. Закрытие этого окна не отменяет отправленную транзакцию.',
             empty: 'Сначала введите команду.', changed: 'Кошелёк изменён. Введите новую команду для этого аккаунта.',
+            searchPrompt: 'Что найти? Например: «найди луна» или «найди автора Vera».',
             tooLong: 'Введите одну команду длиной до 300 символов.',
             listening: 'Слушаю… скажите одну команду.',
             notHeard: 'Ничего не услышано. Нажмите микрофон и попробуйте снова.',
@@ -201,7 +210,7 @@
             unavailable: 'Команды недоступны на этой странице.',
             notice: 'Голосовые команды используют распознавание речи вашего браузера. В Chrome звук отправляется в Google для распознавания. ArtSoul его не записывает, не хранит и не получает.\n\nВключить голосовые команды?',
             micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
-            help: 'Скажите: «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
+            help: 'Скажите: «найди луна», «найди автора Vera», «найди аукционы луна», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
                 '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
             submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
@@ -236,6 +245,26 @@
         }
 
         switch (tool) {
+        case 'search_catalog': {
+            const labels = ru ? { artworks: 'Работы', auctions: 'Аукционы', artists: 'Авторы' }
+                : { artworks: 'Artworks', auctions: 'Auctions', artists: 'Artists' };
+            const lines = [], links = [];
+            let more = false;
+            for (const key of ['artworks', 'auctions', 'artists']) {
+                const group = data.groups?.[key];
+                if (!Array.isArray(group?.items)) return { say: t.error('Invalid search response.'), show: 'Search could not be completed. Please try again.' };
+                const items = group.items.slice(0, data.category === 'all' ? 5 : 20);
+                if (items.length) lines.push(`${labels[key]}: ${items.length}`);
+                more ||= group.hasMore === true;
+                for (const item of items) links.push({ url: item.url, label: key === 'artists'
+                    ? `${labels[key]} · ${item.name} · ${item.wallet_address}`
+                    : `${labels[key]} · ${item.title} (#${item.artwork_id}) · ${item.creator}` });
+            }
+            const head = lines.length ? `${ru ? 'Показано' : 'Shown'}: ${lines.join(' · ')}.`
+                : (ru ? 'Совпадений нет. Попробуйте другое название, имя или номер работы.' : 'No matches. Try another title, artist or artwork number.');
+            const tail = more ? (ru ? 'Есть ещё результаты. Откройте поиск через лупу и выберите категорию.' : 'More matches are available. Open Search ArtSoul and choose a category.') : '';
+            return { say: [head, tail].filter(Boolean).join(' '), show: [head, tail].filter(Boolean).join('\n'), links };
+        }
         case 'add_to_saved':
         case 'remove_from_saved': {
             if (data.updated !== true || typeof data.saved !== 'boolean') return { say: t.error('Saved could not be confirmed.'), show: 'Saved could not be confirmed. Please try again.' };
@@ -385,10 +414,12 @@
             '<p class="artsoul-voice-support"></p>' +
             '<p class="artsoul-voice-heard"></p>' +
             '<p class="artsoul-voice-answer" role="status" aria-live="polite"></p>' +
+            '<div class="artsoul-voice-results"></div>' +
             '<details class="artsoul-voice-examples"><summary></summary><p></p></details>';
 
         const heardEl = panel.querySelector('.artsoul-voice-heard');
         const answerEl = panel.querySelector('.artsoul-voice-answer');
+        const resultsEl = panel.querySelector('.artsoul-voice-results');
         const input = panel.querySelector('input');
         const mic = panel.querySelector('.artsoul-voice-mic');
         const send = panel.querySelector('.artsoul-voice-send');
@@ -419,9 +450,18 @@
             controls();
         }
 
-        function show(heard, answer) {
+        function show(heard, answer, links = []) {
             heardEl.textContent = heard || '';
             answerEl.textContent = answer || '';
+            resultsEl.replaceChildren();
+            for (const item of links) {
+                // Results are untrusted text; links are only canonical public
+                // identities, never URLs supplied by artwork metadata.
+                const id = /^\/artwork\/([1-9][0-9]{0,77})$/.exec(item.url || '');
+                if (!(id && BigInt(id[1]) < 2n ** 256n) && !/^\/profile\?address=0x[0-9a-f]{40}$/.test(item.url || '')) continue;
+                const link = document.createElement('a'); link.href = item.url; link.textContent = item.label;
+                resultsEl.appendChild(link);
+            }
         }
 
         function controls() {
@@ -484,8 +524,8 @@
             silence();
             const t = TEXT[lang];
             const audio = audioGeneration;
-            const reply = (heard, answer, say = answer) => {
-                show(heard, answer);
+            const reply = (heard, answer, say = answer, links = []) => {
+                show(heard, answer, links);
                 if (spoken && audio === audioGeneration) speak(say);
             };
             if (transcript.length > 300) { reply('', t.tooLong); return; }
@@ -500,6 +540,7 @@
                 reply(transcript, t.help);
                 return;
             }
+            if (command.searchPrompt) { reply(transcript, t.searchPrompt); return; }
             if (!mayRun(command, confidence)) {
                 const text = t.unsure(transcript);
                 reply(transcript, text);
@@ -519,7 +560,7 @@
                 const result = JSON.parse(await tool.execute(command.input));
                 if (current !== generation || currentWallet !== walletIdentity()) return;
                 const resultText = describeResult(command.tool, result, lang);
-                reply(transcript, resultText.show, resultText.say);
+                reply(transcript, resultText.show, resultText.say, resultText.links);
             } catch (error) {
                 if (current !== generation || currentWallet !== walletIdentity()) return;
                 const message = (error && error.message) || String(error);
@@ -527,6 +568,9 @@
             } finally {
                 busy = false;
                 controls();
+                // Disabling the focused Send button moves focus to body in
+                // browsers. Return it to the composer so Escape/retry work.
+                if (!panel.hidden && document.activeElement === document.body) input.focus({ preventScroll: true });
             }
         }
 
