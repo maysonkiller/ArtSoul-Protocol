@@ -3,18 +3,21 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B21 explicit Saved commands prepared from `a5ad479`:
+October 26 B21 explicit Saved commands RELEASED: PR #367, candidate `d7cfad7`,
+production merge `91b223f` (started at `a5ad479`):
 
 - Explicit add/remove tools and English/Russian commands reuse the existing
   singleton and authenticated API. No implicit sign-in, toggle-on-retry, new
   schema, economics, contract or role changes. Shared controls/list stay in sync.
-- Focused tests 170/170 and build pass. Eight local browser theme/width cases
-  plus account/busy/401 checks pass against synthetic transport; no new phone,
-  microphone or live-account mutation acceptance is claimed.
+- Focused tests 175/175 and build pass. Eight local browser theme/width cases
+  plus account/busy/401 checks pass against synthetic transport. Preview/apex
+  guest browser 16 cases each, eight-page/36-asset verification pass. Final CI
+  40318543328: Linux 2,725 pass/two skips; Windows 2,338/31; zero failures,
+  46 contract tests each. Send's native-submit/global-click-guard conflict fixed.
+  No new phone, microphone or live-account mutation acceptance is claimed.
 - Evidence: `audits/B21_SAVED_COMMANDS_2026-10-26.md`. Preserve unrelated untracked
-  authority-policy files, `.codex/` and `output/`. Exact-candidate CI/release pending.
-- Exactly next action: complete candidate CI and deployment verification for this
-  Saved slice; then B-21 global public artwork/artist search reuse.
+  authority-policy files, `.codex/` and `output/`. No tracked implementation diff.
+- Exactly next action: B-21 global public artwork/artist search reuse.
 
 October 26 B22 workflow follow-up RELEASED: PR #365, candidate `25ae246`,
 production merge `cc87dcd` (started at `b9be502`):

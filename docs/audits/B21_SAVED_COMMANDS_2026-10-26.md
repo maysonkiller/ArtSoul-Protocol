@@ -1,8 +1,8 @@
 # B-21 explicit Saved commands
 
-Status: implemented and locally verified; release checks pending. Canonical
-checkout `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, starting HEAD
-`a5ad479`. This is a bounded B-21 slice, not completion of Phase B.
+Status: released in PR #367, candidate `d7cfad7`, production merge `91b223f`.
+Canonical checkout `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, starting
+HEAD `a5ad479`. This is a bounded B-21 slice, not completion of Phase B.
 
 ## Scope and cause
 
@@ -60,9 +60,20 @@ No new dependency or model/provider integration.
   dependency resolved its render error, with no application workaround.
 - Initial CI 40317130816 failed only the two cache-pin checks on each platform;
   the page versions had changed but the expected hashes had not. The pins were
-  updated without weakening their assertions. Final candidate CI remains pending.
+  updated without weakening their assertions. Final candidate CI 40318543328
+  passes: Linux 2,725 passed/two skipped; Windows 2,338 passed/31 skipped;
+  zero failures, 46 contract tests per platform, both builds and static checks pass.
+- Exact candidate preview and production merge verification pass for eight pages
+  and 36 assets, including private endpoint guest denial. Preview-only disabled
+  moderation endpoints correctly return 503; production checks require 401.
+- Real-page guest browser checks pass on Home/Gallery/Artwork/Profile, both themes
+  at 390/1440px: 16 preview and 16 apex cases, zero private writes. Send submits
+  once, returns the sign-in guidance, and help/panel geometry remain usable.
+  Apex evidence: `b21-saved-apex-91b223f82f63-1793016120955.json`.
 - Evidence: `output/audit/b21-saved-focused-final.log`, `b21-saved-build-final.log`,
-  `b21-saved-browser-final.log`; screenshots `output/playwright/b21-saved-*.png`.
+  `b21-saved-browser-final.log`, `b21-saved-final-ci.log`,
+  `b21-saved-hosted-browser-final.log`, `b21-saved-apex-browser.log`;
+  screenshots `output/playwright/b21-saved-*.png`.
   No new physical-phone, microphone-service, native WebMCP client, wallet-signature
   or live-account mutation acceptance is claimed by these fixture checks.
 
