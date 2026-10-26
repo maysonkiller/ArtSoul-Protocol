@@ -1,9 +1,9 @@
-// Lazy Protocol Admin menu discovery (A8c audit fix P2-6).
+// Server-owned Protocol Admin menu discovery.
 //
 // Executes the real avatar-dropdown.js inside a minimal DOM harness and
-// proves the discovery contract: a connected header render performs no
-// /api/moderation/access request; the first dropdown opening performs exactly
-// one; repeated openings reuse it; a wallet change invalidates the cached
+// proves the discovery contract: a visual render performs no request, while a
+// confirmed, signed-in wallet warms one decision before the menu opens;
+// repeated openings reuse it; a wallet change invalidates the in-memory
 // result; and the admin link is rendered only after a successful server
 // response. Authorization itself stays server-side and is covered by
 // protocol-admin-review.test.cjs.
@@ -136,9 +136,50 @@ test('render paths call only the non-fetching wallet sync', () => {
   assert.equal(renderCalls.length, 2);
   assert.doesNotMatch(SOURCE, /refreshProtocolAdminAccess/);
   const openCall = SOURCE.match(/void this\.requestProtocolAdminAccessOnce\(\);/g) || [];
-  assert.equal(openCall.length, 1);
-  // Discovery stays on the menu-open path only.
+  assert.equal(openCall.length, 2);
+  // Visual rendering is still separate from the confirmed sign-in warmup.
   assert.match(SOURCE, /if \(this\.isOpen\) \{\s*\n\s*void this\.requestProtocolAdminAccessOnce\(\);/);
+});
+
+function confirmedSignIn(harness, wallet = WALLET_A) {
+  harness.context.window.currentWalletAddress = wallet;
+  harness.context.window.artsoulSettledWalletState = {address: wallet, isConnected: true};
+  harness.context.window.SupabaseAuth = {getAuthenticatedWallet: () => wallet};
+}
+
+test('confirmed signed-in wallet warms eligibility before menu opening without waiting for profile data', async () => {
+  const h = createHarness(); confirmedSignIn(h);
+  const releaseProfile = h.holdProfileReads();
+  h.dispatchWalletState({address: WALLET_A, isConnected: true}); await h.flush();
+  assert.equal(h.accessCalls.length, 1); assert.equal(h.dropdown.isOpen, false);
+  assert.equal(h.dropdown.protocolAdminEligible, true);
+  h.dropdown.toggle(); h.dispatchWalletState({address: WALLET_A, isConnected: true, chainId: 84532}); await h.flush();
+  assert.equal(h.accessCalls.length, 1);
+  releaseProfile(); await h.flush(); assert.equal(h.accessCalls.length, 1);
+});
+
+test('passive warmup requires settled connection and matching sign-in, not cached profile or role hints', async () => {
+  for (const scenario of ['unsettled', 'guest', 'signed-out', 'different-wallet']) {
+    const h = createHarness(); confirmedSignIn(h);
+    if (scenario === 'unsettled') h.context.window.artsoulWalletStateSettled = false;
+    if (scenario === 'guest') h.context.window.artsoulSettledWalletState.isConnected = false;
+    if (scenario === 'signed-out') h.context.window.SupabaseAuth.getAuthenticatedWallet = () => '';
+    if (scenario === 'different-wallet') h.context.window.SupabaseAuth.getAuthenticatedWallet = () => WALLET_B;
+    h.dropdown.prefetchProtocolAdminAccess(); await h.flush();
+    assert.equal(h.accessCalls.length, 0, scenario); assert.equal(h.dropdown.protocolAdminEligible, false);
+  }
+});
+
+test('sign-in warms a new decision, logout clears it, and server revocation is respected after navigation', async () => {
+  const h = createHarness(); confirmedSignIn(h);
+  authChanged(h); await h.flush(); assert.equal(h.dropdown.protocolAdminEligible, true);
+  h.context.window.SupabaseAuth.getAuthenticatedWallet = () => '';
+  authChanged(h); await h.flush(); assert.equal(h.dropdown.protocolAdminEligible, false); assert.equal(h.accessCalls.length, 1);
+  confirmedSignIn(h); authChanged(h); await h.flush(); assert.equal(h.dropdown.protocolAdminEligible, true);
+  h.context.window.dispatchEvent({type: 'pagehide'}); assert.equal(h.dropdown.protocolAdminEligible, false);
+  h.setAccessResponse(() => accessResponse({eligible: false}));
+  h.context.window.dispatchEvent({type: 'pageshow'}); await h.flush();
+  assert.equal(h.dropdown.protocolAdminEligible, false); assert.equal(h.accessCalls.length, 3);
 });
 
 function authChanged(harness) {

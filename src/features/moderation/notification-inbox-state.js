@@ -4,12 +4,12 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
   const owner = wallet.toLowerCase();
   let generation = 0, controller;
   let readEnabled = false;
-  let state = { status: 'idle', items: [], nextCursor: null, retryCursor: null, staffReview: null };
+  let state = { status: 'idle', items: [], nextCursor: null, retryCursor: null, staffReview: null, pendingIds: [] };
   const publish = next => { state = next; onChange(state); };
   function invalidate(status = 'idle') {
     generation++;
     controller?.abort();
-    publish({ status, items: [], nextCursor: null, retryCursor: null, staffReview: null });
+    publish({ status, items: [], nextCursor: null, retryCursor: null, staffReview: null, pendingIds: [] });
   }
   async function loadStaffReview(current, options) {
     let eligible = false;
@@ -24,6 +24,7 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
       eligible = true;
       if (access.enabled !== true) { publish({ ...state, staffReview: { status: 'disabled' } }); return; }
       if (access.access?.stepUpActive !== true) { publish({ ...state, staffReview: { status: 'verify' } }); return; }
+      publish({ ...state, staffReview: { status: 'loading' } });
       const queueResponse = await fetchPage('/api/moderation/review-queue?status=pending_review', options);
       if (!current()) return;
       if (queueResponse.status === 401) { invalidate('auth'); return; }
@@ -51,10 +52,11 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
   }
   async function load(cursor = null) {
     if (!owner || getWallet().toLowerCase() !== owner) { invalidate('auth'); return; }
+    if (state.pendingIds?.length) return;
     const request = ++generation;
     controller?.abort();
     controller = new AbortController();
-    publish({ status: 'loading', items: cursor ? state.items : [], nextCursor: null, retryCursor: cursor, staffReview: cursor ? state.staffReview : null });
+    publish({ status: 'loading', items: cursor ? state.items : [], nextCursor: null, retryCursor: cursor, staffReview: cursor ? state.staffReview : null, pendingIds: [] });
     const current = () => request === generation && getWallet().toLowerCase() === owner;
     try {
       const options = {
@@ -64,7 +66,9 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
       const query = new URLSearchParams();
       if (readEnabled) query.set('v','2');
       if (cursor) query.set('before',cursor);
-      const response = await fetchPage(`/api/moderation/notifications${query.size ? '?'+query : ''}`, options);
+      const pageRequest = fetchPage(`/api/moderation/notifications${query.size ? '?'+query : ''}`, options);
+      const staffRequest = cursor ? null : loadStaffReview(current, options);
+      const response = await pageRequest;
       if (!current()) return;
       if (response.status === 401) { invalidate('auth'); return; }
       if ([404, 503].includes(response.status)) { invalidate('unavailable'); return; }
@@ -76,33 +80,38 @@ export function createNotificationInbox({ wallet, getWallet, onChange, fetchPage
       if (readEnabled && data.items.some(item=>typeof item.read!=='boolean')) throw new Error('Invalid read state');
       const items = [...state.items];
       for (const item of data.items) if (!items.some(existing => existing.id === item.id)) items.push(item);
-      publish({ status: cursor ? 'ready' : 'loading', items, nextCursor: data.nextCursor || null, retryCursor: null, staffReview: state.staffReview });
+      publish({ status: cursor ? 'ready' : 'loading', items, nextCursor: data.nextCursor || null, retryCursor: null, staffReview: state.staffReview, pendingIds: [] });
       if (!cursor) {
-        await loadStaffReview(current, options);
+        await staffRequest;
         if (current()) publish({ ...state, status: 'ready' });
       }
     } catch {
       if (current()) publish({ ...state, status: 'error' });
     }
   }
-  async function markRead(id,read) {
+  async function updateItems(ids,read,removing=false) {
     if (!owner || getWallet().toLowerCase()!==owner) {invalidate('auth');return;}
-    if (!readEnabled || !['ready','error'].includes(state.status) || state.pendingId || typeof read!=='boolean' || !state.items.some(item=>item.id===id)) return;
+    if (!readEnabled || !['ready','error'].includes(state.status) || state.pendingIds?.length || (!removing && typeof read!=='boolean') ||
+      !Array.isArray(ids) || ids.length<1 || ids.length>20 || new Set(ids).size!==ids.length ||
+      ids.some(id=>typeof id!=='string' || !/^[1-9][0-9]{0,18}$/.test(id) || BigInt(id)>9223372036854775807n || !state.items.some(item=>item.id===id))) return;
     const request=++generation;controller?.abort();controller=new AbortController();
     const current=()=>request===generation && getWallet().toLowerCase()===owner;
-    publish({...state,pendingId:id,error:''});
+    publish({...state,pendingId:ids[0],pendingIds:ids,error:''});
     const active=controller, timeout=setTimeout(()=>active.abort(),15000);
     try {
       const response=await fetchPage('/api/moderation/notifications?v=2',{method:'PUT',credentials:'same-origin',cache:'no-store',signal:active.signal,
-        headers:{'X-ArtSoul-Wallet':owner,'Content-Type':'application/json'},body:JSON.stringify({action:'read',ids:[id],read})});
+        headers:{'X-ArtSoul-Wallet':owner,'Content-Type':'application/json'},body:JSON.stringify(removing ? {action:'remove',ids} : {action:'read',ids,read})});
       if (!current()) return;
       if (response.status===401) {invalidate('auth');return;}
       const data=await response.json();
       if (!current()) return;
-      if (!response.ok || active.signal.aborted || data.wallet!==owner || data.read!==read || !Array.isArray(data.updated) || data.updated.length!==1 || data.updated[0]!==id) throw new Error('Read state unavailable');
-      publish({...state,items:state.items.map(item=>item.id===id?{...item,read}:item)});
-    } catch {if(current())publish({...state,error:'Read state could not be saved. Please try again.'});}
-    finally {clearTimeout(timeout);if(current())publish({...state,pendingId:null});}
+      if (data.wallet!==owner && response.ok) {invalidate('auth');return;}
+      const acknowledged=removing ? data.removed : data.updated;
+      if (!response.ok || active.signal.aborted || (!removing && data.read!==read) || !Array.isArray(acknowledged) ||
+        acknowledged.length!==ids.length || new Set(acknowledged).size!==ids.length || acknowledged.some(id=>!ids.includes(id))) throw new Error('Notification update unavailable');
+      publish({...state,items:removing ? state.items.filter(item=>!ids.includes(item.id)) : state.items.map(item=>ids.includes(item.id)?{...item,read}:item)});
+    } catch {if(current())publish({...state,error:removing ? 'Notifications could not be deleted. Please try again.' : 'Read state could not be saved. Please try again.'});}
+    finally {clearTimeout(timeout);if(current())publish({...state,pendingId:null,pendingIds:[]});}
   }
-  return {getState:()=>state,load,invalidate,markRead,configure(config){const next=config?.summaryEnabled===true;if(next!==readEnabled){readEnabled=next;invalidate();}}};
+  return {getState:()=>state,load,invalidate,markRead:(id,read)=>updateItems([id],read),remove:ids=>updateItems(ids,undefined,true),configure(config){const next=config?.summaryEnabled===true;if(next!==readEnabled){readEnabled=next;invalidate();}}};
 }

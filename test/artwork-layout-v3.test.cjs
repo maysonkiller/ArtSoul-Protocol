@@ -57,7 +57,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=49/);
+    assert.match(html, /unified-styles\.css\?v=50/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -67,7 +67,6 @@ test('mobile scroll order matches the rebuilt blocks and disables motion', () =>
         ['artwork-page-right \\.artwork-mobile-auction', 'artwork-mobile-auction', 3],
         ['artwork-page-left \\.artwork-mobile-ai', 'artwork-mobile-ai', 4],
         ['artwork-page-left \\.artwork-mobile-trust', 'artwork-mobile-trust', 5],
-        ['artwork-page-right \\.artwork-mobile-moderation', 'artwork-mobile-moderation', 6],
         ['artwork-page-right \\.artwork-mobile-people', 'artwork-mobile-people', 7]
     ];
     orderRules.forEach(([selector, className, order]) => {
@@ -75,7 +74,8 @@ test('mobile scroll order matches the rebuilt blocks and disables motion', () =>
         assert.match(`${source}\n${skeleton}`, new RegExp(className));
     });
     assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.artwork-page-layout \{[\s\S]*?align-items: stretch;/);
-    assert.match(styles, /\.artwork-mobile-context,[\s\S]*?\.artwork-mobile-ai,[\s\S]*?\.artwork-mobile-moderation \{[\s\S]*?width: 100%;/);
+    assert.doesNotMatch(source, /artwork-mobile-moderation/);
+    assert.match(styles, /\.artwork-mobile-context,[\s\S]*?\.artwork-mobile-ai[^{]*\{[^}]*width: 100%;/);
     assert.match(styles, /animation: none !important;[\s\S]*?transition: none !important;/);
     assert.match(styles, /\.artwork-page-root \.artwork-mobile-auction \{[\s\S]*?padding: 10px;/);
     assert.match(styles, /\.artwork-page-left \.artwork-detail-frame \{[\s\S]*?max-height: 30svh;/);
@@ -140,7 +140,7 @@ test('Community owns artwork actions while Ownership keeps only participant iden
         source.indexOf('<section className="artwork-page-panel artwork-page-ai'));
     const ownership = source.slice(source.indexOf('{/* Ownership Info - Three Roles */}'),
         source.indexOf('<section className="artwork-page-panel artwork-page-provenance'));
-    for (const action of ['<ArtistSupport', 'artwork-page-share', 'artwork-page-report', 'artwork-mobile-back', 'Moderation tools']) {
+    for (const action of ['<ArtistSupport', 'artwork-page-share', 'artwork-page-report', 'artwork-mobile-back']) {
         assert.ok(community.includes(action), `${action} belongs to Community`);
         assert.ok(!ownership.includes(action), `${action} must not crowd Ownership`);
     }
@@ -148,8 +148,7 @@ test('Community owns artwork actions while Ownership keeps only participant iden
     assert.doesNotMatch(ownership, /<button\b/);
     assert.equal((ownership.match(/renderOwnershipRole\(/g) || []).length, 4);
     assert.match(community, /reportingEnabled &&/);
-    assert.match(community, /moderationAccess\?\.canModerate &&/);
-    assert.match(community, /loadModerationVisibility\(artwork, \{ interactive: true \}\)/);
+    assert.doesNotMatch(source, /moderationAccess|loadModerationVisibility|Moderation tools/);
     assert.match(community, /trustScore > 0 &&[\s\S]*?\{trustScore\}/);
     assert.match(styles, /\.artwork-community-actions \{[^}]*flex-wrap: wrap;/);
     assert.doesNotMatch(styles, /grid-template-rows: auto minmax\(0, 1fr\) 160px/);

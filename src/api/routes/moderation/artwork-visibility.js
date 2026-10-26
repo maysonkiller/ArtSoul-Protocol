@@ -6,6 +6,8 @@ import {
   supabaseRest
 } from '../../backend.js';
 import { getModerationAccess, canReadStaffWallets, redactOtherStaffWallets } from '../../moderation-access.js';
+import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
+import { catalogArtworkId } from '../../admin-artwork-catalog.js';
 
 function protocolId(value) {
   const text = String(value || '').trim();
@@ -28,10 +30,9 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
 
   try {
-    // A read is also the artwork page's server-authoritative access probe.
-    // Guests and non-staff wallets receive no moderation data, but they do not
-    // turn an otherwise healthy public artwork page into a noisy 401 request.
-    // Writes remain strict and fail closed before any state is changed.
+    // The legacy read probe remains non-disclosing for unverified callers.
+    // Staff writes belong to the enabled Admin workspace only.
+    if (req.method === 'POST') requireProtocolAdminEnabled();
     const access = await getModerationAccess(req, { strict: req.method === 'POST' });
 
     if (req.method === 'GET' && !access.canModerate) {
@@ -72,25 +73,34 @@ export default async function handler(req, res) {
 
     const body = await readJson(req);
     const chainId = normalizeChainId(body.chain_id);
-    const artworkId = protocolId(body.artwork_id);
+    const artworkId = catalogArtworkId(String(body.artwork_id || ''));
     const hidden = body.hidden;
-    const reason = String(body.reason || '').trim().slice(0, 500);
+    const reason = String(body.reason || '').trim();
+    const expected = body.expected_updated_at;
 
     if (!artworkId) throw badRequest('Valid artwork_id is required', 'INVALID_ARTWORK_ID');
+    if (chainId !== 84532) throw badRequest('Choose the active artwork network.', 'INVALID_CHAIN');
     if (typeof hidden !== 'boolean') throw badRequest('hidden must be a boolean', 'INVALID_HIDDEN_STATE');
-    if (hidden && !reason) throw badRequest('Reason is required to hide artwork', 'MISSING_REASON');
+    if (!reason || reason.length > 500) throw badRequest('A review reason of 1–500 characters is required.', 'MISSING_REASON');
+    if (expected !== null && (typeof expected !== 'string' || !Number.isFinite(Date.parse(expected)))) {
+      throw badRequest('Refresh the artwork before recording a visibility decision.', 'INVALID_VISIBILITY_VERSION');
+    }
 
-    const rows = await supabaseRest('rpc/set_artwork_moderation_visibility', {
+    const rows = await supabaseRest('rpc/review_artwork_visibility', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: {
         p_chain_id: chainId,
         p_artwork_id: artworkId,
         p_hidden: hidden,
-        p_reason: hidden ? reason : null,
-        p_actor_wallet: access.wallet
+        p_reason: reason,
+        p_actor_wallet: access.wallet,
+        p_expected_updated_at: expected
       }
     });
+    if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.hidden !== hidden) {
+      throw new Error('The visibility decision was not recorded. Refresh before retrying.');
+    }
 
     return res.status(200).json({
       success: true,
@@ -104,6 +114,15 @@ export default async function handler(req, res) {
       }
     });
   } catch (error) {
+    const detail = String(error?.details?.message || error?.message || '');
+    const mapped = [
+      ['ARTWORK_ACTIVE_REPORTS','Resolve the active artwork reports before restoring visibility.',409],
+      ['VISIBILITY_REVIEW_CONFLICT','This artwork changed. Refresh it before making a decision.',409],
+      ['VISIBILITY_ALREADY_SET','This visibility decision is already recorded. Refresh the artwork.',409],
+      ['ARTWORK_NOT_FOUND','The artwork no longer exists in the current index.',404],
+      ['ADMIN_REQUIRED','This wallet no longer has an active staff role.',403]
+    ].find(([code]) => detail.includes(code));
+    if (mapped) { error.code=mapped[0]; error.message=mapped[1]; error.statusCode=mapped[2]; }
     sendError(res, error);
   }
 }

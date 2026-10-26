@@ -10,7 +10,7 @@ const source = fs.readFileSync('src/features/moderation/notification-inbox.jsx',
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => {let resolve; const promise = new Promise(done => {resolve = done;}); return {promise, resolve};};
 const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child => elements(child, predicate))
-  : React.isValidElement(node) && ['PersonalHistory', 'AuctionMessage', 'ReportMessage'].includes(node.type?.name) ? elements(node.type(node.props), predicate)
+  : React.isValidElement(node) && ['PersonalHistory', 'AuctionMessage', 'ReportMessage', 'MessageSelection', 'NotificationSettings', 'UpcomingReminders'].includes(node.type?.name) ? elements(node.type(node.props), predicate)
   : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
 
 async function harness(fetchPage, enabled = true, summaryEnabled = false, configPromise = null) {
@@ -181,7 +181,9 @@ for (const clearAccess of [false, true]) {
     first.resolve();await tick();await tick();
     assert.deepEqual(writes,clearAccess?['1']:['1','2']);
     assert.doesNotMatch(h.html(),/Outcome 1|Outcome 2/);
-    if(!clearAccess){h.toggle();await tick();assert.equal((h.html().match(/notification-read-label">Read/g)||[]).length,2);}
+    if(!clearAccess){h.toggle();await tick();assert.equal((h.html().match(/notification-read-label">Read/g)||[]).length,0);
+      elements(h.render(),node=>node.type==='button' && node.props.children==='All')[0].props.onClick();
+      assert.equal((h.html().match(/notification-read-label">Read/g)||[]).length,2);}
     h.unmount();
   });
 }
@@ -254,6 +256,71 @@ test('resale activity shows the NFT and network without inventing an auction ide
 
 const summaryReply = (patch={}) => Response.json({wallet:A,auctionCount:1,moderationCount:0,reminderCount:0,
   remindersAvailable:true,serverTime:'2026-10-25T12:00:00Z',nextReminderDeadline:null,chainRevision:'0',preferencesRevision:0,...patch});
+
+const clickText = (h, text) => elements(h.render(), node => node.type === 'button' && node.props.children === text)[0].props.onClick();
+function removalFixture(write, count = 3) {
+  const removed = new Set();
+  return async (url, options = {}) => {
+    if (url.includes('summary=1')) return summaryReply();
+    if (options.method === 'PUT') {
+      const body = JSON.parse(options.body);
+      const source = url.includes('moderation/') ? 'report' : 'activity';
+      const result = await write?.(source, body);
+      if (result) return result;
+      body.ids.forEach(id => removed.add(`${source}:${id}`));
+      return Response.json({wallet:A,removed:body.ids});
+    }
+    if (url.includes('moderation/notifications')) return Response.json({wallet:A,items:[{id:'1',chain_id:'84532',artwork_id:'34',created_at:'2026-10-25T11:00:00Z',read:false,message:'Report outcome'}].filter(item=>!removed.has(`report:${item.id}`)),nextCursor:null});
+    if (url === '/api/notifications') {
+      const body = await response(url).json(), template = body.items[0];
+      return Response.json({...body,items:Array.from({length:count},(_,index)=>({...template,id:String(count-index),read:index===count-1,message:`Activity ${count-index}`})).filter(item=>!removed.has(`activity:${item.id}`))});
+    }
+    return response(url);
+  };
+}
+
+test('New hides read history; All restores it and settings are available from the heading', async () => {
+  const h = await harness(removalFixture(),true,true); h.toggle(); await tick();
+  assert.match(h.html(), /Activity 3/); assert.doesNotMatch(h.html(), /Activity 1</);
+  clickText(h,'All'); assert.match(h.html(), /Activity 1</);
+  const gear=elements(h.render(),node=>node.type==='button' && node.props['aria-label']==='Notification settings')[0];
+  assert.equal(gear.props['aria-expanded'],false); gear.props.onClick();
+  assert.equal(elements(h.render(),node=>node.props.id==='notification-settings-view')[0].props.hidden,false);
+  clickText(h,'Back to notifications');
+  assert.equal(elements(h.render(),node=>node.props.id==='notification-settings-view')[0].props.hidden,true);
+  h.unmount();
+});
+
+test('Select all shown removes only personal messages in bounded source-specific batches', async () => {
+  const writes=[]; const h=await harness(removalFixture((source,body)=>{writes.push({source,...body});},20),true,true);
+  h.toggle();await tick();clickText(h,'All');clickText(h,'Select');
+  const selectAll=elements(h.render(),node=>node.type==='label' && React.Children.toArray(node.props.children).includes('Select all shown'))[0];
+  elements(selectAll,node=>node.type==='input')[0].props.onChange({target:{checked:true}});
+  clickText(h,'Delete selected (21)'); await tick();await tick();
+  assert.deepEqual(writes.map(write=>[write.source,write.action,write.ids.length]),[['activity','remove',20],['report','remove',1]]);
+  assert.doesNotMatch(h.html(), /Activity 20|Report outcome/);
+  h.toggle();h.toggle();await tick();assert.doesNotMatch(h.html(), /Activity 20|Report outcome/);h.unmount();
+});
+
+test('an unsuccessful deletion keeps selected messages available for retry',async()=>{
+  const h=await harness(removalFixture(()=>Response.json({error:'UNAVAILABLE'},{status:503})),true,true);
+  h.toggle();await tick();clickText(h,'Select');
+  elements(h.render(),node=>node.type==='input' && node.props['aria-label']==='Select Auction created 3')[0].props.onChange();
+  clickText(h,'Delete selected (1)');await tick();await tick();
+  assert.match(h.html(),/Activity 3/);assert.match(h.html(),/could not be deleted/);assert.match(h.html(),/Delete selected \(1\)/);h.unmount();
+});
+
+test('same-wallet reauthentication discards the remaining deletion batches',async()=>{
+  const first=deferred(),writes=[];
+  const h=await harness(removalFixture(async(source,body)=>{writes.push(source);if(writes.length===1)await first.promise;}),true,true);
+  h.toggle();await tick();clickText(h,'All');clickText(h,'Select');
+  const label=elements(h.render(),node=>node.type==='label' && React.Children.toArray(node.props.children).includes('Select all shown'))[0];
+  elements(label,node=>node.type==='input')[0].props.onChange({target:{checked:true}});
+  clickText(h,'Delete selected (4)');await tick();assert.deepEqual(writes,['activity']);
+  h.event('artsoul:auth-state-changed');h.toggle();h.toggle();await tick();
+  first.resolve();await tick();await tick();assert.deepEqual(writes,['activity']);
+  assert.doesNotMatch(h.html(),/Delete selected|Deleting…/);h.unmount();
+});
 test('badge appears before opening, keeps its count when closed, and excludes staff review contents', async () => {
   const h=await harness(async url=>url.includes('summary=1')?summaryReply():url.includes('moderation/notifications')?
     Response.json({wallet:A,items:[],nextCursor:null}):response(url),true,true);

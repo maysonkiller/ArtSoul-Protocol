@@ -1,18 +1,9 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const test = require('node:test');
-const vm = require('node:vm');
-
-const source = fs.readFileSync('src/api/routes/public/artworks.js', 'utf8');
-const helperStart = source.indexOf('function normalizeText');
-const helperEnd = source.indexOf('function getAIValueGuidance');
-const context = vm.createContext({});
-vm.runInContext(
-  `${source.slice(helperStart, helperEnd)}\nthis.mediaHelpers = { getMediaType, getMediaUrl, getPosterUrl };`,
-  context
-);
-
-const { getMediaType, getMediaUrl, getPosterUrl } = context.mediaHelpers;
+let getMediaType, getMediaUrl, getPosterUrl;
+test.before(async () => {
+  ({ getMediaType, getMediaUrl, getPosterUrl } = await import('../src/api/routes/public/artworks.js'));
+});
 
 test('projection keeps video playback URL separate from its image poster', () => {
   const metadata = {

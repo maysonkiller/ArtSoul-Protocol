@@ -1138,8 +1138,8 @@ test('the moderation-visibility read exposes step-up state but no visibility dat
 
 test('artwork keeps no enrollment surface and admin owns passkey controls', () => {
   const client = read(path.join('src', 'entries', 'artwork.jsx'));
-  // Error codes remain a defensive fallback for rejected protected requests.
-  assert.match(client, /\[['"]STEP_UP_REQUIRED['"], ['"]STEP_UP_WALLET_MISMATCH['"], ['"]CREDENTIAL_REVOKED['"]\]\.includes\(result\.error\)/);
+  // Public artwork no longer initiates staff requests or factor ceremonies.
+  assert.doesNotMatch(client, /moderationAccess|\/api\/moderation\/(?:access|artwork-visibility)/);
   assert.doesNotMatch(client, /includes\(result\.code\)/);
   assert.doesNotMatch(client, /Staff passkey|passkeyAccess|passkeyCredentials|loadWebAuthnBrowser|AdditionalPasskeyGrant/);
   const admin = read(path.join('src', 'features', 'admin', 'staff-passkeys.jsx'));

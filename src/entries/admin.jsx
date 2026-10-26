@@ -2,6 +2,7 @@ import { React, createRoot } from './react-runtime.js';
 import { StaffPasskeyDialog } from '../features/admin/staff-passkeys.jsx';
 import { StaffFactorDialog } from '../features/admin/staff-factor-dialog.jsx';
 import { StaffAuthority } from '../features/admin/staff-authority.jsx';
+import { AdminArtworkCatalog, AdminArtworkPreview } from '../features/admin/artwork-catalog.jsx';
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
@@ -319,7 +320,7 @@ function ProtocolAdminPage() {
         try {
             const target = queueTargetRef.current;
             result = await api(`review-queue?status=${encodeURIComponent(status)}` + (target
-                ? `&chainId=${encodeURIComponent(target.chain_id)}&artworkId=${encodeURIComponent(target.artwork_id)}` : ''));
+                ? `&chainId=${encodeURIComponent(target.chain_id)}&artworkId=${encodeURIComponent(target.artwork_id)}&target_type=${encodeURIComponent(target.target_type || 'artwork')}` : ''));
         } catch (error) {
             if (!sessionIsCurrent(epoch, wallet) || request !== queueRequest.current) return false;
             throw error;
@@ -506,6 +507,10 @@ function ProtocolAdminPage() {
     const roleLabel = { admin: 'Administrator', moderator: 'Moderator', team: 'Team' }[access?.role];
     const ready = accessState === 'ready';
     const activeSection = section === 'staff' && !rosterWallet ? 'queue' : section;
+    const catalogEpoch = setupEpoch.current, catalogWallet = connectedWallet;
+    const catalogSessionCurrent = () => sessionIsCurrent(catalogEpoch,catalogWallet)
+        && readySession.current?.epoch === catalogEpoch && readySession.current.wallet === catalogWallet;
+    const reviewArtwork = (artwork,status) => { setSection('queue'); void changeQueueStatus(status,artwork); };
     const statusLabel = { loading: 'Checking access', unauthenticated: 'Wallet sign-in required', step_up: 'Verification required',
         ready: 'Verified', authority: 'Approval access', setup: 'Set up sign-in', setup_verified: 'Verified',
         error: 'Access needs attention', ineligible: 'No staff role', disabled: 'Unavailable' }[accessState];
@@ -530,7 +535,7 @@ function ProtocolAdminPage() {
             {!ready && <AccessGate state={accessState} message={message} walletAddress={connectedWallet} />}
 
             {ready && <nav className="protocol-admin-tabs" aria-label="Protocol Admin sections">
-                {(rosterWallet ? ['queue', 'hidden', 'audit', 'notifications', 'staff'] : ['queue', 'hidden', 'audit', 'notifications']).map(value => (
+                {(rosterWallet ? ['queue', 'artworks', 'hidden', 'audit', 'notifications', 'staff'] : ['queue', 'artworks', 'hidden', 'audit', 'notifications']).map(value => (
                     <button
                         key={value}
                         type="button"
@@ -538,7 +543,7 @@ function ProtocolAdminPage() {
                         aria-current={activeSection === value ? 'page' : undefined}
                         onClick={() => setSection(value)}
                     >
-                        {value === 'queue' ? 'Review queue' : value === 'hidden' ? 'Hidden artwork' : value === 'audit' ? 'Audit log' : value === 'staff' ? authorityWallet ? 'Staff access' : 'Team directory' : 'Notification ledger'}
+                        {value === 'queue' ? 'Review queue' : value === 'artworks' ? 'Artworks' : value === 'hidden' ? 'Hidden artwork' : value === 'audit' ? 'Audit log' : value === 'staff' ? authorityWallet ? 'Staff access' : 'Team directory' : 'Notification ledger'}
                     </button>
                 ))}
             </nav>}
@@ -547,12 +552,19 @@ function ProtocolAdminPage() {
 
             {ready && message && <p className="protocol-admin-message" role="status">{message}</p>}
 
+            {ready && activeSection === 'artworks' && <AdminArtworkCatalog
+                key={`${catalogEpoch}:${catalogWallet}:${accessRequest.current}`}
+                api={api} isSessionCurrent={catalogSessionCurrent} onAccessError={accessFailed}
+                onReview={reviewArtwork} onChanged={() => {
+                    void loadQueue(queueStatusRef.current).catch(error => { if (catalogSessionCurrent()) accessFailed(error); });
+                }} />}
+
             {ready && activeSection === 'queue' && (
                 <section aria-labelledby="reviewQueueTitle">
                     <div className="protocol-admin-section-heading">
                         <h2 id="reviewQueueTitle">Review queue</h2>
                         <div className="protocol-admin-status-filter">
-                            {['pending_review', 'actioned', 'dismissed', 'resolved'].map(status => (
+                            {[...(queueTarget ? ['all'] : []), 'pending_review', 'actioned', 'dismissed', 'resolved'].map(status => (
                                 <button key={status} type="button" className={queueStatus === status ? 'is-active' : ''} aria-pressed={queueStatus === status} onClick={() => changeQueueStatus(status)}>
                                     {status.replace('_', ' ')}
                                 </button>
@@ -560,14 +572,16 @@ function ProtocolAdminPage() {
                         </div>
                     </div>
                     {queueTarget && <p className="protocol-admin-message">
-                        Reports for artwork {queueTarget.artwork_id} · Chain {queueTarget.chain_id}. Resolve each active report to restore the artwork.
-                        {' '}<button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => changeQueueStatus(queueStatus, null)}>Show all reports</button>
+                        {queueTarget.target_type === 'donation_message' ? 'Donation-message reports' : 'Artwork reports'} for artwork {queueTarget.artwork_id} · Chain {queueTarget.chain_id}.
+                        {' '}<button type="button" className="protocol-admin-secondary" disabled={busy} onClick={() => changeQueueStatus(queueStatus === 'all' ? 'pending_review' : queueStatus, null)}>Show all reports</button>
                     </p>}
                     {groups.length === 0 ? <p className="protocol-admin-empty">No reports in this state.</p> : groups.map(group => (
                         <article key={group.key} className="protocol-admin-group">
                             <header>
+                                <AdminArtworkPreview artwork={(data.artworks || []).find(item => item.chain_id === Number(group.chainId) && item.artwork_id === String(group.artworkId))} />
                                 <div>
                                     <h3>{group.targetType === 'donation_message' ? 'Donation message for artwork' : 'Artwork'} {group.artworkId}</h3>
+                                    <p>{(data.artworks || []).find(item => item.chain_id === Number(group.chainId) && item.artwork_id === String(group.artworkId))?.title}</p>
                                     <p>Chain {group.chainId} · {group.reports.length} independent report{group.reports.length === 1 ? '' : 's'}</p>
                                     {group.targetType === 'donation_message' && <p>Transaction {shortWallet(group.transactionHash)} · Log {group.logIndex}</p>}
                                 </div>
@@ -604,7 +618,8 @@ function ProtocolAdminPage() {
             {ready && activeSection === 'hidden' && (
                 <section aria-labelledby="hiddenTitle">
                     <h2 id="hiddenTitle">Hidden artwork</h2>
-                    <p>Review the active reports to restore an artwork. It stays hidden until all active restrictions are resolved.</p>
+                    <p>Resolve active reports to restore a work. For a manual hide without active reports, review its visibility in Artworks.</p>
+                    <button type="button" className="protocol-admin-secondary" onClick={() => setSection('artworks')}>Open artwork catalog</button>
                     <div className="protocol-admin-ledger">
                         {data.hidden.length === 0 ? <p>No hidden artwork.</p> : data.hidden.map(item => (
                             <div key={`${item.chain_id}:${item.artwork_id}`}>

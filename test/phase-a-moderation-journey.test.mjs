@@ -21,6 +21,7 @@ import {setWalletSession} from '../src/api/backend.js';
 import {setModerationSession} from '../src/api/moderation-passkey.js';
 import {digest} from '../src/api/launch-services.js';
 import {deliverReportEmail} from '../src/api/moderation-report-email.js';
+import {listIndexerMigrations} from '../scripts/apply-migrations.js';
 
 const STAFF = `0x${'1'.repeat(40)}`;
 const REPORTER_A = `0x${'2'.repeat(40)}`;
@@ -107,14 +108,23 @@ test('Phase A local moderation route journey and captured email (virtual credent
   }
   assert.ok(ready, 'disposable PostgreSQL became ready');
   await pool.query(`CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;
-    CREATE ROLE service_role NOLOGIN BYPASSRLS;
-    CREATE TABLE public.v41_artworks (chain_id NUMERIC(78,0), artwork_id NUMERIC(78,0), creator VARCHAR(42), PRIMARY KEY(chain_id,artwork_id));`);
+    CREATE ROLE service_role NOLOGIN BYPASSRLS;`);
+  for (const migration of listIndexerMigrations()) await pool.query(migration.sql);
+  // Media/search projections are prerequisite fixtures; notification and catalog
+  // behavior below is installed from the actual current migrations.
+  await pool.query(`CREATE TABLE public.artwork_media_chain_revisions(chain_id NUMERIC PRIMARY KEY,revision NUMERIC(78,0) NOT NULL);
+    CREATE TABLE public.artwork_search_metadata(chain_id NUMERIC(78,0),artwork_id NUMERIC(78,0),metadata_uri TEXT,
+      source_transaction_hash TEXT,title TEXT,metadata JSONB);
+    GRANT SELECT ON public.v41_artworks,public.artwork_search_metadata TO service_role;`);
   for (const name of ['phase18_artwork_moderation_visibility.sql', 'a8a_moderation_passkey_foundation.sql',
     'a8b_artwork_report_intake.sql', 'a8c_protocol_admin_review.sql', 'collection_launch_services.sql',
-    'moderation_report_email_delivery.sql']) {
+    'moderation_report_email_delivery.sql', 'artist_support.sql', 'artist_support_moderation.sql',
+    'auction_notifications.sql', 'auction_notification_lifecycle.sql', 'auction_notification_reminders.sql',
+    'notification_summary.sql', 'notification_inbox_removal.sql', 'admin_artwork_catalog.sql']) {
     await pool.query(fs.readFileSync(new URL(`../sql/migrations/${name}`, import.meta.url), 'utf8'));
   }
-  await pool.query('INSERT INTO v41_artworks SELECT 84532, n, $1 FROM generate_series(101,112) n', [CREATOR]);
+  await pool.query(`INSERT INTO v41_artworks(chain_id,artwork_id,creator,metadata_uri,block_number,transaction_hash,log_index,last_updated_block)
+    SELECT 84532,n,$1,'ipfs://local-journey-fixture',n,'0x'||lpad(to_hex(n),64,'0'),0,n FROM generate_series(101,112) n`, [CREATOR]);
   await pool.query("INSERT INTO artsoul_staff_roles(wallet_address,role) VALUES($1,'moderator')", [STAFF]);
   await pool.query(`INSERT INTO artsoul_staff_passkeys(wallet_address,credential_id,public_key,enrolled_via)
     VALUES($1,'local-virtual-credential','dGVzdC1vbmx5','bootstrap')`, [STAFF]);
@@ -122,7 +132,7 @@ test('Phase A local moderation route journey and captured email (virtual credent
   const tables = new Set(['artsoul_staff_roles', 'artsoul_staff_passkeys', 'artwork_reports', 'artwork_report_events',
     'artwork_moderation_visibility', 'artwork_moderation_log', 'artwork_report_notifications', 'email_subscriptions']);
   const rpcNames = new Set(['submit_artwork_report', 'review_artwork_report', 'consume_launch_service_quota',
-    'claim_moderation_report_email', 'finish_moderation_report_email']);
+    'claim_moderation_report_email', 'finish_moderation_report_email', 'read_admin_artwork_catalog']);
   function filter(params, values) {
     return [...params].filter(([name]) => !['select', 'order', 'limit', 'on_conflict'].includes(name)).map(([name, raw]) => {
       const column = identifier(name);
@@ -148,7 +158,7 @@ test('Phase A local moderation route journey and captured email (virtual credent
       const fn = name.slice(4); assert.ok(rpcNames.has(fn));
       const body = await jsonBody(req);
       const args = Object.entries(body).map(([key, value]) => { values.push(value); return `${identifier(key)} => $${values.length}`; });
-      scalar = ['consume_launch_service_quota', 'finish_moderation_report_email'].includes(fn);
+      scalar = ['consume_launch_service_quota', 'finish_moderation_report_email', 'read_admin_artwork_catalog'].includes(fn);
       sql = `SELECT ${scalar ? '' : '* FROM '}public.${identifier(fn)}(${args.join(',')})${scalar ? ' AS value' : ''}`;
     } else {
       assert.ok(tables.has(name), `unexpected local table ${name}`);

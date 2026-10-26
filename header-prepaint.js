@@ -1,5 +1,3 @@
-// Tiny synchronous first-frame bridge for the shared account button.
-//
 // Restores visual identity only; never authenticates or unlocks wallet actions.
 (function () {
     'use strict';
@@ -41,6 +39,8 @@
         ? walletHint
         : (cachedUiState === 'connected' ? identity?.wallet || '' : '');
     const hasWallet = WALLET_PATTERN.test(wallet);
+    const notificationWallet = !appKitDisconnectedAtBoot && cachedUiState === 'connected'
+        && hasWallet && wallet === walletHint && identity?.wallet === wallet ? wallet : '';
 
     if (!appKitDisconnectedAtBoot
         && WALLET_PATTERN.test(walletHint)
@@ -76,6 +76,8 @@
     };
 
     const hydrate = (container) => {
+        const inbox = document.getElementById('header-notifications');
+        if (inbox) { inbox.hidden = !notificationWallet; inbox.dataset.notificationWallet = notificationWallet; }
         if (!container) return false;
         const button = container.querySelector('.avatar-button');
         const image = button?.querySelector('[data-avatar-image]');
@@ -91,7 +93,6 @@
             const displayAddress = shortAddress && label.toLowerCase() !== shortAddress.toLowerCase()
                 ? shortAddress
                 : '';
-            // Preserve the decoded shell image.
             if (image.getAttribute('src') !== paintSource) image.src = paintSource;
             image.alt = label;
             image.dataset.avatarSource = source;
@@ -155,6 +156,6 @@
     window.ArtSoulHeaderPrepaint = Object.freeze({
         hydrate,
         get neutralAvatar() { return neutralAvatar; },
-        boot: Object.freeze({ appKitDisconnectedAtBoot })
+        boot: Object.freeze({ appKitDisconnectedAtBoot, notificationWallet })
     });
 })();

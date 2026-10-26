@@ -32,7 +32,7 @@ function descendants(node) {
     return [node, ...[node.props?.children].flat(Infinity).flatMap(descendants)];
 }
 
-test('donation history makes no background read or layout insertion until opened, and ignores a closed response', async () => {
+test('donation history stays inside Donate, reads only its open tab, and ignores a closed response', async () => {
     const {transformWithOxc} = await import('vite');
     const code = support.slice(support.indexOf('const { useEffect')).replace('export function', 'function');
     const compiled = await transformWithOxc(code, 'support.jsx', {jsx: {runtime: 'classic'}});
@@ -41,16 +41,24 @@ test('donation history makes no background read or layout insertion until opened
     const render = vm.runInNewContext(compiled.code + '\nArtistSupport;', {
         React, AbortController, fetch: (url, options) => {calls.push({url, options}); return response.promise;},
         donationIdentityKey: () => 'fixture', donationOperations: {read() {}, subscribe: () => () => {}},
-        donationMessageState: () => ({valid: true}), console
+        donationMessageState: () => ({valid: true}), console,
+        document: {querySelector: () => null}, window: {requestAnimationFrame: fn => fn()}
     });
     const props = {deployment: {enabled: true, chainId: 84532, address: 'contract'}, artworkId: '28', creator: 'creator'};
     let tree = h.render(() => render(props));
     assert.equal(calls.length, 0, 'collapsed history does not compete with artwork and avatar loads');
-    const historyButton = () => descendants(tree).find(node => node.props?.['aria-controls'] === 'artistSupportHistory');
-    assert.equal(historyButton().props['aria-expanded'], false);
+    const historyButton = () => descendants(tree).find(node => node.props?.id === 'artistSupportHistoryTab');
+    const donateButton = () => descendants(tree).find(node => node.props?.id === 'artistSupportDonateTab');
+    const openButton = () => tree.props.children.find(node => node?.type === 'button');
+    assert.equal(tree.props.children.filter(node => node?.type === 'button').length, 1, 'Community has only one support action');
+    assert.equal(historyButton().props['aria-selected'], false);
+    openButton().props.onClick(); tree = h.render(() => render(props));
+    assert.equal(calls.length, 0, 'opening Donate does not load history');
     historyButton().props.onClick(); tree = h.render(() => render(props));
     assert.equal(calls.length, 1);
-    historyButton().props.onClick(); tree = h.render(() => render(props));
+    assert.equal(historyButton().props['aria-selected'], true);
+    assert.equal(descendants(tree).find(node => node.props?.id === 'artistSupportDonate').props.hidden, true);
+    donateButton().props.onClick(); tree = h.render(() => render(props));
     assert.equal(calls[0].options.signal.aborted, true);
     response.resolve({ok: true, json: async () => ({creator: 'creator', contract_address: 'contract', top: {amount: '1'}, donations: []})});
     await tick(); tree = h.render(() => render(props));
@@ -59,6 +67,55 @@ test('donation history makes no background read or layout insertion until opened
     historyButton().props.onClick(); tree = h.render(() => render(props)); await tick(); tree = h.render(() => render(props));
     const history = descendants(tree).find(node => node.props?.id === 'artistSupportHistory');
     assert.equal(descendants(history).filter(node => node.props?.className === 'artist-support-top').length, 1);
+    const dialog = descendants(tree).find(node => node.type === 'dialog');
+    assert.ok(descendants(dialog).includes(history));
+    descendants(tree).find(node => node.props?.['aria-label'] === 'Close donation').props.onClick();
+    tree = h.render(() => render(props));
+    assert.equal(calls.at(-1).options.signal.aborted, true, 'closing Donate cancels its history read');
+    openButton().props.onClick(); tree = h.render(() => render(props));
+    assert.equal(donateButton().props['aria-selected'], true, 'reopening starts on the donation form');
+    assert.equal(calls.length, 2, 'reopening the form does not refetch history');
+    h.unmount();
+});
+
+test('Donate tabs support keyboard navigation and history preserves exact message-report targets', async () => {
+    const {transformWithOxc} = await import('vite');
+    const code = support.slice(support.indexOf('const { useEffect')).replace('export function', 'function');
+    const compiled = await transformWithOxc(code, 'support.jsx', {jsx: {runtime: 'classic'}});
+    const h = hooks(), reported = [], focused = [], reads = [];
+    const donation = {transaction_hash: `0x${'55'.repeat(32)}`, log_index: 3, amount: '1', anonymous: true,
+        message: 'Thank you', recorded_at: '2026-10-26T09:00:00Z'};
+    let applyOperation;
+    const React = {...h, createElement: (type, props, ...children) => ({type, props: {...props, children}})};
+    const render = vm.runInNewContext(compiled.code + '\nArtistSupport;', {
+        React, AbortController,
+        fetch: async (url, options) => { reads.push({url, options}); return {ok: true, json: async () => ({
+            creator: 'creator', contract_address: 'contract', donations: [donation], top: donation, next_offset: null
+        })}; },
+        donationIdentityKey: () => 'fixture', donationOperations: {read() {}, subscribe: (identity, apply) => {applyOperation = apply; return () => {}; }},
+        donationMessageState: () => ({valid: true}), document: {querySelector: () => null},
+        window: {requestAnimationFrame: fn => fn()}, console
+    });
+    const props = {deployment: {enabled: true, chainId: 84532, address: 'contract'}, artworkId: '28', creator: 'creator',
+        onReportDonation: target => reported.push({...target})};
+    let tree = h.render(() => render(props));
+    tree.props.children.find(node => node?.type === 'button').props.onClick(); tree = h.render(() => render(props));
+    const tabs = () => descendants(tree).find(node => node.props?.role === 'tablist');
+    const press = key => tabs().props.onKeyDown({key, preventDefault() {},
+        currentTarget: {querySelector: selector => ({focus: () => focused.push(selector)})}});
+    press('End'); tree = h.render(() => render(props)); await tick(); tree = h.render(() => render(props));
+    assert.deepEqual(focused, ['#artistSupportHistoryTab']);
+    assert.equal(reads.length, 1, 'history never needs wallet signing or a contract call');
+    const history = descendants(tree).find(node => node.props?.id === 'artistSupportHistory');
+    descendants(history).find(node => node.type === 'button' && node.props.children.includes('Report message')).props.onClick();
+    assert.deepEqual(reported, [{transaction_hash: donation.transaction_hash, log_index: 3}]);
+    press('Home'); tree = h.render(() => render(props));
+    assert.equal(reads[0].options.signal.aborted, true);
+    assert.equal(descendants(tree).find(node => node.props?.id === 'artistSupportDonate').props.hidden, false);
+    applyOperation({status: 'pending', hash: donation.transaction_hash}); tree = h.render(() => render(props));
+    assert.ok(descendants(tabs()).filter(node => node.props?.role === 'tab').every(node => node.props.disabled));
+    press('End'); tree = h.render(() => render(props));
+    assert.equal(reads.length, 1, 'a pending transaction cannot be hidden by a keyboard tab change');
     h.unmount();
 });
 
@@ -142,66 +199,9 @@ test('an uncovered Highest Bidder without an avatar resolves after its profile r
     }
 });
 
-test('late moderation reads cannot restore staff controls after wallet changes or invalidation', async () => {
-    for (const boundary of ['wallet', 'auth']) {
-        const response = deferred(), state = {wallet: 'staff', writes: []};
-        const scope = {artwork: {chain_id: 84532, artwork_id: '28'}, moderationSequenceRef: {current: 0}, URLSearchParams,
-            window: {getCurrentWalletAddress: () => state.wallet}, fetch: () => response.promise,
-            setModerationAccess: value => state.writes.push(value), setModerationReason() {}, setModerationMessage() {}, console};
-        const load = vm.runInNewContext(`(${pageFunction('loadModerationVisibility')})`, scope);
-        const work = load();
-        if (boundary === 'wallet') state.wallet = 'other'; else scope.moderationSequenceRef.current++;
-        response.resolve({ok: true, json: async () => ({access: {canModerate: true}, data: {hidden_reason: 'private'}})});
-        assert.equal(await work, false); assert.equal(state.writes.length, 0);
-    }
-});
-
-test('moderation stays in a closed dialog until the staff button rechecks server access', () => {
-    assert.match(artwork, /<dialog ref=\{moderationDialogRef\}[^>]+aria-label="Staff moderation"/);
-    assert.doesNotMatch(artwork, /<dialog ref=\{moderationDialogRef\}[^>]+\sopen[\s=>]/);
-    assert.match(artwork, /if \(await loadModerationVisibility\(artwork, \{ interactive: true \}\)\) \{\s*moderationDialogRef\.current\?\.showModal\(\)/);
-    assert.match(artwork, /moderationSequenceRef\.current\+\+;\s*moderationDialogRef\.current\?\.close\(\)/);
-    assert.match(artwork, /const refresh = \(\) => \{\s*invalidate\(\);[\s\S]*?void loadModerationVisibility\(artwork\)/);
-    assert.match(artwork, /addEventListener\('artsoul:auth-state-changed', refresh\)/);
-    assert.match(artwork, /ref=\{moderationTriggerRef\}[^>]+disabled=\{moderationBusy \|\| moderationChecking\}/);
-    assert.match(artwork, /if \(moderationBusy \|\| moderationChecking\) return;\s*setModerationChecking\(true\)/);
-});
-
-test('a current-wallet read cannot display the previous signed-in wallet staff data', async () => {
-    const writes = [];
-    const load = vm.runInNewContext(`(${pageFunction('loadModerationVisibility')})`, {
-        artwork: {chain_id: 84532, artwork_id: '28'}, moderationSequenceRef: {current: 0}, URLSearchParams,
-        window: {getCurrentWalletAddress: () => 'new-wallet'},
-        fetch: async () => ({ok: true, json: async () => ({access: {wallet: 'old-wallet', canModerate: true}, data: {hidden_reason: 'private'}})}),
-        setModerationAccess: value => writes.push(value), console
-    });
-    assert.equal(await load(), false);
-    assert.deepEqual(writes, [null]);
-});
-
-test('moderation controls never invoke sign-in to open, and a changed wallet cannot submit', async () => {
-    const state = {wallet: 'other', writes: 0};
-    assert.doesNotMatch(pageFunction('loadModerationVisibility'), /ensureAuthenticated/);
-    const submit = vm.runInNewContext(`(${pageFunction('handleModerationVisibility')})`, {
-        artwork: {chain_id: 84532, artwork_id: '28'}, moderationSequenceRef: {current: 0}, moderationBusy: false,
-        moderationAccess: {canModerate: true, wallet: 'staff'},
-        moderationReason: 'reason', window: {getCurrentWalletAddress: () => state.wallet},
-        fetch: async () => {state.writes++;}, console
-    });
-    await submit(true);
-    assert.equal(state.writes, 0);
-});
-
-test('visibility mutation relies on current server access and expired access directs staff to Admin', async () => {
-    const state = {access: {canModerate: true, wallet: 'staff'}, busy: false, message: '', writes: 0};
-    const submit = vm.runInNewContext(`(${pageFunction('handleModerationVisibility')})`, {
-        artwork: {chain_id: 84532, artwork_id: '28'}, moderationSequenceRef: {current: 0}, moderationBusy: false,
-        moderationAccess: state.access, moderationReason: 'reason', window: {getCurrentWalletAddress: () => 'staff'},
-        setModerationAccess: value => {state.access = value;}, setModerationBusy: value => {state.busy = value;},
-        setModerationMessage: value => {state.message = value;}, console: {error() {}},
-        fetch: async () => {state.writes++; return {ok: false, status: 403, json: async () => ({error: 'STEP_UP_REQUIRED'})};}
-    });
-    await submit(true);
-    assert.equal(state.writes, 1); assert.equal(state.access, null); assert.equal(state.busy, false);
-    assert.match(state.message, /Verify your access in Admin/);
+test('artwork contains no staff visibility lookup, mutation, state or controls', () => {
+    assert.doesNotMatch(artwork, /loadModerationVisibility|handleModerationVisibility|moderationAccess|moderationDialogRef|moderationSequenceRef/);
+    assert.doesNotMatch(artwork, /\/api\/moderation\/artwork-visibility|Staff moderation|Moderation tools|Hide Artwork|Unhide Artwork/);
+    assert.match(artwork, /fetch\('\/api\/moderation\/reports'/, 'ordinary visitor reports remain available');
+    assert.match(artwork, /onReportDonation=\{reportingEnabled \? openArtworkReport : undefined\}/);
 });

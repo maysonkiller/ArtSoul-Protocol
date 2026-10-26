@@ -179,7 +179,7 @@ async function loadFeedMetadata(artworks) {
   return Promise.all(artworks.map(artwork => indexed.get(artwork) ?? loadMetadataCached(artwork.metadata_uri)));
 }
 
-function getMediaType(metadata = {}, mediaUrl = '') {
+export function getMediaType(metadata = {}, mediaUrl = '') {
   const explicitTypes = [
     metadata.media_type,
     metadata.file_type,
@@ -215,7 +215,7 @@ function getMediaTypeFromUrl(value = '') {
   return 'unknown';
 }
 
-function getMediaUrl(metadata = {}, mediaType = getMediaType(metadata)) {
+export function getMediaUrl(metadata = {}, mediaType = getMediaType(metadata)) {
   if (mediaType === 'video' || mediaType === 'audio') {
     const playbackCandidates = [
       metadata.animation_url,
@@ -240,7 +240,7 @@ function getMediaUrl(metadata = {}, mediaType = getMediaType(metadata)) {
   );
 }
 
-function getPosterUrl(metadata = {}, mediaUrl = '') {
+export function getPosterUrl(metadata = {}, mediaUrl = '') {
   const poster = normalizeText(
     metadata.image ||
     metadata.image_url ||

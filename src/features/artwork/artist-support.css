@@ -11,3 +11,7 @@
 .artist-support-dialog input, .artist-support-dialog textarea, .artist-support-history select { font-size: 16px; min-width: 0; }
 .artist-support-address, .artist-support-message { overflow-wrap: anywhere; }
 .artist-support-history article { padding-block: .75rem; border-bottom: 1px solid currentColor; }
+
+.artist-support-tabs { display: flex; gap: .5rem; margin-block: .75rem; }
+.artist-support-tabs [role=tab] { flex: 1; min-width: 0; }
+.artist-support-tabs [aria-selected=true] { border-color: var(--c-accent); box-shadow: inset 0 -3px var(--c-accent); }

@@ -136,21 +136,23 @@ export function createAuctionNotifications({wallet, getWallet, onChange, fetchPa
     } catch {if (operation.current()) pauseReminders();}
     finally {refreshing=false;}
   }
-  async function markRead(ids, read) {
+  async function updateItems(ids, read, removing = false) {
     if (!owns()) {invalidate('auth'); return;}
-    if (!config.enabled || busy() || typeof read !== 'boolean' || !Array.isArray(ids) || ids.length < 1 || ids.length > 20 ||
+    if (!config.enabled || busy() || (!removing && typeof read !== 'boolean') || !Array.isArray(ids) || ids.length < 1 || ids.length > 20 ||
         new Set(ids).size !== ids.length || ids.some(id => !bigintId(id) || ![...state.items,...state.reminders].some(item => item.id === id))) return;
     const operation = begin();
     publish({status: 'ready', pendingIds: ids, error: '', notice: '', retryCursor: null});
     try {
-      const body = await api(endpoint(), operation, {action: 'read', ids, read});
+      const body = await api(endpoint(), operation, removing ? {action: 'remove', ids} : {action: 'read', ids, read});
       if (!body || !operation.current()) return;
-      if (body.read !== read || !Array.isArray(body.updated) || body.updated.length !== ids.length || new Set(body.updated).size !== ids.length || body.updated.some(id => !ids.includes(id))) throw new Error('The read state could not be verified. Reload notifications.');
-      publish({items: state.items.map(item => ids.includes(item.id) ? {...item, read} : item),
-        reminders:state.reminders.map(item=>ids.includes(item.id)?{...item,read}:item)});
+      const acknowledged = removing ? body.removed : body.updated;
+      if ((!removing && body.read !== read) || !Array.isArray(acknowledged) || acknowledged.length !== ids.length || new Set(acknowledged).size !== ids.length || acknowledged.some(id => !ids.includes(id))) throw new Error('The notification changes could not be verified. Reload notifications.');
+      publish(removing ? {items: state.items.filter(item => !ids.includes(item.id)), reminders: state.reminders.filter(item => !ids.includes(item.id))} :
+        {items: state.items.map(item => ids.includes(item.id) ? {...item, read} : item),
+          reminders:state.reminders.map(item=>ids.includes(item.id)?{...item,read}:item)});
     } catch (error) {
       if (operation.current()) {
-        publish({error: error.message});
+        publish({error: removing ? 'Notifications could not be deleted. Please try again.' : error.message});
         if (error.code === 'NOTIFICATION_UNAVAILABLE') {
           publish({pendingIds: [], notice: 'An auction update is no longer available. The list has been refreshed.'});
           await load();
@@ -190,6 +192,6 @@ export function createAuctionNotifications({wallet, getWallet, onChange, fetchPa
     ? savePreferences({...state.preferences,[type]:enabled}) : Promise.resolve();
   const setReminderMinutes=minutes=>hasReminders() && validReminderMinutes(minutes)
     ? savePreferences(state.preferences,[...minutes].sort((a,b)=>a-b)) : Promise.resolve();
-  return {getState: () => state, configure, load, invalidate, markRead, setPreference, setReminderMinutes, refreshReminders, pauseReminders,
+  return {getState: () => state, configure, load, invalidate, markRead: (ids, read) => updateItems(ids, read), remove: ids => updateItems(ids, undefined, true), setPreference, setReminderMinutes, refreshReminders, pauseReminders,
     dispose: () => {disposed = true; generation++; reminderEpoch++; controller?.abort(); cancelSchedule(reminderTimer);}};
 }
