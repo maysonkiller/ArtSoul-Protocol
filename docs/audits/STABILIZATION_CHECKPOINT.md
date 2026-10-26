@@ -3,7 +3,8 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B24 founder-priority continuation, PR #375 RELEASED, merge `eecd340`:
+October 26 B24 founder-priority continuation RELEASED in PRs #375 / #376,
+production merge `537bad12796bc2202fe9d711490e8f8502f1decd`:
 
 - Shared restricted-action explanations preserve creator/highest-bidder and
   resale guards, distinguish busy states, and keep Donate/Report drafts intact.
@@ -25,8 +26,17 @@ October 26 B24 founder-priority continuation, PR #375 RELEASED, merge `eecd340`:
   load (1168px ->576px identity width). A one-selector follow-up reserves the
   same short-desktop columns before statistics; no placeholder data. Six DOM
   experiments, 104 focused checks and build pass; CSS pins advance to56.
-- Exactly next step: finish the hydration follow-up CI/release, then resume B21
-  Donate/Report preparation through existing review dialogs.
+- Follow-up PR #376 candidate `d7f006f` / merge `537bad1`: CI40368341237 passes
+  (Linux2814/two skips, Windows2419/32 skips, 49 contracts each, builds/static).
+  Merge tree equals candidate; preview six real-DOM cases pass without injected
+  CSS. Apex deployment7338912185 matches eight routes/39 assets and denies five
+  protected guest API calls. Evidence: `output/audit/b24-final-apex-verification.log`.
+  The same six layout cases pass on apex without injected CSS; screenshot
+  inspected, owned browser/preview server closed.
+- Tracked implementation is merged; this checkpoint update contains evidence
+  only. Preserve the unrelated untracked files above. Phase B is not complete.
+- Exactly next step: resume B21 Donate/Report command preparation through
+  existing review dialogs, without automated signing.
 
 October 26 future-contract design continuation MERGED in PR #374,
 candidate `afcfe40`, merge `a914282` (started at `b4ca252`):
