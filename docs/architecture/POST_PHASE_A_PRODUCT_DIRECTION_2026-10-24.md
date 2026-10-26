@@ -221,6 +221,12 @@ must not silently inherit those requirements.
 
 ## 8. Contracts: design for bounded change
 
+October 26 continuation: the maintained [Contract Rework Plan](../canon/CONTRACT_REWORK_PLAN.md)
+contains the updated source inventory, module/upgrade comparison, canon coverage,
+local stale-listing proof and payment failure/acceptance requirements. Its
+[direction record](../canon/CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md) authorizes
+research, not new deployment or final architecture. Keep that single plan current.
+
 Current source is a constructor-based Core, separate NFT and prototype ProjectNFT,
 plus Donations. Core is not a proxy. Local Launch/Forge scaffolds already exist;
 the builder is draft authoring, not proof of a deployed product. NFT source permits

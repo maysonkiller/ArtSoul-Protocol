@@ -3,18 +3,55 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B23 resale controls IN PROGRESS (started at `56536ec`):
+October 26 future-contract design continuation (started at `b4ca252`):
+
+- Founder requests extensible replacement contracts, complete collection/auction/
+  resale paths and future payments from other networks. C-06 research is in
+  progress; Phase B and final C1 sign-off are not complete.
+- Updated the existing `canon/CONTRACT_REWORK_PLAN.md`, with the exact direction
+  and canon qualifications in `canon/CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md`.
+  Source/scaffold/deployment facts, immutable vs proxy choices, module powers,
+  payment recovery, threats and acceptance requirements are separated.
+- Reconciled obsolete C-26 scheduling/message minimum against approved Donate
+  amendments; no new donation behavior or threshold. Corrected C-27 audit link.
+- Local prototype characterization: `npx hardhat test --network hardhat
+  docs/private/stale-resale-roundtrip-proof-20261026.cjs`, one passing, chain31337,
+  exit0. A listing survives transfer away/back and is executable again without
+  relisting. This is a documented future-contract limitation, not a repaired
+  live bug. Source hashes and reproduction sequence are in the maintained plan;
+  local log: `output/audit/stale-resale-roundtrip-proof-20261026.log`.
+- No Solidity/runtime/configuration edits, signing, migration or deployment.
+  Preserve unrelated untracked authority-policy files, `.codex/`, `output/`.
+- Validation: bounded independent source/design review found no actionable issue;
+  `git diff --check` passes. Local link check covers eight documents/222 relative
+  links with zero newly missing targets. Two pre-existing B-05/B-06 references
+  to absent `testnet/B06_SNAPSHOT_A_REHEARSAL_2026-09-14.md` remain flagged;
+  missing historical evidence was not reconstructed or claimed to exist.
+- Exactly next step: resume B21 Donate/Report preparation through existing
+  dialogs with visible review/submission; carry C1 decisions into later sign-off.
+
+October 26 B23 resale controls RELEASED in PR #373, candidate `171ac62`,
+production merge `960794b` (started at `56536ec`):
 
 - Owner price/floor editor and seller cancellation, exact wei validation,
   native dialog, all-surface receipt bridge and bounded confirmed-state worker
   reconciliation implemented. Canon architecture unchanged.
 - Local contract22, adapter20, UI/API106 and indexer84/leadership21 groups pass
-  (overlapping counts); build and four theme/viewport flows pass. Details in
-  `audits/B23_RESALE_CONTROLS_2026-10-26.md`. Full unit run is in progress.
-- No production deployment or actual NFT listing mutation yet. Preserve
-  unrelated authority-policy untracked files, `.codex/`, `output/`.
-- Exactly next step: finish full checks and preview, then deploy the reviewed
-  worker with rollback backup before releasing owner controls.
+  (overlapping counts); same-block receipt regression56 and build pass. Exact
+  CI40350911939: Linux2808/two skips, Windows2413/32 skips, 49 contracts each.
+  Post-merge CI40352342602 passes. Full details/limits in
+  `audits/B23_RESALE_CONTROLS_2026-10-26.md`.
+- Indexer rollout completed with source backup/journal before website release.
+  Healthy advancing boundaries, zero unresolved errors; two RPCs agree with
+  four listing tuples at block50537988. Env/provenance preserved. Do not replay
+  the rollout script. No real NFT listing was mutated or wallet signed.
+- Preview/apex eight-route/37-asset/guest-denial checks and alias binding pass;
+  four owner flows per deployment pass with synthetic wallet/API. Live public
+  data for artwork18/32 passes guest/owner-dialog checks without submission.
+  Native phone or signed Base Sepolia acceptance is not claimed.
+- Preserve unrelated authority-policy untracked files, `.codex/`, `output/`.
+- Exactly next step: resume B21 Donate/Report preparation through existing
+  dialogs with visible review/submission. Phase B is still in progress.
 
 October 26 homepage banner follow-up RELEASED: PR #372, candidate `d4bc3f6`,
 production merge `5ba1901` (started at `bca32be`):
