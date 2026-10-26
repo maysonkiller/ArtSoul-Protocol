@@ -75,4 +75,3 @@ test('nested explanations do not cancel or close their parent form dialog', () =
         assert.equal(e.prevented, false, 'Escape must still close the explanation itself');
     }
 });
-
