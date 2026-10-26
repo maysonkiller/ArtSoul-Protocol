@@ -1,6 +1,6 @@
 # Phase B commands and interface follow-up
 
-Status: implemented locally; release verification pending. Canonical checkout:
+Status: released through PR #363 (`e0f6560`), production merge `3e71338`. Canonical checkout:
 `C:\Projects\ArtSoul`, `codex/takeover-audit`, starting HEAD `6f0fc49`.
 
 ## Scope and evidence
@@ -69,9 +69,25 @@ No economics, contract behavior, role, factor lifetime or signing rule changes.
 - Local evidence: `output/audit/b21-browser-matrix.log`,
   `b21-repaired-tests.log`, `b21-final-focused.log`, `b21-inbox-admin-tests.log`,
   `b21-build-final.log`; screenshots in `output/playwright/b21-final-*.png`.
-- CI and exact-deployment checks are pending. These local layout/mocked tests do
-  not claim a physical phone, actual microphone, wallet signature or live
-  complaint restoration.
+- Exact-candidate CI run 40297318338 passed: Linux 2,632 pass / two skips;
+  Windows 2,259 pass / 29 skips; zero failures. Each platform passed 46 contract
+  tests, build and static checks. Skipped platform/dependency cases are not
+  reported as executions; Linux exercised the disposable PostgreSQL suite.
+- Preview browser: 32/32 cases; apex browser: eight Gallery/Artwork cases plus
+  typed help/Escape and filter measurements. No physical phone, actual
+  microphone, wallet signature or live complaint restoration is claimed.
+- GitHub deployment records bind the preview and production URLs to the exact
+  implementation/merge SHA. All eight HTML headers/asset lists and 32 deployed
+  assets match the local build; the unbundled voice script is compared with
+  normalized CRLF/LF, compiled assets byte-for-byte. Existing Vercel CLI credentials
+  returned 403; verification used authenticated GitHub deployment records and
+  public asset reads, without changing deployment aliases or credentials.
+- Apex notification configuration remains active; guest notification and review
+  API requests return 401 with private/no-store caching. Evidence:
+  `output/audit/b21-ci-complete.log`, `b21-preview-verification.log`,
+  `b21-apex-verification.log`, `b21-preview-browser.log`, `b21-apex-browser.log`.
 
-Exactly next step: finish responsive browser and complete CI checks, then release
-the authorized interface changes and verify exact deployed assets.
+Exactly next step: implement the bounded explicit Saved add/remove commands in
+B-21 using the existing saved-artwork state/API, preserving account isolation and
+visible confirmation for wallet actions. Aggregate favorite counts and the final
+B-18 redesign remain separate pending slices.
