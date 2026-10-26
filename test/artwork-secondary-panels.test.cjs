@@ -46,6 +46,8 @@ test('donation history stays inside Donate, reads only its open tab, and ignores
     });
     const props = {deployment: {enabled: true, chainId: 84532, address: 'contract'}, artworkId: '28', creator: 'creator'};
     let tree = h.render(() => render(props));
+    const viewport = {scrollTop: 0, showModal() { this.open = true; }, close() { this.open = false; }};
+    descendants(tree).find(node => node.props?.className === 'artist-support-content').props.ref.current = viewport;
     assert.equal(calls.length, 0, 'collapsed history does not compete with artwork and avatar loads');
     const historyButton = () => descendants(tree).find(node => node.props?.id === 'artistSupportHistoryTab');
     const donateButton = () => descendants(tree).find(node => node.props?.id === 'artistSupportDonateTab');
@@ -54,11 +56,17 @@ test('donation history stays inside Donate, reads only its open tab, and ignores
     assert.equal(historyButton().props['aria-selected'], false);
     openButton().props.onClick(); tree = h.render(() => render(props));
     assert.equal(calls.length, 0, 'opening Donate does not load history');
+    viewport.scrollTop = 400;
     historyButton().props.onClick(); tree = h.render(() => render(props));
+    assert.equal(viewport.scrollTop, 0, 'opening history starts at its controls');
     assert.equal(calls.length, 1);
     assert.equal(historyButton().props['aria-selected'], true);
     assert.equal(descendants(tree).find(node => node.props?.id === 'artistSupportDonate').props.hidden, true);
+    viewport.scrollTop = 250;
+    tree = h.render(() => render(props));
+    assert.equal(viewport.scrollTop, 250, 'ordinary rerenders preserve the history reading position');
     donateButton().props.onClick(); tree = h.render(() => render(props));
+    assert.equal(viewport.scrollTop, 0, 'returning to Donate starts at the creator and amount');
     assert.equal(calls[0].options.signal.aborted, true);
     response.resolve({ok: true, json: async () => ({creator: 'creator', contract_address: 'contract', top: {amount: '1'}, donations: []})});
     await tick(); tree = h.render(() => render(props));

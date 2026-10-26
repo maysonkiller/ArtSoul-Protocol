@@ -3,6 +3,18 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 B22 history layout follow-up, starting at `890af55`:
+
+- Removed the old inline Donate-history scrollbar and background Community
+  width change. One content scroll region with separate title/close/tabs;
+  readable history, bounded pagination and deliberate position resets.
+- Local final tests187, build, ten Donate browser cases and 12 other-history
+  checks pass. Evidence: `audits/B22_HISTORY_LAYOUT_2026-10-26.md`.
+- No contract, schema, economics, role or authentication changes. Existing
+  provenance/right-column and mobile page scrolling remain accessible.
+- Exactly next action: exact-candidate CI and release verification for this
+  layout follow-up, then resume B21 Donate/Report preparation.
+
 October 26 B21 global search RELEASED: PR #368, candidate `9840a5b`, production
 merge `276d894` (started at `91b223f`):
 
