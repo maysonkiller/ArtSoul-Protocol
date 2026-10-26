@@ -1,6 +1,6 @@
 import { SEARCH_CATEGORIES, canSearch, normalizeSearchQuery, createSearchState, readSearchHistory, writeSearchHistory } from './search-state.js';
 
-const labels = { all: 'All', artworks: 'Artworks', auctions: 'Live auctions', artists: 'Artists' };
+const labels = { all: 'All', artworks: 'Artworks', auctions: 'Live auctions', artists: 'Artist profiles' };
 let dialog, input, results, status, tabs, returnFocus, timer, opening = false;
 let deadlineTimer, deadlineUpdates = [];
 let category = 'all';
@@ -36,9 +36,9 @@ function createDialog() {
     const dismiss = button('Close', close, 'artsoul-search-close'); dismiss.setAttribute('aria-label', 'Close search');
     header.append(title, dismiss);
     const form = element('form', 'artsoul-search-form'); form.setAttribute('role', 'search');
-    const label = element('label', 'artsoul-search-label', 'Title, artist, wallet address or artwork number'); label.htmlFor = 'artsoul-search-input';
+    const label = element('label', 'artsoul-search-label', 'All artworks and artist profiles · title, name, wallet or artwork number'); label.htmlFor = 'artsoul-search-input';
     input = element('input'); input.id = 'artsoul-search-input'; input.type = 'search'; input.maxLength = 100; input.autocomplete = 'off';
-    input.placeholder = 'Search ArtSoul'; input.enterKeyHint = 'search'; input.setAttribute('autocapitalize', 'none'); input.spellcheck = false;
+    input.placeholder = 'Search art and artist profiles'; input.enterKeyHint = 'search'; input.setAttribute('autocapitalize', 'none'); input.spellcheck = false;
     input.addEventListener('input', () => setQuery(input.value));
     input.addEventListener('keydown', event => { if (event.key === 'ArrowDown') { const link = results.querySelector('a'); if (link) { event.preventDefault(); link.focus(); } } });
     const submit = element('button', 'artsoul-search-submit', 'Search'); submit.type = 'submit';

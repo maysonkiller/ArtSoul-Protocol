@@ -41,17 +41,20 @@ export default async function handler(req, res) {
       if (req.headers.origin && !origins.has(req.headers.origin)) throw failure(401,'INVALID_ORIGIN','Open ArtSoul to update notifications.');
       if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) throw failure(415,'JSON_REQUIRED','Use a JSON request.');
       const body = await readBoundedJson(req,4096);
-      if (Object.keys(body).sort().join(',')!=='action,ids,read' || body.action!=='read' || typeof body.read!=='boolean' ||
+      const removing = body.action === 'remove';
+      if ((removing ? Object.keys(body).sort().join(',')!=='action,ids' : Object.keys(body).sort().join(',')!=='action,ids,read' || body.action!=='read' || typeof body.read!=='boolean') ||
         !Array.isArray(body.ids) || body.ids.length<1 || body.ids.length>PAGE_SIZE || body.ids.some(id=>!validId(id)) || new Set(body.ids).size!==body.ids.length) {
         throw failure(400,'INVALID_NOTIFICATION_UPDATE','Choose valid notification updates.');
       }
       let saved;
-      try {saved=await supabaseRest('rpc/mark_personal_moderation_notifications',{method:'POST',body:{p_wallet:wallet,p_ids:body.ids,p_read:body.read}});}
+      try {saved=await supabaseRest(removing ? 'rpc/remove_personal_moderation_notifications' : 'rpc/mark_personal_moderation_notifications',
+        {method:'POST',body:{p_wallet:wallet,p_ids:body.ids,...(removing ? {} : {p_read:body.read})}});}
       catch {throw failure(503,'NOTIFICATIONS_UNAVAILABLE','Notifications are temporarily unavailable. Please try again later.');}
-      if (saved?.updated===false) throw failure(409,'NOTIFICATION_UNAVAILABLE','An update is no longer available. Reload notifications.');
-      if (saved?.updated!==true || !Array.isArray(saved.ids) || saved.ids.length!==body.ids.length || new Set(saved.ids).size!==body.ids.length ||
-        saved.ids.some(id=>!body.ids.includes(id)) || saved.read!==body.read) throw failure(503,'NOTIFICATIONS_UNAVAILABLE','Read state could not be verified. Reload notifications.');
-      return res.status(200).json({wallet,updated:saved.ids,read:saved.read});
+      const acknowledged = removing ? saved?.removed : saved?.updated;
+      if (acknowledged===false) throw failure(409,'NOTIFICATION_UNAVAILABLE','An update is no longer available. Reload notifications.');
+      if (acknowledged!==true || !Array.isArray(saved.ids) || saved.ids.length!==body.ids.length || new Set(saved.ids).size!==body.ids.length ||
+        saved.ids.some(id=>!body.ids.includes(id)) || (!removing && saved.read!==body.read)) throw failure(503,'NOTIFICATIONS_UNAVAILABLE','Notification changes could not be verified. Reload notifications.');
+      return res.status(200).json(removing ? {wallet,removed:saved.ids} : {wallet,updated:saved.ids,read:saved.read});
     }
     const before = req.query?.before;
     if (before !== undefined && !validId(before)) {
@@ -60,7 +63,7 @@ export default async function handler(req, res) {
     let rows, artworkByReport;
     try {
       // Read history independently of intake/review write flags. BIGINT cursors stay exact.
-      rows = await supabaseRest(`artwork_report_notifications?recipient_wallet=eq.${wallet}&select=id::text,report_id,notification_type,created_at${versioned ? ',read_at' : ''}&order=id.desc&limit=${PAGE_SIZE + 1}${before ? `&id=lt.${before}` : ''}`);
+      rows = await supabaseRest(`artwork_report_notifications?recipient_wallet=eq.${wallet}&dismissed_at=is.null&select=id::text,report_id,notification_type,created_at${versioned ? ',read_at' : ''}&order=id.desc&limit=${PAGE_SIZE + 1}${before ? `&id=lt.${before}` : ''}`);
       if (!Array.isArray(rows) || rows.some(row => !validId(row.id) || !validReportId(row.report_id) || !Object.hasOwn(MESSAGES, row.notification_type) || !Number.isFinite(Date.parse(row.created_at)))) {
         throw new Error('Invalid notification projection');
       }

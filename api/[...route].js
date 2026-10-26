@@ -8,6 +8,7 @@ import functionsAiAnalyzeHandler from '../src/api/routes/functions/ai/analyze.js
 import functionsArtworksHandler from '../src/api/routes/functions/artworks.js';
 import functionsAuctionsHandler from '../src/api/routes/functions/auctions.js';
 import artworkVisibilityHandler from '../src/api/routes/moderation/artwork-visibility.js';
+import artworkCatalogHandler from '../src/api/routes/moderation/artwork-catalog.js';
 import reportsHandler from '../src/api/routes/moderation/reports.js';
 import notificationsHandler from '../src/api/routes/moderation/notifications.js';
 import moderationAccessHandler from '../src/api/routes/moderation/access.js';
@@ -69,6 +70,7 @@ const ROUTES = new Map([
   ['functions/artworks', functionsArtworksHandler],
   ['functions/auctions', functionsAuctionsHandler],
   ['moderation/artwork-visibility', artworkVisibilityHandler],
+  ['moderation/artwork-catalog', artworkCatalogHandler],
   ['moderation/reports', reportsHandler],
   ['moderation/notifications', notificationsHandler],
   ['moderation/access', moderationAccessHandler],

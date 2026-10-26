@@ -243,7 +243,7 @@ test('hidden direct artwork is unavailable publicly but visible to authorized st
   assert.equal(staffResponse.body.data[0].moderation_hidden, true);
 });
 
-test('regular authenticated owners cannot change moderation visibility', async () => {
+test('authenticated owners cannot write while the Admin workspace is disabled', async () => {
   activeRole = '';
   const response = responseMock();
   await moderationHandler({
@@ -253,8 +253,8 @@ test('regular authenticated owners cannot change moderation visibility', async (
     body: { chain_id: 84532, artwork_id: '1', hidden: true, reason: 'Not allowed' }
   }, response);
 
-  assert.equal(response.statusCode, 403);
-  assert.equal(response.body.error, 'ADMIN_REQUIRED');
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.error, 'PROTOCOL_ADMIN_DISABLED');
 });
 
 test('guest moderation reads are a quiet access probe and expose no visibility data', async () => {
@@ -288,7 +288,7 @@ test('authorized staff reads retain access to moderation visibility data', async
   assert.equal(visibilityReadCalls, 1);
 });
 
-test('authorized staff hide action uses the atomic server-side RPC', async () => {
+test('legacy staff discovery cannot bypass a disabled Admin workspace', async () => {
   activeRole = 'admin';
   rpcCalls = [];
   const response = responseMock();
@@ -299,9 +299,7 @@ test('authorized staff hide action uses the atomic server-side RPC', async () =>
     body: { chain_id: 84532, artwork_id: '1', hidden: true, reason: 'Copyright review' }
   }, response);
 
-  assert.equal(response.statusCode, 200);
-  assert.equal(response.body.data.hidden, true);
-  assert.equal(rpcCalls.length, 1);
-  assert.equal(rpcCalls[0].p_actor_wallet, staffWallet);
-  assert.equal(rpcCalls[0].p_reason, 'Copyright review');
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.error, 'PROTOCOL_ADMIN_DISABLED');
+  assert.equal(rpcCalls.length, 0);
 });

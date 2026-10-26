@@ -3,6 +3,24 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 B22 workflow follow-up IN PROGRESS, started at `b9be502`:
+
+- Current tracked diff: header bell prepaint and early server eligibility; New/All
+  personal inbox, top settings, selected recipient-only removal; public artwork
+  staff controls removed; Donate contains History; clearer search scope; protected
+  Admin artwork catalog and revision-bound hide/restore under implementation.
+- No new checkout. Unrelated untracked authority-policy files, `.codex/`, `output/`
+  remain untouched. Recovery: `output/audit/b22-inprogress-recovery.patch`.
+- Header185, notifications269, current UI74, artwork/Donate72 focused checks pass.
+  Eight inbox +64 header browser cases and two Donate widths pass. Final full CI,
+  catalog browser checks, guarded schema rollout and publication still pending.
+- Two additive schema files are local only: notification inbox dismissal and
+  staff artwork catalog/visibility guard. No real data was removed or hidden.
+- Evidence: `audits/B22_INBOX_AND_MODERATION_2026-10-26.md`.
+- Exactly next step: finish catalog UI/session verification, then run the final
+  candidate checks and guarded backup/schema/release workflow. Do not call this
+  Phase B complete or repeat the previous full audit.
+
 October 26 B21/header follow-up released: PR #363, implementation `e0f6560`,
 production merge/current code HEAD `3e71338` (started at `6f0fc49`):
 

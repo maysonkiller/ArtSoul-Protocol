@@ -400,15 +400,15 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 <div className="gallery-search-controls">
                                 <input
                                     type="text"
-                                    placeholder="Filter loaded artworks..."
+                                    placeholder="Filter this gallery…"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     autoFocus={false}
                                     autoComplete="off"
-                                    aria-label="Filter loaded artworks"
+                                    aria-label="Filter artworks loaded in this gallery"
                                     className="gallery-search-input rounded-lg"
                                 />
-                                <button type="button" className="gallery-search-all" onClick={() => window.dispatchEvent(new CustomEvent('artsoul:open-search', { detail: { query: searchQuery } }))}>Search all ArtSoul</button>
+                                <button type="button" className="gallery-search-all" onClick={() => window.dispatchEvent(new CustomEvent('artsoul:open-search', { detail: { query: searchQuery } }))}>Find more art or artists</button>
                                 </div>
 
                                 {/* Status Filter */}
@@ -495,7 +495,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                     : isSearchPending
                                     ? 'Filtering loaded artworks...'
                                     : isGlobalSearch
-                                    ? `Showing ${filteredArtworks.length} loaded artworks for “${debouncedSearchQuery.trim()}”. Use Search all ArtSoul for older works and artists.`
+                                    ? `Showing ${filteredArtworks.length} loaded artworks for “${debouncedSearchQuery.trim()}”. Filtering loaded artworks. Use the header search for all art and artist profiles.`
                                     : `Showing ${filteredArtworks.length} artworks in ${GALLERY_TABS.find(tab => tab.id === activeTab)?.label || 'Discover'}`}
                             </div>
                         </div>

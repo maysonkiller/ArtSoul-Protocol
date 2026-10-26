@@ -604,10 +604,7 @@ test('the moderation route and UI never trust client-side staff state', () => {
   assert.match(moderationRouteSource, /strict: req\.method === 'POST'/);
   assert.match(moderationRouteSource, /req\.method === 'GET' && !access\.canModerate/);
   assert.match(moderationRouteSource, /data: null/);
-  // UI: the staff panel renders only from the server-returned access object.
-  assert.match(artworkSource, /\{moderationAccess\?\.canModerate && \(/);
-  // The access object is populated exclusively from the server response.
-  const loader = extractFunction(artworkSource, 'loadModerationVisibility');
-  assert.match(loader, /\/api\/moderation\/artwork-visibility/);
-  assert.doesNotMatch(loader, /localStorage|sessionStorage/);
+  // Public artwork pages no longer own a staff lookup or visibility mutation.
+  assert.doesNotMatch(artworkSource, /moderationAccess|loadModerationVisibility|handleModerationVisibility/);
+  assert.doesNotMatch(artworkSource, /\/api\/moderation\/artwork-visibility/);
 });

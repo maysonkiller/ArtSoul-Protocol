@@ -141,3 +141,32 @@ test('initial pagination stays unavailable until staff discovery finishes', asyn
   pending.resolve(Response.json(access())); await loading;
   assert.equal(h.state.status, 'ready'); assert.equal(h.state.staffReview.count, 1);
 });
+
+test('staff eligibility appears while both the recipient page and review queue are still pending', async () => {
+  const page = deferred(), queue = deferred(), calls = [];
+  let state;
+  const inbox = createNotificationInbox({wallet: OWNER, getWallet: () => OWNER, onChange: value => {state = value;}, fetchPage: async path => {
+    calls.push(path);
+    if (path.startsWith('/api/moderation/notifications')) return page.promise;
+    if (path.startsWith('/api/moderation/access?')) return Response.json(access());
+    return queue.promise;
+  }});
+  const loading = inbox.load(); await tick();
+  assert.equal(calls.length, 3); assert.equal(state.staffReview.status, 'loading'); assert.equal(state.status, 'loading');
+  queue.resolve(Response.json({data: {reports: [report]}})); await tick();
+  assert.equal(state.staffReview.status, 'ready'); assert.equal(state.staffReview.count, 1); assert.equal(state.status, 'loading');
+  page.resolve(Response.json({wallet: OWNER, items: [], nextCursor: null})); await loading;
+  assert.equal(state.status, 'ready'); assert.equal(state.staffReview.count, 1);
+});
+
+test('parallel personal authorization failure clears an already resolved staff queue', async () => {
+  const page = deferred(); let state;
+  const inbox = createNotificationInbox({wallet: OWNER, getWallet: () => OWNER, onChange: value => {state = value;}, fetchPage: async path => {
+    if (path.startsWith('/api/moderation/notifications')) return page.promise;
+    if (path.startsWith('/api/moderation/access?')) return Response.json(access());
+    return Response.json({data: {reports: [report]}});
+  }});
+  const loading = inbox.load(); await tick(); assert.equal(state.staffReview.status, 'ready');
+  page.resolve(Response.json({}, {status: 401})); await loading;
+  assert.equal(state.status, 'auth'); assert.equal(state.staffReview, null); assert.deepEqual(state.items, []);
+});

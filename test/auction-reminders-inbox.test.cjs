@@ -8,6 +8,7 @@ const {renderToStaticMarkup} = require('react-dom/server');
 const source = fs.readFileSync('src/features/moderation/notification-inbox.jsx', 'utf8')
   .replace(/^import .*;\r?$/gm, '').replace(/^export /gm, '');
 const elements = (node, predicate) => Array.isArray(node) ? node.flatMap(child => elements(child, predicate))
+  : React.isValidElement(node) && node.type?.name === 'NotificationSettings' ? elements(node.type(node.props), predicate)
   : React.isValidElement(node) ? [...(predicate(node) ? [node] : []), ...elements(node.props.children, predicate)] : [];
 let compiled;
 async function components(runtime = React, bindings = {}) {
@@ -205,8 +206,7 @@ test('rapid reminder opens finish both saves after closing while the first write
   t.after(() => effects.forEach(effect => effect.cleanup?.()));
   render(); await tick(); toggle(); await tick();
   assert.equal(auctionState.reminders.length, 2);
-  const category = elements(render(), node => node.type === scope.Category)[0];
-  const upcoming = elements(scope.Category(category.props), node => node.type === scope.Upcoming)[0];
+  const upcoming = elements(render(), node => node.type === scope.Upcoming)[0];
   const messages = elements(scope.Upcoming(upcoming.props), node => node.type === 'details');
   for (const message of messages) message.props.onToggle({currentTarget: {open: true}});
   await tick();

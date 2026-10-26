@@ -19,10 +19,10 @@
     <meta name="robots" content="noindex,nofollow">
     <link rel="icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
-    <script src="/header-prepaint.js?v=7"></script>
+    <script src="/header-prepaint.js?v=8"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=49">
+    <link rel="stylesheet" href="/unified-styles.css?v=50">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <script src="/storage-image.js?v=3" defer></script>
@@ -33,7 +33,7 @@
     <script type="module" src="/supabase-client.js"></script>
     <script type="module" src="/supabase-auth.js?v=2"></script>
     <script src="/data-prefetch.js?v=6" async></script>
-    <script src="/avatar-dropdown.js?v=56" defer></script>
+    <script src="/avatar-dropdown.js?v=57" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
 </head>
@@ -50,7 +50,13 @@
                 <div class="site-header-center page-context"></div>
                 <div class="site-header-actions">
                     <div id="networkBadge"></div>
-                    <div id="header-notifications" hidden></div>
+                    <div id="header-notifications" hidden>
+                        <section class="notification-inbox header-notification-inbox" aria-label="Your notifications">
+                            <button type="button" class="notification-toggle" data-notification-preview title="Notifications" aria-label="Notifications" aria-expanded="false" aria-controls="profile-notifications" onclick="this.parentElement.parentElement.dataset.notificationRequested=this.parentElement.parentElement.dataset.notificationWallet;this.setAttribute('aria-busy','true')">
+                                <span class="notification-toggle-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg></span>
+                            </button>
+                        </section>
+                    </div>
                     <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">

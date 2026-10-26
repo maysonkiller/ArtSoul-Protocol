@@ -175,9 +175,9 @@ test('a pending queue read cannot restore complaint data after logout or unmount
 test('targeted restoration survives status changes but does not cross staff sessions', async()=>{
     const h=harness();await tick();h.render();
     await h.actions.changeQueueStatus('actioned',{chain_id:84532,artwork_id:'37'});h.render();
-    assert.match(h.state.calls.at(-1).path,/status=actioned&chainId=84532&artworkId=37$/);
+    assert.match(h.state.calls.at(-1).path,/status=actioned&chainId=84532&artworkId=37&target_type=artwork$/);
     await h.actions.changeQueueStatus('resolved');h.render();
-    assert.match(h.state.calls.at(-1).path,/status=resolved&chainId=84532&artworkId=37$/);
+    assert.match(h.state.calls.at(-1).path,/status=resolved&chainId=84532&artworkId=37&target_type=artwork$/);
     h.state.auth='';h.event('artsoul:auth-state-changed');h.render();
     h.state.auth=WALLET;h.event('artsoul:auth-state-changed');await tick();h.render();
     assert.equal(h.state.calls.at(-1).path,'review-queue?status=resolved');

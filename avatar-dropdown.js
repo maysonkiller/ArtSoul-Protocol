@@ -659,10 +659,20 @@
             this.updateProtocolAdminSlot();
         }
 
-        // Lazy menu discovery: called when the account dropdown opens, at most
-        // one request per wallet/session generation. Eligibility is always
-        // decided by the server; protected admin endpoints still re-check
-        // SIWE + staff role + passkey step-up on every request.
+        // Warm the server-owned menu decision once a real wallet and its
+        // existing sign-in agree. Stored profile/role hints never grant access.
+        prefetchProtocolAdminAccess() {
+            const state = window.artsoulSettledWalletState;
+            const wallet = String(state?.address || '').toLowerCase();
+            if (window.artsoulWalletStateSettled !== true || state?.isConnected !== true
+                || !/^0x[a-f0-9]{40}$/.test(wallet)
+                || String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase() !== wallet) return;
+            this.syncProtocolAdminWallet(wallet);
+            void this.requestProtocolAdminAccessOnce();
+        }
+
+        // Eligibility is always decided by the server. Protected endpoints
+        // still re-check SIWE, staff role and step-up on every request.
         async requestProtocolAdminAccessOnce() {
             const wallet = String(
                 window.currentWalletAddress
@@ -1658,8 +1668,7 @@
 
             this.isOpen = !this.isOpen;
 
-            // Lazy Protocol Admin discovery: ask the server only when the
-            // menu is actually opened, once per wallet per page lifetime.
+            // Reuse the warm decision or discover it now if sign-in was late.
             if (this.isOpen) {
                 void this.requestProtocolAdminAccessOnce();
                 this.recoverUnresolvedIdentity();
@@ -2122,13 +2131,17 @@
 
     // A connected wallet can sign in or out without changing its address.
     // Drop both cached eligibility and pending responses for that old session.
-    window.addEventListener('artsoul:auth-state-changed', () => window.AvatarDropdown.clearProtocolAdminAccess());
+    window.addEventListener('artsoul:auth-state-changed', () => {
+        window.AvatarDropdown.clearProtocolAdminAccess();
+        window.AvatarDropdown.prefetchProtocolAdminAccess();
+    });
     window.addEventListener('storage', (event) => {
         if (!event.key || event.key === 'artsoul_authenticated_wallet') window.AvatarDropdown.clearProtocolAdminAccess();
     });
 
     const syncCurrentMenu = (options = {}) => {
         const walletAddress = window.currentWalletAddress || null;
+        window.AvatarDropdown.prefetchProtocolAdminAccess();
         return window.AvatarDropdown.sync(walletAddress, options);
     };
 
@@ -2140,6 +2153,7 @@
                 chainId: detail.chainId,
                 confirmed: true
             });
+            window.AvatarDropdown.prefetchProtocolAdminAccess();
             return;
         }
 
@@ -2158,6 +2172,8 @@
     }
 
     window.addEventListener('artsoul:nav-ready', () => syncCurrentMenu());
+    window.addEventListener('pagehide', () => window.AvatarDropdown.clearProtocolAdminAccess());
+    window.addEventListener('pageshow', () => window.AvatarDropdown.prefetchProtocolAdminAccess());
 
     // The observer watches the whole document, so gallery renders, filter
     // changes and artwork loading all reach it. It therefore acts on EXACTLY one

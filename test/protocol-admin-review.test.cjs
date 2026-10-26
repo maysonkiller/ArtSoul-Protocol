@@ -364,6 +364,17 @@ test('hidden-artwork recovery reads only that artwork on its network before appl
     const url = new URL(calls.find(value => value.includes('/artwork_reports?')));
     for (const [key,value] of Object.entries({status:'eq.actioned',chain_id:'eq.84532',artwork_id:'eq.37',target_type:'eq.artwork',limit:'200'})) assert.equal(url.searchParams.get(key),value);
     assert.equal(res.headers['Cache-Control'],'private, no-store');
+    for (const type of ['artwork','donation_message']) {
+      calls.length=0; const all=responseHarness();
+      await queueHandler(request('GET','/api/moderation/review-queue',{cookie,query:{status:'all',chainId:'84532',artworkId:'37',target_type:type}}),all);
+      assert.equal(all.statusCode,200);
+      const allUrl=new URL(calls.find(value=>value.includes('/artwork_reports?')));
+      assert.equal(allUrl.searchParams.has('status'),false);
+      assert.equal(allUrl.searchParams.get('target_type'),`eq.${type}`);
+      assert.equal(allUrl.searchParams.get('artwork_id'),'eq.37');
+    }
+    const unbounded=responseHarness();await queueHandler(request('GET','/api/moderation/review-queue',{cookie,query:{status:'all'}}),unbounded);
+    assert.equal(unbounded.statusCode,400);
     for (const query of [{artworkId:'37'}, {chainId:'84532'}, {artworkId:'37&status=eq.resolved',chainId:'84532'}, {artworkId:(2n**256n).toString(),chainId:'84532'}]) {
       calls.length = 0; const bad = responseHarness();
       await queueHandler(request('GET','/api/moderation/review-queue',{cookie,query}),bad);
@@ -550,7 +561,7 @@ test('Protocol Admin UI treats complaint text as untrusted and menu authority as
   assert.match(actionedBlock, /onChoose\(report, 'restore'\)/);
   assert.doesNotMatch(actionedBlock, /'reopen'/);
   assert.match(page, /report\.status === 'dismissed' \|\| report\.status === 'resolved'/);
-  assert.match(page, /\['pending_review', 'actioned', 'dismissed', 'resolved'\]/);
+  assert.match(page, /'pending_review', 'actioned', 'dismissed', 'resolved'/);
   assert.match(header, /fetch\(`\/api\/moderation\/access\?expectedWallet=\$\{encodeURIComponent\(wallet\)\}`/);
   assert.match(header, /result\.eligible === true/);
   assert.doesNotMatch(header, /localStorage[^\n]*(?:admin|moderator|staff)/i);

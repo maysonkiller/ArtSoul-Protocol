@@ -344,14 +344,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 events: [],
                 complete: true
             });
-            const [moderationAccess, setModerationAccess] = useState(null);
-            const [moderationReason, setModerationReason] = useState('');
-            const [moderationBusy, setModerationBusy] = useState(false);
-            const [moderationChecking, setModerationChecking] = useState(false);
-            const [moderationMessage, setModerationMessage] = useState('');
-            const moderationDialogRef = useRef(null);
-            const moderationTriggerRef = useRef(null);
-            const moderationSequenceRef = useRef(0);
             const [walletRenderState, setWalletRenderState] = useState(() => ({
                 settled: window.artsoulWalletStateSettled === true,
                 address: window.artsoulSettledWalletState?.address || window.currentWalletAddress || null,
@@ -634,27 +626,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 window.addEventListener('artsoul:wallet-state-changed', syncWalletRenderState);
                 return () => window.removeEventListener('artsoul:wallet-state-changed', syncWalletRenderState);
             }, []);
-
-            useEffect(() => {
-                const invalidate = () => {
-                    moderationSequenceRef.current++;
-                    moderationDialogRef.current?.close();
-                    setModerationAccess(null);
-                    setModerationReason('');
-                    setModerationMessage('');
-                    setModerationBusy(false);
-                };
-                const refresh = () => {
-                    invalidate();
-                    if (window.artsoulWalletStateSettled && window.getCurrentWalletAddress?.()) void loadModerationVisibility(artwork);
-                };
-                refresh();
-                window.addEventListener('artsoul:auth-state-changed', refresh);
-                return () => {
-                    invalidate();
-                    window.removeEventListener('artsoul:auth-state-changed', refresh);
-                };
-            }, [artwork?.chain_id, artwork?.artwork_id, walletRenderState.address, walletRenderState.settled]);
 
             useEffect(() => {
                 if (!isNewAuctionModalOpen) return undefined;
@@ -1458,120 +1429,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     ? 'https://sepolia.etherscan.io'
                     : 'https://sepolia.basescan.org';
                 return `${explorer}/token/${encodeURIComponent(nftAddress)}?a=${encodeURIComponent(tokenId)}`;
-            }
-
-            async function loadModerationVisibility(projection = artwork, options = {}) {
-                if (!projection?.chain_id || !projection?.artwork_id) return false;
-                const sequence = ++moderationSequenceRef.current;
-                const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
-                const isCurrent = () => sequence === moderationSequenceRef.current &&
-                    wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase();
-
-                try {
-                    const query = new URLSearchParams({
-                        chain_id: String(projection.chain_id),
-                        artwork_id: String(projection.artwork_id)
-                    });
-                    const response = await fetch(`/api/moderation/artwork-visibility?${query}`, {
-                        method: 'GET',
-                        credentials: 'include'
-                    });
-                    const result = await response.json().catch(() => ({}));
-                    if (!isCurrent()) return false;
-                    if (result.access?.canModerate && String(result.access.wallet || '').toLowerCase() !== wallet) {
-                        setModerationAccess(null);
-                        return false;
-                    }
-
-                    if (!response.ok) {
-                        // A8a: a staff wallet with the passkey flag enabled but no
-                        // active, context-bound step-up gets a machine-readable code.
-                        // The API serializes machine codes as { error, message },
-                        // so the code lives in result.error (not result.code).
-                        if (['STEP_UP_REQUIRED', 'STEP_UP_WALLET_MISMATCH', 'CREDENTIAL_REVOKED'].includes(result.error)) {
-                            setModerationAccess(null);
-                            if (options.interactive) setModerationMessage('Verify your access in Admin to use moderation tools.');
-                            return false;
-                        }
-                        if (options.interactive) {
-                            setModerationMessage(result.message || 'This wallet does not have staff moderation access.');
-                        }
-                        return false;
-                    }
-
-                    setModerationAccess({
-                        ...result.access,
-                        ...(result.data || {})
-                    });
-                    setModerationReason(result.data?.hidden_reason || '');
-                    setModerationMessage('');
-                    return result.access?.canModerate === true;
-                } catch (error) {
-                    if (!isCurrent()) return false;
-                    console.warn('Could not load moderation visibility:', error);
-                    if (options.interactive) {
-                        setModerationMessage('Moderation controls are temporarily unavailable.');
-                    }
-                    return false;
-                }
-            }
-
-            async function handleModerationVisibility(hidden) {
-                if (!artwork?.chain_id || !artwork?.artwork_id || moderationBusy) return;
-                const sequence = moderationSequenceRef.current;
-                const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
-                if (!moderationAccess?.canModerate || !wallet || String(moderationAccess.wallet || '').toLowerCase() !== wallet) return;
-                const isCurrent = () => sequence === moderationSequenceRef.current &&
-                    wallet === String(window.getCurrentWalletAddress?.() || '').toLowerCase();
-                if (hidden && !moderationReason.trim()) {
-                    setModerationMessage('Add a reason before hiding this artwork.');
-                    return;
-                }
-
-                // The visibility endpoints enforce the current wallet session,
-                // staff role and factor. Do not start another sign-in ceremony
-                // from this already verified, explicitly opened tool.
-                setModerationBusy(true);
-                setModerationMessage('');
-                try {
-                    const response = await fetch('/api/moderation/artwork-visibility', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chain_id: artwork.chain_id,
-                            artwork_id: artwork.artwork_id,
-                            hidden,
-                            reason: hidden ? moderationReason.trim() : null
-                        })
-                    });
-                    const result = await response.json().catch(() => ({}));
-                    if (!isCurrent()) return;
-                    if (!response.ok) {
-                        if ([401, 403].includes(response.status)) {
-                            setModerationAccess(null);
-                            throw new Error('Verify your access in Admin to use moderation tools.');
-                        }
-                        throw new Error(result.message || 'Moderation update failed');
-                    }
-
-                    setModerationAccess(current => ({
-                        ...(current || {}),
-                        ...(result.access || {}),
-                        ...(result.data || {}),
-                        hidden
-                    }));
-                    if (!hidden) setModerationReason('');
-                    setModerationMessage(hidden
-                        ? 'Artwork is hidden from public surfaces.'
-                        : 'Artwork is visible again where its auction state allows.');
-                } catch (error) {
-                    if (!isCurrent()) return;
-                    console.error('Moderation visibility update failed:', error);
-                    setModerationMessage(error.message || 'Moderation update failed.');
-                } finally {
-                    if (isCurrent()) setModerationBusy(false);
-                }
             }
 
             function openArtworkReport(donation = null) {
@@ -3533,20 +3390,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                                 Report
                                             </button>
                                         )}
-                                        {moderationAccess?.canModerate && (
-                                            <button type="button" ref={moderationTriggerRef} data-allow-rapid="true"
-                                                disabled={moderationBusy || moderationChecking}
-                                                className="btn-secondary artwork-page-compact-action"
-                                                onClick={async () => {
-                                                    if (moderationBusy || moderationChecking) return;
-                                                    setModerationChecking(true);
-                                                    try {
-                                                        if (await loadModerationVisibility(artwork, { interactive: true })) {
-                                                            moderationDialogRef.current?.showModal();
-                                                        }
-                                                    } finally { setModerationChecking(false); }
-                                                }}>{moderationChecking ? 'Checking access…' : 'Moderation tools'}</button>
-                                        )}
                                         <button
                                             onClick={() => window.history.back()}
                                             className="btn-secondary artwork-page-compact-action artwork-mobile-back"
@@ -3554,7 +3397,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                             Back
                                         </button>
                                     </div>
-                                    {moderationMessage && !moderationAccess?.canModerate && <p role="status">{moderationMessage} <a href="/admin">Open Admin</a></p>}
                                     {cardActionNotice && <p role="status">{cardActionNotice}</p>}
                                 </section>
 
@@ -3584,69 +3426,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
 
                             {/* Artwork Info */}
                             <aside className="artwork-page-right">
-                                {moderationAccess?.canModerate && (
-                                    <dialog ref={moderationDialogRef} className="artwork-moderation-dialog reauction-modal"
-                                        aria-label="Staff moderation" onClose={() => moderationTriggerRef.current?.focus({ preventScroll: true })}>
-                                    <section className="moderation-panel artwork-mobile-moderation">
-                                        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                                            <div>
-                                                <h3 className="text-lg font-bold">Staff moderation</h3>
-                                                <p className="text-xs opacity-70">Signed in as {moderationAccess.role}</p>
-                                            </div>
-                                            <span className="moderation-state rounded-full px-3 py-1 text-xs font-bold">
-                                                {moderationAccess.hidden ? 'Hidden' : 'Visible'}
-                                            </span>
-                                            <button type="button" data-allow-rapid="true" className="btn-secondary"
-                                                onClick={() => moderationDialogRef.current?.close()}>Close</button>
-                                        </div>
-
-                                        {moderationAccess.hidden ? (
-                                            <div className="space-y-3">
-                                                {moderationAccess.hidden_reason && (
-                                                    <p className="text-sm opacity-80">
-                                                        Reason: {moderationAccess.hidden_reason}
-                                                    </p>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    className="moderation-action w-full rounded-lg px-4 py-3 font-bold"
-                                                    disabled={moderationBusy}
-                                                    onClick={() => handleModerationVisibility(false)}
-                                                >
-                                                    {moderationBusy ? 'Updating...' : 'Unhide Artwork'}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                <label className="block text-sm font-semibold" htmlFor="moderationReason">
-                                                    Hide reason
-                                                </label>
-                                                <textarea
-                                                    id="moderationReason"
-                                                    className="moderation-reason min-h-[96px] w-full rounded-lg px-3 py-2"
-                                                    maxLength="500"
-                                                    placeholder="Explain why this artwork must be removed from public surfaces"
-                                                    value={moderationReason}
-                                                    onChange={event => setModerationReason(event.target.value)}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="moderation-action w-full rounded-lg px-4 py-3 font-bold"
-                                                    disabled={moderationBusy || !moderationReason.trim()}
-                                                    onClick={() => handleModerationVisibility(true)}
-                                                >
-                                                    {moderationBusy ? 'Updating...' : 'Hide Artwork'}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {moderationMessage && (
-                                            <p className="mt-3 text-sm" role="status">{moderationMessage}</p>
-                                        )}
-                                    </section>
-                                    </dialog>
-                                )}
-
                                 {/* Ownership Info - Three Roles */}
                                 <div className="artwork-page-panel artwork-page-people artwork-mobile-people">
                                     <h3 className="artwork-page-card-title">Ownership</h3>

@@ -56,7 +56,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
         setFeed(null); setFeedError(false); setList(false); setSort('newest'); setOffset(0);
     }, [artworkId, creator, deployment?.address]);
     useEffect(() => {
-        if (!enabled || !list) return;
+        if (!enabled || !open || !list) return;
         const abort = new AbortController();
         setFeed(null); setFeedError(false);
         fetch(`/api/public/donations?chain_id=84532&artwork_id=${encodeURIComponent(artworkId)}&sort=${sort}&offset=${offset}`,
@@ -69,7 +69,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             if (!abort.signal.aborted) setFeed(data);
         }).catch(() => { if (!abort.signal.aborted) setFeedError(true); });
         return () => abort.abort();
-    }, [enabled, list, artworkId, creator, deployment?.address, sort, offset, refresh]);
+    }, [enabled, open, list, artworkId, creator, deployment?.address, sort, offset, refresh]);
     useEffect(() => {
         if (open) {
             setWalletBalance(document.querySelector('[data-network-balance]')?.textContent || '');
@@ -140,29 +140,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
     }
     return <section className="artist-support" aria-label="Support the artist">
         <button type="button" data-allow-rapid="true" ref={trigger} className="btn-secondary artwork-page-compact-action"
-            onClick={() => { setOpen(true); setError(''); }}>Donate</button>
-        <button type="button" data-allow-rapid="true" className="btn-secondary artwork-page-compact-action"
-            aria-expanded={list} aria-controls="artistSupportHistory" onClick={() => setList(value => !value)}>
-            {list ? 'Close history' : 'Donation history'}</button>
-        {list && <div id="artistSupportHistory" className="artist-support-history">
-            {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
-            {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
-            <label>Order <select value={sort} onChange={event => { setSort(event.target.value); setOffset(0); }}>
-                <option value="newest">Newest first</option><option value="amount">Largest first</option>
-            </select></label>
-            {!feed && !feedError && <p role="status">Loading support…</p>}
-            {feed?.donations?.length === 0 && <p>No support recorded yet.</p>}
-            {feed?.donations?.map(donation => <article key={`${donation.transaction_hash}:${donation.log_index}`}>
-                <p><Donor donation={donation}/> · {eth(donation.amount)} ETH</p>
-                {donation.message && <p className="artist-support-message">{donation.message}</p>}
-                {donation.message && onReportDonation && <button type="button" data-allow-rapid="true" className="btn-secondary"
-                    onClick={() => onReportDonation({transaction_hash: donation.transaction_hash, log_index: donation.log_index})}>Report message</button>}
-                <time dateTime={donation.recorded_at}>{new Date(donation.recorded_at).toLocaleString()}</time>
-            </article>)}
-            {offset > 0 && <button type="button" data-allow-rapid="true" onClick={() => setOffset(value => Math.max(0, value - 20))}>Previous</button>}
-            {feed?.next_offset !== null && feed?.next_offset !== undefined &&
-                <button type="button" data-allow-rapid="true" onClick={() => setOffset(feed.next_offset)}>Next</button>}
-        </div>}
+            onClick={() => { setList(false); setOpen(true); setError(''); }}>Donate</button>
         <dialog ref={dialog} className="artist-support-dialog reauction-modal" aria-labelledby="artistSupportTitle"
             onCancel={event => { event.preventDefault(); close(); }} onClose={() => {
                 setOpen(false); window.requestAnimationFrame(() => trigger.current?.focus({ preventScroll: true }));
@@ -172,6 +150,41 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                 <button type="button" className="report-modal-close" aria-label="Close donation"
                     data-allow-rapid="true" autoFocus onClick={close} disabled={busy}>×</button>
             </div>
+            <div className="artist-support-tabs" role="tablist" aria-label="Artist support"
+                onKeyDown={event => {
+                    if (busy || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                    event.preventDefault();
+                    const history = event.key === 'Home' ? false : event.key === 'End' ? true : !list;
+                    setList(history);
+                    event.currentTarget.querySelector(history ? '#artistSupportHistoryTab' : '#artistSupportDonateTab')?.focus();
+                }}>
+                <button id="artistSupportDonateTab" type="button" role="tab" data-allow-rapid="true" className="btn-secondary"
+                    aria-selected={!list} aria-controls="artistSupportDonate" tabIndex={list ? -1 : 0} disabled={busy}
+                    onClick={() => setList(false)}>Donate</button>
+                <button id="artistSupportHistoryTab" type="button" role="tab" data-allow-rapid="true" className="btn-secondary"
+                    aria-selected={list} aria-controls="artistSupportHistory" tabIndex={list ? 0 : -1} disabled={busy}
+                    onClick={() => setList(true)}>History</button>
+            </div>
+            {list && <div id="artistSupportHistory" className="artist-support-history" role="tabpanel" aria-labelledby="artistSupportHistoryTab" tabIndex={0}>
+                {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
+                {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
+                <label>Order <select value={sort} onChange={event => { setSort(event.target.value); setOffset(0); }}>
+                    <option value="newest">Newest first</option><option value="amount">Largest first</option>
+                </select></label>
+                {!feed && !feedError && <p role="status">Loading support…</p>}
+                {feed?.donations?.length === 0 && <p>No support recorded yet.</p>}
+                {feed?.donations?.map(donation => <article key={`${donation.transaction_hash}:${donation.log_index}`}>
+                    <p><Donor donation={donation}/> · {eth(donation.amount)} ETH</p>
+                    {donation.message && <p className="artist-support-message">{donation.message}</p>}
+                    {donation.message && onReportDonation && <button type="button" data-allow-rapid="true" className="btn-secondary"
+                        onClick={() => onReportDonation({transaction_hash: donation.transaction_hash, log_index: donation.log_index})}>Report message</button>}
+                    <time dateTime={donation.recorded_at}>{new Date(donation.recorded_at).toLocaleString()}</time>
+                </article>)}
+                {offset > 0 && <button type="button" data-allow-rapid="true" onClick={() => setOffset(value => Math.max(0, value - 20))}>Previous</button>}
+                {feed?.next_offset !== null && feed?.next_offset !== undefined &&
+                    <button type="button" data-allow-rapid="true" onClick={() => setOffset(feed.next_offset)}>Next</button>}
+            </div>}
+            <div id="artistSupportDonate" role="tabpanel" aria-labelledby="artistSupportDonateTab" hidden={list}>
             <p>{creatorName || 'Creator'}</p><p className="artist-support-address">{creator}</p>
             {walletBalance && <p>Wallet balance: {walletBalance}</p>}
             <p>100% goes to the creator. This does not buy the artwork or provide protocol benefits.</p>
@@ -200,6 +213,7 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
                 <div className="reauction-modal-actions"><button type="button" data-allow-rapid="true" className="btn-secondary" onClick={close} disabled={busy}>Cancel</button>
                     <button type="submit" data-allow-rapid="true" className="btn-main" disabled={busy || !accepted || !messageState.valid}>{busy ? 'Waiting for your wallet…' : 'Confirm in wallet'}</button></div>
             </form>}
+            </div>
         </dialog>
     </section>;
 }

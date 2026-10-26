@@ -97,6 +97,15 @@ export default async function handler(req,res) {
     if (req.headers.origin && !origins.has(req.headers.origin)) throw fail('INVALID_ORIGIN','Open ArtSoul to update notifications.',401);
     if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) throw fail('JSON_REQUIRED','Use a JSON request.',415);
     const body = await readBoundedJson(req,4096);
+    if (body.action === 'remove') {
+      if (!exact(body,['action','ids']) || !Array.isArray(body.ids) || body.ids.length<1 || body.ids.length>PAGE_SIZE ||
+        body.ids.some(id=>!validId(id)) || new Set(body.ids).size!==body.ids.length) throw fail('INVALID_NOTIFICATION_UPDATE','Choose valid notification updates.');
+      const saved = await supabaseRest('rpc/remove_auction_notifications',{method:'POST',body:{p_wallet:wallet,p_core:config.coreAddress,p_ids:body.ids}});
+      if (saved?.removed===false) throw fail('NOTIFICATION_UNAVAILABLE','An update is no longer available. Reload your notifications.',409);
+      if (saved?.removed!==true || !Array.isArray(saved.ids) || saved.ids.length!==body.ids.length ||
+        new Set(saved.ids).size!==body.ids.length || saved.ids.some(id=>!body.ids.includes(id))) throw new Error('Invalid removal acknowledgement');
+      return res.status(200).json({wallet,removed:saved.ids});
+    }
     if (body.action === 'read') {
       if (!exact(body,['action','ids','read']) || !Array.isArray(body.ids) || body.ids.length<1 || body.ids.length>PAGE_SIZE ||
         body.ids.some(id=>!validId(id)) || new Set(body.ids).size!==body.ids.length || typeof body.read!=='boolean') throw fail('INVALID_NOTIFICATION_UPDATE','Choose valid notification updates.');

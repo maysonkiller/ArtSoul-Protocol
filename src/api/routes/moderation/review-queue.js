@@ -2,15 +2,16 @@ import { allowMethods, sendError, supabaseRest } from '../../backend.js';
 import { getModerationAccess, canReadStaffWallets, redactOtherStaffWallets } from '../../moderation-access.js';
 import { requireProtocolAdminEnabled } from '../../protocol-admin-config.js';
 import { readDonationConfig } from '../../donation-config.js';
+import { readAdminArtworkCatalog } from '../../admin-artwork-catalog.js';
 
-const QUEUE_STATUSES = new Set(['pending_review', 'actioned', 'dismissed', 'resolved', 'withdrawn']);
+const QUEUE_STATUSES = new Set(['pending_review', 'actioned', 'dismissed', 'resolved', 'withdrawn', 'all']);
 const REPORT_FIELDS = 'id,chain_id,artwork_id,reporter_wallet,category,details,reference_url,status,created_at,updated_at,reviewed_by,reviewed_at,decision_reason';
 const TARGET_FIELDS = 'target_type,donation_contract_address,donation_transaction_hash,donation_log_index';
 
 async function readReports(status, target) {
-  const path = fields => `artwork_reports?status=eq.${status}&select=${fields}&order=created_at.asc&limit=200`
+  const path = fields => `artwork_reports?${status === 'all' ? '' : `status=eq.${status}&`}select=${fields}&order=created_at.asc&limit=200`
     + (target ? `&chain_id=eq.${target.chainId}&artwork_id=eq.${target.artworkId}`
-      + (fields.includes('target_type') ? '&target_type=eq.artwork' : '') : '');
+      + (fields.includes('target_type') ? `&target_type=eq.${target.type}` : '') : '');
   try {
     // Read retained donation reports even when new donations are paused.
     return await supabaseRest(path(`${REPORT_FIELDS},${TARGET_FIELDS}`));
@@ -21,7 +22,7 @@ async function readReports(status, target) {
       && /target_type|donation_contract_address|donation_transaction_hash|donation_log_index/.test(message);
     // A default-off release remains compatible with the existing A8 schema.
     // No permission, network, table or unrelated column failure is retried.
-    if (readDonationConfig().enabled || !missingTargetColumn) throw error;
+    if (readDonationConfig().enabled || target?.type === 'donation_message' || !missingTargetColumn) throw error;
     return await supabaseRest(path(REPORT_FIELDS));
   }
 }
@@ -63,8 +64,11 @@ export default async function handler(req, res) {
         const error = new Error('Choose a valid artwork and network.');
         error.statusCode = 400; error.code = 'INVALID_REVIEW_TARGET'; throw error;
       }
-      target = {chainId, artworkId};
+      const type = req.query.target_type || 'artwork';
+      if (!['artwork','donation_message'].includes(type)) throw invalidStatus();
+      target = {chainId, artworkId, type};
     }
+    if (status === 'all' && !target) throw invalidStatus();
 
     let reports;
     let hidden;
@@ -122,6 +126,10 @@ export default async function handler(req, res) {
       }
     }
 
+    const artworkIds = [...new Set((reports || []).filter(row => Number(row.chain_id) === 84532)
+      .map(row => String(row.artwork_id)))];
+    const artworks = artworkIds.length ? (await readAdminArtworkCatalog({ids:artworkIds})).artworks : [];
+
     // Permissions can change while the queue is loading. Do not disclose staff
     // identities using the role/session that was valid only before those reads.
     const access = await getModerationAccess(req, { strict: true });
@@ -131,6 +139,7 @@ export default async function handler(req, res) {
       access: { role: access.role },
       data: {
         status,
+        artworks,
         reports: redactOtherStaffWallets(reports, 'reviewed_by', access, canReadAll),
         // Intake events identify complaint participants, not staff decisions.
         events: events.map(event => event.event_type === 'REPORT_SUBMITTED' ? {...event}

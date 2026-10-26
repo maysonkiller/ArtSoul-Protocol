@@ -58,7 +58,7 @@ test('gallery search is debounced, global, stable, and Discovery-ranked', () => 
   assert.match(source, /if \(!globalSearch && window\.ArtSoulDiscovery\?\.filterForGalleryTab\)/);
   assert.match(source, /globalSearch \? 'discovery' : sortBy/);
   assert.match(source, /loaded artworks for/);
-  assert.match(source, /Search all ArtSoul/);
+  assert.match(source, /Find more art or artists/);
   assert.match(source, /artsoul:open-search/);
   assert.match(source, /categoryLabelForArtwork/);
   assert.ok(hiddenFilter >= 0 && hiddenFilter < searchFilter, 'hidden works must be removed before search');
