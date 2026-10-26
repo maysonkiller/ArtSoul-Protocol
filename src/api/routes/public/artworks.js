@@ -374,7 +374,6 @@ function latestCompletedSettlementByArtwork(settlements = []) {
 function resaleByToken(listings = []) {
   const map = new Map();
   for (const listing of listings) {
-    if (!listing.active) continue;
     map.set(keyFor(listing.chain_id, listing.token_id), listing);
   }
   return map;
@@ -558,7 +557,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
   const description = normalizeText(metadata.description) || 'Protocol-backed ArtSoul testnet artwork.';
   const canonicalFloor = floor?.floor_price || artwork.canonical_floor || auction?.final_price || 0;
   const currentBid = auction?.current_bid || auction?.winning_bid || 0;
-  const salePrice = resale?.price || 0;
+  const salePrice = resale?.active ? resale.price : 0;
   const creatorIdentity = maps.publicIdentities?.get(normalizeText(artwork.creator).toLowerCase());
 
   return {
@@ -597,6 +596,8 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     creator_value: weiToEth(auction?.start_price || canonicalFloor),
     start_price: weiToEth(auction?.start_price),
     sale_price: weiToEth(salePrice),
+    resale_seller: addressOrNull(resale?.seller),
+    resale_updated_block: Number(resale?.last_updated_block || resale?.block_number || 0),
     canonical_floor: weiToEth(canonicalFloor),
     floor_price: weiToEth(canonicalFloor),
     minted: Boolean(artwork.minted),
@@ -788,7 +789,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
     tokenId
       ? queryTable(
           'v41_resale_listings',
-          `select=chain_id,token_id,active,price,seller&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
+          `select=chain_id,token_id,active,price,seller,last_updated_block&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
           warnings
         )
       : Promise.resolve([]);
@@ -903,7 +904,7 @@ async function buildProjectionSnapshot() {
     ),
     queryTable(
       'v41_resale_listings',
-      `select=chain_id,token_id,active,price,seller&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,token_id,active,price,seller,last_updated_block&chain_id=${chainFilter}&limit=200`,
       warnings
     ),
     queryTable(

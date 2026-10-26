@@ -94,7 +94,7 @@ test('production polling reuses one observed block and bounds reorg reads', () =
     // gates confirmation on a completed catch-up, so a range that failed closed
     // performs no confirmation work at all (strictly fewer RPC reads, and never
     // confirms past an unapplied event).
-    assert.match(runner, /if \(checkpoint\) \{\s*await this\._processConfirmations\(checkpoint\.currentBlock\);/s);
+    assert.match(runner, /if \(checkpoint && this\.isLeader && this\.isRunning\) \{\s*await this\._processConfirmations\(checkpoint\.currentBlock\);/s);
     assert.doesNotMatch(runner, /_processConfirmations\(checkpoint\?\.currentBlock\)/);
     assert.match(runner, /this\.lastObservedBlock = currentBlock/);
     assert.doesNotMatch(runner, /const currentBlock = await this\.eventListener\.getCurrentBlock\(\);\s*const lag/s);

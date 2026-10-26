@@ -10,9 +10,10 @@ function adapter() {
   const api = window.ArtSoulContracts;
   const calls = [];
   api.coreContract = {
-    artworks: async id => ({ minted: String(id) !== '9', tokenId: 8n }),
+    artworks: async id => ({ minted: String(id) !== '9', tokenId: String(id) === '19' ? 4n : 8n, canonicalFloor: 1n }),
+    tokenToArtwork: async id => String(id) === '8' ? 4n : 19n,
     getAddress: async () => '0xcore',
-    listResale: async id => { calls.push(['list', String(id)]); return { hash: '0xlist', wait: async () => {} }; },
+    listResale: async id => { calls.push(['list', String(id)]); return { hash: '0xlist', wait: async () => ({ status: 1, hash: '0xlist', blockNumber: 100, index: 0, logs: [] }) }; },
     buyResale: async id => { calls.push(['buy', String(id)]); return { hash: '0xbuy', wait: async () => {} }; },
     resaleListings: async id => ({ seller: '0xowner', price: id, active: true })
   };

@@ -16,6 +16,7 @@ import {
 } from './health-policy.js';
 import { reapStaleEventProcessingLeases } from './event-processing-lease.js';
 import { refreshSearchMetadata } from './search-metadata.js';
+import { readResaleStateAtBlock, reconcileResaleState } from './resale-state-reconciliation.js';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,6 +109,10 @@ class ProductionIndexer {
         this.leadershipLossInProgress = false;
         this.catchUpInProgress = false;
         this.confirmationTimer = null;
+        this.confirmationInFlight = null;
+        this.resaleCursor = '0';
+        this.resaleSweepEnd = null;
+        this.resaleReconciliationError = null;
         this.lastSearchMetadataAt = 0;
         this.searchMetadataInFlight = null;
         // Set when startup fails to reconcile the persisted confirmation depth.
@@ -135,6 +140,10 @@ class ProductionIndexer {
      * Try to become leader
      */
     async _tryBecomeLeader() {
+        // A previous leader's pending poll must drain before this instance
+        // starts again, or its follower cleanup could stop the new engine.
+        if (this.leadershipLossInProgress) return false;
+
         if (this.isLeader === true) {
             return true;
         }
@@ -198,6 +207,8 @@ class ProductionIndexer {
 
         // Start indexer
         this.isRunning = true;
+        this.resaleCursor = '0';
+        this.resaleSweepEnd = null;
         await this.syncEngine.start();
 
         // One authoritative read of the failure registry at startup, so the
@@ -290,6 +301,7 @@ class ProductionIndexer {
 
         // Stop indexer
         this.isRunning = false;
+        if (this.confirmationInFlight) await this.confirmationInFlight;
         await this.syncEngine.stop();
 
         console.log('[ProductionIndexer] Follower stopped');
@@ -433,6 +445,7 @@ class ProductionIndexer {
 
         // Wait for current operations to complete (drain)
         console.log('[ProductionIndexer] Draining current operations...');
+        if (this.confirmationInFlight) await this.confirmationInFlight;
         if (this.searchMetadataInFlight) await this.searchMetadataInFlight;
         await this._drainOperations();
 
@@ -599,7 +612,14 @@ class ProductionIndexer {
     _startConfirmationPolling() {
         console.log('[ProductionIndexer] Starting confirmation polling...');
 
-        this.confirmationTimer = setInterval(async () => {
+        this.confirmationTimer = setInterval(() => this._runConfirmationPoll(), this.pollInterval);
+    }
+
+    _runConfirmationPoll() {
+        if (!this.isLeader || !this.isRunning || this.confirmationInFlight) return this.confirmationInFlight;
+        // Serialize reorg checks, catch-up and state reconciliation together.
+        // A slow RPC response must never overlap the next poll's rollback.
+        this.confirmationInFlight = (async () => {
             try {
                 const now = Date.now();
                 if (now - this.lastReorgCheckAt >= this.reorgCheckInterval) {
@@ -608,6 +628,8 @@ class ProductionIndexer {
                         sampleSize: this.reorgSampleSize
                     });
                     if (reorgDetected) {
+                        this.resaleCursor = '0';
+                        this.resaleSweepEnd = null;
                         console.warn('[ProductionIndexer] Reorg detected, resyncing...');
                         return;
                     }
@@ -618,15 +640,44 @@ class ProductionIndexer {
                 // and confirming past an unapplied event would mark it as
                 // reorg-safe and permanently skipped.
                 const checkpoint = await this._catchUpToSafeBlock('poll');
-                if (checkpoint) {
+                if (checkpoint && this.isLeader && this.isRunning) {
                     await this._processConfirmations(checkpoint.currentBlock);
+                    await this._refreshResaleState(checkpoint.safeBlock);
                     // Independent public-search enrichment never delays chain work.
                     this._refreshSearchMetadata();
                 }
             } catch (error) {
                 console.error('[ProductionIndexer] Confirmation polling error:', error);
             }
-        }, this.pollInterval);
+        })().finally(() => { this.confirmationInFlight = null; });
+        return this.confirmationInFlight;
+    }
+
+    async _refreshResaleState(blockNumber) {
+        if (this.config.chainId !== 84532 || !this.isLeader || !this.isRunning) return;
+        const lock = this.distributedLock;
+        const fencingToken = lock.getFencingToken();
+        const isCurrent = () => this.isLeader && this.isRunning && lock.isLeaderInstance() &&
+            lock.getFencingToken() === fencingToken;
+        if (!isCurrent()) return;
+        try {
+            const result = await reconcileResaleState(this.db, {
+                chainId: this.config.chainId, coreAddress: this.config.contractAddress, blockNumber,
+                cursor: this.resaleCursor, sweepEnd: this.resaleSweepEnd,
+                leader: { lockName: lock.lockName, instanceId: lock.instanceId, fencingToken }, isCurrent
+            }, snapshot => readResaleStateAtBlock(this.eventListener, snapshot));
+            if (!isCurrent()) return;
+            this.resaleCursor = result.cursor;
+            this.resaleSweepEnd = result.sweepEnd;
+            this.resaleReconciliationError = null;
+            if (result.updated) console.log(JSON.stringify({ phase: 'resale_reconciliation',
+                chainId: this.config.chainId, blockNumber, checked: result.checked, updated: result.updated }));
+        } catch (error) {
+            // Public state reconciliation is independent of event catch-up. A
+            // failed read preserves prior rows and retries this batch next poll.
+            this.resaleReconciliationError = 'Confirmed resale state refresh failed';
+            console.warn('[ProductionIndexer] Confirmed resale state refresh failed; retrying next poll.');
+        }
     }
 
     _refreshSearchMetadata() {
@@ -782,7 +833,7 @@ class ProductionIndexer {
             let status = 'healthy';
             if (!this.isRunning) {
                 status = 'stopped';
-            } else if (hasErrors) {
+            } else if (hasErrors || this.resaleReconciliationError) {
                 status = 'degraded';
             } else if (blocksBehind > 100) {
                 status = 'syncing';
@@ -805,6 +856,7 @@ class ProductionIndexer {
                     syncThresholdBlocks: this.healthMaxBlocksBehind,
                     confirmationDepth: this.confirmationDepth,
                     confirmationDepthSyncError: this.confirmationDepthSyncError,
+                    resaleReconciliationError: this.resaleReconciliationError || null,
                     totalEventsIndexed: state.total_events_indexed,
                     unresolvedErrors: unresolvedErrorCount,
                     // Additive breakdown; unresolvedErrors stays the headline

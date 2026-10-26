@@ -699,7 +699,9 @@ let morphActive = false;
         }
 
         // Load artworks on page load
+        let homeArtworksRequest = 0;
         async function loadHomeArtworks() {
+            const request = ++homeArtworksRequest;
             const gallery = document.getElementById('artworkGallery');
             if (!gallery) return;
 
@@ -710,6 +712,7 @@ let morphActive = false;
                 }
 
                 let artworks = await db.getPublicProjectionArtworks({ limit: 100 });
+                if (request !== homeArtworksRequest) return;
                 renderHomepageMetrics(artworks?.public_metrics);
                 const suppressedArtworkIds = new Set(
                     (artworks?.suppressed_artwork_ids || []).map(value => String(value).toLowerCase())
@@ -911,6 +914,7 @@ let morphActive = false;
                 }
 
             } catch (error) {
+                if (request !== homeArtworksRequest) return;
                 console.error('Failed to load artworks:', error);
                 showAwaitingLiveTestnetArtworks(gallery);
             }
@@ -919,6 +923,10 @@ let morphActive = false;
         // The entry is mounted after the homepage markup, so discovery can start
         // immediately without waiting for the independently deferred wallet module.
         loadHomeArtworks();
+        window.addEventListener('artsoul:resale-confirmed', loadHomeArtworks);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && window.ArtSoulDB?.confirmedResaleUpdates?.().length) void loadHomeArtworks();
+        });
 
         window.showSection = showSection;
 

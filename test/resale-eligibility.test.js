@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getOwnerResaleEligibility } from '../src/features/marketplace/resale-eligibility.js';
+import { getOwnerResaleEligibility, validateResalePrice } from '../src/features/marketplace/resale-eligibility.js';
 
 const OWNER = '0x1111111111111111111111111111111111111111';
 const OTHER = '0x2222222222222222222222222222222222222222';
@@ -70,4 +70,14 @@ test('owner action stays visible but disabled while canonical floor is unavailab
 
 test('wallet state must be settled before showing an owner action', () => {
     assert.equal(eligible({ walletSettled: false }).showOwnerAction, false);
+});
+
+test('resale prices preserve exact wei and accept a decimal comma', () => {
+    assert.equal(validateResalePrice('0,011', '0.011').normalized, '0.011');
+    assert.equal(validateResalePrice('1.000000000000000001', '1.000000000000000002').valid, false);
+    assert.equal(validateResalePrice('1.000000000000000002', '1.000000000000000002').valid, true);
+    for (const value of ['', '0', '-1', '1e2', '0x10', '1 ETH', '0.0000000000000000001']) {
+        assert.equal(validateResalePrice(value, '0.01').valid, false, value);
+    }
+    assert.equal(validateResalePrice('1', '0').valid, false, 'unknown floor fails closed');
 });

@@ -1,4 +1,19 @@
+import { parseUserEthAmount } from '../auction/eth-amount.js';
+
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
+
+export function validateResalePrice(value, floor) {
+    try {
+        const amount = parseUserEthAmount(value);
+        const minimum = parseUserEthAmount(String(floor));
+        if (amount.wei < minimum.wei) {
+            return { valid: false, error: `Listing price must be at least the canonical floor of ${minimum.eth} ETH.` };
+        }
+        return { valid: true, normalized: amount.eth, error: '' };
+    } catch (error) {
+        return { valid: false, error: error.message };
+    }
+}
 
 function normalizeAddress(value) {
     return String(value || '').trim().toLowerCase();

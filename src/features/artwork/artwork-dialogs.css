@@ -14,3 +14,17 @@ dialog.report-modal .report-field {
     font-size: 16px;
     min-width: 0;
 }
+
+dialog.resale-modal {
+    margin: auto;
+    width: min(480px, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overscroll-behavior: contain;
+}
+
+dialog.resale-modal::backdrop {
+    background: color-mix(in srgb, var(--c-bg) 84%, transparent);
+}
+
+dialog.resale-modal .resale-modal-input { font-size: 16px; }
