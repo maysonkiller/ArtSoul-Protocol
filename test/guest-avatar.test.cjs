@@ -109,13 +109,14 @@ test('account menu uses the compact desktop and mobile width contracts', () => {
 });
 
 test('mobile account button keeps the connected name and address visible', () => {
-  const mobileInfoStart = unifiedStyles.lastIndexOf('.site-header #navButtons .avatar-info {');
+  const mobileInfoStart = unifiedStyles.indexOf('.site-header #navButtons .avatar-info {', unifiedStyles.indexOf('grid-template-columns: 40px minmax(0, 1fr);'));
   const mobileInfo = unifiedStyles.slice(mobileInfoStart, unifiedStyles.indexOf('}', mobileInfoStart) + 1);
   assert.ok(mobileInfoStart >= 0, 'the final shared mobile identity rule must exist');
-  assert.match(unifiedStyles, /@media \(max-width: 768px\)[\s\S]*?grid-template-columns: 40px minmax\(0, 1fr\) 168px;/);
+  assert.match(unifiedStyles, /@media \(max-width: 768px\)[\s\S]*?grid-template-columns: 40px minmax\(0, 1fr\);/);
   assert.match(mobileInfo, /display: flex !important;/);
   assert.match(mobileInfo, /width: 103px !important;/);
   assert.doesNotMatch(mobileInfo, /display: none !important;/);
+  assert.doesNotMatch(unifiedStyles, /\.site-header #navButtons \.avatar-info \{[^}]*display: none/);
 });
 
 test('account menu has one stylesheet source and a full-width compact network row', () => {
@@ -131,7 +132,7 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=48/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /unified-styles\.css\?v=49/, `${page} must use the shared stylesheet cache version`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=7"><\/script>/, `${page} must load the first-frame bridge`);
     assert.match(html, /<script src="\/avatar-dropdown\.js\?v=56" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(

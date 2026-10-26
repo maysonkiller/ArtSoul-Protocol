@@ -122,11 +122,10 @@ test('no audio reaches ArtSoul, and nothing listens without a click', () => {
   // One sentence per click, never continuous, never on load.
   assert.match(source, /session\.continuous = false;/);
   assert.match(source, /session\.interimResults = false;/);
-  assert.match(source, /button\.addEventListener\('click', start\);/);
+  assert.match(source, /mic\.addEventListener\('click', start\);/);
   assert.equal((source.match(/\.start\(\)/g) || []).length, 1, 'the one start() is inside the click handler');
   // A hidden tab stops listening.
-  assert.match(source, /visibilityState === 'hidden'\) stopListening\(\)/);
-  assert.match(source, /addEventListener\('pagehide', stopListening\)/);
+  assert.match(source, /visibilityState === 'hidden'\) \{ stopListening\(\); silence\(\); \}/);
 });
 
 test('the person is told where the audio goes before the microphone first opens', () => {
@@ -136,11 +135,12 @@ test('the person is told where the audio goes before the microphone first opens'
   assert.ok(start.indexOf('TEXT[lang].notice') < start.indexOf('new Recognition()'), 'notice before recognition');
 });
 
-test('a browser without speech recognition gets no button, and the API still exists for tests', () => {
+test('text commands do not require speech recognition', () => {
   const win = { ArtSoulWebMCP: {} };
   const api = loadVoice(win);
   assert.equal(typeof api.parseCommand, 'function');
-  assert.match(source, /typeof Recognition !== 'function' \|\| !window\.ArtSoulWebMCP/);
+  assert.doesNotMatch(source, /typeof Recognition !== 'function' \|\| !window\.ArtSoulWebMCP/);
+  assert.match(source, /mic.disabled = busy \|\| typeof Recognition !== 'function'/);
 });
 
 test('what was heard and the answer are shown, not only spoken', () => {
@@ -178,7 +178,7 @@ test('spoken replies are short, and Russian does not read English out loud', () 
 
 test('the styles follow canon 16 and respect reduced motion', () => {
   const css = fs.readFileSync('unified-styles.css', 'utf8');
-  const block = css.slice(css.indexOf('/* B-09 voice commands.'));
+  const block = css.slice(css.indexOf('/* B-09/B-21 commands.'));
   assert.ok(block.length > 0);
   assert.doesNotMatch(block, /#[0-9a-fA-F]{3,8}\b/, 'theme colours only through variables');
   assert.match(block, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.artsoul-voice-button\.is-listening\s*\{\s*animation: none;/);
@@ -200,12 +200,12 @@ test('the voice script loads after the agent tools on every page that has them',
   assert.match(fs.readFileSync('vite.config.js', 'utf8'), /'voice-commands\.js',/);
 });
 
-test('on a phone the last controls can scroll clear of the button', () => {
-  // Seen on the preview at 375px: the fixed button sat over the settlement
-  // text at the bottom of the artwork page. A spacer at the end of the page
-  // gives the final controls room; it takes none on wider screens.
-  assert.match(source, /spacer\.className = 'artsoul-voice-spacer';/);
-  const css = fs.readFileSync('unified-styles.css', 'utf8');
-  assert.match(css, /\.artsoul-voice-spacer \{\s*display: none;\s*\}/);
-  assert.match(css, /@media \(max-width: 768px\) \{\s*\.artsoul-voice-spacer \{\s*display: block;/);
+test('the command launcher is present in the header before scripts run, outside Admin', () => {
+  for (const page of ['index','gallery','artwork','profile','upload','collection-builder','docs-protocol']) {
+    const html = fs.readFileSync(page + '.html', 'utf8');
+    assert.match(html, /class="site-header-actions">[\s\S]*?class="artsoul-voice-button"/);
+    assert.equal((html.match(/class="artsoul-voice-button"/g) || []).length, 1);
+  }
+  assert.doesNotMatch(fs.readFileSync('admin.html', 'utf8'), /voice-commands|artsoul-voice-button/);
+  assert.doesNotMatch(source, /artsoul-voice-spacer|requestIdleCallback/);
 });

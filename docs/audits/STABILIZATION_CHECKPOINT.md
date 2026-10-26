@@ -1,7 +1,31 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-25 (local time). Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 26 owner-prioritized B21/header follow-up, starting HEAD `6f0fc49`:
+
+- Local uncommitted implementation: accessible text/voice commands in the header,
+  strict financial grammar, stale callback/account fencing, compact scoped search,
+  stable notification slot, shorter gallery actions, paused profile customization,
+  newest-first personal history and targeted hidden-artwork review/restore navigation.
+- No contract, role, schema or economics changes. Preserve unrelated untracked
+  authority-policy files, `.codex/` and `output/`. Recovery diff:
+  `output/audit/b21-recovery-2026-10-26.patch` (local only).
+- Local browser matrix: 64/64, both themes, eight pages, 320–1440px; no header
+  overlap or bell-induced displacement. Filter/Clear are 44px tall. Text and
+  Escape passed. Corrected mobile centre-column and generic dialog overrides.
+- Initial full suite had nine failures; repaired fixtures/pins and isolated
+  PostgreSQL rerun pass 109/109. Final commands/WebMCP/admin boundary: 120/120;
+  inbox/review group: 38/38. Final build passes; complete CI remains the release gate.
+- B17 decision: automatic releases from a dedicated project creator address.
+  Founder deferred designation until new contracts. Shared Core is not a creator
+  source; do not enable broad announcements from all its events.
+- Aggregate favorite count is a distinct pending slice; no saver identities or
+  Trust/ranking changes. Full B21 assistant coverage and Phase B gates remain open.
+- Evidence/interpretations: `audits/B21_COMMANDS_AND_HEADER_2026-10-26.md`.
+- Exactly next step: finish responsive/browser and full checks, release the
+  authorized candidate, verify preview/apex assets, then update this checkpoint.
 
 October 25 shared-header notifications released (implementation HEAD `2e13b5a`, PR #361):
 

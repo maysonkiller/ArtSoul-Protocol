@@ -22,7 +22,7 @@
     <script src="/header-prepaint.js?v=7"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=48">
+    <link rel="stylesheet" href="/unified-styles.css?v=49">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <script src="/storage-image.js?v=3" defer></script>
@@ -35,7 +35,6 @@
     <script src="/data-prefetch.js?v=6" async></script>
     <script src="/avatar-dropdown.js?v=56" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
-    <script type="module" src="/src/entries/search.js"></script>
     <script type="module" src="/src/entries/header-notifications.js"></script>
 </head>
 <body class="protocol-admin-page">
@@ -48,12 +47,7 @@
                         <img src="/ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
                     </a>
                 </div>
-                <div class="site-header-center page-context">
-                    <button type="button" class="site-search-button" data-artsoul-search aria-label="Search ArtSoul" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
-                        <span>Search ArtSoul</span><kbd>Ctrl K</kbd>
-                    </button>
-                </div>
+                <div class="site-header-center page-context"></div>
                 <div class="site-header-actions">
                     <div id="networkBadge"></div>
                     <div id="header-notifications" hidden></div>

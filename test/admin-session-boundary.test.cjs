@@ -166,9 +166,21 @@ test('a pending queue read cannot restore complaint data after logout or unmount
         const h=harness();await tick();h.render();const pending=deferred();h.state.api=()=>pending.promise;
         const old=h.actions.changeQueueStatus('actioned');
         if(boundary==='logout'){h.state.auth='';h.event('artsoul:auth-state-changed');}else h.unmount();
-        const before=h.values[3];pending.resolve({data:{...empty(),reports:[{id:'late-private-report'}]}});await old;
-        assert.notEqual(h.values[3].reports[0]?.id,'late-private-report');if(boundary==='unmount')assert.equal(h.values[3],before);
+        const before=h.render().data;pending.resolve({data:{...empty(),reports:[{id:'late-private-report'}]}});await old;
+        const after=h.render().data;
+        assert.notEqual(after.reports[0]?.id,'late-private-report');if(boundary==='unmount')assert.equal(after,before);
     }
+});
+
+test('targeted restoration survives status changes but does not cross staff sessions', async()=>{
+    const h=harness();await tick();h.render();
+    await h.actions.changeQueueStatus('actioned',{chain_id:84532,artwork_id:'37'});h.render();
+    assert.match(h.state.calls.at(-1).path,/status=actioned&chainId=84532&artworkId=37$/);
+    await h.actions.changeQueueStatus('resolved');h.render();
+    assert.match(h.state.calls.at(-1).path,/status=resolved&chainId=84532&artworkId=37$/);
+    h.state.auth='';h.event('artsoul:auth-state-changed');h.render();
+    h.state.auth=WALLET;h.event('artsoul:auth-state-changed');await tick();h.render();
+    assert.equal(h.state.calls.at(-1).path,'review-queue?status=resolved');
 });
 
 test('late decision completion does not reload the queue or display a success under another session', async()=>{

@@ -557,11 +557,11 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=48">/, `${page} stylesheet pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=49">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=7"><\/script>/, `${page} prepaint pin`);
     assert.match(html, /<script src="\/avatar-dropdown\.js\?v=56" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=48');
+    const stylesheet = html.indexOf('unified-styles.css?v=49');
     const prepaint = html.indexOf('header-prepaint.js?v=7');
     const component = html.indexOf('avatar-dropdown.js?v=56');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
@@ -1465,7 +1465,6 @@ test('the desktop identity column fits the full ArtSoul Guest label', () => {
   const buttonWidth = Number(css.match(/\.site-header #navButtons \.avatar-button \{[\s\S]*?width: (\d+)px !important;/)?.[1]);
   const navWidth = Number(css.match(/\.site-header #navButtons,\s*\.site-header #navButtons \.avatar-dropdown-container \{\s*width: (\d+)px !important;/)?.[1]);
   const menuWidth = Number(css.match(/\.site-header \.avatar-dropdown-menu \{\s*width: min\((\d+)px,/)?.[1]);
-  const sideColumn = Number(css.match(/grid-template-columns: (\d+)px minmax\(0, 1fr\) \1px;/)?.[1]);
 
   // Measured in Chromium at the header's system font, 0.82rem/600:
   // "ArtSoul Guest" needs 90px,
@@ -1475,11 +1474,10 @@ test('the desktop identity column fits the full ArtSoul Guest label', () => {
   assert.equal(labelWidth, infoWidth, 'the label box must match the identity column');
   // avatar 30 + gap 4 + identity + gap 4 + chevron 10 + padding 12 + border 3.2
   assert.ok(buttonWidth >= infoWidth + 63, `button ${buttonWidth}px cannot hold a ${infoWidth}px identity column`);
-  // Every coupled measurement moves together, and the side columns stay equal
-  // so the centre column remains centred.
+  // The right-hand controls share a flexible column; there is no centre search bar.
   assert.equal(navWidth, buttonWidth, '#navButtons and .avatar-dropdown-container must match the button');
   assert.equal(menuWidth, buttonWidth, 'the dropdown menu must align with the button');
-  assert.ok(sideColumn >= buttonWidth, `header side column ${sideColumn}px must not clip a ${buttonWidth}px button`);
+  assert.match(css, /\.site-header-row \{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\);/);
 });
 
 test('the account button geometry is identical in every state and on every page', async () => {

@@ -20,7 +20,7 @@ function render({state='ready',wallet=WALLET,staff=true,authority=true,section='
     // Use actual page JSX with explicit state fixtures. No network, wallet or
     // native credential operation is executed by a static render.
     const states = [state,staff?{role:authority?'team':'moderator',dualWallet:true,stepUpActive:ready}:null,
-        'pending_review',data,section,false,'',null,staff?wallet:'',authority?wallet:'',dialog];
+        'pending_review',null,data,section,false,'',null,staff?wallet:'',authority?wallet:'',dialog];
     let index=0;
     const scope={React:{...React,useState:initial=>[index<states.length?states[index++]:initial,()=>{}]},
         window:{artsoulWalletStateSettled:true,getCurrentWalletAddress:()=>wallet},

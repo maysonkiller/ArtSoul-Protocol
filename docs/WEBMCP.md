@@ -129,7 +129,12 @@ that file and never receives audio; in Chrome the browser sends it to Google,
 and the person is told before the microphone first opens. The microphone opens
 only on a click, for one sentence, and closes when the tab is hidden. A wallet
 command the recogniser hears with low confidence is not run. Browsers without
-speech recognition get no button.
+speech recognition can use the text composer. The header launcher opens the
+panel without starting audio. Typed replies are silent. English and Russian
+remain the supported command grammars, not an unrestricted multilingual AI.
+Closing a panel stops listening, but cannot cancel an already submitted
+transaction. One pending command blocks repeat submissions; changed accounts
+cannot receive a previous account's late answer.
 
 Examples, in English or Russian: "what auctions are open" / «какие аукционы
 открыты», "bid 0.05 on artwork 31" / «ставка 0,05 на работу 31», "my activity" /

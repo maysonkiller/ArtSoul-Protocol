@@ -348,6 +348,31 @@ test('an invalid queue status returns a stable error after authorization', async
   }
 });
 
+test('hidden-artwork recovery reads only that artwork on its network before applying the page limit', async () => {
+  const [, {default: queueHandler}] = await modules;
+  const cookie = await authCookie({stepUp: true}), previousFetch = global.fetch, calls = [];
+  global.fetch = async url => {
+    const value = String(url); calls.push(value);
+    if (value.includes('artsoul_staff_roles')) return supabaseResponse([{role: 'moderator'}]);
+    if (value.includes('artsoul_staff_passkeys')) return supabaseResponse([{credential_id: 'credential-1'}]);
+    return supabaseResponse([]);
+  };
+  try {
+    const res = responseHarness();
+    await queueHandler(request('GET','/api/moderation/review-queue',{cookie,query:{status:'actioned',chainId:'84532',artworkId:'37'}}),res);
+    assert.equal(res.statusCode,200);
+    const url = new URL(calls.find(value => value.includes('/artwork_reports?')));
+    for (const [key,value] of Object.entries({status:'eq.actioned',chain_id:'eq.84532',artwork_id:'eq.37',target_type:'eq.artwork',limit:'200'})) assert.equal(url.searchParams.get(key),value);
+    assert.equal(res.headers['Cache-Control'],'private, no-store');
+    for (const query of [{artworkId:'37'}, {chainId:'84532'}, {artworkId:'37&status=eq.resolved',chainId:'84532'}, {artworkId:(2n**256n).toString(),chainId:'84532'}]) {
+      calls.length = 0; const bad = responseHarness();
+      await queueHandler(request('GET','/api/moderation/review-queue',{cookie,query}),bad);
+      assert.equal(bad.statusCode,400); assert.equal(bad.body.error,'INVALID_REVIEW_TARGET');
+      assert.equal(calls.some(value => value.includes('/artwork_reports?')),false);
+    }
+  } finally {global.fetch = previousFetch;}
+});
+
 test('review actions derive the actor from the server session and return stable output', async () => {
   const [, , { default: actionHandler }] = await modules;
   const cookie = await authCookie({ stepUp: true });
