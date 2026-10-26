@@ -24,7 +24,6 @@ const pageInputs = {
 const legacyRootAssets = [
     '1080x360.png',
     'ai-ui-styles.css',
-    'artsoul-social-preview.png',
     'artsoul-social-preview-v2.png',
     'ARTSOULlogo-clean.png',
     'ARTSOULlogo.png',
@@ -163,6 +162,9 @@ function copyLegacyRuntimeAssets() {
         apply: 'build',
         async closeBundle() {
             await Promise.all([...legacyRootAssets, ...legacyClientFiles].map(copyRelative));
+            // Keep old shared links compatible without retaining a second banner source.
+            await copyFile(path.join(root, 'artsoul-social-preview-v2.png'),
+                path.join(outDir, 'artsoul-social-preview.png'));
             await Promise.all(legacyClientTrees.map(async (relativePath) => {
                 const destination = path.join(outDir, relativePath);
                 await mkdir(path.dirname(destination), { recursive: true });

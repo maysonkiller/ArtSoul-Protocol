@@ -49,6 +49,15 @@ await access(path.join(dist, 'src/config/upload-policy.js')).catch(() => {
     throw new Error('Missing legacy runtime dependency in dist: src/config/upload-policy.js');
 });
 
+// Cached metadata may still request the original filename on a static host.
+// Both URLs must contain the one approved image, even without Vercel redirects.
+const approvedSocialImage = await readFile(path.join(root, 'artsoul-social-preview-v2.png'));
+for (const filename of ['artsoul-social-preview-v2.png', 'artsoul-social-preview.png']) {
+    if (!(await readFile(path.join(dist, filename))).equals(approvedSocialImage)) {
+        throw new Error(`Obsolete social preview in dist: ${filename}`);
+    }
+}
+
 for (const page of pages) {
     const [source, built] = await Promise.all([
         readFile(path.join(root, page), 'utf8'),

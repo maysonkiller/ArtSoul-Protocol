@@ -66,6 +66,8 @@ test('old default-image links redirect to the approved image without changing ar
     assert.equal(new URL(path, canonicalOrigin).pathname, alias.source);
   }
   assert.notEqual(alias.source, alias.destination);
+  assert.equal(fs.existsSync(path.join(root, alias.source.slice(1))), false,
+    'the obsolete source image is removed; builds derive the compatibility filename from v2');
   assert.ok(read('vite.config.js').includes("'artsoul-social-preview-v2.png'"));
   assert.equal(fs.readFileSync(path.join(root, alias.destination.slice(1))).subarray(0, 8).toString('hex'),
     '89504e470d0a1a0a', 'the target is a real PNG, matching its served MIME type');
