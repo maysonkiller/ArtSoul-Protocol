@@ -5,6 +5,12 @@ authorizes a separate chain-aware collection path for local/testnet development.
 It qualifies §§1, 4, 8, 9, 12 and 17 for that path only; the existing Base 1/1
 protocol and unapproved Genesis/mainnet economics remain unchanged.
 
+Approved research direction (2026-10-26): [Future contract extensibility](CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md)
+permits C1 design of versioned modules and cross-chain payment interfaces alongside
+Phase B. It does not activate additional product networks, approve new economics
+or upgrade powers, or close architecture sign-off. See the maintained
+[Contract Rework Plan](CONTRACT_REWORK_PLAN.md).
+
 Approved direction (2026-10-07): [Administration and verified collections](CHANGELOG_2026-10-07_ADMIN_AUTHORITY.md)
 records mandatory approval by both designated authority wallets for role and
 critical changes, authenticator-app or security-key login, and reviewed

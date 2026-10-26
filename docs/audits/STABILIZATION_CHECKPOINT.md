@@ -3,6 +3,33 @@
 Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 26 future-contract design continuation (started at `b4ca252`):
+
+- Founder requests extensible replacement contracts, complete collection/auction/
+  resale paths and future payments from other networks. C-06 research is in
+  progress; Phase B and final C1 sign-off are not complete.
+- Updated the existing `canon/CONTRACT_REWORK_PLAN.md`, with the exact direction
+  and canon qualifications in `canon/CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md`.
+  Source/scaffold/deployment facts, immutable vs proxy choices, module powers,
+  payment recovery, threats and acceptance requirements are separated.
+- Reconciled obsolete C-26 scheduling/message minimum against approved Donate
+  amendments; no new donation behavior or threshold. Corrected C-27 audit link.
+- Local prototype characterization: `npx hardhat test --network hardhat
+  docs/private/stale-resale-roundtrip-proof-20261026.cjs`, one passing, chain31337,
+  exit0. A listing survives transfer away/back and is executable again without
+  relisting. This is a documented future-contract limitation, not a repaired
+  live bug. Source hashes and reproduction sequence are in the maintained plan;
+  local log: `output/audit/stale-resale-roundtrip-proof-20261026.log`.
+- No Solidity/runtime/configuration edits, signing, migration or deployment.
+  Preserve unrelated untracked authority-policy files, `.codex/`, `output/`.
+- Validation: bounded independent source/design review found no actionable issue;
+  `git diff --check` passes. Local link check covers eight documents/222 relative
+  links with zero newly missing targets. Two pre-existing B-05/B-06 references
+  to absent `testnet/B06_SNAPSHOT_A_REHEARSAL_2026-09-14.md` remain flagged;
+  missing historical evidence was not reconstructed or claimed to exist.
+- Exactly next step: resume B21 Donate/Report preparation through existing
+  dialogs with visible review/submission; carry C1 decisions into later sign-off.
+
 October 26 B23 resale controls RELEASED in PR #373, candidate `171ac62`,
 production merge `960794b` (started at `56536ec`):
 

@@ -2,6 +2,10 @@
 
 This file is the compact overview of the ArtSoul public canon. The full version is `ARTSOUL_CANON_BIBLE_FULL.md`.
 
+The [October 26 extensibility direction](CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md)
+permits future contract/payment research alongside Phase B; it does not enable
+new product networks or alter existing economics or deployment authority.
+
 ## Product
 
 ArtSoul is a Base NFT art protocol built around discovery, primary auctions, lazy minting, settlement, provenance, and resale.
