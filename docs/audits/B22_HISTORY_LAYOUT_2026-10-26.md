@@ -65,7 +65,23 @@ financial acceptance is claimed by this layout check.
 
 ## Release and continuation
 
-Local implementation and build complete. Exact-candidate CI, preview and
-production verification pending. Phase B is not complete. After release,
-resume B-21 Donate/Report preparation through existing dialogs with deliberate
-human review and submission.
+Released in PR #369: candidate `454fa70`, production merge `581a736`.
+CI run 40328801007 passed: Linux 2,747 unit passes/two skips; Windows 2,360
+passes/31 skips; zero failures; 46 contract tests on each platform. Build and
+static checks passed on both runners.
+
+Exact preview and apex checks passed for eight pages and 36 assets, including
+the changed artwork bundle and v52 stylesheet. Apex browser checks passed in
+both themes at 320/390/1440px and 740x320: two actual donation entries are fully
+visible without a scrollbar when they fit, one content scrollbar only when
+needed, unchanged background geometry, nested Report return, and tab resets.
+Zero page script errors and zero API writes.
+
+Release evidence: `output/audit/history-layout-ci-full.log`,
+`history-layout-preview.log`, `history-layout-apex.log`,
+`history-layout-apex-browser.log`; exact verifier records
+`docs/private/b22-history-preview-454fa702fd81-1793020487966.json` and
+`docs/private/b22-history-apex-581a7364a5ef-1793020733359.json`.
+
+Phase B is not complete. Next: resume B-21 Donate/Report preparation through
+existing dialogs with deliberate human review and submission.
