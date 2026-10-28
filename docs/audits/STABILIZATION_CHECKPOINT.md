@@ -1,3 +1,11 @@
+October 29 B31 API follow-up: the observed quota outage returned successful-empty
+public artwork responses. Feed/direct source failures now return uncached503
+with a generic retry message; valid empty results and optional metrics behavior
+remain intact. 17 focused tests pass. See B31_PROJECTION_OUTAGE_2026-10-29.md.
+Exactly next: commit/release B31 after exact CI and verify its actual HTTP
+behavior against the existing provider restriction. This does not unblock
+Supabase or close the provider recovery gate.
+
 October 29 B30 quota incident: founder supplied 411.15 GB / 275 GB egress notice.
 Confirmed cause: _computeStateHash downloads all historical block hashes each
 poll (9.25 MB in the measured history). Same SHA-256 now computed inside PG.

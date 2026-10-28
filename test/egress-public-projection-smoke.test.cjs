@@ -70,7 +70,7 @@ function loadHandler({ missDirectArtworkOnce = false, beforeRead = async () => {
 
   const context = vm.createContext({
     allowMethods: () => true,
-    sendError: (res, error) => res.status(500).json({ error: String((error && error.message) || error) }),
+    sendError: (res, error) => res.status(error.statusCode || 500).json({ error: error.code, message: error.message }),
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },
     getModerationAccess: async () => ({ canModerate: false }),
@@ -171,4 +171,57 @@ test('a negative direct lookup is not retained for the projection TTL', async ()
     2,
     'the empty direct lookup is fetched again instead of staying cached'
   );
+});
+
+test('a source outage returns an uncached unavailable response for feeds and artwork details', async () => {
+  for (const query of [{}, { id: '7' }]) {
+    const { handler } = loadHandler({ beforeRead: async table => {
+      if (table === 'v41_artworks') throw Object.assign(new Error('Private provider failure detail'), {
+        code: 'SUPABASE_QUERY_FAILED', statusCode: 500
+      });
+    } });
+    const res = fakeRes();
+    await handler({ query }, res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.headers['cache-control'], 'private, no-store');
+    assert.equal(res.body.error, 'ARTWORKS_UNAVAILABLE');
+    assert.equal(res.body.success, undefined);
+    assert.equal(res.body.data, undefined);
+    assert.doesNotMatch(JSON.stringify(res.body), /Private provider/);
+  }
+});
+
+test('a successful empty source is still an ordinary empty catalogue', async () => {
+  const { handler } = loadHandler({ missDirectArtworkOnce: true });
+  const res = fakeRes();
+  await handler({ query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.count, 0);
+});
+
+test('unavailable optional metrics do not suppress valid artworks', async () => {
+  const { handler } = loadHandler({ beforeRead: async table => {
+    if (table === 'v41_public_metrics') throw new Error('Metrics unavailable');
+  } });
+  const res = fakeRes();
+  await handler({ query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.count, 1);
+  assert.equal(res.body.public_metrics, null);
+});
+
+test('a recovered direct source is visible on the next request after an outage', async () => {
+  let unavailable = true;
+  const { handler } = loadHandler({ beforeRead: async table => {
+    if (unavailable && table === 'v41_artworks') throw new Error('Provider unavailable');
+  } });
+  const first = fakeRes();
+  await handler({ query: { id: '7' } }, first);
+  assert.equal(first.statusCode, 503);
+  unavailable = false;
+  const second = fakeRes();
+  await handler({ query: { id: '7' } }, second);
+  assert.equal(second.statusCode, 200);
+  assert.equal(second.body.count, 1);
 });

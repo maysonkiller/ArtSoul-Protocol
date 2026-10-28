@@ -1058,6 +1058,14 @@ export default async function handler(req, res) {
     const { cards, bids, diagnostics, warnings, publicMetrics } = directLookup
       ? await getDirectProjectionSnapshot(directLookup, requestQuery.fresh === '1')
       : await getProjectionSnapshot();
+    // A failed source read is not an empty catalogue. In particular, quota
+    // restrictions must not become CDN-cacheable successful empty responses.
+    if (warnings.some(warning => warning.table === 'v41_artworks')) {
+      res.setHeader('Cache-Control', 'private, no-store');
+      return sendError(res, Object.assign(new Error('Artworks are temporarily unavailable. Please try again later.'), {
+        code: 'ARTWORKS_UNAVAILABLE', statusCode: 503
+      }));
+    }
     const suppressedArtworkIds = cards
       .filter(card => card.moderation_hidden === true)
       .map(card => card.id);
