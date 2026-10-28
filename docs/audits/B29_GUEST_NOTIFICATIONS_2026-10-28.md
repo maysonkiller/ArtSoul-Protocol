@@ -70,14 +70,30 @@ theme document 16 apply, while notification authorization is unchanged.
 
 ## Release
 
-Local implementation verified; candidate CI, preview and production verification
-are pending. Phase B remains open. Exactly next: publish this bounded change,
-verify the deployed guest entry, then resume the existing B12/B21 integrated
-public assistant journey. Paid voice provider activation stays deferred.
+Released in PR #382, candidate `18d54f400c3a583cdb0d8efd8bc239f7f7b1532c`,
+production/implementation merge `e5f121f330d8200bb88e20d64b5376a752758123`.
+Candidate and merge trees are identical. CI40724176358 passed Linux 2,857/two
+skipped and Windows 2,462/32 skipped, both builds/static checks and 49 contracts
+per platform. Preview7390898747 and production7391021122 succeeded. Both hosts
+passed eight-route/four exact-content asset checks; preview and apex each passed
+48 actual browser cases without mocks, API writes, private notification reads
+or page errors. Final 34 controller/profile checks passed after updating the
+historical assertion. Post-merge CI40724972008 also passed. A final apex test
+using the actual Connect wallet helper opened the standard AppKit wallet picker
+and closed the explanation. No wallet was selected or paired; no signature or
+transaction was requested. Owned browser `b29bell` and preview4229 were closed;
+the one bounded helper completed and no helper remains active.
+
+PR attachment hit the chat's existing 100-artifact limit; nothing was removed.
+Source: https://github.com/maysonkiller/ArtSoul-Protocol/pull/382.
+The B12/B21 public guest journey also passed; see the addendum in
+`B21_PUBLICATION_DRAFT_2026-10-28.md`. Phase B remains open. Exactly next:
+review existing resale page/tool parity before extending reviewed assistant
+actions. Paid voice provider activation stays deferred.
 
 Initial candidate `3e203e4a` passed preview deployment 7390768630, eight-route
 and four exact-content asset checks, and 48 hosted browser cases without mocks,
 API writes, notification reads or page errors. CI40723410468 found an older
 profile organization assertion requiring the now-superseded hidden guest bell.
 Updated it to require one generic public shell and no embedded private inbox or
-badge. Final candidate CI remains required before release.
+badge. The final candidate CI and release results above supersede that failure.

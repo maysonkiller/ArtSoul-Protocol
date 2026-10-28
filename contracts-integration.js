@@ -776,11 +776,58 @@ class ArtSoulContracts {
         return await this.createAuction(artworkId, newPriceEth, 24);
     }
 
+    captureResaleRuntime() {
+        const core = this.coreContract, nft = this.nftContract, signer = this.signer, provider = this.provider;
+        return { core, nft, signer, assertCurrent: () => {
+            if (this.coreContract !== core || this.nftContract !== nft || this.signer !== signer || this.provider !== provider) {
+                throw new Error('The wallet connection changed. Review the listing again.');
+            }
+        } };
+    }
+
+    async getResaleManagementState(id, options = {}) {
+        this.ensureCore();
+        const runtime = this.captureResaleRuntime();
+        const wallet = await runtime.signer.getAddress();
+        await this.assertExpectedWallet({ expectedWallet: wallet, expectedChainId: 84532 });
+        const tokenId = await this.resolveTokenId(id, options);
+        const artworkId = await this.coreContract.tokenToArtwork(tokenId);
+        const [artwork, owner, listing, coreAddress, nftAddress] = await Promise.all([
+            this.getArtworkStruct(artworkId), this.nftContract.ownerOf(tokenId),
+            this.coreContract.resaleListings(tokenId), runtime.core.getAddress(), runtime.nft.getAddress()
+        ]);
+        if (!artwork.minted || artwork.tokenId !== tokenId) throw new Error('The NFT mapping changed. Review the artwork again.');
+        await this.assertExpectedWallet({ expectedWallet: wallet, expectedChainId: 84532 });
+        runtime.assertCurrent();
+        return { wallet, chainId: 84532, coreAddress, nftAddress, artworkId: String(artworkId), tokenId: String(tokenId), owner,
+            canonicalFloor: this.formatEth(artwork.canonicalFloor),
+            listing: { active: listing.active, seller: listing.seller, price: this.formatEth(listing.price) } };
+    }
+
+    async assertReviewedResale(tokenId, options, checkOwner = true) {
+        const expected = options.expectedResale;
+        if (!expected) return;
+        const live = await this.getResaleManagementState(tokenId, { idType: 'token' });
+        const sameAddress = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+        if (live.artworkId !== expected.artworkId || live.tokenId !== expected.tokenId ||
+            !sameAddress(live.coreAddress, expected.coreAddress) || !sameAddress(live.nftAddress, expected.nftAddress) ||
+            !sameAddress(live.wallet, expected.wallet) || live.chainId !== expected.chainId ||
+            (checkOwner && (!sameAddress(live.owner, expected.owner) ||
+                this.parseEth(live.canonicalFloor) !== this.parseEth(expected.canonicalFloor))) ||
+            live.listing.active !== expected.listing.active ||
+            (live.listing.active && (!sameAddress(live.listing.seller, expected.listing.seller) ||
+                this.parseEth(live.listing.price) !== this.parseEth(expected.listing.price)))) {
+            throw new Error('The listing changed since your review. Review it again before signing.');
+        }
+    }
+
     async listResale(id, priceEth, onStep, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
+        const runtime = this.captureResaleRuntime();
         await this.assertExpectedWallet(options);
         const tokenId = await this.resolveTokenId(id, options);
+        await this.assertReviewedResale(tokenId, options);
         const artworkId = await this.coreContract.tokenToArtwork(tokenId);
         const price = this.parseEth(priceEth);
         const coreAddress = await this.coreContract.getAddress();
@@ -801,14 +848,18 @@ class ArtSoulContracts {
         if (needsApproval) {
             onStep?.({ step: 1, totalSteps });
             await this.assertExpectedWallet(options);
-            const approveTx = await this.nftContract.approve(coreAddress, tokenId);
+            await this.assertReviewedResale(tokenId, options);
+            runtime.assertCurrent();
+            const approveTx = await runtime.nft.approve(coreAddress, tokenId);
             console.log('Approving Core for resale...', approveTx.hash);
             await this.waitForConfirmedTransaction(approveTx);
         }
 
         onStep?.({ step: totalSteps, totalSteps });
+        await this.assertReviewedResale(tokenId, options);
         await this.assertExpectedWallet(options);
-        const tx = await this.coreContract.listResale(tokenId, price);
+        runtime.assertCurrent();
+        const tx = await runtime.core.listResale(tokenId, price);
         console.log('Listing resale...', tx.hash);
         const receipt = await this.waitForConfirmedTransaction(tx);
         this.publishResaleReceipt(receipt, { artworkId, tokenId, seller, active: true, price: this.formatEth(price) });
@@ -818,6 +869,7 @@ class ArtSoulContracts {
     async cancelResale(id, options = {}) {
         await this.ensureBaseSepoliaWrite();
         this.ensureCore();
+        const runtime = this.captureResaleRuntime();
         await this.assertExpectedWallet(options);
         const tokenId = await this.resolveTokenId(id, options);
         const [listing, seller, artworkId] = await Promise.all([
@@ -825,8 +877,10 @@ class ArtSoulContracts {
         ]);
         if (!listing.active) throw new Error('This NFT is no longer listed for sale.');
         if (listing.seller.toLowerCase() !== seller.toLowerCase()) throw new Error('Only the seller can remove this listing.');
+        await this.assertReviewedResale(tokenId, options, false);
         await this.assertExpectedWallet(options);
-        const tx = await this.coreContract.cancelResale(tokenId);
+        runtime.assertCurrent();
+        const tx = await runtime.core.cancelResale(tokenId);
         const receipt = await this.waitForConfirmedTransaction(tx);
         this.publishResaleReceipt(receipt, { artworkId, tokenId, seller, active: false, price: '0' });
         return receipt.hash || tx.hash;

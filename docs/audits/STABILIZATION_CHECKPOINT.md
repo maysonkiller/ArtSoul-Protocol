@@ -1,17 +1,33 @@
+October 28 B12/B21 resale parity and async confirmation are implemented locally.
+Workspace `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, base `5d592dca`.
+New edit/removal commands reuse B23 adapters, bind live review to wallet/chain/
+deployment/listing and guard runtime replacement. Browser testing reproduced a
+Promise-as-consent bug in the common wallet gate; all calls now await explicit
+consent, with shared action lock and revocation checks. 167 affected checks and
+build pass; eight actual-browser fixture journeys / 56 checks pass, no real writes.
+See `B12_RESALE_COMMANDS_2026-10-28.md`. Preserve unrelated untracked files.
+Exactly next: exact-candidate CI and preview verification, then authorized release.
+
 # Stabilization checkpoint
 
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 28 B29 guest notification entry is locally implemented from `aad01970`.
-The existing header gap is replaced by an always-visible bell with a native
-explanation and explicit Connect wallet action. No guest private reads/imports;
-wallet/generation/BFCache fences remain. 29 controller checks, 336 broader
-notification/header checks, 125 overlapping layout/cache checks and build pass.
-48 local rendered cases and four script-blocked first-paint keyboard/AX cases
-pass; no physical-phone acceptance inferred. See
-`B29_GUEST_NOTIFICATIONS_2026-10-28.md`. Preserve unrelated untracked files.
-Exactly next: candidate CI, preview, authorized merge/release and apex check.
+October 28 B29 guest notification entry RELEASED in PR #382. Candidate `18d54f40`,
+production/implementation HEAD `e5f121f330d8200bb88e20d64b5376a752758123`, same tree.
+Always-visible bell, native explanation and explicit Connect wallet action;
+private wallet/generation/BFCache fences preserved. Build, 336 broader checks,
+34 final controller/profile checks, 48 local cases and four first-paint keyboard/
+AX cases pass. CI40724176358 passes Linux/Windows and 49 contracts per platform.
+Preview/apex each pass 48 browser cases and eight-route/four exact asset checks;
+production7391021122 and post-merge CI40724972008 succeeded. Actual apex Connect
+opens the standard wallet picker; no pairing/signature requested. Owned browser
+and preview4229 closed; the bounded helper completed, none remains active.
+See `B29_GUEST_NOTIFICATIONS_2026-10-28.md`. The next B12/B21 public guest journey
+also passed (two languages/themes, 16 steps, zero API writes); no signed-in/wallet/
+microphone acceptance inferred. Paid voice stays deferred. Preserve unrelated
+untracked files. Exactly next: existing resale page/tool parity review before
+extending reviewed assistant actions.
 
 October 28 B28 mobile account header correction RELEASED in PR #381, candidate
 `329f98dc`, production/implementation HEAD `9faffe2d7797b2caec111ad7da2922d49bb33a74`.

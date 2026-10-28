@@ -67,6 +67,7 @@ function fixture({ needsApproval = false, owner = SELLER, listingSeller = SELLER
         cancelResale: async (...args) => transaction('cancelResale', args)
     };
     api.nftContract = {
+        getAddress: async () => NFT,
         ownerOf: async id => { reads.push(['ownerOf', String(id)]); return state.owner; },
         getApproved: async () => state.approved,
         isApprovedForAll: async () => false,
@@ -254,4 +255,74 @@ test('a confirmed sale action stays successful if optional browser persistence f
     const f = fixture();
     f.window.ArtSoulDB.recordConfirmedResale = () => { throw new Error('storage unavailable'); };
     assert.equal(await f.api.listResale(4, '0.002', undefined, { ...REVIEW, idType: 'artwork' }), HASH);
+});
+
+test('resale review reads live identity, floor and listing without switching network or requesting a signature', async () => {
+    const f = fixture();
+    const state = await f.api.getResaleManagementState('19', { idType: 'artwork' });
+    assert.equal(state.artworkId, '19'); assert.equal(state.tokenId, '4');
+    assert.equal(state.wallet, SELLER); assert.equal(state.chainId, 84532);
+    assert.equal(state.coreAddress, CORE); assert.equal(state.nftAddress, NFT);
+    assert.equal(state.canonicalFloor, ethers.formatEther(FLOOR + 1n));
+    assert.equal(state.listing.price, ethers.formatEther(FLOOR));
+    assert.equal(f.writes.length, 0); assert.equal(f.reads.some(read => read[0] === 'network-gate'), false);
+    f.state.chain = '0x1';
+    await assert.rejects(f.api.getResaleManagementState('19', { idType: 'artwork' }), /network changed/);
+});
+
+test('reviewed listing changes are rejected before approval, listing or cancellation', async () => {
+    for (const cancel of [false, true]) {
+        for (const mutate of [f => { f.state.listing.active = false; }, f => { f.state.listing.price += 1n; },
+            f => { f.state.listing.seller = OTHER; }, f => { f.api.coreContract.getAddress = async () => OTHER; },
+            f => { f.api.nftContract.getAddress = async () => OTHER; }]) {
+            const f = fixture({ needsApproval: true });
+            const expectedResale = await f.api.getResaleManagementState('4', { idType: 'artwork' });
+            mutate(f);
+            const options = { ...REVIEW, idType: 'artwork', expectedResale };
+            await assert.rejects(cancel ? f.api.cancelResale('4', options) : f.api.listResale('4', '0.002', undefined, options));
+            assert.equal(f.writes.length, 0); assert.equal(f.records.length, 0);
+        }
+    }
+});
+
+test('approval waits cannot silently overwrite a changed listing, floor or owner', async () => {
+    for (const mutate of [state => { state.listing.price += 1n; }, state => { state.listing.active = false; },
+        state => { state.owner = OTHER; }, state => { state.artworks[4].canonicalFloor += 1n; }]) {
+        const f = fixture({ needsApproval: true, waits: { approve: async ({ state, receipt }) => { mutate(state); return receipt; } } });
+        const expectedResale = await f.api.getResaleManagementState('4', { idType: 'artwork' });
+        await assert.rejects(f.api.listResale('4', '0.002', undefined, { ...REVIEW, idType: 'artwork', expectedResale }), /listing changed/);
+        assert.deepEqual(f.writes.map(write => write.method), ['approve']); assert.equal(f.records.length, 0);
+    }
+});
+
+test('the original seller can cancel a reviewed listing after ownership transfers', async () => {
+    const f = fixture();
+    const expectedResale = await f.api.getResaleManagementState('4', { idType: 'artwork' });
+    f.state.owner = OTHER;
+    assert.equal(await f.api.cancelResale('4', { ...REVIEW, idType: 'artwork', expectedResale }), HASH);
+    assert.deepEqual(f.writes.map(write => write.method), ['cancelResale']);
+    assert.equal(f.state.owner, OTHER);
+});
+
+test('adapter replacement at the final awaited check never reaches a replacement writer', async () => {
+    for (const method of ['approve', 'listResale', 'cancelResale']) {
+        for (const field of ['coreContract', 'nftContract', 'signer', 'provider']) {
+            const f = fixture({ needsApproval: method === 'approve' });
+            const expectedResale = await f.api.getResaleManagementState('4', { idType: 'artwork' });
+            const originalCheck = method === 'approve' ? f.api.assertReviewedResale : f.api.assertExpectedWallet;
+            let checks = 0;
+            // Listing checks the wallet at entry and immediately before its write.
+            // Nested review reads also check it twice; mutate after the final one.
+            const checkName = method === 'approve' ? 'assertReviewedResale' : 'assertExpectedWallet';
+            const lastCheck = method === 'approve' ? 2 : method === 'listResale' ? 6 : 4;
+            f.api[checkName] = async function (...args) {
+                await originalCheck.apply(this, args);
+                if (++checks === lastCheck) this[field] = { ...this[field] };
+            };
+            const options = { ...REVIEW, idType: 'artwork', expectedResale };
+            await assert.rejects(method === 'cancelResale' ? f.api.cancelResale('4', options)
+                : f.api.listResale('4', '0.002', undefined, options), /connection changed/);
+            assert.equal(f.writes.length, 0, `${method}/${field}`);
+        }
+    }
 });

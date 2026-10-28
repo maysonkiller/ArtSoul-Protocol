@@ -26,7 +26,8 @@ belongs, because an agent reads instructions from the open web and an agent that
 could sign is an agent that can lose someone's money on a misread instruction.
 
 Opening the wallet at all requires a permission the person grants themselves,
-through the browser's own confirmation dialog, in the page. The default level is
+through the page's confirmation dialog. Its asynchronous answer is awaited;
+only an explicit approval grants access. The default level is
 `read`; the `wallet` level is remembered per browser and can be revoked with
 `window.ArtSoulWebMCP.revokePermission()`. A storage that cannot be read denies
 rather than grants, a refusal is never remembered as a grant, and **no tool can
@@ -62,7 +63,9 @@ same for all of them:
    - ending an auction, closing an expired settlement, withdrawing their own
    funds - rely on the grant and the wallet approval alone.
 4. **One wallet action at a time.** A retried command or a voice command heard
-   twice cannot stack a second approval behind the first.
+   twice cannot stack a second approval behind the first, including when voice
+   and WebMCP are both active. Revocation or an account change invalidates an
+   open review before it can grant access or submit a transaction.
 5. **The agent can lower its own access and never raise it.**
    `revoke_wallet_access` removes the grant; nothing restores it but the person's
    click.
@@ -95,6 +98,8 @@ economics.
 | `close_expired_settlement` | Closes a settlement nobody paid in time, so the creator can auction again | `ArtSoulContracts.claimSettlementDefault` |
 | `start_auction` | A creator starts a primary auction on an unminted work | `ArtSoulContracts.createAuction` (durations read from the contract) |
 | `list_for_resale` | An owner lists an NFT at or above its canonical floor | `ArtSoulContracts.listResale` |
+| `change_resale_price` | Changes an active listing's asking price after reviewing its live price and floor; never creates a missing listing | `getResaleManagementState`, `listResale` |
+| `cancel_resale_listing` | Removes the connected seller's active listing; NFT ownership is unchanged | `getResaleManagementState`, `cancelResale` |
 | `buy_resale_listing` | Buys a listed NFT at the price the contract holds now | `ArtSoulContracts.getResaleListing`, `buyResale` |
 | `withdraw_pending_funds` | Withdraws proceeds, royalties and returned deposits to the same wallet | `ArtSoulContracts.getPendingWithdrawal`, `withdraw` |
 | `revoke_wallet_access` | Takes away the agent's wallet access in this browser | — |

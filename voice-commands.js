@@ -46,6 +46,8 @@
         'close_expired_settlement',
         'start_auction',
         'list_for_resale',
+        'change_resale_price',
+        'cancel_resale_listing',
         'buy_resale_listing',
         'withdraw_pending_funds'
     ]);
@@ -79,6 +81,8 @@
         ['en', new RegExp(`\\bstart\\s+(?:an\\s+)?auction\\s+(?:on|for)\\s+${EN_WORK}${ID}\\s+(?:at|from|starting at)\\s+${AMOUNT}(?:\\s*eth)?\\s+for\\s+(\\d{1,3})\\s*hours?`),
             m => ({ tool: 'start_auction', input: { artwork_id: m[1], start_price_eth: amount(m[2]), duration_hours: Number(m[3]) } })],
         ['en', new RegExp(`\\b(?:list|sell)\\s+${EN_WORK}${ID}\\s+(?:for|at)\\s+${AMOUNT}`), m => ({ tool: 'list_for_resale', input: { artwork_id: m[1], price_eth: amount(m[2]) } })],
+        ['en', new RegExp(`\\bchange\\s+(?:the\\s+)?price\\s+(?:of|for)\\s+${EN_WORK}${ID}\\s+to\\s+${AMOUNT}(?:\\s*eth)?`), m => ({ tool: 'change_resale_price', input: { artwork_id: m[1], price_eth: amount(m[2]) } })],
+        ['en', new RegExp(`\\bremove\\s+${EN_WORK}${ID}\\s+from\\s+sale`), m => ({ tool: 'cancel_resale_listing', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`\\bbuy\\s+${EN_WORK}${ID}(?:\\s+for\\s+${AMOUNT})?`),
             m => ({ tool: 'buy_resale_listing', input: m[2] ? { artwork_id: m[1], expected_price_eth: amount(m[2]) } : { artwork_id: m[1] } })],
         ['en', new RegExp(`\\bclose\\s+(?:the\\s+)?(?:expired\\s+)?settlement\\s+(?:on\\s+|for\\s+)?${EN_WORK}${ID}`), m => ({ tool: 'close_expired_settlement', input: { artwork_id: m[1] } })],
@@ -103,6 +107,8 @@
         ['ru', new RegExp(`(?:запусти|начни|создай)\\s+аукцион\\s+(?:на\\s+|для\\s+)?${RU_WORK}${ID}\\s+(?:за|от|по)\\s+${AMOUNT}(?:\\s*eth|\\s*эфир[а-я]*)?\\s+на\\s+(\\d{1,3})\\s*час(?:а|ов)?`),
             m => ({ tool: 'start_auction', input: { artwork_id: m[1], start_price_eth: amount(m[2]), duration_hours: Number(m[3]) } })],
         ['ru', new RegExp(`(?:выстав[а-я]*|продай)\\s+${RU_WORK}${ID}\\s+(?:за|по)\\s+${AMOUNT}`), m => ({ tool: 'list_for_resale', input: { artwork_id: m[1], price_eth: amount(m[2]) } })],
+        ['ru', new RegExp(`(?:измени|поменяй)\\s+цену\\s+${RU_WORK}${ID}\\s+на\\s+${AMOUNT}(?:\\s*(?:eth|эфира?))?`), m => ({ tool: 'change_resale_price', input: { artwork_id: m[1], price_eth: amount(m[2]) } })],
+        ['ru', new RegExp(`(?:сними|убери)\\s+${RU_WORK}${ID}\\s+с\\s+продажи`), m => ({ tool: 'cancel_resale_listing', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`(?:купи|купить)\\s+${RU_WORK}${ID}(?:\\s+за\\s+${AMOUNT})?`),
             m => ({ tool: 'buy_resale_listing', input: m[2] ? { artwork_id: m[1], expected_price_eth: amount(m[2]) } : { artwork_id: m[1] } })],
         ['ru', new RegExp(`(?:закрой|закрыть)\\s+(?:расч[её]т|сделку)\\s+(?:по\\s+|за\\s+)?${RU_WORK}${ID}`), m => ({ tool: 'close_expired_settlement', input: { artwork_id: m[1] } })],
@@ -161,6 +167,7 @@
             if (isWrite(command)) {
                 // Never execute a financial phrase extracted from a negation,
                 // question, multiple requests, truncated number or quoted text.
+                if (/\?/.test(normalized)) return null;
                 const prefix = heard.slice(0, match.index).trim();
                 const allowedPrefix = language === 'ru' ? /^(?:пожалуйста,?\s*)?(?:поставь\s*)?$/
                     : /^(?:please\s*)?(?:place a\s*)?$/;
@@ -206,6 +213,7 @@
             help: 'Try: "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
                 '"prepare artwork titled Moonlight", "donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
+                '"change price of artwork 19 to 0.003", "remove artwork 19 from sale", ' +
                 '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
             submitted: 'Done. The wallet approved it and the transaction was sent.',
             refused: reason => `Not done. ${reason}`,
@@ -235,6 +243,7 @@
             help: 'Скажите: «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
                 '«подготовь работу с названием Лунный свет», «донат автору работы 31», «пожаловаться на работу 31» (только открывает форму; ничего не отправляет), ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
+                '«измени цену работы 19 на 0,003», «сними работу 19 с продажи», ' +
                 '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
             submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
             refused: () => 'Не выполнено. Причина показана на экране.',
