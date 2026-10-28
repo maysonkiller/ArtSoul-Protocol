@@ -72,3 +72,20 @@ and 17 (Phase B) remain unchanged.
 Natural multilingual conversation, provider privacy/retention and an approved
 enforced operating budget remain open. See
 `../VOICE_AND_NETWORK_FOLLOWUP_2026-10-25.md`. Phase B is not closed by this slice.
+
+## Integrated public journey addendum, October 28
+
+After the guest-header correction, exercised the existing live public assistant
+journey while B29 was staged (apex source `9faffe2d`, unchanged B21 assets):
+public search for Rehearsal → artwork 34 → explicit Saved add/remove refused for
+the guest → Donate review → Report review → publication draft review/apply →
+reload without replay. English/Classic 1366px and Russian/Future 390px both pass
+(two journeys, 16 steps); no response mocks, API writes or page errors. Runtime
+record: `output/b21-integrated-guest.log`; runner:
+`output/playwright/b21-integrated-guest.js`.
+
+This confirms public navigation/form preparation and guest boundaries only.
+It does not accept authenticated Saved writes, wallet transactions, real speech,
+paid AI or the remaining B12 signed-in journey. Resale tool parity remains to
+review against the B23 page controls; historical B12 cancellation limitations
+must not be treated as evidence that the current page lacks cancellation.
