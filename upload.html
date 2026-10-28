@@ -39,7 +39,7 @@
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
     <script src="/header-prepaint.js?v=8"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=57">
+    <link rel="stylesheet" href="/unified-styles.css?v=58">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=2">
@@ -610,12 +610,9 @@
             <p>Prepare artwork for auction discovery</p>
         </div>
 
-        <nav class="publish-panel mb-6" aria-label="Publication type">
-            <p class="form-hint">What do you want to publish?</p>
-            <div class="flex flex-wrap gap-3 mt-3">
-                <a href="/upload" class="btn-secondary" aria-current="page">1/1 Artwork</a>
-                <a href="/collection-builder" class="btn-secondary">Collection · local draft</a>
-            </div>
+        <nav class="publication-type-nav" aria-label="Publication type">
+            <a href="/upload" aria-current="page">Single artwork</a>
+            <a href="/collection-builder">Collection <span>Local draft</span></a>
         </nav>
 
         <div class="upload-form-stack space-y-8">
