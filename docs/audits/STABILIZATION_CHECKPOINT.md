@@ -1,3 +1,17 @@
+October 28 B12 real Chrome/Rabby acceptance is now in progress. Starting HEAD
+`53e58dc2`, published implementation `63c0c286`. The owner connected the old
+`0x6EC8...6989B` wallet in a new Chrome tab after reporting blocked manual clicks
+in the first controlled tab. Read-only assistant activity and actual Cancel at
+the resale review pass. Both RPCs verify artwork32/token5 owner, active 0.1 ETH
+listing, 0.0001 ETH floor and pinned code at block51456851. All six old September29
+journal hashes are confirmed successful; none was replayed. See
+`B12_LIVE_ASSISTANT_2026-10-28.md` and its private evidence. No new transaction yet.
+Exactly next: resume the prepared 0.11 test ETH Music 2 review with the owner,
+verify its actual signed result before proceeding to removal/restoration at the
+original 0.1 price. Browser tab1329851543 is marked for handoff; do not assume the
+review is still pending without observing it. All wallet signatures stay with
+the owner. The bounded grammar reviewer completed; no helper work remains.
+
 October 28 B12/B21 resale parity RELEASED in PR #383, implementation HEAD
 `268808687ef66b41d9b4db5088aa320ee0598a93`, candidate `d028e9b8` (same tree).
 Exact CI40739293538, post-merge CI40739908758 and production7393179527 pass.
