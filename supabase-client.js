@@ -277,7 +277,7 @@ function compareAuctionUpdates(left, right) {
     if (blockOrder) return blockOrder;
     const auctionOrder = BigInt(left.auction_id) - BigInt(right.auction_id);
     if (auctionOrder) return auctionOrder > 0n ? 1 : -1;
-    const rank = {created: 1, ended: 2, defaulted: 3};
+    const rank = {created: 1, ended: 2, defaulted: 3, settled: 4};
     return rank[left.kind] - rank[right.kind];
 }
 function confirmedAuctionUpdates() {
@@ -291,7 +291,7 @@ function confirmedAuctionUpdates() {
         /^0x[0-9a-f]{64}$/i.test(item.transaction_hash) &&
         Number.isSafeInteger(item.block_number) && item.block_number > 0 &&
         item.confirmed_at <= Date.now() && Date.now() - item.confirmed_at < AUCTION_SYNC_TTL &&
-        ['created', 'ended', 'defaulted'].includes(item.kind));
+        ['created', 'ended', 'defaulted', 'settled'].includes(item.kind));
     const latest = new Map();
     for (const item of valid) {
         const key = `${item.chain_id}:${item.artwork_id}`;
@@ -320,6 +320,8 @@ function applyConfirmedAuctionUpdate(row) {
     const confirmedId = BigInt(update.auction_id);
     if (indexedId > confirmedId) return row;
     const status = String(row.status || '').toLowerCase();
+    // Indexed mint/ownership and later resale always supersede the receipt bridge.
+    if (update.kind === 'settled' && ['sold', 'for_sale'].includes(status) && row.minted === true) return row;
     if (indexedId === confirmedId && (
         (update.kind === 'created' && ['auction', 'awaiting_end', 'settlement_pending', 'ended_no_bids', 'defaulted', 'sold', 'for_sale'].includes(status)) ||
         (update.kind === 'ended' && ['settlement_pending', 'ended_no_bids', 'defaulted', 'sold', 'for_sale'].includes(status)) ||
@@ -330,7 +332,9 @@ function applyConfirmedAuctionUpdate(row) {
     // browser storage. Every transaction still checks current chain state.
     const allowed = update.kind === 'created'
         ? {status: 'auction', active_auction_id: update.auction_id, start_price: patch.start_price, auction_end_time: patch.auction_end_time, current_bid: '0', highest_bid: '0', current_bidder: null, bids: []}
-        : {status: update.kind === 'defaulted' ? 'defaulted' : (patch.has_winner === true ? 'settlement_pending' : 'ended_no_bids'), active_auction_id: patch.has_winner === true ? update.auction_id : '', settlement_deadline: patch.settlement_deadline};
+        : update.kind === 'settled'
+            ? {status: 'sold', active_auction_id: '', settlement_deadline: null}
+            : {status: update.kind === 'defaulted' ? 'defaulted' : (patch.has_winner === true ? 'settlement_pending' : 'ended_no_bids'), active_auction_id: patch.has_winner === true ? update.auction_id : '', settlement_deadline: patch.settlement_deadline};
     return {...row, ...allowed, auction_id: update.auction_id, pending_auction_sync: true};
 }
 

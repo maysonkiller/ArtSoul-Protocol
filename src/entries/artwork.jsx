@@ -2899,7 +2899,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const trustScore = Math.round(Number(normalizedArtwork.trust_score || 0));
             const creatorName = getProfileDisplayName(creatorProfile, artwork.creator_id || artwork.creator);
             const mintedArtwork = isArtworkMinted(artwork) || auction?.state === 'SOLD';
-            const awaitingPayment = auction?.state === 'WAITING_PAYMENT';
+            const awaitingPayment = auction?.state === 'WAITING_PAYMENT' && !['sold', 'for_sale'].includes(artwork.status);
             const settlementExpired = awaitingPayment && isSettlementWindowClosed(settlementDeadlineMs);
             const liveAuction = Boolean(auction && !auctionEnded && !awaitingPayment && !mintedArtwork);
             const resaleStatus = String(artwork.status || artwork.listing_status || artwork.resale_status || '').toLowerCase();
@@ -3818,7 +3818,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                         {/* End Auction Button (for anyone after time expires) */}
                                         {canEndAuction && (
                                             <div className="artwork-auction-next-step mt-4">
-                                                <p>Confirm the expired auction first. After it closes on-chain, the creator can start a new auction.</p>
+                                                <p>Confirm the expired auction. With a winning bid, this opens payment for the winner. With no bids, the creator can start a new auction.</p>
                                                 <button
                                                     onClick={handleEndAuction}
                                                     className="btn-secondary w-full artwork-page-primary-action"

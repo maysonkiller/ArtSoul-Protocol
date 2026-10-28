@@ -217,6 +217,8 @@
                 '"change price of artwork 19 to 0.003", "remove artwork 19 from sale", ' +
                 '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
             submitted: 'Done. The wallet approved it and the transaction was sent.',
+            settled: 'Settlement confirmed. The NFT is yours. Artwork details are updating.',
+            next: 'What would you like to do next?',
             refused: reason => `Not done. ${reason}`,
             noWallet: 'No wallet is connected. Connect one first.',
             error: message => `That did not work: ${message}`
@@ -247,6 +249,8 @@
                 '«измени цену работы 19 на 0,003», «сними работу 19 с продажи», ' +
                 '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
             submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
+            settled: 'Расчёт подтверждён. NFT теперь ваша. Данные работы обновляются.',
+            next: 'Что хотите сделать дальше?',
             refused: () => 'Не выполнено. Причина показана на экране.',
             noWallet: 'Кошелёк не подключён. Сначала подключите его.',
             error: () => 'Не получилось. Подробности на экране.'
@@ -271,7 +275,14 @@
         const data = result || {};
         if (data.error) return { say: t.error(data.error), show: data.error };
         if (data.connected === false) return { say: t.noWallet, show: data.reason || t.noWallet };
-        if (data.submitted === true) return { say: t.submitted, show: `${t.submitted}${data.transaction_hash ? ` ${data.transaction_hash}` : ''}` };
+        if (data.submitted === true) {
+            const message = tool === 'complete_settlement' && data.confirmed === true ? t.settled : t.submitted;
+            const links = [{url: data.url || '/profile', label: ru ? (data.url ? 'Открыть работу' : 'Открыть профиль') : (data.url ? 'View artwork' : 'View profile')}];
+            if (/^0x[0-9a-f]{64}$/i.test(data.transaction_hash || '')) {
+                links.push({url: `https://sepolia.basescan.org/tx/${data.transaction_hash}`, label: ru ? 'Посмотреть транзакцию' : 'View transaction'});
+            }
+            return { say: message, show: `${message}\n${t.next}`, links };
+        }
         if ((data.submitted === false && !(tool === DRAFT_TOOL && data.prepared === true)) || data.prepared === false || data.opened === false || data.updated === false) {
             const reason = data.reason || '';
             return { say: t.refused(reason), show: reason };
@@ -357,10 +368,20 @@
             const needs = Array.isArray(data.needs_attention) ? data.needs_attention : [];
             const total = Number(data.needs_attention_count ?? needs.length) || 0;
             const head = ru
-                ? `Создано: ${data.created?.count || 0}. Во владении: ${data.owned?.count || 0}. Листингов: ${data.resale_listings?.count || 0}. Требует внимания: ${total}.`
-                : `You created ${data.created?.count || 0}, own ${data.owned?.count || 0}, and have ${data.resale_listings?.count || 0} listings. ${total} things need you.`;
-            const show = [head, ...needs.slice(0, 5).map(entry => `• ${entry.why} (${entry.tool}${entry.artwork_id ? ` #${entry.artwork_id}` : ''})`)].join('\n');
-            return { say: head, show };
+                ? `Создано: ${data.created?.count || 0}. Во владении: ${data.owned?.count || 0}. На продаже: ${data.resale_listings?.count || 0}. Доступных действий: ${total}.`
+                : `You created ${data.created?.count || 0}, own ${data.owned?.count || 0}, and have ${data.resale_listings?.count || 0} listings. ${total} available actions.`;
+            const labels = {
+                complete_settlement: ['Complete payment before the deadline to receive your NFT.', 'Завершите расчёт до срока оплаты, чтобы получить NFT.'],
+                end_expired_auction: ['Confirm the auction end to record its result.', 'Подтвердите завершение аукциона, чтобы зафиксировать результат.'],
+                close_expired_settlement: ['Close the unpaid settlement to allow a new auction.', 'Закройте неоплаченный аукцион, чтобы автор мог начать новый.'],
+                start_auction: ['You can start an auction when you are ready.', 'Можно начать аукцион, когда будете готовы.'],
+                withdraw_pending_funds: ['Funds are available to withdraw to your wallet.', 'Есть средства, доступные для вывода на ваш кошелёк.']
+            };
+            const items = needs.slice(0, 5);
+            const show = [head, ...items.map(entry => `• ${entry.artwork_id ? `${ru ? 'Работа' : 'Artwork'} #${entry.artwork_id}: ` : ''}${labels[entry.tool]?.[ru ? 1 : 0] || (ru ? 'Подробности доступны в профиле.' : entry.why)}`)].join('\n');
+            return { say: head, show, links: items.filter(entry => entry.artwork_id).map(entry => ({
+                url: `/artwork/${entry.artwork_id}`, label: `${ru ? 'Открыть работу' : 'View artwork'} #${entry.artwork_id}`
+            })) };
         }
         case 'open_artwork': {
             const text = ru ? `Открываю ${data.title}.` : `Opening ${data.title}.`;
@@ -513,10 +534,12 @@
                 // Results are untrusted text; links are only canonical public
                 // identities and public pages, never arbitrary metadata URLs.
                 const id = /^\/artwork\/([1-9][0-9]{0,77})$/.exec(item.url || '');
+                const receipt = /^https:\/\/sepolia\.basescan\.org\/tx\/0x[0-9a-f]{64}$/i.test(item.url || '');
                 const page = ['/', '/gallery', '/upload', '/profile', '/docs-protocol'].includes(item.url)
                     || /^\/docs-protocol#[a-z][a-z0-9-]*$/.test(item.url || '');
-                if (!(id && BigInt(id[1]) < 2n ** 256n) && !/^\/profile\?address=0x[0-9a-f]{40}$/.test(item.url || '') && !page) continue;
+                if (!(id && BigInt(id[1]) < 2n ** 256n) && !/^\/profile\?address=0x[0-9a-f]{40}$/.test(item.url || '') && !page && !receipt) continue;
                 const link = document.createElement('a'); link.href = item.url; link.textContent = item.label;
+                if (receipt) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
                 link.addEventListener('click', event => {
                     if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
                     if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return;
@@ -529,7 +552,7 @@
 
         function controls() {
             input.disabled = busy || noticePending || Boolean(recognition);
-            send.disabled = busy || noticePending || Boolean(recognition);
+            send.disabled = busy || noticePending || Boolean(recognition) || !input.value.trim();
             mic.disabled = busy || noticePending || typeof Recognition !== 'function';
             panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy || noticePending; });
             panel.querySelector('form').setAttribute('aria-busy', String(busy || noticePending));
@@ -623,6 +646,12 @@
             try {
                 const result = JSON.parse(await tool.execute(command.input));
                 if (current !== generation || currentWallet !== walletIdentity()) return;
+                if (!result.error && (result.submitted === true || result.updated === true || result.revoked === true)) {
+                    // A finished action must not remain armed in the composer.
+                    // Declines/errors retain the draft for a deliberate retry.
+                    input.value = '';
+                    input.placeholder = t.next;
+                }
                 const resultText = describeResult(command.tool, result, lang);
                 reply(transcript, resultText.show, resultText.say, resultText.links);
             } catch (error) {
@@ -711,6 +740,7 @@
             (input.disabled ? close : input).focus({ preventScroll: true });
         });
         mic.addEventListener('click', start);
+        input.addEventListener('input', controls);
         close.addEventListener('click', closePanel);
         panel.addEventListener('keydown', event => {
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closePanel(); }

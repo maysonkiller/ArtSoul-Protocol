@@ -340,6 +340,29 @@ test('spoken replies are short, and Russian does not read English out loud', () 
   assert.match(provenance.show, /0xA61C…0329/);
 });
 
+test('confirmed settlement presents a result and safe navigation, never another payment instruction', () => {
+  const result = {submitted: true, confirmed: true, url: '/artwork/38', transaction_hash: '0x' + 'ab'.repeat(32)};
+  for (const lang of ['en', 'ru']) {
+    const answer = voice.describeResult('complete_settlement', result, lang);
+    assert.equal(answer.links[0].url, '/artwork/38');
+    assert.match(answer.links[1].url, /^https:\/\/sepolia.basescan.org\/tx\/0x/);
+    assert.doesNotMatch(answer.say, /0x|sent|отправлена/);
+    assert.match(answer.show, lang === 'en' ? /confirmed.*NFT[\s\S]*next/ : /подтверждён.*NFT[\s\S]*дальше/);
+  }
+  const pending = voice.describeResult('complete_settlement', {...result, confirmed: false}, 'en');
+  assert.doesNotMatch(pending.show, /NFT is yours/);
+});
+
+test('Russian activity uses understandable action descriptions instead of English or tool names', () => {
+  const answer = voice.describeResult('get_my_activity', {needs_attention: [
+    {tool: 'end_expired_auction', artwork_id: '38', why: 'Your bid is winning'},
+    {tool: 'start_auction', artwork_id: '16', why: 'No auction running'}
+  ]}, 'ru');
+  assert.doesNotMatch(answer.show, /Your bid|No auction|end_expired_auction|start_auction|Требует внимания/);
+  assert.match(answer.show, /Работа #38: Подтвердите/);
+  assert.deepEqual(answer.links.map(link => link.url), ['/artwork/38', '/artwork/16']);
+});
+
 test('the styles follow canon 16 and respect reduced motion', () => {
   const css = fs.readFileSync('unified-styles.css', 'utf8');
   const block = css.slice(css.indexOf('/* B-09/B-21 commands.'));
