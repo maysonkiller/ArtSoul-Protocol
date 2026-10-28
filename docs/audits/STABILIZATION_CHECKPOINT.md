@@ -4,11 +4,17 @@ Windows/build/static checks pass. Post-merge CI40756740467 and production7395560
 succeeded. B05/B4 current-schema readiness is done; final capture remains C16.
 Two live read-only in-memory rehearsals agree; no final archive or reset occurred.
 
-October 28 B18 Future account control: local CSS refinement complete; 143 checks,
-build and 40 browser presentation cases pass. See B18_ACCOUNT_CONTROL_2026-10-28.md.
-Exactly next: publish this bounded styling slice after hosted preview/CI, then
-continue B18 capability labels. Owner-dependent signatures/audio wait; Phase B
-remains open. Preserve unrelated untracked policy files, .codex/ and output/.
+October 28 B18 account surface RELEASED in PR #387, candidate 8bde2319,
+production/main af7451c4. CI40758384305 and production7395897642 pass;
+preview/apex each verify eight routes and exact CSS. 143 affected tests/build
+and 40 built-header presentation cases pass. See B18_ACCOUNT_CONTROL_2026-10-28.md.
+New hosted screenshot blocked by Chrome extension UI; owner is away, no action
+requested. Temporary viewport reset and fixture server stopped. No active helper.
+Workspace C:\Projects\ArtSoul, branch codex/takeover-audit; HEAD advances with
+this evidence commit. Preserve unrelated untracked policy files, .codex/, output/.
+Exactly next: B18 capability-label/final visual reconciliation against actual
+collection/assistant availability; do not label an undeployed feature as active.
+Signed assistant/native audio checks wait for the owner's return. Phase B open.
 
 October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
 verify receipts, mapping, owner and unchanged floor; see

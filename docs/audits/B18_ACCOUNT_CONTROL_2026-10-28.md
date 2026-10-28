@@ -37,6 +37,12 @@ Validation before release:
 
 CSS version 61 is applied to every existing stylesheet consumer. Existing cache
 pin checks are updated; no new tests merely asserting decorative CSS values.
-Hosted preview/apex validation is required before calling this slice released.
+Hosted release evidence is recorded below.
 B18 stays open for remaining capability-label/final visual work; this does not
 close cohort, native microphone or signed assistant acceptance.
+
+## Release
+
+PR #387, candidate `8bde2319`, merged as `af7451c4` with the same implementation tree. CI40758384305 passed Linux/Windows builds, tests and static checks. Production7395897642 succeeded. Preview and apex each passed eight-route/exact-CSS-content verification (`unified-styles-CB8ON_9o.css`).
+
+A new hosted browser screenshot was blocked by an open Chrome extension UI. The owner is away and was not asked to interrupt it. The 40 built-header rendering cases above passed before release; hosted menu/wallet acceptance was not inferred from HTTP checks. Temporary viewport was reset and the local fixture server stopped. No new signature, authentication or paid provider was used.
