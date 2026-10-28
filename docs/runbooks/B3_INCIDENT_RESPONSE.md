@@ -132,6 +132,14 @@ incident in a beta is usually a new uncached consumer, not growth.
 holds here: revert the new uncached consumer before considering a plan change,
 and keep the Supabase spend cap on.
 
+For the confirmed October 29 full-history digest transfer, use
+[`B30_DATABASE_EGRESS_2026-10-29.md`](../audits/B30_DATABASE_EGRESS_2026-10-29.md)
+and A9's post-deployment query-delta check. The fix preserves hash/reorg semantics
+while returning one digest. Its deployment does not remove an already-applied
+provider quota restriction. Verify Data API and Storage separately before
+declaring recovery; a public HTTP 200 response with upstream warnings is not
+sufficient. Do not enable billable overages or reset data as an automatic fix.
+
 ---
 
 ## 6. Moderation

@@ -1,3 +1,20 @@
+October 29 B30 quota incident: founder supplied 411.15 GB / 275 GB egress notice.
+Confirmed cause: _computeStateHash downloads all historical block hashes each
+poll (9.25 MB in the measured history). Same SHA-256 now computed inside PG.
+Active host source-only correction deployed after stored-hash parity, six real
+read-only SQL fixtures and 18 focused checks. Worker stopped 23:16:14 and resumed
+23:21:22 UTC October 28; cursor preserved, old query stopped, new query returns
+one row per call, healthy/synced and zero event failures. See
+B30_DATABASE_EGRESS_2026-10-29.md. Full local units 2535 pass/33 skip including
+unrelated untracked policy tests; exact candidate CI still pending.
+Data API and Storage genuinely return HTTP402; public HTTP200 with warnings
+does not prove recovery. Correct billing organization unavailable in current
+browser session. No spend-cap, paid service, schema, cursor or contract change.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / starting HEAD be066f44.
+Preserve untracked policy files, .codex/, output/. No active helper agents.
+Exactly next: commit the bounded B30 patch, execute exact-candidate CI and record
+release; provider restoration/usage breakdown remains an owner-access gate.
+
 October 28 B12/B21 continuation: real Russian microphone/read/spoken reply passed
 (owner confirmed audio); Taes artwork38 / auction73 ended and settled through
 owner-operated Rabby. Two RPCs prove token7, owner, 0.001 ETH floor, zero payment
@@ -5,12 +22,18 @@ value, and +0.009 ETH winner credit. NEVER replay these operations. See
 B12_SETTLEMENT_COMPLETION_2026-10-28.md for hashes and precise evidence.
 A missing settlement receipt refresh and an armed completed command reproduced.
 Local patch: shared settled bridge, early repeat-settlement rejection, cleared
-successful composer, result links, translated activity. 204 tests and build pass;
-desktop/mobile fixture rendering passes. Release pending.
-Workspace C:\Projects\ArtSoul / codex/takeover-audit / starting HEAD33497c9c.
+successful composer, result links, translated activity, homepage receipt refresh.
+Released PR #388 / main39b8a68b. CI40765748743: Linux2,900 / Windows2,504 unit
+passes (2/33 skips), 49 contract tests each; builds/static pass. Production
+7396934039 succeeded; eight routes/four exact runtime assets match. Preview UI
+and apex API show Taes sold/token7/correct owner/floor. Apex screenshot blocked
+by an extension window; no new signed post-release test is claimed.
+Post-merge CI40766354465 also passes. The following local commit records only
+release evidence; implementation is already on main and production.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / release HEAD39b8a68b.
 Preserve unrelated untracked files. No active helper or paid provider.
-Exactly next: review and release this B12 completion patch, then verify hosted
-assets and Taes UI read-only. No new signature is required for this fix.
+Exactly next: reconcile remaining B12 signed journeys against existing receipts
+before preparing the next owner-operated scenario. Never replay Taes settlement.
 
 October 28 B05 tooling RELEASED in PR #386, main cc7db8dc.
 Linux CI40755921705 executed the new PostgreSQL concurrency check successfully;

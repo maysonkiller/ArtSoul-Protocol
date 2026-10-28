@@ -111,18 +111,16 @@ class IndexerSyncEngine {
      * Hashes the sequence of block hashes up to the specified block.
      */
     async _computeStateHash(blockNumber) {
-        const blocks = await this.db.query(
-            `SELECT block_hash FROM block_hashes
-             WHERE chain_id = $1 AND block_number <= $2
-             ORDER BY block_number ASC`,
-            [this._chainIdString(), blockNumber]
-        );
-
-        const hashString = blocks.map(b => b.block_hash).join(',');
-
+        // Keep the existing ordered comma-separated SHA-256 format, but return
+        // only its digest. Downloading the entire history on every sync cycle
+        // makes database egress grow with both history length and poll count.
         const result = await this.db.query(
-            `SELECT encode(digest($1, 'sha256'), 'hex') as hash`,
-            [hashString]
+            `SELECT encode(digest(
+                 COALESCE(string_agg(block_hash, ',' ORDER BY block_number ASC), ''),
+                 'sha256'), 'hex') AS hash
+             FROM block_hashes
+             WHERE chain_id = $1 AND block_number <= $2`,
+            [this._chainIdString(), blockNumber]
         );
 
         return '0x' + result[0].hash;
