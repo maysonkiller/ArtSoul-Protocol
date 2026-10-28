@@ -28,3 +28,7 @@ dialog.artist-support-dialog[open] { display: flex; flex-direction: column; }
 .artist-support-tabs { display: flex; gap: .5rem; margin-block: .75rem; }
 .artist-support-tabs [role=tab] { flex: 1; min-width: 0; }
 .artist-support-tabs [aria-selected=true] { border-color: var(--c-accent); box-shadow: inset 0 -3px var(--c-accent); }
+.artist-support-order { display: flex; flex-wrap: wrap; gap: .375rem; padding-block: .5rem; }
+.artist-support-order button { min-height: 44px; padding: .5rem .75rem; border: 1px solid transparent; border-radius: .625rem; background: transparent; color: var(--c-text-muted); font: inherit; font-size: .875rem; cursor: pointer; }
+.artist-support-order button[aria-pressed=true] { color: var(--c-accent); border-color: var(--c-border); background: var(--c-surface-muted); }
+.artist-support-order button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }

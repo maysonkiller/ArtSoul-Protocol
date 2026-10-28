@@ -1,7 +1,30 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
+
+October 28 B26 founder-priority video follow-up, implementation verified locally
+(started at `b854089b`, production baseline `537bad1`):
+
+- Reviewed the full 4:22 recording through 131 sampled frames, selected larger
+  frames and approximate offline transcription; raw media stays private.
+- Compact short-desktop composition across product pages, static desktop
+  wordmark/mobile mark, earlier homepage artwork, tighter profile editor,
+  restrained Ownership motion, two-choice Donate sorting and accessible native
+  image enlargement/original controls. Shared CSS pins advance to 57.
+- Build and 155 focused checks pass; the subsequent 12 behavior checks pass.
+  Candidate browser evidence: 98 page/theme/viewport cases, eight profile cases,
+  ten Donate history cases and eight image-control cases. These are synthetic
+  API/wallet fixtures, not new physical-device or financial acceptance.
+- Current social preview: 32 crawler metadata requests, 12 images and three
+  aliases pass. Telegram's stored old preview is not a successful cache purge.
+- Evidence and interpretation ledger: `B26_COMPACT_PAGES_2026-10-28.md`.
+  Full tracked unit run is in progress; exact-candidate release is pending.
+- Preserve unrelated `.codex/`, `output/`, `src/api/moderation-authority-policy.js`
+  and `test/moderation-authority-policy.test.mjs`. Include the new image-control
+  test only with this slice. No contracts, economic changes or signing.
+- Exactly next: finish B26 exact-candidate CI, preview and apex verification;
+  then resume B21 Donate/Report command preparation through existing dialogs.
 
 October 26 B24 founder-priority continuation RELEASED in PRs #375 / #376,
 production merge `537bad12796bc2202fe9d711490e8f8502f1decd`:

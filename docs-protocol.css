@@ -288,3 +288,16 @@
         transition: none;
     }
 }
+
+@media (min-width: 1024px) and (max-height: 850px) {
+    .protocol-docs-shell { padding-top: 0.75rem; }
+    .protocol-docs-intro { padding: 1rem; margin-bottom: 0.75rem; }
+    .protocol-docs-layout { gap: 0.75rem; }
+    .protocol-content { gap: 0.5rem; }
+    .protocol-section-body { padding: 0 1rem 1rem; }
+    .protocol-side-nav {
+        top: calc(var(--site-header-height, 77px) + 0.75rem);
+        max-height: calc(100dvh - var(--site-header-height, 77px) - 1.5rem);
+    }
+    .protocol-section { scroll-margin-top: calc(var(--site-header-height, 77px) + 0.75rem); }
+}

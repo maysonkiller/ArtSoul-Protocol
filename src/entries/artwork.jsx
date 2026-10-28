@@ -155,31 +155,43 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const [isPlaying, setIsPlaying] = React.useState(false);
             const [videoLoaded, setVideoLoaded] = React.useState(false);
             const [isImageFullscreen, setIsImageFullscreen] = React.useState(false);
+            const imageDialogRef = React.useRef(null);
+            const imageCloseRef = React.useRef(null);
+            const imageReturnFocusRef = React.useRef(null);
             const mediaType = media?.type || 'unknown';
             const url = media?.url || '';
             const poster = media?.poster || '';
             const sanitizedTitle = window.ArtSoulSecurity?.sanitizeText(title) || 'Artwork';
             const isSafeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(url);
+            const originalUrl = isSafeMediaUrl && /^https:\/\//i.test(url) ? url : '';
             const decodedImage = useDecodedImage(isSafeMediaUrl && ['image', 'gif'].includes(mediaType) ? url : '');
+            const canOpenImage = isSafeMediaUrl && ['image', 'gif'].includes(mediaType) && !mediaError && !decodedImage.failed;
 
             React.useEffect(() => {
                 setMediaError(false);
                 setVideoLoaded(false);
-            }, [url]);
+                setIsImageFullscreen(false);
+            }, [url, mediaType]);
 
             React.useEffect(() => {
-                if (!isImageFullscreen) return undefined;
+                const dialog = imageDialogRef.current;
+                if (!isImageFullscreen || !canOpenImage || !dialog) return undefined;
                 const previousOverflow = document.body.style.overflow;
-                const closeOnEscape = (event) => {
-                    if (event.key === 'Escape') setIsImageFullscreen(false);
-                };
+                const returnFocus = imageReturnFocusRef.current;
+                dialog.showModal();
+                imageCloseRef.current?.focus({ preventScroll: true });
                 document.body.style.overflow = 'hidden';
-                document.addEventListener('keydown', closeOnEscape);
                 return () => {
+                    if (dialog.open) dialog.close();
                     document.body.style.overflow = previousOverflow;
-                    document.removeEventListener('keydown', closeOnEscape);
+                    if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
                 };
-            }, [isImageFullscreen]);
+            }, [isImageFullscreen, canOpenImage, url]);
+
+            const openImage = (event) => {
+                imageReturnFocusRef.current = event.currentTarget;
+                setIsImageFullscreen(true);
+            };
 
             const renderMediaFallback = (message = 'Media unavailable') => (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-black p-8 text-center">
@@ -283,33 +295,46 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         role="button"
                         tabIndex="0"
                         aria-label="View artwork full size"
-                        onClick={() => setIsImageFullscreen(true)}
+                        aria-haspopup="dialog"
+                        onClick={openImage}
                         onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                                 event.preventDefault();
-                                setIsImageFullscreen(true);
+                                openImage(event);
                             }
                         }}
                         onError={() => setMediaError(true)}
                     />}
+                    <div className="artwork-detail-image-controls" role="group" aria-label="Artwork image controls">
+                        <button type="button" onClick={openImage} aria-haspopup="dialog">View full size</button>
+                        {originalUrl && <a href={originalUrl} target="_blank" rel="noopener noreferrer" aria-label="Open original artwork in a new tab">Open original</a>}
+                    </div>
                     {isImageFullscreen && window.ReactDOM?.createPortal?.(
-                        <div
+                        <dialog
+                            ref={imageDialogRef}
                             className="artwork-image-lightbox"
-                            role="dialog"
-                            aria-modal="true"
                             aria-label={`${sanitizedTitle} full-size view`}
-                            onClick={() => setIsImageFullscreen(false)}
+                            onCancel={(event) => {
+                                event.preventDefault();
+                                setIsImageFullscreen(false);
+                            }}
+                            onClose={() => setIsImageFullscreen(false)}
+                            onClick={(event) => {
+                                if (event.target === event.currentTarget) setIsImageFullscreen(false);
+                            }}
                         >
                             <button
+                                ref={imageCloseRef}
                                 type="button"
                                 className="artwork-image-lightbox-close"
                                 aria-label="Close full-size artwork view"
+                                autoFocus
                                 onClick={() => setIsImageFullscreen(false)}
                             >
                                 ×
                             </button>
                             <img src={url} alt={sanitizedTitle} className="artwork-image-lightbox-media" />
-                        </div>,
+                        </dialog>,
                         document.body
                     )}
                 </div>
@@ -982,17 +1007,15 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     resolvedProfileAddresses.has(address.toLowerCase()) || Object.hasOwn(bidderProfiles, address.toLowerCase());
 
                 const roleCardStyle = !isClassic ? {
-                    boxShadow: '0 0 15px rgba(var(--c-accent-rgb), 0.2)',
-                    border: '1px solid rgba(var(--c-accent-rgb), 0.3)',
-                    animation: 'glow-pulse 3s ease-in-out infinite'
+                    boxShadow: '0 0 12px rgba(var(--c-accent-rgb), 0.1)',
+                    border: '1px solid var(--c-border-soft)'
                 } : {};
 
                 const avatarStyle = {
                     display: 'block',
                     objectFit: 'cover',
                     ...(!isClassic ? {
-                        boxShadow: '0 0 10px rgba(var(--c-accent-rgb), 0.5)',
-                        animation: 'colorShift 8s ease-in-out infinite'
+                        boxShadow: '0 0 8px rgba(var(--c-accent-rgb), 0.25)'
                     } : {})
                 };
 
@@ -1000,8 +1023,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     background: 'linear-gradient(90deg, var(--c-accent), var(--c-accent-2))',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    animation: 'colorShift 8s ease-in-out infinite'
+                    backgroundClip: 'text'
                 } : {};
 
                 return (
