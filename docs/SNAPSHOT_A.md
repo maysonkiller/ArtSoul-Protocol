@@ -38,12 +38,12 @@ That single constraint produces every design decision below.
 | `auction_endings.json` | Endings: winner, winning bid, settlement deadline, transaction hash |
 | `settlements.json` | Settlements: winner, final price, token id, status, transaction hash |
 | `resales.json` | Completed resales: seller, buyer, price, transaction hash |
-| `floor_history.json` | Canonical floor changes and their source |
+| `floor_history.json` | Canonical floor changes tied to artwork and token ids |
 | `participants.json` | Every address that took part, lowercased, deduplicated, sorted |
 | `manifest.json` | Schema version, chain, cut-off, entitlement notice, counts, per-file hashes, root hash |
 
-Every row carries `indexed_at`, so a reader can place each event in time without
-another source.
+Every row carries `indexed_at`, the projection's indexing timestamp. It is not
+a substitute for the original block timestamp.
 
 ## What is deliberately excluded
 
@@ -61,15 +61,23 @@ another source.
 ## Integrity
 
 Each file is hashed with SHA-256. The manifest lists those hashes, and a
-`root_hash` covers the manifest body itself — so editing a file *and* its entry
-in the manifest still fails, because the root hash no longer matches.
+`root_hash` covers the manifest body itself. Editing a file and its entry breaks
+that root. An attacker who rewrites the data, manifest and root together can
+make another internally consistent archive. Authenticity therefore requires a
+trusted root retained separately from the archive under review; a hash inside
+the same archive is not an independent trust anchor.
 
-Output is deterministic: object keys are sorted, rows are sorted by their own
-content, and every file ends with a newline. Running the export twice against the
-same cut-off produces byte-identical files and the same root hash. That equality
-is the cheapest evidence the capture is sound, and a disagreement between two
-runs is indistinguishable from tampering — which is why it is a hard property
-rather than a convenience.
+The verifier checks all eight required data files, section shapes, allowlisted
+columns, chain scope, participant derivation, aggregate counts and hashes. Use
+`--expected-root` with the separately retained capture hash for durable-copy
+acceptance. Without it, a successful result proves internal consistency only.
+
+Output is deterministic for identical input rows: object keys and rows are
+sorted and every file ends with a newline. A timestamp cut-off alone does not
+freeze mutable auction/artwork projections. Two runs against a changing database
+can differ legitimately; this is not proof of tampering. Final capture must use
+a consistent, stabilized read view. The current timestamp filter does not
+reconstruct historical projection state at an earlier block.
 
 ## Capture runbook
 
@@ -81,25 +89,30 @@ Run this on the announced cut-off date, before any destructive step.
 node scripts/export-snapshot-a.mjs --out ../snapshot-a --cut-off <ISO-8601 UTC>
 ```
 
-Needs `DATABASE_URL`. The output goes outside the repository and is never
-committed: it is a data export, not source.
+Needs `DATABASE_URL`, an explicit cut-off and a new output directory inside an
+existing parent. Existing directories are refused before connecting; file writes
+are exclusive. A failed partial capture remains inspectable and must not be
+reused. Tables are read in one repeatable-read, read-only transaction; any failed
+read rolls it back. The output goes outside the repository and is never committed.
 
-**2. Export again to a second directory and compare the root hashes.**
+**2. Retain the capture root independently, then export again from the same
+stabilized source to a new directory and compare the root hashes.**
 They must be identical. If they differ, stop — the capture is not reproducible
 and nothing downstream can be trusted.
 
 **3. Verify in place.**
 
 ```bash
-node scripts/verify-snapshot-a.mjs ../snapshot-a
+node scripts/verify-snapshot-a.mjs ../snapshot-a --expected-root <trusted SHA-256>
 ```
 
 **4. Copy to two independent durable locations.** Independent means different
 providers, not two buckets in one account: the point is surviving the loss of any
 single one.
 
-**5. Verify each copy in its own location.** A copy nobody has verified where it
-lives is a copy nobody has verified. Record the root hash from each.
+**5. Verify each copy in its own location against the independently retained
+capture root.** Record the command, root hash and result from each. Do not obtain
+the expected root from the same copy being tested.
 
 **6. Record in the migration runbook:** the cut-off, the root hash, both
 locations, and the verification result from each. Bible section 16 point 2 asks
@@ -110,13 +123,46 @@ re-imported as live product state.
 
 ## Verifying a copy years later
 
-Everything needed is in the directory:
+Retain a verifier package with each durable copy: the reviewed
+`scripts/verify-snapshot-a.mjs` and `src/snapshot/snapshot-a.js` with those relative
+paths, plus a `package.json` containing `{"type":"module"}`. It uses only Node
+built-ins, needs no npm install, and reads no database or API. Retain the reviewed
+Git revision and tool-file hashes in the capture record. The offline test runs
+these copies outside the repository. With the data and verifier package available:
 
 ```bash
-node scripts/verify-snapshot-a.mjs /path/to/copy
+node verification-tools/scripts/verify-snapshot-a.mjs /path/to/copy --expected-root <trusted SHA-256>
 ```
 
 The verifier exits non-zero and names every problem it finds rather than stopping
 at the first, so two damaged copies can be compared in a single pass. If a copy
 fails, fetch another durable copy and verify that one. Never repair a copy by
 hand — a hand-edited snapshot is no longer a record of anything.
+
+## October 28 verifier hardening evidence
+
+Three regressions reproduced against the earlier verifier: a removed data file
+also removed from a recomputed manifest was accepted; a JSON `null` manifest
+threw; a fully rewritten internally consistent archive had no trusted-root
+comparison. The repaired verifier rejects these cases. The focused suite has
+27 passing local tests, including section/chain/column/count corruption, arbitrary
+manifest paths, invalid JSON, CLI exit codes and an isolated verifier package.
+No final capture, archive storage upload or reset was performed. The capture
+follow-up adds the consistent read-only view, rollback and no-overwrite guards.
+A PostgreSQL 17 integration test commits a concurrent update between table reads,
+checks that capture still sees the earlier state, rejects a write and verifies
+rollback. Local Docker was unavailable; its CI result must be recorded separately.
+
+At `2026-10-28T19:35:52Z`, a read-only in-memory rehearsal against the pinned live
+testnet database completed twice with the same root
+`bbc6aa0e2d277f442427479ee939534952c75e140ef74ec55513b80a21060a00`.
+Both transactions report `repeatable read` / `read_only=on`. Counts: 38 artworks,
+73 auctions, 15 bids, six completed settlements, three resales, ten participating
+addresses; primary settled volume `23200000000000000` wei. Both in-memory archives
+pass the verifier. Only hashes/counts and transaction-mode evidence were saved
+privately; no archive data files or final Snapshot A were written. This confirms
+the current schema/read path, not a final cut-off or two durable copies.
+
+Final-contract schema alignment and a fresh stabilized-source rehearsal remain
+required before the late-C capture. Current schema version 1 is not automatically
+valid for future contract projections.

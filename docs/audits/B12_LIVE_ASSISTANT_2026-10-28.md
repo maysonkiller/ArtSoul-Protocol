@@ -122,3 +122,16 @@ price and shows List NFT. Both browser cases pass; owner/floor remain unchanged.
 No real wallet is installed in that fixture. Screenshot:
 `output/b12-slow-read-price-2026-10-28.png`. Real post-release acceptance stays
 separate.
+
+## Release verification
+
+Released in PR #385, candidate `7b9b76f5996cb48087f0973c4d4a4397a822050c`,
+production merge `a093d1a54dd6168ed63fabfb438394bf8c73cbfc` (identical tree).
+Candidate CI40752823553 and post-merge CI40753567678 pass Linux, Windows and static checks. Production
+deployment7395108941 succeeded. Preview and apex each pass eight route and four
+exact asset checks, including voice v11. Both rendered pages show nine provenance
+events: the four existing lifecycle events and all five immutable listings.
+The apex still shows the owner's current 0.0001 ETH asking price and floor,
+with Change price / Remove from sale available. No new signature was requested.
+Screenshot: `output/b12-pr385-apex-2026-10-28.png`.
+The actual signed post-release refresh and microphone journeys remain pending.

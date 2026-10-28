@@ -1,3 +1,15 @@
+October 28 B05 independent follow-up from HEAD 86434e4: three offline verifier
+failures reproduced, then repaired. Required archive files/shape, derived counts
+and participants are checked; --expected-root anchors the copy to a separately
+trusted capture record. Capture now uses a repeatable-read, read-only transaction
+and refuses to overwrite an existing directory. 27 local checks pass; one real
+PostgreSQL concurrency test is skipped locally because Docker is unavailable.
+Two live read-only in-memory rehearsals agree on root bbc6aa0e2d277f442427479ee939534952c75e140ef74ec55513b80a21060a00.
+Only count/hash evidence saved; no archive data files, final cut-off, upload or reset.
+Exactly next: release the B05 patch after Linux/Windows CI and the PostgreSQL
+concurrency result; preserve the late-C final-capture requirement.
+The owner is away; wallet/native microphone acceptance waits. Keep Phase B open.
+
 October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
 verify receipts, mapping, owner and unchanged floor; see
 `B12_LIVE_ASSISTANT_2026-10-28.md`. Current Music2/artwork32/token5 listing is
@@ -5,15 +17,19 @@ active at 0.0001 test ETH after a subsequent owner action, also verified. Do not
 restore the earlier 0.1 price or replay any operation without renewed review.
 The owner is away; no signatures or device actions are requested now.
 
-Local follow-up from HEAD cd954fb5: immutable listing provenance, immediate
-receipt refresh on the open artwork, and the explicit Russian listing phrase
-are patched. 139 affected checks and 109 overlapping agent/cache checks pass.
+Follow-up RELEASED in PR #385, candidate 7b9b76f5, production/current HEAD
+a093d1a54dd6168ed63fabfb438394bf8c73cbfc (identical tree): immutable listing
+provenance, immediate receipt refresh and the explicit Russian listing phrase.
+139 affected checks and 109 overlapping agent/cache checks pass.
 Read-only execution of the new handler against the real DB returns all five
-historical listings with original prices/receipts. Release pending. Snapshot A
+historical listings with original prices/receipts. Build and candidate CI40752823553
+pass; post-merge CI40753567678 and production7395108941 succeeded. Preview/apex each pass eight routes/four
+exact assets and show all nine timeline events with the current 0.0001 price.
+Two delayed-API browser fixture cases pass. Snapshot A
 capture is moved from B exit to late C after full final-contract testnet, before
 D reset/mainnet, with two-week notice and independent copies preserved.
-Exactly next: finish build/release verification for this focused patch; real
-post-release signed refresh/audio scenarios wait for the owner's return.
+Exactly next: B05 offline verifier completeness/independent-root hardening;
+real post-release signed refresh/audio scenarios wait for the owner's return.
 Preserve unrelated untracked policy files, .codex/ and output/. No helper work.
 
 October 28 B12/B21 resale parity RELEASED in PR #383, implementation HEAD
