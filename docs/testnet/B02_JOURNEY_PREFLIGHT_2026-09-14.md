@@ -1,5 +1,39 @@
 # B-02 — journey pre-flight, 2026-09-14
 
+## October 28 reconciliation of the historical pre-flight
+
+The September findings below are a dated baseline, not the current deployment
+state. Phase A later accepted the actual auction 66 settlement/mint/withdrawal,
+moderation and account-recovery paths; see
+[`PHASE_A_TESTNET_2026-09-29.md`](../audits/PHASE_A_TESTNET_2026-09-29.md),
+[`PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md`](../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md)
+and [`CONTROLLED_BETA_ENTRY.md`](CONTROLLED_BETA_ENTRY.md). Do not rerun their
+completed journals or describe RG-03 activation as still pending.
+
+Read-only reconciliation on October 28 found that two of the four original
+expired settlements were already defaulted and followed by another auction:
+
+| Artwork | Default receipt | Subsequent auction receipt |
+| --- | --- | --- |
+| 24 | [Auction 24, September 20 23:25:00 UTC](https://sepolia.basescan.org/tx/0x5dd9ed877641fdfe044c17370739e6dcd014bc75aa574c40880f7527aec7a6e1) | [Auction 60, September 20 23:25:34 UTC](https://sepolia.basescan.org/tx/0x9e3b81aafc048ac367353cffeaa56bca232d0e6fa7ae5231ec841ab4a60a8791) |
+| 30 | [Auction 39, September 21 21:08:04 UTC](https://sepolia.basescan.org/tx/0x0c5dcd045c8325fdfa4e9c695b9465c976f2b06ebdcd7b54ae34bb3047af0974) | [Auction 64, September 21 22:52:08 UTC](https://sepolia.basescan.org/tx/0x45873122f9b1851a8948949e4bfb1552b59368d28302b77b0cd4536edcb63c67) |
+
+Both existing Base Sepolia RPCs confirmed chain ID, successful receipt, Core log
+address, decoded event/auction/artwork IDs, block hash/time and chronological
+order. Some legacy indexer event rows have no source contract address; receipt
+verification supplies evidence for this report without rewriting those rows.
+Auctions 14 and 25 remain projected as settlement pending after their deadlines.
+Current future deadlines are absent; an `active` projection alone is not Live.
+Private read-only evidence: `beta-acceptance-source-2026-10-28.json` and
+`beta-default-receipts-2026-10-28.json` under `docs/private/`.
+
+This proves existing on-chain default/re-auction outcomes, not which browser
+control submitted them. B11's current-page acceptance and B12's signed assistant
+journey remain separate. B02 still requires the controlled real-user cohort;
+the owner/automated rehearsals do not establish independent beta acceptance.
+
+## Original September 14 pre-flight
+
 B-02 asks for complete publish-to-resale journeys verified with real users. Before
 anyone is invited to walk that path, somebody should walk it on the data that is
 already there and see whether every step can actually be completed from the site.

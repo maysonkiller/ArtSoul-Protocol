@@ -1,3 +1,21 @@
+October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
+verify receipts, mapping, owner and unchanged floor; see
+`B12_LIVE_ASSISTANT_2026-10-28.md`. Current Music2/artwork32/token5 listing is
+active at 0.0001 test ETH after a subsequent owner action, also verified. Do not
+restore the earlier 0.1 price or replay any operation without renewed review.
+The owner is away; no signatures or device actions are requested now.
+
+Local follow-up from HEAD cd954fb5: immutable listing provenance, immediate
+receipt refresh on the open artwork, and the explicit Russian listing phrase
+are patched. 139 affected checks and 109 overlapping agent/cache checks pass.
+Read-only execution of the new handler against the real DB returns all five
+historical listings with original prices/receipts. Release pending. Snapshot A
+capture is moved from B exit to late C after full final-contract testnet, before
+D reset/mainnet, with two-week notice and independent copies preserved.
+Exactly next: finish build/release verification for this focused patch; real
+post-release signed refresh/audio scenarios wait for the owner's return.
+Preserve unrelated untracked policy files, .codex/ and output/. No helper work.
+
 October 28 B12/B21 resale parity RELEASED in PR #383, implementation HEAD
 `268808687ef66b41d9b4db5088aa320ee0598a93`, candidate `d028e9b8` (same tree).
 Exact CI40739293538, post-merge CI40739908758 and production7393179527 pass.
@@ -6,14 +24,37 @@ preview and apex each pass four guest journeys / 20 checks, seven routes and
 three exact assets. No real signatures or financial acceptance inferred.
 See `B12_RESALE_COMMANDS_2026-10-28.md`.
 
-Current local follow-up on that HEAD: B21 microphone async consent, versioned
-renewal, late-approval fences and shared modal replacement cancellation. 151
-checks and build pass; eight browser fixture journeys / 120 checks, no actual
-audio or API writes. See `B21_AUDIO_CONSENT_2026-10-28.md`. Work remains only in
-`C:\Projects\ArtSoul`, branch `codex/takeover-audit`. Preserve unrelated untracked
-policy files, `.codex/` and `output/`.
-Exactly next: exact-candidate CI and preview verification for this follow-up,
-then authorized release. B17 real due-time reminder evidence remains unclosed.
+B21 microphone consent follow-up RELEASED in PR #384, candidate `ceb9225b`,
+implementation/production HEAD `63c0c28626a47d5e755d347ab44e03fcdac647c5` (same tree).
+151 checks and build pass; eight browser journeys / 120 checks on local, preview
+and apex; eight resale regression journeys / 56 checks and four apex guest
+journeys / 20 checks. All audio/financial transports in fixture tests are fake;
+no real audio, transaction or phone acceptance inferred. Eight routes/four exact
+assets match. CI40742075291, post-merge CI40742744216 and production7393591134
+pass. See `B21_AUDIO_CONSENT_2026-10-28.md`.
+
+B17 read-only follow-up verified one existing auction-ending reminder/read marker
+for artwork37/auction71 in the real due window on October25; both public RPCs
+confirm its chain receipt/source/deadline. At October28 18:09UTC the indexer is
+fresh/synchronized, failed/dead events zero, and no future deadlines/current
+candidates exist. No preference, notification or chain writes performed. See the
+dated follow-up in `B17_REMINDERS_2026-10-25.md`. Payment-due/live-extension/phone
+delivery acceptance and official-source designation are not inferred.
+
+Work remains only in `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
+Release/evidence documentation is a separate follow-up commit; inspect HEAD on
+resume. Preserve unrelated untracked policy files, `.codex/` and `output/`.
+B02/B11 reconciliation also completed read-only: both RPCs prove the historical
+default/re-auction pairs 24→60 and39→64; auctions14/25 still await default closure.
+This does not prove the submitting browser path. Updated the dated B02 report,
+backlog and B3 runbook: actual Phase A moderation/recovery acceptance supersedes
+September activation blockers. 28 affected documentation/liveness checks pass.
+No new wallet transactions. Local preview4230 and owned browser closed; the one
+bounded review helper completed, no background helper work remains.
+Exactly next: complete the B12 signed assistant acceptance plan using the current
+published adapters and existing authorized test accounts, reconciling their
+journal first. Keep real device/signature consent distinct from fixture evidence;
+do not replay completed operations or manufacture a due-time notification.
 
 # Stabilization checkpoint
 

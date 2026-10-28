@@ -2,7 +2,7 @@
 
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Base: `268808687ef66b41d9b4db5088aa320ee0598a93` (PR #383).
-Status: implemented and tested locally; release pending.
+Status: released in PR #384; production verification below.
 
 ## Reproduction and correction
 
@@ -44,6 +44,9 @@ npm run build
   Zero page exceptions or API writes. Mobile consent screenshot inspected.
 - Independent final review: no remaining concrete defect in this scope; original
   replacement reproduction now releases controls without starting recognition.
+- The existing B12 resale browser regression passes against the updated shared
+  modal: eight journeys / 56 checks / 32 confirmation interactions. Its financial
+  transport is synthetic; no signed transaction is claimed.
 - Ignored local artifacts: `output/b31-focused-tests.log`, `output/b31-build.log`,
   `output/b31-browser-final.log`, `output/playwright/b31-audio-consent.js`,
   `output/playwright/b31-audio-mobile.png`.
@@ -60,3 +63,22 @@ deferred; B12/B21 and Phase B retain their separate acceptance gates.
 Inactive legacy deletion/simulated queue handlers also contain old synchronous
 confirmation calls; they are not active product actions and were not enabled or
 rewritten here. They must be removed or converted before reuse.
+
+## Release
+
+PR [#384](https://github.com/maysonkiller/ArtSoul-Protocol/pull/384), candidate
+`ceb9225b9934ac35b27754d73c530960ff417d09`, merged as
+`63c0c28626a47d5e755d347ab44e03fcdac647c5` (same source tree).
+
+- Exact-candidate CI40742075291 passes: Linux 2,878 passed / two skips; Windows
+  2,483 passed / 32 skips; 49 contract checks per platform, builds/static checks.
+- Preview7393480376 and production7393591134 succeeded. Each passed eight HTML
+  routes and four byte-matched runtimes against the reviewed Git revision.
+- Preview and apex each pass the same eight browser journeys / 120 consent
+  checks with fake SpeechRecognition. The apex also passes four public guest
+  journeys / 20 checks with actual read APIs and no account/signature.
+  No real microphone or phone acceptance is inferred.
+- Post-merge CI40742744216 passes. Final ignored evidence:
+  `output/b31-preview-assets.log`, `output/b31-preview-browser.log`,
+  `output/b31-production-assets.log`, `output/b31-production-browser.log`,
+  `output/b31-production-guest.log`, `output/b31-resale-regression.log`.

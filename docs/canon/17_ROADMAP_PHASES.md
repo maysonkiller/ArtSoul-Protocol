@@ -9,8 +9,8 @@ The active canonical model is A–D:
 | Canon phase | Purpose | Historical work absorbed |
 | --- | --- | --- |
 | A — Stabilize Public Testnet | Close production-testnet blockers | Repository/security cleanup, wallet stabilization, diagnostics cleanup, testnet/indexer verification, moderation MVP, Base commitments |
-| B — Public Beta | Validate with real users | Tester onboarding, monitoring, defect correction, durable Snapshot A, build-in-public |
-| C — Mainnet Preparation | Build and audit the final system | Contract rework, Genesis, Collections, pool, admin controls, auras, legal/domain/treasury readiness, fresh Base Sepolia rehearsal |
+| B — Public Beta | Validate with real users | Tester onboarding, monitoring, defect correction, snapshot tooling readiness, build-in-public |
+| C — Mainnet Preparation | Build and audit the final system | Contract rework, Genesis, Collections, pool, admin controls, auras, legal/domain/treasury readiness, fresh Base Sepolia rehearsal and final-testnet Snapshot A |
 | D — Staged Mainnet Launch | Migrate and activate safely | Snapshot verification, data reset, Base deployment, Core stability window, separate Genesis pilot, controlled growth |
 
 Earlier informal A–G plans are retired and are not parallel authority. Token or multichain phases from historical planning have no A–D destination and remain out of scope. Any old stabilization/testnet item belongs to A; beta/growth validation belongs to B; contract, security, Genesis, Collections, legal, and final visual work belongs to C; migration/deployment/activation belongs to D.
@@ -29,11 +29,11 @@ Exit: all Phase A backlog items accepted, no P1 open, green local/CI baselines, 
 
 Goal: validate the complete user journey on testnet with a controlled real cohort.
 
-Run publish → auction → settlement → mint → resale journeys; operate monitoring and incident response; process moderation cases and beta defects; report progress through verified cached metrics; and capture Snapshot A at the announced cut-off as a durable, reproducible export.
+Run publish → auction → settlement → mint → resale journeys; operate monitoring and incident response; process moderation cases and beta defects; report progress through verified cached metrics; and keep snapshot tooling ready. The October 28 founder amendment moves the actual Snapshot A capture to the end of the full final-contract testnet in late Phase C; it does not end the current beta or assign a cut-off now.
 
 Snapshot A is a community record only. It survives later database reset through versioned machine-readable data, a cryptographic manifest, independent durable copies, and a documented verification procedure. It creates no Genesis, token, points, airdrop, or other entitlement.
 
-Exit: stable beta, feedback processed, moderation proven, Snapshot A verified, and Phase C inputs ready.
+Exit: stable beta, feedback processed, moderation proven, snapshot tooling ready, and Phase C inputs ready. The actual Snapshot A capture is not a Phase B exit gate.
 
 ## Phase C — Mainnet Preparation
 
@@ -57,7 +57,9 @@ The following remain explicit planning inputs rather than frozen canon:
 
 Genesis administration must use public eligibility categories, durable grant records, an audit log, and multisig-authorized controls. Losing-bidder refunds use deterministic obligations, bounded batch execution, and withdrawable-credit fallback; no unbounded loop or unmotivated bidder may be required to finalize an auction.
 
-Exit: independent audit passed, fresh rehearsal green, treasuries/domain/legal ready, migration evidence verified, and launch approval recorded.
+After the final topology has completed its full public-testnet validation, capture Snapshot A at the final cut-off announced at least two weeks ahead. Verify two independent durable copies and independent readability before Phase D. Earlier rehearsal exports are not the final Snapshot A.
+
+Exit: independent audit passed, fresh rehearsal green, treasuries/domain/legal ready, final-testnet Snapshot A and migration evidence verified, and launch approval recorded.
 
 ## Phase D — Staged Mainnet Launch
 

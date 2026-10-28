@@ -1775,7 +1775,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }, [artworkId, isV41CompositeId, auction?.auctionId, auction?.status, auction?.state, auction?.endTime]);
 
             useEffect(() => {
-                const refresh = () => { void loadArtwork(); };
+                const refresh = () => {
+                    // Apply the confirmed receipt before waiting for API/profile
+                    // reads. The shared bridge preserves ownership and floor.
+                    setArtwork(current => current && (window.ArtSoulDB.applyConfirmedAuctionUpdate?.(current) || current));
+                    void loadArtwork();
+                };
                 window.addEventListener('artsoul:auction-confirmed', refresh);
                 window.addEventListener('artsoul:resale-confirmed', refresh);
                 return () => {

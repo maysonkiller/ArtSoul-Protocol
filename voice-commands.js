@@ -107,7 +107,7 @@
         ['ru', new RegExp(`(?:ставк[а-я]*|поставь)\\s+${AMOUNT}(?:\\s*eth|\\s*эфир[а-я]*)?\\s+на\\s+${RU_WORK}${ID}`), m => ({ tool: 'place_bid', input: { artwork_id: m[2], bid_eth: amount(m[1]) } })],
         ['ru', new RegExp(`(?:запусти|начни|создай)\\s+аукцион\\s+(?:на\\s+|для\\s+)?${RU_WORK}${ID}\\s+(?:за|от|по)\\s+${AMOUNT}(?:\\s*eth|\\s*эфир[а-я]*)?\\s+на\\s+(\\d{1,3})\\s*час(?:а|ов)?`),
             m => ({ tool: 'start_auction', input: { artwork_id: m[1], start_price_eth: amount(m[2]), duration_hours: Number(m[3]) } })],
-        ['ru', new RegExp(`(?:выстав[а-я]*|продай)\\s+${RU_WORK}${ID}\\s+(?:за|по)\\s+${AMOUNT}`), m => ({ tool: 'list_for_resale', input: { artwork_id: m[1], price_eth: amount(m[2]) } })],
+        ['ru', new RegExp(`(?:выстав[а-я]*|продай)\\s+${RU_WORK}${ID}\\s+(?:на\\s+продажу\\s+)?(?:за|по)\\s+${AMOUNT}`), m => ({ tool: 'list_for_resale', input: { artwork_id: m[1], price_eth: amount(m[2]) } })],
         ['ru', new RegExp(`(?:измени|поменяй)\\s+цену\\s+${RU_WORK}${ID}\\s+на\\s+${AMOUNT}(?:\\s*(?:eth|эфира?))?`), m => ({ tool: 'change_resale_price', input: { artwork_id: m[1], price_eth: amount(m[2]) } })],
         ['ru', new RegExp(`(?:сними|убери)\\s+${RU_WORK}${ID}\\s+с\\s+продажи`), m => ({ tool: 'cancel_resale_listing', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`(?:купи|купить)\\s+${RU_WORK}${ID}(?:\\s+за\\s+${AMOUNT})?`),
