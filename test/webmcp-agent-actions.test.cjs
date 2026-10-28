@@ -49,6 +49,12 @@ function recorder(overrides = {}) {
     completeSettlement: async (...args) => { calls.push(['completeSettlement', ...args]); return '0xsettle'; },
     claimSettlementDefault: async (...args) => { calls.push(['claimSettlementDefault', ...args]); return '0xdefault'; },
     listResale: async (...args) => { calls.push(['listResale', ...args]); return '0xlist'; },
+    cancelResale: async (...args) => { calls.push(['cancelResale', ...args]); return '0xcancel'; },
+    getResaleManagementState: async (id) => {
+      if (id !== '19') throw new Error('NFT is not minted yet.');
+      return { wallet: ME, chainId: 84532, artworkId: '19', tokenId: '4', owner: ME,
+        canonicalFloor: '0.001', listing: { active: false, seller: ME, price: '0' } };
+    },
     buyResale: async (...args) => { calls.push(['buyResale', ...args]); return '0xbuy'; },
     getResaleListing: async () => ({ seller: OTHER, price: '0.0011', active: true }),
     withdraw: async (...args) => { calls.push(['withdraw', ...args]); return '0xwithdraw'; },
@@ -73,7 +79,7 @@ function tools({ cards, contracts = null, address = ME, storage = GRANTED(), con
       throw new Error(`unexpected ${path}`);
     },
     readContracts: () => contracts,
-    readWalletAddress: () => address,
+    readWalletAddress: () => typeof address === 'function' ? address() : address,
     loadWalletRuntime: async () => {},
     storage,
     now: () => NOW,
@@ -209,7 +215,10 @@ test('an owner lists at or above the floor, confirmed with the price on the page
   const answer = await run(tools({ cards: [OWNED], contracts, prompts }), 'list_for_resale', { artwork_id: '19', price_eth: '0.002' });
 
   assert.equal(answer.submitted, true);
-  assert.deepEqual(calls, [['listResale', '19', '0.002', undefined, { idType: 'artwork' }]]);
+  assert.deepEqual(calls, [['listResale', '19', '0.002', undefined, {
+    idType: 'artwork', expectedWallet: ME, expectedChainId: 84532,
+    expectedResale: await contracts.getResaleManagementState('19')
+  }]]);
   assert.match(prompts[0], /0\.002 ETH/);
   assert.match(prompts[0], /Canonical floor: 0\.001 ETH/);
 });
@@ -226,7 +235,9 @@ test('a listing below the floor, by a non-owner, or of an unminted work never op
   const underByOneWei = await run(tools({ cards: [OWNED], contracts }), 'list_for_resale', { artwork_id: '19', price_eth: '0.000999999999999999' });
   assert.equal(underByOneWei.submitted, false);
 
-  const notMine = await run(tools({ cards: [{ ...OWNED, current_owner_address: OTHER }], contracts }), 'list_for_resale', { artwork_id: '19', price_eth: '1' });
+  const notMine = await run(tools({ cards: [OWNED], contracts: { ...contracts,
+    getResaleManagementState: async () => ({ ...await contracts.getResaleManagementState('19'), owner: OTHER }) }
+  }), 'list_for_resale', { artwork_id: '19', price_eth: '1' });
   assert.equal(notMine.submitted, false);
   const unminted = await run(tools({ cards: [UNSOLD], contracts }), 'list_for_resale', { artwork_id: '31', price_eth: '1' });
   assert.equal(unminted.submitted, false);
@@ -402,4 +413,135 @@ test('no new tool carries a frozen figure', () => {
   assert.equal(/86400|129600|172800/.test(source), false, 'auction durations are read from the contract');
   assert.equal(/\b24\s*h|\b36\s*h|\b48\s*h/i.test(source), false);
   assert.equal(/\b80\s*\/\s*20\b|\b80%|\b20%/.test(source), false, 'the default split lives in the contract');
+});
+
+const ACTIVE_REVIEW = { wallet: ME, chainId: 84532, artworkId: '19', tokenId: '4', owner: ME,
+  canonicalFloor: '0.001', listing: { active: true, seller: ME, price: '0.003' } };
+
+test('repricing and removal review live contract facts despite stale projection fields', async () => {
+  for (const removing of [false, true]) {
+    const { calls, contracts } = recorder({ getResaleManagementState: async (id, options) => {
+      assert.equal(id, '19'); assert.deepEqual(options, { idType: 'artwork' });
+      return { ...ACTIVE_REVIEW, owner: removing ? OTHER : ME };
+    } });
+    const prompts = [];
+    const answer = await run(tools({ cards: [{ ...OWNED, minted: false, current_owner_address: OTHER, sale_price: '9' }], contracts, prompts }),
+      removing ? 'cancel_resale_listing' : 'change_resale_price', { artwork_id: '19', ...(!removing ? { price_eth: '0.004' } : {}) });
+    assert.equal(answer.submitted, true); assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /0\.003 ETH/); assert.doesNotMatch(prompts[0], /9 ETH/);
+    assert.equal(calls[0][1], '19'); assert.equal(calls[0].at(-1).expectedWallet, ME);
+    assert.equal(calls[0].at(-1).expectedChainId, 84532);
+    assert.equal(calls[0].at(-1).expectedResale.tokenId, '4');
+    if (removing) assert.match(answer.note, /ownership is unchanged/);
+    else assert.match(prompts[0], /0\.004 ETH/);
+  }
+});
+
+test('cancel and edit refuse inactive listings and every action requires a fresh confirmation', async () => {
+  for (const name of ['cancel_resale_listing', 'change_resale_price', 'list_for_resale']) {
+    const input = { artwork_id: '19', ...(name === 'cancel_resale_listing' ? {} : { price_eth: '0.004' }) };
+    const { calls, contracts } = recorder({ getResaleManagementState: async () => ACTIVE_REVIEW });
+    const prompts = [];
+    const map = tools({ cards: [OWNED], contracts, prompts, confirm: () => false });
+    assert.equal((await run(map, name, input)).submitted, false);
+    assert.equal((await run(map, name, input)).submitted, false);
+    assert.equal(prompts.length, 2); assert.equal(calls.length, 0);
+    if (name !== 'list_for_resale') {
+      contracts.getResaleManagementState = async () => ({ ...ACTIVE_REVIEW, listing: { ...ACTIVE_REVIEW.listing, active: false } });
+      const inactive = await run(map, name, input);
+      assert.match(inactive.reason, /no longer listed/); assert.equal(prompts.length, 2);
+    }
+  }
+});
+
+test('resale commands reject ambiguous IDs, foreign chains and mismatched reviewed wallets', async () => {
+  const { contracts, calls } = recorder({ getResaleManagementState: async () => ACTIVE_REVIEW });
+  const prompts = [];
+  for (const name of ['list_for_resale', 'change_resale_price', 'cancel_resale_listing']) {
+    const args = name === 'cancel_resale_listing' ? {} : { price_eth: '0.004' };
+    const map = tools({ cards: [OWNED], contracts, prompts });
+    for (const id of [0, 19, '0', '019', '-19', '19 ', String(2n ** 256n)]) {
+      assert.equal((await run(map, name, { ...args, artwork_id: id })).submitted, false);
+    }
+    assert.equal((await run(map, name, { ...args, artwork_id: '19', chain_id: 1 })).submitted, false);
+    const foreign = tools({ cards: [{ ...OWNED, chain_id: 1 }], contracts, prompts });
+    assert.equal((await run(foreign, name, { ...args, artwork_id: '19' })).submitted, false);
+    const changed = tools({ cards: [OWNED], contracts, address: OTHER, prompts });
+    assert.match((await run(changed, name, { ...args, artwork_id: '19' })).reason, /wallet changed/);
+  }
+  assert.equal(calls.length, 0); assert.equal(prompts.length, 0);
+});
+
+test('an unresolved resale review holds the shared wallet lock and errors release it', async () => {
+  let rejectRead;
+  const { calls, contracts } = recorder({ getResaleManagementState: () => new Promise((_, reject) => { rejectRead = reject; }) });
+  const map = tools({ cards: [OWNED], contracts });
+  const pending = run(map, 'change_resale_price', { artwork_id: '19', price_eth: '0.004' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match((await run(map, 'cancel_resale_listing', { artwork_id: '19' })).reason, /Another wallet action/);
+  rejectRead(new Error('RPC unavailable'));
+  assert.match((await pending).reason, /RPC unavailable/);
+  contracts.getResaleManagementState = async () => ACTIVE_REVIEW;
+  assert.equal((await run(map, 'cancel_resale_listing', { artwork_id: '19' })).submitted, true);
+  assert.equal(calls.length, 1);
+});
+
+test('asynchronous page confirmation never grants access or writes before an explicit true', async () => {
+  for (const initialGrant of [false, true]) {
+    for (const response of [true, false, undefined, {}, 'yes']) {
+      let resolveReview;
+      const storage = initialGrant ? GRANTED() : memoryStorage();
+      const { calls, contracts } = recorder();
+      const map = tools({ cards: [OWNED], contracts, storage, confirm: () => new Promise(resolve => { resolveReview = resolve; }) });
+      const pending = run(map, 'list_for_resale', { artwork_id: '19', price_eth: '0.002' });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(calls.length, 0);
+      assert.equal(storage.getItem('artsoul.agent.permission') === 'wallet', initialGrant);
+      assert.match((await run(map, 'cancel_resale_listing', { artwork_id: '19' })).reason, /Another wallet action/);
+      resolveReview(response);
+      assert.equal((await pending).submitted, response === true);
+      assert.equal(calls.length, response === true ? 1 : 0);
+      assert.equal(storage.getItem('artsoul.agent.permission') === 'wallet', initialGrant || response === true);
+    }
+  }
+});
+
+test('revocation or account changes while a review is open invalidate later consent', async () => {
+  for (const initialGrant of [false, true]) for (const change of ['revoke', 'wallet']) {
+    let resolveReview, address = ME;
+    const storage = initialGrant ? GRANTED() : memoryStorage();
+    const { calls, contracts } = recorder();
+    const map = tools({ cards: [OWNED], contracts, storage, address: () => address,
+      confirm: () => new Promise(resolve => { resolveReview = resolve; }) });
+    const pending = run(map, 'list_for_resale', { artwork_id: '19', price_eth: '0.002' });
+    await new Promise(resolve => setImmediate(resolve));
+    if (change === 'revoke') await run(map, 'revoke_wallet_access');
+    else address = OTHER;
+    resolveReview(true);
+    assert.equal((await pending).submitted, false); assert.equal(calls.length, 0);
+    if (change === 'revoke') assert.equal(storage.getItem('artsoul.agent.permission'), null);
+  }
+});
+
+test('a rejected confirmation promise releases the wallet lock without a transaction', async () => {
+  const { calls, contracts } = recorder();
+  let failed = true;
+  const map = tools({ cards: [OWNED], contracts, confirm: async () => { if (failed) throw Error('Dialog closed'); return true; } });
+  assert.equal((await run(map, 'list_for_resale', { artwork_id: '19', price_eth: '0.002' })).submitted, false);
+  assert.equal(calls.length, 0); failed = false;
+  assert.equal((await run(map, 'list_for_resale', { artwork_id: '19', price_eth: '0.002' })).submitted, true);
+});
+
+test('voice and WebMCP tool instances share one pending wallet review', async () => {
+  const win = load();
+  const { calls, contracts } = recorder();
+  let resolveReview;
+  const deps = { fetchJson: async () => ({ data: [] }), readContracts: () => contracts,
+    readWalletAddress: () => ME, storage: memoryStorage(), confirmAction: () => new Promise(resolve => { resolveReview = resolve; }) };
+  const first = new Map(win.ArtSoulWebMCP.createTools(deps).map(tool => [tool.name, tool]));
+  const second = new Map(win.ArtSoulWebMCP.createTools(deps).map(tool => [tool.name, tool]));
+  const pending = run(first, 'withdraw_pending_funds');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match((await run(second, 'withdraw_pending_funds')).reason, /Another wallet action/);
+  resolveReview(false); assert.equal((await pending).submitted, false); assert.equal(calls.length, 0);
 });

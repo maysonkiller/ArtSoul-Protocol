@@ -20,6 +20,28 @@ function loadVoice(win = {}) {
 const voice = loadVoice();
 const parse = (text, lang = 'en') => voice.parseCommand(text, lang);
 
+test('resale edit and removal preserve explicit intent in both command languages', () => {
+  for (const [lang, phrase, tool, input] of [
+    ['en', 'remove artwork 19 from sale', 'cancel_resale_listing', { artwork_id: '19' }],
+    ['ru', 'сними работу 19 с продажи', 'cancel_resale_listing', { artwork_id: '19' }],
+    ['en', 'change price of artwork 19 to 0.001000000000000001 ETH', 'change_resale_price', { artwork_id: '19', price_eth: '0.001000000000000001' }],
+    ['ru', 'поменяй цену работы 19 на 0,003', 'change_resale_price', { artwork_id: '19', price_eth: '0.003' }]
+  ]) {
+    const command = parse(phrase, lang);
+    assert.deepEqual(command, { tool, input });
+    assert.equal(voice.isWrite(command), true);
+    assert.equal(voice.mayRun(command, 0.2), false);
+    for (const unsafe of [phrase + '?', '"' + phrase + '"', phrase + (lang === 'en' ? ' and buy artwork 4' : ' и купи работу 4'),
+      (lang === 'en' ? 'do not ' : 'не ') + phrase]) {
+      assert.equal(parse(unsafe, lang), null, unsafe);
+    }
+    const search = parse((lang === 'en' ? 'search ' : 'найди ') + phrase, lang);
+    assert.equal(voice.isWrite(search), false);
+  }
+  assert.equal(parse('change price of artwork 19 to 0.0010000000000000001'), null);
+  assert.equal(parse('remove from sale'), null);
+});
+
 test('publication commands preserve title data, clarify and retain review confidence', () => {
   for (const [lang, prefix] of [['en', 'prepare artwork titled '], ['ru', 'подготовь работу с названием ']]) {
     for (const title of ['Moonlight 🌙', 'Ночь & Свет', 'buy artwork 31', '<img src=x>', 'What is art?']) {

@@ -53,6 +53,8 @@
     const PERMISSION_KEY = 'artsoul.agent.permission';
     const PERMISSION_READ = 'read';
     const PERMISSION_WALLET = 'wallet';
+    let permissionEpoch = 0;
+    let walletActionInFlight = false;
 
     function safeLocalStorage() {
         try {
@@ -556,30 +558,42 @@
          *
          * Returns null when the action may proceed, or the reason it may not.
          */
-        function authorizeWalletAction(summary, confirmEachTime) {
-            if (readPermission() !== PERMISSION_WALLET) {
-                const granted = confirmAction(
+        async function authorizeWalletAction(summary, confirmEachTime) {
+            const epoch = permissionEpoch;
+            const wallet = text(readWalletAddress()).toLowerCase();
+            const contracts = readContracts();
+            const level = readPermission();
+            const needsGrant = level !== PERMISSION_WALLET;
+            if (!needsGrant && !confirmEachTime) return null;
+            let approved;
+            try {
+                approved = await confirmAction(needsGrant ? (
                     "Allow this page's AI agent to open your wallet on ArtSoul?\n\n" +
                     `Next: ${summary}\n\n` +
                     'Your wallet will still ask you to approve every transaction. ArtSoul never signs for you.'
-                );
-                if (!granted) return 'The person did not grant the agent permission to open the wallet.';
-                writePermission(PERMISSION_WALLET);
-                return null;
+                ) : (
+                    `Confirm on ArtSoul:\n\n${summary}\n\n` +
+                    'Your wallet will ask you to approve it next. ArtSoul never signs for you.'
+                ));
+            } catch {
+                return 'The confirmation could not be completed. Nothing was submitted.';
             }
-            if (!confirmEachTime) return null;
-            const confirmed = confirmAction(
-                `Confirm on ArtSoul:\n\n${summary}\n\n` +
-                'Your wallet will ask you to approve it next. ArtSoul never signs for you.'
-            );
-            return confirmed ? null : 'The person did not confirm this action on the page.';
+            // The site's custom confirm returns a Promise. Only a resolved true
+            // is consent; a Promise object is never permission to open a wallet.
+            if (approved !== true) return needsGrant ? 'The person did not grant the agent permission to open the wallet.'
+                : 'The person did not confirm this action on the page.';
+            if (epoch !== permissionEpoch || readPermission() !== level) return 'Wallet access changed during review. Review the action again.';
+            if (wallet !== text(readWalletAddress()).toLowerCase() || contracts !== readContracts()) {
+                return 'The wallet changed during review. Review the action again.';
+            }
+            if (needsGrant) writePermission(PERMISSION_WALLET);
+            return null;
         }
 
         // One wallet action at a time. An agent retrying against a slow wallet,
         // or a voice command heard twice, must not stack a second approval
         // behind the first where the person could approve both believing they
         // approved one.
-        let walletActionInFlight = false;
         async function withWalletAction(run) {
             if (walletActionInFlight) {
                 return JSON.stringify({
@@ -744,7 +758,7 @@
                 // bid, because the wallet shows the deposit it sends and not the
                 // bid inside the transaction.
                 return withWalletAction(async () => {
-                    const refusal = authorizeWalletAction(
+                    const refusal = await authorizeWalletAction(
                         `a bid of ${amount} ETH on artwork ${artworkId}, "${text(card.title) || 'Untitled'}".`,
                         true
                     );
@@ -906,7 +920,7 @@
                 }
 
                 return withWalletAction(async () => {
-                    const refusal = authorizeWalletAction(
+                    const refusal = await authorizeWalletAction(
                         `finalize the expired auction on artwork ${artworkId}. This pays you nothing and costs only gas.`,
                         false
                     );
@@ -1164,7 +1178,7 @@
                 }
 
                 return withWalletAction(async () => {
-                    const refusal = authorizeWalletAction(
+                    const refusal = await authorizeWalletAction(
                         `complete the settlement for "${titleOf(card)}" (artwork ${artworkId}), won with a bid of ` +
                         `${text(card.current_bid) || 'unknown'} ETH. Your wallet shows the remaining payment, computed by ` +
                         'the contract from the bid and the deposit already locked. Settlement mints the NFT to you.',
@@ -1224,7 +1238,7 @@
                 }
 
                 return withWalletAction(async () => {
-                    const refusal = authorizeWalletAction(
+                    const refusal = await authorizeWalletAction(
                         `close the expired settlement on artwork ${artworkId}, "${titleOf(card)}". This pays you nothing and costs only gas.`,
                         false
                     );
@@ -1247,74 +1261,78 @@
             }
         };
 
-        const listForResale = {
-            name: 'list_for_resale',
-            description:
-                'List an ArtSoul NFT the connected wallet owns for resale at a price in ETH, at or above its canonical ' +
-                'floor. The wallet may ask twice: once to let ArtSoul transfer the NFT when it sells, once for the ' +
-                'listing. Confirmed by the person on the page and in their wallet.',
+        function resaleManagementTool(name, mode, description) {
+            const removing = mode === 'cancel';
+            return {
+            name,
+            description,
             inputSchema: {
                 type: 'object',
+                additionalProperties: false,
                 properties: {
-                    artwork_id: { type: 'string', description: 'The artwork number shown in its page URL.' },
-                    price_eth: { type: 'string', description: 'The asking price in ETH.' }
+                    artwork_id: { type: 'string', pattern: '^[1-9][0-9]{0,77}$', description: 'The artwork number shown in its page URL, not the token number.' },
+                    ...(!removing ? { price_eth: { type: 'string', description: 'The new asking price in ETH, at or above the canonical floor.' } } : {})
                 },
-                required: ['artwork_id', 'price_eth']
+                required: removing ? ['artwork_id'] : ['artwork_id', 'price_eth']
             },
             execute: async (input) => {
                 const args = input || {};
-                const artworkId = requireArtworkId(args);
-                if (!artworkId) return JSON.stringify({ error: 'artwork_id must be the artwork number from its URL.' });
+                const artworkId = args.artwork_id;
+                if (Object.keys(args).some(key => key !== 'artwork_id' && (removing || key !== 'price_eth')) ||
+                    typeof artworkId !== 'string' || !/^[1-9][0-9]{0,77}$/.test(artworkId) || BigInt(artworkId) >= 2n ** 256n) {
+                    return JSON.stringify({ submitted: false, reason: 'Use the exact artwork number from its URL.' });
+                }
                 const url = artworkUrl(artworkId);
                 const price = text(args.price_eth);
                 const priceWei = parseEthWei(price);
-                if (!priceWei || priceWei <= 0n) {
+                if (!removing && (!priceWei || priceWei <= 0n)) {
                     return JSON.stringify({ submitted: false, url, reason: 'price_eth must be a positive amount in ETH, like 0.25.' });
                 }
 
-                const contracts = await walletReadyFor('listResale');
-                if (!contracts) return JSON.stringify({ submitted: false, reason: NO_WALLET, url });
-
-                const card = await lookupCard(artworkId);
-                if (!card) return JSON.stringify({ error: `No published artwork ${artworkId} on Base Sepolia.` });
-                if (card.minted !== true) {
-                    return JSON.stringify({ submitted: false, url,
-                        reason: `Artwork ${artworkId} has not been minted, so there is no NFT to resell.` });
-                }
-                const address = text(readWalletAddress());
-                if (address && !sameAddress(card.current_owner_address, address)) {
-                    return JSON.stringify({ submitted: false, url,
-                        reason: 'Only the current owner can list this NFT, and the connected wallet does not own it.' });
-                }
-                // PriceBelowCanonicalFloor otherwise. The floor is read from the
-                // projection, which reads it from the chain; it is never a figure
-                // this file carries.
-                const floor = text(card.canonical_floor);
-                const floorWei = parseEthWei(floor);
-                if (floorWei && priceWei < floorWei) {
-                    return JSON.stringify({ submitted: false, url, canonical_floor_eth: floor,
-                        reason: `${price} ETH is below this work's canonical floor of ${floor} ETH, and the contract refuses listings below the floor.` });
-                }
-
                 return withWalletAction(async () => {
-                    const replacing = text(card.status) === 'for_sale' && text(card.sale_price)
-                        ? ` This replaces the current listing at ${text(card.sale_price)} ETH.`
-                        : '';
-                    const refusal = authorizeWalletAction(
-                        `list "${titleOf(card)}" (artwork ${artworkId}) for resale at ${price} ETH. Canonical floor: ` +
-                        `${floor || 'unknown'} ETH.${replacing}`,
-                        true
-                    );
-                    if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
                     try {
-                        const transactionHash = await contracts.listResale(artworkId, price, undefined, { idType: 'artwork' });
+                        const contracts = await walletReadyFor(removing ? 'cancelResale' : 'listResale');
+                        if (!contracts || typeof contracts.getResaleManagementState !== 'function') {
+                            return JSON.stringify({ submitted: false, reason: NO_WALLET, url });
+                        }
+                        const card = await lookupCard(artworkId);
+                        if (!card || String(card.artwork_id) !== artworkId ||
+                            (card.chain_id != null && Number(card.chain_id) !== CHAIN_ID)) {
+                            return JSON.stringify({ submitted: false, reason: 'This artwork could not be confirmed on Base Sepolia.', url });
+                        }
+                        // Read the current contract state, not a stale projected price or owner.
+                        const state = await contracts.getResaleManagementState(artworkId, { idType: 'artwork' });
+                        if (!state || state.artworkId !== artworkId || state.chainId !== CHAIN_ID ||
+                            !/^0x[0-9a-f]{40}$/i.test(state.wallet) || !state.listing ||
+                            typeof state.listing.active !== 'boolean') throw new Error('The live listing could not be verified.');
+                        if (text(readWalletAddress()) && !sameAddress(readWalletAddress(), state.wallet)) {
+                            throw new Error('The wallet changed. Review the action again.');
+                        }
+                        if (!sameAddress(removing ? state.listing.seller : state.owner, state.wallet)) {
+                            throw new Error(removing ? 'Only the listing seller can remove it from sale.' : 'Only the current NFT owner can change its listing.');
+                        }
+                        if ((removing || mode === 'edit') && !state.listing.active) {
+                            throw new Error('This NFT is no longer listed for sale. Nothing was changed.');
+                        }
+                        const floorWei = parseEthWei(state.canonicalFloor);
+                        if (!removing && (floorWei === null || floorWei <= 0n)) throw new Error('The canonical floor could not be verified.');
+                        if (!removing && priceWei < floorWei) throw new Error(`${price} ETH is below this work's canonical floor of ${state.canonicalFloor} ETH.`);
+                        const summary = removing
+                            ? `remove "${titleOf(card)}" (artwork ${artworkId}) from sale at ${state.listing.price} ETH. Ownership stays unchanged.`
+                            : `${mode === 'edit' ? 'change the listing price of' : 'list'} "${titleOf(card)}" (artwork ${artworkId}) for resale at ${price} ETH. Canonical floor: ${state.canonicalFloor} ETH.` +
+                                (state.listing.active ? ` This replaces the current listing at ${state.listing.price} ETH.` : '');
+                        const refusal = await authorizeWalletAction(summary, true);
+                        if (refusal) return JSON.stringify({ submitted: false, reason: refusal, url });
+                        const options = { idType: 'artwork', expectedWallet: state.wallet, expectedChainId: CHAIN_ID, expectedResale: state };
+                        const transactionHash = removing ? await contracts.cancelResale(artworkId, options)
+                            : await contracts.listResale(artworkId, price, undefined, options);
                         return JSON.stringify({
                             submitted: true,
                             approved_by: 'the person, in their own wallet',
                             artwork_id: artworkId,
-                            price_eth: price,
+                            ...(!removing ? { price_eth: price } : {}),
                             transaction_hash: transactionHash || null,
-                            note: 'The listing is live once this confirms. Creator, First Collector and Owner stay on the provenance record.',
+                            note: removing ? 'Removed from sale. NFT ownership is unchanged.' : 'Listing confirmed. Creator, First Collector and Owner stay on the provenance record.',
                             url
                         });
                     } catch (error) {
@@ -1322,7 +1340,14 @@
                     }
                 });
             }
-        };
+            };
+        }
+        const listForResale = resaleManagementTool('list_for_resale', 'list',
+            'List an owned ArtSoul NFT at or above its live canonical floor. Can replace an existing listing. The person reviews the price and signs approval/listing transactions in their wallet.');
+        const changeResalePrice = resaleManagementTool('change_resale_price', 'edit',
+            'Change the price of an existing ArtSoul NFT listing. Refuses an inactive listing. The person reviews the old and new price before signing in their wallet.');
+        const cancelResaleListing = resaleManagementTool('cancel_resale_listing', 'cancel',
+            'Remove an active ArtSoul NFT listing by its original seller. Does not transfer or destroy the NFT. Requires review on the page and the person signing in their wallet.');
 
         const buyResaleListing = {
             name: 'buy_resale_listing',
@@ -1385,7 +1410,7 @@
                 }
 
                 return withWalletAction(async () => {
-                    const refusal = authorizeWalletAction(
+                    const refusal = await authorizeWalletAction(
                         `buy "${titleOf(card)}" (artwork ${artworkId}) for ${text(listing.price)} ETH, the price the contract holds for this listing now.`,
                         true
                     );
@@ -1435,7 +1460,7 @@
                 return withWalletAction(async () => {
                     // Money comes back to the person's own wallet, and the wallet
                     // shows nothing it could misrepresent, so the grant is enough.
-                    const refusal = authorizeWalletAction(
+                    const refusal = await authorizeWalletAction(
                         `withdraw ${amount} ETH that ArtSoul holds for this wallet, back to the same wallet.`,
                         false
                     );
@@ -1516,7 +1541,7 @@
                 }
 
                 return withWalletAction(async () => {
-                    const refusal = authorizeWalletAction(
+                    const refusal = await authorizeWalletAction(
                         `start an auction for "${titleOf(card)}" (artwork ${artworkId}) at a starting price of ${price} ETH, ` +
                         `running ${seconds / 3600} hours.`,
                         true
@@ -1551,6 +1576,7 @@
                 'wallet action needs the person to grant access again with their own click.',
             inputSchema: { type: 'object', properties: {} },
             execute: async () => {
+                permissionEpoch++;
                 try {
                     if (storage && typeof storage.removeItem === 'function') storage.removeItem(PERMISSION_KEY);
                 } catch {
@@ -1606,6 +1632,8 @@
             closeExpiredSettlement,
             startAuction,
             listForResale,
+            changeResalePrice,
+            cancelResaleListing,
             buyResaleListing,
             withdrawPendingFunds,
             revokeWalletAccess,
@@ -1654,6 +1682,7 @@
     }
 
     function revokePermission() {
+        permissionEpoch++;
         try {
             const store = safeLocalStorage();
             if (store) store.removeItem(PERMISSION_KEY);

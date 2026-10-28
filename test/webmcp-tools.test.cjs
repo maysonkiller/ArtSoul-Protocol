@@ -90,6 +90,8 @@ test('the ArtSoul tools are registered when the browser supports WebMCP', async 
     'close_expired_settlement',
     'start_auction',
     'list_for_resale',
+    'change_resale_price',
+    'cancel_resale_listing',
     'buy_resale_listing',
     'withdraw_pending_funds',
     'revoke_wallet_access',
@@ -816,14 +818,17 @@ test('the tools that reach the chain are exactly the reviewed set, and all use o
     'close_expired_settlement',
     'start_auction',
     'list_for_resale',
+    'change_resale_price',
+    'cancel_resale_listing',
     'buy_resale_listing',
     'withdraw_pending_funds'
   ]);
   // The grant is checked in exactly one place, and nothing else writes it.
-  assert.equal((source.match(/readPermission\(\) !== PERMISSION_WALLET/g) || []).length, 1);
+  assert.equal((source.match(/async function authorizeWalletAction\(/g) || []).length, 1);
   assert.equal((source.match(/writePermission\(PERMISSION_WALLET\)/g) || []).length, 1);
   // Every write is serialised through the one-at-a-time lock.
   for (const tool of tools.filter((entry) => writes.includes(entry.name))) {
+    assert.match(tool.execute.toString(), /await authorizeWalletAction\(/, `${tool.name} must await consent`);
     assert.match(tool.execute.toString(), /withWalletAction\(/, `${tool.name} must hold the wallet lock`);
   }
 });
