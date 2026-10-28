@@ -81,7 +81,13 @@ if (host && !host.dataset.notificationInitialized) {
 
   window.addEventListener('artsoul:wallet-state-changed', sync);
   window.addEventListener('artsoul:wallet-runtime-ready', sync);
-  window.addEventListener('pagehide', () => { suspended = true; void sync(); });
+  window.addEventListener('pagehide', () => {
+    const visible = !host.hidden;
+    suspended = true;
+    void sync();
+    // Keep only the generic shell in the outgoing page snapshot after cleanup.
+    host.hidden = !visible;
+  });
   window.addEventListener('pageshow', () => { suspended = false; void sync(); });
   window.addEventListener('online', sync);
   host.addEventListener('click', event => {

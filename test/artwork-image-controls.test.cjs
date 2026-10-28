@@ -27,6 +27,9 @@ function harness(type = 'image', url = original) {
         showModal() { this.open = true; this.shown++; },
         close() { this.open = false; this.closed++; }};
     const closeButton = {focus(options) {focused.push({target: 'close', ...options});}};
+    const listeners = new Map();
+    const menu = {open: false, contains: target => target === menu,
+        querySelector: () => ({focus: options => focused.push({target: 'menu', ...options})})};
     const trigger = {isConnected: true, focus(options) {focused.push({target: 'trigger', ...options});}};
     const React = {
         createElement: (type, props, ...children) => ({type, props: {...props, children}}),
@@ -42,12 +45,15 @@ function harness(type = 'image', url = original) {
     vm.runInNewContext(fs.readFileSync('storage-image.js', 'utf8'), {window, URL});
     window.ArtSoulSecurity = {isValidStorageUrl: window.ArtSoulStorageImage.isValidStorageUrl, sanitizeText: value => value};
     const component = vm.runInNewContext(compiled + '\nMediaViewer;', {
-        React, window, document: {body}, useDecodedImage: url => ({url, failed: false})
+        React, window, URL, document: {body,
+            addEventListener: (type, fn) => listeners.set(type, fn),
+            removeEventListener: type => listeners.delete(type)},
+        useDecodedImage: url => ({url, failed: false})
     });
     const render = (next = props) => {
         props = next; si = ri = ei = 0; pending = []; tree = component(props);
         for (const node of descendants(tree)) {
-            if (node.props.ref) node.props.ref.current = node.type === 'dialog' ? modal : closeButton;
+            if (node.props.ref) node.props.ref.current = node.type === 'dialog' ? modal : node.type === 'details' ? menu : closeButton;
         }
         pending.forEach(fn => fn());
         return tree;
@@ -56,7 +62,7 @@ function harness(type = 'image', url = original) {
     const toolbar = () => find(node => node.props.className === 'artwork-detail-image-controls');
     const open = () => {descendants(toolbar()).find(node => node.type === 'button').props.onClick({currentTarget: trigger}); render();};
     render();
-    return {render, find, toolbar, open, modal, body, focused, trigger, window,
+    return {render, find, toolbar, open, modal, body, focused, trigger, window, menu, listeners,
         unmount: () => effects.forEach(effect => effect.cleanup?.())};
 }
 
@@ -65,8 +71,8 @@ for (const type of ['image', 'gif']) test(`${type} exposes full-size and origina
     const h = harness(type, url);
     const controls = descendants(h.toolbar());
     const button = controls.find(node => node.type === 'button');
-    const link = controls.find(node => node.type === 'a');
-    assert.equal(button.props.children[0], 'View full size');
+    const link = controls.find(node => node.props['aria-label'] === 'Open original artwork in a new tab');
+    assert.equal(button.props['aria-label'], 'View full size');
     assert.equal(button.props.type, 'button');
     assert.equal(button.props['aria-haspopup'], 'dialog');
     assert.equal(link.props.href, url);
@@ -82,6 +88,43 @@ for (const type of ['image', 'gif']) test(`${type} exposes full-size and origina
     h.unmount();
     assert.equal(h.modal.open, false);
     assert.equal(h.body.style.overflow, 'auto');
+});
+
+test('the image menu downloads public Storage originals without replacing the artwork URL', () => {
+    const h = harness('image', original + '?cache=1');
+    const download = h.find(node => node.type === 'a' && node.props.children[0] === 'Download image');
+    const target = new URL(download.props.href);
+    assert.equal(target.pathname, new URL(original).pathname);
+    assert.equal(target.searchParams.get('download'), '');
+    assert.equal(target.searchParams.get('cache'), '1');
+    assert.equal(download.props.rel, 'noopener noreferrer');
+    h.menu.open = true;
+    download.props.onClick();
+    assert.equal(h.menu.open, false);
+    assert.deepEqual(h.focused.at(-1), {target: 'menu', preventScroll: true});
+    h.menu.open = true;
+    h.find(node => node.props['aria-label'] === 'Open original artwork in a new tab').props.onClick();
+    assert.equal(h.menu.open, false);
+    assert.deepEqual(h.focused.at(-1), {target: 'menu', preventScroll: true});
+    assert.equal(h.find(node => node.props.role === 'button').props.src, original + '?cache=1');
+    h.unmount();
+});
+
+test('image options close on outside press, Escape and enlargement and remove their listeners', () => {
+    const h = harness();
+    h.menu.open = true;
+    h.listeners.get('pointerdown')({type: 'pointerdown', target: h.menu});
+    assert.equal(h.menu.open, true);
+    h.listeners.get('pointerdown')({type: 'pointerdown', target: {}});
+    assert.equal(h.menu.open, false);
+    h.menu.open = true;
+    h.listeners.get('keydown')({type: 'keydown', key: 'Escape', preventDefault() {}});
+    assert.equal(h.menu.open, false);
+    assert.equal(h.focused.at(-1).target, 'menu');
+    h.menu.open = true; h.open();
+    assert.equal(h.menu.open, false);
+    h.unmount();
+    assert.equal(h.listeners.size, 0);
 });
 
 test('image keyboard activation, Escape, close and backdrop return focus to the initiating control', () => {

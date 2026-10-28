@@ -3,6 +3,27 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 28 13:59 video follow-up B27 is implemented locally, starting at
+`23711dca` after the B21 release. Compact image icons/menu with public-original
+download, tall-desktop density, 200px homepage gap removal, compact publish type
+navigation and outgoing bell continuity. Rendered verification also found an
+obsolete roadmap float rule moving the entire homepage; removed its positional
+selectors/keyframes. No contract/economic/auth boundary changes.
+
+- Build passes; 124 final affected checks pass. Initial tracked suite:
+  2835 passed, two stale stylesheet expectations failed and are now corrected.
+- 80 local built-browser cases, eight media fixtures and ten profile fixtures
+  pass. Six final featured-row cases and eight final new-tab/focus cases pass.
+  Final layout/cache group: ten passed. Screenshots inspected.
+- Evidence: `B27_VIDEO_FOLLOWUP_2026-10-28.md`; private logs in `output/audit/`.
+- Current diff is this bounded implementation plus its tests/evidence. Preserve
+  unrelated untracked authority-policy files, `.codex/` and `output/`.
+- One bounded reviewer completed; no other helper needed.
+- Exactly next: PR/CI/preview/apex verification
+  and release this video correction under the existing founder authorization.
+  Resume B21 publication drafts afterward; do not mark all Phase B complete.
+
+Previous release (historical checkpoint):
 October 28 B21 Donate/Report command slice RELEASED in PR #378, candidate
 `b49311cd`, implementation HEAD/production merge `8abca4615d09aa206ab219f3e972c2ae212cb886`
 (started from production `13bda8e5` plus B26 release-evidence commit `77624572`):

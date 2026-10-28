@@ -138,23 +138,52 @@ test('returning to unresolved state removes a mounted inbox until connection is 
   h.connect(B); await flush(); assert.equal(h.host.current.props.wallet, B);
 });
 
-test('pagehide disposes private content and BFCache pageshow uses the latest confirmed wallet', async () => {
+test('pagehide preserves only the generic bell and BFCache pageshow uses the latest confirmed wallet', async () => {
   const h = harness(); h.connect(A); await flush();
+  h.host.innerHTML = '<span class="notification-badge">3</span><div id="profile-notifications">Private update</div>';
   h.fire('pagehide');
-  assert.equal(h.host.hidden, true); assert.equal(h.host.current, null); assert.equal(h.roots[0].disposed, true);
+  assert.equal(h.host.hidden, false); assert.equal(h.host.current, null); assert.equal(h.roots[0].disposed, true);
+  assert.equal(h.host.innerHTML, '<button data-notification-preview>Notifications</button>');
+  assert.equal(h.host.dataset.notificationWallet, '');
   h.connect(B); h.fire('online'); await flush(); assert.equal(h.roots.length, 1);
+  assert.equal(h.host.hidden, true); assert.equal(h.host.current, null);
   h.fire('pageshow'); await flush();
   assert.equal(h.roots.length, 2); assert.equal(h.host.current.props.wallet, B);
-  h.fire('pagehide'); h.connect(null); h.fire('pageshow'); await flush();
+  h.fire('pagehide'); h.connect(null);
+  assert.equal(h.host.hidden, true); assert.equal(h.host.current, null);
+  h.fire('pageshow'); await flush();
   assert.equal(h.host.hidden, true); assert.equal(h.roots.length, 2);
 });
 
 test('pagehide also fences pending imports and a later pageshow restores exactly once', async () => {
   const pending = deferred(), h = harness({pending});
-  h.connect(A); h.fire('pagehide'); pending.resolve(); await flush();
-  assert.equal(h.host.hidden, true); assert.equal(h.roots.length, 0);
+  h.connect(A); h.clickPreview(); h.fire('pagehide'); pending.resolve(); await flush();
+  assert.equal(h.host.hidden, false); assert.equal(h.roots.length, 0);
+  assert.equal(h.host.innerHTML, '<button data-notification-preview>Notifications</button>');
+  assert.equal(h.host.dataset.notificationWallet, '');
+  assert.equal(h.host.dataset.notificationRequested, undefined);
   h.fire('pageshow'); h.fire('pageshow'); await flush();
   assert.equal(h.roots.length, 1); assert.equal(h.host.current.props.wallet, A);
+  assert.equal(h.clicks, 0);
+});
+
+test('pagehide never creates a guest bell and a restoring preview retains no wallet binding', async () => {
+  const guest = harness(); guest.fire('pagehide'); await flush();
+  assert.equal(guest.host.hidden, true); assert.equal(guest.roots.length, 0);
+  assert.equal(guest.imports.length, 0);
+  guest.fire('pageshow'); await flush();
+  assert.equal(guest.host.hidden, true); assert.equal(guest.imports.length, 0);
+
+  const pending = deferred(), restoring = harness({hint: A, pending});
+  restoring.clickPreview(); restoring.fire('pagehide');
+  assert.equal(restoring.host.hidden, false);
+  assert.equal(restoring.host.dataset.notificationWallet, '');
+  assert.equal(restoring.host.dataset.notificationRequested, undefined);
+  pending.resolve(); await flush();
+  assert.equal(restoring.roots.length, 0);
+  restoring.connect(null); restoring.fire('pageshow'); await flush();
+  assert.equal(restoring.host.hidden, true); assert.equal(restoring.roots.length, 0);
+  assert.equal(restoring.clicks, 0);
 });
 
 test('failed imports retain the non-private bell and retry on online without stale-wallet rendering', async () => {
