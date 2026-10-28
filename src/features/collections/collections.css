@@ -109,3 +109,23 @@
     .launch-phase { padding: 14px; }
     .launch-row { flex-wrap: wrap; }
 }
+
+@media (min-width: 1024px) and (max-height: 850px) {
+    .launch-page { padding-top: 12px; }
+    .launch-topline { margin-bottom: 12px; }
+    .launch-hero { margin-bottom: 16px; gap: 20px; }
+    .launch-hero p { margin-top: 8px; }
+    .launch-draft-tools { margin: 12px 0 16px; }
+    .launch-layout { gap: 16px; }
+    .launch-panel { padding: 16px; }
+    .launch-panel-title { margin-bottom: 16px; }
+    .launch-stack { gap: 16px; }
+    .launch-grid { gap: 12px; }
+    .launch-footer { margin-top: 16px; padding-top: 12px; }
+    .launch-phase { padding: 14px; }
+    .launch-phase-head { margin-bottom: 12px; }
+    .launch-steps, .launch-summary { top: calc(var(--site-header-height, 77px) + 12px); }
+    .launch-summary { padding: 16px; }
+    .launch-summary dl { margin-top: 12px; }
+    .launch-summary dl div { padding-block: 8px; }
+}

@@ -77,12 +77,22 @@ test('donation history stays inside Donate, reads only its open tab, and ignores
     assert.equal(descendants(history).filter(node => node.props?.className === 'artist-support-top').length, 1);
     const dialog = descendants(tree).find(node => node.type === 'dialog');
     assert.ok(descendants(dialog).includes(history));
+    const orderButton = label => descendants(tree).find(node => node.type === 'button' && node.props?.children?.includes(label));
+    orderButton('Largest first').props.onClick();
+    tree = h.render(() => render(props)); await tick(); tree = h.render(() => render(props));
+    assert.equal(orderButton('Largest first').props['aria-pressed'], true);
+    assert.equal(orderButton('Newest first').props['aria-pressed'], false);
+    assert.match(calls.at(-1).url, /sort=amount&offset=0/);
+    orderButton('Newest first').props.onClick();
+    tree = h.render(() => render(props)); await tick(); tree = h.render(() => render(props));
+    assert.equal(orderButton('Newest first').props['aria-pressed'], true);
+    assert.match(calls.at(-1).url, /sort=newest&offset=0/);
     descendants(tree).find(node => node.props?.['aria-label'] === 'Close donation').props.onClick();
     tree = h.render(() => render(props));
     assert.equal(calls.at(-1).options.signal.aborted, true, 'closing Donate cancels its history read');
     openButton().props.onClick(); tree = h.render(() => render(props));
     assert.equal(donateButton().props['aria-selected'], true, 'reopening starts on the donation form');
-    assert.equal(calls.length, 2, 'reopening the form does not refetch history');
+    assert.equal(calls.length, 4, 'reopening the form does not refetch history');
     h.unmount();
 });
 

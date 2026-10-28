@@ -175,9 +175,12 @@ export function ArtistSupport({ deployment, artworkId, creator, creatorName, con
             {list && <div id="artistSupportHistory" className="artist-support-history" role="tabpanel" aria-labelledby="artistSupportHistoryTab" tabIndex={0}>
                 {feed?.top && <p className="artist-support-top">Largest support: <Donor donation={feed.top}/> · {eth(feed.top.amount)} ETH</p>}
                 {feedError && <p role="status">Support history is unavailable. <button type="button" data-allow-rapid="true" onClick={() => setRefresh(value => value + 1)}>Retry</button></p>}
-                <label>Order <select value={sort} onChange={event => { setSort(event.target.value); setOffset(0); }}>
-                    <option value="newest">Newest first</option><option value="amount">Largest first</option>
-                </select></label>
+                <div className="artist-support-order" role="group" aria-label="Order donation history">
+                    <button type="button" data-allow-rapid="true" aria-pressed={sort === 'newest'}
+                        onClick={() => { setSort('newest'); setOffset(0); }}>Newest first</button>
+                    <button type="button" data-allow-rapid="true" aria-pressed={sort === 'amount'}
+                        onClick={() => { setSort('amount'); setOffset(0); }}>Largest first</button>
+                </div>
                 {!feed && !feedError && <p role="status">Loading support…</p>}
                 {feed?.donations?.length === 0 && <p>No support recorded yet.</p>}
                 {feed?.donations?.map(donation => <article key={`${donation.transaction_hash}:${donation.log_index}`}>

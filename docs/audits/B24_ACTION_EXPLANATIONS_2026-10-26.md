@@ -1,6 +1,6 @@
 # B24 — compact laptop profile and actionable restriction explanations
 
-Status: primary slice released; a narrow profile hydration follow-up is prepared.
+Status: released in PRs #375 and #376; final production merge `537bad1`.
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, starting commit
 `55cca68`. This is one bounded Phase B slice, not completion of Phase B.
 
@@ -89,12 +89,28 @@ column from 1168px to 576px when statistics appeared at 1366px. The follow-up
 reserves the short-desktop columns before statistics arrive. No invented/loading
 statistics are rendered. Long content still scrolls naturally.
 
-Follow-up validation: production build and 104 focused checks pass. Six real-DOM
-experiments (Classic/Future x 390/1280/1366px) with the proposed CSS preserve the
-identity/social width while statistics are removed/reinserted, with no overflow.
-Evidence: `output/audit/b24-profile-hydration-browser.log`. This controlled DOM
-experiment is not a claim of new device or signed acceptance. The source/pin
-follow-up uses CSS version56; its exact CI and release remain pending.
+Follow-up PR #376 released candidate `d7f006f`, merge `537bad1`. Production build
+and 104 focused checks pass. Exact-candidate CI40368341237 passes: Linux 2814
+tests/two skips, Windows 2419 tests/32 skips, 49 contract tests each, both builds
+and static checks. The merge tree equals the tested candidate. CSS references
+and assertions advance together to version 56.
 
-Next step: finish the hydration follow-up release, then resume B21 Donate/Report command
-preparation through existing visible dialogs, without automated signing.
+Six controlled real-DOM cases (Classic/Future x 390/1280/1366px) on the deployed
+preview, without injected CSS, preserve identity/social width while statistics
+are removed/reinserted, with no horizontal overflow. Evidence:
+`output/audit/b24-profile-hydration-preview-browser.log`. This experiment is not
+a claim of new physical-device or signed acceptance.
+
+Final production deployment 7338912185, checked at 2026-10-26 17:33 UTC: eight
+HTML routes and 39 assets match the local build; five protected API guest checks
+remain denied with private/no-store responses. Evidence:
+`output/audit/b24-final-apex-verification.log` and
+`output/audit/b24-actions-apex-537bad12796b-1793036018986.json`.
+The same six real-DOM cases pass on the final apex release without injected CSS;
+identity/social widths stay 317.8125px, 533.5px and 576.015625px respectively.
+Evidence: `output/audit/b24-profile-hydration-apex-browser.log` and inspected
+`output/playwright/b24-final-profile-apex.png`. The owned browser and local
+preview server were closed after verification.
+
+Next step: resume B21 Donate/Report command preparation through existing visible
+dialogs, without automated signing. Phase B remains in progress.

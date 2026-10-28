@@ -42,7 +42,7 @@
     <script src="/header-prepaint.js?v=8"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=56">
+    <link rel="stylesheet" href="/unified-styles.css?v=57">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/ai-ui-styles.css?v=1">
     <link rel="stylesheet" href="/simplified-ui.css?v=1">
@@ -249,6 +249,7 @@
                 <div class="site-header-logo-zone">
                     <a href="/" class="logo-link" aria-label="ArtSoul home">
                         <img src="/ARTSOULlogo-clean.png" alt="ArtSoul" class="site-logo">
+                        <span class="site-wordmark" aria-hidden="true">ArtSoul<span>PROTOCOL</span></span>
                     </a>
                 </div>
                 <div class="site-header-center page-context"></div>
@@ -317,6 +318,14 @@
             </dl>
         </section>
 
+        <!-- Discovery Spotlight -->
+        <div class="home-spotlight mb-12">
+            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center">Discovery Spotlight</h2>
+            <div class="gallery" id="artworkGallery" aria-busy="true" aria-label="Loading featured artworks">
+                <span class="col-span-full profile-gallery-loading-note" role="status">Loading artworks…</span>
+            </div>
+        </div>
+
         <section class="home-protocol-section home-how-section" aria-labelledby="howItWorksTitle">
             <div class="home-section-heading">
                 <p class="home-section-kicker">Demand before minting</p>
@@ -328,14 +337,6 @@
                 <li><span>3</span><strong>Settle and Mint</strong><small>The NFT exists only after successful settlement</small></li>
             </ol>
         </section>
-
-        <!-- Discovery Spotlight -->
-        <div class="home-spotlight mb-12">
-            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center">Discovery Spotlight</h2>
-            <div class="gallery" id="artworkGallery" aria-busy="true" aria-label="Loading featured artworks">
-                <span class="col-span-full profile-gallery-loading-note" role="status">Loading artworks…</span>
-            </div>
-        </div>
 
         <section id="homepageFeaturedSection" class="home-protocol-section" aria-labelledby="homepageFeaturedTitle" hidden>
             <div class="home-section-heading home-section-heading-row">
@@ -394,7 +395,7 @@
                     <!-- Contact -->
                     <div class="footer-column">
                         <h3>Contact</h3>
-                        <a href="https://x.com/ArtSoulProtocol" target="_blank" class="hover:opacity-100">X (Twitter)</a>
+                        <a href="https://x.com/ArtSoulProtocol" target="_blank" class="hover:opacity-100">X</a>
                         <a href="https://github.com/maysonkiller/ArtSoul-Protocol" target="_blank" class="hover:opacity-100">GitHub</a>
                         <a href="mailto:maysonkiller@gmail.com" class="hover:opacity-100">maysonkiller@gmail.com</a>
                     </div>
@@ -408,7 +409,7 @@
                 <div class="text-center text-sm pt-4 border-t" style="border-color: currentColor; opacity: 0.5;">
                     <p style="opacity: 0.9; margin-bottom: 0.25rem;">&copy; 2026 ArtSoul Protocol | Built for digital artists</p>
                     <p style="opacity: 0.9;">
-                        Built by <a href="https://twitter.com/maysonkiller23" target="_blank" class="hover:underline">@maysonkiller23</a>
+                        Built by <a href="https://x.com/maysonkiller23" target="_blank" class="hover:underline">@maysonkiller23</a>
                     </p>
                 </div>
             </div>

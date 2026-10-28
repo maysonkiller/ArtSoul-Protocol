@@ -1,9 +1,39 @@
 # Stabilization checkpoint
 
-Updated: 2026-10-26 (local time). Continue only in `C:\Projects\ArtSoul`, branch
+Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 26 B24 founder-priority continuation, PR #375 RELEASED, merge `eecd340`:
+October 28 B26 founder-priority video follow-up, implementation verified locally
+(started at `b854089b`, production baseline `537bad1`):
+
+- Reviewed the full 4:22 recording through 131 sampled frames, selected larger
+  frames and approximate offline transcription; raw media stays private.
+- Compact short-desktop composition across product pages, static desktop
+  wordmark/mobile mark, earlier homepage artwork, tighter profile editor,
+  restrained Ownership motion, two-choice Donate sorting and accessible native
+  image enlargement/original controls. Shared CSS pins advance to 57.
+- Build and 155 focused checks pass; the subsequent 12 behavior checks pass.
+  Candidate browser evidence: 98 page/theme/viewport cases, eight profile cases,
+  ten Donate history cases and eight image-control cases. These are synthetic
+  API/wallet fixtures, not new physical-device or financial acceptance.
+- Current social preview: 32 crawler metadata requests, 12 images and three
+  aliases pass. Telegram's stored old preview is not a successful cache purge.
+- Evidence and interpretation ledger: `B26_COMPACT_PAGES_2026-10-28.md`.
+  Full tracked run: 2820 passed, one obsolete exact-60px provider-row expectation.
+  Updated that assertion to retain the 44px minimum touch target. Exact-candidate
+  CI and release verification are pending.
+- PR #377 preview passed eight-route/39-asset verification, but actual browser
+  runtime exposed rapid-close image focus loss: the shared click guard disabled
+  the trigger for 500ms. Added its existing UI-toggle exemption, an actual-listener
+  regression test, and rebuilt; 18 affected checks pass. Repeat final preview.
+- Preserve unrelated `.codex/`, `output/`, `src/api/moderation-authority-policy.js`
+  and `test/moderation-authority-policy.test.mjs`. Include the new image-control
+  test only with this slice. No contracts, economic changes or signing.
+- Exactly next: finish B26 exact-candidate CI, preview and apex verification;
+  then resume B21 Donate/Report command preparation through existing dialogs.
+
+October 26 B24 founder-priority continuation RELEASED in PRs #375 / #376,
+production merge `537bad12796bc2202fe9d711490e8f8502f1decd`:
 
 - Shared restricted-action explanations preserve creator/highest-bidder and
   resale guards, distinguish busy states, and keep Donate/Report drafts intact.
@@ -25,8 +55,17 @@ October 26 B24 founder-priority continuation, PR #375 RELEASED, merge `eecd340`:
   load (1168px ->576px identity width). A one-selector follow-up reserves the
   same short-desktop columns before statistics; no placeholder data. Six DOM
   experiments, 104 focused checks and build pass; CSS pins advance to56.
-- Exactly next step: finish the hydration follow-up CI/release, then resume B21
-  Donate/Report preparation through existing review dialogs.
+- Follow-up PR #376 candidate `d7f006f` / merge `537bad1`: CI40368341237 passes
+  (Linux2814/two skips, Windows2419/32 skips, 49 contracts each, builds/static).
+  Merge tree equals candidate; preview six real-DOM cases pass without injected
+  CSS. Apex deployment7338912185 matches eight routes/39 assets and denies five
+  protected guest API calls. Evidence: `output/audit/b24-final-apex-verification.log`.
+  The same six layout cases pass on apex without injected CSS; screenshot
+  inspected, owned browser/preview server closed.
+- Tracked implementation is merged; this checkpoint update contains evidence
+  only. Preserve the unrelated untracked files above. Phase B is not complete.
+- Exactly next step: resume B21 Donate/Report command preparation through
+  existing review dialogs, without automated signing.
 
 October 26 future-contract design continuation MERGED in PR #374,
 candidate `afcfe40`, merge `a914282` (started at `b4ca252`):
