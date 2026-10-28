@@ -52,6 +52,8 @@ also left every successful write armed in the composer.
   state across shared readers; indexed owner, floor, metadata and token identity
   are never taken from browser storage. Newer auction and indexed resale win.
 - A fresh on-chain status check rejects repeat settlement before a wallet write.
+- The homepage also refreshes on the shared auction receipt and on returning to
+  a tab with a pending receipt, matching artwork, profile and gallery readers.
 - Successful writes clear the command, disable empty submission and show a next
   action prompt, an artwork/profile link and a validated Base Sepolia receipt
   link. Declines and errors retain the draft. No automatic transaction follows.
@@ -82,3 +84,11 @@ transactions. No completed Taes transaction was replayed to test the patch.
 
 Release status and final hosted checks are recorded below after completion.
 Phase B remains open for its other named acceptance/operational gates.
+
+The first full CI run (40764576497) caught two outdated test expectations: the
+previous contract-script cache version and the former expired-auction copy.
+Both assertions were updated to the shipped interface. The homepage receipt
+regression and both affected suites pass (59 tests); the full local unit run has
+zero failures and 33 environment-dependent skips. That local run also includes
+an existing untracked policy test, which is not part of this PR. The final build
+passes. Clean Linux/Windows CI remains the release gate for the committed files.

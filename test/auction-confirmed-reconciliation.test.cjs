@@ -635,3 +635,36 @@ test('open artwork applies repricing and cancellation before a slow refresh can 
     assert.equal(displayed.current_owner_address,OWNER);
   }
 });
+
+test('homepage refreshes settled receipts immediately and when returning from another tab', async () => {
+  const source = fs.readFileSync('src/entries/index.js', 'utf8');
+  const start = source.indexOf('        loadHomeArtworks();');
+  const end = source.indexOf('        window.showSection = showSection;', start);
+  assert.ok(start >= 0 && end > start);
+  const api = client({ reply: () => ({ data: [row({ auction_id: '63', status: 'awaiting_payment' })] }) });
+  const pending = [];
+  let displayed;
+  let onVisibility;
+  const document = { visibilityState: 'visible', addEventListener(type, callback) {
+    assert.equal(type, 'visibilitychange'); onVisibility = callback;
+  } };
+  vm.runInNewContext(source.slice(start, end), {
+    window: api.window, document,
+    loadHomeArtworks() {
+      const task = api.db.getPublicProjectionArtworks({ limit: 100 }).then(rows => { displayed = rows[0]; });
+      pending.push(task); return task;
+    }
+  });
+  await Promise.all(pending);
+  assert.equal(displayed.status, 'awaiting_payment');
+  api.db.recordConfirmedAuction(confirmed({ kind: 'settled' }));
+  assert.equal(pending.length, 2, 'receipt triggers refresh without navigation');
+  await Promise.all(pending);
+  assert.equal(displayed.status, 'sold', 'stale API cannot restore payment state');
+  document.visibilityState = 'hidden'; onVisibility();
+  assert.equal(pending.length, 2);
+  document.visibilityState = 'visible'; onVisibility();
+  assert.equal(pending.length, 3, 'returning tab rechecks a pending settlement bridge');
+  await Promise.all(pending);
+  assert.equal(displayed.status, 'sold');
+});

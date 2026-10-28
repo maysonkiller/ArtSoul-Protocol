@@ -16,7 +16,8 @@ test('auction keeps one status and exposes each existing state action', () => {
     assert.match(source, /const mintedArtwork =/);
     assert.match(source, /End Expired Auction/);
     assert.match(source, /Create New Auction/);
-    assert.match(source, /Confirm the expired auction first/);
+    assert.match(source, /With a winning bid, this opens payment for the winner/);
+    assert.match(source, /With no bids, the creator can start a new auction/);
     assert.match(source, /Complete Settlement & Mint NFT/);
     assert.match(source, /Buy Now/);
 });
