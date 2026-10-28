@@ -80,6 +80,46 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
         assert.deepEqual(access, { relrowsecurity: true, relforcerowsecurity: true, anon_read: false, authenticated_read: false });
     });
 
+    await t.test('state hashing preserves historical digests while returning one row for large histories', async () => {
+        await fresh.query('BEGIN');
+        try {
+            // Only the disposable database is changed; restore its bootstrap fixture below.
+            await fresh.query('DELETE FROM block_hashes');
+            const fixture = Array.from({ length: 2048 }, (_, i) => ({
+                block: i + 1, hash: `0x${crypto.createHash('sha256').update(String(i)).digest('hex')}`
+            }));
+            await fresh.query(`INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
+                SELECT 84532, block, hash, $3, 1700000000
+                FROM unnest($1::bigint[], $2::text[]) AS f(block,hash) ORDER BY block DESC`,
+            [fixture.map(row => row.block), fixture.map(row => row.hash), `0x${'0'.repeat(64)}`]);
+            await fresh.query(`INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
+                VALUES (11155111,1,$1,$1,1700000000)`, [`0x${'f'.repeat(64)}`]);
+            const responses = [];
+            const engine = new Engine({ query: async (sql, params) => {
+                const result = await fresh.query(sql, params);
+                responses.push(result.rows);
+                return result.rows;
+            } }, { chainId: 84532 });
+            for (const cutoff of [0, 1, 17, 2048, 9999]) {
+                responses.length = 0;
+                const previousInput = fixture.filter(row => row.block <= cutoff).map(row => row.hash).join(',');
+                const expected = `0x${crypto.createHash('sha256').update(previousInput).digest('hex')}`;
+                assert.equal(await engine._computeStateHash(cutoff), expected);
+                assert.equal(responses.length, 1, 'one database response per digest');
+                assert.equal(responses[0].length, 1, 'history size must not increase rows crossing the connection');
+                assert.ok(Buffer.byteLength(JSON.stringify(responses[0])) < 100, 'digest response is bounded');
+            }
+            engine.chainId = 11155111;
+            assert.equal(await engine._computeStateHash(2048),
+                `0x${crypto.createHash('sha256').update(`0x${'f'.repeat(64)}`).digest('hex')}`);
+            engine.chainId = 999;
+            assert.equal(await engine._computeStateHash(2048),
+                `0x${crypto.createHash('sha256').update('').digest('hex')}`);
+        } finally {
+            await fresh.query('ROLLBACK');
+        }
+    });
+
     await t.test('forward repair preserves existing rows, hashes and access controls and is idempotent', async () => {
         await fresh.query('CREATE DATABASE legacy');
         legacy = new pg.Pool({ connectionString: url('legacy') });

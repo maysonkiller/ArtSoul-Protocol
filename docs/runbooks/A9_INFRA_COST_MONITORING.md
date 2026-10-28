@@ -49,6 +49,24 @@ The `/health` handler observes the current block. Do not poll this command more 
 
 ## Manual review schedule
 
+After the October 29 egress incident, a healthy indexer is not sufficient
+evidence of healthy Supabase services or affordable usage. See
+[`B30_DATABASE_EGRESS_2026-10-29.md`](../audits/B30_DATABASE_EGRESS_2026-10-29.md).
+At every database/indexer deployment, also compare two bounded
+`pg_stat_statements` snapshots without resetting the counters. For the state
+digest query, the delta of returned rows must equal the delta of calls; the
+old full-history SELECT must not increase. Keep chain/cursor/hash parity and
+the existing health invariants. Do not run a diagnostic that repeatedly
+downloads all block hashes.
+
+Record the correct organization's **Shared Pooler**, Database and Storage
+egress separately; database/storage size is not transferred volume. During a
+quota incident, test a bounded real Data API and Storage read as well as the
+public endpoint's data and warnings. An HTTP 200 empty fallback or a healthy
+direct PostgreSQL connection does not prove Data API availability. HTTP 402
+requires a provider/quota decision; a code patch cannot reset the allowance.
+Keep Spend Cap enabled unless the owner approves the financial change.
+
 Until native threshold alerts are available, the founder or named operator performs this review every Tuesday and Friday and after any indexer/RPC/database deployment:
 
 1. Run `npm run --silent monitor:indexer` on Hetzner.

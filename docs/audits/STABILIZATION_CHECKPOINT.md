@@ -1,3 +1,20 @@
+October 29 B30 quota incident: founder supplied 411.15 GB / 275 GB egress notice.
+Confirmed cause: _computeStateHash downloads all historical block hashes each
+poll (9.25 MB in the measured history). Same SHA-256 now computed inside PG.
+Active host source-only correction deployed after stored-hash parity, six real
+read-only SQL fixtures and 18 focused checks. Worker stopped 23:16:14 and resumed
+23:21:22 UTC October 28; cursor preserved, old query stopped, new query returns
+one row per call, healthy/synced and zero event failures. See
+B30_DATABASE_EGRESS_2026-10-29.md. Full local units 2535 pass/33 skip including
+unrelated untracked policy tests; exact candidate CI still pending.
+Data API and Storage genuinely return HTTP402; public HTTP200 with warnings
+does not prove recovery. Correct billing organization unavailable in current
+browser session. No spend-cap, paid service, schema, cursor or contract change.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / starting HEAD be066f44.
+Preserve untracked policy files, .codex/, output/. No active helper agents.
+Exactly next: commit the bounded B30 patch, execute exact-candidate CI and record
+release; provider restoration/usage breakdown remains an owner-access gate.
+
 October 28 B12/B21 continuation: real Russian microphone/read/spoken reply passed
 (owner confirmed audio); Taes artwork38 / auction73 ended and settled through
 owner-operated Rabby. Two RPCs prove token7, owner, 0.001 ETH floor, zero payment
