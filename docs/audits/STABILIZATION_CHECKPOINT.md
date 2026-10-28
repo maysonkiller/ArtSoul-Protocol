@@ -22,6 +22,10 @@ October 28 B26 founder-priority video follow-up, implementation verified locally
   Full tracked run: 2820 passed, one obsolete exact-60px provider-row expectation.
   Updated that assertion to retain the 44px minimum touch target. Exact-candidate
   CI and release verification are pending.
+- PR #377 preview passed eight-route/39-asset verification, but actual browser
+  runtime exposed rapid-close image focus loss: the shared click guard disabled
+  the trigger for 500ms. Added its existing UI-toggle exemption, an actual-listener
+  regression test, and rebuilt; 18 affected checks pass. Repeat final preview.
 - Preserve unrelated `.codex/`, `output/`, `src/api/moderation-authority-policy.js`
   and `test/moderation-authority-policy.test.mjs`. Include the new image-control
   test only with this slice. No contracts, economic changes or signing.

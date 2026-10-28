@@ -143,3 +143,29 @@ test('removing the image after a load error closes the modal and restores the sc
     assert.deepEqual(h.focused, [{target: 'close', preventScroll: true}], 'do not focus an unmounted artwork control');
     h.unmount();
 });
+
+test('image controls remain focusable during the global rapid-click guard window', () => {
+    const listeners = new Map();
+    const context = vm.createContext({
+        window: {addEventListener() {}}, console: {log() {}}, setTimeout() {},
+        document: {readyState: 'loading', addEventListener(name, fn) {listeners.set(name, fn);}}
+    });
+    const performanceSource = fs.readFileSync('src/core/utils/performance-utils.js', 'utf8')
+        .replace(/export\s*\{[\s\S]*?\};/, '');
+    vm.runInContext(performanceSource, context);
+    vm.runInContext('enableLazyLoading = setupIntersectionObserver = optimizeAnimations = () => {}; initPerformanceOptimizations();', context);
+    const captureClick = props => {
+        const target = {disabled: false, style: {}, dataset: {allowRapid: props['data-allow-rapid']},
+            classList: {contains() {return false;}}, closest() {return this;}};
+        listeners.get('click')({target});
+        return target.disabled;
+    };
+    assert.equal(captureClick({}), true, 'the ordinary button guard is active');
+    const h = harness();
+    const trigger = descendants(h.toolbar()).find(node => node.type === 'button');
+    assert.equal(captureClick(trigger.props), false, 'closing immediately can restore trigger focus');
+    assert.equal(captureClick(h.find(node => node.props.role === 'button').props), false);
+    h.open();
+    assert.equal(captureClick(h.find(node => node.props.className === 'artwork-image-lightbox-close').props), false);
+    h.unmount();
+});

@@ -294,6 +294,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         className="artwork-detail-media-object artwork-detail-image artwork-detail-image-zoomable"
                         role="button"
                         tabIndex="0"
+                        data-allow-rapid="true"
                         aria-label="View artwork full size"
                         aria-haspopup="dialog"
                         onClick={openImage}
@@ -306,7 +307,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         onError={() => setMediaError(true)}
                     />}
                     <div className="artwork-detail-image-controls" role="group" aria-label="Artwork image controls">
-                        <button type="button" onClick={openImage} aria-haspopup="dialog">View full size</button>
+                        <button type="button" data-allow-rapid="true" onClick={openImage} aria-haspopup="dialog">View full size</button>
                         {originalUrl && <a href={originalUrl} target="_blank" rel="noopener noreferrer" aria-label="Open original artwork in a new tab">Open original</a>}
                     </div>
                     {isImageFullscreen && window.ReactDOM?.createPortal?.(
@@ -327,6 +328,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                                 ref={imageCloseRef}
                                 type="button"
                                 className="artwork-image-lightbox-close"
+                                data-allow-rapid="true"
                                 aria-label="Close full-size artwork view"
                                 autoFocus
                                 onClick={() => setIsImageFullscreen(false)}
