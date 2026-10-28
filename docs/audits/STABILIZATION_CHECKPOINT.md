@@ -6,14 +6,29 @@ preview and apex each pass four guest journeys / 20 checks, seven routes and
 three exact assets. No real signatures or financial acceptance inferred.
 See `B12_RESALE_COMMANDS_2026-10-28.md`.
 
-Current local follow-up on that HEAD: B21 microphone async consent, versioned
-renewal, late-approval fences and shared modal replacement cancellation. 151
-checks and build pass; eight browser fixture journeys / 120 checks, no actual
-audio or API writes. See `B21_AUDIO_CONSENT_2026-10-28.md`. Work remains only in
-`C:\Projects\ArtSoul`, branch `codex/takeover-audit`. Preserve unrelated untracked
-policy files, `.codex/` and `output/`.
-Exactly next: exact-candidate CI and preview verification for this follow-up,
-then authorized release. B17 real due-time reminder evidence remains unclosed.
+B21 microphone consent follow-up RELEASED in PR #384, candidate `ceb9225b`,
+implementation/production HEAD `63c0c28626a47d5e755d347ab44e03fcdac647c5` (same tree).
+151 checks and build pass; eight browser journeys / 120 checks on local, preview
+and apex; eight resale regression journeys / 56 checks and four apex guest
+journeys / 20 checks. All audio/financial transports in fixture tests are fake;
+no real audio, transaction or phone acceptance inferred. Eight routes/four exact
+assets match. CI40742075291, post-merge CI40742744216 and production7393591134
+pass. See `B21_AUDIO_CONSENT_2026-10-28.md`.
+
+B17 read-only follow-up verified one existing auction-ending reminder/read marker
+for artwork37/auction71 in the real due window on October25; both public RPCs
+confirm its chain receipt/source/deadline. At October28 18:09UTC the indexer is
+fresh/synchronized, failed/dead events zero, and no future deadlines/current
+candidates exist. No preference, notification or chain writes performed. See the
+dated follow-up in `B17_REMINDERS_2026-10-25.md`. Payment-due/live-extension/phone
+delivery acceptance and official-source designation are not inferred.
+
+Work remains only in `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
+Release/evidence documentation is a separate follow-up commit; inspect HEAD on
+resume. Preserve unrelated untracked policy files, `.codex/` and `output/`.
+Exactly next: reconcile B02/B11/B12 remaining real-wallet acceptance against
+existing receipts and tester evidence before planning any new transaction.
+Do not replay completed journals or manufacture a due-time notification.
 
 # Stabilization checkpoint
 
