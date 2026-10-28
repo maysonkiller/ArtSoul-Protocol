@@ -932,6 +932,50 @@
             }
         };
 
+        // These tools only navigate to the existing review forms. Their own
+        // submit handlers retain authentication, validation and wallet approval.
+        const reviewTools = ['donate', 'report'].map(action => ({
+            name: action === 'donate' ? 'prepare_donation' : 'prepare_artwork_report',
+            description: action === 'donate'
+                ? 'Open the donation form for a published Base Sepolia artwork. The person reviews its creator, enters an amount and optionally a message, then confirms in their wallet. This tool sends no funds and opens no wallet request.'
+                : 'Open the complaint form for a published Base Sepolia artwork. The person selects the reason, supplies their own evidence and explicitly submits the report. This tool submits no complaint and performs no moderation.',
+            inputSchema: {
+                type: 'object',
+                properties: { artwork_id: { type: 'string', pattern: '^[1-9][0-9]{0,77}$', description: 'The artwork number from its URL, not an auction or token number.' } },
+                required: ['artwork_id'],
+                additionalProperties: false
+            },
+            execute: async (input) => {
+                const artworkId = input?.artwork_id;
+                if (!input || typeof input !== 'object' || Array.isArray(input) ||
+                    Object.keys(input).some(key => key !== 'artwork_id') ||
+                    typeof artworkId !== 'string' || !/^[1-9][0-9]{0,77}$/.test(artworkId) || BigInt(artworkId) >= 2n ** 256n) {
+                    return JSON.stringify({ prepared: false, reason: 'Provide only a valid artwork_id. Enter the donation amount or complaint details yourself in the review form.' });
+                }
+                try {
+                    const card = await lookupCard(artworkId);
+                    if (!card || card.moderation_hidden === true || String(card.artwork_id) !== artworkId || Number(card.chain_id) !== CHAIN_ID) {
+                        return JSON.stringify({ prepared: false, reason: `No public artwork ${artworkId} on Base Sepolia.` });
+                    }
+                    const url = `/artwork/${artworkId}?action=${action}`;
+                    const actions = await deps.readArtworkActions?.(card);
+                    if (!Array.isArray(actions) || !actions.some(item => item?.href === url && !item.external)) {
+                        return JSON.stringify({ prepared: false, reason: `${action === 'donate' ? 'Donations' : 'Reporting'} are unavailable for this artwork. Open its page to check availability.` });
+                    }
+                    openPath(url);
+                    return JSON.stringify({
+                        prepared: true, review_required: true, artwork_id: artworkId,
+                        title: text(card.title) || 'Untitled', url,
+                        instruction: action === 'donate'
+                            ? 'Opening Donate. Review the creator and enter your amount. Nothing has been sent; only your explicit confirmation can request a wallet signature.'
+                            : 'Opening Report. Choose a reason and provide your own details. Nothing has been submitted; review the form before sending it.'
+                    });
+                } catch {
+                    return JSON.stringify({ prepared: false, reason: 'The review form could not be opened. Try again or open the artwork page. Nothing was submitted.' });
+                }
+            }
+        }));
+
         const prepareArtworkRegistration = {
             name: 'prepare_artwork_registration',
             description:
@@ -1569,6 +1613,7 @@
             withdrawPendingFunds,
             revokeWalletAccess,
             prepareArtworkRegistration,
+            ...reviewTools,
             ...savedTools
         ];
     }
@@ -1631,6 +1676,14 @@
                 return response.json();
             },
             openPath: (path) => window.location.assign(path),
+            readArtworkActions: async card => {
+                const config = await window.ArtSoulPublicConfig?.load?.();
+                // Docs and the collection builder have no card renderer at
+                // startup. Load the same policy only when a form is requested.
+                if (!window.ArtSoulArtworkUrl) await import('/src/ui/artwork-url.js?v=1');
+                if (!window.ArtSoulArtworkCard) await import('/src/ui/components/artwork-card.js?v=23');
+                return window.ArtSoulArtworkCard?.cardActionItems?.(card, config || {}) || [];
+            },
             readContracts: () => window.ArtSoulContracts || null,
             searchCatalog: input => window.ArtSoulSearch?.query?.(input) ||
                 { error: 'Open Gallery, Profile or an artwork to search ArtSoul. If it is still loading, try again shortly.' },

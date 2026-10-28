@@ -50,6 +50,7 @@
         'withdraw_pending_funds'
     ]);
     const SAVED_TOOLS = ['add_to_saved', 'remove_from_saved'];
+    const REVIEW_TOOLS = ['prepare_donation', 'prepare_artwork_report'];
 
     // Recognisers write numbers as digits: "31", "0.05", and in Russian "0,05".
     const AMOUNT = '(\\d+(?:[.,]\\d{1,18})?)';
@@ -66,6 +67,8 @@
      */
     const GRAMMAR = [
         // --- English ---------------------------------------------------------
+        ['en', new RegExp(`^(?:please\\s+)?(?:donate\\s+to|open\\s+donate\\s+for)\\s+${EN_WORK}${ID}$`), m => ({ tool: 'prepare_donation', input: { artwork_id: m[1] } })],
+        ['en', new RegExp(`^(?:please\\s+)?(?:report|open\\s+report\\s+for)\\s+${EN_WORK}${ID}$`), m => ({ tool: 'prepare_artwork_report', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`^(?:please\\s+)?save\\s+${EN_WORK}${ID}(?:\\s+to\\s+(?:my\\s+)?(?:saved|favou?rites))?$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`^(?:please\\s+)?add\\s+${EN_WORK}${ID}\\s+to\\s+(?:my\\s+)?(?:saved|favou?rites)$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
         ['en', new RegExp(`^(?:please\\s+)?remove\\s+${EN_WORK}${ID}\\s+from\\s+(?:my\\s+)?(?:saved|favou?rites)$`), m => ({ tool: 'remove_from_saved', input: { artwork_id: m[1] } })],
@@ -89,6 +92,8 @@
         ['en', /\bauctions?\b/, () => ({ tool: 'find_active_auctions', input: {} })],
 
         // --- Russian ---------------------------------------------------------
+        ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:донат\\s+автору|открой\\s+донат\\s+для)\\s+${RU_WORK}${ID}$`), m => ({ tool: 'prepare_donation', input: { artwork_id: m[1] } })],
+        ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:пожаловаться\\s+на|открой\\s+жалобу\\s+на)\\s+${RU_WORK}${ID}$`), m => ({ tool: 'prepare_artwork_report', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:сохрани|добавь)\\s+${RU_WORK}${ID}\\s+в\\s+избранное$`), m => ({ tool: 'add_to_saved', input: { artwork_id: m[1] } })],
         ['ru', new RegExp(`^(?:пожалуйста,?\\s+)?(?:убери|удали)\\s+${RU_WORK}${ID}\\s+из\\s+избранного$`), m => ({ tool: 'remove_from_saved', input: { artwork_id: m[1] } })],
         ['ru', /^(помощь|команды|что (можно|ты умеешь))/, () => ({ help: true })],
@@ -135,12 +140,16 @@
                 : ['pages', 'page', 'страницу', 'страницы', 'страницах'].includes(kind) ? 'pages' : 'artists';
             return { tool: 'search_catalog', input: { query: scoped[2], category } };
         }
+        // Do not fall back to a different action extracted from a malformed or
+        // combined donation/report request. Search terms above remain data.
+        const reviewIntent = language === 'ru' ? /донат|пожертв|жалоб|пожаловаться/.test(heard) : /\b(?:donat\w*|report\w*|complaint\w*)\b/.test(heard);
         for (const [ruleLang, pattern, build] of GRAMMAR) {
             if (ruleLang !== language) continue;
             const match = pattern.exec(heard);
             if (!match) continue;
             const command = build(match);
-            if (SAVED_TOOLS.includes(command.tool) && (/\?/.test(transcript) || !/^[1-9][0-9]{0,77}$/.test(command.input.artwork_id) || BigInt(command.input.artwork_id) >= 2n ** 256n)) return null;
+            if (reviewIntent && !REVIEW_TOOLS.includes(command.tool)) continue;
+            if ([...SAVED_TOOLS, ...REVIEW_TOOLS].includes(command.tool) && (/\?/.test(transcript) || !/^[1-9][0-9]{0,77}$/.test(command.input.artwork_id) || BigInt(command.input.artwork_id) >= 2n ** 256n)) return null;
             if (isWrite(command)) {
                 // Never execute a financial phrase extracted from a negation,
                 // question, multiple requests, truncated number or quoted text.
@@ -160,7 +169,7 @@
 
     /** Whether a heard command may run, given the recogniser's own confidence. */
     function mayRun(command, confidence) {
-        if (!isWrite(command) && !SAVED_TOOLS.includes(command?.tool)) return true;
+        if (!isWrite(command) && !SAVED_TOOLS.includes(command?.tool) && !REVIEW_TOOLS.includes(command?.tool)) return true;
         const value = Number(confidence);
         return !(Number.isFinite(value) && value > 0 && value < WRITE_CONFIDENCE);
     }
@@ -186,6 +195,7 @@
             notice: 'Voice commands use your browser\'s speech recognition. In Chrome, the audio is sent to Google to be transcribed. ArtSoul does not record, store or receive it.\n\nTurn on voice commands?',
             micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
             help: 'Try: "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
+                '"donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
                 '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
             submitted: 'Done. The wallet approved it and the transaction was sent.',
@@ -213,6 +223,7 @@
             notice: 'Голосовые команды используют распознавание речи вашего браузера. В Chrome звук отправляется в Google для распознавания. ArtSoul его не записывает, не хранит и не получает.\n\nВключить голосовые команды?',
             micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
             help: 'Скажите: «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
+                '«донат автору работы 31», «пожаловаться на работу 31» (только открывает форму; ничего не отправляет), ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
                 '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
             submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
@@ -247,6 +258,15 @@
         }
 
         switch (tool) {
+        case 'prepare_donation':
+        case 'prepare_artwork_report': {
+            const message = ru
+                ? (tool === 'prepare_donation'
+                    ? 'Открываю Donate. Проверьте автора и введите сумму в форме. Ничего не отправлено; подпись в кошельке потребуется только после вашего подтверждения.'
+                    : 'Открываю Report. Выберите причину и заполните жалобу самостоятельно. Ничего не отправлено; сначала проверьте форму.')
+                : data.instruction;
+            return { say: message, show: message };
+        }
         case 'search_catalog': {
             const labels = ru ? { artworks: 'Работы', auctions: 'Аукционы', artists: 'Авторы', pages: 'Страницы', docs: 'Документация' }
                 : { artworks: 'Artworks', auctions: 'Auctions', artists: 'Artists', pages: 'Pages', docs: 'Documentation' };

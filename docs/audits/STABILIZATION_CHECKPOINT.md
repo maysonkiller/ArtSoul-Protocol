@@ -3,6 +3,25 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 28 B21 Donate/Report command slice IN PROGRESS, starting from production
+`13bda8e5` plus B26 release-evidence commit `77624572`:
+
+- `prepare_donation` / `prepare_artwork_report` reuse public artwork lookup and
+  shared card eligibility, then open the existing review forms. No automated
+  wallet, authentication, complaint submission or donation. Hidden/wrong-chain
+  records, malformed IDs, unsupported parameters and mixed commands fail closed.
+- English/Russian text/speech preparation, explicit no-submission copy, lazy
+  shared card policy on non-card pages. Static WebMCP/voice pins advance to 8/7.
+- 123 focused checks pass; 17 final affected checks include lazy-import cache
+  consistency. Build passes. Sixteen local built-browser cases (real public
+  apex reads proxied locally) pass: Home/Gallery/Docs/Builder, Donate/Report,
+  Classic laptop/Future mobile. No page exceptions or API writes.
+- Evidence: `B21_REVIEW_COMMANDS_2026-10-28.md`. Full tracked suite running;
+  hosted CI, preview and apex verification pending. Preserve unrelated untracked
+  authority-policy files, `.codex/` and `output/`.
+- Exactly next: finish full-suite and hosted verification, release this bounded
+  B21 slice; do not call all of Phase B complete.
+
 October 28 B26 founder-priority video follow-up RELEASED in PR #377,
 production merge `13bda8e5ffeea623d7a3f856c904516ec9885496`
 (started at `b854089b`, production baseline `537bad1`):
