@@ -39,14 +39,17 @@ Status: implemented and tested locally; release evidence follows below.
 Final affected command:
 
 ```text
-node --test test/cache-version-follows-content.test.cjs test/expired-settlement-close.test.cjs test/profile-lifecycle-action-gating.test.cjs test/voice-commands.test.cjs test/resale-listing-flow.test.cjs test/webmcp-tools.test.cjs test/webmcp-agent-actions.test.cjs
+node --test test/a12-stale-network-copy.test.cjs test/cache-version-follows-content.test.cjs test/expired-settlement-close.test.cjs test/profile-lifecycle-action-gating.test.cjs test/voice-commands.test.cjs test/resale-listing-flow.test.cjs test/webmcp-tools.test.cjs test/webmcp-agent-actions.test.cjs
 ```
 
-- 167 checks pass. Includes one-wei floor boundaries, inactive edit/removal,
+- 172 checks pass. Includes one-wei floor boundaries, inactive edit/removal,
   cancellation after transfer, stale reviews before/after approval, wallet/chain/
   adapter replacement, pending/declined/rejected confirmation, revoked access,
   strict identifiers and the shared voice/WebMCP lock.
 - `npm run build` passes, including built-route and Tailwind verification.
+- Initial CI40738564744 exposed one stale secondary cache-version assertion in
+  `a12-stale-network-copy.test.cjs`; corrected to the shipped adapter version 16.
+  The expanded affected suite above includes this regression guard.
 - Actual browser fixture: Classic/Future x 390/1366 px x EN/RU, eight journeys,
   56 checks and 32 real custom confirmation interactions. Checks initial refusal,
   list/edit/cancel, no writes before consent, inactive actions, question refusal,
