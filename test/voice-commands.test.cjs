@@ -20,6 +20,25 @@ function loadVoice(win = {}) {
 const voice = loadVoice();
 const parse = (text, lang = 'en') => voice.parseCommand(text, lang);
 
+test('publication commands preserve title data, clarify and retain review confidence', () => {
+  for (const [lang, prefix] of [['en', 'prepare artwork titled '], ['ru', 'подготовь работу с названием ']]) {
+    for (const title of ['Moonlight 🌙', 'Ночь & Свет', 'buy artwork 31', '<img src=x>', 'What is art?']) {
+      const command = parse(prefix + title, lang);
+      assert.deepEqual(command, { tool: 'prepare_artwork_registration', input: { title } });
+      assert.equal(voice.isWrite(command), false);
+      assert.equal(voice.mayRun(command, 0.2), false);
+    }
+  }
+  assert.deepEqual(parse('prepare publication'), { publicationPrompt: true });
+  assert.deepEqual(parse('подготовь работу', 'ru'), { publicationPrompt: true });
+  for (const text of ['do not prepare artwork titled Moon', 'can you prepare artwork titled Moon?', 'prepare artwork titled']) {
+    assert.equal(parse(text), null);
+  }
+  const reply = voice.describeResult('prepare_artwork_registration', { prepared: true, submitted: false, instruction: 'Review the draft. Nothing sent.' }, 'en');
+  assert.equal(reply.show, 'Review the draft. Nothing sent.');
+  assert.match(voice.describeResult('prepare_artwork_registration', { prepared: false, reason: 'Keep your edits' }, 'en').show, /Keep your edits/);
+});
+
 test('global search keeps query text as data, supports public categories and asks for a missing query', () => {
   for (const [lang, phrase, input] of [
     ['en', 'Find artists Vera', {query: 'Vera', category: 'artists'}],
