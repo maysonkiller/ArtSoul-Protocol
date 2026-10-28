@@ -106,10 +106,16 @@ source-only rollout preceded the repository release to contain ongoing egress.
 ## Remaining incident gates
 
 Real Data API and Storage read requests returned **HTTP 402** at 23:24 UTC.
-The public artwork endpoint still returned HTTP 200 with `success: true` and
+Before B31, the public artwork endpoint returned HTTP 200 with `success: true` and
 11 upstream warnings, so HTTP status alone must not be used as an availability
 check. Direct database access and the indexer remained operational. This is
 not a claim that the user-facing product is restored.
+
+PR #390 subsequently corrected that API failure response. At 23:45:58 UTC,
+both production public feed and direct artwork requests returned uncached
+HTTP 503 / `ARTWORKS_UNAVAILABLE`, as required while the source is unavailable.
+See [B31 verification](B31_PROJECTION_OUTAGE_2026-10-29.md). This is an outage
+handling correction, not provider service recovery.
 
 Fixing the consumer does not erase consumed allowance. Retain Spend Cap and
 do not move projects, delete data, reset statistics, bypass service restrictions
@@ -123,6 +129,15 @@ breakdown, restore provider service under an approved decision, verify real
 Data API/Storage and populated public results, and record post-fix egress slope.
 The historical A9 cost window does not prove present-day cost readiness.
 Phase B remains open. No financial support request was sent on the owner's behalf.
+
+For the provider restoration discussion, the evidence is ready: the notice's
+411.15 GB / 275 GB figures; roughly 101 MB database and 116 MB stored objects;
+the recurring full-history query; the correction and rollout timestamps;
+unchanged old-query counters; and one returned row per new digest calculation.
+Request the current-cycle Shared Pooler/Database/Storage egress breakdown and
+whether restoration is possible after remediation while retaining the spend
+cap. Do not describe the cumulative SQL counters as billing-cycle totals, or
+promise a quota waiver. Sending this request still requires owner authorization.
 
 ## Interpretation and rollback
 

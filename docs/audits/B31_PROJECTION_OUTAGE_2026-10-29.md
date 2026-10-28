@@ -1,6 +1,6 @@
 # B31 — Distinguish a source outage from an empty artwork feed
 
-Status: implemented; focused tests pass; exact-candidate CI/release pending.
+Status: released in PR #390; preview and production outage checks pass.
 Scope: canonical B3, public API error semantics. No protocol, schema, billing
 or permission change. This is separate from B30's indexer transfer correction.
 
@@ -33,7 +33,21 @@ entry isolation and artwork recovery suite. New cases cover feed/detail
 failure, non-cacheability, provider-detail redaction, genuine empty success,
 optional-metric degradation and immediate direct-read recovery.
 
-After deployment, verify the actual restricted provider yields HTTP 503 from
-both public feed and detail, with no successful-empty payload or cache header.
-After provider restoration, verify populated reads again. Do not infer service
-recovery from a successful code deployment or a healthy direct DB connection.
+Exact candidate `c959d7338a1839b6817953f6e804b9b80fd53258` passed CI
+40789032692: Linux 2,907 unit tests (two skips), Windows 2,510 (33 skips),
+49 contract tests per platform, both builds and static checks. The real
+PostgreSQL regression also ran on Linux. PR #390 merged as
+`1e7e27728476485972eccf3691aa8c612f3f6573` at 23:45:10 UTC on October 28.
+Production deployment 7400144007 succeeded; post-merge CI 40789507981 also
+passed on Linux and Windows, including builds and static checks.
+
+Read-only checks on the preview at 23:42 UTC and `artsoulprotocol.com` at
+23:45:58 UTC verified both `/api/public/artworks?limit=1` and
+`/api/public/artworks?id=38&limit=1` against the actual restricted provider:
+HTTP 503, `ARTWORKS_UNAVAILABLE`, `private, no-store`, and no `success` or
+`data` field. Private JSON evidence is retained under `docs/private/`.
+
+After provider restoration, verify populated reads again under B30. Do not
+infer service recovery from a successful code deployment or a healthy direct
+DB connection. Legacy frontend fallback presentation is not accepted by these
+API checks and remains a separate product verification concern.

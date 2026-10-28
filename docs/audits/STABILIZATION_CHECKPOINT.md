@@ -1,10 +1,21 @@
-October 29 B31 API follow-up: the observed quota outage returned successful-empty
-public artwork responses. Feed/direct source failures now return uncached503
-with a generic retry message; valid empty results and optional metrics behavior
-remain intact. 17 focused tests pass. See B31_PROJECTION_OUTAGE_2026-10-29.md.
-Exactly next: commit/release B31 after exact CI and verify its actual HTTP
-behavior against the existing provider restriction. This does not unblock
-Supabase or close the provider recovery gate.
+October 29 B31 RELEASED: PR #390 / main1e7e2772 / candidatec959d733.
+The observed quota outage returned successful-empty public artwork responses.
+Feed/direct source failures now return uncached503 with a generic retry message;
+valid empty results and optional metrics behavior remain intact. 17 focused
+tests pass; exact CI40789032692 passes (Linux2907/Windows2510 units, 49 contracts
+each, builds/static). Preview and production actual outage checks pass for both
+feed/detail: HTTP503, ARTWORKS_UNAVAILABLE, private/no-store, no success/data.
+Production7400144007 and post-merge CI40789507981 succeeded. See
+B31_PROJECTION_OUTAGE_2026-10-29.md. The following documentation-only commit
+records release evidence; the implementation is already on main and production.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / release HEAD1e7e2772.
+Preserve untracked policy files, .codex/, output/. No helper or paid service.
+Exactly next: obtain the correct organization's billing-cycle egress breakdown
+and an owner-approved provider restoration decision; then verify real populated
+Data API/Storage/public reads and post-fix usage slope under B30. The owner is
+away; do not request device actions now, toggle spend cap, or send a support
+message without authorization. Both technical fixes are deployed; the quota
+incident and Phase B remain open. No signed operations should be replayed.
 
 October 29 B30 quota incident: founder supplied 411.15 GB / 275 GB egress notice.
 Confirmed cause: _computeStateHash downloads all historical block hashes each
