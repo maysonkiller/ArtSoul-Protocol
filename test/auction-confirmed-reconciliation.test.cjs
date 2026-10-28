@@ -336,12 +336,14 @@ function adapter({ tx, recordError, eventName = 'AuctionCreated' } = {}) {
   api.coreContract = {
     interface: iface, getAddress: async () => CORE,
     createAuction: async () => tx,
-    auctions: async () => ({ status: 1, artworkId: 28n }),
+    auctions: async () => ({ status: eventName === 'SettlementCompleted' ? 2 : 1, artworkId: 28n, highestBid: 1n, depositLocked: 10n }),
+    settleAuction: async () => tx,
     endAuction: async () => tx,
     claimSettlementDefault: async () => tx
   };
   const args = eventName === 'AuctionCreated' ? [63n, 28n, CREATOR, ethers.parseEther('0.001'), 86400n, 1790000000n, BigInt(CHAIN)]
-    : eventName === 'AuctionEnded' ? [63n, ethers.ZeroAddress, 0n, 0n] : [63n, CREATOR, 8n, 2n];
+    : eventName === 'AuctionEnded' ? [63n, ethers.ZeroAddress, 0n, 0n]
+    : eventName === 'SettlementCompleted' ? [63n, 28n, CREATOR, 1n, 7n] : [63n, CREATOR, 8n, 2n];
   const encoded = iface.encodeEventLog(iface.getEvent(eventName), args);
   const receipt = { status: 1, hash: HASH, blockNumber: 100, logs: [{ ...encoded, address: CORE }] };
   return { api, records, receipt };
@@ -370,6 +372,52 @@ test('revert and wallet rejection never publish a confirmed auction', async () =
     await assert.rejects(() => api.createAuction(28, '0.001', 24));
     assert.equal(records.length, 0);
   }
+});
+
+test('settlement waits for a successful receipt before publishing its terminal state', async () => {
+  const pending = deferred(), sent = deferred();
+  const tx = {hash: HASH, wait: () => pending.promise};
+  const {api, records, receipt} = adapter({tx, eventName: 'SettlementCompleted'});
+  api.coreContract.settleAuction = async (id, options) => {
+    assert.equal(id, 63n); assert.equal(options.value, 0n); sent.resolve(); return tx;
+  };
+  const action = api.completeSettlement(63);
+  await sent.promise; assert.equal(records.length, 0);
+  pending.resolve(receipt);
+  assert.equal(await action, HASH);
+  assert.equal(records[0].kind, 'settled');
+  assert.equal(records[0].artwork_id, '28');
+  assert.equal(records[0].auction_id, '63');
+});
+
+test('settlement rejects failed receipts and already completed auctions before a second write', async () => {
+  for (const status of [0, 1, 3, 4]) {
+    const {api, records} = adapter({eventName: 'SettlementCompleted'});
+    api.coreContract.auctions = async () => ({status, artworkId: 28n});
+    api.coreContract.settleAuction = async () => assert.fail('must not ask for a repeat signature');
+    await assert.rejects(() => api.completeSettlement(63));
+    assert.equal(records.length, 0);
+  }
+  for (const receipt of [null, {status: 0}]) {
+    const {api, records} = adapter({eventName: 'SettlementCompleted', tx: {hash: HASH, wait: async () => receipt}});
+    await assert.rejects(() => api.completeSettlement(63));
+    assert.equal(records.length, 0);
+  }
+});
+
+test('settlement bridge closes payment during indexer lag without inventing an NFT owner or floor', async () => {
+  let projection = row({auction_id: '63', active_auction_id: '63', status: 'settlement_pending'});
+  const {db, events, store, time} = client({reply: () => ({data: [projection]})});
+  db.recordConfirmedAuction(confirmed({kind: 'settled', patch: {minted: true, token_id: '999', canonical_floor: '999', current_owner_address: 'injected'}}));
+  const bridge = db.applyConfirmedAuctionUpdate(projection);
+  assert.equal(bridge.status, 'sold'); assert.equal(bridge.active_auction_id, '');
+  assert.equal(bridge.pending_auction_sync, true);
+  for (const key of ['minted', 'token_id', 'canonical_floor', 'current_owner_address']) assert.equal(bridge[key], projection[key]);
+  assert.equal(events.at(-1).type, 'artsoul:auction-confirmed');
+  assert.equal(client({store, time}).db.applyConfirmedAuctionUpdate(projection).status, 'sold');
+  projection = {...projection, status: 'sold', minted: true, token_id: '7', canonical_floor: '0.001', current_owner_address: CREATOR, active_auction_id: ''};
+  assert.deepEqual(plain(db.applyConfirmedAuctionUpdate(projection)), projection);
+  assert.equal(db.applyConfirmedAuctionUpdate(row({auction_id: '64', status: 'auction'})).status, 'auction');
 });
 
 test('a verified gas-only replacement publishes the actual confirmed replacement hash', async () => {
@@ -586,4 +634,37 @@ test('open artwork applies repricing and cancellation before a slow refresh can 
     assert.equal(displayed.canonical_floor,'0.01');
     assert.equal(displayed.current_owner_address,OWNER);
   }
+});
+
+test('homepage refreshes settled receipts immediately and when returning from another tab', async () => {
+  const source = fs.readFileSync('src/entries/index.js', 'utf8');
+  const start = source.indexOf('        loadHomeArtworks();');
+  const end = source.indexOf('        window.showSection = showSection;', start);
+  assert.ok(start >= 0 && end > start);
+  const api = client({ reply: () => ({ data: [row({ auction_id: '63', status: 'awaiting_payment' })] }) });
+  const pending = [];
+  let displayed;
+  let onVisibility;
+  const document = { visibilityState: 'visible', addEventListener(type, callback) {
+    assert.equal(type, 'visibilitychange'); onVisibility = callback;
+  } };
+  vm.runInNewContext(source.slice(start, end), {
+    window: api.window, document,
+    loadHomeArtworks() {
+      const task = api.db.getPublicProjectionArtworks({ limit: 100 }).then(rows => { displayed = rows[0]; });
+      pending.push(task); return task;
+    }
+  });
+  await Promise.all(pending);
+  assert.equal(displayed.status, 'awaiting_payment');
+  api.db.recordConfirmedAuction(confirmed({ kind: 'settled' }));
+  assert.equal(pending.length, 2, 'receipt triggers refresh without navigation');
+  await Promise.all(pending);
+  assert.equal(displayed.status, 'sold', 'stale API cannot restore payment state');
+  document.visibilityState = 'hidden'; onVisibility();
+  assert.equal(pending.length, 2);
+  document.visibilityState = 'visible'; onVisibility();
+  assert.equal(pending.length, 3, 'returning tab rechecks a pending settlement bridge');
+  await Promise.all(pending);
+  assert.equal(displayed.status, 'sold');
 });

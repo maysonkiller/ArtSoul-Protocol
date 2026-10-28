@@ -923,9 +923,13 @@ let morphActive = false;
         // The entry is mounted after the homepage markup, so discovery can start
         // immediately without waiting for the independently deferred wallet module.
         loadHomeArtworks();
+        window.addEventListener('artsoul:auction-confirmed', loadHomeArtworks);
         window.addEventListener('artsoul:resale-confirmed', loadHomeArtworks);
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && window.ArtSoulDB?.confirmedResaleUpdates?.().length) void loadHomeArtworks();
+            if (document.visibilityState === 'visible' && (
+                window.ArtSoulDB?.confirmedAuctionUpdates?.().length ||
+                window.ArtSoulDB?.confirmedResaleUpdates?.().length
+            )) void loadHomeArtworks();
         });
 
         window.showSection = showSection;

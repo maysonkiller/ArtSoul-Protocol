@@ -508,7 +508,8 @@ class ArtSoulContracts {
             const event = await this.waitForEvent(receipt, eventName);
             if (!event) return;
             const args = event.args;
-            const kind = eventName === 'AuctionCreated' ? 'created' : eventName === 'AuctionEnded' ? 'ended' : 'defaulted';
+            const kind = {AuctionCreated: 'created', AuctionEnded: 'ended', SettlementDefaulted: 'defaulted', SettlementCompleted: 'settled'}[eventName];
+            if (!kind) return;
             window.ArtSoulDB?.recordConfirmedAuction?.({
                 chain_id: 84532,
                 artwork_id: String(args.artworkId ?? context.artworkId),
@@ -554,13 +555,15 @@ class ArtSoulContracts {
         this.ensureCore();
         const auctionId = await this.resolveAuctionId(id, options);
         const auction = await this.getAuctionStruct(auctionId);
+        if (Number(auction.status) !== 2) throw new Error('This auction is not awaiting payment. Refresh the artwork to see its current state.');
         const remainingPayment = auction.highestBid > auction.depositLocked
             ? auction.highestBid - auction.depositLocked
             : 0n;
         const tx = await this.coreContract.settleAuction(auctionId, { value: remainingPayment });
         console.log('Completing V4.1 settlement...', tx.hash);
-        await tx.wait();
-        return tx.hash;
+        const receipt = await this.waitForConfirmedTransaction(tx);
+        await this.publishAuctionReceipt(receipt, 'SettlementCompleted', {artworkId: auction.artworkId});
+        return receipt.hash;
     }
 
     async claimSettlementDefault(id, options = {}) {

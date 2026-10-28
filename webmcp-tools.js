@@ -1189,10 +1189,11 @@
                         const transactionHash = await contracts.completeSettlement(artworkId, { idType: 'artwork' });
                         return JSON.stringify({
                             submitted: true,
+                            confirmed: true,
                             approved_by: 'the person, in their own wallet',
                             artwork_id: artworkId,
                             transaction_hash: transactionHash || null,
-                            note: 'Once this confirms, the NFT is minted to the winner and becomes its First Collector.',
+                            note: 'Settlement confirmed. The NFT is minted to the winner, its First Collector. Indexed details may still be updating.',
                             url
                         });
                     } catch (error) {

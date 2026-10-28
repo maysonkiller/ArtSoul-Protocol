@@ -198,6 +198,30 @@ test('double submit and closing/reopening cannot replay an in-flight wallet requ
   assert.equal(h.get('.artsoul-voice-answer').textContent, 'Declined in wallet');
 });
 
+test('successful wallet actions clear the composer and offer safe next steps without replay', async () => {
+  const hash = '0x' + 'ab'.repeat(32);
+  const h = harness({execute: async () => JSON.stringify({submitted: true, transaction_hash: hash, url: '/artwork/31'})});
+  h.open(); h.submit('buy artwork 31'); await flush();
+  assert.equal(h.get('input').value, '');
+  assert.match(h.get('input').placeholder, /next/);
+  assert.equal(h.get('.artsoul-voice-send').disabled, true);
+  assert.deepEqual(h.get('.artsoul-voice-results').children.map(link => link.href), ['/artwork/31', `https://sepolia.basescan.org/tx/${hash}`]);
+  assert.equal(h.get('.artsoul-voice-results').children[1].rel, 'noopener noreferrer');
+  h.get('form').fire('submit'); await flush(); assert.equal(h.calls.length, 1);
+  h.get('input').value = 'my activity'; h.get('input').fire('input');
+  assert.equal(h.get('.artsoul-voice-send').disabled, false);
+});
+
+test('declined and failed wallet commands retain the draft for an explicit retry', async () => {
+  for (const result of [{submitted: false, reason: 'Declined'}, {error: 'Network unavailable'}]) {
+    const h = harness({execute: async () => JSON.stringify(result)});
+    h.open(); h.submit('buy artwork 31'); await flush();
+    assert.equal(h.get('input').value, 'buy artwork 31');
+    assert.equal(h.get('.artsoul-voice-send').disabled, false);
+    assert.equal(h.get('.artsoul-voice-results').children.length, 0);
+  }
+});
+
 test('a late response does not reopen a closed panel or speak after closing', async () => {
   let finish; const h = harness({speech: true, execute: () => new Promise(resolve => {finish = resolve;})});
   h.open(); h.get('.artsoul-voice-mic').fire('click'); await flush();

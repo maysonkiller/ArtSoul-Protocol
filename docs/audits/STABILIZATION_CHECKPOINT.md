@@ -1,14 +1,34 @@
+October 28 B12/B21 continuation: real Russian microphone/read/spoken reply passed
+(owner confirmed audio); Taes artwork38 / auction73 ended and settled through
+owner-operated Rabby. Two RPCs prove token7, owner, 0.001 ETH floor, zero payment
+value, and +0.009 ETH winner credit. NEVER replay these operations. See
+B12_SETTLEMENT_COMPLETION_2026-10-28.md for hashes and precise evidence.
+A missing settlement receipt refresh and an armed completed command reproduced.
+Local patch: shared settled bridge, early repeat-settlement rejection, cleared
+successful composer, result links, translated activity. 204 tests and build pass;
+desktop/mobile fixture rendering passes. Release pending.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / starting HEAD33497c9c.
+Preserve unrelated untracked files. No active helper or paid provider.
+Exactly next: review and release this B12 completion patch, then verify hosted
+assets and Taes UI read-only. No new signature is required for this fix.
+
 October 28 B05 tooling RELEASED in PR #386, main cc7db8dc.
 Linux CI40755921705 executed the new PostgreSQL concurrency check successfully;
 Windows/build/static checks pass. Post-merge CI40756740467 and production7395560251
 succeeded. B05/B4 current-schema readiness is done; final capture remains C16.
 Two live read-only in-memory rehearsals agree; no final archive or reset occurred.
 
-October 28 B18 Future account control: local CSS refinement complete; 143 checks,
-build and 40 browser presentation cases pass. See B18_ACCOUNT_CONTROL_2026-10-28.md.
-Exactly next: publish this bounded styling slice after hosted preview/CI, then
-continue B18 capability labels. Owner-dependent signatures/audio wait; Phase B
-remains open. Preserve unrelated untracked policy files, .codex/ and output/.
+October 28 B18 account surface RELEASED in PR #387, candidate 8bde2319,
+production/main af7451c4. CI40758384305 and production7395897642 pass;
+preview/apex each verify eight routes and exact CSS. 143 affected tests/build
+and 40 built-header presentation cases pass. See B18_ACCOUNT_CONTROL_2026-10-28.md.
+New hosted screenshot blocked by Chrome extension UI; owner is away, no action
+requested. Temporary viewport reset and fixture server stopped. No active helper.
+Workspace C:\Projects\ArtSoul, branch codex/takeover-audit; HEAD advances with
+this evidence commit. Preserve unrelated untracked policy files, .codex/, output/.
+Exactly next: B18 capability-label/final visual reconciliation against actual
+collection/assistant availability; do not label an undeployed feature as active.
+Signed assistant/native audio checks wait for the owner's return. Phase B open.
 
 October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
 verify receipts, mapping, owner and unchanged floor; see
