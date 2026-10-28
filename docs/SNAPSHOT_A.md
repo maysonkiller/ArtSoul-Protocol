@@ -89,8 +89,11 @@ Run this on the announced cut-off date, before any destructive step.
 node scripts/export-snapshot-a.mjs --out ../snapshot-a --cut-off <ISO-8601 UTC>
 ```
 
-Needs `DATABASE_URL`. The output goes outside the repository and is never
-committed: it is a data export, not source.
+Needs `DATABASE_URL`, an explicit cut-off and a new output directory inside an
+existing parent. Existing directories are refused before connecting; file writes
+are exclusive. A failed partial capture remains inspectable and must not be
+reused. Tables are read in one repeatable-read, read-only transaction; any failed
+read rolls it back. The output goes outside the repository and is never committed.
 
 **2. Retain the capture root independently, then export again from the same
 stabilized source to a new directory and compare the root hashes.**
@@ -142,11 +145,24 @@ Three regressions reproduced against the earlier verifier: a removed data file
 also removed from a recomputed manifest was accepted; a JSON `null` manifest
 threw; a fully rewritten internally consistent archive had no trusted-root
 comparison. The repaired verifier rejects these cases. The focused suite has
-26 passing tests, including section/chain/column/count corruption, arbitrary
+27 passing local tests, including section/chain/column/count corruption, arbitrary
 manifest paths, invalid JSON, CLI exit codes and an isolated verifier package.
-No database read, final capture, storage upload or reset was performed.
+No final capture, archive storage upload or reset was performed. The capture
+follow-up adds the consistent read-only view, rollback and no-overwrite guards.
+A PostgreSQL 17 integration test commits a concurrent update between table reads,
+checks that capture still sees the earlier state, rejects a write and verifies
+rollback. Local Docker was unavailable; its CI result must be recorded separately.
 
-B05 remains in progress: final-contract schema alignment, consistent read-view
-capture and a fresh rehearsal still need evidence before the late-C capture.
-The existing exporter also needs a no-overwrite output guard before operational
-use. These capture concerns are separate from this offline verifier patch.
+At `2026-10-28T19:35:52Z`, a read-only in-memory rehearsal against the pinned live
+testnet database completed twice with the same root
+`bbc6aa0e2d277f442427479ee939534952c75e140ef74ec55513b80a21060a00`.
+Both transactions report `repeatable read` / `read_only=on`. Counts: 38 artworks,
+73 auctions, 15 bids, six completed settlements, three resales, ten participating
+addresses; primary settled volume `23200000000000000` wei. Both in-memory archives
+pass the verifier. Only hashes/counts and transaction-mode evidence were saved
+privately; no archive data files or final Snapshot A were written. This confirms
+the current schema/read path, not a final cut-off or two durable copies.
+
+Final-contract schema alignment and a fresh stabilized-source rehearsal remain
+required before the late-C capture. Current schema version 1 is not automatically
+valid for future contract projections.

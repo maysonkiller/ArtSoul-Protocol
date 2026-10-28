@@ -410,3 +410,30 @@ test('CLI distinguishes consistency from a trusted copy and rejects incomplete o
     fs.rmSync(directory, { recursive: true });
   }
 });
+
+test('export refuses existing output and missing cut-off before any database connection', async () => {
+  const { writeSnapshotFiles } = await import('../scripts/export-snapshot-a.mjs');
+  const { files } = await build();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'artsoul-export-'));
+  const directory = path.join(root, 'capture');
+  const script = path.join(__dirname, '..', 'scripts', 'export-snapshot-a.mjs');
+  try {
+    writeSnapshotFiles(directory, files);
+    assert.throws(() => writeSnapshotFiles(directory, { 'manifest.json': 'replacement' }), /EEXIST/);
+    assert.equal(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'), files['manifest.json']);
+    const run = (...args) => spawnSync(process.execPath, [script, ...args], {
+      encoding: 'utf8', env: { ...process.env, DATABASE_URL: '' }
+    });
+    const existing = run('--out', directory, '--cut-off', '2026-10-28T00:00:00Z');
+    assert.equal(existing.status, 1);
+    assert.match(existing.stderr, /Output directory already exists/);
+    const missingCutOff = run('--out', path.join(root, 'new'));
+    assert.equal(missingCutOff.status, 1);
+    assert.match(missingCutOff.stderr, /explicit ISO-8601/);
+    assert.equal(fs.existsSync(path.join(root, 'new')), false);
+  } finally {
+    assert.equal(path.dirname(root), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(root).startsWith('artsoul-export-'));
+    fs.rmSync(root, { recursive: true });
+  }
+});

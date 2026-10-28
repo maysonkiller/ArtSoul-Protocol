@@ -1,10 +1,13 @@
 October 28 B05 independent follow-up from HEAD 86434e4: three offline verifier
 failures reproduced, then repaired. Required archive files/shape, derived counts
 and participants are checked; --expected-root anchors the copy to a separately
-trusted capture record. 26 focused checks pass, including isolated CLI execution.
-No DB read, archive capture, storage upload or reset. Patch/release pending.
-Exactly next: release this verifier patch after CI, then address the remaining
-B05 consistent capture/no-overwrite guard without producing the final Snapshot A.
+trusted capture record. Capture now uses a repeatable-read, read-only transaction
+and refuses to overwrite an existing directory. 27 local checks pass; one real
+PostgreSQL concurrency test is skipped locally because Docker is unavailable.
+Two live read-only in-memory rehearsals agree on root bbc6aa0e2d277f442427479ee939534952c75e140ef74ec55513b80a21060a00.
+Only count/hash evidence saved; no archive data files, final cut-off, upload or reset.
+Exactly next: release the B05 patch after Linux/Windows CI and the PostgreSQL
+concurrency result; preserve the late-C final-capture requirement.
 The owner is away; wallet/native microphone acceptance waits. Keep Phase B open.
 
 October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
