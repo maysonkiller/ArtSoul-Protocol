@@ -1,8 +1,9 @@
 # Voice, agent tools and future network scope
 
 Status: text/header, explicit Saved and global search slices released October 26;
-Donate/Report review released October 28; publication draft review implemented
-locally October 28, release verification recorded separately. Broader conversation planned.
+Donate/Report review released October 28; publication draft review released
+October 28 in PR #380 / `26883c59`, with exact CI and hosted-browser evidence in
+`audits/B21_PUBLICATION_DRAFT_2026-10-28.md`. Broader conversation planned.
 Source: founder requests of October 25, 2026. Related: B-08, B-09, B-12,
 B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
 

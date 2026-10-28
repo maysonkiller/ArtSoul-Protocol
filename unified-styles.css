@@ -5885,8 +5885,8 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     }
 
     .site-header .logo-link {
-        width: 40px;
-        height: 40px;
+        width: var(--header-mobile-logo-size, 40px);
+        height: var(--header-mobile-logo-size, 40px);
     }
 
     .site-header .site-logo,
@@ -5894,10 +5894,10 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     body.future .site-header .logo-link > .site-logo,
     html.classic .site-header .logo-link > .site-logo,
     html.future .site-header .logo-link > .site-logo {
-        width: 40px !important;
-        height: 40px !important;
-        max-width: 40px !important;
-        max-height: 40px !important;
+        width: var(--header-mobile-logo-size, 40px) !important;
+        height: var(--header-mobile-logo-size, 40px) !important;
+        max-width: var(--header-mobile-logo-size, 40px) !important;
+        max-height: var(--header-mobile-logo-size, 40px) !important;
     }
 
     .site-header #navButtons,
@@ -5914,9 +5914,9 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         width: 168px !important;
         min-width: 168px !important;
         max-width: 168px !important;
-        height: 42px !important;
-        min-height: 42px !important;
-        max-height: 42px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+        max-height: 44px !important;
         gap: 3px !important;
         justify-content: center !important;
         padding: 4px !important;
@@ -6920,18 +6920,34 @@ dialog.artsoul-search-dialog[open] { display: flex; flex-direction: column; }
 }
 
 @media (max-width: 480px) {
+    /* Share the available space with the three 44px tools instead of clipping
+       the identity inside an unnecessarily narrow fixed text column. */
+    .site-header-shell { padding-inline: 6px !important; }
     .site-header #navButtons,
     .site-header #navButtons .avatar-dropdown-container,
-    .site-header #navButtons .avatar-button { width: 144px !important; min-width: 144px !important; max-width: 144px !important; }
-    .site-header #navButtons .avatar-info { width: 84px !important; min-width: 0 !important; max-width: 84px !important; flex-basis: 84px !important; }
+    .site-header #navButtons .avatar-button { width: 160px !important; min-width: 160px !important; max-width: 160px !important; }
+    .site-header #navButtons .avatar-info { width: auto !important; min-width: 0 !important; max-width: none !important; flex: 1 1 0 !important; }
     .site-header #navButtons .avatar-info > div { width: 100% !important; max-width: 100% !important; }
     .site-header #navButtons .avatar-dropdown-arrow,
     .site-header #navButtons .menu-chevron { display: none; }
     .site-header-row { gap: 0.25rem; }
 }
-@media (max-width: 360px) {
+@media (max-width: 374px) {
+    .site-header { --header-mobile-logo-size: 32px; }
+    .site-header-row { grid-template-columns: 32px minmax(0, 1fr); gap: 2px; }
+    .site-header-actions { gap: 2px; }
     .site-header #navButtons,
     .site-header #navButtons .avatar-dropdown-container,
-    .site-header #navButtons .avatar-button { width: 100px !important; min-width: 100px !important; max-width: 100px !important; }
-    .site-header #navButtons .avatar-info { width: 48px !important; max-width: 48px !important; flex-basis: 48px !important; }
+    .site-header #navButtons .avatar-button { width: 120px !important; min-width: 120px !important; max-width: 120px !important; }
+    /* Guest identity can use both lines normally occupied by name/address.
+       Keep the avatar and interactive targets intact on the narrowest phones. */
+    .site-header #navButtons .avatar-info { height: 32px !important; }
+    .site-header #navButtons .avatar-info:has([data-avatar-address][hidden]) [data-avatar-name] {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        flex-shrink: 0;
+    }
 }
