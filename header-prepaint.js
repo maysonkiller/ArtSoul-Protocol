@@ -77,7 +77,7 @@
 
     const hydrate = (container) => {
         const inbox = document.getElementById('header-notifications');
-        if (inbox) { inbox.hidden = !notificationWallet; inbox.dataset.notificationWallet = notificationWallet; }
+        if (inbox) { inbox.hidden = false; inbox.dataset.notificationWallet = notificationWallet; }
         if (!container) return false;
         const button = container.querySelector('.avatar-button');
         const image = button?.querySelector('[data-avatar-image]');

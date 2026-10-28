@@ -3,12 +3,29 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 28 B28 mobile account header correction is locally verified from
-`26883c59`: full guest/unnamed labels, contained avatar, fixed mobile touch
-targets and static/hydrated geometry. CSS only, v59 on all consumers. 170
+October 28 B29 guest notification entry is locally implemented from `aad01970`.
+The existing header gap is replaced by an always-visible bell with a native
+explanation and explicit Connect wallet action. No guest private reads/imports;
+wallet/generation/BFCache fences remain. 29 controller checks, 336 broader
+notification/header checks, 125 overlapping layout/cache checks and build pass.
+48 local rendered cases and four script-blocked first-paint keyboard/AX cases
+pass; no physical-phone acceptance inferred. See
+`B29_GUEST_NOTIFICATIONS_2026-10-28.md`. Preserve unrelated untracked files.
+Exactly next: candidate CI, preview, authorized merge/release and apex check.
+
+October 28 B28 mobile account header correction RELEASED in PR #381, candidate
+`329f98dc`, production/implementation HEAD `9faffe2d7797b2caec111ad7da2922d49bb33a74`.
+Full guest/unnamed labels, contained avatar, fixed mobile touch targets and
+static/hydrated geometry. CSS only, v59 on all consumers. 170
 affected checks, build, 176 rendered layouts / 704 presentation states and four
-reload cases pass. See `B28_MOBILE_ACCOUNT_2026-10-28.md`.
-Next: exact candidate CI and hosted release verification for this header patch.
+reload cases pass. Exact candidate CI40716480161 passes; preview and apex each
+pass 32 guest browser cases and eight-route/exact stylesheet checks. Production
+deployment7389878595 and post-merge CI40717354429 succeeded. Owned preview4228
+and browser `b21draft` closed; no helper remains active.
+See `B28_MOBILE_ACCOUNT_2026-10-28.md`.
+Next: exercise the B12/B21 integrated agent journey through public search,
+explicit Saved changes and reviewed publication preparation; keep paid provider
+setup deferred and record any real-wallet prerequisites separately. Phase B is open.
 
 October 28 B21 publication draft review RELEASED in PR #380, candidate `b88f1aa5`,
 production/current HEAD `26883c59a05f1de524c033667facd7a38e25262b` (same tree).

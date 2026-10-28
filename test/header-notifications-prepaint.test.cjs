@@ -25,12 +25,15 @@ test('prepaint restores only a generic bell for the matching previously connecte
   }
 });
 
-test('guest, explicit desktop disconnect and mismatched cache never prepaint a bell', () => {
+test('guests, explicit desktop disconnect and mismatched cache retain the generic bell without a wallet hint', () => {
   for (const storage of [{}, {...cached(), '@appkit/connection_status': 'disconnected'},
     {...cached(), artsoul_header_ui_state: 'disconnected'}, {...cached(), artsoul_wallet: B},
     {...cached(), artsoul_header_identity: '{malformed'}, {...cached(), artsoul_wallet: 'not-a-wallet'}]) {
     const {h, host, hint} = paint(storage);
-    assert.equal(host.hidden, true); assert.equal(hint, ''); assert.equal(host.dataset.notificationWallet, '');
+    assert.equal(host.hidden, false); assert.equal(hint, ''); assert.equal(host.dataset.notificationWallet, '');
     assert.equal(h.accessCalls.length, 0);
+    assert.equal(h.context.currentWalletAddress, undefined);
+    assert.equal(h.context.artsoulWalletStateSettled, false);
+    assert.equal(h.dropdown.protocolAdminEligible, false);
   }
 });
