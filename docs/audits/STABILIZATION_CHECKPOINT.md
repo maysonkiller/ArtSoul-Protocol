@@ -1,14 +1,14 @@
-October 28 B05 independent follow-up from HEAD 86434e4: three offline verifier
-failures reproduced, then repaired. Required archive files/shape, derived counts
-and participants are checked; --expected-root anchors the copy to a separately
-trusted capture record. Capture now uses a repeatable-read, read-only transaction
-and refuses to overwrite an existing directory. 27 local checks pass; one real
-PostgreSQL concurrency test is skipped locally because Docker is unavailable.
-Two live read-only in-memory rehearsals agree on root bbc6aa0e2d277f442427479ee939534952c75e140ef74ec55513b80a21060a00.
-Only count/hash evidence saved; no archive data files, final cut-off, upload or reset.
-Exactly next: release the B05 patch after Linux/Windows CI and the PostgreSQL
-concurrency result; preserve the late-C final-capture requirement.
-The owner is away; wallet/native microphone acceptance waits. Keep Phase B open.
+October 28 B05 tooling RELEASED in PR #386, main cc7db8dc.
+Linux CI40755921705 executed the new PostgreSQL concurrency check successfully;
+Windows/build/static checks pass. Post-merge CI40756740467 and production7395560251
+succeeded. B05/B4 current-schema readiness is done; final capture remains C16.
+Two live read-only in-memory rehearsals agree; no final archive or reset occurred.
+
+October 28 B18 Future account control: local CSS refinement complete; 143 checks,
+build and 40 browser presentation cases pass. See B18_ACCOUNT_CONTROL_2026-10-28.md.
+Exactly next: publish this bounded styling slice after hosted preview/CI, then
+continue B18 capability labels. Owner-dependent signatures/audio wait; Phase B
+remains open. Preserve unrelated untracked policy files, .codex/ and output/.
 
 October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
 verify receipts, mapping, owner and unchanged floor; see

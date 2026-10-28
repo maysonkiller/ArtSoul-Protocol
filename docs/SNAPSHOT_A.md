@@ -166,3 +166,7 @@ the current schema/read path, not a final cut-off or two durable copies.
 Final-contract schema alignment and a fresh stabilized-source rehearsal remain
 required before the late-C capture. Current schema version 1 is not automatically
 valid for future contract projections.
+
+## October 28 tooling release
+
+PR #386, `cc7db8dc`, released after CI40755921705 passed: Linux 2,892 passing checks (two unrelated skips), Windows 2,496 (33 environment-dependent skips), builds and contract suites. The new PostgreSQL concurrency check **executed and passed on Linux**. Production deployment7395560251 succeeded. B05/B4 current-schema tooling readiness is complete; the final capture and independent durable-copy gate remain C16.
