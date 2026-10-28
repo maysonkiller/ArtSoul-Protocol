@@ -19,7 +19,9 @@ October 28 B26 founder-priority video follow-up, implementation verified locally
 - Current social preview: 32 crawler metadata requests, 12 images and three
   aliases pass. Telegram's stored old preview is not a successful cache purge.
 - Evidence and interpretation ledger: `B26_COMPACT_PAGES_2026-10-28.md`.
-  Full tracked unit run is in progress; exact-candidate release is pending.
+  Full tracked run: 2820 passed, one obsolete exact-60px provider-row expectation.
+  Updated that assertion to retain the 44px minimum touch target. Exact-candidate
+  CI and release verification are pending.
 - Preserve unrelated `.codex/`, `output/`, `src/api/moderation-authority-policy.js`
   and `test/moderation-authority-policy.test.mjs`. Include the new image-control
   test only with this slice. No contracts, economic changes or signing.

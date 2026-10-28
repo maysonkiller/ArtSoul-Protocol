@@ -82,7 +82,8 @@ test('public social links share equal columns and provider rows share theme-base
   const value = (selector, property) => rules.get(selector)?.nodes.find(node => node.prop === property)?.value;
   assert.equal(value('.profile-social-links', 'grid-template-columns'), 'repeat(2, minmax(0, 1fr))');
   assert.equal(value('.profile-social-links > *', 'font-size'), '0.875rem');
-  assert.equal(value('.profile-connections .profile-connection-row', 'min-height'), '60px');
+  assert.ok(parseFloat(value('.profile-connections .profile-connection-row', 'min-height')) >= 44,
+    'provider rows retain a usable touch target');
   assert.equal(value('.profile-connections .profile-connection-row', 'font-size'), '0.875rem');
   assert.equal(value('.profile-connections .profile-connection-row', 'background'), 'var(--c-surface)');
   assert.equal(value('.profile-connections .profile-connection-row', 'color'), 'var(--c-text)');

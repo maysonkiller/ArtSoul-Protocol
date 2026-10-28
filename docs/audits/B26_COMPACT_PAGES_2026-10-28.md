@@ -61,6 +61,7 @@ physical-phone or financial acceptance. Screenshots were inspected.
 | Artwork image controls | Eight browser cases pass: native modal state, original link, visible/keyboard activation, background focus exclusion, Escape/close and focus/overflow restoration. Five source behavior tests cover image/GIF and rejected URLs/guards. |
 | Social preview HTTP | 32 metadata requests, 12 images and three aliases pass across browser/Telegram/X/Facebook agents. Current homepage and generic fallback use the new banner. |
 | Independent bounded review | No actionable findings in final compact/header cascade, image dialog, theme separation or Donate sorting. |
+| Full local tracked unit run | 2820 passed; one outdated provider-row assertion expected exactly 60px. Replaced that arbitrary size expectation with the 44px minimum touch-target invariant; exact-candidate CI must pass before release. |
 | Whitespace | `git diff --check` passes. |
 
 At 1366x700, the homepage Spotlight heading moves from y=664.64 to y=370.42;
