@@ -1,7 +1,7 @@
 # B30 — Database egress incident
 
-Status: confirmed indexer defect fixed on the active Base Sepolia host;
-repository CI/release pending. Provider quota restriction remains open.
+Status: indexer correction deployed and released in PR #389; provider quota
+restriction remains open.
 Work date: October 29, 2026 in Europe/Warsaw; measurements below use UTC.
 Scope: canonical B2/B3, indexer/database operations, Bible sections 1 and 15.
 No contract, economic, lifecycle, permission or schema change.
@@ -12,6 +12,10 @@ The founder supplied a Supabase notice reporting 411.15 GB of 275 GB egress
 and restriction until November 24. These are the notice's billing figures,
 not an independently retrieved usage dashboard. The available dashboard
 session belongs to a different organization; no billing setting was changed.
+The existing CLI later confirmed access to the correct ArtSoul organization
+and its single ArtSoul project, reported `ACTIVE_HEALTHY`. This project status
+does not override the measured Data API/Storage restriction. The CLI's available
+organization commands do not expose the billing-cycle egress breakdown.
 
 The active database measured 100,912,275 bytes; Storage metadata recorded
 159 objects totaling 115,603,645 bytes. Egress is cumulative network transfer,
@@ -67,19 +71,37 @@ zero unresolved, failed or dead events, and zero recent RPC errors. The new
 query's execution time over this interval averaged about 43 ms. This is a
 bounded observation, not a future monthly usage guarantee.
 
+At 23:31 UTC an RPC latency spike coincided with lag 85 (`isSynced: false`),
+while digest counters still showed one row per call and zero hash mismatches.
+The bounded follow-up at 23:32 UTC found lag 12 and synchronization restored,
+with one recent RPC error and zero failed/dead events. No cursor reset,
+threshold relaxation or second process restart was used. Record this transient
+degradation rather than treating all samples as continuously synchronized.
+
 ## Regression and acceptance
 
 - New transport tests reject a second history round trip and propagate query
   failures without retry/fallback writes.
 - Disposable PostgreSQL regression exercises 2,048 reverse-inserted blocks,
   multiple cutoffs, chain isolation, empty input and response below 100 bytes.
-  Docker is unavailable locally; this test must execute in Linux CI.
+  Docker is unavailable locally; this test passed in Linux CI.
 - Local full unit run: 2,535 passed, 33 skipped, no failures. That run includes
   the existing unrelated untracked policy tests, which are not part of this
-  change; exact committed-candidate CI results must be recorded separately.
+  change; exact committed-candidate CI results are recorded below.
 - Private read-only measurements and the bounded rollout journal are retained
   under `docs/private/` and the host recovery directory. They are not public
   source files and contain no emitted credential values.
+
+## Repository release
+
+PR #389 merged exact candidate `38bbf544700b4a6ee7122a4c34c4b28182509dc3`
+as main `25bd610247e823a985535fa3658b7193acd9b17f` on October 28 at
+23:33:45 UTC. Candidate CI **40787623379** passes: Linux 2,903 unit checks
+(two skips), Windows 2,506 (33 skips), 49 contract tests on each platform,
+both builds and static checks. The new disposable PostgreSQL transport/parity
+subtest executed successfully on Linux. Production deployment 7399975277
+succeeded; post-merge CI 40788220794 also passed. The active host's
+source-only rollout preceded the repository release to contain ongoing egress.
 
 ## Remaining incident gates
 

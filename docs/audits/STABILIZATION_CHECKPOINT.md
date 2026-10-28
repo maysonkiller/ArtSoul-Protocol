@@ -1,3 +1,11 @@
+October 29 B31 API follow-up: the observed quota outage returned successful-empty
+public artwork responses. Feed/direct source failures now return uncached503
+with a generic retry message; valid empty results and optional metrics behavior
+remain intact. 17 focused tests pass. See B31_PROJECTION_OUTAGE_2026-10-29.md.
+Exactly next: commit/release B31 after exact CI and verify its actual HTTP
+behavior against the existing provider restriction. This does not unblock
+Supabase or close the provider recovery gate.
+
 October 29 B30 quota incident: founder supplied 411.15 GB / 275 GB egress notice.
 Confirmed cause: _computeStateHash downloads all historical block hashes each
 poll (9.25 MB in the measured history). Same SHA-256 now computed inside PG.
@@ -5,15 +13,21 @@ Active host source-only correction deployed after stored-hash parity, six real
 read-only SQL fixtures and 18 focused checks. Worker stopped 23:16:14 and resumed
 23:21:22 UTC October 28; cursor preserved, old query stopped, new query returns
 one row per call, healthy/synced and zero event failures. See
-B30_DATABASE_EGRESS_2026-10-29.md. Full local units 2535 pass/33 skip including
-unrelated untracked policy tests; exact candidate CI still pending.
+B30_DATABASE_EGRESS_2026-10-29.md. Released PR #389 / main25bd6102; exact candidate
+CI40787623379 passes (Linux2903/Windows2506 units, 49 contracts each, both builds,
+static). The 2048-block PostgreSQL regression executed on Linux. Production
+7399975277 succeeded; post-merge CI40788220794 also passes.
 Data API and Storage genuinely return HTTP402; public HTTP200 with warnings
-does not prove recovery. Correct billing organization unavailable in current
-browser session. No spend-cap, paid service, schema, cursor or contract change.
-Workspace C:\Projects\ArtSoul / codex/takeover-audit / starting HEAD be066f44.
+does not prove recovery. Browser has another organization; existing CLI confirms
+the correct ArtSoul organization/project but does not expose billing-cycle usage.
+No spend-cap, paid service, schema, cursor or contract change. One RPC-lag spike
+to 85 recovered to 12 without intervention; no state-hash mismatch/event failure.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / release HEAD25bd6102.
 Preserve untracked policy files, .codex/, output/. No active helper agents.
-Exactly next: commit the bounded B30 patch, execute exact-candidate CI and record
-release; provider restoration/usage breakdown remains an owner-access gate.
+Exactly next: reject the observed successful-empty public API response during
+source failure; provider restoration remains separate before live acceptance.
+Do not replay earlier assistant transactions or interpret HTTP200 fallback as
+service recovery. Technical containment is complete; provider incident is open.
 
 October 28 B12/B21 continuation: real Russian microphone/read/spoken reply passed
 (owner confirmed audio); Taes artwork38 / auction73 ended and settled through
