@@ -3,26 +3,45 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 28 13:59 video follow-up B27 is implemented locally, starting at
-`23711dca` after the B21 release. Compact image icons/menu with public-original
-download, tall-desktop density, 200px homepage gap removal, compact publish type
-navigation and outgoing bell continuity. Rendered verification also found an
-obsolete roadmap float rule moving the entire homepage; removed its positional
-selectors/keyframes. No contract/economic/auth boundary changes.
+October 28 B21 publication draft review is locally implemented from `5580a430`;
+release verification pending. Reuses `prepare_artwork_registration`, preserves
+files/recovery, stages suggestions for explicit review, adds bounded EN/RU
+commands and waits for delayed wallet restoration. No paid provider/key/API.
+131 focused checks and build pass. Initial full tracked suite had two outdated
+cache pins (corrected) and two disposable database startup/shutdown failures;
+both database suites pass sequentially (38 assertions). Browser and release
+evidence: `B21_PUBLICATION_DRAFT_2026-10-28.md`. Preserve unrelated untracked
+authority-policy files, `.codex/` and `output/`. Next: verify the exact PR
+candidate and deploy only after required checks pass; paid setup stays deferred.
 
-- Build passes; 124 final affected checks pass. Initial tracked suite:
-  2835 passed, two stale stylesheet expectations failed and are now corrected.
-- 80 local built-browser cases, eight media fixtures and ten profile fixtures
-  pass. Six final featured-row cases and eight final new-tab/focus cases pass.
-  Final layout/cache group: ten passed. Screenshots inspected.
-- Evidence: `B27_VIDEO_FOLLOWUP_2026-10-28.md`; private logs in `output/audit/`.
-- Current diff is this bounded implementation plus its tests/evidence. Preserve
-  unrelated untracked authority-policy files, `.codex/` and `output/`.
-- One bounded reviewer completed; no other helper needed.
-- Exactly next: PR/CI/preview/apex verification
-  and release this video correction under the existing founder authorization.
-  Resume B21 publication drafts afterward; do not mark all Phase B complete.
+October 28 13:59 video follow-up B27 RELEASED in PR #379, candidate `6ce2a1d6`,
+production merge/implementation HEAD `5fae86aa28e5e69f57e4b161347535dd818eb217`.
+Started at `23711dca` after the B21 release. Compact image icons/menu with public
+original download, tall-desktop density, 200px homepage gap removal, compact
+publication-type navigation and outgoing generic bell continuity. Removed an
+obsolete roadmap selector that translated the whole homepage in Future.
+No contract/economic/auth boundary change.
 
+- Build passes; 124 final affected and ten layout/cache checks pass. Initial
+  tracked suite: 2835 passed, two outdated stylesheet assertions corrected.
+- Exact-candidate CI40703520760 passes: Linux2835/two skips, Windows2440/32 skips,
+  both builds/static and 49 contracts per platform. Merge tree equals candidate.
+  Post-merge CI40704289448 passes. Owned browser sessions and local servers
+  4226/4227 closed; no helper remains active.
+- Local rendering: 80 route/theme/size cases, ten profile fixtures, eight final
+  media/new-tab focus cases, six featured-row/stable-container cases pass.
+- Preview/apex each verify eight routes/40 assets and guest access boundaries.
+  32 actual-browser cases on each deployment pass, with zero page exceptions or
+  API writes. Actual public-image GET confirms attachment delivery.
+- Evidence: `B27_VIDEO_FOLLOWUP_2026-10-28.md`. Preserve unrelated untracked
+  authority-policy files, `.codex/` and `output/`. The only post-release tracked
+  diff is this evidence/backlog update. Screenshots inspected.
+- One bounded reviewer completed. PR attachment hit the existing 100-artifact
+  limit; the URL is retained in the audit record. No old attachment removed.
+- Exactly next: B21 publication draft preparation through the existing Publish
+  form, preserving selected files, pending publication recovery, explicit review
+  and wallet approval. Other Phase B exit gates remain open. Do not restart the
+  audit or repeat completed physical-device ceremonies.
 Previous release (historical checkpoint):
 October 28 B21 Donate/Report command slice RELEASED in PR #378, candidate
 `b49311cd`, implementation HEAD/production merge `8abca4615d09aa206ab219f3e972c2ae212cb886`

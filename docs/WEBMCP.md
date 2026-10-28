@@ -98,12 +98,36 @@ economics.
 | `buy_resale_listing` | Buys a listed NFT at the price the contract holds now | `ArtSoulContracts.getResaleListing`, `buyResale` |
 | `withdraw_pending_funds` | Withdraws proceeds, royalties and returned deposits to the same wallet | `ArtSoulContracts.getPendingWithdrawal`, `withdraw` |
 | `revoke_wallet_access` | Takes away the agent's wallet access in this browser | — |
-| `prepare_artwork_registration` | Validates details, then opens the publish page for the person to sign | — |
+| `prepare_artwork_registration` | Stages a local title, optional description and starting price for review in Publish; never uploads or signs | — |
 | `add_to_saved` | Saves one explicitly identified artwork to the signed-in account's private list | Existing Saved store and `/api/saved` |
 | `remove_from_saved` | Removes that artwork from the same list, including an already absent item | Existing Saved store and `/api/saved` |
 
 No new API route was added. Public reads retain the existing projection/CDN path;
 Saved uses the existing private, no-store API with the expected wallet header.
+
+### Publication drafts (B-21)
+
+`prepare_artwork_registration` reuses the existing Publish form. Its suggested
+title, optional description and optional `start_price_eth` are shown separately;
+**Use these details** is the person's explicit action to fill blank fields.
+Conflicting existing details are not replaced. Preparing on Publish does not
+reload the page or discard selected media. A publication already being
+authorized, analyzed, submitted or recovered cannot be edited this way.
+
+Other pages transfer suggestions once through tab-local session storage and an
+opaque URL fragment, never title/description query parameters or the durable
+publication journal. The transfer expires after five minutes, is consumed once,
+and waits for the original wallet to finish restoring. A different settled
+wallet discards it. This timeout is UI housekeeping, not an authorization grant.
+
+Commands: `prepare artwork titled Moonlight` or
+`подготовь работу с названием Лунный свет`. A request without a title asks for
+one. Title text is data, including words resembling commands. EN/RU command
+grammar is still bounded; this is not unrestricted conversational AI. Structured
+tools may also supply a description and exact positive ETH price. Duration,
+original-work confirmation and file selection remain manual. No AI request,
+upload, wallet connection, signature, complaint or contract write is performed
+by this preparation path. Registration still does not mint an NFT.
 
 ### Private Saved commands (B-21)
 

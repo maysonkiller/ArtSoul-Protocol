@@ -979,33 +979,30 @@
         const prepareArtworkRegistration = {
             name: 'prepare_artwork_registration',
             description:
-                'Prepare publishing a new artwork on ArtSoul: validate the details, open the publish page and hand ' +
-                'the action to the person. This tool CANNOT upload a file or sign a registration - the person ' +
-                'attaches the media and signs in their own wallet.',
+                'Prepare a local draft in the existing Publish form. The person reviews and applies the suggested ' +
+                'details. This does not upload, authorize, analyze, publish or sign. Existing fields, selected media ' +
+                'and pending publications are preserved. Registration is not minting.',
             inputSchema: {
-                type: 'object',
+                type: 'object', additionalProperties: false,
                 properties: {
-                    title: { type: 'string', description: 'Artwork title.' },
-                    description: { type: 'string', description: 'Short description of the work.' }
+                    title: { type: 'string', minLength: 1, maxLength: 300, description: 'Suggested artwork title.' },
+                    description: { type: 'string', maxLength: 1000, description: 'Suggested description of the work.' },
+                    start_price_eth: { type: 'string', description: 'Optional positive starting price in ETH. Never inferred.' }
                 },
                 required: ['title']
             },
             execute: async (input) => {
-                const args = input || {};
-                const title = text(args.title);
-                if (!title) {
-                    return JSON.stringify({ prepared: false, error: 'A title is required to publish an artwork.' });
+                if (typeof deps.prepareArtworkDraft !== 'function') {
+                    return JSON.stringify({ prepared: false, submitted: false, reason: 'Open Publish to prepare a draft.' });
                 }
-                openPath('/upload');
+                const result = await deps.prepareArtworkDraft(input);
+                if (result?.prepared !== true) return JSON.stringify(result);
                 return JSON.stringify({
-                    prepared: true,
-                    signed_by: 'the person, in their own wallet',
-                    title,
-                    description: text(args.description) || null,
+                    prepared: true, submitted: false, review_required: true,
                     network: 'Base Sepolia (chain 84532)',
                     instruction:
-                        'The publish page is now open. The person attaches the media file, confirms the details and ' +
-                        'signs the registration in their wallet. Registration publishes the work for discovery; it ' +
+                        'Review the draft on Publish and choose Use these details. Nothing has been uploaded or sent. ' +
+                        'Choose your file and review the remaining fields before authorizing and publishing. Registration ' +
                         'does not mint an NFT. An NFT exists only after a primary auction settles successfully.',
                     url: '/upload'
                 });
@@ -1676,6 +1673,20 @@
                 return response.json();
             },
             openPath: (path) => window.location.assign(path),
+            prepareArtworkDraft: async input => {
+                const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
+                const { stageCommandDraft } = await import('/src/features/artwork/command-draft.js?v=1');
+                if (wallet !== String(window.getCurrentWalletAddress?.() || '').toLowerCase()) {
+                    return { prepared: false, submitted: false, reason: 'Wallet changed. Prepare a new draft for this account.' };
+                }
+                return stageCommandDraft(input, {
+                    pathname: window.location.pathname, wallet, now: () => Date.now(),
+                    showDraft: window.ArtSoulPublicationDraft?.show,
+                    get storage() { return window.sessionStorage; },
+                    randomId: () => window.crypto.randomUUID(),
+                    openPath: path => window.location.assign(path)
+                });
+            },
             readArtworkActions: async card => {
                 const config = await window.ArtSoulPublicConfig?.load?.();
                 // Docs and the collection builder have no card renderer at

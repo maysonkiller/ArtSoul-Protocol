@@ -2,6 +2,7 @@ import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import { readAIValuation, formatAIPrice } from '../features/artwork/ai-valuation-values.js';
 import { parseUserEthAmount } from '../features/auction/eth-amount.js';
+import { validateCommandDraft, consumeCommandDraft } from '../features/artwork/command-draft.js';
 import { prepareBrowserPublication, checkBrowserPublication, readBrowserPublications } from '../features/artwork/publication-preparation.js';
 import {
     ALLOWED_ARTWORK_MIME_TYPES,
@@ -33,6 +34,8 @@ let selectedFile = null;
         let savedPublicationScope = '';
         let savedPublicationSnapshot = '';
         let savedPublicationGeneration = 0;
+        let commandDraft = null;
+        let incomingCommandDraft = null;
 
         const AI_ANALYSIS_TIMEOUT_MS = 20000;
         const AI_PREVIEW_MAX_DATA_URL_LENGTH = 1800000;
@@ -1550,8 +1553,104 @@ let selectedFile = null;
             updatePublishReadiness();
         }
 
+        function showCommandDraft(input, wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase()) {
+            const draft = validateCommandDraft(input);
+            if (commandDraft && JSON.stringify(commandDraft.draft) !== JSON.stringify(draft)) {
+                return { prepared: false, submitted: false, reason: 'Review or discard the existing draft first.' };
+            }
+            commandDraft = { draft, wallet };
+            const panel = document.getElementById('commandDraftPanel');
+            panel.hidden = false;
+            document.getElementById('commandDraftDetails').textContent = [
+                `Title: ${draft.title}`,
+                draft.description ? `Description: ${draft.description}` : '',
+                draft.start_price_eth ? `Starting price: ${draft.start_price_eth} ETH` : ''
+            ].filter(Boolean).join('\n');
+            document.getElementById('commandDraftStatus').textContent = 'Review these suggestions before adding them to the form. Nothing has been uploaded or sent.';
+            document.getElementById('applyCommandDraft').hidden = false;
+            document.getElementById('applyCommandDraft').style.display = '';
+            document.getElementById('discardCommandDraft').textContent = 'Discard draft';
+            panel.scrollIntoView({ block: 'center' });
+            return { prepared: true, submitted: false, review_required: true };
+        }
+
+        function discardCommandDraft() {
+            commandDraft = null;
+            document.getElementById('commandDraftDetails').textContent = '';
+            document.getElementById('commandDraftPanel').hidden = true;
+        }
+
+        function restoreCommandDraft(state) {
+            if (!incomingCommandDraft) return;
+            // The wallet runtime restores after the page entry. Do not discard
+            // a connected user's suggestion as a guest while it is still loading.
+            if (incomingCommandDraft.wallet && !state) return;
+            const incoming = incomingCommandDraft;
+            incomingCommandDraft = null;
+            const current = state?.isConnected ? String(state.address || '').toLowerCase() : '';
+            if (incoming.wallet === current) showCommandDraft(incoming.draft, incoming.wallet);
+        }
+
+        function applyCommandDraft() {
+            if (!commandDraft) return false;
+            const status = document.getElementById('commandDraftStatus');
+            const wallet = String(window.getCurrentWalletAddress?.() || '').toLowerCase();
+            if (commandDraft.wallet !== wallet) {
+                discardCommandDraft();
+                return false;
+            }
+            if (uploading || authorizationInProgress || aiValuationController || pendingPublicationAttempt ||
+                publishNavigationLocked || submittedRegisterTxHash) {
+                status.textContent = 'Finish or check the current publication before changing its details. Your file and saved attempt are unchanged.';
+                return false;
+            }
+            // A selected file may belong to an unresolved journal entry after a
+            // reload. Do not hash, recover or replace that attempt from a command.
+            if (selectedFile) {
+                try {
+                    const attempts = readBrowserPublications({ wallet, coreAddress: window.ARTSOUL_CONTRACTS?.baseSepolia?.core });
+                    if (attempts.length) throw new Error('Saved publication');
+                } catch {
+                    status.textContent = 'Check Saved publications before changing details for this file. You can keep editing the form yourself.';
+                    return false;
+                }
+            }
+            const fields = Object.entries({ title: 'artTitle', description: 'artDescription', start_price_eth: 'artPrice' })
+                .filter(([key]) => commandDraft.draft[key] !== undefined)
+                .map(([key, id]) => ({ field: document.getElementById(id), value: commandDraft.draft[key] }));
+            if (fields.some(({ field, value }) => !field || (field.value.trim() && field.value !== value))) {
+                status.textContent = 'Your form already has different details. Nothing was replaced. Keep your edits, or clear those fields before applying the draft.';
+                return false;
+            }
+            for (const { field, value } of fields) {
+                if (field.value === value) continue;
+                field.value = value;
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            commandDraft = null;
+            document.getElementById('applyCommandDraft').hidden = true;
+            document.getElementById('applyCommandDraft').style.display = 'none';
+            document.getElementById('discardCommandDraft').textContent = 'Close';
+            status.textContent = 'Draft added to the form. Review every field, choose your file and continue when ready. Nothing has been uploaded or sent.';
+            document.getElementById('artTitle').focus({ preventScroll: true });
+            return true;
+        }
+
         function bindUploadFlow() {
             bindDescriptionCounter();
+            document.getElementById('applyCommandDraft')?.addEventListener('click', applyCommandDraft);
+            document.getElementById('discardCommandDraft')?.addEventListener('click', discardCommandDraft);
+            window.ArtSoulPublicationDraft = Object.freeze({ show: draft => {
+                incomingCommandDraft = null;
+                return showCommandDraft(draft);
+            } });
+            incomingCommandDraft = consumeCommandDraft({
+                hash: window.location.hash, now: () => Date.now(),
+                get storage() { return window.sessionStorage; },
+                clearHash: () => window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search)
+            });
+            restoreCommandDraft(window.artsoulSettledWalletState);
             ['artTitle', 'artDescription', 'artPrice'].forEach((id) => {
                 const field = document.getElementById(id);
                 field?.addEventListener('input', () => { clearBlockingStep(); updatePublishReadiness(); });
@@ -1560,6 +1659,8 @@ let selectedFile = null;
             document.getElementById('originalWorkConfirm')?.addEventListener('change', handleUploadFormChange);
             window.addEventListener('artsoul:wallet-state-changed', (event) => {
                 const nextAddress = String(event?.detail?.address || '').toLowerCase();
+                if (commandDraft && commandDraft.wallet !== nextAddress) discardCommandDraft();
+                restoreCommandDraft(event?.detail);
                 if (!event?.detail?.isConnected || (authorizedWalletAddress && nextAddress !== authorizedWalletAddress)) {
                     authorizedWalletAddress = '';
                     cancelAIValuation();

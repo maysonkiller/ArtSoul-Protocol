@@ -997,18 +997,23 @@ test('the wallet wait goes through the documented runtime entry point', () => {
   assert.doesNotMatch(source, /import\(['"`]\.\/appkit-init/);
 });
 
-test('prepare_artwork_registration says registration is not a mint', async () => {
-  const opened = [];
+test('prepare_artwork_registration stages a review without navigation, upload or signing', async () => {
+  const drafts = [];
   const win = load();
-  const tools = toolsFrom(win, { fetchJson: async () => ({}), openPath: (path) => opened.push(path) });
+  const tools = toolsFrom(win, { fetchJson: async () => { throw new Error('No request expected'); },
+    openPath: () => { throw new Error('Must not reload a selected file'); },
+    prepareArtworkDraft: async draft => { drafts.push(draft); return { prepared: !!draft.title.trim(), reason: 'Title required' }; } });
 
   const prepared = JSON.parse(await tools.get('prepare_artwork_registration').execute({ title: 'Slow Water' }));
   assert.equal(prepared.prepared, true);
+  assert.equal(prepared.submitted, false);
+  assert.equal(prepared.review_required, true);
   assert.match(prepared.instruction, /does not mint an NFT/);
-  assert.deepEqual(opened, ['/upload']);
+  assert.deepEqual(drafts, [{ title: 'Slow Water' }]);
 
   const rejected = JSON.parse(await tools.get('prepare_artwork_registration').execute({ title: '  ' }));
   assert.equal(rejected.prepared, false);
+  assert.equal(JSON.parse(await toolsFrom(win, {}).get('prepare_artwork_registration').execute({ title: 'A' })).prepared, false);
 });
 
 test('no frozen economic value is copied into the agent layer', () => {

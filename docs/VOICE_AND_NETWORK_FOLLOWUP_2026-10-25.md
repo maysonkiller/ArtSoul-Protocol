@@ -1,6 +1,8 @@
 # Voice, agent tools and future network scope
 
-Status: text/header, explicit Saved and global search slices released October 26; broader expansion planned.
+Status: text/header, explicit Saved and global search slices released October 26;
+Donate/Report review released October 28; publication draft review implemented
+locally October 28, release verification recorded separately. Broader conversation planned.
 Source: founder requests of October 25, 2026. Related: B-08, B-09, B-12,
 B-13/B-14 and C-06/C-27 in `BACKLOG.md`.
 
@@ -59,6 +61,51 @@ Browser speech support and language availability vary
 ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition/lang)).
 Sources checked October 25, 2026. No new provider, dependency, credential,
 microphone permission or signing delegation was introduced by this review.
+
+## October 28 conversational voice decision
+
+The founder requests natural, multilingual conversation with clarification and
+ordinary-user protocol navigation. This supersedes the September 15 assumption
+that browser speech alone is the final voice experience. It does not authorize
+automatic signing, administration, private-data disclosure or unrestricted spend.
+The founder then asked to prepare the necessary work while clarifying API cost.
+No OpenAI key has been created or configured, no paid API call made, and no paid
+voice service enabled by this work. The existing browser command interface
+remains available. Publication draft preparation above is provider-independent.
+
+Current official pricing was checked October 28: [GPT-Live 1 is $0.05 per
+minute](https://developers.openai.com/api/docs/pricing), with backend model/tool
+usage charged separately. Thus 100 active voice minutes would be $5 for the
+voice session component alone, not an all-inclusive ArtSoul quote. Active time
+also includes silence and waiting for tools; stopping microphone input does not
+end billing. [Close the session when it is no longer needed](https://developers.openai.com/api/docs/guides/voice-latency-cost).
+Realtime has a different token-based tariff; provider/model selection remains
+open. These are operating costs, not changes to protocol fees.
+
+Before live integration, the remaining acceptance gates are:
+
+- Explicit provider/key setup and an owner-approved operating budget. Limits
+  must be enforced before opening sessions, including concurrent requests and
+  exhaustion; dashboard notifications alone do not establish a hard spend cap.
+- Explicit microphone activation, text alternative, interruption/cancellation,
+  session closure, provider disclosure and an agreed audio/transcript retention
+  policy. Do not claim that audio remains entirely in the browser once a remote
+  conversational provider is enabled.
+- Allowlisted tool proposals through the existing validation and review gates.
+  Page metadata and search results remain data, never tool instructions. No raw
+  DOM dump, tokens, email, staff directory or complaints are conversation context.
+  Private-account tools require the current authenticated account and are
+  cleared on identity change. Admin actions are excluded.
+- Clarification for ambiguous artwork, amount, recipient, network or action;
+  explicit visible review and wallet signatures for financial actions; no replay
+  after interruption. Test adversarial metadata, duplicate calls, stale results,
+  cancellations and unsupported tools before widening availability.
+- Real language, voice-quality and mobile-wallet journeys. No claim of support
+  for every language or of embedding the ChatGPT subscription's Voice product.
+
+This records preparation and unresolved gates, not a deployed conversational
+assistant. The next offline slice can evaluate these tool boundaries without
+issuing provider requests. Do not silently reopen paid setup on continuation.
 
 ## Network direction: discussion, not activation
 

@@ -51,6 +51,7 @@
     ]);
     const SAVED_TOOLS = ['add_to_saved', 'remove_from_saved'];
     const REVIEW_TOOLS = ['prepare_donation', 'prepare_artwork_report'];
+    const DRAFT_TOOL = 'prepare_artwork_registration';
 
     // Recognisers write numbers as digits: "31", "0.05", and in Russian "0,05".
     const AMOUNT = '(\\d+(?:[.,]\\d{1,18})?)';
@@ -140,6 +141,13 @@
                 : ['pages', 'page', 'страницу', 'страницы', 'страницах'].includes(kind) ? 'pages' : 'artists';
             return { tool: 'search_catalog', input: { query: scoped[2], category } };
         }
+        // Everything after the explicit title delimiter is artwork text, not a
+        // second command. Preserve its case just as global search preserves data.
+        const draft = language === 'ru' ? /^подготовь работу с названием\s+(.+)$/i.exec(normalized)
+            : /^prepare artwork titled\s+(.+)$/i.exec(normalized);
+        if (draft) return { tool: DRAFT_TOOL, input: { title: draft[1] } };
+        if (language === 'ru' ? /^(?:подготовь работу|подготовь публикацию)$/i.test(normalized)
+            : /^(?:prepare artwork|prepare publication)$/i.test(normalized)) return { publicationPrompt: true };
         // Do not fall back to a different action extracted from a malformed or
         // combined donation/report request. Search terms above remain data.
         const reviewIntent = language === 'ru' ? /донат|пожертв|жалоб|пожаловаться/.test(heard) : /\b(?:donat\w*|report\w*|complaint\w*)\b/.test(heard);
@@ -169,7 +177,7 @@
 
     /** Whether a heard command may run, given the recogniser's own confidence. */
     function mayRun(command, confidence) {
-        if (!isWrite(command) && !SAVED_TOOLS.includes(command?.tool) && !REVIEW_TOOLS.includes(command?.tool)) return true;
+        if (!isWrite(command) && !SAVED_TOOLS.includes(command?.tool) && !REVIEW_TOOLS.includes(command?.tool) && command?.tool !== DRAFT_TOOL) return true;
         const value = Number(confidence);
         return !(Number.isFinite(value) && value > 0 && value < WRITE_CONFIDENCE);
     }
@@ -185,6 +193,7 @@
             working: 'Working… If your wallet opens, review the request there. Closing this panel does not cancel a submitted transaction.',
             empty: 'Enter a command first.', changed: 'Wallet changed. Enter a new command for this account.',
             searchPrompt: 'What would you like to find? Try "search moon", "find artists Vera" or "search docs fees".',
+            publicationPrompt: 'What is the title? Try "prepare artwork titled Moonlight". You will review the draft on Publish; nothing is uploaded or signed.',
             tooLong: 'Use one command of up to 300 characters.',
             listening: 'Listening… say one command.',
             notHeard: 'Nothing was heard. Press the microphone and try again.',
@@ -195,7 +204,7 @@
             notice: 'Voice commands use your browser\'s speech recognition. In Chrome, the audio is sent to Google to be transcribed. ArtSoul does not record, store or receive it.\n\nTurn on voice commands?',
             micBlocked: 'The microphone is blocked for this site. Allow it in the browser settings to use voice.',
             help: 'Try: "search moon", "find artists Vera", "find auctions moon", "search docs fees", "find pages gallery", "save artwork 31", "remove artwork 31 from favorites", "what auctions are open", "tell me about artwork 31", "who owns artwork 19", "my activity", ' +
-                '"donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
+                '"prepare artwork titled Moonlight", "donate to artwork 31", "report artwork 31" (opens a review form; sends nothing), ' +
                 '"bid 0.05 on artwork 31", "pay for artwork 30", "list artwork 19 for 0.002", "buy artwork 19", ' +
                 '"start an auction on artwork 31 at 0.005 for 36 hours", "withdraw", "stop using my wallet".',
             submitted: 'Done. The wallet approved it and the transaction was sent.',
@@ -213,6 +222,7 @@
             working: 'Выполняется… Если откроется кошелёк, проверьте запрос в нём. Закрытие этого окна не отменяет отправленную транзакцию.',
             empty: 'Сначала введите команду.', changed: 'Кошелёк изменён. Введите новую команду для этого аккаунта.',
             searchPrompt: 'Что найти? Например: «найди луна», «найди автора Vera» или «найди в документации fees».',
+            publicationPrompt: 'Как назвать работу? Например: «подготовь работу с названием Лунный свет». На Publish вы проверите черновик; файл не загружается, подпись не запрашивается.',
             tooLong: 'Введите одну команду длиной до 300 символов.',
             listening: 'Слушаю… скажите одну команду.',
             notHeard: 'Ничего не услышано. Нажмите микрофон и попробуйте снова.',
@@ -223,7 +233,7 @@
             notice: 'Голосовые команды используют распознавание речи вашего браузера. В Chrome звук отправляется в Google для распознавания. ArtSoul его не записывает, не хранит и не получает.\n\nВключить голосовые команды?',
             micBlocked: 'Микрофон для этого сайта заблокирован. Разрешите его в настройках браузера.',
             help: 'Скажите: «найди луна», «найди автора Vera», «найди аукционы луна», «найди в документации fees», «найди страницы gallery», «добавь работу 31 в избранное», «убери работу 31 из избранного», «какие аукционы открыты», «расскажи о работе 31», «кто владелец работы 19», «мой профиль», ' +
-                '«донат автору работы 31», «пожаловаться на работу 31» (только открывает форму; ничего не отправляет), ' +
+                '«подготовь работу с названием Лунный свет», «донат автору работы 31», «пожаловаться на работу 31» (только открывает форму; ничего не отправляет), ' +
                 '«ставка 0,05 на работу 31», «оплати работу 30», «выстави работу 19 за 0,002», «купи работу 19», ' +
                 '«запусти аукцион на работу 31 за 0,005 на 36 часов», «выведи деньги», «стоп, не трогай кошелёк».',
             submitted: 'Готово. Кошелёк подтвердил, транзакция отправлена.',
@@ -252,12 +262,16 @@
         if (data.error) return { say: t.error(data.error), show: data.error };
         if (data.connected === false) return { say: t.noWallet, show: data.reason || t.noWallet };
         if (data.submitted === true) return { say: t.submitted, show: `${t.submitted}${data.transaction_hash ? ` ${data.transaction_hash}` : ''}` };
-        if (data.submitted === false || data.prepared === false || data.opened === false || data.updated === false) {
+        if ((data.submitted === false && !(tool === DRAFT_TOOL && data.prepared === true)) || data.prepared === false || data.opened === false || data.updated === false) {
             const reason = data.reason || '';
             return { say: t.refused(reason), show: reason };
         }
 
         switch (tool) {
+        case 'prepare_artwork_registration': {
+            const message = ru ? 'Черновик готов к проверке на Publish. Нажмите Use these details, чтобы заполнить форму. Ничего не загружено и не отправлено. Затем выберите файл и проверьте остальные поля.' : data.instruction;
+            return { say: message, show: message };
+        }
         case 'prepare_donation':
         case 'prepare_artwork_report': {
             const message = ru
@@ -579,6 +593,7 @@
                 return;
             }
             if (command.searchPrompt) { reply(transcript, t.searchPrompt); return; }
+            if (command.publicationPrompt) { reply(transcript, t.publicationPrompt); return; }
             if (!mayRun(command, confidence)) {
                 const text = t.unsure(transcript);
                 reply(transcript, text);

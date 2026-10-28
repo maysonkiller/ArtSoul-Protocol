@@ -2,7 +2,8 @@
 
 Date: 2026-10-28. Workspace: `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`, starting HEAD `23711dca` (production `8abca461`).
-Status: implemented locally; release verification pending.
+Status: released in [PR #379](https://github.com/maysonkiller/ArtSoul-Protocol/pull/379),
+candidate `6ce2a1d6`, production merge `5fae86aa28e5e69f57e4b161347535dd818eb217`.
 
 ## Evidence and changes
 
@@ -71,6 +72,33 @@ pin assertions. The expected pins were updated to 58; the final affected group
 passes all 124 checks. An independent review caught keyboard focus being lost
 after selecting an image-menu link; the menu now restores its summary focus
 without scrolling, with a behavior test and a real new-tab browser check.
+
+## Release verification
+
+- Exact-candidate CI 40703520760 passes: Linux 2,835 passed / two skipped,
+  Windows 2,440 passed / 32 skipped; zero failures. Both builds/static checks
+  and 49 contract checks on each platform pass. Skipped tests are not claimed
+  executed. The merge tree equals the tested candidate. Post-merge CI40704289448
+  also passes all three jobs.
+- Preview deployment 7387712040 and production deployment 7387843584 each pass
+  the eight-route/40-asset byte verification plus existing guest API boundaries.
+- Thirty-two real preview and 32 real apex browser cases pass, without request
+  mocks: eight pages, both themes, 1366x700 and 390x844. No page exceptions or API
+  writes. Image menu/fullscreen/Escape/focus, homepage gap, stable container and
+  horizontal bounds pass; representative screenshots inspected.
+- Actual public-image GET returns HTTP 200, `Content-Type: image/png` and
+  `Content-Disposition: attachment;` for the menu download URL. HEAD did not
+  return the attachment header; the real GET was therefore checked separately.
+- Logs: `output/audit/b27-{build,unit,final-focused,final-layout,ci}.log`,
+  `b27-{local-browser,home-final,media-browser,profile-browser}.log`,
+  `b27-{preview,apex}-{browser,verification}.log`, `b27-download-check.log`.
+  Local fixture results do not stand in for real-phone, wallet or signature
+  acceptance. No transactions, complaints or profile writes were performed.
+- The chat attachment tool rejected the PR attachment because the existing
+  thread already has 100 artifact identities. The PR URL is recorded here;
+  no earlier attachment was removed.
+- Owned browser sessions `b27video`/`b27release` and local servers 4226/4227 are
+  closed. The only helper completed its bounded review; none remains active.
 
 ## Remaining work
 

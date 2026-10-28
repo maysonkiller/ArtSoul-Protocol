@@ -74,9 +74,9 @@
     <script type="module" src="/ipfs-client.js?v=2"></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
-    <script src="/webmcp-tools.js?v=8" defer></script>
+    <script src="/webmcp-tools.js?v=9" defer></script>
     <!-- Voice commands: the same agent tools, spoken. Absent where the browser has no speech recognition. -->
-    <script src="/voice-commands.js?v=7" defer></script>
+    <script src="/voice-commands.js?v=8" defer></script>
     <script type="module" src="/contracts-integration.js?v=15"></script>
 
     <!-- AI Integration -->
@@ -616,6 +616,15 @@
         </nav>
 
         <div class="upload-form-stack space-y-8">
+            <section id="commandDraftPanel" class="publish-panel" aria-labelledby="commandDraftTitle" hidden>
+                <h2 id="commandDraftTitle" class="font-semibold mb-3">Publication draft</h2>
+                <p id="commandDraftDetails" class="break-words mb-3" style="white-space: pre-line;"></p>
+                <p id="commandDraftStatus" class="form-hint" role="status">Review these suggestions before adding them to the form. Nothing has been uploaded or sent.</p>
+                <div class="flex flex-wrap gap-3 mt-3">
+                    <button type="button" id="applyCommandDraft" class="btn-secondary">Use these details</button>
+                    <button type="button" id="discardCommandDraft" class="btn-secondary">Discard draft</button>
+                </div>
+            </section>
             <section id="savedPublications" class="publish-panel" aria-labelledby="savedPublicationsTitle" hidden>
                 <h2 id="savedPublicationsTitle" class="font-semibold mb-3">Saved publications</h2>
                 <p class="form-hint">Check a previous publication before trying again. Checking does not send a transaction or require the original file or new AI guidance.</p>
