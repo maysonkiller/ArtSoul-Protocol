@@ -3,16 +3,27 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 28 B21 publication draft review is locally implemented from `5580a430`;
-release verification pending. Reuses `prepare_artwork_registration`, preserves
+October 28 B28 mobile account header correction is locally verified from
+`26883c59`: full guest/unnamed labels, contained avatar, fixed mobile touch
+targets and static/hydrated geometry. CSS only, v59 on all consumers. 170
+affected checks, build, 176 rendered layouts / 704 presentation states and four
+reload cases pass. See `B28_MOBILE_ACCOUNT_2026-10-28.md`.
+Next: exact candidate CI and hosted release verification for this header patch.
+
+October 28 B21 publication draft review RELEASED in PR #380, candidate `b88f1aa5`,
+production/current HEAD `26883c59a05f1de524c033667facd7a38e25262b` (same tree).
+Reuses `prepare_artwork_registration`, preserves
 files/recovery, stages suggestions for explicit review, adds bounded EN/RU
 commands and waits for delayed wallet restoration. No paid provider/key/API.
 131 focused checks and build pass. Initial full tracked suite had two outdated
 cache pins (corrected) and two disposable database startup/shutdown failures;
 both database suites pass sequentially (38 assertions). Browser and release
-evidence: `B21_PUBLICATION_DRAFT_2026-10-28.md`. Preserve unrelated untracked
-authority-policy files, `.codex/` and `output/`. Next: verify the exact PR
-candidate and deploy only after required checks pass; paid setup stays deferred.
+evidence: `B21_PUBLICATION_DRAFT_2026-10-28.md`. Candidate CI40711322018 and
+post-merge CI40712001912 pass. Preview/apex each pass 14 actual browser cases
+and exact asset checks; production deployment 7389042952 succeeded. Preserve
+unrelated untracked authority-policy files, `.codex/` and `output/`.
+Next: reproduce and fix the newly reported mobile header account truncation;
+paid provider setup stays deferred.
 
 October 28 13:59 video follow-up B27 RELEASED in PR #379, candidate `6ce2a1d6`,
 production merge/implementation HEAD `5fae86aa28e5e69f57e4b161347535dd818eb217`.

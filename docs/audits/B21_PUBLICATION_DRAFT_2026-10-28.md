@@ -2,7 +2,8 @@
 
 Date: October 28, 2026. Workspace: `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Start HEAD: `5580a430`; production at start: `5fae86aa`.
-Status: implemented locally; release checks pending.
+Status: released in PR #380, candidate `b88f1aa57103e7cc8eadab2c37f76bb986c3d830`,
+production merge `26883c59a05f1de524c033667facd7a38e25262b` (identical source tree).
 
 ## Reproduction and cause
 
@@ -48,6 +49,15 @@ preparation command. Existing search and Donate/Report tools are retained.
   sessions remain unavailable. No wallet ceremonies are claimed from fixtures.
 - One bounded read-only reviewer found the delayed-wallet transfer bug; corrected
   and confirmed with actual binder regression coverage. No helpers left running.
+- Exact-candidate CI 40711322018 passed: Linux 2,845 passed / two skipped;
+  Windows 2,450 passed / 32 skipped; both builds/static checks and 49 contract
+  checks per platform. Post-merge CI 40712001912 also passed.
+- Preview deployment 7388923586 and production deployment 7389042952 succeeded.
+  Verified seven routes and four exact-content command assets on both preview
+  and apex. Separate hosted-browser passes covered 14 cases each (seven routes,
+  Classic desktop / Future mobile), without response mocks, API writes or page
+  exceptions. Local built-browser pass covered 19 cases. No real-device wallet
+  or microphone ceremony was performed in these checks.
 
 ## Interpretation and remaining boundaries
 

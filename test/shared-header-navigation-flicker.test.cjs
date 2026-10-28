@@ -557,11 +557,11 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=58">/, `${page} stylesheet pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=59">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=8"><\/script>/, `${page} prepaint pin`);
     assert.match(html, /<script src="\/avatar-dropdown\.js\?v=57" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=58');
+    const stylesheet = html.indexOf('unified-styles.css?v=59');
     const prepaint = html.indexOf('header-prepaint.js?v=8');
     const component = html.indexOf('avatar-dropdown.js?v=57');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
@@ -1938,7 +1938,7 @@ test('the preview contract is pinned in the component source', () => {
 test('every shared-header page and both themes keep one stable button geometry', () => {
   const css = fs.readFileSync(path.join(ROOT, 'unified-styles.css'), 'utf8');
   assert.match(css, /\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 180px !important;[\s\S]*?height: 42px !important;/);
-  assert.match(css, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 168px !important;[\s\S]*?height: 42px !important;/);
+  assert.match(css, /@media \(max-width: 768px\)[\s\S]*?\.site-header #navButtons \.avatar-button \{[\s\S]*?width: 168px !important;[\s\S]*?height: 44px !important;/);
   // Classic stays animation-free: nothing was hidden behind a fade.
   assert.match(css, /\.classic[\s\S]{0,400}?\.avatar-button,[\s\S]{0,200}?animation: none !important;/);
   assert.doesNotMatch(css, /\[data-wallet-ui-state="restoring"\][^{]*\{[^}]*(?:opacity|transition|animation)/);
