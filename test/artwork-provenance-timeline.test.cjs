@@ -130,6 +130,12 @@ const visibleFixtures = {
     log_index: 6,
     indexed_at: '2026-07-19T15:00:00.000Z'
   }],
+  contract_events: [{
+    chain_id: 84532, event_name: 'ResaleListed',
+    event_data: { tokenId: '900', seller: CURRENT_OWNER, price: '4000000000000000000' },
+    block_number: 60, transaction_hash: TX, log_index: 6,
+    indexed_at: '2026-07-19T15:00:00.000Z'
+  }],
   v41_bids: [],
   v41_floor_history: [],
   v41_trust_signals: [],
@@ -189,6 +195,59 @@ test('provenance endpoint returns a chain-scoped chronological lifecycle and can
       ).includes('auction_id=in.(500)'),
       'auction endings are limited to this artwork auction'
     );
+  });
+});
+
+test('repricing and cancellation preserve each original listing price, date and transaction', async () => {
+  const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
+  const secondHash = `0x${'cd'.repeat(32)}`;
+  const second = { ...visibleFixtures.contract_events[0], block_number: 70,
+    transaction_hash: secondHash, indexed_at: '2026-07-20T15:00:00.000Z',
+    event_data: { tokenId: '900', seller: CURRENT_OWNER, price: '5000000000000000000' } };
+  for (const active of [true, false]) {
+    const fixtures = { ...visibleFixtures,
+      contract_events: [...visibleFixtures.contract_events, second],
+      // The projection retains original event metadata while its price changes.
+      v41_resale_listings: active ? [{ ...visibleFixtures.v41_resale_listings[0], price: second.event_data.price }] : []
+    };
+    await withSupabaseFixtures(fixtures, async requests => {
+      const res = apiResponse();
+      await handler({ method: 'GET', query: { chain_id: '84532', artwork_id: '77' }, headers: {} }, res);
+      assert.equal(res.statusCode, 200);
+      const events = res.body.events.filter(event => event.type === 'resale_listed');
+      assert.deepEqual(events.map(e => [e.price,e.transaction_hash,e.block_number,e.recorded_at]), [
+        ['4',TX,60,'2026-07-19T15:00:00.000Z'],
+        ['5',secondHash,70,'2026-07-20T15:00:00.000Z']
+      ]);
+      assert.equal(res.body.events.some(e => e.type === 'resale_cancelled'), false, 'eventless cancellation is not invented');
+      const q = new URLSearchParams(requests.find(r => r.table === 'contract_events').search);
+      assert.equal(q.get('event_name'), 'eq.ResaleListed');
+      assert.equal(q.get('event_data->>tokenId'), 'eq.900');
+      assert.equal(q.get('chain_id'), 'eq.84532');
+      assert.equal(q.get('limit'), '200');
+      assert.equal(q.get('order'), 'block_number.asc,log_index.asc');
+      assert.equal(res.body.events.some(e => Object.hasOwn(e,'event_data')), false);
+    });
+  }
+});
+
+test('missing listing logs never turn mutable state into a historical event', async () => {
+  const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
+  await withSupabaseFixtures({ ...visibleFixtures, contract_events: [] }, async () => {
+    const res = apiResponse();
+    await handler({ method: 'GET', query: { chain_id: '84532', artwork_id: '77' }, headers: {} }, res);
+    assert.equal(res.statusCode,200);
+    assert.equal(res.body.events.some(e => e.type === 'resale_listed'),false);
+  });
+});
+
+test('bounded listing history reports truncation instead of claiming a complete timeline', async () => {
+  const { default: handler } = await import('../src/api/routes/public/artwork-provenance.js');
+  await withSupabaseFixtures({ ...visibleFixtures, contract_events: Array.from({length:200}, () => visibleFixtures.contract_events[0]) }, async () => {
+    const res = apiResponse();
+    await handler({ method: 'GET', query: { chain_id: '84532', artwork_id: '77' }, headers: {} }, res);
+    assert.equal(res.body.complete,false);
+    assert.deepEqual(res.body.truncated_sources,['listings']);
   });
 });
 

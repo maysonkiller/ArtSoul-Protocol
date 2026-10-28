@@ -3,7 +3,9 @@
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Starting documentation HEAD: `53e58dc2bd674b9dd35ef22e57f4843470e5160f`.
 Published implementation: `63c0c28626a47d5e755d347ab44e03fcdac647c5`.
-Status: real connected-wallet read and declined review passed; signed mutation pending.
+Status: real connected-wallet read, declined review, signed repricing and signed
+removal passed. A subsequent owner listing is verified separately. Refresh and
+provenance defects found during acceptance are patched locally; release pending.
 
 ## Observed journey
 
@@ -44,7 +46,7 @@ NFT artwork-to-token lookup on the core and reverted; the target was corrected
 to the existing NFT ABI, then the complete two-RPC preflight passed. No write
 RPC exists in the verifier.
 
-## Next bounded step
+## Initial pending step (superseded by the signed evidence below)
 
 The owner approves the prepared Music 2 edit from 0.1 to 0.11 test ETH in ArtSoul,
 then reviews/signs the Base Sepolia request in Rabby. The edit changes the asking
@@ -57,3 +59,66 @@ command merely because a browser result was missed.
 
 No economics, contract, database, paid-provider or mainnet changes. Actual audio
 recognition and signed command acceptance remain unperformed at this checkpoint.
+
+## Signed acceptance and follow-up
+
+The following receipts and state were independently verified through both
+existing Base Sepolia RPCs, including chain 84532, pinned core/NFT hashes,
+artwork32/token5 mapping, owner and unchanged 0.0001 ETH floor:
+
+| Action | Transaction | Block | Result |
+| --- | --- | --- | --- |
+| Assistant repricing to 0.11 test ETH | `0xb41087037029312e7ed138531871600962ed1964024a183395fd56d7660e3ca4` | 51458340 | Successful, active listing at 0.11 |
+| Assistant removal | `0xd59f37395c1b018515a9e8195c6ecb560798d5054d68f9c05ab94b5f7953bc4d` | 51460564 | Successful, inactive listing; UI offers List NFT |
+| Subsequent owner listing at the floor | `0x90e37a804c2a4c9e7c8fb18d24ac7650c9e3716353b8595d26a5fb623d4b745f` | 51461486 | Successful, active listing at 0.0001; page agrees |
+
+The last listing was observed after the owner interacted with the page, not
+submitted by the agent. Do not attribute it to assistant acceptance or overwrite
+it with the earlier planned 0.1 restoration. The owner is now away and requested
+independent work; further signatures wait. No new write is pending in the tab.
+
+Public API reads confirmed the 0.11 price while the open page retained 0.1.
+The receipt handler waited for the entire artwork read before updating visible
+state. It now applies the existing receipt bridge synchronously, then refreshes;
+a regression test holds the refresh unresolved and verifies the new price or
+cancellation immediately, with owner/floor preserved. A fresh real signed edit
+after release remains necessary to confirm this specific latency symptom.
+
+The provenance defect was reproduced independently in the public API: current
+price 0.11 was attached to the original September 7 listing transaction/time.
+Cause: `buildTimeline` treated mutable `v41_resale_listings` as event history.
+The patch reads bounded, chain/token-scoped immutable `ResaleListed` logs from
+`contract_events`. Each listing survives later edits/removal with its original
+price and receipt; truncation is explicit. No synthetic cancellation is added:
+the deployed contract emits no cancellation event. Existing owner resolution
+and moderation suppression remain unchanged.
+
+The real database contains five listing logs for token5: the original 0.1,
+three 0.11 transactions, and the latest 0.0001 listing. The local handler's
+read-only run against that database returned all five correct event/price pairs.
+The other two 0.11 hashes are `0xb9e47789813475c59bf5159de24edd6c4d53229c01f34876ccf2f7e88793e1af`
+and `0xb20ae02a2bfd22bef7e1abb5d444e3ed45c6b4218fa9d9222476ee40c2018f16`;
+do not replay them or claim their unobserved submission UI.
+
+The strict Russian parser rejected "выстави работу 32 на продажу за 0,1".
+It now accepts that explicit variant with the same review/signature requirements;
+runtime voice cache version is 11. This remains bounded EN/RU grammar, not an
+unrestricted multilingual AI assistant.
+
+Validation: 139 affected resale/provenance/parser/snapshot checks pass; 109
+agent/cache-version checks pass (overlapping suites, not 248 unique checks).
+Build and release results are recorded below once complete. Private evidence:
+`b12-price-edit-confirmed-2026-10-28.json`, `b12-remove-confirmed-2026-10-28.json`,
+`b12-owner-relisted-confirmed-2026-10-28.json`, `b12-resale-events-2026-10-28.json`
+and `b12-fixed-provenance-read-2026-10-28.json` under `docs/private/`.
+
+No data migration, economic change, autonomous signature or paid API activation.
+Snapshot timing is a separate approved amendment linked in the canon changelog.
+
+The final local build passes 11 route and 173 Tailwind-utility checks. A built
+Chrome fixture holds all artwork API reads unresolved after a synthetic receipt:
+price changes to 0.11 immediately, and cancellation immediately removes the sale
+price and shows List NFT. Both browser cases pass; owner/floor remain unchanged.
+No real wallet is installed in that fixture. Screenshot:
+`output/b12-slow-read-price-2026-10-28.png`. Real post-release acceptance stays
+separate.

@@ -566,3 +566,24 @@ test('confirmed resale stays visible with blocked browser storage', () => {
   const {db} = client({storageFails:true}); db.recordConfirmedResale(resaleReceipt());
   assert.equal(db.applyConfirmedAuctionUpdate(resaleRow()).status, 'sold');
 });
+
+test('open artwork applies repricing and cancellation before a slow refresh can finish', () => {
+  const source = fs.readFileSync('src/entries/artwork.jsx','utf8');
+  const handler = source.match(/const refresh = \(\) => \{([\s\S]*?)\};\s*window\.addEventListener\('artsoul:auction-confirmed', refresh\)/);
+  assert.ok(handler,'the artwork receipt listener is present');
+  for (const active of [true,false]) {
+    const {db} = client();
+    let displayed = resaleRow({canonical_floor:'0.01'}), refreshes = 0;
+    db.recordConfirmedResale(resaleReceipt({active,price:active?'0.11':'0'}));
+    vm.runInNewContext(handler[1], {
+      window: {ArtSoulDB:db},
+      setArtwork(update) { displayed = update(displayed); },
+      loadArtwork() { refreshes++; return new Promise(() => {}); }
+    });
+    assert.equal(refreshes,1);
+    assert.equal(displayed.sale_price,active?'0.11':'0');
+    assert.equal(displayed.status,active?'for_sale':'sold');
+    assert.equal(displayed.canonical_floor,'0.01');
+    assert.equal(displayed.current_owner_address,OWNER);
+  }
+});

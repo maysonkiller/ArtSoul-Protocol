@@ -223,6 +223,7 @@ test('Russian sentences reach the same tools, and a spoken comma is a decimal po
     ['заверши аукцион по работе 31', 'end_expired_auction', { artwork_id: '31' }],
     ['запусти аукцион на работу 31 за 0,005 на 36 часов', 'start_auction', { artwork_id: '31', start_price_eth: '0.005', duration_hours: 36 }],
     ['выстави работу 19 за 0,002', 'list_for_resale', { artwork_id: '19', price_eth: '0.002' }],
+    ['выстави работу 32 на продажу за 0,1', 'list_for_resale', { artwork_id: '32', price_eth: '0.1' }],
     ['купи работу 19', 'buy_resale_listing', { artwork_id: '19' }],
     ['выведи деньги', 'withdraw_pending_funds', {}],
     ['стоп, не трогай кошелёк', 'revoke_wallet_access', {}]

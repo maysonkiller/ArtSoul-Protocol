@@ -92,10 +92,10 @@ Goal: validate the product with real users without changing frozen economics.
 - [ ] **B1 — Tester cohort.** Recruit a controlled artist and collector cohort and track full publish → auction → settlement → mint → resale journeys in GitHub Issues.
 - [ ] **B2 — Monitoring and incident runbook.** Operate health, cost, error, moderation, and cached public-metrics monitoring with named response steps.
 - [ ] **B3 — Beta defect work.** Fix evidence-backed defects in focused PRs; do not mix protocol redesign into UX fixes.
-- [ ] **B4 — Snapshot A.** Announce the final public-testnet cut-off at least two weeks ahead. At the cut-off, create the versioned, machine-readable, hashed export required by Bible §16; store and verify it in at least two independent durable locations. Snapshot A is a community record only and creates no Genesis, token, points, airdrop, or other entitlement.
+- [ ] **B4 — Snapshot tooling readiness.** Maintain and rehearse the versioned exporter and independent verifier. The October 28 founder amendment moves actual Snapshot A capture to C16, after the full final-contract testnet. No final cut-off or export is required to close the current beta.
 - [ ] **B5 — Base go-to-market loop.** Onboard the first artist cohort personally, run themed auction drops, build in public through the official project account, and use verified cached metrics when reporting progress.
 
-Phase B exit: stable beta, feedback processed, moderation proven with real cases, durable Snapshot A verified, and mainnet-preparation inputs ready.
+Phase B exit: stable beta, feedback processed, moderation proven with real cases, snapshot tooling ready, and mainnet-preparation inputs ready. Actual Snapshot A capture is a late-C gate.
 
 ## Phase C — Mainnet Preparation
 
@@ -127,6 +127,7 @@ still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
 - [ ] **C13 — Fresh Base Sepolia rehearsal.** Deploy the final topology, hand roles to rehearsal Safes, exercise pool operations and the full lifecycle, and prove recovery/runbooks.
 - [ ] **C14 — Legal and operational readiness.** Complete counsel-approved entity, ToS, Privacy/GDPR, IP assignment, domain/email, audit, and operating procedures. Exact legal form remains undecided until counsel/founder approval.
 - [ ] **C15 — Final visual pass.** Apply premium homepage, cards, artwork, aura, accessibility, and responsive polish after functionality is stable.
+- [ ] **C16 — Final public-testnet Snapshot A.** After the final contracts complete full public-testnet validation, capture the versioned machine-readable hashed export at a final cut-off announced at least two weeks ahead. Store and verify at least two independent durable copies before any Phase D reset or mainnet launch. It is a community record only and creates no Genesis, token, points, airdrop, or other entitlement. Earlier beta rehearsals do not count as this capture.
 
 Phase C exit: audit passed, fresh rehearsal green, treasuries/domain/legal ready, Snapshot A independently readable, and a signed launch decision recorded.
 

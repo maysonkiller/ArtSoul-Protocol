@@ -314,6 +314,14 @@ When the reworked contracts are deployed and testnet validation is complete, a *
 
 This is the mandatory pre-mainnet migration checklist. It runs after the reworked contracts pass a fresh public-testnet cycle and before any mainnet marketing.
 
+*Scheduling amendment — October 28, 2026, founder decision.* Snapshot A is taken
+at the end of the full public testnet of the final contracts, in late Phase C,
+before the Phase D reset and mainnet launch. It is not a capture or exit gate for
+the current Phase B beta. Announce that final cut-off at least two weeks ahead;
+keep the exporter and verifier ready meanwhile. No cut-off is assigned now.
+This changes timing only: the two independent verified durable copies,
+post-reset readability and absence of entitlement above remain mandatory.
+
 ## 17. Phase Status And Canonical Phase Model
 
 September 30 scheduling amendment: the founder requests implementation of the

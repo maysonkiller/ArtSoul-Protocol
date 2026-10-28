@@ -13,6 +13,13 @@ outlive every document around it.
 
 ## Why the format looks like this
 
+Timing was amended by the founder on October 28, 2026: the actual capture follows
+the full public testnet of the final contracts in late Phase C, before Phase D
+reset and mainnet launch. It is not an exit gate for the current Phase B beta.
+Announce the final cut-off at least two weeks ahead; no date is assigned now.
+Keep export tooling and rehearsals ready, without calling rehearsal files the
+final Snapshot A. See Bible §16 and canonical backlog C16.
+
 Snapshot A is captured once, on an announced date, immediately before a
 destructive reset, and it cannot be recaptured afterwards. Its proof of integrity
 therefore cannot depend on anything the reset removes. A reader holding only the

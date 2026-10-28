@@ -1,16 +1,20 @@
-October 28 B12 real Chrome/Rabby acceptance is now in progress. Starting HEAD
-`53e58dc2`, published implementation `63c0c286`. The owner connected the old
-`0x6EC8...6989B` wallet in a new Chrome tab after reporting blocked manual clicks
-in the first controlled tab. Read-only assistant activity and actual Cancel at
-the resale review pass. Both RPCs verify artwork32/token5 owner, active 0.1 ETH
-listing, 0.0001 ETH floor and pinned code at block51456851. All six old September29
-journal hashes are confirmed successful; none was replayed. See
-`B12_LIVE_ASSISTANT_2026-10-28.md` and its private evidence. No new transaction yet.
-Exactly next: resume the prepared 0.11 test ETH Music 2 review with the owner,
-verify its actual signed result before proceeding to removal/restoration at the
-original 0.1 price. Browser tab1329851543 is marked for handoff; do not assume the
-review is still pending without observing it. All wallet signatures stay with
-the owner. The bounded grammar reviewer completed; no helper work remains.
+October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
+verify receipts, mapping, owner and unchanged floor; see
+`B12_LIVE_ASSISTANT_2026-10-28.md`. Current Music2/artwork32/token5 listing is
+active at 0.0001 test ETH after a subsequent owner action, also verified. Do not
+restore the earlier 0.1 price or replay any operation without renewed review.
+The owner is away; no signatures or device actions are requested now.
+
+Local follow-up from HEAD cd954fb5: immutable listing provenance, immediate
+receipt refresh on the open artwork, and the explicit Russian listing phrase
+are patched. 139 affected checks and 109 overlapping agent/cache checks pass.
+Read-only execution of the new handler against the real DB returns all five
+historical listings with original prices/receipts. Release pending. Snapshot A
+capture is moved from B exit to late C after full final-contract testnet, before
+D reset/mainnet, with two-week notice and independent copies preserved.
+Exactly next: finish build/release verification for this focused patch; real
+post-release signed refresh/audio scenarios wait for the owner's return.
+Preserve unrelated untracked policy files, .codex/ and output/. No helper work.
 
 October 28 B12/B21 resale parity RELEASED in PR #383, implementation HEAD
 `268808687ef66b41d9b4db5088aa320ee0598a93`, candidate `d028e9b8` (same tree).

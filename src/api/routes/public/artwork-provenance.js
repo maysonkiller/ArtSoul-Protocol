@@ -57,7 +57,7 @@ function eventBase(type, row = {}) {
   };
 }
 
-function buildTimeline({ artwork, auctions, endings, settlements, resaleHistory, activeListing }) {
+function buildTimeline({ artwork, auctions, endings, settlements, resaleHistory, listingEvents }) {
   const events = [];
   const creatorAddress = addressOrNull(artwork.creator);
 
@@ -113,12 +113,15 @@ function buildTimeline({ artwork, auctions, endings, settlements, resaleHistory,
     });
   }
 
-  if (activeListing?.active) {
+  // Current listing rows are mutable state, including eventless cancellation
+  // reconciliation. Only immutable logs can describe historical price changes.
+  for (const listing of listingEvents) {
+    const data = listing.event_data || {};
     events.push({
-      ...eventBase('resale_listed', activeListing),
-      token_id: protocolId(activeListing.token_id),
-      owner_address: addressOrNull(activeListing.seller),
-      price: weiToEth(activeListing.price)
+      ...eventBase('resale_listed', listing),
+      token_id: protocolId(data.tokenId),
+      owner_address: addressOrNull(data.seller),
+      price: weiToEth(data.price)
     });
   }
 
@@ -192,7 +195,7 @@ export default async function handler(req, res) {
           )
         : [];
     });
-    const [auctions, settlements, resaleHistory, listingRows, endings] = await Promise.all([
+    const [auctions, settlements, resaleHistory, listingRows, endings, listingEvents] = await Promise.all([
       auctionsPromise,
       readRows(
         'v41_settlements?select=chain_id,auction_id,artwork_id,winner,final_price,token_id,settlement_status,block_number,transaction_hash,log_index,indexed_at' +
@@ -212,7 +215,14 @@ export default async function handler(req, res) {
             `&chain_id=${chainFilter}&token_id=eq.${tokenId}&active=eq.true&limit=1`
           )
         : [],
-      endingsPromise
+      endingsPromise,
+      tokenId
+        ? readRows(
+            'contract_events?select=chain_id,event_name,event_data,block_number,transaction_hash,log_index,indexed_at' +
+            `&chain_id=${chainFilter}&event_name=eq.ResaleListed&event_data->>tokenId=eq.${tokenId}` +
+            `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
+          )
+        : []
     ]);
 
     const completedSettlement = latestCompletedSettlement(settlements);
@@ -226,7 +236,8 @@ export default async function handler(req, res) {
       auctions: auctions.length,
       endings: endings.length,
       settlements: settlements.length,
-      resales: resaleHistory.length
+      resales: resaleHistory.length,
+      listings: listingEvents.length
     };
     const truncatedSources = Object.entries(sourceCounts)
       .filter(([, count]) => count >= MAX_ROWS_PER_SOURCE)
@@ -251,7 +262,7 @@ export default async function handler(req, res) {
         endings,
         settlements,
         resaleHistory,
-        activeListing
+        listingEvents
       }),
       complete: truncatedSources.length === 0,
       truncated_sources: truncatedSources
