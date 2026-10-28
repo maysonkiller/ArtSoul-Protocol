@@ -19,10 +19,10 @@
     <meta name="robots" content="noindex,nofollow">
     <link rel="icon" type="image/jpeg" href="/favicon.jpg?v=3">
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
-    <script src="/header-prepaint.js?v=8"></script>
+    <script src="/header-prepaint.js?v=9"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=59">
+    <link rel="stylesheet" href="/unified-styles.css?v=60">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <script src="/storage-image.js?v=3" defer></script>
@@ -55,11 +55,19 @@
                     <button type="button" class="site-search-button" data-artsoul-search aria-label="Search ArtSoul" title="Search ArtSoul (Ctrl K)" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">
                         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
                     </button>
-                    <div id="header-notifications" hidden>
+                    <div id="header-notifications">
                         <section class="notification-inbox header-notification-inbox" aria-label="Your notifications">
-                            <button type="button" class="notification-toggle" data-notification-preview title="Notifications" aria-label="Notifications" aria-expanded="false" aria-controls="profile-notifications" onclick="this.parentElement.parentElement.dataset.notificationRequested=this.parentElement.parentElement.dataset.notificationWallet;this.setAttribute('aria-busy','true')">
+                            <button type="button" class="notification-toggle" data-notification-preview data-allow-rapid="true" title="Notifications" aria-label="Notifications" aria-controls="notification-preview-panel" popovertarget="notification-preview-panel" onclick="const host=this.closest('#header-notifications');if(host.dataset.notificationWallet&&!document.getElementById('notification-preview-panel').matches(':popover-open'))host.dataset.notificationRequested=host.dataset.notificationWallet;else delete host.dataset.notificationRequested">
                                 <span class="notification-toggle-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg></span>
                             </button>
+                        <div id="notification-preview-panel" class="notification-panel" popover="auto" role="region" aria-labelledby="notification-preview-title">
+                                <div class="notification-panel-heading">
+                                    <h2 id="notification-preview-title">Notifications</h2>
+                                    <button type="button" class="notification-close" data-allow-rapid="true" popovertarget="notification-preview-panel" popovertargetaction="hide" aria-label="Close notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"></path></svg></button>
+                                </div>
+                                <p class="notification-help" data-notification-message>Connect your wallet to see bids, auction results and other updates.</p>
+                                <button type="button" class="btn-secondary" data-notification-connect data-allow-rapid="true">Connect wallet</button>
+                            </div>
                         </section>
                     </div>
                     <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">

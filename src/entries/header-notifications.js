@@ -8,13 +8,29 @@ if (host && !host.dataset.notificationInitialized) {
   let generation = 0;
   let suspended = false;
   let modules;
+  let shellMounted = true;
+  let loadFailed = false;
+  let connecting = false;
   const shell = host.innerHTML;
 
+  const panel = () => host.querySelector('#notification-preview-panel');
+
   function preview(address) {
-    if (host.dataset.notificationWallet !== address) delete host.dataset.notificationRequested;
+    if (host.dataset.notificationWallet !== address) {
+      delete host.dataset.notificationRequested;
+      loadFailed = false;
+    }
     host.dataset.notificationWallet = address;
-    host.hidden = !address;
-    if (!root && host.innerHTML !== shell) host.innerHTML = shell;
+    host.hidden = false;
+    if (!shellMounted) { host.innerHTML = shell; shellMounted = true; }
+    const message = host.querySelector('[data-notification-message]');
+    const action = host.querySelector('[data-notification-connect]');
+    message.textContent = loadFailed ? 'Notifications could not load. Please try again.'
+      : address ? 'Preparing your notifications…'
+      : 'Connect your wallet to see bids, auction results and other updates.';
+    action.hidden = Boolean(address) && !loadFailed;
+    action.disabled = connecting;
+    action.textContent = loadFailed ? 'Try again' : 'Connect wallet';
   }
 
   function connectedWallet() {
@@ -49,6 +65,7 @@ if (host && !host.dataset.notificationInitialized) {
     host.hidden = true;
     root?.unmount();
     root = null;
+    loadFailed = false;
     preview(next || hint);
     if (!next) {
       if (hint) void loadInbox().catch(() => {});
@@ -57,16 +74,22 @@ if (host && !host.dataset.notificationInitialized) {
     try {
       const [{React, createRoot}, {NotificationInbox}] = await loadInbox();
       if (current !== generation || suspended || connectedWallet() !== next) return;
+      const requested = host.dataset.notificationRequested === next;
+      const restoreFocus = host.contains(document.activeElement);
+      panel()?.hidePopover();
+      delete host.dataset.notificationRequested;
       function Inbox() {
         React.useEffect(() => {
-          if (connectedWallet() === next && host.dataset.notificationRequested === next) {
-            delete host.dataset.notificationRequested;
-            host.querySelector('.notification-toggle')?.click();
+          if (connectedWallet() === next) {
+            const toggle = host.querySelector('.notification-toggle');
+            if (restoreFocus) toggle?.focus();
+            if (requested) toggle?.click();
           }
         }, []);
         return React.createElement(NotificationInbox, {header: true, wallet: next});
       }
       root = createRoot(host);
+      shellMounted = false;
       root.render(React.createElement(Inbox));
       host.hidden = false;
     } catch {
@@ -74,6 +97,7 @@ if (host && !host.dataset.notificationInitialized) {
       root?.unmount();
       root = null;
       wallet = '';
+      loadFailed = true;
       preview(next);
       console.warn('Notifications could not load. They will retry when the connection resumes.');
     }
@@ -82,18 +106,41 @@ if (host && !host.dataset.notificationInitialized) {
   window.addEventListener('artsoul:wallet-state-changed', sync);
   window.addEventListener('artsoul:wallet-runtime-ready', sync);
   window.addEventListener('pagehide', () => {
-    const visible = !host.hidden;
     suspended = true;
+    panel()?.hidePopover();
+    delete host.dataset.notificationRequested;
     void sync();
-    // Keep only the generic shell in the outgoing page snapshot after cleanup.
-    host.hidden = !visible;
   });
   window.addEventListener('pageshow', () => { suspended = false; void sync(); });
   window.addEventListener('online', sync);
-  host.addEventListener('click', event => {
-    if (!event.target.closest?.('[data-notification-preview]')) return;
-    host.dataset.notificationRequested = host.dataset.notificationWallet;
-    void sync();
+  host.addEventListener('beforetoggle', event => {
+    if (event.target === panel() && event.newState === 'closed') delete host.dataset.notificationRequested;
+  }, true);
+  host.addEventListener('click', async event => {
+    if (suspended) return;
+    if (event.target.closest?.('[data-notification-preview]')) {
+      void sync(); // The native popover also works before this entry loads.
+      return;
+    }
+    if (!event.target.closest?.('[data-notification-connect]') || connecting) return;
+    if (connectedWallet()) { void sync(); return; }
+    const action = host.querySelector('[data-notification-connect]');
+    const message = host.querySelector('[data-notification-message]');
+    if (typeof window.safeConnectWallet !== 'function') {
+      message.textContent = 'Wallet connection is still loading. Please try again in a moment.';
+      return;
+    }
+    connecting = true;
+    action.disabled = true;
+    panel()?.hidePopover();
+    try { await window.safeConnectWallet(); }
+    catch { message.textContent = 'Wallet connection was not completed. You can try again.'; }
+    finally {
+      connecting = false;
+      action.disabled = false;
+      // A wallet change can have replaced the original guest shell meanwhile.
+      if (!root) host.querySelector('[data-notification-connect]').disabled = false;
+    }
   });
   void sync();
 }

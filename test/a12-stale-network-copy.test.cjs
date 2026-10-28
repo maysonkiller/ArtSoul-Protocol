@@ -68,7 +68,7 @@ test('all consumers receive the updated shared runtime assets', () => {
 
   for (const path of accountMenuPages) {
     const source = read(path);
-    assert.match(source, /header-prepaint\.js\?v=8/, path);
+    assert.match(source, /header-prepaint\.js\?v=9/, path);
     assert.match(source, /avatar-dropdown\.js\?v=57/, path);
   }
   for (const path of contractPages) {

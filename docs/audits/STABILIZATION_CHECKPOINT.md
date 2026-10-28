@@ -3,6 +3,16 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
+October 28 B29 guest notification entry is locally implemented from `aad01970`.
+The existing header gap is replaced by an always-visible bell with a native
+explanation and explicit Connect wallet action. No guest private reads/imports;
+wallet/generation/BFCache fences remain. 29 controller checks, 336 broader
+notification/header checks, 125 overlapping layout/cache checks and build pass.
+48 local rendered cases and four script-blocked first-paint keyboard/AX cases
+pass; no physical-phone acceptance inferred. See
+`B29_GUEST_NOTIFICATIONS_2026-10-28.md`. Preserve unrelated untracked files.
+Exactly next: candidate CI, preview, authorized merge/release and apex check.
+
 October 28 B28 mobile account header correction RELEASED in PR #381, candidate
 `329f98dc`, production/implementation HEAD `9faffe2d7797b2caec111ad7da2922d49bb33a74`.
 Full guest/unnamed labels, contained avatar, fixed mobile touch targets and

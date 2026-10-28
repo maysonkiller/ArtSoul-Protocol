@@ -5717,7 +5717,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .notification-badge.notification-badge-dot { min-width: 0; width: 0.5rem; height: 0.5rem; padding: 0; inset-block-start: 0.125rem; inset-inline-end: 0.375rem; }
 .notification-toggle-chevron { flex: 0 0 auto; width: 16px; height: 16px; color: var(--c-text-muted); transition: transform 160ms ease; }
 .notification-toggle[aria-expanded="true"] .notification-toggle-chevron { transform: rotate(180deg); color: var(--c-accent); }
-.notification-inbox > #profile-notifications { max-height: min(24rem, 60dvh); margin-top: 0.625rem; overflow: auto; overscroll-behavior: contain; padding: 1rem; border: 1px solid var(--c-border-soft); border-radius: 1rem; background: var(--c-surface); overflow-wrap: anywhere; scrollbar-color: var(--c-border) transparent; scrollbar-width: thin; }
+.notification-inbox > :is(#profile-notifications, #notification-preview-panel) { max-height: min(24rem, 60dvh); margin-top: 0.625rem; overflow: auto; overscroll-behavior: contain; padding: 1rem; border: 1px solid var(--c-border-soft); border-radius: 1rem; background: var(--c-surface); overflow-wrap: anywhere; scrollbar-color: var(--c-border) transparent; scrollbar-width: thin; }
 .notification-panel-heading { position: sticky; top: -1rem; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin: -1rem -1rem 0.875rem; padding: 0.625rem 0.75rem 0.625rem 1rem; border-bottom: 1px solid var(--c-border-soft); background: var(--c-surface); }
 .notification-panel-heading > :first-child { min-width: 0; }
 .notification-panel-heading h2, .notification-panel-heading h3, .notification-category h3 { margin: 0; background: none; -webkit-text-fill-color: currentColor; color: var(--c-text); text-shadow: none; animation: none; font-size: 1rem; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; }
@@ -5740,7 +5740,10 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 .header-notification-inbox > .notification-toggle { width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; }
 .header-notification-inbox .notification-toggle-icon { flex: 0 0 20px; width: 20px; height: 20px; }
 .header-notification-inbox .notification-badge { inset-block-start: -0.5rem; inset-inline-end: -0.625rem; }
-.header-notification-inbox > #profile-notifications { position: fixed; inset-inline-end: var(--site-gutter, 1rem); top: calc(var(--site-header-height, 80px) + 0.5rem); z-index: 120; width: min(26rem, calc(100% - 2 * var(--site-gutter, 1rem))); max-height: calc(100dvh - var(--site-header-height, 80px) - 1.5rem); margin: 0; text-align: start; box-shadow: 0 0.75rem 2rem var(--c-surface-muted); }
+.header-notification-inbox > :is(#profile-notifications, #notification-preview-panel) { position: fixed; inset-inline-end: var(--site-gutter, 1rem); top: calc(var(--site-header-height, 80px) + 0.5rem); z-index: 120; width: min(26rem, calc(100% - 2 * var(--site-gutter, 1rem))); max-height: calc(100dvh - var(--site-header-height, 80px) - 1.5rem); margin: 0; text-align: start; box-shadow: 0 0.75rem 2rem var(--c-surface-muted); }
+#notification-preview-panel { inset-block-end: auto; inset-inline-start: auto; color: var(--c-text); }
+#notification-preview-panel > .btn-secondary { margin-top: 0.5rem; }
+.header-notification-inbox:has(#notification-preview-panel:popover-open) > .notification-toggle { border-color: var(--c-accent); background: var(--c-surface-strong); color: var(--c-accent); }
 .notification-groups > button { display: flex; align-items: center; justify-content: center; gap: 0.375rem; min-width: 0; padding: 0.5rem; border: 1px solid transparent; border-radius: 0.625rem; background: transparent; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; font-weight: 600; line-height: 1.4; cursor: pointer; }
 .notification-groups > button[aria-pressed="true"] { border-color: var(--c-border); background: var(--c-surface); color: var(--c-text); }
 .future .notification-groups > button[aria-pressed="true"] { border-color: var(--c-accent); color: var(--c-accent); }

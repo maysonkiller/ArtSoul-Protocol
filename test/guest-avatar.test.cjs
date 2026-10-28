@@ -132,8 +132,8 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=59/, `${page} must use the shared stylesheet cache version`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=8"><\/script>/, `${page} must load the first-frame bridge`);
+    assert.match(html, /unified-styles\.css\?v=60/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=9"><\/script>/, `${page} must load the first-frame bridge`);
     assert.match(html, /<script src="\/avatar-dropdown\.js\?v=57" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(
       html,
