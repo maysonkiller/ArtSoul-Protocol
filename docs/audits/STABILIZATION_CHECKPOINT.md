@@ -3,7 +3,8 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 28 B26 founder-priority video follow-up, implementation verified locally
+October 28 B26 founder-priority video follow-up RELEASED in PR #377,
+production merge `13bda8e5ffeea623d7a3f856c904516ec9885496`
 (started at `b854089b`, production baseline `537bad1`):
 
 - Reviewed the full 4:22 recording through 131 sampled frames, selected larger
@@ -20,17 +21,29 @@ October 28 B26 founder-priority video follow-up, implementation verified locally
   aliases pass. Telegram's stored old preview is not a successful cache purge.
 - Evidence and interpretation ledger: `B26_COMPACT_PAGES_2026-10-28.md`.
   Full tracked run: 2820 passed, one obsolete exact-60px provider-row expectation.
-  Updated that assertion to retain the 44px minimum touch target. Exact-candidate
-  CI and release verification are pending.
+  Updated that assertion to retain the 44px minimum touch target. Final CI and
+  release verification passed as recorded below.
 - PR #377 preview passed eight-route/39-asset verification, but actual browser
   runtime exposed rapid-close image focus loss: the shared click guard disabled
   the trigger for 500ms. Added its existing UI-toggle exemption, an actual-listener
-  regression test, and rebuilt; 18 affected checks pass. Repeat final preview.
+  regression test, and rebuilt; 18 affected checks pass. Final preview passed.
 - Preserve unrelated `.codex/`, `output/`, `src/api/moderation-authority-policy.js`
   and `test/moderation-authority-policy.test.mjs`. Include the new image-control
   test only with this slice. No contracts, economic changes or signing.
-- Exactly next: finish B26 exact-candidate CI, preview and apex verification;
-  then resume B21 Donate/Report command preparation through existing dialogs.
+- Final candidate `d2396005`: CI40689668153 passes, Linux2820/two skips,
+  Windows2425/32 skips, zero failures and 49 contract checks each. Earlier CI
+  had a Windows DPAPI startup timeout; no security code weakened. Post-merge
+  CI40690418396 passes; merge tree equals the reviewed candidate.
+- Final preview/apex eight routes/39 assets and guest access checks pass.
+  Actual deployed browser: 32 preview +32 apex cases with real public reads,
+  zero page exceptions/API writes. Six further populated-gallery cases pass.
+  Apex has 16 home/29 Discovery cards. Rapid image close/focus now passes with
+  the real click guard. Final affected 18 checks and build pass.
+- This checkpoint/report update is evidence only; tracked runtime is merged.
+  No remaining B26 implementation diff. Phase B is not complete; broader
+  Future navigation, command coverage and beta exit gates remain open.
+- Exactly next: resume B21 Donate/Report command preparation through existing
+  review dialogs, without automated signing.
 
 October 26 B24 founder-priority continuation RELEASED in PRs #375 / #376,
 production merge `537bad12796bc2202fe9d711490e8f8502f1decd`:
