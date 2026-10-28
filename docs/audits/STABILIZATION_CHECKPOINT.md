@@ -3,8 +3,9 @@
 Updated: 2026-10-28 (local time). Continue only in `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Read `git status` and `git log -1` before editing.
 
-October 28 B21 Donate/Report command slice IN PROGRESS, starting from production
-`13bda8e5` plus B26 release-evidence commit `77624572`:
+October 28 B21 Donate/Report command slice RELEASED in PR #378, candidate
+`b49311cd`, implementation HEAD/production merge `8abca4615d09aa206ab219f3e972c2ae212cb886`
+(started from production `13bda8e5` plus B26 release-evidence commit `77624572`):
 
 - `prepare_donation` / `prepare_artwork_report` reuse public artwork lookup and
   shared card eligibility, then open the existing review forms. No automated
@@ -16,11 +17,22 @@ October 28 B21 Donate/Report command slice IN PROGRESS, starting from production
   consistency. Build passes. Sixteen local built-browser cases (real public
   apex reads proxied locally) pass: Home/Gallery/Docs/Builder, Donate/Report,
   Classic laptop/Future mobile. No page exceptions or API writes.
-- Evidence: `B21_REVIEW_COMMANDS_2026-10-28.md`. Full tracked suite running;
-  hosted CI, preview and apex verification pending. Preserve unrelated untracked
-  authority-policy files, `.codex/` and `output/`.
-- Exactly next: finish full-suite and hosted verification, release this bounded
-  B21 slice; do not call all of Phase B complete.
+- Full tracked local suite: 2833 passed. Exact-candidate CI40695082625 passes:
+  Linux2832/two skips, Windows2437/32 skips, 49 contracts per platform, both
+  builds/static. Merge tree equals the candidate; post-merge CI40696631058 passed.
+- Preview/apex: eight routes/39 assets and guest protection checks each pass.
+  Fourteen real preview cases refuse disabled features; fourteen real apex cases
+  open/close forms across all seven command pages. Zero API writes/page errors.
+  Four extra local visual cases pass; representative screenshots inspected.
+- Evidence: `B21_REVIEW_COMMANDS_2026-10-28.md`. Remaining tracked diff is this
+  evidence/backlog update only. Preserve unrelated untracked authority-policy
+  files, `.codex/` and `output/`. PR attachment tool hit the chat's 100-artifact
+  limit; PR remains linked in this checkpoint and the audit report.
+- Owned browser `b26release` and local preview/dev servers 4226/4227 closed.
+  The bounded review agent finished; no helper is running.
+- Exactly next: B21 publication draft preparation through the existing Publish
+  form, preserving selected files and pending publication recovery. Wider
+  languages, B18 and operational/beta exit gates remain open.
 
 October 28 B26 founder-priority video follow-up RELEASED in PR #377,
 production merge `13bda8e5ffeea623d7a3f856c904516ec9885496`

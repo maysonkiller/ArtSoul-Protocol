@@ -1,6 +1,7 @@
 # B21 Donate and Report review commands
 
-Status: implemented locally, release verification pending.
+Status: released in PR #378. Candidate `b49311cd920979c343113a44ebe5de88e7269a83`;
+production merge `8abca4615d09aa206ab219f3e972c2ae212cb886`.
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Starting production HEAD: `13bda8e5`; B26 release evidence commit: `77624572`.
 
@@ -51,8 +52,33 @@ contract, schema, roles, networks or automatic signing change.
   mobile: correct modal, bounded width, empty donation amount, consumed action,
   closing behavior, zero page exceptions and zero API writes. Includes actual
   lazy imports on pages without cards. This is not a physical-device test.
-- Full tracked unit suite, hosted CI and deployment: pending at this checkpoint.
-  No real payment or complaint was submitted.
+- Full tracked local unit suite: 2,833 passed, zero failures/skips. The final
+  cache assertion added during that run passed separately in the 17-check group.
+- Exact-candidate CI 40695082625 passed: Linux 2,832 passed / two skipped;
+  Windows 2,437 passed / 32 skipped. Zero failures, 49 contract tests per platform,
+  both builds and static checks passed. Post-merge CI40696631058 also passed.
+  Skipped cases are not claimed executed.
+- Preview deployment 7386418350: eight HTML routes and 39 assets match the local
+  build, existing guest API boundaries remain enforced. Fourteen actual browser
+  cases across all seven command pages correctly refused preview-disabled
+  Donate/Report without navigation or writes. Initial harness attempts forgot
+  that same-hash Gallery navigation preserves the open command panel; explicitly
+  closing between cases fixed the test sequence without an application change.
+- Production asset/deployment verifier passed for the merge SHA; its tree equals
+  the reviewed candidate. Fourteen actual apex browser cases opened and closed
+  the existing forms from Home/Gallery/Profile/Artwork/Upload/Docs/Builder, with
+  English/Classic desktop and Russian/Future mobile layouts. No request mocking,
+  page exceptions or API writes. Additional four local visual cases captured both
+  forms in both themes; representative screenshots inspected.
+- No real payment, complaint, wallet signature or physical microphone/device
+  acceptance was performed for this slice. Existing forms retain those steps.
+- Logs: `output/audit/b21-review-tracked-unit.log`, `b21-review-focused.log`,
+  `b21-review-final-affected.log`, `b21-review-build.log`, `b21-review-ci.log`,
+  `b21-review-local-browser.log`, `b21-review-visual.log`,
+  `b21-review-preview-browser.log`, `b21-review-preview-verification.log`,
+  `b21-review-apex-browser.log`, `b21-review-apex-verification.log`.
 
-Exactly next: finish browser and full-suite verification, release the reviewed
-candidate, and verify its actual deployed runtime before advancing B21.
+Exactly next: B21 publication draft preparation through the existing Publish
+form, preserving selected files, pending publication recovery, explicit review
+and wallet approval. Wider language coverage and the other Phase B exit gates
+remain open; this release does not complete all of Phase B.
