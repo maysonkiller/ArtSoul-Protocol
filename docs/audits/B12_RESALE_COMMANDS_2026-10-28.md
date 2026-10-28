@@ -2,7 +2,7 @@
 
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Starting HEAD: `5d592dca`; starting production implementation: `e5f121f3`.
-Status: implemented and tested locally; release evidence follows below.
+Status: released in PR #383; release evidence follows below.
 
 ## Reproduction and cause
 
@@ -78,4 +78,22 @@ remaining acceptance and beta gates.
 
 ## Release
 
-Pending exact-candidate CI, preview and production verification.
+PR [#383](https://github.com/maysonkiller/ArtSoul-Protocol/pull/383) merged as
+`268808687ef66b41d9b4db5088aa320ee0598a93`. Its source tree matches the checked
+candidate `d028e9b8d3d3e98575e8b8e70660a68b387e4df6`.
+
+- Exact-candidate CI40739293538: Linux 2,871 pass / two skips; Windows 2,476
+  pass / 32 skips; 49 contract checks per runner, builds and static checks pass.
+- Preview7393093202 and production7393179527 succeeded. Each passed seven route
+  checks and three exact runtime-content comparisons. Production was compared
+  with the merged Git revision, not subsequent local microphone changes.
+- Both preview and apex passed four guest browser journeys / 20 checks across
+  Classic/Future, mobile/desktop and EN/RU: explicit refusal without a connected
+  wallet, help, panel bounds and closure. Zero page exceptions or API writes.
+- Post-merge CI40739908758 succeeded. Local evidence:
+  `output/b30-final-preview-assets.log`, `output/b30-final-preview-browser.log`,
+  `output/b30-production-assets.log`, `output/b30-production-browser.log`.
+
+The follow-up microphone consent review is recorded separately in
+`B21_AUDIO_CONSENT_2026-10-28.md`; it does not turn fixture financial acceptance
+into a real signed transaction.

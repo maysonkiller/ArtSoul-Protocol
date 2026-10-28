@@ -303,7 +303,7 @@ test('text commands do not require speech recognition', () => {
   const api = loadVoice(win);
   assert.equal(typeof api.parseCommand, 'function');
   assert.doesNotMatch(source, /typeof Recognition !== 'function' \|\| !window\.ArtSoulWebMCP/);
-  assert.match(source, /mic.disabled = busy \|\| typeof Recognition !== 'function'/);
+  assert.match(source, /mic.disabled = busy \|\| noticePending \|\| typeof Recognition !== 'function'/);
 });
 
 test('what was heard and the answer are shown, not only spoken', () => {

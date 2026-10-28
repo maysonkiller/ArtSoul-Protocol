@@ -33,7 +33,8 @@
     'use strict';
 
     const LANG_KEY = 'artsoul.voice.lang';
-    const NOTICE_KEY = 'artsoul.voice.notice';
+    // Older clients could persist consent before an asynchronous dialog resolved.
+    const NOTICE_KEY = 'artsoul.voice.notice.v2';
     // SpeechRecognition reports 0..1. Below this a wallet command is not run.
     // Some engines report 0 when they do not measure it at all; that is treated
     // as unknown, and the tool gate still applies.
@@ -426,6 +427,7 @@
             : readStored(LANG_KEY) === 'en' ? 'en'
                 : (String(navigator.language || '').toLowerCase().startsWith('ru') ? 'ru' : 'en');
         let recognition = null;
+        let noticePending = false;
         let busy = false;
         let generation = 0;
         let audioGeneration = 0;
@@ -526,11 +528,11 @@
         }
 
         function controls() {
-            input.disabled = busy || Boolean(recognition);
-            send.disabled = busy || Boolean(recognition);
-            mic.disabled = busy || typeof Recognition !== 'function';
-            panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy; });
-            panel.querySelector('form').setAttribute('aria-busy', String(busy));
+            input.disabled = busy || noticePending || Boolean(recognition);
+            send.disabled = busy || noticePending || Boolean(recognition);
+            mic.disabled = busy || noticePending || typeof Recognition !== 'function';
+            panel.querySelectorAll('.artsoul-voice-lang').forEach(el => { el.disabled = busy || noticePending; });
+            panel.querySelector('form').setAttribute('aria-busy', String(busy || noticePending));
         }
 
         function silence() {
@@ -581,7 +583,7 @@
         }
 
         async function handle(transcript, confidence, spoken = false) {
-            if (busy) return;
+            if (busy || noticePending) return;
             silence();
             const t = TEXT[lang];
             const audio = audioGeneration;
@@ -636,17 +638,28 @@
             }
         }
 
-        function start() {
-            if (busy || typeof Recognition !== 'function') return;
+        async function start() {
+            if (busy || noticePending || panel.hidden || document.visibilityState === 'hidden' || typeof Recognition !== 'function') return;
             silence();
             if (recognition) {
                 stopListening();
                 return;
             }
             if (readStored(NOTICE_KEY) !== 'accepted') {
-                // The browser's own dialog, like the wallet grant: a human click
-                // on text that says where the audio goes.
-                if (!window.confirm(TEXT[lang].notice)) return;
+                const audio = audioGeneration, current = generation, account = walletIdentity();
+                noticePending = true;
+                controls();
+                let approved = false;
+                try {
+                    approved = await window.confirm(TEXT[lang].notice);
+                } catch {
+                    // A failed or dismissed consent dialog never starts audio.
+                } finally {
+                    noticePending = false;
+                    controls();
+                }
+                if (approved !== true || audio !== audioGeneration || current !== generation || account !== walletIdentity() ||
+                    busy || panel.hidden || document.visibilityState === 'hidden') return;
                 writeStored(NOTICE_KEY, 'accepted');
             }
 
