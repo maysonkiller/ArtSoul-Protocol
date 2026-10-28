@@ -6,6 +6,9 @@
 // be done about it.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const test = require('node:test');
 const { pathToFileURL } = require('node:url');
@@ -248,4 +251,162 @@ test('an unreadable cut-off is refused instead of exporting everything', async (
     () => buildSnapshot({ tables: sampleTables(), chainId: CHAIN_ID, hashText, cutOff: 'last friday' }),
     /ISO-8601/
   );
+});
+
+test('an incomplete manifest is rejected even when its root hash is recomputed', async () => {
+  const { verifySnapshot, canonicalJson } = await snapshotModule;
+  const { files } = await build();
+  const { root_hash, ...body } = JSON.parse(files['manifest.json']);
+  delete body.files['bids.json'];
+  body.sections = body.sections.filter(name => name !== 'bids.json');
+  const altered = { ...files, 'manifest.json': canonicalJson({ ...body, root_hash: hashText(canonicalJson(body)) }) };
+  delete altered['bids.json'];
+  const result = verifySnapshot({ readFile: readerFor(altered), hashText });
+  assert.equal(result.ok, false);
+  assert.match(result.problems.join(' '), /required snapshot files/);
+});
+
+test('malformed JSON manifest shapes return failures instead of throwing', async () => {
+  const { verifySnapshot } = await snapshotModule;
+  for (const value of [null, [], 'manifest', 42]) {
+    const result = verifySnapshot({ readFile: () => JSON.stringify(value), hashText });
+    assert.equal(result.ok, false);
+    assert.match(result.problems.join(' '), /JSON object/);
+  }
+});
+
+test('a trusted root rejects a fully rewritten but internally consistent export', async () => {
+  const { verifySnapshot } = await snapshotModule;
+  const original = await build();
+  const tables = sampleTables();
+  tables.v41_settlements[0].final_price = '9000';
+  const rewritten = await build({ tables });
+  assert.equal(verifySnapshot({ readFile: readerFor(rewritten.files), hashText }).ok, true);
+  const result = verifySnapshot({ readFile: readerFor(rewritten.files), hashText, expectedRootHash: original.rootHash });
+  assert.equal(result.ok, false);
+  assert.match(result.problems.join(' '), /trusted root hash/);
+  assert.equal(verifySnapshot({ readFile: readerFor(original.files), hashText, expectedRootHash: original.rootHash }).ok, true);
+});
+
+// Model an archive whose data AND hashes were edited together. Structural
+// validation must still reject it; authenticity additionally needs a trusted root.
+async function rehash(files) {
+  const { canonicalJson } = await snapshotModule;
+  const { root_hash, ...body } = JSON.parse(files['manifest.json']);
+  for (const name of Object.keys(body.files)) body.files[name] = hashText(files[name]);
+  files['manifest.json'] = canonicalJson({ ...body, root_hash: hashText(canonicalJson(body)) });
+  return files;
+}
+
+test('section contents, participants and totals are checked after hashes agree', async () => {
+  const { verifySnapshot } = await snapshotModule;
+  const cases = [
+    ['bids.json', data => { data.rows = null; }, /invalid section or row count/],
+    ['bids.json', data => { data.count++; }, /invalid section or row count/],
+    ['bids.json', data => { data.section = 'artworks'; }, /invalid section or row count/],
+    ['bids.json', data => { data.private_note = 'unexpected'; }, /invalid section or row count/],
+    ['bids.json', data => { data.rows[0].chain_id = '11155111'; }, /different chain/],
+    ['bids.json', data => { data.rows[0].bidder = { toString: null }; }, /invalid columns/],
+    ['bids.json', data => { data.rows[0].email = 'not-exportable@example.test'; }, /invalid columns/],
+    ['bids.json', data => { delete data.rows[0].transaction_hash; }, /invalid columns/],
+    ['participants.json', data => { data.addresses.pop(); data.count--; }, /exported participants/],
+    ['manifest.json', data => { data.counts.bids++; }, /aggregate counts/],
+    ['manifest.json', data => { data.entitlement = 'granted'; }, /entitlement must be none/],
+    ['settlements.json', data => { data.rows[0].final_price = 'not a number'; }, /cannot be aggregated/]
+  ];
+  for (const [name, mutate, expected] of cases) {
+    const { files } = await build();
+    const data = JSON.parse(files[name]);
+    mutate(data);
+    files[name] = JSON.stringify(data);
+    const result = verifySnapshot({ readFile: readerFor(await rehash(files)), hashText });
+    assert.equal(result.ok, false, `${name}: ${expected}`);
+    assert.match(result.problems.join(' '), expected);
+  }
+});
+
+test('manifest names cannot coerce objects and canonical hashing preserves prototype-named keys', async () => {
+  const { verifySnapshot, canonicalJson } = await snapshotModule;
+  const prototypeNamed = JSON.parse('{"__proto__":{"value":1}}');
+  assert.deepEqual(JSON.parse(canonicalJson(prototypeNamed)), prototypeNamed);
+  const { files } = await build();
+  const originalManifest = files['manifest.json'];
+  const addedKey = originalManifest.replace('{', '{"__proto__":{"value":1},');
+  assert.equal(verifySnapshot({ readFile: readerFor({ ...files, 'manifest.json': addedKey }), hashText }).ok, false);
+  const body = JSON.parse(originalManifest);
+  body.sections[0] = { toString: null };
+  const malformed = verifySnapshot({ readFile: readerFor({ ...files, 'manifest.json': JSON.stringify(body) }), hashText });
+  assert.equal(malformed.ok, false);
+  assert.match(malformed.problems.join(' '), /required snapshot files/);
+});
+
+test('arbitrary manifest paths are rejected before any data file is read', async () => {
+  const { verifySnapshot, canonicalJson } = await snapshotModule;
+  for (const replacement of [null, [], '../outside.json', { '../outside.json': 'a'.repeat(64) }]) {
+    const { files } = await build();
+    const { root_hash, ...body } = JSON.parse(files['manifest.json']);
+    body.files = replacement;
+    const reads = [];
+    const result = verifySnapshot({ hashText, readFile: name => {
+      reads.push(name);
+      return canonicalJson({ ...body, root_hash: hashText(canonicalJson(body)) });
+    } });
+    assert.equal(result.ok, false);
+    assert.deepEqual(reads, ['manifest.json']);
+  }
+});
+
+test('invalid JSON in a correctly hashed section fails verification', async () => {
+  const { verifySnapshot } = await snapshotModule;
+  const { files } = await build();
+  files['bids.json'] = '{broken';
+  const result = verifySnapshot({ readFile: readerFor(await rehash(files)), hashText });
+  assert.equal(result.ok, false);
+  assert.match(result.problems.join(' '), /bids.json is not valid JSON/);
+});
+
+test('CLI distinguishes consistency from a trusted copy and rejects incomplete options', async () => {
+  const { files, rootHash } = await build();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'artsoul-verifier-'));
+  const script = path.join(__dirname, '..', 'scripts', 'verify-snapshot-a.mjs');
+  try {
+    for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(directory, name), content);
+    const run = (...args) => spawnSync(process.execPath, [script, directory, ...args], { encoding: 'utf8' });
+    const unanchored = run();
+    assert.equal(unanchored.status, 0, unanchored.stderr);
+    assert.match(unanchored.stdout, /Authenticity is NOT checked/);
+    const trusted = run('--expected-root', rootHash);
+    assert.equal(trusted.status, 0, trusted.stderr);
+    assert.match(trusted.stdout, /independently supplied trusted capture record/);
+    const mismatch = run('--expected-root', '0'.repeat(64));
+    assert.equal(mismatch.status, 1);
+    assert.match(mismatch.stdout, /trusted root hash/);
+    for (const args of [['--expected-root'], ['--expected-root', 'bad'], ['--unknown'], ['--expected-root', rootHash, 'extra']]) {
+      const invalid = run(...args);
+      assert.equal(invalid.status, 1);
+      assert.match(invalid.stderr, /Usage:/);
+    }
+    fs.writeFileSync(path.join(directory, 'manifest.json'), 'null');
+    const invalidManifest = run();
+    assert.equal(invalidManifest.status, 1);
+    assert.match(invalidManifest.stdout, /JSON object/);
+
+    // Archive the verifier with its one local module; no repository or npm
+    // installation is needed when a durable copy is checked after migration.
+    fs.writeFileSync(path.join(directory, 'manifest.json'), files['manifest.json']);
+    const toolsDir = path.join(directory, 'verification-tools');
+    fs.mkdirSync(path.join(toolsDir, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(toolsDir, 'src', 'snapshot'), { recursive: true });
+    fs.writeFileSync(path.join(toolsDir, 'package.json'), '{"type":"module"}\n');
+    fs.copyFileSync(script, path.join(toolsDir, 'scripts', 'verify-snapshot-a.mjs'));
+    fs.copyFileSync(path.join(__dirname, '..', 'src', 'snapshot', 'snapshot-a.js'), path.join(toolsDir, 'src', 'snapshot', 'snapshot-a.js'));
+    const isolated = spawnSync(process.execPath, [path.join(toolsDir, 'scripts', 'verify-snapshot-a.mjs'), directory,
+      '--expected-root', rootHash], { cwd: directory, encoding: 'utf8', env: { ...process.env, DATABASE_URL: '', SUPABASE_URL: '' } });
+    assert.equal(isolated.status, 0, isolated.stderr);
+    assert.match(isolated.stdout, /trusted capture record/);
+  } finally {
+    assert.equal(path.dirname(directory), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(directory).startsWith('artsoul-verifier-'));
+    fs.rmSync(directory, { recursive: true });
+  }
 });

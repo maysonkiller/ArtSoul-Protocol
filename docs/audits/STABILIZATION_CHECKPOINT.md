@@ -1,3 +1,12 @@
+October 28 B05 independent follow-up from HEAD 86434e4: three offline verifier
+failures reproduced, then repaired. Required archive files/shape, derived counts
+and participants are checked; --expected-root anchors the copy to a separately
+trusted capture record. 26 focused checks pass, including isolated CLI execution.
+No DB read, archive capture, storage upload or reset. Patch/release pending.
+Exactly next: release this verifier patch after CI, then address the remaining
+B05 consistent capture/no-overwrite guard without producing the final Snapshot A.
+The owner is away; wallet/native microphone acceptance waits. Keep Phase B open.
+
 October 28 B12 signed repricing/removal passed through Chrome/Rabby. Both RPCs
 verify receipts, mapping, owner and unchanged floor; see
 `B12_LIVE_ASSISTANT_2026-10-28.md`. Current Music2/artwork32/token5 listing is

@@ -117,7 +117,7 @@ export function canonicalJson(value) {
 function sortDeep(value) {
     if (Array.isArray(value)) return value.map(sortDeep);
     if (value && typeof value === 'object' && !(value instanceof Date)) {
-        const sorted = {};
+        const sorted = Object.create(null);
         for (const key of Object.keys(value).sort()) sorted[key] = sortDeep(value[key]);
         return sorted;
     }
@@ -261,7 +261,7 @@ export function buildSnapshot({ tables, cutOff = null, chainId, hashText }) {
  * manifest lists, and reports every disagreement instead of stopping at the
  * first, so one corrupted copy can be compared against another in a single pass.
  */
-export function verifySnapshot({ readFile, hashText }) {
+export function verifySnapshot({ readFile, hashText, expectedRootHash = null }) {
     if (typeof readFile !== 'function') throw new Error('readFile is required');
     if (typeof hashText !== 'function') throw new Error('hashText is required');
 
@@ -279,22 +279,52 @@ export function verifySnapshot({ readFile, hashText }) {
         return { ok: false, problems: ['manifest.json is not valid JSON'] };
     }
 
+    const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+    if (!isObject(manifest)) {
+        return { ok: false, problems: ['manifest.json must be a JSON object'] };
+    }
+    const requiredFiles = [...EXPORTED_TABLES.map(spec => `${spec.name}.json`), 'participants.json'].sort();
+    const sameNames = (actual, expected) => Array.isArray(actual) && actual.every(name => typeof name === 'string') &&
+        canonicalJson([...actual].sort()) === canonicalJson(expected);
+
     if (manifest.schema_version !== SNAPSHOT_SCHEMA_VERSION) {
         problems.push(`schema_version ${manifest.schema_version} is not ${SNAPSHOT_SCHEMA_VERSION}`);
     }
     if (manifest.notice !== ENTITLEMENT_NOTICE) {
         problems.push('the entitlement notice is missing or altered');
     }
+    if (manifest.entitlement !== 'none') problems.push('entitlement must be none');
+    if (typeof manifest.chain_id !== 'string' || !/^[1-9]\d*$/.test(manifest.chain_id)) {
+        problems.push('chain_id must be a positive decimal string');
+    }
+    if (manifest.source_cut_off !== null && (typeof manifest.source_cut_off !== 'string' ||
+        !Number.isFinite(Date.parse(manifest.source_cut_off)))) {
+        problems.push('source_cut_off must be a timestamp or null');
+    }
 
     const { root_hash: recordedRoot, ...body } = manifest;
     if (hashText(canonicalJson(body)) !== recordedRoot) {
         problems.push('root_hash does not match the manifest body');
     }
+    // A hash stored beside its data proves consistency, not authenticity. The
+    // reference must come from a separately retained, trusted capture record.
+    if (expectedRootHash !== null) {
+        if (typeof expectedRootHash !== 'string' || !/^[0-9a-f]{64}$/i.test(expectedRootHash)) {
+            problems.push('trusted root hash must contain 64 hexadecimal characters');
+        } else if (recordedRoot !== expectedRootHash.toLowerCase()) {
+            problems.push('root_hash does not match the trusted root hash');
+        }
+    }
 
-    const listed = Object.keys(manifest.files || {});
-    if (listed.length === 0) problems.push('the manifest lists no files');
+    if (!isObject(manifest.files) || !sameNames(Object.keys(manifest.files), requiredFiles) ||
+        !sameNames(manifest.sections, requiredFiles)) {
+        problems.push('the manifest must list exactly the required snapshot files');
+        return { ok: false, problems };
+    }
 
-    for (const name of listed) {
+    const contents = {};
+    // Read only schema-known filenames, never an arbitrary manifest path.
+    for (const name of requiredFiles) {
         const content = readFile(name);
         if (typeof content !== 'string') {
             problems.push(`${name} is listed in the manifest but missing`);
@@ -303,7 +333,49 @@ export function verifySnapshot({ readFile, hashText }) {
         if (hashText(content) !== manifest.files[name]) {
             problems.push(`${name} does not match its recorded hash`);
         }
+        contents[name] = content;
     }
+    if (problems.length) return { ok: false, problems };
+
+    const sections = {};
+    for (const spec of EXPORTED_TABLES) {
+        const name = `${spec.name}.json`;
+        let section;
+        try { section = JSON.parse(contents[name]); } catch {
+            problems.push(`${name} is not valid JSON`);
+            continue;
+        }
+        if (!isObject(section) || !sameNames(Object.keys(section), ['count', 'rows', 'section']) ||
+            section.section !== spec.name || !Array.isArray(section.rows) ||
+            section.count !== section.rows.length) {
+            problems.push(`${name} has an invalid section or row count`);
+            continue;
+        }
+        if (section.rows.some(row => !isObject(row) ||
+            !sameNames(Object.keys(row), [...spec.columns].sort()) ||
+            Object.values(row).some(value => value !== null && !['string', 'number', 'boolean'].includes(typeof value)) ||
+            String(row.chain_id) !== manifest.chain_id)) {
+            problems.push(`${name} contains invalid columns or a different chain`);
+            continue;
+        }
+        sections[spec.name] = section.rows;
+    }
+    if (problems.length) return { ok: false, problems };
+
+    const participants = collectParticipants(sections);
+    try {
+        const section = JSON.parse(contents['participants.json']);
+        if (!isObject(section) || !sameNames(Object.keys(section), ['addresses', 'count', 'section']) ||
+            section.section !== 'participants' || section.count !== participants.length ||
+            canonicalJson(section.addresses) !== canonicalJson(participants)) {
+            problems.push('participants.json does not match the exported participants');
+        }
+    } catch { problems.push('participants.json is not valid JSON'); }
+    try {
+        if (canonicalJson(manifest.counts) !== canonicalJson(countAggregates(sections, participants))) {
+            problems.push('aggregate counts do not match the exported rows');
+        }
+    } catch { problems.push('settlement values cannot be aggregated'); }
 
     return { ok: problems.length === 0, problems };
 }

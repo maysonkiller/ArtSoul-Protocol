@@ -19,7 +19,13 @@ import { verifySnapshot } from '../src/snapshot/snapshot-a.js';
 
 const hashText = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 
-const dir = path.resolve(process.argv[2] || path.join('..', 'snapshot-a'));
+const [directory, flag, expectedRootHash, ...extra] = process.argv.slice(2);
+if ((flag !== undefined && flag !== '--expected-root') ||
+    (flag === '--expected-root' && !/^[0-9a-f]{64}$/i.test(expectedRootHash || '')) || extra.length) {
+    console.error('Usage: verify-snapshot-a.mjs <directory> [--expected-root <trusted SHA-256>]');
+    process.exit(1);
+}
+const dir = path.resolve(directory || path.join('..', 'snapshot-a'));
 
 const readFile = (name) => {
     // Names come from the manifest, which is untrusted input until it verifies.
@@ -32,7 +38,7 @@ const readFile = (name) => {
     }
 };
 
-const result = verifySnapshot({ readFile, hashText });
+const result = verifySnapshot({ readFile, hashText, expectedRootHash });
 
 console.log(`snapshot : ${dir}`);
 
@@ -42,8 +48,10 @@ if (result.ok) {
     console.log(`cut-off  : ${manifest.source_cut_off || 'none'}`);
     console.log(`counts   : ${JSON.stringify(manifest.counts)}`);
     console.log('');
-    console.log('VALID. Every listed file matches its recorded hash and the manifest matches its');
-    console.log('own root hash. Compare the root hash against the other durable copy.');
+    console.log('VALID. Required sections, participant and aggregate counts, and hashes agree.');
+    console.log(expectedRootHash
+        ? 'The root hash also matches the independently supplied trusted capture record.'
+        : 'Internal consistency only. Authenticity is NOT checked without --expected-root.');
 } else {
     console.log('');
     console.log('INVALID:');
