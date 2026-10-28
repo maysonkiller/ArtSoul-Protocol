@@ -2,7 +2,8 @@
 
 Date: October 28, 2026. Workspace: `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Start HEAD: `26883c59` (PR #380).
-Status: implemented and verified locally; candidate release pending.
+Status: RELEASED in PR #381. Candidate `329f98dc9e83455004207bbb46a9515cec93f9f0`;
+production merge `9faffe2d7797b2caec111ad7da2922d49bb33a74`, identical source tree.
 
 ## Reproduction and cause
 
@@ -59,6 +60,19 @@ Physical iPhone acceptance is not claimed from Chromium responsive testing.
 
 ## Release
 
-Exact candidate CI, preview and apex verification are pending. Paid voice setup
-remains deferred; the previous B21 publication preparation release is recorded
+Exact-candidate CI 40716480161 passed: Linux 2,845 passed / two skipped; Windows
+2,450 passed / 32 skipped; both builds/static and 49 contract checks per platform.
+Preview deployment 7389737333 and production deployment 7389878595 succeeded.
+Eight HTML routes on each host reference the expected built stylesheet
+`unified-styles-CBqoDq7g.css`; its content hash matches the local build exactly.
+Preview and apex each passed 32 real guest browser cases without response mocks,
+API writes or page exceptions: eight routes, both themes, 320/390px and reload
+plus account-menu containment. These are responsive Chromium checks, not a
+new physical-iPhone acceptance report. Post-merge CI 40717354429 also passed;
+the implementation tree matches the green candidate. Owned local preview4228
+and browser session `b21draft` are closed; no helper remains running.
+The app could not attach PR #381 because this chat already has 100 attachments;
+the source remains https://github.com/maysonkiller/ArtSoul-Protocol/pull/381.
+
+Paid voice setup remains deferred; the previous B21 publication preparation release is recorded
 in `B21_PUBLICATION_DRAFT_2026-10-28.md`. Phase B remains open.
