@@ -1,5 +1,10 @@
 # B12 real assistant acceptance: Chrome and Rabby
 
+Latest continuation: `B12_SETTLEMENT_COMPLETION_2026-10-28.md` records actual
+desktop microphone/spoken response and owner-signed Taes end/settlement, plus
+the completion-state fix released in PR #388. Earlier pending audio/settlement
+notes below are historical; other signed journey gates remain separate.
+
 Workspace: `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Starting documentation HEAD: `53e58dc2bd674b9dd35ef22e57f4843470e5160f`.
 Published implementation: `63c0c28626a47d5e755d347ab44e03fcdac647c5`.

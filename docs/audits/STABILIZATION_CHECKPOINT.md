@@ -5,12 +5,18 @@ value, and +0.009 ETH winner credit. NEVER replay these operations. See
 B12_SETTLEMENT_COMPLETION_2026-10-28.md for hashes and precise evidence.
 A missing settlement receipt refresh and an armed completed command reproduced.
 Local patch: shared settled bridge, early repeat-settlement rejection, cleared
-successful composer, result links, translated activity. 204 tests and build pass;
-desktop/mobile fixture rendering passes. Release pending.
-Workspace C:\Projects\ArtSoul / codex/takeover-audit / starting HEAD33497c9c.
+successful composer, result links, translated activity, homepage receipt refresh.
+Released PR #388 / main39b8a68b. CI40765748743: Linux2,900 / Windows2,504 unit
+passes (2/33 skips), 49 contract tests each; builds/static pass. Production
+7396934039 succeeded; eight routes/four exact runtime assets match. Preview UI
+and apex API show Taes sold/token7/correct owner/floor. Apex screenshot blocked
+by an extension window; no new signed post-release test is claimed.
+Post-merge CI40766354465 also passes. The following local commit records only
+release evidence; implementation is already on main and production.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / release HEAD39b8a68b.
 Preserve unrelated untracked files. No active helper or paid provider.
-Exactly next: review and release this B12 completion patch, then verify hosted
-assets and Taes UI read-only. No new signature is required for this fix.
+Exactly next: reconcile remaining B12 signed journeys against existing receipts
+before preparing the next owner-operated scenario. Never replay Taes settlement.
 
 October 28 B05 tooling RELEASED in PR #386, main cc7db8dc.
 Linux CI40755921705 executed the new PostgreSQL concurrency check successfully;

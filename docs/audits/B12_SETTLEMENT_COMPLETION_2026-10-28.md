@@ -82,13 +82,35 @@ work, and the mobile page has no horizontal overflow. Screenshots were inspected
 `output/b12-settlement-completion-mobile.png`. Browser fixtures are not new signed
 transactions. No completed Taes transaction was replayed to test the patch.
 
-Release status and final hosted checks are recorded below after completion.
-Phase B remains open for its other named acceptance/operational gates.
-
 The first full CI run (40764576497) caught two outdated test expectations: the
 previous contract-script cache version and the former expired-auction copy.
 Both assertions were updated to the shipped interface. The homepage receipt
 regression and both affected suites pass (59 tests); the full local unit run has
 zero failures and 33 environment-dependent skips. That local run also includes
 an existing untracked policy test, which is not part of this PR. The final build
-passes. Clean Linux/Windows CI remains the release gate for the committed files.
+passes. Clean Linux/Windows CI is the release gate for the committed files.
+
+## Release and hosted verification
+
+PR #388 merged candidate `94efaaec0be0ed746ea6b83487d512b3a7a0bd83` as main
+`39b8a68b21e56eabf1e187d5d92b95f82c0f2823` on October 28 at 20:47 UTC.
+Final-candidate CI 40765748743 passes: Linux 2,900 unit checks (two skips),
+Windows 2,504 (33 skips), 49 contract tests on each runner, both builds and
+static checks. The different unit totals include Linux PostgreSQL coverage.
+Production deployment 7396934039 succeeded.
+Post-merge CI 40766354465 also passes on Linux and Windows.
+
+Preview and apex each serve the exact four reviewed standalone runtime assets
+and expected script versions across eight routes. The final preview in Chrome
+shows Taes Sold, token 7, the correct First Collector and the settlement timeline
+without a payment action. Apex API also confirms sold/minted/token 7, the owner,
+0.001 ETH floor and cleared active auction. Evidence:
+`output/b12-completion-preview-final-assets.json`,
+`output/b12-completion-production-assets.json`, and
+`output/b12-completion-production-artwork.json`.
+
+Opening the final apex page in Chrome was blocked by an extension window; no
+fresh apex screenshot or new signed post-release journey is claimed. The
+successful fixture rendering and final preview inspection are distinct from
+the already completed real transactions. No financial action was replayed.
+Phase B remains open for its other named acceptance/operational gates.
