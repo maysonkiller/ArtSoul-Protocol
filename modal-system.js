@@ -7,6 +7,7 @@
     class ModalSystem {
         constructor() {
             this.currentModal = null;
+            this.dismissCurrent = null;
             this.init();
         }
 
@@ -52,13 +53,13 @@
                 this.show({
                     title,
                     message,
+                    onDismiss: resolve,
                     buttons: [
                         {
                             text: 'OK',
                             primary: true,
                             onClick: () => {
                                 this.close();
-                                resolve();
                             }
                         }
                     ]
@@ -77,21 +78,21 @@
                 this.show({
                     title,
                     message,
+                    onDismiss: () => resolve(false),
                     buttons: [
                         {
                             text: 'Cancel',
                             primary: false,
                             onClick: () => {
                                 this.close();
-                                resolve(false);
                             }
                         },
                         {
                             text: 'OK',
                             primary: true,
                             onClick: () => {
-                                this.close();
                                 resolve(true);
+                                this.close();
                             }
                         }
                     ]
@@ -104,7 +105,10 @@
          * @param {Object} options - Modal options
          */
         show(options) {
-            const { title, message, buttons } = options;
+            // Replacing a dialog cancels its pending decision; it never grants consent.
+            this.close();
+            const { title, message, buttons, onDismiss } = options;
+            this.dismissCurrent = onDismiss;
             const theme = localStorage.getItem('artsoul_theme') || 'classic';
             const isClassic = theme === 'classic';
 
@@ -273,11 +277,14 @@
          * Close current modal
          */
         close() {
+            const dismiss = this.dismissCurrent;
+            this.dismissCurrent = null;
             if (this.currentModal) {
                 this.currentModal.style.display = 'none';
                 this.currentModal.innerHTML = '';
                 this.currentModal = null;
             }
+            if (typeof dismiss === 'function') dismiss();
         }
     }
 

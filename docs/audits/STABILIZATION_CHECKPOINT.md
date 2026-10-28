@@ -1,12 +1,19 @@
-October 28 B12/B21 resale parity and async confirmation are implemented locally.
-Workspace `C:\Projects\ArtSoul`, branch `codex/takeover-audit`, base `5d592dca`.
-New edit/removal commands reuse B23 adapters, bind live review to wallet/chain/
-deployment/listing and guard runtime replacement. Browser testing reproduced a
-Promise-as-consent bug in the common wallet gate; all calls now await explicit
-consent, with shared action lock and revocation checks. 167 affected checks and
-build pass; eight actual-browser fixture journeys / 56 checks pass, no real writes.
-See `B12_RESALE_COMMANDS_2026-10-28.md`. Preserve unrelated untracked files.
-Exactly next: exact-candidate CI and preview verification, then authorized release.
+October 28 B12/B21 resale parity RELEASED in PR #383, implementation HEAD
+`268808687ef66b41d9b4db5088aa320ee0598a93`, candidate `d028e9b8` (same tree).
+Exact CI40739293538, post-merge CI40739908758 and production7393179527 pass.
+172 affected checks and build pass; eight browser fixture journeys / 56 checks;
+preview and apex each pass four guest journeys / 20 checks, seven routes and
+three exact assets. No real signatures or financial acceptance inferred.
+See `B12_RESALE_COMMANDS_2026-10-28.md`.
+
+Current local follow-up on that HEAD: B21 microphone async consent, versioned
+renewal, late-approval fences and shared modal replacement cancellation. 151
+checks and build pass; eight browser fixture journeys / 120 checks, no actual
+audio or API writes. See `B21_AUDIO_CONSENT_2026-10-28.md`. Work remains only in
+`C:\Projects\ArtSoul`, branch `codex/takeover-audit`. Preserve unrelated untracked
+policy files, `.codex/` and `output/`.
+Exactly next: exact-candidate CI and preview verification for this follow-up,
+then authorized release. B17 real due-time reminder evidence remains unclosed.
 
 # Stabilization checkpoint
 
