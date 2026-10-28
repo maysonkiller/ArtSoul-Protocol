@@ -50,7 +50,9 @@ test('profile display and editing defer notifications to the single shared heade
   assert.doesNotMatch(profile, /NotificationInbox|notification-inbox\.jsx/);
   const html = fs.readFileSync('profile.html', 'utf8');
   assert.equal((html.match(/id="header-notifications"/g) || []).length, 1);
-  assert.match(html, /<div id="header-notifications" hidden>/);
+  assert.match(html, /<div id="header-notifications">/);
+  assert.match(html, /id="notification-preview-panel"[^>]*popover="auto"/);
+  assert.doesNotMatch(html, /id="profile-notifications"|notification-badge/);
 });
 
 test('Activity names the existing Sales subset without pretending to be a complete ledger', async () => {

@@ -74,3 +74,10 @@ Local implementation verified; candidate CI, preview and production verification
 are pending. Phase B remains open. Exactly next: publish this bounded change,
 verify the deployed guest entry, then resume the existing B12/B21 integrated
 public assistant journey. Paid voice provider activation stays deferred.
+
+Initial candidate `3e203e4a` passed preview deployment 7390768630, eight-route
+and four exact-content asset checks, and 48 hosted browser cases without mocks,
+API writes, notification reads or page errors. CI40723410468 found an older
+profile organization assertion requiring the now-superseded hidden guest bell.
+Updated it to require one generic public shell and no embedded private inbox or
+badge. Final candidate CI remains required before release.
