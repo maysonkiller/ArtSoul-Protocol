@@ -26,9 +26,17 @@ delivery acceptance and official-source designation are not inferred.
 Work remains only in `C:\Projects\ArtSoul`, branch `codex/takeover-audit`.
 Release/evidence documentation is a separate follow-up commit; inspect HEAD on
 resume. Preserve unrelated untracked policy files, `.codex/` and `output/`.
-Exactly next: reconcile B02/B11/B12 remaining real-wallet acceptance against
-existing receipts and tester evidence before planning any new transaction.
-Do not replay completed journals or manufacture a due-time notification.
+B02/B11 reconciliation also completed read-only: both RPCs prove the historical
+default/re-auction pairs 24→60 and39→64; auctions14/25 still await default closure.
+This does not prove the submitting browser path. Updated the dated B02 report,
+backlog and B3 runbook: actual Phase A moderation/recovery acceptance supersedes
+September activation blockers. 28 affected documentation/liveness checks pass.
+No new wallet transactions. Local preview4230 and owned browser closed; the one
+bounded review helper completed, no background helper work remains.
+Exactly next: complete the B12 signed assistant acceptance plan using the current
+published adapters and existing authorized test accounts, reconciling their
+journal first. Keep real device/signature consent distinct from fixture evidence;
+do not replay completed operations or manufacture a due-time notification.
 
 # Stabilization checkpoint
 

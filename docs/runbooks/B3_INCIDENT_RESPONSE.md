@@ -136,25 +136,27 @@ and keep the Supabase spend cap on.
 
 ## 6. Moderation
 
-**Find out:** the review queue, once moderation is activated.
-
-Moderation is built and merged behind a disabled feature flag with its migration
-unapplied, per A-39 and RG-03. **Until that activation ceremony runs there is no
-queue to watch, and nothing in this section applies.**
+**Find out:** the protected review queue in Admin, after wallet/role and factor
+verification. Activation and operator acceptance are recorded in
+[`PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md`](../audits/PHASE_A_MODERATION_ACCEPTANCE_2026-10-11.md).
+The older September statement that the migration and activation were pending
+is superseded; do not repeat setup or reset staff credentials as an incident step.
 
 `artsoulprotocol.com/api/public/config` reports `reportingEnabled`, which is how
 to tell from a phone whether report intake is on. It is the flag, not the queue.
 
-After activation:
+When intake is enabled:
 
 1. A report in `pending_review` that nobody has looked at is the signal. Canon
    12 makes the complaint-driven flow the primary mechanism, so an unattended
    queue is the failure mode, not a full one.
-2. A valid claim hides the artwork pending review. That is expected and is not
-   an incident.
-3. Critical or irreversible actions need multisig, not a single operator. If an
-   incident seems to call for one, it calls for the ceremony in
-   [`A8_MODERATION_ROLLOUT.md`](A8_MODERATION_ROLLOUT.md) instead.
+2. A verified moderator reviews the claim and can hide the work pending review
+   with a recorded reason. A submission alone does not automatically hide it.
+   Hiding after review is expected behavior, not itself an incident.
+3. Staff grants and sign-in recovery use the approved paired application
+   authority. Contract custody retains its separate Safe controls. Follow the
+   current ceremony in [`A8_MODERATION_ROLLOUT.md`](A8_MODERATION_ROLLOUT.md);
+   do not replace either control with social login or an operator database edit.
 
 ---
 
