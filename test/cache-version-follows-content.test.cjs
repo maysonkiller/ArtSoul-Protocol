@@ -23,8 +23,8 @@ const RUNTIME = {
   'src/ui/components/artwork-card.js': { version: 23, sha256: 'ef343be5c814bd8a' },
   'contracts-integration.js': { version: 15, sha256: '3ab534527f8b5332' },
   'modal-system.js': { version: 1, sha256: '73be2dadc241ea78' },
-  'webmcp-tools.js': { version: 7, sha256: '7e933a8d00275786' },
-  'voice-commands.js': { version: 6, sha256: '1a27e600d18c08e6' },
+  'webmcp-tools.js': { version: 8, sha256: '69ec7cff1a0314b7' },
+  'voice-commands.js': { version: 7, sha256: '9084dd723dfb706d' },
   'avatar-dropdown.js': { version: 57, sha256: '07cf616b2741bc9b' },
   'header-prepaint.js': { version: 8, sha256: '2ca7f2d8f0612be6' },
   'data-prefetch.js': { version: 6, sha256: '339cad21ebc03f47' },
@@ -76,6 +76,13 @@ test('every page agrees on the version of every runtime file', () => {
       assertRuntimeVersion(html, page, file, expected.version);
     }
   }
+});
+
+test('on-demand command imports use the same card policy version as page scripts', () => {
+  const file = 'src/ui/components/artwork-card.js';
+  const match = fs.readFileSync('webmcp-tools.js', 'utf8').match(/import\('\/src\/ui\/components\/artwork-card\.js\?v=(\d+)'\)/);
+  assert.ok(match, 'non-card command pages must reuse the shared action policy');
+  assert.equal(Number(match[1]), RUNTIME[file].version, 'commands must not load an obsolete card policy');
 });
 
 test('no page loads one of these without a version at all', () => {

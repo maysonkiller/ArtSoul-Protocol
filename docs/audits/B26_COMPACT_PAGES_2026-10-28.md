@@ -2,7 +2,8 @@
 
 Date: 2026-10-28. Workspace: `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`, starting HEAD `b854089b` (production `537bad1`).
-Status: implemented and locally verified; release evidence follows below.
+Status: released in PR #377, production merge
+`13bda8e5ffeea623d7a3f856c904516ec9885496`.
 
 ## Scope and observations
 
@@ -58,7 +59,7 @@ physical-phone or financial acceptance. Screenshots were inspected.
 | Candidate rendered matrix | Same 98 cases pass, from 320px mobile through 1920px desktop, including short desktop and landscape. Browser zoom stays 1. |
 | Profile editor | Eight current-markup cases pass: labels, empty/filled placeholders, 16px fields, Cancel, overflow and desktop/mobile connection layout. |
 | Donate history | Ten cases pass: long rows, both sort states, pagination, nested Report close/focus, reachable controls, one content scroller and stable background geometry. |
-| Artwork image controls | Eight local fixture cases pass: native modal state, original link, visible/keyboard activation, background focus exclusion, Escape/close and focus/overflow restoration. Preview exposed a rapid-close focus failure through the real global click guard; image controls now use its existing UI-toggle exemption. Six source behavior tests cover image/GIF, rejected URLs/guards and the actual rapid-click listener. The affected 18-test group and rebuilt artifact pass; preview is repeated after this repair. |
+| Artwork image controls | Eight local fixture cases pass: native modal state, original link, visible/keyboard activation, background focus exclusion, Escape/close and focus/overflow restoration. Preview exposed a rapid-close focus failure through the real global click guard; image controls now use its existing UI-toggle exemption. Six source behavior tests cover image/GIF, rejected URLs/guards and the actual rapid-click listener. The affected 18-test group and rebuilt artifact pass; final preview and apex pass after this repair. |
 | Social preview HTTP | 32 metadata requests, 12 images and three aliases pass across browser/Telegram/X/Facebook agents. Current homepage and generic fallback use the new banner. |
 | Independent bounded review | No actionable findings in final compact/header cascade, image dialog, theme separation or Donate sorting. |
 | Full local tracked unit run | 2820 passed; one outdated provider-row assertion expected exactly 60px. Replaced that arbitrary size expectation with the 44px minimum touch-target invariant; exact-candidate CI must pass before release. |
@@ -95,6 +96,36 @@ remaining notification acceptance, ordinary-user command preparation and final
 visual work retain their individual backlog status. No mainnet, new collection
 deployment, broadcast source or live wallet ceremony is implied by this report.
 
-Exactly next: complete the exact-candidate CI/preview/apex release checks for
-this slice, then resume B21 Donate/Report command preparation through the
-existing review dialogs without automatic signing.
+## Release evidence
+
+- PR: https://github.com/maysonkiller/ArtSoul-Protocol/pull/377.
+  Final candidate `d23960050cc5bb6d6d8585d13d1206793e66c8bd`; merge tree matches it
+  exactly. Production merge `13bda8e5ffeea623d7a3f856c904516ec9885496`.
+- Exact-candidate CI 40689668153 passes: Linux 2820 passed/two skipped;
+  Windows 2425 passed/32 skipped; zero failures, builds/static checks and
+  49 contract tests on each platform. Post-merge CI 40690418396 also passes.
+- Earlier candidate CI 40688853210 hit an unrelated 20-second Windows DPAPI
+  self-test timeout. No credential code or security assertion was weakened;
+  the final candidate's unchanged DPAPI test passes.
+- Preview and apex checks each verify eight HTML routes, matching header and
+  39 asset hashes, expected runtime configuration and protected guest endpoints.
+  Apex evidence: `output/audit/b26-apex-verification.log`.
+- Actual deployed browser, with real public reads and no synthetic route
+  interception: 32 preview and 32 apex cases pass across eight pages, both
+  themes, 1366x700 and 390x844. Native image open/rapid Escape/focus restoration
+  pass with the real global click guard. No page exceptions or API writes.
+- An additional six populated-preview gallery cases pass at 1366, 390 and
+  320px, both themes. Apex renders 16 homepage cards and 29 Discovery cards;
+  no horizontal overflow. These counts are observations, not product claims.
+- Final build and the 18 affected behavior checks pass. Screenshots were
+  inspected. Public guest/profile/collection-draft rendering is not evidence
+  of authenticated profile editing, mainnet collection deployment or a new
+  physical iPhone acceptance.
+- Sources of record: `output/audit/b26-final-ci.log`,
+  `b26-final-preview-verification.log`, `b26-final-preview-browser.log`,
+  `b26-preview-populated-gallery.log`, `b26-apex-verification.log`,
+  `b26-apex-browser.log`, `b26-final-focused.log` and `b26-build-final.log`.
+
+Exactly next: resume B21 Donate/Report command preparation through the existing
+review dialogs without automatic signing. B18 Future navigation and subsequent
+visual work remain explicitly open.

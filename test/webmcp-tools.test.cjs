@@ -94,6 +94,8 @@ test('the ArtSoul tools are registered when the browser supports WebMCP', async 
     'withdraw_pending_funds',
     'revoke_wallet_access',
     'prepare_artwork_registration',
+    'prepare_donation',
+    'prepare_artwork_report',
     'add_to_saved',
     'remove_from_saved'
   ]);
