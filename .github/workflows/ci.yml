@@ -49,6 +49,17 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Enable isolated PostgreSQL recovery tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          postgres_bin="$(pg_config --bindir)"
+          test -x "$postgres_bin/initdb"
+          test -x "$postgres_bin/pg_ctl"
+          echo "ARTSOUL_TEST_POSTGRES_BIN=$postgres_bin" >> "$GITHUB_ENV"
+          "$postgres_bin/postgres" --version
+
       - name: Node unit tests
         run: npm run test:unit
 

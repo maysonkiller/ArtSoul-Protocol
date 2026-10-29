@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { enqueueAIJob } from '../queue.js';
 import { projectDonation } from './donation-events.js';
+import { restorePrimaryReorgProjections } from './reorg-projections.js';
 import cacheService from '../services/cache-service.js';
 import {
     V41_EVENT_REQUIRED_FIELDS,
@@ -586,6 +587,7 @@ class IndexerSyncEngine {
             rewindTo = Math.min(Number(rows[0].last_indexed_block), reorgBlock - 1);
             const confirmedTo = Math.min(Number(rows[0].last_confirmed_block), rewindTo);
             await client.query('SELECT rollback_events_from_block($1, $2)', [reorgBlock, this._chainIdString()]);
+            await restorePrimaryReorgProjections(client, this._chainIdString(), reorgBlock);
             await client.query('DELETE FROM block_hashes WHERE chain_id = $1 AND block_number >= $2',
                 [this._chainIdString(), reorgBlock]);
             const stateHash = await this._computeStateHash(confirmedTo, client);

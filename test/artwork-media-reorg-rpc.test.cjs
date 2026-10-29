@@ -97,6 +97,41 @@ test('media registration and indexer rollback share an atomic revision fence (Po
       CREATE TABLE public.outbox_events(correlation_id TEXT,idempotency_key TEXT);`);
     for(const table of projectionTables) await setup.query(`CREATE TABLE public.${table}(chain_id NUMERIC(78,0),block_number BIGINT);`);
     await setup.query('ALTER TABLE public.v41_artworks ADD artwork_id NUMERIC(78,0), ADD creator TEXT, ADD metadata_uri TEXT, ADD transaction_hash TEXT;');
+    // This fixture uses sparse rows to test the media fence independently of
+    // lifecycle constraints. Supply every field read by primary reconstruction;
+    // indexer-reorg-atomicity.test.cjs exercises the real ordered schema and facts.
+    await setup.query(`ALTER TABLE public.v41_artworks
+        ADD minted BOOLEAN, ADD token_id NUMERIC(78,0), ADD canonical_floor NUMERIC(78,0),
+        ADD active_auction_id NUMERIC(78,0), ADD log_index INTEGER,
+        ADD indexed_at TIMESTAMPTZ, ADD last_updated_block BIGINT, ADD last_updated_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_auctions
+        ADD auction_id NUMERIC(78,0), ADD artwork_id NUMERIC(78,0), ADD log_index INTEGER,
+        ADD indexed_at TIMESTAMPTZ, ADD original_end_time TIMESTAMPTZ, ADD end_time TIMESTAMPTZ,
+        ADD current_bid NUMERIC(78,0), ADD current_bidder TEXT, ADD status TEXT,
+        ADD winner TEXT, ADD winning_bid NUMERIC(78,0), ADD settlement_deadline TIMESTAMPTZ,
+        ADD final_price NUMERIC(78,0), ADD token_id NUMERIC(78,0), ADD total_extension_seconds BIGINT,
+        ADD default_artist_amount NUMERIC(78,0), ADD default_platform_amount NUMERIC(78,0),
+        ADD last_updated_block BIGINT, ADD last_updated_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_bids
+        ADD auction_id NUMERIC(78,0), ADD bid_amount NUMERIC(78,0), ADD bidder TEXT,
+        ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_auction_extensions
+        ADD auction_id NUMERIC(78,0), ADD new_end_time TIMESTAMPTZ,
+        ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_auction_endings
+        ADD auction_id NUMERIC(78,0), ADD winner TEXT, ADD winning_bid NUMERIC(78,0),
+        ADD settlement_deadline TIMESTAMPTZ, ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_settlements
+        ADD auction_id NUMERIC(78,0), ADD artwork_id NUMERIC(78,0), ADD winner TEXT,
+        ADD settlement_status TEXT, ADD final_price NUMERIC(78,0), ADD token_id NUMERIC(78,0),
+        ADD artist_amount NUMERIC(78,0), ADD platform_amount NUMERIC(78,0),
+        ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_floor_history
+        ADD artwork_id NUMERIC(78,0), ADD token_id NUMERIC(78,0), ADD floor_price NUMERIC(78,0),
+        ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      CREATE TABLE public.v41_trust_signals(chain_id NUMERIC(78,0),user_address TEXT,
+        successful_settlements INTEGER,failed_settlements INTEGER,suspicious_flags INTEGER,
+        last_updated_block BIGINT,last_updated_at TIMESTAMPTZ);`);
     await setup.query(migration('src/indexer/migrations/014_schema_aware_reorg_rollback.sql'));
     // The legacy signature delegates exactly as migration 013 does.
     await setup.query(`CREATE FUNCTION public.rollback_events_from_block(reorg_block BIGINT)
@@ -141,7 +176,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     await pool.query(`TRUNCATE public.artwork_media_registration_evidence, public.artwork_media_publications,
       public.artwork_media_catalog, public.artwork_media_preparations, public.artwork_media_rewinds,
       public.artwork_media_chain_revisions, public.contract_events, public.event_processing_registry,
-      public.outbox_events, ${projectionTables.map(table=>'public.'+table).join(',')};
+      public.outbox_events, public.v41_trust_signals, ${projectionTables.map(table=>'public.'+table).join(',')};
       INSERT INTO public.artwork_media_chain_revisions(chain_id,revision) VALUES(84532,0);`);
   }
   async function seedProjection(block=123,chain=84532) {
