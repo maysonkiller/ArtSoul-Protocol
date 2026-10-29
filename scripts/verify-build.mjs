@@ -45,6 +45,11 @@ async function verifyLocalReference(page, reference) {
 }
 
 await Promise.all(pages.map(page => access(path.join(dist, page))));
+for (const filename of ['robots.txt', 'sitemap.xml']) {
+    if (!(await readFile(path.join(dist, filename))).equals(await readFile(path.join(root, 'public', filename)))) {
+        throw new Error(`Search discovery asset differs from its source: ${filename}`);
+    }
+}
 await access(path.join(dist, 'src/config/upload-policy.js')).catch(() => {
     throw new Error('Missing legacy runtime dependency in dist: src/config/upload-policy.js');
 });
