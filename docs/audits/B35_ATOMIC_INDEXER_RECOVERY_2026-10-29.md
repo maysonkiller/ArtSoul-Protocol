@@ -502,17 +502,72 @@ PostgreSQL 18.4 fixture passes all 124 tests, zero skips, cluster stopped. Evide
 Independent runtime review found no blocker for this scoped refill race and
 identified the mixed-version/Redis-restoration limitations above.
 
-The new disposable Redis suite uses two real clients and the actual cache source
+The disposable Redis suite uses two real clients and the actual cache source
 to exercise TTL, overlapping purges, missing-marker recreation, concurrent NX,
 and actual Redis ACL failures. Local Windows explicitly skips because no Linux
-Docker server is available; Linux CI requires this suite to run. Its result is
-still pending and is not replaced by the Map transport tests.
+Docker server is available; Linux CI requires this suite to run. Candidate
+`ca44ddebed684b3a8551ca62d6eef69dc5eaa89d` passed CI40968117393: Linux 3,092
+pass/two skips, including the real Redis 7.4.12 suite; Windows CI passed, and both
+platforms passed 49 contract checks and builds. The downloaded Windows log omits
+its aggregate Node summary, so a test count is not inferred. PR #405 merged as
+`92b1b330436d706984bb3e5d7ed5eccc2afa5c12`. Private CI evidence is retained in
+`b35-refill-ci-linux.log` and `b35-refill-ci-windows.log`. Source-only release;
+the separate indexer worker and ordered feature migrations remain inactive.
+
+## Ordinary invalidation: separate reproduced refill race
+
+Recovery-generation fencing alone does not cover a normal new bid: the ordinary
+auction invalidation used DEL without changing that generation. Actual cache
+methods with controlled snapshots and Map transport reproduced an older query
+refilling bid100 after bid200 and invalidation completed; the next request served
+100 without reading again. Preserved baseline: `docs/private/b35-key-invalidation-before.log`
+and `b35-key-invalidation-before.json`. No live service was used.
+
+The next source correction captures a separate per-entry UUID before fetching and
+atomically checks both that UUID and the recovery generation before storing.
+Ordinary invalidation atomically rotates the entry UUID and deletes its data.
+Auction and bid entries are both covered; an unrelated auction does not force
+other in-flight queries to read twice. The single uncached retry remains bounded.
+
+Entry markers expire rather than accumulating indefinitely: initialization uses
+the requested cache TTL, while invalidation retains its marker for one hour, the
+existing default cache lifetime. This duration is an internal storage bound, not
+a protocol parameter. Correctness does not require the marker to survive for the
+whole request: missing markers reject old writes, and recreation uses a fresh
+random UUID. Recovery purge removes entry markers along with data, while its
+global marker remains. Direct helper SET, mixed old writers and Redis snapshot
+restoration retain the activation limitations described above.
+
+Ordinary invalidation retains its existing best-effort error policy. A Redis
+permission/connection failure can leave cached data until expiry; this slice does
+not claim guaranteed ordinary invalidation during a Redis outage. Recovery purge
+still fails strictly and retains its durable PostgreSQL obligation.
+
+The auction and bid invalidations are separate sequential Lua calls, not one
+transaction across both entries. Failure on one call stops the remaining calls
+under the existing best-effort policy. The extra expiring marker per touched
+entry increases memory and full-prefix scan work, including for cold invalidated
+keys. No atomic pair deletion or outage convergence is claimed.
+
+Local verification of this source candidate: 29 focused checks; full suite
+2,589 pass/35 explicit environment skips (includes untracked policy tests);
+build/11 routes/173 utilities pass. The isolated PostgreSQL fixture passes
+124/124 with zero skips and cluster stopped. Evidence:
+`docs/private/b35-entry-focused.log`, `b35-entry-full-units.log`,
+`b35-entry-build.log`, `b35-key-invalidation-postgres.log`, and
+`reorg-atomicity-1793314445789-33136-cc1510a5/evidence.json`.
+Independent review found no scoped blocker and confirmed the per-key failure
+and marker-memory limitations. Eleven added real-Redis cases cover ordinary
+invalidation, auction/bid pairs, unrelated keys, expired/deleted markers,
+reinitialization, overlapping recovery, competing NX and actual ACL failures.
+Docker is unavailable locally, so Redis explicitly skipped; Linux CI requires
+the real fixture. No live Redis or database was contacted by these fixtures.
 
 ## Open acceptance and exact next step
 
-This slice still needs actual Redis integration and exact-candidate CI evidence.
-Ordinary per-key invalidation can race a delayed fetch independently of recovery;
-unversioned deployment keys, full-prefix scan cost and independent CDN caches
+The ordinary-invalidation slice still needs real Redis integration and
+exact-candidate CI evidence. Unversioned deployment keys,
+full-prefix scan cost and independent CDN caches
 remain separate gates. Reads already in flight are not cancelled by a purge.
 No all-cache convergence or production-scale recovery claim is made.
 

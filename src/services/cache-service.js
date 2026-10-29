@@ -2,12 +2,29 @@ import { getRedisConnection } from '../queue.js';
 import { randomUUID } from 'node:crypto';
 
 const RECOVERY_GENERATION_KEY = 'artsoul:cache:recovery-generation';
+const entryGenerationKey = key => `artsoul:cache:entry-generation:${key}`;
+const INVALIDATION_MARKER_TTL = 3600;
 // The comparison and write must be indivisible across API/indexer processes.
 const STORE_IN_GENERATION = `
     if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
-    redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[3])
+    if redis.call('GET', KEYS[2]) ~= ARGV[2] then return 0 end
+    redis.call('SET', KEYS[3], ARGV[3], 'EX', ARGV[4])
     return 1
 `;
+const INVALIDATE_ENTRY = `
+    redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+    return redis.call('DEL', KEYS[2])
+`;
+
+async function readGeneration(redis, key, ttl) {
+    let generation = await redis.get(key);
+    if (!generation) {
+        const options = ttl === undefined ? ['NX'] : ['NX', 'EX', ttl];
+        await redis.set(key, randomUUID(), ...options);
+        generation = await redis.get(key);
+    }
+    return generation;
+}
 
 class CacheService {
     constructor() {
@@ -89,8 +106,11 @@ class CacheService {
 
         try {
             const keysToDelete = Array.isArray(keys) ? keys : [keys];
-            if (keysToDelete.length > 0) {
-                await redis.del(...keysToDelete);
+            for (const key of keysToDelete) {
+                // Even a currently missing entry may have a fetch in flight.
+                // The marker is temporary; its absence rejects old writers too.
+                await redis.eval(INVALIDATE_ENTRY, 2, entryGenerationKey(key), key,
+                    randomUUID(), INVALIDATION_MARKER_TTL);
             }
         } catch (error) {
             this.handleRedisError('del', error);
@@ -114,32 +134,30 @@ class CacheService {
         const cached = await this.get(key);
         if (cached !== null) return cached;
 
-        let redis, generation;
+        let redis, generation, entryGeneration;
         try {
             redis = await this.getRedis();
             if (redis) {
-                generation = await redis.get(RECOVERY_GENERATION_KEY);
-                if (!generation) {
-                    await redis.set(RECOVERY_GENERATION_KEY, randomUUID(), 'NX');
-                    generation = await redis.get(RECOVERY_GENERATION_KEY);
-                }
+                generation = await readGeneration(redis, RECOVERY_GENERATION_KEY);
+                entryGeneration = await readGeneration(redis, entryGenerationKey(key), ttl);
             }
         } catch (error) {
-            this.handleRedisError('read recovery generation', error);
+            this.handleRedisError('read cache generation', error);
         }
         // No nil/default generation: losing the marker must not allow ABA reuse.
-        if (!generation) return asyncFetcher();
+        if (!generation || !entryGeneration) return asyncFetcher();
 
         const freshData = await asyncFetcher();
         if (freshData === null || freshData === undefined) return freshData;
         try {
-            const stored = await redis.eval(STORE_IN_GENERATION, 2,
-                RECOVERY_GENERATION_KEY, key, generation, JSON.stringify(freshData), ttl);
+            const stored = await redis.eval(STORE_IN_GENERATION, 3,
+                RECOVERY_GENERATION_KEY, entryGenerationKey(key), key,
+                generation, entryGeneration, JSON.stringify(freshData), ttl);
             if (stored === 1) return freshData;
         } catch (error) {
             this.handleRedisError(`remember(${key})`, error);
         }
-        // A rewind crossed the fetch, or the guarded write could not be proven.
+        // An invalidation crossed the fetch, or the guarded write could not be proven.
         // Re-read once without caching; repeated purges cannot cause a retry loop.
         // Fetch errors deliberately propagate, rather than serving the old result.
         return asyncFetcher();
