@@ -995,6 +995,16 @@ class IndexerSyncEngine {
             ? `notification-v2-${createHash('sha256').update(`${scopedCorrelationId}-${eventType}-${recipientKey}`).digest('hex')}`
             : `${scopedCorrelationId}-${eventType}`;
 
+        if (eventType === 'notification') {
+            // Rebind an identical source event to its retained inbox row after
+            // rewind. Read/dismissal state belongs to that row, not its log index.
+            await client.query(
+                `SELECT public.write_recoverable_notification($1::TEXT,$2::TEXT,$3::JSONB,$4::TEXT,$5::TEXT,$6::TEXT)`,
+                [aggregateType, aggregateId, JSON.stringify(payload), scopedCorrelationId, idempotencyKey, 'pending']
+            );
+            return;
+        }
+
         await client.query(
             `INSERT INTO outbox_events (
                 aggregate_type, aggregate_id, event_type, payload,

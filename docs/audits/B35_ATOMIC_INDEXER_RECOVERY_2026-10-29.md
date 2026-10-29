@@ -282,6 +282,16 @@ Build, built-route verification and Tailwind verification pass. Docker-only
 integration fixtures are adapted but await Linux CI, not claimed from local
 skips. Independent source review found no remaining blocker in this slice.
 
+Release evidence: candidate `823e6ec5ea819f947edba5a7faa9f43ca08ab946`
+passed exact CI `40951733294`: Linux 3,036 passed / two platform skips;
+Windows 2,549 passed / 34 environment skips; zero failures. Both builds,
+static checks and 49 contract tests on each platform passed. Linux executed
+the Docker integration and disposable PostgreSQL recovery fixtures. PR #401
+merged as `1d79cee6819ae67a0770a7f12c20f24599113d22`; Vercel reports successful
+deployment for that merge. This publishes the source, not the separately
+operated production indexer. Private job logs are `b35-writer-ci-linux.log`
+and `b35-writer-ci-windows.log`.
+
 Private evidence: `b35-writer-fence-before.log`,
 `reorg-atomicity-1793305692857-34644-2bac29fa/evidence.json`,
 `b35-writer-fence-after-confirmations.log`,
@@ -296,10 +306,93 @@ timeout then fails closed, potentially causing election churn. Bounded history
 and transaction-duration acceptance remain activation gates. No production
 worker activation, live recovery or migration was performed.
 
+## Follow-up reproduction: in-app notification resurrection
+
+After PR #401, the disposable real-schema fixture loaded the shipped notification
+migrations and exercised the actual read/mark/remove functions. In two cases,
+the same transaction was re-included after rewind, first with its original global
+log index and then with a changed index. Both cases lost read/dismissal state:
+a previously read notice returned unread and a dismissed notice became visible.
+While the source event was absent, canonical readers correctly hid the notices.
+The original 89 nested recovery cases still passed; the two new intended-behavior
+assertions failed, also failing the parent suite. The cluster stopped cleanly.
+
+This was the failing baseline before the durable-identity change below. It is
+not evidence of duplicate external email. Original reproduction evidence:
+`docs/private/b35-notification-replay-before-corrected.log` and
+`docs/private/reorg-atomicity-1793307259641-31572-29b72f29/evidence.json`.
+Retaining rows alone is insufficient: current-source bindings must be renewed,
+different events must not inherit state, and reminder materialization has its
+own identity path.
+
+## Notification identity: local implementation and verification
+
+The ordered feature migration `20261029212603_notification_reorg_identity.sql`
+adds a private ledger linking a proven event identity to its original outbox ID.
+The identity includes chain, actual contract, transaction, event name, occurrence
+within that transaction/contract/event name, exact JSONB event data, aggregate
+and full notification payload including recipient. Block height and block-global
+log index are deliberately excluded. A different transaction, event payload or
+recipient receives a new identity. Identical repeated occurrences stay distinct.
+
+Rewind adopts source-proven legacy rows before deleting source evidence, then
+detaches notifications, tombstones their current keys and quarantines their
+delivery status. Unknown-source rows remain retained but receive no invented
+identity. A restrictive ledger foreign key prevents accidental deletion of
+protected inbox rows. Proven replay rebinds the original ID and restores its
+previous processing status without changing recipient read/dismissal timestamps.
+Already active identical writes do not update either row. This is inbox recovery,
+not an external-email exactly-once guarantee or permission to enable delivery.
+
+The engine and existing bounded reminder materializer use the same invoker
+writer. The bell summary resolves retained reminder state before the inbox is
+opened, without creating or rebinding rows. Existing canonical source/recipient
+proofs still decide visibility. API roles cannot access the private schema,
+ledger or helpers; the existing protected inbox RPC signatures are unchanged.
+
+Recovery locks state before media; the state self-update also invalidates short-
+lived buffered writer contexts for privileged primitive calls. The helper takes
+media SHARE before reading the source. A writer released after source deletion
+fails closed rather than inserting a stale key. Full recovery still requires the
+engine transaction for cursor, digest, headers and predecessor reconstruction;
+the SQL rollback primitive alone is not a replacement recovery procedure.
+
+Local PostgreSQL 18.4: 111/111 checks pass, zero skips (89 retained nested cases,
+21 notification cases and the parent). Includes read/dismissal with unchanged or
+shifted indices, different transactions/data/recipients/payloads, repeated logs,
+key collisions, failure rollback, legacy adoption/quarantine, reminders and bell
+counts before materialization, privileges, reapplication and actual concurrent
+lock waits. The disposable loopback cluster stopped cleanly. Evidence:
+`docs/private/reorg-atomicity-1793309902248-33084-dec372c8/evidence.json` and
+`docs/private/b35-notification-recovery-concurrency.log`.
+Build and built-route/Tailwind checks pass; independent source review found no
+remaining blocker. Full local suite: 2,580 pass / 34 explicit environment skips /
+zero failures (includes unrelated untracked policy tests). Older minimal-schema
+fixtures use an explicitly test-only adapter for the new writer signature; the
+real retention implementation is exercised by the full-stack PostgreSQL fixture.
+Docker/no-default-grant integration awaits Linux CI; release status follows.
+
+Interpretations: same creation transaction plus exact creation data/recipient/
+offset preserves an existing reminder across extension; a reused auction number
+from a different creation transaction does not. Unknown historical provenance
+is quarantined, never inferred from current configuration. Canon sections 5 and
+17 are touched through database recovery; no economic or contract rule changes.
+
+Activation order: reviewed media reorg and notification migrations through
+`notification_inbox_removal.sql`, then this feature migration, privilege and
+restore rehearsal, then the matching indexer release. This is intentionally not
+inserted into the existing numbered 001-017 core migration runner. The deployed
+worker has NOT been updated and this feature migration has NOT run on a live
+database. No mainnet, reset, fee, billing, DNS or external delivery change.
+Keep retained rows/ledger during rollback planning; do not drop the ledger or
+reinstall an older destructive rollback function as a shortcut. Pause the writer
+and validate the selected source/schema combination in the disposable restore
+rehearsal before any separately authorized worker activation or rollback.
+
 ## Open acceptance and exact next step
 
-Next: accept the writer-fence candidate through Linux/Windows CI, then extend the
-clean-replay oracle to delivery deduplication. Keep the worker inactive until
+Next: reproduce process termination after committed rewind and before cache
+invalidation, then make that recovery obligation durable. Keep the worker inactive until
 the remaining recovery gates have independent evidence.
 Primary auction/end/extension/payment/default, mint/floor, trust and metrics
 now have the local recovery evidence above. Full owner/provenance acceptance

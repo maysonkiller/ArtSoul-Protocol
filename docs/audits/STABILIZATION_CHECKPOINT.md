@@ -1,5 +1,28 @@
-October 29 B35 buffered writer fence / local checks complete, CI pending:
-Workspace C:\Projects\ArtSoul / codex/takeover-audit / base HEAD d02fa6e3.
+October 29 B35 notification identity / local candidate:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+HEAD 1d79cee6819ae67a0770a7f12c20f24599113d22 (PR401 baseline).
+New ordered feature migration preserves original inbox IDs/read/dismissal when
+the same proven event is replayed, including changed global log indices. Shared
+engine/reminder writer; summary honors retained state before materialization.
+Private ledger, no API grants; unknown legacy sources quarantined. Direct rewind
+locks state before media and invalidates buffered contexts; delayed writers fail.
+111/111 isolated PostgreSQL 18.4 checks pass, zero skips, cluster stopped.
+Evidence docs/private/reorg-atomicity-1793309902248-33084-dec372c8/evidence.json.
+Build/route/CSS verification pass; independent source review found no blocker.
+Full local suite: 2,580 pass / 34 explicit environment skips / zero failures;
+includes unrelated untracked policy tests. Docker checks await Linux CI.
+Exact-candidate CI/release still pending here.
+Source/schema activation remains separate: no live migration or worker update.
+Prior dirty release docs preserved. Unrelated untracked files remain untouched.
+Exactly next: finish full checks and reviewed PR for this notification patch;
+then reproduce crash-after-commit cache invalidation in the disposable fixture.
+
+October 29 B35 buffered writer fence / PR401 MERGED:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+HEAD 1d79cee6819ae67a0770a7f12c20f24599113d22 (main, PR401).
+Candidate 823e6ec5 passed exact CI40951733294: Linux 3036 pass/two platform
+skips, Windows 2549 pass/34 environment skips, 49 contracts each, both builds
+and static checks. Vercel reports successful deployment for the merge.
 Baseline paused ranges resurrected a bid/header/cursor after rewind109.
 New short-lived immutable authority/state-version context precedes RPC; header,
 event claim/projection/failure, checkpoint, status, reaper and confirmation writes
@@ -11,8 +34,17 @@ Independent review found no blocker; all three bounded helpers have finished.
 No production worker activation, live rollback, migration, billing or contracts.
 Recovery patch/docs and unrelated untracked files retained. See B35 audit for
 before/after evidence. Renewal waits behind slow SQL remain a liveness risk.
-Exactly next: submit this bounded candidate and require Linux/Windows CI,
-including Docker integration, before merge; then delivery deduplication.
+CI logs: docs/private/b35-writer-ci-linux.log and b35-writer-ci-windows.log.
+Tracked uncommitted changes after merge are release-status documentation;
+unrelated untracked files remain untouched. No deployment to the worker.
+Notification replay baseline now reproduced in actual read/mark/remove SQL:
+same and shifted logIndex both lose read/dismissal. Original 89 nested recovery
+cases still pass; two new intended assertions fail. Disposable cluster stopped:
+docs/private/reorg-atomicity-1793307259641-31572-29b72f29/evidence.json.
+Exactly next: retain/rebind proven notification identities across rewinds using
+the preserved private b35-notification-replay-regression.patch as a regression.
+Active inbox reads require exact current source proof; reminders have a separate
+SQL materializer. Dormant external outbox delivery is not production evidence.
 
 October 29 continuation / Protocol search COMPLETE / B35 startup MERGED:
 Workspace C:\Projects\ArtSoul / codex/takeover-audit /
