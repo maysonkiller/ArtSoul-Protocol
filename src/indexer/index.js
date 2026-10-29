@@ -265,38 +265,10 @@ class ArtSoulIndexer {
     }
 
     async rebuildFromBlock(startBlock) {
-        console.log(`[ArtSoulIndexer] Rebuilding from block ${startBlock}...`);
-        await cacheService.purge();
-
-        await this.db.query('DELETE FROM v41_genesis_holders WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_project_eligibility WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_resale_history WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_resale_listings WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_floor_history WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_settlements WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_auction_endings WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_auction_extensions WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_bid_withdrawals WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_bids WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_auctions WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM v41_artworks WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-        await this.db.query('DELETE FROM contract_events WHERE chain_id = $1 AND block_number >= $2', [this._chainIdString(), startBlock]);
-
-        await this.db.query(
-            'UPDATE indexer_state SET last_indexed_block = $1 WHERE chain_id = $2',
-            [startBlock - 1, this._chainIdString()]
-        );
-
-        const currentBlock = await this.eventListener.getCurrentBlock();
-        const eventCount = await this.syncEngine.syncHistoricalEvents(startBlock, currentBlock);
-
-        console.log(`[ArtSoulIndexer] Rebuild complete: ${eventCount} events reindexed`);
-
-        return {
-            startBlock,
-            endBlock: currentBlock,
-            eventsReindexed: eventCount
-        };
+        // The API facade owns no leadership lease. Its former delete-and-replay
+        // path could partially erase projections alongside an active runner.
+        // Recovery belongs to the production runner's reviewed atomic rewind.
+        throw new Error('Indexer API is read-only; rebuild requires leadership-fenced recovery');
     }
 }
 

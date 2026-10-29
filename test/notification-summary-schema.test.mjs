@@ -32,6 +32,8 @@ test('private notification summaries prove all unread categories before paginati
     ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon,authenticated,service_role;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC;`);
   for(const migration of listIndexerMigrations())await pool.query(migration.sql);
+  await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+    VALUES('notification-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query('CREATE TABLE artwork_media_chain_revisions(chain_id NUMERIC PRIMARY KEY,revision NUMERIC(78,0) NOT NULL);');
   for(const name of ['phase18_artwork_moderation_visibility','a8b_artwork_report_intake','a8c_protocol_admin_review',
     'artist_support','artist_support_moderation','auction_notifications','auction_notification_lifecycle','auction_notification_reminders']){
@@ -52,11 +54,13 @@ test('private notification summaries prove all unread categories before paginati
     await pool.query('INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp) VALUES(84532,10000,$1,$2,$3)',[hash(10000),hash(9999),now]);
     report=(await pool.query("INSERT INTO artwork_reports(chain_id,artwork_id,reporter_wallet,category,details,good_faith_confirmed) VALUES(84532,1,$1,'other','Synthetic review fixture',true) RETURNING id",[A])).rows[0].id;
     engine=new Engine({pool,query:async(q,p)=>(await pool.query(q,p)).rows},{chainId:84532,contractAddress:CORE,donationAddress:OLD});
+    engine.getRecoveryAuthority=()=>({lockName:'notification-fixture',instanceId:'worker-fixture',fencingToken:'1',isCurrent:()=>true});
   });
   async function event(name,data,source=CORE){
+    const context=await engine._captureWriteContext();
     const n=++block,value={eventName:name,eventData:data,blockNumber:n,logIndex:0,transactionHash:hash(n),timestamp:now*1000};
     await pool.query('INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp) VALUES(84532,$1,$2,$3,$4)',[n,hash(n+20000),hash(n+19999),now]);
-    if(source!==null)value.contractAddress=source;await engine._processEvent(value);return value;
+    if(source!==null)value.contractAddress=source;await engine._processEvent(value,context);return value;
   }
   const register=id=>event('ArtworkRegistered',{artworkId:String(id),creator:A,metadataURI:'ipfs://fixture'});
   const auction=(id,artwork=id,deadline=now+1800,source=CORE)=>event('AuctionCreated',{auctionId:String(id),artworkId:String(artwork),creator:A,startPrice:'1000',duration:'86400',endTime:String(deadline),chainId:'84532'},source);

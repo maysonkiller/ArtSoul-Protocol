@@ -59,9 +59,13 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
   await pool.query(`CREATE TABLE public.block_hashes(chain_id NUMERIC(78,0),block_number BIGINT,
     block_hash TEXT,parent_hash TEXT,timestamp BIGINT NOT NULL,PRIMARY KEY(chain_id,block_number));
     CREATE TABLE public.indexer_state(chain_id NUMERIC(78,0) PRIMARY KEY,last_indexed_block BIGINT NOT NULL DEFAULT 0,
+      contract_address TEXT NOT NULL,
       last_indexed_at TIMESTAMPTZ,total_events_indexed BIGINT NOT NULL DEFAULT 0,confirmation_depth INTEGER NOT NULL DEFAULT 3,
       last_confirmed_block BIGINT NOT NULL DEFAULT 0,state_hash TEXT);
-    INSERT INTO public.indexer_state(chain_id) VALUES(84532);`);
+    INSERT INTO public.indexer_state(chain_id,contract_address) VALUES(84532,'${CORE}');`);
+  await pool.query(migration('src/indexer/migrations/004_distributed_locks.sql'));
+  await pool.query(`INSERT INTO public.distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+    VALUES('donation-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query(migration('src/indexer/migrations/005_event_idempotency.sql'));
   await pool.query(migration('src/indexer/migrations/006_ownership_observability.sql'));
   await pool.query(`ALTER TABLE public.event_processing_registry ADD COLUMN chain_id NUMERIC(78,0) NOT NULL;
@@ -95,22 +99,19 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
     chainId: 84532, donationAddress: SUPPORT, donationInterface,
     maxBlockRange: 1000, maxBlockRangeLimit: 1000, _retryRpcCall: operation => operation()});
   engine = new SyncEngine({pool, isBackpressure() {return false;},
-    async query(sql, params) { return (await pool.query(sql, params)).rows; },
-    async batchInsert(table, columns, rows, conflict) {
-      assert.equal(table,'block_hashes');
-      assert.deepEqual(columns,['chain_id','block_number','block_hash','parent_hash','timestamp']);
-      const slots = rows.map((row,i) => `(${row.map((_,j)=>`$${i*columns.length+j+1}`).join(',')})`).join(',');
-      return await pool.query(`INSERT INTO public.block_hashes(${columns.join(',')}) VALUES ${slots} ON CONFLICT ${conflict}`,rows.flat());
-    }}, listener);
+    async query(sql, params) { return (await pool.query(sql, params)).rows; }}, listener);
+  engine.getRecoveryAuthority = () => ({ lockName: 'donation-fixture', instanceId: 'worker-fixture',
+    fencingToken: '1', isCurrent: () => true });
 
   async function fromLog(index, message = '', amount = 500000000000000n, block = 100 + index) {
+    const context = await engine._captureWriteContext();
     const encoded = donationInterface.encodeEventLog(donationInterface.getEvent('Donation'),
       [DONOR, CREATOR, 28, amount, message, false]);
     listener.provider = {async getLogs() { return [{...encoded, address: SUPPORT, blockNumber: block,
       transactionHash: hash(index), index: 0}]; }};
     const [event] = await listener._queryLogsChunk(block, block);
     assert.ok(event, 'the actual event listener parsed the contract log');
-    return {...event, timestamp: Date.UTC(2026, 8, 30, 12, 0, index)};
+    return {...event, timestamp: Date.UTC(2026, 8, 30, 12, 0, index), context};
   }
   async function snapshot() {
     return (await pool.query(`SELECT artists_onboarded,auctions_completed,unique_collectors,settled_volume_wei
@@ -146,8 +147,8 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
     const messages = ['<img src=x onerror=alert(1)>', 'before\0after', 'a'.repeat(141)];
     for (let index = 1; index <= messages.length; index++) {
       const event = await fromLog(index, messages[index - 1]);
-      await engine.processEvent(event);
-      await engine.processEvent(event);
+      await engine.processEvent(event, event.context);
+      await engine.processEvent(event, event.context);
     }
     const rows = (await pool.query(`SELECT d.transaction_hash,d.message,e.event_data,r.processing_status
       FROM public.artwork_donations d JOIN public.contract_events e USING(chain_id,transaction_hash,log_index)
@@ -167,7 +168,7 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
     const event = await fromLog(4, 'Original', 1n);
     // Every nonzero amount can carry a message. The parser trusts verified
     // contract events, not a client-reported payment.
-    await engine.processEvent(event);
+    await engine.processEvent(event, event.context);
     await Promise.all([eventApi.projectDonation(pool, event, 84532, SUPPORT, new Date(event.timestamp)),
       eventApi.projectDonation(pool, {...event, eventData: {...event.eventData, amount: 99n}},
         84532, SUPPORT, new Date(event.timestamp))]);
@@ -177,7 +178,7 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
 
   await t.test('foreign deployment rolls back event and projection atomically and records a retryable failed lease', async () => {
     const event = {...await fromLog(5), contractAddress: CORE};
-    await assert.rejects(engine.processEvent(event), /Event contract source does not match its configured listener/);
+    await assert.rejects(engine.processEvent(event, event.context), /Event contract source does not match its configured listener/);
     assert.equal((await pool.query('SELECT * FROM public.contract_events WHERE transaction_hash=$1', [hash(5)])).rowCount, 0);
     assert.equal((await pool.query('SELECT * FROM public.artwork_donations WHERE transaction_hash=$1', [hash(5)])).rowCount, 0);
     assert.equal((await pool.query('SELECT processing_status FROM public.event_processing_registry WHERE transaction_hash=$1', [hash(5)])).rows[0].processing_status, 'failed');
@@ -185,7 +186,8 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
 
   await t.test('amount and newest ordering retain deterministic block and log ties with exact large wei values', async () => {
     for (const [index, amount, block] of [[6, 10n ** 30n + 1n, 200], [7, 10n ** 30n + 1n, 201], [8, 10n ** 30n, 202]]) {
-      await engine.processEvent(await fromLog(index, '', amount, block));
+      const event = await fromLog(index, '', amount, block);
+      await engine.processEvent(event, event.context);
     }
     const amountRows = (await pool.query(`SELECT transaction_hash,amount FROM public.artwork_donations
       WHERE block_number>=200 ORDER BY amount DESC,block_number DESC,log_index DESC`)).rows;
@@ -210,7 +212,8 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
     assert.deepEqual(await snapshot(), beforeMetrics);
     // Re-indexing the same event after a reorg is possible; it must not erase
     // the separately retained on-site message visibility decision.
-    await engine.processEvent(await fromLog(7, 'Reindexed message', 10n ** 30n + 1n, 201));
+    const replayed = await fromLog(7, 'Reindexed message', 10n ** 30n + 1n, 201);
+    await engine.processEvent(replayed, replayed.context);
     assert.equal((await pool.query('SELECT * FROM public.artwork_donations WHERE transaction_hash=$1', [hash(7)])).rowCount, 1);
     assert.equal((await pool.query('SELECT hidden FROM public.donation_message_visibility WHERE transaction_hash=$1', [hash(7)])).rows[0].hidden, true);
   });
@@ -239,6 +242,9 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
       for (const [index,skip] of ['false','true'].entries()) {
         process.env.ARTSOUL_SKIP_EMPTY_BLOCK_HASH_BACKFILL = skip;
         const block = 500+index, seconds = 1578000000+index;
+        // Earlier cases exercise individual events; this range begins at its
+        // explicit disposable-fixture checkpoint, never across a cursor gap.
+        await pool.query('UPDATE indexer_state SET last_indexed_block=$1,last_confirmed_block=$1 WHERE chain_id=84532',[block-1]);
         let blockFetches = 0;
         listener.getBlock = async requested => {blockFetches++; assert.equal(requested,block);
           return {hash:hash(block),parentHash:hash(block-1),timestamp:seconds};};
@@ -259,22 +265,24 @@ test('Creator support pipeline, RLS and reorg integration (PostgreSQL 17)', {
   await t.test('refetched replacement blocks update their stored timestamp before donation replay', async () => {
     await pool.query('INSERT INTO public.block_hashes VALUES(84532,550,$1,$2,1578000000)',[hash(550),hash(549)]);
     listener.getBlock = async () => ({hash:hash(551),parentHash:hash(549),timestamp:1578000010});
-    await engine._storeBlockHashesForBlocks([550]);
+    await engine._storeBlockHashesForBlocks([550], await engine._captureWriteContext());
     const row = (await pool.query('SELECT block_hash,timestamp FROM public.block_hashes WHERE chain_id=84532 AND block_number=550')).rows[0];
     assert.equal(row.block_hash,hash(551)); assert.equal(row.timestamp,'1578000010');
   });
   await t.test('a missing block timestamp fails the range retryably without inventing dates or advancing its cursor', async () => {
+    await pool.query('UPDATE indexer_state SET last_indexed_block=599,last_confirmed_block=599 WHERE chain_id=84532');
     const before = (await pool.query('SELECT last_indexed_block,total_events_indexed FROM public.indexer_state WHERE chain_id=84532')).rows[0];
     const block = 600;
     listener.provider = {async getLogs(){return [{...donationInterface.encodeEventLog(donationInterface.getEvent('Donation'),
       [DONOR,CREATOR,28,9n,'',false]),address:SUPPORT,blockNumber:block,transactionHash:hash(6000),index:0}];}};
     listener.queryAllHistoricalEvents = async(from,to) => await listener._queryLogsChunk(from,to);
     listener.getBlock = async () => {throw new Error('Local missing block fixture');};
-    await assert.rejects(engine.syncHistoricalEvents(block,block,{currentBlock:block+3}),error=>error.code==='INDEXER_RANGE_INCOMPLETE');
+    await assert.rejects(engine.syncHistoricalEvents(block,block,{currentBlock:block+3}),/Local missing block fixture/);
     assert.deepEqual((await pool.query('SELECT last_indexed_block,total_events_indexed FROM public.indexer_state WHERE chain_id=84532')).rows[0],before);
     assert.equal((await pool.query('SELECT * FROM public.artwork_donations WHERE transaction_hash=$1',[hash(6000)])).rowCount,0);
     assert.equal((await pool.query('SELECT * FROM public.contract_events WHERE transaction_hash=$1',[hash(6000)])).rowCount,0);
-    assert.equal((await pool.query('SELECT processing_status FROM public.event_processing_registry WHERE transaction_hash=$1',[hash(6000)])).rows[0].processing_status,'failed');
+    assert.equal((await pool.query('SELECT processing_status FROM public.event_processing_registry WHERE transaction_hash=$1',[hash(6000)])).rowCount,0,
+      'header failure aborts before any event claim');
     listener.getBlock = async () => ({hash:hash(block),parentHash:hash(block-1),timestamp:1578000020});
     assert.equal(await engine.syncHistoricalEvents(block,block,{currentBlock:block+3}),1);
     assert.equal((await pool.query('SELECT recorded_at FROM public.artwork_donations WHERE transaction_hash=$1',[hash(6000)])).rows[0].recorded_at.getTime(),1578000020000);

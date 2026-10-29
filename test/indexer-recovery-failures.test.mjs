@@ -15,6 +15,10 @@ function transactionFixture({ failAt, emptyState = false, indexed = 115, confirm
                 last_indexed_block: String(indexed), last_confirmed_block: String(confirmed),
                 contract_address: 'fixture-core', revision: '1'
             }] };
+            if (sql.startsWith('SELECT *, xmin::TEXT AS revision')) return { rows: emptyState ? [] : [{
+                chain_id: '84532', last_indexed_block: indexed, last_confirmed_block: confirmed,
+                contract_address: 'fixture-core', revision: '1'
+            }] };
             if (sql.includes('FROM public.distributed_locks')) return { rows: [{ lock_name: 'fixture' }] };
             if (sql.includes('string_agg')) return { rows: [{ hash: 'a'.repeat(64) }] };
             return { rows: [] };
@@ -87,7 +91,7 @@ test('startup finishes its rewind before becoming running and leaves replay to c
     engine.getIndexerState = async () => ({ chain_id: '84532', last_indexed_block: 115,
         last_confirmed_block: 109, contract_address: 'fixture-core', revision: '1' });
     engine.db.query = async sql => { calls.push({ sql }); };
-    engine.eventListener = { getCurrentBlock() { assert.fail('startup must not replay to unconfirmed head'); } };
+    engine.eventListener = { contractAddress: 'fixture-core', getCurrentBlock() { assert.fail('startup must not replay to unconfirmed head'); } };
     engine.syncHistoricalEvents = () => assert.fail('catch-up belongs to runner');
     await engine.start();
     assert.equal(engine.isRunning, true);
@@ -96,18 +100,19 @@ test('startup finishes its rewind before becoming running and leaves replay to c
 });
 
 test('a failed startup purge retries before reading state without another rewind', async () => {
-    const engine = Object.create(Engine.prototype);
+    const { engine, calls: transactionCalls } = transactionFixture({ indexed: 109, confirmed: 109 });
     const calls = [];
     let fail = true;
     Object.assign(engine, { chainId: 84532, recoveryCachePurgePending: true,
+        eventListener: { contractAddress: 'fixture-core' },
         async _purgeRecoveryCache() {
             calls.push('purge');
             if (fail) throw new Error('purge failed');
             this.recoveryCachePurgePending = false;
         },
-        async getIndexerState() { calls.push('state'); return { last_indexed_block: 109, last_confirmed_block: 109 }; },
-        async recoverFromSafeBlock() { assert.fail('committed rewind must not repeat'); },
-        db: { async query() { calls.push('running'); } }
+        async getIndexerState() { calls.push('state'); return { chain_id: '84532', contract_address: 'fixture-core',
+            revision: '1', last_indexed_block: 109, last_confirmed_block: 109 }; },
+        async recoverFromSafeBlock() { assert.fail('committed rewind must not repeat'); }
     });
     await assert.rejects(engine.start(), /purge failed/);
     assert.equal(Boolean(engine.isRunning), false);
@@ -115,7 +120,9 @@ test('a failed startup purge retries before reading state without another rewind
     fail = false;
     await engine.start();
     assert.equal(engine.isRunning, true);
-    assert.deepEqual(calls, ['purge', 'purge', 'state', 'running']);
+    assert.deepEqual(calls, ['purge', 'purge', 'state', 'state']);
+    assert.ok(transactionCalls.some(call => call.sql.includes("status = 'running'")));
+    assert.deepEqual(transactionCalls.slice(-2).map(call => call.sql), ['COMMIT', 'release']);
 });
 
 test('listener cleanup failure leaves the engine stopped so a later start cannot skip recovery', async () => {

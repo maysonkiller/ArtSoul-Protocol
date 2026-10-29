@@ -49,15 +49,23 @@ test('the complete indexer bootstrap supports state hashes without a fixture sch
         const options = { apply: true, connectionString: url('fresh'), environment: 'local-bootstrap-test' };
         const applied = await applyIndexerMigrations(options);
         assert.ok(applied.migrations.every(row => row.status === 'applied'));
+        await fresh.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+            VALUES('bootstrap-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
         const db = { pool: fresh, query: async (sql, params) => (await fresh.query(sql, params)).rows,
             isBackpressure: () => false };
-        const engine = new Engine(db, { chainId: 84532, queryAllHistoricalEvents: async () => [] });
+        const engine = new Engine(db, { chainId: 84532, contractAddress: CORE,
+            queryAllHistoricalEvents: async () => [], getBlock: async number => {
+                assert.equal(number, 101);
+                return { hash: `0x${'2'.repeat(64)}`, parentHash: `0x${'3'.repeat(64)}`, timestamp: 1700000000 };
+            } });
+        engine.getRecoveryAuthority = () => ({ lockName: 'bootstrap-fixture', instanceId: 'worker-fixture',
+            fencingToken: '1', isCurrent: () => true });
         await engine.initialize(CORE, 84532, 100);
         assert.equal((await engine.getIndexerState()).state_hash, '0x0');
         const blockHash = `0x${'2'.repeat(64)}`;
         await fresh.query(`INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
             VALUES(84532,101,$1,$2,1700000000)`, [blockHash, `0x${'3'.repeat(64)}`]);
-        // This empty confirmed range already has its fixture block hash; no RPC.
+        // Its header is revalidated through the synthetic listener; no live RPC.
         engine._shouldSkipEmptyBlockHashBackfill = () => true;
         assert.equal(await engine.syncHistoricalEvents(101, 101, { currentBlock: 113 }), 0);
         const state = await engine.getIndexerState();

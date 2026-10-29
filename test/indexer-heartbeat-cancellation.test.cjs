@@ -20,6 +20,8 @@ const { pathToFileURL } = require('node:url');
 
 const ROOT = path.resolve(__dirname, '..');
 const CHAIN_ID = 84532;
+const AUTHORITY = { lockName: 'heartbeat-fixture', instanceId: 'worker-fixture',
+    fencingToken: '1', isCurrent: () => true };
 
 function moduleUrl(relativePath) {
     return pathToFileURL(path.join(ROOT, relativePath)).href;
@@ -66,8 +68,17 @@ function createFakeDb({ heartbeatRowCount = 1 } = {}) {
     };
 
     function runQuery(sql, params) {
+        if (/FROM public\.distributed_locks/i.test(sql)) {
+            assert.deepEqual(params, [AUTHORITY.lockName, AUTHORITY.instanceId, AUTHORITY.fencingToken]);
+            return [{ lock_name: AUTHORITY.lockName }];
+        }
+        if (/SELECT \*, xmin::TEXT AS revision FROM indexer_state/i.test(sql)) {
+            assert.deepEqual(params, [String(CHAIN_ID)]);
+            return [{ chain_id: String(CHAIN_ID), contract_address: '0xcore', revision: '1',
+                last_indexed_block: 500, last_confirmed_block: 500 }];
+        }
         if (/^\s*SELECT encode\(/i.test(sql)) return [{ hash: 'a'.repeat(64) }];
-        if (/^\s*(BEGIN|COMMIT|ROLLBACK)\s*$/i.test(sql)) return { rows: [] };
+        if (/^\s*(BEGIN(?: ISOLATION LEVEL READ COMMITTED)?|COMMIT|ROLLBACK)\s*$/i.test(sql)) return { rows: [] };
         if (/SELECT block_hash FROM block_hashes/i.test(sql)) return [];
 
         if (/INSERT INTO event_processing_registry/i.test(sql)) {
@@ -145,12 +156,17 @@ function createFakeDb({ heartbeatRowCount = 1 } = {}) {
         },
         pool: {
             async connect() {
+                let released = false;
                 return {
                     async query(sql, params = []) {
                         const result = runQuery(sql, params);
                         return Array.isArray(result) ? { rows: result, rowCount: result.length } : result;
                     },
-                    release() { calls.releases += 1; }
+                    release() {
+                        assert.equal(released, false, 'each acquired connection releases exactly once');
+                        released = true;
+                        calls.releases += 1;
+                    }
                 };
             }
         },
@@ -165,9 +181,10 @@ function createFakeDb({ heartbeatRowCount = 1 } = {}) {
 async function createEngine({ heartbeatIntervalMs, heartbeatRowCount, handler } = {}) {
     const { default: IndexerSyncEngine } = await syncEngineModule;
     const db = createFakeDb({ heartbeatRowCount });
-    const listener = { chainId: CHAIN_ID, async getCurrentBlock() { return 1000; } };
+    const listener = { chainId: CHAIN_ID, contractAddress: '0xcore', async getCurrentBlock() { return 1000; } };
     const engine = new IndexerSyncEngine(db, listener, null);
     engine.chainId = CHAIN_ID;
+    engine.getRecoveryAuthority = () => AUTHORITY;
     if (typeof heartbeatIntervalMs === 'number') engine.heartbeatIntervalMs = heartbeatIntervalMs;
     engine._handleAuctionCreatedTx = async (event) => {
         if (handler) await handler(event);
@@ -193,14 +210,14 @@ test('a fast successful event returns without waiting for the heartbeat interval
     const { engine, db } = await createEngine({ handler: async () => {} });
 
     const started = Date.now();
-    await engine.processEvent(validEvent(1));
+    await engine.processEvent(validEvent(1), await engine._captureWriteContext());
     const elapsed = Date.now() - started;
 
     assert.ok(elapsed < 5000, `processEvent should return promptly, took ${elapsed}ms`);
     assert.equal(db.calls.completedUpdates, 1);
     // No heartbeat could fire in that window, and the woken timer issues none.
     assert.equal(db.calls.heartbeatQueries, 0);
-    assert.equal(db.calls.releases, 1);
+    assert.equal(db.calls.releases, 2, 'claim and projection each own a fenced transaction');
 });
 
 test('a failed event returns promptly after the failure record is persisted', async () => {
@@ -209,7 +226,7 @@ test('a failed event returns promptly after the failure record is persisted', as
     });
 
     const started = Date.now();
-    await assert.rejects(engine.processEvent(validEvent(2)), /handler exploded/);
+    await assert.rejects(engine.processEvent(validEvent(2), await engine._captureWriteContext()), /handler exploded/);
     const elapsed = Date.now() - started;
 
     assert.ok(elapsed < 5000, `failed processEvent should return promptly, took ${elapsed}ms`);
@@ -217,7 +234,7 @@ test('a failed event returns promptly after the failure record is persisted', as
     assert.equal(db.calls.failureUpdates.length, 1);
     assert.equal(db.calls.failureUpdates[0].status, 'failed');
     assert.equal(db.calls.completedUpdates, 0);
-    assert.equal(db.calls.releases, 1);
+    assert.equal(db.calls.releases, 3, 'claim, rolled-back projection and failure record each release their connection');
 });
 
 test('a long-running handler refreshes its committed processing lease at the configured cadence', async () => {
@@ -228,7 +245,7 @@ test('a long-running handler refreshes its committed processing lease at the con
         handler: async () => { await handlerGate.promise; }
     });
 
-    const processing = engine.processEvent(validEvent(3));
+    const processing = engine.processEvent(validEvent(3), await engine._captureWriteContext());
     // Hold the handler open across several intervals, then release it.
     await new Promise(resolve => setTimeout(resolve, 130));
     const midFlightHeartbeats = db.calls.heartbeatQueries;
@@ -236,7 +253,7 @@ test('a long-running handler refreshes its committed processing lease at the con
     await processing;
 
     assert.ok(midFlightHeartbeats >= 1, `expected at least one heartbeat attempt, saw ${midFlightHeartbeats}`);
-    assert.equal(db.calls.releases, 1);
+    assert.equal(db.calls.releases, 2);
 });
 
 test('cancellation clears the pending timer and issues no late heartbeat query', async () => {
@@ -244,7 +261,7 @@ test('cancellation clears the pending timer and issues no late heartbeat query',
     // would fire several times during the post-return wait below.
     const { engine, db } = await createEngine({ heartbeatIntervalMs: 40, handler: async () => {} });
 
-    await engine.processEvent(validEvent(4));
+    await engine.processEvent(validEvent(4), await engine._captureWriteContext());
     const afterReturn = db.calls.heartbeatQueries;
 
     // Wait well beyond several intervals; a cleared timer fires nothing.
@@ -252,7 +269,7 @@ test('cancellation clears the pending timer and issues no late heartbeat query',
 
     assert.equal(afterReturn, 0, 'no heartbeat should have run for a fast event');
     assert.equal(db.calls.heartbeatQueries, 0, 'no late heartbeat query after processEvent resolved');
-    assert.equal(db.calls.releases, 1);
+    assert.equal(db.calls.releases, 2);
 });
 
 test('lost ownership stops the heartbeat and prevents the stale attempt from committing', async () => {
@@ -267,7 +284,7 @@ test('lost ownership stops the heartbeat and prevents the stale attempt from com
         handler: async () => { await handlerGate.promise; }
     });
 
-    const processing = engine.processEvent(validEvent(5));
+    const processing = engine.processEvent(validEvent(5), await engine._captureWriteContext());
     await new Promise(resolve => setTimeout(resolve, 130));
     const midFlightHeartbeats = db.calls.heartbeatQueries;
     handlerGate.resolve();
@@ -278,15 +295,15 @@ test('lost ownership stops the heartbeat and prevents the stale attempt from com
 
     assert.equal(midFlightHeartbeats, 1);
     assert.equal(db.calls.completedUpdates, 0);
-    assert.equal(db.calls.releases, 1);
+    assert.equal(db.calls.releases, 3);
 });
 
-test('the connection is released exactly once on both success and failure', async () => {
+test('each fenced connection is released exactly once on both success and failure', async () => {
     const ok = await createEngine({ handler: async () => {} });
-    await ok.engine.processEvent(validEvent(6));
-    assert.equal(ok.db.calls.releases, 1);
+    await ok.engine.processEvent(validEvent(6), await ok.engine._captureWriteContext());
+    assert.equal(ok.db.calls.releases, 2);
 
     const bad = await createEngine({ handler: async () => { throw new Error('boom'); } });
-    await assert.rejects(bad.engine.processEvent(validEvent(7)), /boom/);
-    assert.equal(bad.db.calls.releases, 1);
+    await assert.rejects(bad.engine.processEvent(validEvent(7), await bad.engine._captureWriteContext()), /boom/);
+    assert.equal(bad.db.calls.releases, 3);
 });
