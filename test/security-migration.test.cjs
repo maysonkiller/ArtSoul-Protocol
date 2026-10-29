@@ -145,7 +145,26 @@ test('the indexer migration runner covers the complete 001 through 017 sequence'
   }
 });
 
-test('Phase 18.7b classifies every table created by tracked SQL', () => {
+function createdSqlTables(sql) {
+  return [...sql.replace(/--[^\n]*/g, '').matchAll(
+    /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:([a-z0-9_]+)\s*\.\s*)?([a-z0-9_]+)/gi
+  )].map(match => ({ schema: (match[1] || 'public').toLowerCase(), table: match[2].toLowerCase() }));
+}
+
+test('table classification separates explicit private schemas from public and unqualified tables', () => {
+  assert.deepEqual(createdSqlTables(`
+    CREATE TABLE plain_table(id INT);
+    CREATE TABLE IF NOT EXISTS public.public_table(id INT);
+    CREATE TABLE IF NOT EXISTS artsoul_private.private_table(id INT);
+    -- CREATE TABLE ignored_comment(id INT);
+  `), [
+    { schema: 'public', table: 'plain_table' },
+    { schema: 'public', table: 'public_table' },
+    { schema: 'artsoul_private', table: 'private_table' }
+  ]);
+});
+
+test('Phase 18.7b classifies tracked public tables while private tables have their own hardening', () => {
   const sqlRoots = [
     path.join(REPO_ROOT, 'migrations'),
     path.join(REPO_ROOT, 'sql/migrations'),
@@ -153,6 +172,7 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     path.join(REPO_ROOT, 'src/indexer/migrations')
   ];
   const createdTables = new Set();
+  const privateTables = new Set();
 
   // Migrations that apply their OWN complete RLS + service-role hardening
   // inline (and are therefore never edited into the historical, already-
@@ -186,8 +206,9 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
     for (const name of fs.readdirSync(root).filter(candidate => candidate.endsWith('.sql'))) {
       if (SELF_HARDENING_MIGRATIONS.has(name)) continue;
       const sql = fs.readFileSync(path.join(root, name), 'utf8');
-      for (const match of sql.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?([a-z0-9_]+)/gi)) {
-        createdTables.add(match[1]);
+      for (const { schema, table } of createdSqlTables(sql)) {
+        if (schema === 'public') createdTables.add(table);
+        else privateTables.add(`${schema}.${table}`);
       }
     }
   }
@@ -198,6 +219,25 @@ test('Phase 18.7b classifies every table created by tracked SQL', () => {
   );
   const missing = [...createdTables].filter(table => !hardening.includes(`'${table}'`));
   assert.deepEqual(missing, []);
+  // New private tables require an explicit independent hardening test; they
+  // must never acquire the historical public-table service grants by accident.
+  assert.deepEqual([...privateTables].sort(), ['artsoul_private.notification_reorg_identities']);
+});
+
+test('notification recovery identity keeps its ledger and internal writer outside Data API access', () => {
+  const sql = fs.readFileSync(path.join(REPO_ROOT, 'sql/migrations/20261029212603_notification_reorg_identity.sql'), 'utf8');
+  assert.match(sql, /REVOKE ALL ON SCHEMA artsoul_private FROM PUBLIC,anon,authenticated,service_role/);
+  assert.match(sql, /ALTER TABLE artsoul_private\.notification_reorg_identities ENABLE ROW LEVEL SECURITY/);
+  assert.match(sql, /ALTER TABLE artsoul_private\.notification_reorg_identities FORCE ROW LEVEL SECURITY/);
+  assert.match(sql, /REVOKE ALL ON artsoul_private\.notification_reorg_identities FROM PUBLIC,anon,authenticated,service_role/);
+  for (const signature of [
+    'artsoul_private.notification_source_identity(TEXT,TEXT,JSONB,TEXT,BOOLEAN)',
+    'artsoul_private.detach_reorg_notifications(BIGINT,NUMERIC)',
+    'public.write_recoverable_notification(TEXT,TEXT,JSONB,TEXT,TEXT,TEXT)'
+  ]) {
+    assert.ok(sql.replace(/\s+/g, ' ').includes(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC,anon,authenticated,service_role;`), signature);
+  }
+  assert.doesNotMatch(sql, /GRANT[^;]*(?:artsoul_private|write_recoverable_notification)/i);
 });
 
 test('report email delivery self-hardens state and every delivery RPC', () => {

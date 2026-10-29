@@ -69,6 +69,7 @@ test('canonical log order preserves dependent projections and stops at the first
     }
     await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
     for (const migration of listIndexerMigrations()) await pool.query(migration.sql);
+    await pool.query(fs.readFileSync(new URL('./fixtures/indexer-legacy-notification-writer.sql', import.meta.url), 'utf8'));
     await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
         VALUES('log-order-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
     await pool.query(`INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,

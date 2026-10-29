@@ -30,6 +30,7 @@ test('event-only backfill keeps one range boundary header for truthful reminder 
   for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');await delay(100);await pool.query('SELECT 1');break;}catch(error){if(attempt>=80)throw error;await delay(250);}}
   await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
   for(const migration of listIndexerMigrations())await pool.query(migration.sql);
+  await pool.query(fs.readFileSync(new URL('./fixtures/indexer-legacy-notification-writer.sql',import.meta.url),'utf8'));
   await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
     VALUES('reminder-boundary-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query(`CREATE TABLE artwork_moderation_visibility(chain_id NUMERIC,artwork_id NUMERIC,hidden BOOLEAN);

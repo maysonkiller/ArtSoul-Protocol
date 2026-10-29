@@ -102,8 +102,15 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   for (const name of ['identity', 'preparation', 'submission', 'registration', 'reorg']) {
     await pool.query(read(`sql/migrations/artwork_media_${name}.sql`));
   }
+  // Use the shipped inbox tables, source-proof readers and recipient mutation
+  // RPCs. These migrations do not start an outbox processor or delivery worker.
+  const notificationMigrations = ['phase18_artwork_moderation_visibility','a8b_artwork_report_intake',
+    'a8c_protocol_admin_review','artist_support','artist_support_moderation','auction_notifications',
+    'auction_notification_lifecycle','auction_notification_reminders','notification_summary','notification_inbox_removal',
+    '20261029212603_notification_reorg_identity'];
+  for (const name of notificationMigrations) await pool.query(read(`sql/migrations/${name}.sql`));
   evidence.migrations = [...migrations, ...['identity', 'preparation', 'submission', 'registration', 'reorg']
-    .map(name => `sql/migrations/artwork_media_${name}.sql`)];
+    .map(name => `sql/migrations/artwork_media_${name}.sql`), ...notificationMigrations.map(name=>`sql/migrations/${name}.sql`)];
   const engineFile = path.join(directory, 'isolated-engine.mjs');
   fs.writeFileSync(engineFile, isolatedEngineSource());
   const Engine = (await import(pathToFileURL(engineFile).href)).default;
@@ -177,7 +184,8 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   }
   async function reset() {
     // Local database only; all included tables were just created by this test.
-    await pool.query(`TRUNCATE ${tables.join(',')},outbox_events,distributed_locks CASCADE`);
+    await pool.query(`TRUNCATE ${tables.join(',')},outbox_events,distributed_locks,
+      auction_notification_reads,auction_notification_preferences CASCADE`);
     beforeSql = null;rpcHook = null;leaderCurrent = true;leaderEpoch = 0;resaleStates.clear();resaleReads.length=0;
     await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
       VALUES('fixture-reorg','fixture-worker',1,clock_timestamp()+INTERVAL '1 hour')`);
@@ -226,6 +234,387 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       throw new Error(`Operation finished before reaching its concurrency gate: ${outcome.error?.message || 'unexpected success'}`);
     })]);
   }
+  const notificationEvent=(eventName,eventData,blockNumber,logIndex,tx)=>({eventName,eventData,blockNumber,logIndex,
+    transactionHash:hash(tx),contractAddress:CORE,blockHash:hash(blockNumber),timestamp:1700000000000+blockNumber*2000});
+  async function emitNotificationEvent(writer,value) {
+    const context=await writer._captureWriteContext();
+    await writer._storeBlockHashesForBlocks([value.blockNumber],context);
+    await writer.processEvent(value,context);
+  }
+  const notificationRows=async value=>(await pool.query(`SELECT id::TEXT,aggregate_type,aggregate_id,payload,
+    idempotency_key,correlation_id,processing_status FROM outbox_events WHERE event_type='notification'
+    AND correlation_id=$1 ORDER BY id`,[`${CHAIN}-${value.transactionHash}-${value.logIndex}`])).rows;
+  const notificationInbox=async wallet=>(await pool.query('SELECT read_auction_notifications_v3($1,$2) AS value',[wallet,CORE])).rows[0].value;
+  async function assertReminderSummary(count) {
+    const before=await notificationSnapshot();
+    const summary=(await pool.query('SELECT read_notification_summary($1,$2,true,true,true) AS value',[CREATOR,CORE])).rows[0].value;
+    assert.equal(summary.remindersAvailable,true);assert.equal(summary.reminderCount,count);
+    assert.deepEqual(await notificationSnapshot(),before,'summary reads do not materialize or rebind notifications');
+  }
+  const notificationReads=async ids=>(await pool.query(`SELECT wallet_address,core_address,outbox_id::TEXT,read,dismissed_at,updated_at
+    FROM auction_notification_reads WHERE outbox_id=ANY($1::BIGINT[]) ORDER BY outbox_id`,[ids])).rows;
+  async function markNotification(wallet,id,{dismiss=false,read=true}={}) {
+    assert.equal((await pool.query('SELECT mark_auction_notifications_v3($1,$2,$3,$4) AS value',
+      [wallet,CORE,[id],read])).rows[0].value.updated,true);
+    if(dismiss) assert.equal((await pool.query('SELECT remove_auction_notifications($1,$2,$3) AS value',
+      [wallet,CORE,[id]])).rows[0].value.removed,true);
+  }
+  async function notificationFixture({dismissReceived=true}={}) {
+    const writer=historicalWriter([]), event=notificationEvent;
+    await emitNotificationEvent(writer,event('ArtworkRegistered',{artworkId:2,creator:CREATOR,metadataURI:'ipfs://notification-replay-fixture'},100,1,20000));
+    await emitNotificationEvent(writer,event('AuctionCreated',{auctionId:2,artworkId:2,creator:CREATOR,startPrice:1000,
+      duration:86400,endTime:1700086400,chainId:CHAIN},105,2,20001));
+    await emitNotificationEvent(writer,event('BidPlaced',{auctionId:2,bidder:WINNER,bidAmount:1500,depositAmount:10000},108,3,20002));
+    const original=event('BidPlaced',{auctionId:2,bidder:`0x${'d'.repeat(40)}`,bidAmount:2500,depositAmount:10000},112,7,29000);
+    await emitNotificationEvent(writer,original);
+    const rows=await notificationRows(original),outbid=rows.find(row=>row.payload.type==='outbid'),received=rows.find(row=>row.payload.type==='bid_received');
+    assert.ok(outbid && received);
+    await markNotification(WINNER,outbid.id);
+    await markNotification(CREATOR,received.id,{dismiss:dismissReceived});
+    return {writer,original,rows,outbid,received,reads:await notificationReads(rows.map(row=>row.id))};
+  }
+  async function replayNotifications(writer,events) {
+    writer.eventListener.queryAllHistoricalEvents=async()=>events;
+    await writer.syncHistoricalEvents(110,120,{currentBlock:132});
+  }
+  const notificationReplay=(original,changes={})=>({...original,blockNumber:118,blockHash:hash(118),
+    timestamp:1700000000000+118*2000,logIndex:11,...changes});
+  async function notificationSnapshot() {
+    return {outbox:(await pool.query('SELECT to_jsonb(o) AS value FROM outbox_events o ORDER BY id')).rows.map(row=>row.value),
+      identities:(await pool.query('SELECT to_jsonb(i) AS value FROM artsoul_private.notification_reorg_identities i ORDER BY identity_key')).rows.map(row=>row.value),
+      reads:(await pool.query('SELECT to_jsonb(r) AS value FROM auction_notification_reads r ORDER BY outbox_id,wallet_address')).rows.map(row=>row.value)};
+  }
+  async function assertPostgresWait(waiter,blocker) {
+    const deadline=Date.now()+5000;
+    while(Date.now()<deadline) {
+      const row=(await pool.query('SELECT $2::INT=ANY(pg_blocking_pids($1::INT)) AS blocked',
+        [waiter,blocker])).rows[0];
+      if(row.blocked) return;
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    assert.fail('expected the operation to wait on the real PostgreSQL transaction');
+  }
+  for (const shiftedIndex of [false,true]) await t.test(`same transaction replay with ${shiftedIndex?'shifted':'unchanged'} log index preserves recipient read and dismissal state`, async () => {
+    const {writer,original,rows:originalRows,outbid,received,reads:originalReadRows}=await notificationFixture();
+    const sourceItems=async wallet=>(await notificationInbox(wallet)).items.filter(item=>item.transaction_hash===original.transactionHash);
+    assert.equal(originalRows.length,2,'actual Engine writes both the outbid and bid-received notices');
+    assert.equal(originalReadRows.length,2);
+    assert.equal((await sourceItems(WINNER))[0].read,true);
+    assert.deepEqual(await sourceItems(CREATOR),[]);
+
+    await target._handleReorg(BOUNDARY);
+    const sourceAbsent={winnerItems:await sourceItems(WINNER),creatorItems:await sourceItems(CREATOR),
+      readRows:await notificationReads(originalRows.map(row=>row.id)),canonicalProofs:[]};
+    for(const [wallet,id] of [[WINNER,outbid.id],[CREATOR,received.id]]) {
+      sourceAbsent.canonicalProofs.push((await pool.query(`SELECT id::TEXT FROM canonical_auction_notifications_v2($1,$2,NULL,$3::BIGINT[])`,
+        [wallet,CORE,[id]])).rows);
+    }
+    assert.deepEqual(sourceAbsent.winnerItems,[]);
+    assert.deepEqual(sourceAbsent.creatorItems,[]);
+    assert.deepEqual(sourceAbsent.canonicalProofs,[[],[]],'removed canonical source cannot authorize either notice');
+    assert.deepEqual(sourceAbsent.readRows,originalReadRows,'orphaning preserves recipient intent');
+
+    const replay={...original,blockNumber:118,blockHash:hash(118),timestamp:1700000000000+118*2000,
+      logIndex:shiftedIndex?11:original.logIndex};
+    writer.eventListener.queryAllHistoricalEvents=async()=>[replay];
+    await writer.syncHistoricalEvents(110,120,{currentBlock:132});
+    const replayRows=await notificationRows(replay), winnerItems=await sourceItems(WINNER), creatorItems=await sourceItems(CREATOR);
+    const replayReadRows=await notificationReads(replayRows.map(row=>row.id));
+    evidence.results.push({scenario:`same_transaction_notification_replay_${shiftedIndex?'shifted':'unchanged'}_log_index`,
+      transactionHash:original.transactionHash,originalLogIndex:original.logIndex,replayLogIndex:replay.logIndex,
+      originalRows,originalReadRows,sourceAbsent,replayRows,replayReadRows,winnerItems,creatorItems});
+    assert.deepEqual(replayRows.map(row=>row.id),originalRows.map(row=>row.id),'identical effects keep their original serial IDs');
+    assert.deepEqual(replayReadRows,originalReadRows,'read and dismissal timestamps survive unchanged');
+    assert.deepEqual({readNoticeRead:winnerItems[0]?.read,dismissedNoticeVisible:creatorItems.length>0},
+      {readNoticeRead:true,dismissedNoticeVisible:false},'re-inclusion must not make read or dismissed notifications new again');
+  });
+  for(const changed of ['transaction','source data']) await t.test(`changed notification ${changed} cannot inherit read or dismissal state`,async()=>{
+    const fixture=await notificationFixture();
+    await target._handleReorg(BOUNDARY);
+    const replay=notificationReplay(fixture.original,changed==='transaction'?{transactionHash:hash(29001)}:
+      {eventData:{...fixture.original.eventData,bidAmount:3500}});
+    await replayNotifications(fixture.writer,[replay]);
+    const rows=await notificationRows(replay);
+    assert.equal(rows.length,2);
+    assert.ok(rows.every(row=>!fixture.rows.some(old=>old.id===row.id)));
+    assert.deepEqual(await notificationReads(rows.map(row=>row.id)),[]);
+    assert.deepEqual(await notificationReads(fixture.rows.map(row=>row.id)),fixture.reads);
+    for(const wallet of [WINNER,CREATOR]) {
+      const items=(await notificationInbox(wallet)).items.filter(item=>item.transaction_hash===replay.transactionHash);
+      assert.equal(items.length,1);assert.equal(items[0].read,false);
+    }
+  });
+  await t.test('changed outbid recipient does not inherit another wallet intent',async()=>{
+    const fixture=await notificationFixture(),previous=`0x${'e'.repeat(40)}`;
+    await target._handleReorg(BOUNDARY);
+    const predecessor=notificationEvent('BidPlaced',{auctionId:2,bidder:previous,bidAmount:2000,depositAmount:10000},111,6,29002);
+    const replay=notificationReplay(fixture.original);
+    await replayNotifications(fixture.writer,[predecessor,replay]);
+    const rows=await notificationRows(replay),outbid=rows.find(row=>row.payload.type==='outbid');
+    assert.equal(outbid.payload.recipient,previous);assert.notEqual(outbid.id,fixture.outbid.id);
+    assert.deepEqual(await notificationReads([outbid.id]),[]);
+    assert.equal(rows.find(row=>row.payload.type==='bid_received').id,fixture.received.id,
+      'unchanged creator effect retains its separate dismissal');
+    const items=(await notificationInbox(previous)).items.filter(item=>item.transaction_hash===replay.transactionHash);
+    assert.equal(items.length,1);assert.equal(items[0].read,false);
+    assert.deepEqual((await notificationInbox(WINNER)).items.filter(item=>item.transaction_hash===replay.transactionHash),[]);
+  });
+  await t.test('changed notification payload cannot reuse a durable identity',async()=>{
+    const fixture=await notificationFixture(),old=fixture.outbid;
+    await target._handleReorg(BOUNDARY);
+    const write=fixture.writer._writeToOutbox;
+    fixture.writer._writeToOutbox=async function(client,type,aggregate,id,payload,...rest) {
+      return write.call(this,client,type,aggregate,id,payload.type==='outbid'?{...payload,newAmount:'3500'}:payload,...rest);
+    };
+    const replay=notificationReplay(fixture.original);
+    await replayNotifications(fixture.writer,[replay]);
+    const id=(await notificationRows(replay)).find(row=>row.payload.type==='outbid').id;
+    assert.notEqual(id,old.id);assert.deepEqual(await notificationReads([id]),[]);
+    assert.deepEqual(await notificationReads(fixture.rows.map(row=>row.id)),fixture.reads);
+  });
+  await t.test('replay preserves an already completed outbox processing record',async()=>{
+    const fixture=await notificationFixture();
+    await pool.query(`UPDATE outbox_events SET processing_status='completed',processed_at=clock_timestamp(),
+      processing_attempts=2,last_attempt_at=clock_timestamp() WHERE id=$1`,[fixture.outbid.id]);
+    const processing=async()=>(await pool.query(`SELECT processing_status,processed_at,processing_attempts,last_attempt_at
+      FROM outbox_events WHERE id=$1`,[fixture.outbid.id])).rows[0];
+    const before=await processing();
+    await target._handleReorg(BOUNDARY);
+    await replayNotifications(fixture.writer,[notificationReplay(fixture.original)]);
+    assert.deepEqual(await processing(),before,'recovery does not turn a completed effect into pending work');
+  });
+  await t.test('a different event at the retired global log index cannot collide with its old key',async()=>{
+    const fixture=await notificationFixture();
+    await target._handleReorg(BOUNDARY);
+    const replacement=notificationEvent('AuctionCreated',{auctionId:3,artworkId:2,creator:CREATOR,startPrice:1000,
+      duration:86400,endTime:1700086400,chainId:CHAIN},118,7,29000);
+    await replayNotifications(fixture.writer,[replacement]);
+    const rows=await notificationRows(replacement);
+    assert.equal(rows.length,1);assert.equal(rows[0].payload.type,'auction_created');
+    assert.notEqual(rows[0].id,fixture.outbid.id);assert.equal(rows[0].idempotency_key,fixture.outbid.idempotency_key);
+    assert.deepEqual(await notificationReads([rows[0].id]),[]);
+    assert.deepEqual(await notificationReads(fixture.rows.map(row=>row.id)),fixture.reads);
+    const items=(await notificationInbox(CREATOR)).items.filter(item=>item.transaction_hash===replacement.transactionHash);
+    assert.equal(items.length,1);assert.equal(items[0].id,rows[0].id);assert.equal(items[0].read,false);
+  });
+  await t.test('identical repeated log occurrences retain distinct notification IDs and recipient intent',async()=>{
+    const fixture=await notificationFixture({dismissReceived:false});
+    const second={...fixture.original,logIndex:8};
+    await emitNotificationEvent(fixture.writer,second);
+    const secondNotice=(await notificationRows(second)).find(row=>row.payload.type==='bid_received');
+    assert.ok(secondNotice);assert.notEqual(secondNotice.id,fixture.received.id);
+    // Give the otherwise identical effects different recipient-owned states.
+    await markNotification(CREATOR,secondNotice.id,{dismiss:true});
+    const before=await notificationReads([fixture.received.id,secondNotice.id]);
+    await target._handleReorg(BOUNDARY);
+    const firstReplay=notificationReplay(fixture.original),secondReplay=notificationReplay(second,{logIndex:12});
+    await replayNotifications(fixture.writer,[firstReplay,secondReplay]);
+    assert.equal((await notificationRows(firstReplay)).find(row=>row.payload.type==='bid_received').id,fixture.received.id);
+    assert.equal((await notificationRows(secondReplay)).find(row=>row.payload.type==='bid_received').id,secondNotice.id);
+    assert.deepEqual(await notificationReads([fixture.received.id,secondNotice.id]),before);
+    const items=(await notificationInbox(CREATOR)).items.filter(item=>item.transaction_hash===fixture.original.transactionHash);
+    assert.deepEqual(items.map(item=>[item.id,item.read]),[[fixture.received.id,true]]);
+  });
+  for(const failure of ['rewind','rebind']) await t.test(`notification ${failure} failure rolls back identity and recipient state`,async()=>{
+    const fixture=await notificationFixture();
+    if(failure==='rebind') await target._handleReorg(BOUNDARY);
+    const before=await notificationSnapshot(),state=await snapshot(CHAIN);
+    beforeSql=async sql=>{
+      if(failure==='rewind'?sql.startsWith('UPDATE indexer_state'):sql.includes("SET processing_status = 'completed'")) {
+        throw new Error('fixture notification identity failure');
+      }
+    };
+    try {
+      if(failure==='rewind') await assert.rejects(target._handleReorg(BOUNDARY),/fixture notification identity failure/);
+      else await assert.rejects(replayNotifications(fixture.writer,[notificationReplay(fixture.original)]),
+        error=>error.code==='INDEXER_RANGE_INCOMPLETE' && error.failures[0]?.error==='fixture notification identity failure');
+    } finally {beforeSql=null;}
+    assert.deepEqual(await notificationSnapshot(),before);
+    const after=await snapshot(CHAIN);
+    for(const table of ['contract_events','v41_bids','v41_auctions','indexer_state']) assert.deepEqual(after[table],state[table]);
+  });
+  await t.test('notification identity privileges and migration reapplication preserve existing data',async()=>{
+    await notificationFixture();
+    const before=await notificationSnapshot();
+    await pool.query(read('sql/migrations/20261029212603_notification_reorg_identity.sql'));
+    assert.deepEqual(await notificationSnapshot(),before);
+    for(const role of ['anon','authenticated','service_role']) {
+      const row=(await pool.query(`SELECT has_schema_privilege($1,'artsoul_private','USAGE') AS schema_access,
+        has_table_privilege($1,'artsoul_private.notification_reorg_identities','SELECT,INSERT,UPDATE,DELETE') AS table_access`,[role])).rows[0];
+      assert.deepEqual(row,{schema_access:false,table_access:false});
+      assert.equal((await pool.query(`SELECT has_function_privilege($1,
+        'public.write_recoverable_notification(text,text,jsonb,text,text,text)','EXECUTE') AS allowed`,[role])).rows[0].allowed,false);
+      assert.equal((await pool.query(`SELECT has_function_privilege($1,
+        'artsoul_private.notification_source_identity(text,text,jsonb,text,boolean)','EXECUTE') AS allowed`,[role])).rows[0].allowed,false);
+    }
+    assert.equal((await pool.query(`SELECT prosecdef FROM pg_proc WHERE oid=
+      'public.write_recoverable_notification(text,text,jsonb,text,text,text)'::regprocedure`)).rows[0].prosecdef,false);
+  });
+  await t.test('concurrent identical notification writers reuse one row without changing recipient intent',async()=>{
+    const fixture=await notificationFixture(),row=fixture.outbid;
+    const versions=async()=>(await pool.query(`SELECT o.xmin::TEXT AS outbox_revision,i.xmin::TEXT AS identity_revision
+      FROM outbox_events o JOIN artsoul_private.notification_reorg_identities i ON i.outbox_id=o.id WHERE o.id=$1`,[row.id])).rows[0];
+    const before=await versions();
+    const args=[row.aggregate_type,row.aggregate_id,row.payload,row.correlation_id,row.idempotency_key,'pending'];
+    const ids=await Promise.all([1,2].map(async()=>
+      (await pool.query('SELECT write_recoverable_notification($1,$2,$3,$4,$5,$6)::TEXT AS id',args)).rows[0].id));
+    assert.deepEqual(ids,[row.id,row.id]);
+    assert.deepEqual(await notificationReads(fixture.rows.map(row=>row.id)),fixture.reads);
+    assert.equal((await notificationRows(fixture.original)).length,2);
+    assert.deepEqual(await versions(),before,'an already bound identical write does not update either row');
+  });
+  await t.test('owner rollback waits for a normal writer before acquiring the media fence',async()=>{
+    const fixture=await notificationFixture(),owner=await pool.connect();
+    const paused=deferred(),release=deferred();let writerPid;
+    const event=notificationEvent('BidPlaced',{auctionId:2,bidder:`0x${'e'.repeat(40)}`,bidAmount:3000,depositAmount:10000},118,8,29003);
+    const context=await fixture.writer._captureWriteContext();
+    await fixture.writer._storeBlockHashesForBlocks([118],context);
+    beforeSql=async(sql,client)=>{
+      if(sql.includes('SELECT public.write_recoverable_notification') && !writerPid) {
+        writerPid=client.processID;paused.resolve();await release.promise;
+      }
+    };
+    const writing=settle(fixture.writer.processEvent(event,context));let rolling;
+    try {
+      await reach(paused,writing);
+      await owner.query('BEGIN');
+      rolling=settle(owner.query('SELECT rollback_events_from_block($1,$2)',[BOUNDARY,CHAIN]));
+      await assertPostgresWait(owner.processID,writerPid);
+      // A rollback that took media before state would block this probe, then
+      // deadlock when the normal writer reaches its notification helper.
+      const probe=await pool.connect();
+      try {
+        await probe.query('BEGIN');
+        await probe.query('SELECT revision FROM artwork_media_chain_revisions WHERE chain_id=$1 FOR SHARE NOWAIT',[CHAIN]);
+        await probe.query('ROLLBACK');
+      } finally {await probe.query('ROLLBACK');probe.release();}
+      release.resolve();
+      assert.ifError((await writing).error);assert.ifError((await rolling).error);
+      await owner.query('COMMIT');
+    } finally {
+      release.resolve();beforeSql=null;await writing;
+      if(rolling) await rolling;
+      await owner.query('ROLLBACK');owner.release();
+    }
+    assert.equal((await pool.query('SELECT count(*)::INTEGER AS count FROM contract_events WHERE chain_id=$1 AND block_number>=$2',
+      [CHAIN,BOUNDARY])).rows[0].count,0);
+    assert.deepEqual(await notificationRows(event),[]);
+    assert.deepEqual(await notificationReads(fixture.rows.map(row=>row.id)),fixture.reads);
+    assert.deepEqual((await notificationInbox(CREATOR)).items.filter(item=>item.transaction_hash===event.transactionHash),[]);
+    evidence.results.push({scenario:'direct_owner_rollback_after_writer',blockedOnStateBeforeMedia:true,noDeadlock:true,noCanonicalStaleNotice:true});
+  });
+  await t.test('a standalone notification writer waiting behind recovery cannot rebind its removed source',async()=>{
+    const fixture=await notificationFixture(),row=fixture.outbid;
+    const staleContext=await fixture.writer._captureWriteContext();
+    const owner=await pool.connect(),helper=await pool.connect();let writing;
+    try {
+      await owner.query('BEGIN');
+      await owner.query('SELECT rollback_events_from_block($1,$2)',[BOUNDARY,CHAIN]);
+      writing=settle(helper.query('SELECT write_recoverable_notification($1,$2,$3,$4,$5,$6)::TEXT AS id',
+        [row.aggregate_type,row.aggregate_id,row.payload,row.correlation_id,row.idempotency_key,'pending']));
+      await assertPostgresWait(helper.processID,owner.processID);
+      await owner.query('COMMIT');
+      const result=await writing;
+      assert.match(result.error?.message||'',/NOTIFICATION_SOURCE_UNAVAILABLE/);
+    } finally {
+      await owner.query('ROLLBACK');
+      if(writing) await writing;
+      owner.release();helper.release();
+    }
+    assert.deepEqual(await notificationRows(fixture.original),[],'the retired key remains unbound while its source is absent');
+    assert.deepEqual(await notificationReads(fixture.rows.map(row=>row.id)),fixture.reads);
+    const identities=(await pool.query('SELECT orphaned FROM artsoul_private.notification_reorg_identities WHERE outbox_id=ANY($1::BIGINT[])',
+      [fixture.rows.map(row=>row.id)])).rows;
+    assert.equal(identities.length,2);assert.ok(identities.every(identity=>identity.orphaned));
+    const afterDirectRollback=await notificationSnapshot();
+    await assert.rejects(fixture.writer.processEvent(notificationReplay(fixture.original),staleContext),fenceLost);
+    assert.deepEqual(await notificationSnapshot(),afterDirectRollback,
+      'a committed direct rollback invalidates contexts captured before it');
+    // Complete the normal engine rewind, then prove a freshly indexed identical
+    // source can still rebind after the rejected delayed helper call.
+    await target._handleReorg(BOUNDARY);
+    const replay=notificationReplay(fixture.original);
+    await replayNotifications(fixture.writer,[replay]);
+    assert.deepEqual((await notificationRows(replay)).map(value=>value.id),fixture.rows.map(value=>value.id));
+    assert.deepEqual(await notificationReads(fixture.rows.map(row=>row.id)),fixture.reads);
+    const before=await notificationSnapshot();
+    await pool.query('SELECT read_notification_summary($1,$2,true,true,true)',[CREATOR,CORE]);
+    assert.deepEqual(await notificationSnapshot(),before,'summary remains read-only after the concurrent recovery');
+    evidence.results.push({scenario:'standalone_notification_waits_for_recovery',blockedOnMedia:true,staleSourceRejected:true,
+      staleContextRejected:true,legitimateReplayPreserved:true});
+  });
+  for(const proved of [true,false]) await t.test(`${proved?'proved':'unknown-source'} legacy notification handling does not invent provenance`,async()=>{
+    const fixture=await notificationFixture(),ids=fixture.rows.map(row=>row.id);
+    // Remove only the new ledger records to model rows created before migration.
+    await pool.query('DELETE FROM artsoul_private.notification_reorg_identities WHERE outbox_id=ANY($1::BIGINT[])',[ids]);
+    if(!proved) await pool.query(`UPDATE contract_events SET contract_address=NULL WHERE chain_id=$1
+      AND transaction_hash=$2 AND log_index=$3`,[CHAIN,fixture.original.transactionHash,fixture.original.logIndex]);
+    await target._handleReorg(BOUNDARY);
+    const adopted=(await pool.query('SELECT outbox_id::TEXT,orphaned FROM artsoul_private.notification_reorg_identities WHERE outbox_id=ANY($1::BIGINT[]) ORDER BY outbox_id',[ids])).rows;
+    assert.equal(adopted.length,proved?2:0);
+    assert.ok(adopted.every(row=>row.orphaned));
+    assert.deepEqual(await notificationReads(ids),fixture.reads);
+    const replay=notificationReplay(fixture.original);
+    await replayNotifications(fixture.writer,[replay]);
+    const replayIds=(await notificationRows(replay)).map(row=>row.id);
+    if(proved) assert.deepEqual(replayIds,ids);
+    else {assert.ok(replayIds.every(id=>!ids.includes(id)));assert.deepEqual(await notificationReads(replayIds),[]);}
+  });
+  async function reminderFixture({dismiss=false}={}) {
+    const writer=historicalWriter([]);
+    const now=Number((await pool.query('SELECT floor(extract(epoch FROM clock_timestamp())) AS epoch')).rows[0].epoch);
+    writer.eventListener.getBlock=async number=>({hash:hash(number),parentHash:hash(number-1),timestamp:now+(number-120)*2});
+    await emitNotificationEvent(writer,notificationEvent('ArtworkRegistered',
+      {artworkId:2,creator:CREATOR,metadataURI:'ipfs://reminder-replay-fixture'},100,1,30000));
+    const original=notificationEvent('AuctionCreated',{auctionId:2,artworkId:2,creator:CREATOR,startPrice:1000,
+      duration:86400,endTime:now+1800,chainId:CHAIN},112,7,30001);
+    await emitNotificationEvent(writer,original);
+    await pool.query('UPDATE block_hashes SET timestamp=$1 WHERE chain_id=$2 AND block_number=115',[now,CHAIN]);
+    const inbox=await notificationInbox(CREATOR);
+    assert.equal(inbox.remindersAvailable,true);
+    const reminder=inbox.reminders.find(item=>item.auction_id==='2');
+    assert.ok(reminder);assert.equal(reminder.type,'auction_ending');
+    await markNotification(CREATOR,reminder.id,{dismiss});
+    return {writer,now,original,reminder,reads:await notificationReads([reminder.id])};
+  }
+  for(const dismiss of [false,true]) await t.test(`replayed reminder preserves its serial ID and ${dismiss?'dismissal':'read'} state`,async()=>{
+    const fixture=await reminderFixture({dismiss});
+    await target._handleReorg(BOUNDARY);
+    assert.deepEqual((await notificationInbox(CREATOR)).reminders,[]);
+    assert.deepEqual((await pool.query(`SELECT id FROM canonical_auction_reminders($1,$2,ARRAY[60],statement_timestamp(),$3)`,
+      [CREATOR,CORE,[fixture.reminder.id]])).rows,[]);
+    await replayNotifications(fixture.writer,[notificationReplay(fixture.original)]);
+    await assertReminderSummary(0);
+    const inbox=await notificationInbox(CREATOR);
+    assert.equal(inbox.remindersAvailable,true);
+    const reminders=inbox.reminders.filter(item=>item.auction_id==='2');
+    assert.deepEqual(reminders.map(item=>[item.id,item.read]),dismiss?[]:[[fixture.reminder.id,true]]);
+    assert.deepEqual(await notificationReads([fixture.reminder.id]),fixture.reads);
+    const proof=(await pool.query(`SELECT id::TEXT FROM canonical_auction_reminders($1,$2,ARRAY[60],statement_timestamp(),$3)`,
+      [CREATOR,CORE,[fixture.reminder.id]])).rows;
+    assert.deepEqual(proof,[{id:fixture.reminder.id}]);
+  });
+  await t.test('a different creation transaction reusing an auction ID cannot inherit reminder dismissal',async()=>{
+    const fixture=await reminderFixture({dismiss:true});
+    await target._handleReorg(BOUNDARY);
+    await replayNotifications(fixture.writer,[notificationReplay(fixture.original,{transactionHash:hash(30002)})]);
+    await assertReminderSummary(1);
+    const reminders=(await notificationInbox(CREATOR)).reminders.filter(item=>item.auction_id==='2');
+    assert.equal(reminders.length,1);assert.notEqual(reminders[0].id,fixture.reminder.id);assert.equal(reminders[0].read,false);
+    assert.deepEqual(await notificationReads([fixture.reminder.id]),fixture.reads);
+    assert.deepEqual(await notificationReads([reminders[0].id]),[]);
+  });
+  await t.test('an extension keeps one reminder per unchanged creation and offset',async()=>{
+    const fixture=await reminderFixture();
+    const extended=notificationEvent('AuctionExtended',{auctionId:2,oldEndTime:fixture.now+1800,newEndTime:fixture.now+2400},114,8,30003);
+    await emitNotificationEvent(fixture.writer,extended);
+    await assertReminderSummary(0);
+    const reminders=(await notificationInbox(CREATOR)).reminders.filter(item=>item.auction_id==='2');
+    assert.deepEqual(reminders.map(item=>[item.id,item.read,item.deadline]),[[fixture.reminder.id,true,String(fixture.now+2400)]]);
+    assert.deepEqual(await notificationReads([fixture.reminder.id]),fixture.reads);
+    assert.equal((await pool.query(`SELECT count(*)::INTEGER AS count FROM outbox_events
+      WHERE event_type='notification' AND payload->>'type'='auction_ending' AND payload->>'auctionId'='2'`)).rows[0].count,1);
+  });
   for (const withEvent of [true,false]) await t.test(`stale buffered ${withEvent?'event':'empty header-only'} range cannot write after rewind`, async () => {
     const entered = deferred(), release = deferred();
     const events = withEvent ? [bufferedBid()] : [];

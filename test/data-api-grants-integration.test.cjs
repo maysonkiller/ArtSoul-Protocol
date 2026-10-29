@@ -34,7 +34,8 @@ const features = [
   'artist_support_moderation', 'moderation_report_email_delivery', 'artwork_media_identity', 'artwork_media_preparation',
   'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks',
   'public_artwork_search', 'public_artwork_search_current_round', 'profile_layouts', 'auction_notifications', 'auction_notification_lifecycle',
-  'auction_notification_reminders', 'notification_summary'
+  'auction_notification_reminders', 'notification_summary', 'notification_inbox_removal',
+  '20261029212603_notification_reorg_identity'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [
@@ -129,6 +130,32 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     query(noImplicitGrants);
     query(fs.readFileSync(`sql/migrations/${name}.sql`, 'utf8'));
   }
+  await t.test('notification recovery ledger and writer stay inaccessible to every Data API role', () => {
+    const table = 'artsoul_private.notification_reorg_identities';
+    assert.equal(query(`SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+      WHERE oid='${table}'::regclass;`), 't');
+    const internalFunctions = [
+      'artsoul_private.notification_source_identity(text,text,jsonb,text,boolean)',
+      'artsoul_private.detach_reorg_notifications(bigint,numeric)',
+      'public.write_recoverable_notification(text,text,jsonb,text,text,text)'
+    ];
+    for (const signature of internalFunctions) {
+      assert.equal(query(`SELECT prosecdef FROM pg_proc WHERE oid='${signature}'::regprocedure;`), 'f', signature);
+    }
+    for (const role of ['anon', 'authenticated', 'service_role']) {
+      assert.equal(query(`SELECT has_schema_privilege('${role}','artsoul_private','USAGE,CREATE');`), 'f', role);
+      assert.equal(query(`SELECT has_table_privilege('${role}','${table}',
+        'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');`), 'f', role);
+      for (const signature of internalFunctions) {
+        assert.equal(query(`SELECT has_function_privilege('${role}','${signature}','EXECUTE');`), 'f', `${role}: ${signature}`);
+      }
+      assert.throws(() => query(`SET ROLE ${role}; SELECT * FROM ${table} LIMIT 0;`),
+        /permission denied for schema artsoul_private/);
+      assert.throws(() => query(`SET ROLE ${role}; SELECT public.write_recoverable_notification(
+        NULL::text,NULL::text,NULL::jsonb,NULL::text,NULL::text,NULL::text);`),
+        /permission denied for function write_recoverable_notification/);
+    }
+  });
   await t.test('all application tables have explicit service reads and forced RLS', () => {
     assert.equal(query(`SELECT c.relname FROM pg_class c WHERE c.relnamespace='public'::regnamespace
       AND c.relkind IN ('r','p') AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity

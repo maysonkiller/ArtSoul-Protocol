@@ -32,6 +32,7 @@ test('recipient inbox removal preserves protocol and complaint records in Postgr
     ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon,authenticated,service_role;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC;`);
   for(const migration of listIndexerMigrations())await pool.query(migration.sql);
+  await pool.query(fs.readFileSync(new URL('./fixtures/indexer-legacy-notification-writer.sql',import.meta.url),'utf8'));
   await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
     VALUES('notification-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query('CREATE TABLE artwork_media_chain_revisions(chain_id NUMERIC PRIMARY KEY,revision NUMERIC(78,0) NOT NULL);');
