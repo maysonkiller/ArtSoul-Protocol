@@ -69,7 +69,7 @@ subscription charges.
 
 Sources: [Supabase egress](https://supabase.com/docs/guides/platform/manage-your-usage/egress),
 [Supabase cost controls](https://supabase.com/docs/guides/platform/cost-control),
-[Neon Free limits](https://neon.com/docs/introduction/pro-plan),
+[Neon Free limits](https://neon.com/pricing),
 [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/),
 [Supabase Docker resources](https://supabase.com/docs/guides/self-hosting/docker).
 
