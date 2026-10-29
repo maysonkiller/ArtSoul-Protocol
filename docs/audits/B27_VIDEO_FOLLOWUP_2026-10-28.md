@@ -1,5 +1,14 @@
 # B27: desktop video follow-up
 
+October 29 owner revision: remove the artwork image menu, both Download image
+and Open original file actions, and their dead handlers/styles. Do not move an
+original link into Artwork details. Keep image/GIF fullscreen viewing and the
+separate card Donate/Report actions. This supersedes only the menu decision
+below; it does not make stored public media private or change its source URL.
+Existing media/layout behavior tests: 20/20 pass; build and route/CSS checks pass.
+Rendered verification and release follow in the checkpoint. No new dependencies,
+architecture changes or economic interpretation; canon 05/16 UI surface only.
+
 Date: 2026-10-28. Workspace: `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`, starting HEAD `23711dca` (production `8abca461`).
 Status: released in [PR #379](https://github.com/maysonkiller/ArtSoul-Protocol/pull/379),

@@ -370,7 +370,11 @@ remaining blocker. Full local suite: 2,580 pass / 34 explicit environment skips 
 zero failures (includes unrelated untracked policy tests). Older minimal-schema
 fixtures use an explicitly test-only adapter for the new writer signature; the
 real retention implementation is exercised by the full-stack PostgreSQL fixture.
-Docker/no-default-grant integration awaits Linux CI; release status follows.
+Candidate ba7b59b5 passed exact CI40960261913: Linux 3,060 pass/two platform
+skips, Windows 2,551 pass/34 environment skips; contracts, builds and static
+checks passed. Linux exercised Docker recovery and no-default-grant integration.
+PR402 merged as 199aa28e. This releases source only; the migration and indexer
+worker remain inactive pending the operational gates below.
 
 Interpretations: same creation transaction plus exact creation data/recipient/
 offset preserves an existing reminder across extension; a reused auction number

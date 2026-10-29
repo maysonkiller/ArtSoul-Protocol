@@ -1,6 +1,13 @@
-October 29 B35 notification identity / local candidate:
-Workspace C:\Projects\ArtSoul / codex/takeover-audit /
-HEAD 1d79cee6819ae67a0770a7f12c20f24599113d22 (PR401 baseline).
+October 29 artwork media follow-up / B35 notification identity MERGED:
+Workspace C:\Projects\ArtSoul / codex/artwork-fullscreen-controls /
+HEAD 199aa28e0352e304aeb030d18033698ffd76cc55 (main, PR402).
+Owner requested removal of the artwork image three-dot menu, download action
+and original-file link. Removed the shared image/GIF menu, dead handlers and
+styles; fullscreen and preview-card Donate/Report menus remain unchanged.
+Existing media/layout tests: 20 pass, zero skips; build/route/CSS checks pass.
+Rendered preview verification and exact-candidate UI release checks pending.
+This is the owner's explicit UI revision of B27, touching canon 05/16 only;
+no contract, permission or economics change and no new original-file link.
 New ordered feature migration preserves original inbox IDs/read/dismissal when
 the same proven event is replayed, including changed global log indices. Shared
 engine/reminder writer; summary honors retained state before materialization.
@@ -10,11 +17,13 @@ locks state before media and invalidates buffered contexts; delayed writers fail
 Evidence docs/private/reorg-atomicity-1793309902248-33084-dec372c8/evidence.json.
 Build/route/CSS verification pass; independent source review found no blocker.
 Full local suite: 2,580 pass / 34 explicit environment skips / zero failures;
-includes unrelated untracked policy tests. Docker checks await Linux CI.
-Exact-candidate CI/release still pending here.
+includes unrelated untracked policy tests. Exact candidate ba7b59b5 passed
+CI40960261913: Linux 3,060 pass/two platform skips, Windows 2,551 pass/34
+environment skips; contracts/build/static green. Linux exercised Docker
+recovery and no-default-grant integration. PR402 merged.
 Source/schema activation remains separate: no live migration or worker update.
 Prior dirty release docs preserved. Unrelated untracked files remain untouched.
-Exactly next: finish full checks and reviewed PR for this notification patch;
+Exactly next: verify and release the requested fullscreen-only media controls;
 then reproduce crash-after-commit cache invalidation in the disposable fixture.
 
 October 29 B35 buffered writer fence / PR401 MERGED:
