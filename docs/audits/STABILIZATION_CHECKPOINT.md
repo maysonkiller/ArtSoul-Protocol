@@ -1,3 +1,21 @@
+October 29 B30 owner-login follow-up: correct Supabase organization dashboard
+now verified. Current cycle Oct24-Nov24 shows 782.023 GB uncached egress /250 GB;
+daily tooltip attributes 98.7-100% (rounded) to Shared Pooler. Earlier email
+411.15/275 figures are historical, not current. No billing action taken.
+Current live Protocol/OS targets, schemas and Storage inspected read-only in
+both directions: separate projects, no foreign references found; OS Storage
+empty, Protocol artworks159objects/115603645bytes. Old local OS developer target
+belongs to retired OS, not Protocol; untouched. Scope limits and evidence in
+B30_DATABASE_EGRESS_2026-10-29.md; private mappings contain no secret values.
+At23:55UTC old heavy query counters unchanged, new779calls/779rows; indexer
+healthy/synced, lag6, zero event failures/RPC errors. No historical-byte-rate
+guarantee inferred. Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+release HEAD1e7e2772, evidence parent7fb26884. No runtime code changed this step.
+Exactly next: obtain an owner-approved provider restoration decision, then
+verify Data API/Storage/populated public reads and hourly post-fix egress slope.
+Do not disable spend cap, send support messages, or replay signed transactions.
+Phase B remains open. Preserve unrelated untracked files.
+
 October 29 B31 RELEASED: PR #390 / main1e7e2772 / candidatec959d733.
 The observed quota outage returned successful-empty public artwork responses.
 Feed/direct source failures now return uncached503 with a generic retry message;
