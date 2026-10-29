@@ -1,3 +1,21 @@
+October 29 B32 local completion / B30 owner cost decision:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / parent16bc6041.
+Owner declined all paid overage. Billing draft cancelled; Spend Cap remains
+enabled. No migration, support message, chargeable service or credential change.
+Current source remains restricted; do not ask again to disable Spend Cap.
+Home/gallery strict reads now show unavailable + Retry, preserve old cards on
+failed refresh, distinguish empty success and ignore stale responses. Metrics
+clear stale values. Related gallery label initialization order fixed.
+76 focused checks and full local units (2545 pass/33 skips, including unrelated
+untracked policy tests), build/11 routes/Tailwind pass. Chrome local HTTP503
+fixture verified home/gallery Retry, 390px Classic/Future without horizontal
+overflow; viewport restored. No live-provider recovery inferred. One bounded
+read-only reviewer finished; no helpers left running. See B32_FEED_RECOVERY and
+B30_DATABASE_EGRESS for evidence and no-new-subscription hosting comparison.
+Preserve unrelated untracked policy files, .codex/ and output/.
+Exactly next: release B32 through exact-candidate CI and verify production error
+presentation. Provider restoration/live acceptance remain a separate open gate.
+
 October 29 B30 owner-login follow-up: correct Supabase organization dashboard
 now verified. Current cycle Oct24-Nov24 shows 782.023 GB uncached egress /250 GB;
 daily tooltip attributes 98.7-100% (rounded) to Shared Pooler. Earlier email

@@ -195,6 +195,47 @@ whether restoration is possible after remediation while retaining the spend
 cap. Do not describe the cumulative SQL counters as billing-cycle totals, or
 promise a quota waiver. Sending this request still requires owner authorization.
 
+## October 29 owner decision and no-new-subscription options
+
+The owner explicitly declined disabling Spend Cap or buying extra capacity.
+The unsaved billing proposal was cancelled; the dashboard confirmed Spend Cap
+is still enabled. No invoice-producing confirmation, migration, account change
+or support message was submitted. Continue independent Phase B work while the
+provider restriction remains. Restoration is not a condition for local code work.
+
+The measured small database/object footprint is not the billed quantity:
+egress is transferred data. The repeated full-history query caused large
+transfers despite small stored data. A different provider would not repair that
+query; its correction has already been deployed and verified separately.
+
+Options researched on October 29 (discussion, not migration approval):
+
+| Option | Additional subscription | Practical limit |
+| --- | --- | --- |
+| Keep existing Supabase capped | None beyond the existing plan | Data API/Storage remain restricted until provider restoration or the stated November 24 refill. Develop and test locally meanwhile. |
+| Neon Free | $0 within its free limits | Official pricing lists 1 GB database, 100 CU-hours/project/month and 5 GB public network transfer. A continuously active indexer requires a measured budget; this is not unlimited capacity. |
+| Separate Protocol PostgreSQL/API on the already-owned indexer host | Potentially no new subscription | Requires load/headroom measurement, backups, service isolation and a reviewed API/Storage migration. Never reuse the ArtSoul OS database. |
+
+Sources: [Neon pricing](https://neon.com/pricing),
+[Supabase Docker requirements](https://supabase.com/docs/guides/self-hosting/docker).
+The latter specifies 4 GB RAM / 2 cores / 40 GB SSD minimum for all components,
+with higher recommended capacity and removable unused services. A read-only
+inspection of the current indexer host found 2 cores, 3,819 MiB total RAM,
+3,265 MiB available, and 28 GB disk free; Docker/PostgreSQL are not installed.
+Do not install the full stack beside the running indexer on that basis alone.
+
+Current server integration uses PostgREST (`/rest/v1`) and Supabase Storage
+(`/storage/v1`) in `src/api/backend.js`, not just a PostgreSQL connection string.
+Therefore switching to Neon or plain PostgreSQL also needs compatible API,
+uploads/public media, signed upload/download behavior, authentication/role
+boundaries, backup/restore proof and existing media-URL handling. Private keys,
+service-role secrets and user data must not be copied into a demo provider.
+
+Recommended next architecture comparison: a minimal, isolated Protocol service
+on the existing host versus capped hosted Supabase after recovery. Prepare a
+local rehearsal and full rollback plan before proposing any live migration.
+No claim is made that current server capacity can sustain the final product.
+
 ## Interpretation and rollback
 
 No canon amendment is needed: computation location changes, not the checksum

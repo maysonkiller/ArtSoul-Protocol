@@ -674,6 +674,7 @@ let morphActive = false;
         function renderHomepageMetrics(metrics) {
             const section = document.getElementById('homepageMetrics');
             if (!section) return;
+            const status = document.getElementById('homepageMetricsStatus');
 
             const values = {
                 artists_onboarded: Number(metrics?.artists_onboarded),
@@ -685,6 +686,8 @@ let morphActive = false;
 
             if (!hasCounts || !settledVolume) {
                 section.dataset.metricsState = 'unavailable';
+                if (status) status.hidden = false;
+                section.querySelectorAll('[data-public-metric]').forEach(element => { element.textContent = '—'; });
                 return;
             }
 
@@ -696,6 +699,7 @@ let morphActive = false;
             const volumeElement = section.querySelector('[data-public-metric="settled_volume_eth"]');
             if (volumeElement) volumeElement.textContent = `${settledVolume} ETH`;
             section.dataset.metricsState = 'ready';
+            if (status) status.hidden = true;
         }
 
         // Load artworks on page load
@@ -704,6 +708,9 @@ let morphActive = false;
             const request = ++homeArtworksRequest;
             const gallery = document.getElementById('artworkGallery');
             if (!gallery) return;
+            const errorPanel = document.getElementById('homepageFeedError');
+            const retry = document.getElementById('homepageFeedRetry');
+            if (retry) { retry.disabled = true; retry.textContent = 'Checking…'; }
 
             try {
                 const db = window.ArtSoulDB;
@@ -711,8 +718,9 @@ let morphActive = false;
                     throw new Error('ArtSoulDB is not ready');
                 }
 
-                let artworks = await db.getPublicProjectionArtworks({ limit: 100 });
+                let artworks = await db.getPublicProjectionArtworks({ limit: 100 }, true);
                 if (request !== homeArtworksRequest) return;
+                if (errorPanel) errorPanel.hidden = true;
                 renderHomepageMetrics(artworks?.public_metrics);
                 const suppressedArtworkIds = new Set(
                     (artworks?.suppressed_artwork_ids || []).map(value => String(value).toLowerCase())
@@ -746,6 +754,9 @@ let morphActive = false;
 
                 gallery.innerHTML = '';
                 gallery.setAttribute('aria-busy', 'false');
+                gallery.setAttribute('aria-label', 'Featured artworks');
+                gallery.dataset.hasArtworks = String(slots.length > 0);
+                gallery.className = 'gallery';
 
                 if (slots.length === 0) {
                     showAwaitingLiveTestnetArtworks(gallery);
@@ -916,12 +927,27 @@ let morphActive = false;
             } catch (error) {
                 if (request !== homeArtworksRequest) return;
                 console.error('Failed to load artworks:', error);
-                showAwaitingLiveTestnetArtworks(gallery);
+                const hasArtworks = gallery.dataset.hasArtworks === 'true';
+                if (!hasArtworks) gallery.replaceChildren();
+                gallery.setAttribute('aria-busy', 'false');
+                gallery.setAttribute('aria-label', 'Featured artworks unavailable');
+                if (errorPanel) errorPanel.hidden = false;
+                const message = document.getElementById('homepageFeedErrorMessage');
+                if (message) message.textContent = hasArtworks
+                    ? 'Unable to refresh artworks. Showing the last loaded results.'
+                    : 'Artworks are temporarily unavailable. Please retry.';
+                renderHomepageMetrics(null);
+            } finally {
+                if (request === homeArtworksRequest && retry) {
+                    retry.disabled = false;
+                    retry.textContent = 'Retry';
+                }
             }
         }
 
         // The entry is mounted after the homepage markup, so discovery can start
         // immediately without waiting for the independently deferred wallet module.
+        document.getElementById('homepageFeedRetry')?.addEventListener('click', loadHomeArtworks);
         loadHomeArtworks();
         window.addEventListener('artsoul:auction-confirmed', loadHomeArtworks);
         window.addEventListener('artsoul:resale-confirmed', loadHomeArtworks);
