@@ -29,6 +29,7 @@ function runnerWithPendingSnapshot() {
             async release() { events.push('release'); }
         },
         syncEngine: {
+            async _purgeRecoveryCache() { return false; },
             async start() { engineRunning = true; events.push('engine-start'); },
             async stop() { engineRunning = false; events.push('engine-stop'); }
         },

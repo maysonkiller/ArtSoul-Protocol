@@ -28,7 +28,7 @@ class CacheService {
         const redis = await this.getRedis();
         if (!redis) {
             if (strict && process.env.REDIS_URL) throw new Error('Recovery cache connection unavailable');
-            return;
+            return false;
         }
 
         try {
@@ -37,9 +37,11 @@ class CacheService {
                 await redis.del(...keys);
                 console.log(`[Cache] Recovery purge cleared ${keys.length} keys`);
             }
+            return true;
         } catch (error) {
             this.handleRedisError('purge', error);
             if (strict) throw error;
+            return false;
         }
     }
 

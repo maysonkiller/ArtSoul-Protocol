@@ -16,10 +16,16 @@ export function requireWriteAuthority(authority) {
     }
 }
 
+export function requireRecoveryCacheReady(state, allowRecoveryCache = false) {
+    if (process.env.REDIS_URL && state.recovery_cache_token != null && !allowRecoveryCache) {
+        fail('recovery cache purge pending');
+    }
+}
+
 // A context belongs to one in-memory range, never a persisted/retryable job.
 // xmin is a short-lived row-version check, not a long-term transaction identity.
 // Capture BEFORE fetching logs/headers; retries must discard the old payload.
-export async function captureWriteContext(engine, authority = engine.getRecoveryAuthority?.()) {
+export async function captureWriteContext(engine, authority = engine.getRecoveryAuthority?.(), { allowRecoveryCache = false } = {}) {
     requireWriteAuthority(authority);
     authority = Object.freeze({ ...authority });
     const state = await engine.getIndexerState();
@@ -29,8 +35,10 @@ export async function captureWriteContext(engine, authority = engine.getRecovery
         !Number.isSafeInteger(Number(state.last_indexed_block)) || Number(state.last_indexed_block) < 0 ||
         !state.contract_address || state.contract_address.toLowerCase() !==
             engine.eventListener.contractAddress?.toLowerCase()) fail('deployment or state unavailable');
+    requireRecoveryCacheReady(state, allowRecoveryCache);
     return Object.freeze({ authority, chainId: engine._chainIdString(),
         contractAddress: state.contract_address, revision: state.revision,
+        recoveryCacheToken: state.recovery_cache_token, allowRecoveryCache,
         lastIndexedBlock: Number(state.last_indexed_block) });
 }
 
@@ -57,6 +65,7 @@ export async function lockWriteContext(client, context) {
     const state = result.rows[0];
     if (result.rows.length !== 1 || state.revision !== context.revision ||
         state.contract_address !== context.contractAddress) fail('state changed after read');
+    requireRecoveryCacheReady(state, context.allowRecoveryCache);
     // The state lock can have waited behind a recovery or another writer.
     await verifyWriteAuthority(client, context);
     return state;

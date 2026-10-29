@@ -47,11 +47,13 @@ export async function reconcileResaleState(db, options, readSnapshot) {
         !leader?.lockName || !leader.instanceId || !uintPattern.test(String(leader.fencingToken)) ||
         typeof isCurrent !== 'function' || !isCurrent()) return empty;
 
+    // Recheck on the locked write as well: a rewind can commit during RPC I/O.
+    const cacheGuard = process.env.REDIS_URL ? ' AND s.recovery_cache_token IS NULL' : '';
     const boundary = await db.query(`SELECT h.block_hash
         FROM public.indexer_state s JOIN public.block_hashes h
             ON h.chain_id=s.chain_id AND h.block_number=s.last_confirmed_block
         WHERE s.chain_id=$1 AND lower(s.contract_address)=$2
-            AND s.last_indexed_block=$3 AND s.last_confirmed_block=$3`,
+            AND s.last_indexed_block=$3 AND s.last_confirmed_block=$3${cacheGuard}`,
     [String(chainId), coreAddress.toLowerCase(), blockNumber]);
     const blockHash = boundary[0]?.block_hash;
     if (!isCurrent()) return empty;
@@ -94,7 +96,7 @@ export async function reconcileResaleState(db, options, readSnapshot) {
                 AND EXISTS (SELECT 1 FROM public.indexer_state s JOIN public.block_hashes h
                     ON h.chain_id=s.chain_id AND h.block_number=s.last_confirmed_block
                     WHERE s.chain_id=r.chain_id AND lower(s.contract_address)=$8
-                        AND s.last_indexed_block=$4 AND s.last_confirmed_block=$4 AND h.block_hash=$9
+                        AND s.last_indexed_block=$4 AND s.last_confirmed_block=$4 AND h.block_hash=$9${cacheGuard}
                     FOR SHARE OF s,h)
                 AND EXISTS (SELECT 1 FROM public.distributed_locks l
                     WHERE l.lock_name=$10 AND l.instance_id=$11 AND l.fencing_token=$12

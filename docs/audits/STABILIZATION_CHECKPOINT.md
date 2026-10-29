@@ -1,11 +1,40 @@
-October 29 artwork media follow-up / B35 notification identity MERGED:
+October 29 B35 durable cache recovery / LOCAL VERIFIED CANDIDATE:
+Workspace C:\Projects\ArtSoul / codex/durable-recovery-cache /
+base HEAD 1eaed6486449a7603162af27068248ff9884ef08 (main, PR403).
+Original tracked doc diff preserved in docs/private/b35-cache-continuation-docs-before.patch.
+Durable UUID obligation is created in the rewind transaction and survives process
+exit. Startup and each poll drain it; acknowledgement requires original chain,
+deployment, token, revision and leadership. Disabled cache retains the obligation;
+configured failures block normal writes at capture and locked write, including
+resale reconciliation. New ordered migration is NOT applied live; worker unchanged.
+124/124 isolated PostgreSQL18.4 checks pass, zero skips; clusterStopped=true.
+Evidence reorg-atomicity-1793312395052-29992-e1836d8e/evidence.json,
+b35-durable-cache-admission.log. Actual child exit86 and real cache methods with
+Map transport; no real Redis/server-reader acceptance is claimed.
+Full local units: 2,579 pass/34 skips (includes untracked policy tests), build and
+static checks pass. Focused runtime35 pass/one skip. Independent review complete.
+Exact release CI/PR pending. Current source/test/migration/docs diff is this B35
+slice; prior B27 release docs and unrelated untracked files remain preserved.
+Exactly next: finish exact candidate CI/release, then reproduce a pre-rewind
+cache fetch writing its stale result after purge. External refill/CDN/scan cost,
+owner-transfer gaps, bounded recovery and independent restore remain gates.
+Phase B is NOT closed. No mainnet, billing, live reset or deployment activation.
+
+October 29 artwork media follow-up RELEASED / B35 notification identity MERGED:
 Workspace C:\Projects\ArtSoul / codex/artwork-fullscreen-controls /
-HEAD 199aa28e0352e304aeb030d18033698ffd76cc55 (main, PR402).
+HEAD 1eaed6486449a7603162af27068248ff9884ef08 (main, PR403).
 Owner requested removal of the artwork image three-dot menu, download action
 and original-file link. Removed the shared image/GIF menu, dead handlers and
 styles; fullscreen and preview-card Donate/Report menus remain unchanged.
 Existing media/layout tests: 20 pass, zero skips; build/route/CSS checks pass.
-Rendered preview verification and exact-candidate UI release checks pending.
+PR403 candidate a00a9e58 passed CI40961408052: Linux 3,058 pass/two skips,
+Windows 2,549 pass/34 skips, 49 contracts each, both builds and static green.
+Preview and apex return exact built artwork JS and normalized CSS. Removed
+actions are absent; fullscreen is present. Vercel reports successful deployment.
+Evidence: docs/private/artwork-fullscreen-{preview,apex}-http.json.
+Fresh responsive visual verification was unavailable: Chrome reported an open
+extension, then Computer Use stopped because its URL could not be verified.
+No fresh screenshot or physical-phone acceptance is claimed.
 This is the owner's explicit UI revision of B27, touching canon 05/16 only;
 no contract, permission or economics change and no new original-file link.
 New ordered feature migration preserves original inbox IDs/read/dismissal when
@@ -23,8 +52,14 @@ environment skips; contracts/build/static green. Linux exercised Docker
 recovery and no-default-grant integration. PR402 merged.
 Source/schema activation remains separate: no live migration or worker update.
 Prior dirty release docs preserved. Unrelated untracked files remain untouched.
-Exactly next: verify and release the requested fullscreen-only media controls;
-then reproduce crash-after-commit cache invalidation in the disposable fixture.
+Next B35 defect reproduced in an isolated PostgreSQL process-exit fixture:
+after committed rewind, a fresh engine sees no reorg and serves cached bid2500
+while PostgreSQL holds0. Evidence reorg-atomicity-1793310797557-25372-b920eb22,
+docs/private/b35-cache-crash-before.log. PostgreSQL stopped; no live cache used.
+Exactly next: implement the durable post-rewind cache-purge obligation and its
+restart/race regressions from docs/private/B35_NEXT_RECOVERY_SLICE.md.
+Current tracked unfinished diff is release-status documentation only. Unrelated
+untracked files remain preserved; all bounded helper agents have finished.
 
 October 29 B35 buffered writer fence / PR401 MERGED:
 Workspace C:\Projects\ArtSoul / codex/takeover-audit /

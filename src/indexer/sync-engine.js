@@ -175,9 +175,9 @@ class IndexerSyncEngine {
             return;
         }
 
-        // Finish any committed rewind's cache purge before retrying startup.
+        // The database obligation survives a process exit after rewind commit.
         const authority = this.getRecoveryAuthority?.();
-        if (this.recoveryCachePurgePending) await this._purgeRecoveryCache();
+        await this._purgeRecoveryCache(authority);
         const state = await this.getIndexerState();
         if (!state) throw new Error('Missing indexer state for startup');
         if (state.last_indexed_block > state.last_confirmed_block) {
@@ -386,8 +386,8 @@ class IndexerSyncEngine {
         return processedCount;
     }
 
-    _captureWriteContext(authority) {
-        return captureWriteContext(this, authority);
+    _captureWriteContext(authority, options) {
+        return captureWriteContext(this, authority, options);
     }
 
     _withWriteContext(context, operation) {
@@ -448,11 +448,8 @@ class IndexerSyncEngine {
     }
 
     async detectReorg(options = {}) {
-        // Retry an interrupted post-commit purge without repeating the rewind.
-        if (this.recoveryCachePurgePending) {
-            await this._purgeRecoveryCache();
-            return true;
-        }
+        // Check durable intent even in a fresh process with no pending flag.
+        if (await this._purgeRecoveryCache()) return true;
         const state = await this.getIndexerState();
         if (!state) return false;
 
@@ -557,9 +554,9 @@ class IndexerSyncEngine {
         }
         console.log(`[IndexerSyncEngine] Handling reorg from block ${reorgBlock}`);
         const client = await this.db.pool.connect();
-        let rewindTo;
+        let rewindTo, plan;
         try {
-            const plan = await prepareResaleRewind(client, this._chainIdString(), reorgBlock,
+            plan = await prepareResaleRewind(client, this._chainIdString(), reorgBlock,
                 this.eventListener, this.getRecoveryAuthority, expectedState);
             await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
             await lockResaleRewind(client, plan);
@@ -587,15 +584,37 @@ class IndexerSyncEngine {
             client.release();
         }
         this.recoveryCachePurgePending = true;
-        await this._purgeRecoveryCache();
+        await this._purgeRecoveryCache(plan.authority);
         console.log(`[IndexerSyncEngine] Indexer state reset to block ${rewindTo}`);
         return rewindTo;
     }
 
-    async _purgeRecoveryCache() {
+    async _purgeRecoveryCache(authority = this.getRecoveryAuthority?.()) {
+        const context = await this._captureWriteContext(authority, { allowRecoveryCache: true });
+        if (context.recoveryCacheToken === undefined) throw new Error('Recovery cache schema unavailable');
+        this.recoveryCachePurgePending = context.recoveryCacheToken !== null;
+        if (!this.recoveryCachePurgePending) return false;
+
+        // No database/leadership locks across Redis I/O. A disabled cache leaves
+        // the obligation intact for the next process that actually enables it.
         const cacheService = (await import('../services/cache-service.js')).default;
-        await cacheService.purge({ strict: true });
+        const purged = await cacheService.purge({ strict: true });
+        if (purged === false) return false;
+        if (purged !== true) throw new Error('Recovery cache purge was not acknowledged');
+
+        // The original state revision and leadership epoch must still match.
+        // Never acknowledge a newer rewind or a different deployment's work.
+        await this._withWriteContext(context, async client => {
+            const result = await client.query(
+                `UPDATE indexer_state SET recovery_cache_token = NULL
+                 WHERE chain_id = $1 AND contract_address = $2 AND recovery_cache_token = $3
+                 RETURNING chain_id`,
+                [context.chainId, context.contractAddress, context.recoveryCacheToken]
+            );
+            if (result.rows.length !== 1) throw new IndexerWriteFenceLostError('recovery cache obligation changed');
+        });
         this.recoveryCachePurgePending = false;
+        return true;
     }
 
     async _processBatchInOrder(events, context) {
