@@ -29,13 +29,23 @@ function fixture(t, overrides = {}) {
             return [...values.keys()];
         },
         async del(...keys) { calls.deletes++; keys.forEach(key => values.delete(key)); },
-        async eval(script, count, marker, key, expected, value, ttl) {
+        async eval(script, count, ...args) {
+            if (count === 2) {
+                const [marker, key, generation, ttl] = args;
+                assert.match(script, /redis.call\('DEL', KEYS\[2\]\)/);
+                assert.equal(marker, `artsoul:cache:entry-generation:${key}`);
+                assert.ok(ttl > 0);
+                values.set(marker, generation);
+                return Number(values.delete(key));
+            }
             calls.writes++;
-            assert.equal(count, 2);
+            const [marker, entryMarker, key, expected, entryExpected, value, ttl] = args;
+            assert.equal(count, 3);
             assert.equal(marker, generationKey);
-            assert.match(script, /redis.call\('SET', KEYS\[2\], ARGV\[2\], 'EX', ARGV\[3\]\)/);
+            assert.equal(entryMarker, `artsoul:cache:entry-generation:${key}`);
+            assert.match(script, /redis.call\('SET', KEYS\[3\], ARGV\[3\], 'EX', ARGV\[4\]\)/);
             assert.ok(ttl > 0);
-            if (values.get(marker) !== expected) return 0;
+            if (values.get(marker) !== expected || values.get(entryMarker) !== entryExpected) return 0;
             values.set(key, value);
             return 1;
         },
@@ -137,4 +147,55 @@ test('null results and authoritative failures never write a cached entry', async
     await assert.rejects(cache.remember('artsoul:auction:1', 30, async () => { throw failure; }),
         error => error === failure);
     assert.equal(calls.writes, 0);
+});
+
+test('ordinary auction invalidation rejects both auction and bid snapshots from before the new bid', async t => {
+    const { cache, values } = fixture(t);
+    const id = '84532:artwork:1';
+    const keys = [cache.keys.auction(id), cache.keys.bids(id)];
+    let release, current = 100;
+    const released = new Promise(resolve => { release = resolve; });
+    const entered = [], starts = [];
+    const fetches = [0, 0];
+    for (let i = 0; i < keys.length; i++) entered.push(new Promise(resolve => { starts.push(resolve); }));
+    const pending = keys.map((key, i) => cache.remember(key, 3600, async () => {
+        const captured = current;
+        if (++fetches[i] === 1) { starts[i](); await released; }
+        return { bid: captured };
+    }));
+    await Promise.all(entered);
+    current = 200;
+    await cache.invalidateAuctionState(id);
+    release();
+    assert.deepEqual(await Promise.all(pending), [{ bid: 200 }, { bid: 200 }]);
+    assert.deepEqual(fetches, [2, 2]);
+    keys.forEach(key => assert.equal(values.has(key), false));
+});
+
+test('unrelated auction invalidation does not force an in-flight read to fetch twice', async t => {
+    const { cache, values } = fixture(t);
+    const key = cache.keys.auction('84532:artwork:1');
+    let fetches = 0;
+    assert.equal(await cache.remember(key, 3600, async () => {
+        fetches++;
+        await cache.invalidateAuctionState('84532:artwork:2');
+        return 'current';
+    }), 'current');
+    assert.equal(fetches, 1);
+    assert.equal(JSON.parse(values.get(key)), 'current');
+});
+
+test('entry marker loss refuses the old write without requiring a recovery purge', async t => {
+    const { cache, values } = fixture(t);
+    const key = cache.keys.auction('84532:artwork:1');
+    let fetches = 0;
+    assert.equal(await cache.remember(key, 3600, async () => {
+        if (++fetches === 1) {
+            values.delete(`artsoul:cache:entry-generation:${key}`);
+            return 'obsolete';
+        }
+        return 'current';
+    }), 'current');
+    assert.equal(fetches, 2);
+    assert.equal(values.has(key), false);
 });

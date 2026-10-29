@@ -8,6 +8,7 @@ import test from 'node:test';
 import Redis from 'ioredis';
 
 const GENERATION = 'artsoul:cache:recovery-generation';
+const entryGeneration = key => `artsoul:cache:entry-generation:${key}`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const docker = (...args) => execFileSync('docker', args, {
     encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 60000
@@ -29,7 +30,7 @@ function transport(client, overrides) {
     } });
 }
 
-test('recovery generation fences cache refill against real Redis', {
+test('recovery and entry generations fence cache refill against real Redis', {
     skip: !available && !required ? 'Disposable Redis requires a Linux Docker server; no Redis connection attempted' : false,
     timeout: 90000
 }, async t => {
@@ -87,6 +88,9 @@ test('recovery generation fences cache refill against real Redis', {
         assert.deepEqual(await cacheA.remember(key, 5, async () => { fetches++; return { bid: 10 }; }), { bid: 10 });
         const generation = await first.get(GENERATION);
         assert.match(generation, UUID);
+        assert.match(await first.get(entryGeneration(key)), UUID);
+        const entryLifetime = await first.pttl(entryGeneration(key));
+        assert.ok(entryLifetime > 0 && entryLifetime <= 5000, 'a read-created entry marker has a bounded lifetime');
         assert.deepEqual(JSON.parse(await first.get(key)), { bid: 10 });
         assert.deepEqual(await cacheB.remember(key, 5, async () => assert.fail('cache hit must not fetch')), { bid: 10 });
         assert.equal(fetches, 1);
@@ -205,6 +209,126 @@ test('recovery generation fences cache refill against real Redis', {
         assert.deepEqual(await first.mget('artsoul:auction:init-0', 'artsoul:auction:init-1'), ['0', '1']);
     });
 
+    function delayedFill(cache, key, stale = 100, fresh = 200) {
+        const entered = deferred(), release = deferred();
+        let reads = 0;
+        const reading = cache.remember(key, 60, async () => {
+            if (++reads === 1) { entered.resolve(); await release.promise; return stale; }
+            return fresh;
+        });
+        return { entered, release, reading, reads: () => reads };
+    }
+    await t.test('ordinary deletion fences a delayed fill without changing the recovery generation', async () => {
+        const key = 'artsoul:auction:ordinary', pending = delayedFill(cacheA, key);
+        try {
+            await pending.entered.promise;
+            const recovery = await first.get(GENERATION), entry = await first.get(entryGeneration(key));
+            await cacheB.del(key);
+            assert.equal(await first.get(GENERATION), recovery);
+            const invalidated = await first.get(entryGeneration(key));
+            assert.match(invalidated, UUID); assert.notEqual(invalidated, entry);
+            const ttl = await first.ttl(entryGeneration(key));
+            assert.ok(ttl > 0 && ttl <= 3600, 'invalidation markers expire instead of accumulating indefinitely');
+        } finally { pending.release.resolve(); }
+        assert.equal(await pending.reading, 200); assert.equal(pending.reads(), 2);
+        assert.equal(await first.get(key), null, 'the stale fill and its uncached refresh cannot repopulate the key');
+        await cacheA.remember(key, 5, async () => 200);
+        const ttl = await first.pttl(key);
+        assert.ok(ttl > 0 && ttl <= 5000, 'the longer invalidation marker does not extend cached-data TTL');
+    });
+    await t.test('auction-state invalidation fences both auction and bid reads', async () => {
+        const artwork = '84532:artwork:9';
+        const keys = [cacheA.keys.auction(artwork), cacheA.keys.bids(artwork)];
+        const pending = [delayedFill(cacheA, keys[0], { bid: 100 }, { bid: 200 }),
+            delayedFill(cacheB, keys[1], [100], [100, 200])];
+        try {
+            await Promise.all(pending.map(value => value.entered.promise));
+            const entries = await first.mget(keys.map(entryGeneration));
+            await cacheB.invalidateAuctionState(artwork);
+            const invalidated = await first.mget(keys.map(entryGeneration));
+            for (let index = 0; index < keys.length; index++) {
+                assert.match(invalidated[index], UUID); assert.notEqual(invalidated[index], entries[index]);
+            }
+        } finally { for (const value of pending) value.release.resolve(); }
+        assert.deepEqual(await Promise.all(pending.map(value => value.reading)), [{ bid: 200 }, [100, 200]]);
+        assert.deepEqual(pending.map(value => value.reads()), [2, 2]);
+        assert.deepEqual(await first.mget(keys), [null, null]);
+    });
+    await t.test('invalidating an unrelated key does not discard another in-flight fill', async () => {
+        const key = 'artsoul:auction:unrelated', pending = delayedFill(cacheA, key, 100, 200);
+        try {
+            await pending.entered.promise;
+            const recovery = await first.get(GENERATION), entry = await first.get(entryGeneration(key));
+            await cacheB.del('artsoul:auction:changed');
+            assert.equal(await first.get(GENERATION), recovery);
+            assert.equal(await first.get(entryGeneration(key)), entry);
+        } finally { pending.release.resolve(); }
+        assert.equal(await pending.reading, 100); assert.equal(pending.reads(), 1);
+        assert.equal(await first.get(key), '100');
+    });
+    for (const loss of ['deletion', 'expiry']) for (const reinitialize of [false, true]) {
+        await t.test(`entry marker ${loss} ${reinitialize ? 'and reinitialization' : 'without replacement'} cannot authorize an old fill`, async () => {
+            const key = 'artsoul:auction:entry-loss', marker = entryGeneration(key), pending = delayedFill(cacheA, key);
+            try {
+                await pending.entered.promise;
+                const original = await first.get(marker), recovery = await first.get(GENERATION);
+                if (loss === 'deletion') await second.del(marker);
+                else { await second.pexpire(marker, 50); await delay(80); }
+                assert.equal(await first.get(marker), null);
+                if (reinitialize) {
+                    assert.equal(await cacheB.remember(key, 60, async () => 200), 200);
+                    const replacement = await first.get(marker);
+                    assert.match(replacement, UUID); assert.notEqual(replacement, original);
+                }
+                assert.equal(await first.get(GENERATION), recovery);
+            } finally { pending.release.resolve(); }
+            assert.equal(await pending.reading, 200); assert.equal(pending.reads(), 2);
+            assert.equal(await first.get(key), reinitialize ? '200' : null);
+            if (!reinitialize) assert.equal(await first.get(marker), null);
+        });
+    }
+    await t.test('repeated entry invalidations and recovery purge cannot revive an older fill', async () => {
+        const key = 'artsoul:auction:combined', marker = entryGeneration(key), pending = delayedFill(cacheA, key);
+        try {
+            await pending.entered.promise;
+            const recovery = await first.get(GENERATION), firstEntry = await first.get(marker);
+            await cacheB.del(key); const secondEntry = await first.get(marker);
+            await cacheA.del(key); const thirdEntry = await first.get(marker);
+            assert.equal(new Set([firstEntry, secondEntry, thirdEntry]).size, 3);
+            assert.equal(await cacheB.purge({ strict: true }), true);
+            assert.notEqual(await first.get(GENERATION), recovery);
+            assert.equal(await first.get(marker), null, 'recovery purge removes entry markers along with cached data');
+            await cacheA.del(key);
+            const finalEntry = await first.get(marker); assert.match(finalEntry, UUID);
+            assert.ok(![firstEntry, secondEntry, thirdEntry].includes(finalEntry));
+            assert.equal(await cacheB.remember(key, 60, async () => 200), 200);
+        } finally { pending.release.resolve(); }
+        assert.equal(await pending.reading, 200); assert.equal(pending.reads(), 2);
+        assert.equal(await first.get(key), '200', 'an old fill must not overwrite the newly cached value');
+    });
+    await t.test('concurrent entry initialization uses the winning entry nonce', async () => {
+        await cacheA.purge({ strict: true });
+        const key = 'artsoul:auction:entry-init', marker = entryGeneration(key);
+        const entered = [deferred(), deferred()], release = deferred();
+        const make = (client, index) => {
+            let initial = true;
+            return service(transport(client, { get: async requested => {
+                const value = await client.get(requested);
+                if (requested === marker && initial) {
+                    initial = false; assert.equal(value, null); entered[index].resolve(); await release.promise;
+                }
+                return value;
+            } }));
+        };
+        const reads = [0, 0];
+        const pending = [make(first, 0), make(second, 1)].map((cache, index) =>
+            cache.remember(key, 60, async () => { reads[index]++; return 200; }));
+        try { await Promise.all(entered.map(gate => gate.promise)); }
+        finally { release.resolve(); }
+        assert.deepEqual(await Promise.all(pending), [200, 200]); assert.deepEqual(reads, [1, 1]);
+        assert.match(await first.get(marker), UUID); assert.equal(await first.get(key), '200');
+    });
+
     async function denied(command, run) {
         const name = `fixture-${command}-${crypto.randomBytes(3).toString('hex')}`;
         const password = crypto.randomUUID();
@@ -220,6 +344,25 @@ test('recovery generation fences cache refill against real Redis', {
         assert.equal(await first.get('artsoul:auction:retained'), 'stale');
         const current = await first.get(GENERATION); assert.match(current, UUID);
         if (command === 'set') assert.equal(current, original); else assert.notEqual(current, original);
+    });
+    for (const command of ['set', 'del']) await t.test(`entry invalidation logs a real Redis ${command.toUpperCase()} denial without claiming deletion`, async () => {
+        const key = 'artsoul:auction:denied-invalidation', marker = entryGeneration(key), original = crypto.randomUUID();
+        await first.set(key, '100'); await first.set(marker, original, 'EX', 300);
+        const warnings = [];
+        await denied(command, async cache => {
+            const report = cache.handleRedisError;
+            cache.handleRedisError = function (operation, error) {
+                warnings.push({ operation, message: error.message }); report.call(this, operation, error);
+            };
+            assert.notEqual(await cache.del(key), true);
+            assert.equal(cache.isEnabled, false);
+        });
+        assert.equal(warnings.length, 1); assert.match(warnings[0].operation, /del/);
+        assert.match(warnings[0].message, /NOPERM|permission|can't run/i);
+        assert.equal(await first.get(key), '100', 'a failed Lua command does not imply the data was deleted');
+        const retained = await first.get(marker); assert.match(retained, UUID);
+        // Redis scripts do not roll back an earlier SET when a later DEL fails.
+        if (command === 'set') assert.equal(retained, original); else assert.notEqual(retained, original);
     });
     await t.test('failed marker initialization reads fresh data once without writing cache', async () => {
         let fetches = 0;

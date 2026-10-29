@@ -1058,11 +1058,21 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       async get(key){return current(key);},async set(...args){return set(...args);},
       async keys(pattern){assert.equal(pattern,'artsoul:*');calls.keys++;return [...data.keys()];},
       async del(...keys){calls.deletes++;for(const key of keys){data.delete(key);expires.delete(key);}},
-      async eval(script,keyCount,generationKey,key,generation,value,ttl){
-        assert.equal(typeof script,'string');assert.equal(keyCount,2);
-        assert.equal(generationKey,'artsoul:cache:recovery-generation');
-        if(current(generationKey)!==generation)return 0;
-        set(key,value,'EX',ttl);return 1;
+      async eval(script,keyCount,...args){
+        assert.equal(typeof script,'string');
+        if(keyCount===3){
+          const [recoveryKey,entryKey,key,recovery,entry,value,ttl]=args;
+          assert.equal(recoveryKey,'artsoul:cache:recovery-generation');
+          assert.equal(entryKey,`artsoul:cache:entry-generation:${key}`);
+          if(current(recoveryKey)!==recovery||current(entryKey)!==entry)return 0;
+          set(key,value,'EX',ttl);return 1;
+        }
+        assert.equal(keyCount,2);
+        const [entryKey,key,generation,ttl]=args;
+        assert.equal(entryKey,`artsoul:cache:entry-generation:${key}`);
+        set(entryKey,generation,'EX',ttl);
+        const deleted=current(key)!==null?1:0;
+        data.delete(key);expires.delete(key);calls.deletes++;return deleted;
       }
     });
     return {cache,data,calls};

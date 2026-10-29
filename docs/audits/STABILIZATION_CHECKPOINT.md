@@ -1,3 +1,29 @@
+October 29 B35 ordinary invalidation refill / source candidate:
+Workspace C:\Projects\ArtSoul / codex/auction-cache-invalidation-fence /
+base HEAD 92b1b330436d706984bb3e5d7ed5eccc2afa5c12 (main, PR405).
+PR405 candidate ca44ddeb passed exact CI40968117393: Linux3,092 pass/two skips
+including actual Redis7.4.12, Windows/builds/static green,49 contracts each.
+Source merged; no live migration, cache purge or separate indexer activation.
+Original ordinary-invalidation baseline retained: old bid100 refills after a new
+bid200 and completed invalidation. Actual methods/Map transport, no live system.
+Evidence docs/private/b35-key-invalidation-before.{log,json}.
+Current source adds per-entry random generation, atomic invalidation and combined
+entry/recovery compare before store. Entry markers expire; expired/missing values
+cannot authorize an older query. Unrelated keys keep their in-flight work.
+29 focused tests pass; full local suite 2,589 pass/35 explicit environment skips
+(includes untracked policy tests). Build/11 routes/173 utilities pass. Isolated
+PostgreSQL passes 124/124, zero skips, cluster stopped. Evidence:
+docs/private/b35-entry-{focused,full-units,build}.log and
+b35-key-invalidation-postgres.log; PostgreSQL fixture
+reorg-atomicity-1793314445789-33136-cc1510a5/evidence.json.
+Independent review found no blocker. Ordinary invalidation remains best-effort
+and sequential across auction/bids; markers add bounded-lived cache entries.
+Real Redis adds 11 regression cases; Docker is unavailable locally, explicitly
+skipped. Linux CI requires execution. No live services were used for these tests.
+Exactly next: submit the isolated source correction and require exact-candidate
+Linux real-Redis, PostgreSQL, Windows, contract and build CI.
+Unrelated B27 release docs/untracked files preserved; Phase B is NOT closed.
+
 October 29 B35 delayed cache refill / source candidate:
 Workspace C:\Projects\ArtSoul / codex/recovery-cache-refill-fence /
 base HEAD 51cda1b4387ee73ec5fef37f511951ec470f3ce3 (main, PR404).
