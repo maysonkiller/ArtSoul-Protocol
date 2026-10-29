@@ -1430,8 +1430,19 @@ const { useState, useEffect, useRef } = React;
                         <main className="site-page-container py-12">
                             <section className="profile-connect-state max-w-xl mx-auto p-8 text-center" role="alert">
                                 <h1 className="text-2xl font-semibold mb-3">Profile unavailable</h1>
-                                <p className="text-sm opacity-70 mb-6">{profileLoadError}</p>
-                                <button type="button" onClick={retryProfile} className="btn-main">Retry</button>
+                                <p className="text-sm opacity-70 mb-4">{profileLoadError}</p>
+                                <p className="text-sm opacity-70 mb-6">
+                                    Account and artwork data cannot be verified while the data service is unavailable.
+                                    This does not mean your artworks were deleted.
+                                </p>
+                                <div className="flex flex-wrap items-center justify-center gap-3">
+                                    <button type="button" onClick={retryProfile} className="btn-main">Retry</button>
+                                    <a href="/gallery" className="btn-secondary">Explore Gallery</a>
+                                    <a href="/" className="btn-secondary">ArtSoul Home</a>
+                                </div>
+                                <p className="mt-5 text-xs opacity-70">
+                                    Editing and ownership-dependent actions remain unavailable until the profile can be verified.
+                                </p>
                             </section>
                         </main>
                     </div>
