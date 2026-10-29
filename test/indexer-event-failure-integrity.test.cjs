@@ -109,9 +109,9 @@ function createFakeDatabase(options = {}) {
         if (/SELECT block_hash FROM block_hashes/i.test(sql)) return [];
         if (/INSERT INTO block_hashes/i.test(sql)) return [];
 
-        if (/SELECT \* FROM indexer_state/i.test(sql)) {
+        if (/SELECT \*, xmin::TEXT AS revision FROM indexer_state/i.test(sql)) {
             const row = indexerState.get(String(params[0]));
-            return row ? [{ ...row }] : [];
+            return row ? [{ ...row, revision: '1' }] : [];
         }
 
         if (/UPDATE indexer_state/i.test(sql) && /last_indexed_block/i.test(sql)) {

@@ -15,13 +15,15 @@ function transactionFixture({ failAt, emptyState = false, indexed = 115, confirm
                 last_indexed_block: String(indexed), last_confirmed_block: String(confirmed),
                 contract_address: 'fixture-core', revision: '1'
             }] };
+            if (sql.includes('FROM public.distributed_locks')) return { rows: [{ lock_name: 'fixture' }] };
             if (sql.includes('string_agg')) return { rows: [{ hash: 'a'.repeat(64) }] };
             return { rows: [] };
         },
         release() { calls.push({ sql: 'release' }); }
     };
     const engine = Object.create(Engine.prototype);
-    Object.assign(engine, { chainId: 84532, db: {
+    Object.assign(engine, { chainId: 84532,
+        getRecoveryAuthority: () => ({ lockName: 'fixture', instanceId: 'worker', fencingToken: '1', isCurrent: () => true }), db: {
         query() { throw new Error('pooled query used inside a transaction'); },
         pool: { async connect() { calls.push({ sql: 'connect' }); return client; } }
     }, async _purgeRecoveryCache() { calls.push({ sql: 'purge' }); } });
@@ -33,7 +35,8 @@ test('rewind uses one client, commits before cache work and never advances a cur
     await engine._handleReorg(110);
     const begin = calls.findIndex(call => call.sql === 'BEGIN ISOLATION LEVEL READ COMMITTED');
     assert.ok(begin > 1, 'prepare before taking transaction locks');
-    assert.match(calls[begin + 1].sql, /FOR UPDATE$/);
+    assert.match(calls[begin + 1].sql, /distributed_locks[\s\S]*FOR SHARE$/);
+    assert.match(calls[begin + 3].sql, /indexer_state[\s\S]*FOR UPDATE$/);
     const update = calls.find(call => call.sql.startsWith('UPDATE indexer_state'));
     assert.deepEqual(update.params, [99, 90, `0x${'a'.repeat(64)}`, '84532']);
     assert.deepEqual(calls.slice(-3).map(call => call.sql), ['COMMIT', 'release', 'purge']);
@@ -63,19 +66,64 @@ test('missing state cannot delete events; invalid boundary cannot acquire a conn
 });
 
 test('startup recovery propagates failure before any chain read or replay', async () => {
-    const { engine, failure } = transactionFixture({ failAt: /^UPDATE indexer_state/ });
+    const { engine, failure } = transactionFixture({ failAt: /^UPDATE indexer_state/, confirmed: 109 });
     engine.eventListener = { getCurrentBlock() { assert.fail('must not read chain after failed rewind'); } };
     engine.syncHistoricalEvents = () => assert.fail('must not replay after failed rewind');
-    await assert.rejects(engine.recoverFromSafeBlock({ last_confirmed_block: '109' }), error => error === failure);
+    await assert.rejects(engine.recoverFromSafeBlock({ chain_id: '84532', last_indexed_block: 115,
+        last_confirmed_block: 109, contract_address: 'fixture-core', revision: '1' }), error => error === failure);
 });
 
-test('startup replay begins after the actual cursor when its supplied safe-block hint is ahead', async () => {
-    const { engine } = transactionFixture({ indexed: 99, confirmed: 90 });
-    let replay;
-    engine.eventListener = { async getCurrentBlock() { return 115; } };
-    engine.syncHistoricalEvents = async (...args) => { replay = args; };
-    await engine.recoverFromSafeBlock({ last_confirmed_block: '109' });
-    assert.deepEqual(replay, [100, 115], 'do not skip the range between the actual cursor and queued hint');
+test('startup rejects unversioned hints and changed snapshots without deleting events', async () => {
+    const { engine, calls } = transactionFixture({ indexed: 99, confirmed: 90 });
+    await assert.rejects(engine.recoverFromSafeBlock({ last_confirmed_block: '109' }), /Invalid startup recovery snapshot/);
+    assert.deepEqual(calls, []);
+    await assert.rejects(engine.recoverFromSafeBlock({ chain_id: '84532', last_indexed_block: 115,
+        last_confirmed_block: 109, contract_address: 'fixture-core', revision: '1' }), /snapshot is stale/);
+    assert.equal(calls.some(call => call.sql.includes('rollback_events_from_block')), false);
+});
+
+test('startup finishes its rewind before becoming running and leaves replay to confirmed catch-up', async () => {
+    const { engine, calls } = transactionFixture({ indexed: 115, confirmed: 109 });
+    engine.getIndexerState = async () => ({ chain_id: '84532', last_indexed_block: 115,
+        last_confirmed_block: 109, contract_address: 'fixture-core', revision: '1' });
+    engine.db.query = async sql => { calls.push({ sql }); };
+    engine.eventListener = { getCurrentBlock() { assert.fail('startup must not replay to unconfirmed head'); } };
+    engine.syncHistoricalEvents = () => assert.fail('catch-up belongs to runner');
+    await engine.start();
+    assert.equal(engine.isRunning, true);
+    const statements = calls.map(call => call.sql);
+    assert.ok(statements.indexOf('purge') < statements.findIndex(sql => sql.includes("status = 'running'")));
+});
+
+test('a failed startup purge retries before reading state without another rewind', async () => {
+    const engine = Object.create(Engine.prototype);
+    const calls = [];
+    let fail = true;
+    Object.assign(engine, { chainId: 84532, recoveryCachePurgePending: true,
+        async _purgeRecoveryCache() {
+            calls.push('purge');
+            if (fail) throw new Error('purge failed');
+            this.recoveryCachePurgePending = false;
+        },
+        async getIndexerState() { calls.push('state'); return { last_indexed_block: 109, last_confirmed_block: 109 }; },
+        async recoverFromSafeBlock() { assert.fail('committed rewind must not repeat'); },
+        db: { async query() { calls.push('running'); } }
+    });
+    await assert.rejects(engine.start(), /purge failed/);
+    assert.equal(Boolean(engine.isRunning), false);
+    assert.deepEqual(calls, ['purge']);
+    fail = false;
+    await engine.start();
+    assert.equal(engine.isRunning, true);
+    assert.deepEqual(calls, ['purge', 'purge', 'state', 'running']);
+});
+
+test('listener cleanup failure leaves the engine stopped so a later start cannot skip recovery', async () => {
+    const engine = Object.create(Engine.prototype);
+    engine.isRunning = true;
+    engine.eventListener = { async stopListening() { throw new Error('listener cleanup failed'); } };
+    await assert.rejects(engine.stop(), /listener cleanup failed/);
+    assert.equal(engine.isRunning, false);
 });
 
 test('a detected mismatch cannot swallow recovery failure as an RPC error', async t => {

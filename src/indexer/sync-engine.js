@@ -173,45 +173,39 @@ class IndexerSyncEngine {
             return;
         }
 
-        // --- SELF-HEALING RECOVERY ENGINE ---
+        // Finish any committed rewind's cache purge before retrying startup.
+        const authority = this.getRecoveryAuthority?.();
+        if (this.recoveryCachePurgePending) await this._purgeRecoveryCache();
         const state = await this.getIndexerState();
-        if (state && state.last_indexed_block > state.last_confirmed_block) {
+        if (!state) throw new Error('Missing indexer state for startup');
+        if (state.last_indexed_block > state.last_confirmed_block) {
             console.log(`[IndexerSyncEngine] Recovery detected: last_indexed (${state.last_indexed_block}) > last_confirmed (${state.last_confirmed_block})`);
-
-            try {
-                const { recoveryQueue } = await import('../queue.js');
-                await recoveryQueue.add('system-recovery', { state });
-                console.log('[IndexerSyncEngine] Recovery signal enqueued to recovery worker');
-            } catch (error) {
-                console.error(`[IndexerSyncEngine] Failed to enqueue recovery signal: ${error.message}`);
-            }
+            await this.recoverFromSafeBlock(state);
         }
-
-        this.isRunning = true;
-
+        if (authority && !authority.isCurrent()) throw new Error('Startup leadership changed');
         await this.db.query(
             `UPDATE indexer_state SET status = 'running', last_indexed_at = NOW() WHERE chain_id = $1`,
             [this._chainIdString()]
         );
+        if (authority && !authority.isCurrent()) throw new Error('Startup leadership changed');
+        this.isRunning = true;
 
         console.log('[IndexerSyncEngine] Started (polling mode with transactions)');
     }
 
     async recoverFromSafeBlock(state) {
-        console.log(`[IndexerSyncEngine] Executing self-healing recovery from block ${state.last_confirmed_block}`);
-
-        const safeBlock = Number(state.last_confirmed_block);
-        // Startup recovery must use the same atomic rewind as a detected reorg.
-        const replayFrom = (await this._handleReorg(safeBlock + 1)) + 1;
-
-        // Reprocess missing blocks only after a successful rewind and purge.
-        const currentBlock = await this.eventListener.getCurrentBlock();
-        if (currentBlock >= replayFrom) {
-            console.log(`[IndexerSyncEngine] Reprocessing blocks ${replayFrom} to ${currentBlock}`);
-            await this.syncHistoricalEvents(replayFrom, currentBlock);
+        const snapshot = { ...state };
+        const safeBlock = Number(snapshot.last_confirmed_block);
+        const indexedBlock = Number(snapshot.last_indexed_block);
+        if (!/^[0-9]+$/.test(snapshot.revision || '') ||
+            String(snapshot.chain_id) !== this._chainIdString() ||
+            ![safeBlock, indexedBlock].every(value => Number.isSafeInteger(value) && value >= 0) ||
+            indexedBlock <= safeBlock) {
+            throw new Error('Invalid startup recovery snapshot');
         }
-
-        console.log(`[IndexerSyncEngine] Self-healing recovery complete.`);
+        // The original versioned snapshot must still match under the rewind
+        // lock. Replay belongs to the runner's confirmed-head catch-up.
+        return this._handleReorg(safeBlock + 1, snapshot);
     }
 
     async stop() {
@@ -220,8 +214,8 @@ class IndexerSyncEngine {
             return;
         }
 
-        await this.eventListener.stopListening();
         this.isRunning = false;
+        await this.eventListener.stopListening();
 
         await this.db.query(
             `UPDATE indexer_state SET status = 'stopped', last_indexed_at = NOW() WHERE chain_id = $1`,
@@ -570,7 +564,7 @@ class IndexerSyncEngine {
         return false;
     }
 
-    async _handleReorg(reorgBlock) {
+    async _handleReorg(reorgBlock, expectedState = null) {
         reorgBlock = Number(reorgBlock);
         if (!Number.isSafeInteger(reorgBlock) || reorgBlock < 1) {
             throw new Error('Invalid reorg boundary');
@@ -580,7 +574,7 @@ class IndexerSyncEngine {
         let rewindTo;
         try {
             const plan = await prepareResaleRewind(client, this._chainIdString(), reorgBlock,
-                this.eventListener, this.getRecoveryAuthority);
+                this.eventListener, this.getRecoveryAuthority, expectedState);
             await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
             await lockResaleRewind(client, plan);
             rewindTo = plan.rewindTo;
@@ -1811,7 +1805,7 @@ class IndexerSyncEngine {
 
     async getIndexerState() {
         const state = await this.db.query(
-            'SELECT * FROM indexer_state WHERE chain_id = $1',
+            'SELECT *, xmin::TEXT AS revision FROM indexer_state WHERE chain_id = $1',
             [this._chainIdString()]
         );
         if (!state[0]) return null;

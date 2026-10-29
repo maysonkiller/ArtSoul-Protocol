@@ -35,7 +35,6 @@ function isolatedEngineSource() {
   let source = read('src/indexer/sync-engine.js');
   assert(source.includes("import { enqueueAIJob } from '../queue.js';"));
   source = source.replace("import { enqueueAIJob } from '../queue.js';", 'const enqueueAIJob = async () => {};');
-  source = source.replaceAll("await import('../queue.js')", '{recoveryQueue: {add: async () => {}}}');
   source = source.replace("import cacheService from '../services/cache-service.js';",
     'const cacheService = {invalidateAuctionState: async () => {}, del: async () => {}, keys: {stats: value => value}};');
   const cacheImport = "const cacheService = (await import('../services/cache-service.js')).default;";
@@ -166,6 +165,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     for (const instance of [target, other]) {
       instance.fixtureFailCachePurge = false;
       instance.recoveryCachePurgePending = false;
+      instance.isRunning = false;
       await pool.query(`INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,
         last_indexed_at,started_at,state_hash) VALUES($1,$2,115,115,NOW(),NOW(),'0x0')`, [instance.chainId, CORE]);
       for (const block of [100, 105, 110, 115]) await pool.query(`INSERT INTO block_hashes
@@ -194,19 +194,82 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   for (const method of ['_handleReorg', 'recoverFromSafeBlock']) {
     await t.test(`${method} commits event deletion, cursor, digest and revision together`, async () => {
       await apply(target, 'BidPlaced', 112, {auctionId: 1, bidder: WINNER, bidAmount: 2500, depositAmount: 10000});
+      if (method === 'recoverFromSafeBlock') await pool.query(
+        'UPDATE indexer_state SET last_confirmed_block=$1 WHERE chain_id=$2', [BOUNDARY - 1, CHAIN]);
       const otherBefore = await snapshot(OTHER_CHAIN);
       let reads = 0, replay;
       target.eventListener.getCurrentBlock = async () => { reads++; return 115; };
       target.syncHistoricalEvents = async (...args) => { replay = args; await assertRewound(otherBefore); };
       if (method === '_handleReorg') await target._handleReorg(BOUNDARY);
-      else await target.recoverFromSafeBlock({last_confirmed_block: String(BOUNDARY - 1)});
+      else await target.recoverFromSafeBlock(await target.getIndexerState());
       const after = await assertRewound(otherBefore);
       assert.equal(target.recoveryCachePurgePending, false);
-      assert.equal(reads, method === '_handleReorg' ? 0 : 1);
-      assert.deepEqual(replay, method === '_handleReorg' ? undefined : [BOUNDARY, 115]);
+      assert.equal(reads, 0, 'startup rewind does not read or replay unconfirmed head');
+      assert.equal(replay, undefined);
       evidence.results.push({scenario: method, after, otherChainUnchanged: true});
     });
   }
+  for (const mutation of ['cursor advanced', 'cursor ABA', 'deployment changed', 'foreign chain', 'unversioned']) {
+    await t.test(`startup rejects ${mutation} in the original snapshot`, async () => {
+      await pool.query('UPDATE indexer_state SET last_confirmed_block=109 WHERE chain_id=$1', [CHAIN]);
+      const state = await target.getIndexerState();
+      if (mutation.startsWith('cursor')) {
+        await pool.query('UPDATE indexer_state SET last_indexed_block=116 WHERE chain_id=$1', [CHAIN]);
+        if (mutation === 'cursor ABA') await pool.query('UPDATE indexer_state SET last_indexed_block=115 WHERE chain_id=$1', [CHAIN]);
+      } else if (mutation === 'deployment changed') {
+        await pool.query('UPDATE indexer_state SET contract_address=$1 WHERE chain_id=$2', [CREATOR, CHAIN]);
+      } else if (mutation === 'foreign chain') state.chain_id = String(OTHER_CHAIN);
+      else delete state.revision;
+      const before = await snapshot(CHAIN);
+      await assert.rejects(target.recoverFromSafeBlock(state), /snapshot is stale|Invalid startup recovery snapshot/);
+      assert.deepEqual(await snapshot(CHAIN), before);
+      assert.equal(target.recoveryCachePurgePending, false);
+    });
+  }
+  await t.test('startup rechecks its snapshot under the state lock even without resale rows', async () => {
+    await pool.query('UPDATE indexer_state SET last_confirmed_block=109 WHERE chain_id=$1', [CHAIN]);
+    const state = await target.getIndexerState(), before = await snapshot(CHAIN);
+    beforeSql = async sql => {
+      if (sql.startsWith('SELECT last_indexed_block') && sql.endsWith('FOR UPDATE')) {
+        beforeSql = null;
+        await pool.query('UPDATE indexer_state SET last_indexed_block=last_indexed_block WHERE chain_id=$1', [CHAIN]);
+      }
+    };
+    await assert.rejects(target.recoverFromSafeBlock(state), /Reorg preparation is stale/);
+    assert.deepEqual(await snapshot(CHAIN), before);
+  });
+  for (const failure of ['missing authority', 'replaced leader', 'expired leader', 'late expiry']) {
+    await t.test(`rewind without resale rows rejects ${failure}`, async () => {
+      const authority = target.getRecoveryAuthority;
+      if (failure === 'missing authority') target.getRecoveryAuthority = undefined;
+      if (failure === 'replaced leader') await pool.query("UPDATE distributed_locks SET fencing_token=2");
+      if (failure === 'expired leader') await pool.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second'");
+      if (failure === 'late expiry') beforeSql = async (sql, client) => {
+        if (sql.startsWith('UPDATE indexer_state')) await client.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second'");
+      };
+      const before = await snapshot(CHAIN);
+      try { await assert.rejects(target._handleReorg(BOUNDARY), /authority or deployment unavailable|leadership changed|leadership expired/); }
+      finally { target.getRecoveryAuthority = authority; }
+      assert.deepEqual(await snapshot(CHAIN), before);
+      assert.equal(target.recoveryCachePurgePending, false);
+    });
+  }
+  await t.test('startup retries a committed rewind purge without rewinding twice or replaying head', async () => {
+    await pool.query('UPDATE indexer_state SET last_confirmed_block=109 WHERE chain_id=$1', [CHAIN]);
+    target.fixtureFailCachePurge = true;
+    await assert.rejects(target.start(), /fixture cache purge failure/);
+    assert.equal(target.isRunning, false);
+    assert.equal(target.recoveryCachePurgePending, true);
+    const after = await snapshot(CHAIN);
+    await assert.rejects(target.start(), /fixture cache purge failure/);
+    assert.deepEqual(await snapshot(CHAIN), after);
+    target.fixtureFailCachePurge = false;
+    await target.start();
+    assert.equal(target.isRunning, true);
+    assert.equal(target.recoveryCachePurgePending, false);
+    assert.deepEqual((await snapshot(CHAIN)).artwork_media_chain_revisions, after.artwork_media_chain_revisions);
+    assert.equal((await target.getIndexerState()).last_indexed_block, 109);
+  });
   for (const failedTable of ['contract_events', 'block_hashes', 'indexer_state']) {
     await t.test(`failure at ${failedTable} rolls back all earlier SQL including media revision`, async () => {
       await apply(target, 'BidPlaced', 112, {auctionId: 1, bidder: WINNER, bidAmount: 2500, depositAmount: 10000});
@@ -463,8 +526,8 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     assert.deepEqual(await snapshot(CHAIN),concurrentState,'only the injected concurrent change persists');
     assert.equal(target.recoveryCachePurgePending,false);
   });
-  await t.test('leadership expiry after lock wait cannot authorize a rewind',async()=>{
-    await resaleFixture();await dirtyResale();const before=await snapshot(CHAIN);
+  for (const withResale of [false,true]) await t.test(`leadership expiry after lock wait cannot authorize a rewind ${withResale?'with':'without'} resale rows`,async()=>{
+    if(withResale){await resaleFixture();await dirtyResale();}const before=await snapshot(CHAIN);
     const holder=await pool.connect();await holder.query('BEGIN');
     await holder.query("UPDATE distributed_locks SET expires_at=clock_timestamp()+INTERVAL '100 milliseconds' WHERE lock_name='fixture-reorg'");
     let attempting;const waiting=new Promise(resolve=>{attempting=resolve;});
