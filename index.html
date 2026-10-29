@@ -317,6 +317,7 @@
             <div class="home-section-heading home-metrics-heading">
                 <p class="home-section-kicker">Live Base Sepolia proof</p>
                 <h2 id="homepageMetricsTitle">Protocol activity</h2>
+                <p id="homepageMetricsStatus" class="text-sm" hidden>Statistics temporarily unavailable.</p>
             </div>
             <dl class="home-metrics-grid">
                 <div><dt>Artists onboarded</dt><dd data-public-metric="artists_onboarded">—</dd></div>
@@ -329,6 +330,10 @@
         <!-- Discovery Spotlight -->
         <div class="home-spotlight mb-12">
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center">Discovery Spotlight</h2>
+            <div id="homepageFeedError" class="home-protocol-section mb-4" role="status" hidden>
+                <p id="homepageFeedErrorMessage">Artworks are temporarily unavailable. Please retry.</p>
+                <button id="homepageFeedRetry" type="button" class="btn-secondary mt-4">Retry</button>
+            </div>
             <div class="gallery" id="artworkGallery" aria-busy="true" aria-label="Loading featured artworks">
                 <span class="col-span-full profile-gallery-loading-note" role="status">Loading artworks…</span>
             </div>

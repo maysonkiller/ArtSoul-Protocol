@@ -182,7 +182,7 @@ test('the request string matches what the page will ask for', () => {
   );
   assert.match(client, /`\/api\/public\/profile\?address=\$\{encodeURIComponent\(normalizedAddress\)\}`/);
   const index = fs.readFileSync('src/entries/index.js', 'utf8');
-  assert.match(index, /getPublicProjectionArtworks\(\{ limit: 100 \}\)/);
+  assert.match(index, /getPublicProjectionArtworks\(\{ limit: 100 \}, true\)/);
 });
 
 test('every shared-header page loads it, and the build ships it', () => {

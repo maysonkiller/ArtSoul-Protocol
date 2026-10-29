@@ -1,10 +1,57 @@
-October 29 B31 API follow-up: the observed quota outage returned successful-empty
-public artwork responses. Feed/direct source failures now return uncached503
-with a generic retry message; valid empty results and optional metrics behavior
-remain intact. 17 focused tests pass. See B31_PROJECTION_OUTAGE_2026-10-29.md.
-Exactly next: commit/release B31 after exact CI and verify its actual HTTP
-behavior against the existing provider restriction. This does not unblock
-Supabase or close the provider recovery gate.
+October 29 B32 local completion / B30 owner cost decision:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / parent16bc6041.
+Owner declined all paid overage. Billing draft cancelled; Spend Cap remains
+enabled. No migration, support message, chargeable service or credential change.
+Current source remains restricted; do not ask again to disable Spend Cap.
+Home/gallery strict reads now show unavailable + Retry, preserve old cards on
+failed refresh, distinguish empty success and ignore stale responses. Metrics
+clear stale values. Related gallery label initialization order fixed.
+76 focused checks and full local units (2545 pass/33 skips, including unrelated
+untracked policy tests), build/11 routes/Tailwind pass. Chrome local HTTP503
+fixture verified home/gallery Retry, 390px Classic/Future without horizontal
+overflow; viewport restored. No live-provider recovery inferred. One bounded
+read-only reviewer finished; no helpers left running. See B32_FEED_RECOVERY and
+B30_DATABASE_EGRESS for evidence and no-new-subscription hosting comparison.
+Preserve unrelated untracked policy files, .codex/ and output/.
+Exactly next: release B32 through exact-candidate CI and verify production error
+presentation. Provider restoration/live acceptance remain a separate open gate.
+
+October 29 B30 owner-login follow-up: correct Supabase organization dashboard
+now verified. Current cycle Oct24-Nov24 shows 782.023 GB uncached egress /250 GB;
+daily tooltip attributes 98.7-100% (rounded) to Shared Pooler. Earlier email
+411.15/275 figures are historical, not current. No billing action taken.
+Current live Protocol/OS targets, schemas and Storage inspected read-only in
+both directions: separate projects, no foreign references found; OS Storage
+empty, Protocol artworks159objects/115603645bytes. Old local OS developer target
+belongs to retired OS, not Protocol; untouched. Scope limits and evidence in
+B30_DATABASE_EGRESS_2026-10-29.md; private mappings contain no secret values.
+At23:55UTC old heavy query counters unchanged, new779calls/779rows; indexer
+healthy/synced, lag6, zero event failures/RPC errors. No historical-byte-rate
+guarantee inferred. Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+release HEAD1e7e2772, evidence parent7fb26884. No runtime code changed this step.
+Exactly next: obtain an owner-approved provider restoration decision, then
+verify Data API/Storage/populated public reads and hourly post-fix egress slope.
+Do not disable spend cap, send support messages, or replay signed transactions.
+Phase B remains open. Preserve unrelated untracked files.
+
+October 29 B31 RELEASED: PR #390 / main1e7e2772 / candidatec959d733.
+The observed quota outage returned successful-empty public artwork responses.
+Feed/direct source failures now return uncached503 with a generic retry message;
+valid empty results and optional metrics behavior remain intact. 17 focused
+tests pass; exact CI40789032692 passes (Linux2907/Windows2510 units, 49 contracts
+each, builds/static). Preview and production actual outage checks pass for both
+feed/detail: HTTP503, ARTWORKS_UNAVAILABLE, private/no-store, no success/data.
+Production7400144007 and post-merge CI40789507981 succeeded. See
+B31_PROJECTION_OUTAGE_2026-10-29.md. The following documentation-only commit
+records release evidence; the implementation is already on main and production.
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / release HEAD1e7e2772.
+Preserve untracked policy files, .codex/, output/. No helper or paid service.
+Exactly next: obtain the correct organization's billing-cycle egress breakdown
+and an owner-approved provider restoration decision; then verify real populated
+Data API/Storage/public reads and post-fix usage slope under B30. The owner is
+away; do not request device actions now, toggle spend cap, or send a support
+message without authorization. Both technical fixes are deployed; the quota
+incident and Phase B remain open. No signed operations should be replayed.
 
 October 29 B30 quota incident: founder supplied 411.15 GB / 275 GB egress notice.
 Confirmed cause: _computeStateHash downloads all historical block hashes each

@@ -16,6 +16,17 @@ const { useState, useEffect, useMemo, useRef } = React;
         const GALLERY_TAB_ALIASES = {
             auctions: 'live_auctions'
         };
+        // Display labels only; contract status and settlement rules are unchanged.
+        const GALLERY_STATUS_LABELS = {
+            auction: 'Live',
+            awaiting_end: 'Awaiting payment',
+            settlement_pending: 'Awaiting payment',
+            defaulted: 'Unsettled',
+            defaulted_no_bids: 'No bids',
+            ended_no_bids: 'No bids',
+            for_sale: 'For sale',
+            sold: 'Sold'
+        };
 
         function getInitialGalleryTab() {
             const hash = (window.location.hash || '').replace('#', '');
@@ -27,6 +38,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [theme, setTheme] = useState(() => window.ThemeSync?.getTheme() || 'classic');
             const [artworkCorpus, setArtworkCorpus] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [loadError, setLoadError] = useState(false);
             const loadSequenceRef = useRef(0);
 
             // Filters
@@ -138,19 +150,6 @@ const { useState, useEffect, useMemo, useRef } = React;
                     window.ArtSoulSecurity.isValidStorageUrl(url)
                 );
             }
-
-            // Plain-English labels for the contract-y projection statuses.
-            // Display only — does NOT change the underlying status logic.
-            const GALLERY_STATUS_LABELS = {
-                auction: 'Live',
-                awaiting_end: 'Awaiting payment',
-                settlement_pending: 'Awaiting payment',
-                defaulted: 'Unsettled',
-                defaulted_no_bids: 'No bids',
-                ended_no_bids: 'No bids',
-                for_sale: 'For sale',
-                sold: 'Sold'
-            };
 
             function friendlyStatusLabel(status) {
                 return GALLERY_STATUS_LABELS[status] || 'Not yet minted';
@@ -339,20 +338,21 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                     data = await db.getPublicProjectionArtworks({
                         limit: 200
-                    });
+                    }, true);
 
                     if (loadId !== loadSequenceRef.current) {
                         return;
                     }
 
                     setArtworkCorpus(data || []);
+                    setLoadError(false);
                     setLoading(false);
                 } catch (error) {
                     if (loadId !== loadSequenceRef.current) {
                         return;
                     }
                     console.error('Error loading artworks:', error);
-                    setArtworkCorpus([]);
+                    setLoadError(true);
                     setLoading(false);
                 }
             }
@@ -494,6 +494,8 @@ const { useState, useEffect, useMemo, useRef } = React;
                             <div className="mt-4 text-sm opacity-70" aria-live="polite">
                                 {loading
                                     ? 'Loading artworks...'
+                                    : loadError
+                                    ? 'Artwork updates are temporarily unavailable.'
                                     : isSearchPending
                                     ? 'Filtering loaded artworks...'
                                     : isGlobalSearch
@@ -503,9 +505,20 @@ const { useState, useEffect, useMemo, useRef } = React;
                         </div>
 
                         {/* Gallery Grid */}
-                        {loading ? (
+                        {loadError && (
+                            <div className="home-protocol-section mb-4" role="status">
+                                <p>{artworkCorpus.length
+                                    ? 'Unable to refresh artworks. Showing the last loaded results.'
+                                    : 'Artworks are temporarily unavailable. Please retry.'}</p>
+                                <button type="button" className="btn-secondary mt-4" disabled={loading} onClick={loadArtworks}>
+                                    {loading ? 'Checking…' : 'Retry'}
+                                </button>
+                            </div>
+                        )}
+                        {loading && artworkCorpus.length === 0 ? (
                             <CardGridSkeleton className="gallery-results-grid" />
-                        ) : filteredArtworks.length === 0 ? (
+                        ) : loadError && filteredArtworks.length === 0 ? null
+                        : filteredArtworks.length === 0 ? (
                             <div className="text-center py-20 rounded-xl" style={{
                                 background: isClassic ? 'rgba(232, 227, 213, 0.03)' : 'rgba(var(--c-accent-rgb), 0.04)',
                                 border: isClassic ? '1px solid rgba(var(--c-accent-rgb), 0.35)' : '1px solid rgba(var(--c-accent-rgb), 0.22)'

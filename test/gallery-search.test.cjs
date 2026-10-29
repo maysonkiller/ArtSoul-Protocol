@@ -71,6 +71,6 @@ test('clearing search restores the selected tab without another API request', ()
   assert.match(source, /setDebouncedSearchQuery\(searchQuery\)/);
   assert.match(source, /searchQuery: debouncedSearchQuery/);
   assert.match(source, /!globalSearch[\s\S]*filterForGalleryTab\(result, activeTab\)/);
-  assert.match(source, /getPublicProjectionArtworks\(\{[\s\S]*limit: 200[\s\S]*\}\)/);
+  assert.match(source, /getPublicProjectionArtworks\(\{[\s\S]*limit: 200[\s\S]*\}, true\)/);
   assert.doesNotMatch(source, /getPublicProjectionArtworks\(\{[\s\S]*view:/);
 });

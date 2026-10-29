@@ -6,6 +6,61 @@ Work date: October 29, 2026 in Europe/Warsaw; measurements below use UTC.
 Scope: canonical B2/B3, indexer/database operations, Bible sections 1 and 15.
 No contract, economic, lifecycle, permission or schema change.
 
+## October 29 follow-up: correct dashboard and project separation
+
+After the owner signed into the correct organization, its Usage dashboard
+confirmed the October 24–November 24 billing cycle, Pro allowance of 250 GB,
+**782.023 GB uncached egress**, 3.142 GB cached egress, and service restriction.
+These are the later dashboard values; the earlier email's 411.15 / 275 GB
+figures are retained below as the original incident evidence, not current usage.
+The dashboard states usage may take up to one hour to refresh.
+
+The daily chart identifies Shared Pooler as the dominant source, rather than
+Storage. Values below are quoted as rendered by the chart, without treating
+rounded chart units as an exact reconciliation of the summary's billing total:
+
+| Date shown | Shared Pooler | PostgREST | Storage |
+| --- | --- | --- | --- |
+| October 24 | 514.1 MB (98.7%) | 3.835 MB | 2.814 MB |
+| October 25 | 12.489 GB (99.9%) | 7.611 MB | 831.3 KB |
+| October 26 | 121.01 GB (100.0%, rounded) | 11.87 MB | 5.768 MB |
+| October 27 | 248.88 GB (100.0%, rounded) | 1.393 MB | 162.5 KB |
+| October 28 | 345.348 GB (100.0%, rounded) | 8.352 MB | 45.671 MB |
+
+At 23:55:54 UTC October 28, a further read-only host check found the old query
+still frozen at 1,287,486 calls / 16,221,744,465 returned rows. The new digest
+query had 779 calls / 779 rows. The indexer was healthy and synchronized,
+six blocks behind, with no failed/dead events or recent RPC error. Historical
+dashboard totals are not a post-patch traffic-rate measurement.
+
+The owner explicitly requested checking accidental Protocol/OS mixing in
+both directions. Current live configuration and database inventories show
+separate Supabase projects:
+
+- Protocol's local configuration, running indexer environment and production
+  `/api/public/config` all identify the existing Protocol project. Its only
+  Storage bucket is `artworks`: 159 objects, 115,603,645 bytes. Count-only
+  checks across 67 public text/JSON-bearing tables and Storage metadata found
+  no current/retired OS project reference or OS domain. Protocol runtime source
+  also contains none of those references.
+- A bounded independent read-only check of the OS production environment and
+  running API/bot confirmed its separate Frankfurt project. Its expected OS
+  schema has no Protocol projection/indexer tables; Supabase Storage has zero
+  buckets and zero objects. Thirty-seven relevant URL/metadata/settings columns
+  contain no Protocol project reference. Current deployed OS source also has
+  no Protocol project reference.
+- An older local OS development checkout still references its retired OS
+  project. This is stale OS development configuration, not a Protocol target;
+  the current OS server uses the newer OS project. Nothing was edited there.
+
+These are current configuration/schema/storage/reference checks. They do not
+prove that no historical copy ever existed in deleted projects or backups, or
+provide a semantic review of every uploaded image. No cross-project copy,
+database mutation, configuration change or billing change was performed.
+Sanitized exact project mappings and Protocol measurements are retained in
+the ignored `docs/private/` evidence, without credentials or personal records.
+No canon interpretation or amendment was required.
+
 ## Evidence and cause
 
 The founder supplied a Supabase notice reporting 411.15 GB of 275 GB egress
@@ -106,10 +161,16 @@ source-only rollout preceded the repository release to contain ongoing egress.
 ## Remaining incident gates
 
 Real Data API and Storage read requests returned **HTTP 402** at 23:24 UTC.
-The public artwork endpoint still returned HTTP 200 with `success: true` and
+Before B31, the public artwork endpoint returned HTTP 200 with `success: true` and
 11 upstream warnings, so HTTP status alone must not be used as an availability
 check. Direct database access and the indexer remained operational. This is
 not a claim that the user-facing product is restored.
+
+PR #390 subsequently corrected that API failure response. At 23:45:58 UTC,
+both production public feed and direct artwork requests returned uncached
+HTTP 503 / `ARTWORKS_UNAVAILABLE`, as required while the source is unavailable.
+See [B31 verification](B31_PROJECTION_OUTAGE_2026-10-29.md). This is an outage
+handling correction, not provider service recovery.
 
 Fixing the consumer does not erase consumed allowance. Retain Spend Cap and
 do not move projects, delete data, reset statistics, bypass service restrictions
@@ -118,11 +179,62 @@ with the provider or an explicitly approved paid-overage decision; otherwise
 the notice's refill date remains the stated recovery date. See
 [cost control](https://supabase.com/docs/guides/platform/cost-control).
 
-Before closing the incident: inspect the correct organization's billing-cycle
-breakdown, restore provider service under an approved decision, verify real
+The correct organization's billing-cycle dashboard/category breakdown is now
+verified as recorded above. Before closing the incident: restore provider
+service under an approved decision, verify real
 Data API/Storage and populated public results, and record post-fix egress slope.
 The historical A9 cost window does not prove present-day cost readiness.
 Phase B remains open. No financial support request was sent on the owner's behalf.
+
+For the provider restoration discussion, the evidence is ready: the notice's
+411.15 GB / 275 GB figures; roughly 101 MB database and 116 MB stored objects;
+the recurring full-history query; the correction and rollout timestamps;
+unchanged old-query counters; and one returned row per new digest calculation.
+The current-cycle dashboard now corroborates Shared Pooler dominance. Request
+whether restoration is possible after remediation while retaining the spend
+cap. Do not describe the cumulative SQL counters as billing-cycle totals, or
+promise a quota waiver. Sending this request still requires owner authorization.
+
+## October 29 owner decision and no-new-subscription options
+
+The owner explicitly declined disabling Spend Cap or buying extra capacity.
+The unsaved billing proposal was cancelled; the dashboard confirmed Spend Cap
+is still enabled. No invoice-producing confirmation, migration, account change
+or support message was submitted. Continue independent Phase B work while the
+provider restriction remains. Restoration is not a condition for local code work.
+
+The measured small database/object footprint is not the billed quantity:
+egress is transferred data. The repeated full-history query caused large
+transfers despite small stored data. A different provider would not repair that
+query; its correction has already been deployed and verified separately.
+
+Options researched on October 29 (discussion, not migration approval):
+
+| Option | Additional subscription | Practical limit |
+| --- | --- | --- |
+| Keep existing Supabase capped | None beyond the existing plan | Data API/Storage remain restricted until provider restoration or the stated November 24 refill. Develop and test locally meanwhile. |
+| Neon Free | $0 within its free limits | Official pricing lists 1 GB database, 100 CU-hours/project/month and 5 GB public network transfer. A continuously active indexer requires a measured budget; this is not unlimited capacity. |
+| Separate Protocol PostgreSQL/API on the already-owned indexer host | Potentially no new subscription | Requires load/headroom measurement, backups, service isolation and a reviewed API/Storage migration. Never reuse the ArtSoul OS database. |
+
+Sources: [Neon pricing](https://neon.com/pricing),
+[Supabase Docker requirements](https://supabase.com/docs/guides/self-hosting/docker).
+The latter specifies 4 GB RAM / 2 cores / 40 GB SSD minimum for all components,
+with higher recommended capacity and removable unused services. A read-only
+inspection of the current indexer host found 2 cores, 3,819 MiB total RAM,
+3,265 MiB available, and 28 GB disk free; Docker/PostgreSQL are not installed.
+Do not install the full stack beside the running indexer on that basis alone.
+
+Current server integration uses PostgREST (`/rest/v1`) and Supabase Storage
+(`/storage/v1`) in `src/api/backend.js`, not just a PostgreSQL connection string.
+Therefore switching to Neon or plain PostgreSQL also needs compatible API,
+uploads/public media, signed upload/download behavior, authentication/role
+boundaries, backup/restore proof and existing media-URL handling. Private keys,
+service-role secrets and user data must not be copied into a demo provider.
+
+Recommended next architecture comparison: a minimal, isolated Protocol service
+on the existing host versus capped hosted Supabase after recovery. Prepare a
+local rehearsal and full rollback plan before proposing any live migration.
+No claim is made that current server capacity can sustain the final product.
 
 ## Interpretation and rollback
 
