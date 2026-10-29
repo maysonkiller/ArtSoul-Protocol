@@ -139,6 +139,7 @@ test('a detected mismatch cannot swallow recovery failure as an RPC error', asyn
     const failure = new Error('rollback failed');
     Object.assign(engine, {
         chainId: 84532,
+        async _purgeRecoveryCache() { return false; },
         async getIndexerState() { return { last_indexed_block: 115, last_confirmed_block: 0 }; },
         db: { async query() { return [{ block_number: '110', block_hash: 'old' }]; } },
         eventListener: { async getBlock() { return { hash: 'replacement' }; } },
@@ -154,7 +155,8 @@ test('runner retries recovery on the next poll before catch-up or confirmations'
     let attempts = 0, catchUps = 0;
     Object.assign(runner, { isLeader: true, isRunning: true, lastReorgCheckAt: 0,
         reorgCheckInterval: 60000, reorgSampleSize: 12, resaleCursor: '8', resaleSweepEnd: '11',
-        syncEngine: { async detectReorg() { if (++attempts < 3) throw new Error('rewind unavailable'); return true; } },
+        syncEngine: { async _purgeRecoveryCache() { return false; },
+            async detectReorg() { if (++attempts < 3) throw new Error('rewind unavailable'); return true; } },
         async _catchUpToSafeBlock() { catchUps++; return { currentBlock: 120 }; },
         async _processConfirmations() {}, async _refreshResaleState() {}, _refreshSearchMetadata() {} });
     await runner._runConfirmationPoll();
@@ -168,6 +170,30 @@ test('runner retries recovery on the next poll before catch-up or confirmations'
     assert.equal(attempts, 3); assert.equal(catchUps, 1);
 });
 
+test('runner drains durable cache work before catch-up when the periodic reorg check is not due', async t => {
+    t.mock.method(console, 'error', () => {});
+    const runner = Object.create(ProductionIndexer.prototype);
+    let fail = true, pending = true, catchUps = 0, purges = 0;
+    Object.assign(runner, { isLeader: true, isRunning: true, lastReorgCheckAt: Date.now(),
+        reorgCheckInterval: 60000, resaleCursor: '8', resaleSweepEnd: '11',
+        syncEngine: { async detectReorg() { assert.fail('chain check is not due'); },
+            async _purgeRecoveryCache() {
+                purges++;
+                if (fail) throw new Error('configured cache unavailable');
+                const result = pending; pending = false; return result;
+            } },
+        async _catchUpToSafeBlock() { catchUps++; },
+    });
+    await runner._runConfirmationPoll();
+    assert.equal(catchUps, 0); assert.equal(runner.resaleCursor, '8');
+    fail = false;
+    await runner._runConfirmationPoll();
+    assert.equal(catchUps, 0); assert.equal(runner.resaleCursor, '0');
+    assert.equal(runner.resaleSweepEnd, null);
+    await runner._runConfirmationPoll();
+    assert.equal(catchUps, 1); assert.equal(purges, 3);
+});
+
 test('real cache purge propagates deletion failure only for strict recovery', async t => {
     t.mock.method(console, 'warn', () => {});
     t.mock.method(console, 'log', () => {});
@@ -178,13 +204,27 @@ test('real cache purge propagates deletion failure only for strict recovery', as
         async del() { deletes++; if (fail) throw failure; }
     }));
     const engine = Object.create(Engine.prototype);
-    engine.recoveryCachePurgePending = true;
+    let token = '1d4d37bb-3aa3-4e7e-9ec9-900222329923';
+    const contexts = [];
+    engine._captureWriteContext = async () => ({ recoveryCacheToken: token, chainId: '84532', contractAddress: 'fixture-core' });
+    engine._withWriteContext = async (context, operation) => {
+        contexts.push(context);
+        await operation({ async query(sql, params) {
+            assert.match(sql, /SET recovery_cache_token = NULL[\s\S]*RETURNING chain_id/);
+            assert.deepEqual(params, ['84532', 'fixture-core', token]);
+            token = null;
+            return { rows: [{ chain_id: '84532' }] };
+        } });
+    };
     await assert.rejects(engine._purgeRecoveryCache(), error => error === failure);
     assert.equal(engine.recoveryCachePurgePending, true);
-    await cacheService.purge(); // Ordinary best-effort callers remain compatible.
+    assert.equal(contexts.length, 0, 'failed purge cannot acknowledge its obligation');
+    assert.equal(await cacheService.purge(), false); // Ordinary callers remain best-effort.
     fail = false;
-    assert.equal(await engine.detectReorg(), true, 'retry completes before any database or chain read');
+    assert.equal(await engine.detectReorg(), true, 'retry completes before normal reorg detection');
     assert.equal(engine.recoveryCachePurgePending, false);
+    assert.equal(token, null);
+    assert.equal(contexts.length, 1);
     assert.equal(deletes, 3);
 });
 
@@ -193,7 +233,7 @@ test('strict purge distinguishes disabled cache from an unavailable configured c
     t.after(() => { if (previous === undefined) delete process.env.REDIS_URL; else process.env.REDIS_URL = previous; });
     t.mock.method(cacheService, 'getRedis', async () => null);
     process.env.REDIS_URL = '';
-    await cacheService.purge({ strict: true });
+    assert.equal(await cacheService.purge({ strict: true }), false);
     process.env.REDIS_URL = 'redis://invalid.example';
     await assert.rejects(cacheService.purge({ strict: true }), /Recovery cache connection unavailable/);
 });

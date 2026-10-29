@@ -608,7 +608,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     process.env.REDIS_URL='';
     try {
       const cache=(await import('../src/services/cache-service.js')).default;
-      workerTest.mock.method(cache,'purge',async()=>{purges++;});
+      workerTest.mock.method(cache,'purge',async()=>{purges++;return true;});
       workerTest.mock.method(cache,'getRedis',async()=>assert.fail('Recovery must use the isolated cache stub'));
       const {default:IndexerSyncEngine}=await import('../src/indexer/sync-engine.js');
       workerPool=new Pool({host:'127.0.0.1',port:Number(endpoint.split(':')[1]),database:'artsoul',
@@ -616,13 +616,19 @@ test('media registration and indexer rollback share an atomic revision fence (Po
       await workerPool.query(`CREATE TABLE public.indexer_state(
         chain_id NUMERIC(78,0) PRIMARY KEY, last_indexed_block BIGINT NOT NULL,
         last_confirmed_block BIGINT NOT NULL, confirmation_depth INTEGER NOT NULL,
-        last_indexed_at TIMESTAMPTZ, state_hash TEXT, contract_address TEXT);
+        last_indexed_at TIMESTAMPTZ, state_hash TEXT, contract_address TEXT NOT NULL DEFAULT '${core}');
         CREATE TABLE public.distributed_locks(lock_name TEXT PRIMARY KEY,instance_id TEXT NOT NULL,
           fencing_token BIGINT NOT NULL,expires_at TIMESTAMPTZ NOT NULL);
         INSERT INTO public.distributed_locks VALUES('fixture-recovery','fixture-worker',1,clock_timestamp()+INTERVAL '1 hour');
         CREATE TABLE public.block_hashes(chain_id NUMERIC(78,0) NOT NULL,block_number BIGINT NOT NULL,
           block_hash VARCHAR(66) NOT NULL,parent_hash VARCHAR(66) NOT NULL,timestamp BIGINT NOT NULL,
           indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(chain_id,block_number));`);
+      // This minimal media fixture has no notification ledger. The full-stack
+      // atomicity suite covers real retention; only its detach hook is inert here.
+      await pool.query('CREATE SCHEMA artsoul_private AUTHORIZATION postgres');
+      await workerPool.query(`CREATE FUNCTION artsoul_private.detach_reorg_notifications(BIGINT,NUMERIC)
+        RETURNS VOID LANGUAGE plpgsql AS $$ BEGIN RETURN; END $$;`);
+      await workerPool.query(migration('sql/migrations/20261029220854_recovery_cache_obligation.sql'));
       const role=(await workerPool.query(`SELECT current_user AS name,rolsuper,rolbypassrls,
         has_function_privilege(current_user,'public.rollback_events_from_block(bigint,numeric)','EXECUTE') AS can_rollback
         FROM pg_roles WHERE rolname=current_user`)).rows[0];
@@ -650,7 +656,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
             CROSS JOIN unnest(ARRAY[119,120,123,130]) AS block_number`,['0x'+'ab'.repeat(32),'0x'+'bc'.repeat(32)]);
           const before=await snapshot(),beforeWorker=await workerState(),beforeClaim=await claimRow(value);
           const foreignClaim=await claimRow(foreign),observed=await revision();
-          const engine=new IndexerSyncEngine(database,{chainId:84532,async getCurrentBlock(){networkReads++;return 119;}});
+          const engine=new IndexerSyncEngine(database,{chainId:84532,contractAddress:core,async getCurrentBlock(){networkReads++;return 119;}});
           engine.getRecoveryAuthority=()=>({lockName:'fixture-recovery',instanceId:'fixture-worker',fencingToken:'1',isCurrent:()=>true});
           const run=async()=>method==='_handleReorg'?engine._handleReorg(120):engine.recoverFromSafeBlock(await engine.getIndexerState());
           if(failRollback) {

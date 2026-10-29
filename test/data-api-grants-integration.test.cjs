@@ -35,7 +35,7 @@ const features = [
   'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks',
   'public_artwork_search', 'public_artwork_search_current_round', 'profile_layouts', 'auction_notifications', 'auction_notification_lifecycle',
   'auction_notification_reminders', 'notification_summary', 'notification_inbox_removal',
-  '20261029212603_notification_reorg_identity'
+  '20261029212603_notification_reorg_identity', '20261029220854_recovery_cache_obligation'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [
@@ -137,6 +137,7 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     const internalFunctions = [
       'artsoul_private.notification_source_identity(text,text,jsonb,text,boolean)',
       'artsoul_private.detach_reorg_notifications(bigint,numeric)',
+      'artsoul_private.mark_deployment_cache_obligation()',
       'public.write_recoverable_notification(text,text,jsonb,text,text,text)'
     ];
     for (const signature of internalFunctions) {

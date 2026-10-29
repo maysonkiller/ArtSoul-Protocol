@@ -185,7 +185,7 @@ test('the runner serializes reconciliation with catch-up and reorg checks', asyn
     let release, starts = 0, reorgChecks = 0;
     const held = new Promise(resolve => { release = resolve; });
     Object.assign(runner, { isLeader: true, isRunning: true, lastReorgCheckAt: 0, reorgCheckInterval: 1,
-        syncEngine: { async detectReorg() { reorgChecks++; return false; } },
+        syncEngine: { async _purgeRecoveryCache() { return false; }, async detectReorg() { reorgChecks++; return false; } },
         async _catchUpToSafeBlock() { starts++; return { currentBlock: 103, safeBlock: 100 }; },
         async _processConfirmations() {}, async _refreshResaleState() { await held; }, _refreshSearchMetadata() {} });
     const first = runner._runConfirmationPoll();
@@ -207,6 +207,7 @@ test('the runner preserves failed reconciliation batches and continues event cat
     Object.assign(runner, { config: { chainId: 84532, contractAddress: CORE },
         isLeader: true, isRunning: true, resaleCursor: '8', resaleSweepEnd: '11',
         lastReorgCheckAt: Date.now(), reorgCheckInterval: 60000,
+        syncEngine: { async _purgeRecoveryCache() { return false; } },
         distributedLock: { ...leader, getFencingToken: () => '1', isLeaderInstance: () => true },
         db: { async query() { throw new Error('database unavailable'); } },
         async _catchUpToSafeBlock() { catchUps++; return { currentBlock: 103, safeBlock: 100 }; },
@@ -216,7 +217,8 @@ test('the runner preserves failed reconciliation batches and continues event cat
     assert.equal(runner.resaleCursor, '8'); assert.equal(runner.resaleSweepEnd, '11');
     assert.equal(runner.resaleReconciliationError, 'Confirmed resale state refresh failed');
     runner.db.healthCheck = async () => ({ healthy: true });
-    runner.syncEngine = { async getIndexerState() { return { last_indexed_block: 100, started_at: new Date().toISOString() }; },
+    runner.syncEngine = { async _purgeRecoveryCache() { return false; },
+        async getIndexerState() { return { last_indexed_block: 100, started_at: new Date().toISOString() }; },
         async getUnresolvedErrors() { return []; }, async getEventFailureCounts() { return { failed: 0, dead: 0 }; } };
     runner.eventListener = { async getCurrentBlock() { return 103; }, getRpcHealth() { return []; } };
     const health = await runner.getHealth();

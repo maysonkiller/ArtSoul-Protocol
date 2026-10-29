@@ -656,6 +656,12 @@ class ProductionIndexer {
                         console.warn('[ProductionIndexer] Reorg detected, resyncing...');
                         return;
                     }
+                } else if (await this.syncEngine._purgeRecoveryCache()) {
+                    // A direct recovery can commit between periodic chain checks.
+                    // Drain its durable cache work before admitting catch-up.
+                    this.resaleCursor = '0';
+                    this.resaleSweepEnd = null;
+                    return;
                 }
 
                 // Only confirm when the catch-up for this poll actually

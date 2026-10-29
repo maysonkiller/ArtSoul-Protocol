@@ -393,23 +393,74 @@ reinstall an older destructive rollback function as a shortcut. Pause the writer
 and validate the selected source/schema combination in the disposable restore
 rehearsal before any separately authorized worker activation or rollback.
 
+## Durable cache recovery: local implementation and verification
+
+The previous crash reproduction is fixed in the source candidate. Ordered feature
+migration `20261029220854_recovery_cache_obligation.sql` records a nullable UUID
+on `indexer_state`. Existing and newly initialized rows receive an initial purge
+obligation; applying the migration again preserves acknowledged NULLs and pending
+tokens. Rewind rotates the token in its existing SQL transaction, including calls
+to either rollback overload. A real deployment-address replacement also rearms it.
+
+Startup and recovery read that durable token. The purge runs outside database
+locks. Only an actual successful purge is acknowledged, against the original
+chain, deployment, token, row revision and leadership epoch. A failed purge or
+acknowledgement leaves retry work. Intentionally disabled caching allows progress
+but retains the token; configured cache unavailability fails closed. Ordinary
+range/event/header/confirmation writes reject pending configured-cache recovery
+at admission and again under their write fence. The runner drains it between
+periodic chain checks, and resale reconciliation checks before RPC and under its
+locked update. An old process cannot acknowledge a newer rewind or deployment.
+
+Local PostgreSQL 18.4: 124/124 checks pass, zero skips, cluster stopped. These
+retain the preceding 111 checks and add 13 cache/recovery/admission cases. Actual
+child termination after rewind commit leaves the token in PostgreSQL; the next
+engine purges once, serves the corrected bid and does not rewind again. The
+fixture uses the real cache-service methods with a parent-owned Map transport;
+it does not claim a real Redis server or distributed-reader acceptance. Includes
+rollback, purge/ack failures, newer-rewind races, authority/deployment changes,
+disabled cache, migration reapplication, and pending-before/during-RPC admission.
+Evidence: `docs/private/b35-durable-cache-admission.log` and
+`docs/private/reorg-atomicity-1793312395052-29992-e1836d8e/evidence.json`.
+The failing baseline remains `docs/private/b35-cache-crash-before.log` and
+`docs/private/reorg-atomicity-1793310797557-25372-b920eb22/evidence.json`.
+
+Focused runtime/admission checks: 35 pass, one explicit environment skip.
+Full local suite: 2,579 pass / 34 explicit environment skips / zero failures;
+it includes unrelated untracked policy tests. Build, built-route and Tailwind
+checks pass. Independent source review found no remaining blocker in this slice.
+Linux Docker/no-default-grant verification and exact candidate CI are pending.
+The older minimal media fixture installs the actual cache migration with an
+explicitly inert notification-detach adapter; full retention is tested only by
+the complete-schema atomicity fixture, not that adapter.
+
+Interpretations: a successful purge and its acknowledgement are separate steps;
+a retry after an acknowledgement failure may safely purge again. Disabled cache
+is not proof that a surviving external cache was cleared, so the obligation is
+retained. Initial obligations conservatively cover earlier lost process-local
+intent. These are internal recovery semantics under canon sections 5 and 17;
+no contract, economic, eligibility or user authorization rule changes.
+
+Activation requires the ordered notification migration above, then the new cache
+migration, then the corresponding indexer worker after the remaining gates. A
+worker without the new schema fails startup instead of silently bypassing it.
+No live migration, Redis operation, rollback or worker update was performed.
+Do not remove the token or reinstall an older rollback function while this worker
+is running. Preserve pending obligations and rehearse any rollback on the isolated
+restore copy first. The normal 001-017 bootstrap runner is not extended by this
+separately gated feature migration.
+
 ## Open acceptance and exact next step
 
-Next: reproduce process termination after committed rewind and before cache
-invalidation, then make that recovery obligation durable. Keep the worker inactive until
-the remaining recovery gates have independent evidence.
-Primary auction/end/extension/payment/default, mint/floor, trust and metrics
-now have the local recovery evidence above. Full owner/provenance acceptance
-still needs to account for transfers absent from the prototype event stream.
-Prove bounded processing for long history and a production-like restore.
+Exactly next: reproduce a public cache refill that starts before rewind and writes
+its old result after purge/acknowledgement. Durable purge intent fixes the process-
+crash gap; it does not fence such external cache writers. The existing full-prefix
+Redis scan, unversioned keys and independent CDN caches remain separate acceptance
+gates. No all-cache convergence or production-scale recovery claim is made.
 
-The in-memory pending purge is not a durable crash-recovery record; cache purge
-still uses the existing full-prefix Redis scan. Neither limitation is declared
-fixed here. Commit acknowledgement loss and process termination after commit
-need operational reconciliation, not blind replay. This slice only establishes
-transactional database atomicity and the current process's failure propagation.
-
-Keep worker rollout separate until the projection-restoration gate is met.
-Never run a live rollback to reproduce the issue. Snapshot tooling, backup
-restoration, beta-cohort evidence and founder business inputs remain independent
-Phase B gates. No economic or canonical policy ambiguity was resolved here.
+Keep the worker inactive until the remaining gates have independent evidence.
+Full owner/provenance acceptance still needs to account for transfers absent from
+the prototype event stream. Sparse ancestor proof, bounded history/renewal time,
+external delivery guarantees and independent database AND object-byte restoration
+remain open. Snapshot A stays at the end of public testnet; no destructive reset
+or mainnet step is authorized by this source change. Phase B remains in progress.

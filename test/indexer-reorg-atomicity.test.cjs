@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 const test = require('node:test');
-const {execFileSync} = require('node:child_process');
+const {execFileSync,spawnSync} = require('node:child_process');
 const {pathToFileURL} = require('node:url');
 const {Pool} = require('pg');
 const {Interface} = require('ethers');
@@ -46,7 +46,7 @@ function isolatedEngineSource() {
   const cacheImport = "const cacheService = (await import('../services/cache-service.js')).default;";
   assert(source.includes(cacheImport));
   source = source.replaceAll(cacheImport,
-    "const cacheService = {purge: async () => { if (this.fixtureFailCachePurge) throw new Error('fixture cache purge failure'); }};");
+    "const cacheService = {purge: async options => { if (this.fixtureFailCachePurge) throw new Error('fixture cache purge failure'); return this.fixtureCachePurgeHook ? this.fixtureCachePurgeHook(options) : true; }};");
   return source.replace(/from '([^']+)'/g, (whole, specifier) => specifier.startsWith('.')
     ? `from '${pathToFileURL(path.resolve(ROOT, 'src/indexer', specifier)).href}'` : whole);
 }
@@ -107,7 +107,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const notificationMigrations = ['phase18_artwork_moderation_visibility','a8b_artwork_report_intake',
     'a8c_protocol_admin_review','artist_support','artist_support_moderation','auction_notifications',
     'auction_notification_lifecycle','auction_notification_reminders','notification_summary','notification_inbox_removal',
-    '20261029212603_notification_reorg_identity'];
+    '20261029212603_notification_reorg_identity','20261029220854_recovery_cache_obligation'];
   for (const name of notificationMigrations) await pool.query(read(`sql/migrations/${name}.sql`));
   evidence.migrations = [...migrations, ...['identity', 'preparation', 'submission', 'registration', 'reorg']
     .map(name => `sql/migrations/artwork_media_${name}.sql`), ...notificationMigrations.map(name=>`sql/migrations/${name}.sql`)];
@@ -192,10 +192,11 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     await pool.query('INSERT INTO artwork_media_chain_revisions VALUES(84532,0)');
     for (const instance of [target, other]) {
       instance.fixtureFailCachePurge = false;
+      instance.fixtureCachePurgeHook = null;
       instance.recoveryCachePurgePending = false;
       instance.isRunning = false;
       await pool.query(`INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,
-        last_indexed_at,started_at,state_hash) VALUES($1,$2,115,115,NOW(),NOW(),'0x0')`, [instance.chainId, CORE]);
+        last_indexed_at,started_at,state_hash,recovery_cache_token) VALUES($1,$2,115,115,NOW(),NOW(),'0x0',NULL)`, [instance.chainId, CORE]);
       for (const block of [100, 105, 110, 115]) await pool.query(`INSERT INTO block_hashes
         (chain_id,block_number,block_hash,parent_hash,timestamp) VALUES($1,$2,$3,$4,$5)`,
         [instance.chainId, block, hash(block), hash(block - 1), 1700000000 + block * 2]);
@@ -437,6 +438,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     await notificationFixture();
     const before=await notificationSnapshot();
     await pool.query(read('sql/migrations/20261029212603_notification_reorg_identity.sql'));
+    await pool.query(read('sql/migrations/20261029220854_recovery_cache_obligation.sql'));
     assert.deepEqual(await notificationSnapshot(),before);
     for(const role of ['anon','authenticated','service_role']) {
       const row=(await pool.query(`SELECT has_schema_privilege($1,'artsoul_private','USAGE') AS schema_access,
@@ -1024,8 +1026,209 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     target.fixtureFailCachePurge = false;
     assert.equal(await target.detectReorg(), true);
     assert.equal(target.recoveryCachePurgePending, false);
-    assert.deepEqual(await snapshot(CHAIN), after, 'purge retry must not delete or bump revision again');
+    after.indexer_state[0].recovery_cache_token=null;
+    assert.deepEqual(await snapshot(CHAIN), after, 'purge retry only acknowledges its token without another rewind');
     evidence.results.push({scenario: 'post_commit_purge_retry', after, noRepeatedRewind: true});
+  });
+
+  const recoveryToken=async(chain=CHAIN)=>(await pool.query('SELECT recovery_cache_token FROM indexer_state WHERE chain_id=$1',[chain])).rows[0]?.recovery_cache_token;
+  const requestPurge=async(chain=CHAIN)=>(await pool.query(`UPDATE indexer_state SET recovery_cache_token=gen_random_uuid()
+    WHERE chain_id=$1 RETURNING recovery_cache_token`,[chain])).rows[0].recovery_cache_token;
+  async function recoveryCache() {
+    const file=path.join(directory,'isolated-cache.mjs'),source=read('src/services/cache-service.js');
+    assert.ok(source.includes("import { getRedisConnection } from '../queue.js';"));
+    fs.writeFileSync(file,source.replace("import { getRedisConnection } from '../queue.js';",
+      'const getRedisConnection = async () => { throw new Error("External Redis disabled in recovery fixture"); };'));
+    const cache=(await import(pathToFileURL(file).href)).default;
+    const data=new Map(),calls={keys:0,deletes:0};
+    cache.getRedis=async()=>({
+      async get(key){return data.get(key)??null;},async set(key,value){data.set(key,value);},
+      async keys(pattern){assert.equal(pattern,'artsoul:*');calls.keys++;return [...data.keys()];},
+      async del(...keys){calls.deletes++;for(const key of keys)data.delete(key);}
+    });
+    return {cache,data,calls};
+  }
+  await t.test('a new worker drains the committed cache obligation after actual process exit',async()=>{
+    await apply(target,'BidPlaced',112,{auctionId:1,bidder:WINNER,bidAmount:2500,depositAmount:10000});
+    const {cache,calls}=await recoveryCache(),cacheKey=cache.keys.auction(CHAIN+':artwork:1');
+    await cache.set(cacheKey,{current_bid:2500},3600);
+    // Real PostgreSQL and process termination; only the Redis transport is a
+    // parent-owned Map that survives the worker child, without any live service.
+    const childFile=path.join(directory,'crash-after-rewind-commit.cjs'),markerFile=path.join(directory,'cache-crash-boundary.json');
+    fs.writeFileSync(childFile,`const fs=require('node:fs');
+const {Pool}=require('pg');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+  const config=JSON.parse(process.argv[2]);
+  const Engine=(await import(pathToFileURL(config.engineFile).href)).default;
+  const pool=new Pool({host:'127.0.0.1',port:config.port,database:'postgres',user:'postgres',password:'',max:2,
+    connectionTimeoutMillis:2000,statement_timeout:10000});
+  const db={pool,query:async(sql,values)=>(await pool.query(sql,values)).rows};
+  const engine=new Engine(db,{chainId:config.chain,contractAddress:config.core});
+  engine.getRecoveryAuthority=()=>({lockName:'fixture-reorg',instanceId:'fixture-worker',fencingToken:'1',isCurrent:()=>true});
+  engine.fixtureCachePurgeHook=async options=>{
+    const state=await engine.getIndexerState();
+    fs.writeFileSync(config.markerFile,JSON.stringify({strict:options.strict,state,pending:engine.recoveryCachePurgePending}));
+    process.exit(86);
+  };
+  await engine._handleReorg(110);
+  throw new Error('Expected post-commit termination seam was not reached');
+})().catch(error=>{console.error(error);process.exit(87);});
+`);
+    const child=spawnSync(process.execPath,[childFile,JSON.stringify({engineFile,port,markerFile,chain:CHAIN,core:CORE})],
+      {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:15000});
+    fs.writeFileSync(path.join(directory,'cache-crashed-worker.log'),(child.stdout||'')+(child.stderr||''));
+    assert.ifError(child.error);assert.equal(child.status,86);
+    const boundary=JSON.parse(fs.readFileSync(markerFile,'utf8'));
+    assert.equal(boundary.strict,true);assert.equal(boundary.pending,true);
+    assert.equal(boundary.state.last_indexed_block,109);assert.equal(boundary.state.last_confirmed_block,109);
+    assert.ok(boundary.state.recovery_cache_token);assert.equal(await recoveryToken(),boundary.state.recovery_cache_token);
+    assert.equal(calls.deletes,0);
+    const revisionBefore=(await snapshot(CHAIN)).artwork_media_chain_revisions;
+    const replacement=historicalWriter([]);let purges=0,fetches=0;
+    replacement.fixtureCachePurgeHook=async options=>{purges++;return cache.purge(options);};
+    await replacement.start();
+    assert.equal(await replacement.detectReorg(),false);
+    const state=await replacement.getIndexerState();
+    const dbBid=Number((await pool.query('SELECT current_bid FROM v41_auctions WHERE chain_id=$1 AND auction_id=1',[CHAIN])).rows[0].current_bid);
+    const served=await cache.remember(cacheKey,3600,async()=>{fetches++;return {current_bid:dbBid};});
+    assert.equal(served.current_bid,0);assert.equal(dbBid,0);assert.equal(fetches,1);
+    assert.equal(purges,1);assert.equal(calls.deletes,1);assert.equal(state.recovery_cache_token,null);
+    assert.equal(state.last_indexed_block,109);assert.equal(state.last_confirmed_block,109);
+    assert.equal(state.state_hash,await replacement._computeStateHash(109));
+    assert.deepEqual((await snapshot(CHAIN)).artwork_media_chain_revisions,revisionBefore);
+    evidence.results.push({scenario:'cache_obligation_survives_process_exit',childExit:child.status,
+      tokenPersistedBeforeExit:true,purges,cacheRead:served.current_bid,databaseBid:dbBid,noRepeatedRewind:true,
+      redisTransport:'local Map; actual cache-service methods'});
+  });
+  await t.test('failed rewind preserves an earlier cache obligation without publishing another token',async()=>{
+    const token=await requestPurge(),before=await snapshot(CHAIN);let purges=0;
+    target.fixtureCachePurgeHook=async()=>{purges++;return true;};
+    beforeSql=async sql=>{if(sql.startsWith('DELETE FROM block_hashes'))throw new Error('fixture rewind before commit');};
+    try {await assert.rejects(target._handleReorg(BOUNDARY),/fixture rewind before commit/);}
+    finally {beforeSql=null;}
+    assert.equal(await recoveryToken(),token);assert.equal(purges,0);assert.deepEqual(await snapshot(CHAIN),before);
+  });
+  await t.test('a fresh worker cannot start while its durable cache purge fails',async()=>{
+    const token=await requestPurge(),before=await snapshot(CHAIN),replacement=historicalWriter([]);
+    replacement.fixtureFailCachePurge=true;
+    await assert.rejects(replacement.start(),/fixture cache purge failure/);
+    assert.equal(replacement.isRunning,false);assert.equal(await recoveryToken(),token);
+    assert.deepEqual(await snapshot(CHAIN),before);
+    replacement.fixtureFailCachePurge=false;
+    await replacement.start();assert.equal(replacement.isRunning,true);assert.equal(await recoveryToken(),null);
+    assert.deepEqual((await snapshot(CHAIN)).artwork_media_chain_revisions,before.artwork_media_chain_revisions);
+  });
+  await t.test('a successful purge with failed acknowledgement is retried by the next worker',async()=>{
+    const token=await requestPurge(),replacement=historicalWriter([]);let purges=0;
+    replacement.fixtureCachePurgeHook=async()=>{purges++;return true;};
+    beforeSql=async sql=>{if(sql.includes('SET recovery_cache_token = NULL'))throw new Error('fixture cache acknowledgement failure');};
+    try {await assert.rejects(replacement.start(),/fixture cache acknowledgement failure/);}
+    finally {beforeSql=null;}
+    assert.equal(purges,1);assert.equal(await recoveryToken(),token);assert.equal(replacement.isRunning,false);
+    const successor=historicalWriter([]);successor.fixtureCachePurgeHook=async()=>{purges++;return true;};
+    await successor.start();assert.equal(purges,2);assert.equal(await recoveryToken(),null);
+  });
+  await t.test('an older purge cannot acknowledge a newer committed rewind token',async()=>{
+    const firstToken=await requestPurge(),replacement=historicalWriter([]),entered=deferred(),release=deferred();
+    replacement.fixtureCachePurgeHook=async()=>{entered.resolve();await release.promise;return true;};
+    const purging=settle(replacement._purgeRecoveryCache());let newerToken;
+    try {
+      await reach(entered,purging);
+      target.fixtureFailCachePurge=true;
+      await assert.rejects(target._handleReorg(BOUNDARY),/fixture cache purge failure/);
+      newerToken=await recoveryToken();assert.ok(newerToken);assert.notEqual(newerToken,firstToken);
+    } finally {target.fixtureFailCachePurge=false;release.resolve();}
+    assert.ok(fenceLost((await purging).error));assert.equal(await recoveryToken(),newerToken);
+    const before=(await snapshot(CHAIN)).artwork_media_chain_revisions;
+    assert.equal(await historicalWriter([])._purgeRecoveryCache(),true);assert.equal(await recoveryToken(),null);
+    assert.deepEqual((await snapshot(CHAIN)).artwork_media_chain_revisions,before);
+  });
+  await t.test('leadership epoch loss during purge leaves acknowledgement for the successor',async()=>{
+    const token=await requestPurge(),replacement=historicalWriter([]);
+    replacement.fixtureCachePurgeHook=async()=>{leaderEpoch++;return true;};
+    await assert.rejects(replacement._purgeRecoveryCache(),fenceLost);assert.equal(await recoveryToken(),token);
+    assert.equal(await historicalWriter([])._purgeRecoveryCache(),true);assert.equal(await recoveryToken(),null);
+  });
+  await t.test('cache acknowledgement is scoped to its original chain and deployment',async()=>{
+    const token=await requestPurge(),foreign=await requestPurge(OTHER_CHAIN),replacement=historicalWriter([]);
+    replacement.fixtureCachePurgeHook=async()=>{
+      await pool.query('UPDATE indexer_state SET contract_address=$1 WHERE chain_id=$2',[CREATOR,CHAIN]);
+      return true;
+    };
+    await assert.rejects(replacement._purgeRecoveryCache(),fenceLost);
+    const changed=await recoveryToken();assert.ok(changed);assert.notEqual(changed,token);assert.equal(await recoveryToken(OTHER_CHAIN),foreign);
+    const successor=new Engine(db,{chainId:CHAIN,contractAddress:CREATOR});successor.getRecoveryAuthority=target.getRecoveryAuthority;
+    assert.equal(await successor._purgeRecoveryCache(),true);assert.equal(await recoveryToken(),null);
+    assert.equal(await recoveryToken(OTHER_CHAIN),foreign);
+    assert.equal((await successor.getIndexerState()).contract_address,CREATOR);
+  });
+  await t.test('disabled caching retains its durable obligation until an enabled purge succeeds',async()=>{
+    const token=await requestPurge(),replacement=historicalWriter([]);
+    replacement.fixtureCachePurgeHook=async()=>false;
+    await replacement.start();assert.equal(replacement.isRunning,true);assert.equal(await recoveryToken(),token);
+    assert.equal(await replacement._purgeRecoveryCache(),false);assert.equal(await recoveryToken(),token);
+    replacement.fixtureCachePurgeHook=async()=>true;
+    assert.equal(await replacement.detectReorg(),true);assert.equal(await recoveryToken(),null);
+    assert.equal((await replacement.getIndexerState()).last_indexed_block,115);
+  });
+  await t.test('a configured cache obligation blocks fresh ranges, events, headers and confirmations until acknowledged',async()=>{
+    const previous=process.env.REDIS_URL;
+    process.env.REDIS_URL='redis://fixture.invalid:6379';
+    try {
+      target.fixtureFailCachePurge=true;
+      await assert.rejects(target._handleReorg(BOUNDARY),/fixture cache purge failure/);
+      target.fixtureFailCachePurge=false;
+      const writer=historicalWriter([bufferedBid()]);let rangeReads=0;
+      writer.eventListener.queryAllHistoricalEvents=async()=>{rangeReads++;return [bufferedBid()];};
+      const before=await writerSnapshot();
+      await assert.rejects(writer._captureWriteContext(),fenceLost);
+      await assert.rejects(writer.syncHistoricalEvents(110,120,{currentBlock:132}),fenceLost);
+      assert.equal(rangeReads,0,'ordinary admission fails before fetching the historical range');
+      const runner=Object.assign(new ConfirmationRunner(),{config:{chainId:CHAIN},syncEngine:writer,
+        eventListener:writer.eventListener,confirmationDepth:12});
+      await assert.rejects(runner._processConfirmations(132),fenceLost);
+      // Capture while caching is disabled, then enable it without changing xmin.
+      // The locked check must independently reject this otherwise-current context.
+      process.env.REDIS_URL='';
+      const context=await writer._captureWriteContext();
+      process.env.REDIS_URL='redis://fixture.invalid:6379';
+      await assert.rejects(writer._storeBlockHashesForBlocks([118],context),fenceLost);
+      await assert.rejects(writer.processEvent(bufferedBid(),context),fenceLost);
+      assert.deepEqual(await writerSnapshot(),before);
+      assert.equal(await writer._purgeRecoveryCache(),true,'only the recovery acknowledgement context bypasses admission');
+      assert.equal(await recoveryToken(),null);
+      await writer.syncHistoricalEvents(110,120,{currentBlock:132});
+      await runner._processConfirmations(132);
+      assert.equal((await writer.getIndexerState()).last_indexed_block,120);
+      assert.equal(rangeReads,1);
+      evidence.results.push({scenario:'configured_cache_obligation_blocks_ordinary_writes',
+        captureRejected:true,lockedContextRejected:true,confirmationRejected:true,recoveryAcknowledgementAllowed:true});
+    } finally {
+      target.fixtureFailCachePurge=false;
+      if(previous===undefined)delete process.env.REDIS_URL;else process.env.REDIS_URL=previous;
+    }
+  });
+  await t.test('disabled caching permits ordinary range and confirmation writes without acknowledging the token',async()=>{
+    const previous=process.env.REDIS_URL;process.env.REDIS_URL='';
+    try {
+      const token=await requestPurge(),writer=historicalWriter([bufferedBid()]);
+      await writer.syncHistoricalEvents(116,120,{currentBlock:132});
+      const runner=Object.assign(new ConfirmationRunner(),{config:{chainId:CHAIN},syncEngine:writer,
+        eventListener:writer.eventListener,confirmationDepth:12});
+      await runner._processConfirmations(132);
+      assert.equal(await recoveryToken(),token);assert.equal((await writer.getIndexerState()).last_indexed_block,120);
+    } finally {if(previous===undefined)delete process.env.REDIS_URL;else process.env.REDIS_URL=previous;}
+  });
+  await t.test('cache-obligation migration seeds new rows and preserves acknowledged or pending tokens on reapply',async()=>{
+    const pending=await requestPurge();
+    await pool.query('DELETE FROM indexer_state WHERE chain_id=$1',[OTHER_CHAIN]);
+    await pool.query(`INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,
+      last_indexed_at,started_at,state_hash) VALUES($1,$2,115,115,NOW(),NOW(),'0x0')`,[OTHER_CHAIN,CORE]);
+    assert.ok(await recoveryToken(OTHER_CHAIN));
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[OTHER_CHAIN]);
+    await pool.query(read('sql/migrations/20261029220854_recovery_cache_obligation.sql'));
+    assert.equal(await recoveryToken(),pending);assert.equal(await recoveryToken(OTHER_CHAIN),null);
   });
 
   const bid = (amount=2500,bidder=WINNER) => ({auctionId:1,bidder,bidAmount:amount,depositAmount:10000});
@@ -1148,6 +1351,34 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const resaleRow = async () => (await pool.query('SELECT * FROM v41_resale_listings WHERE chain_id=$1 AND token_id=7',[CHAIN])).rows[0];
   const dirtyResale = async (active=false) => pool.query(`UPDATE v41_resale_listings
     SET active=$1,last_updated_block=112 WHERE chain_id=$2 AND token_id=7`,[active,CHAIN]);
+  for(const duringRead of [false,true]) await t.test(`resale reconciliation rejects a cache obligation ${duringRead?'created during RPC':'before RPC'}`,async()=>{
+    const previous=process.env.REDIS_URL;process.env.REDIS_URL='redis://fixture.invalid:6379';
+    try {
+      const {reconcileResaleState}=await import('../src/indexer/resale-state-reconciliation.js');
+      await resaleFixture();
+      await pool.query(`UPDATE indexer_state SET last_indexed_block=109,last_confirmed_block=109,state_hash=$1 WHERE chain_id=$2`,
+        [await target._computeStateHash(109),CHAIN]);
+      const before=await resaleRow();let reads=0,token;
+      const options={chainId:CHAIN,coreAddress:CORE,blockNumber:109,leader:target.getRecoveryAuthority(),isCurrent:()=>true};
+      const readSnapshot=async()=>{
+        reads++;if(duringRead)token=await requestPurge();
+        return [{tokenId:'7',seller:WINNER,price:'2500',active:false}];
+      };
+      if(duringRead) {
+        const result=await reconcileResaleState(db,options,readSnapshot);
+        assert.equal(result.updated,0);assert.equal(reads,1);
+      } else {
+        token=await requestPurge();
+        await assert.rejects(reconcileResaleState(db,options,readSnapshot),/boundary unavailable/);
+        assert.equal(reads,0);
+      }
+      assert.deepEqual(await resaleRow(),before);assert.equal(await recoveryToken(),token);
+      assert.equal(await target._purgeRecoveryCache(),true);
+      const result=await reconcileResaleState(db,options,async()=>[{tokenId:'7',seller:WINNER,price:'2500',active:false}]);
+      assert.equal(result.updated,1);assert.equal((await resaleRow()).active,false);
+      assert.equal(await recoveryToken(),null);
+    } finally {if(previous===undefined)delete process.env.REDIS_URL;else process.env.REDIS_URL=previous;}
+  });
   for (const active of [true,false]) for (const matching of [true,false]) await t.test(`rewind restores ${active?'active':'cancelled'} boundary state from ${matching?'matching':'opposite'} future observations`,async()=>{
     await resaleFixture();const before=await resaleRow(),foreign=await snapshot(OTHER_CHAIN);
     await dirtyResale(matching?active:!active);resaleStates.set('7',[WINNER,2500n,active]);
