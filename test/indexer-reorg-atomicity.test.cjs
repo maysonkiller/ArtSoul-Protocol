@@ -1,5 +1,5 @@
-// Atomic rewind regression; full reconstruction of older mutated projections
-// remains a separate gate. This suite does not certify those projections.
+// Atomic rewind and primary-projection reconstruction regression. Resale state,
+// legacy eligibility and writer fencing remain separate acceptance gates.
 // Run with ARTSOUL_TEST_POSTGRES_BIN pointing at local PostgreSQL binaries.
 // Always creates its own loopback-only cluster; never accepts a database URL.
 const assert = require('node:assert/strict');
@@ -104,24 +104,28 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const db = {pool, query: async (sql, values) => (await pool.query(sql, values)).rows};
   const engine = chain => new Engine(db, {chainId: chain});
   const target = engine(CHAIN), other = engine(OTHER_CHAIN);
-  let transaction = 0;
-  async function apply(instance, name, block, eventData) {
-    const event = {eventName: name, eventData, blockNumber: block, transactionHash: hash(++transaction),
-      logIndex: 0, timestamp: 1700000000000 + block * 2000};
+  async function apply(instance, name, block, eventData, logIndex = 0) {
+    const transactionHash = '0x' + crypto.createHash('sha256')
+      .update(JSON.stringify([instance.chainId,name,block,eventData,logIndex])).digest('hex');
+    const event = {eventName: name, eventData, blockNumber: block, transactionHash,
+      logIndex, timestamp: 1700000000000 + block * 2000};
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(`INSERT INTO contract_events(chain_id,event_name,artwork_id,block_number,
-        transaction_hash,log_index,event_data) VALUES($1,$2,$3,$4,$5,0,$6)`,
-        [instance.chainId, name, eventData.artworkId || 1, block, event.transactionHash, JSON.stringify(eventData)]);
+        transaction_hash,log_index,event_data,indexed_at) VALUES($1,$2,$3,$4,$5,$6,$7,to_timestamp($8 / 1000.0))`,
+        [instance.chainId, name, eventData.artworkId || 1, block, event.transactionHash,logIndex,JSON.stringify(eventData),event.timestamp]);
       await client.query(`INSERT INTO event_processing_registry(event_hash,chain_id,transaction_hash,log_index,
-        event_name,block_number,processing_status) VALUES($1,$2,$1,0,$3,$4,'completed')`,
-        [event.transactionHash, instance.chainId, name, block]);
+        event_name,block_number,processing_status) VALUES($1,$2,$1,$3,$4,$5,'completed')`,
+        [event.transactionHash, instance.chainId, logIndex,name,block]);
       await instance[`_handle${name}Tx`](event, client);
+      await instance._recordPublicMetricEventTx(event,client);
       await client.query('COMMIT');
     } catch (error) {await client.query('ROLLBACK'); throw error;} finally {client.release();}
   }
   const tables = ['v41_artworks', 'v41_auctions', 'v41_bids', 'v41_settlements', 'v41_trust_signals',
+    'v41_auction_extensions','v41_auction_endings','v41_floor_history',
+    'v41_public_metric_events','v41_public_metric_participants','v41_public_metrics',
     'contract_events', 'event_processing_registry', 'indexer_state', 'block_hashes',
     'artwork_media_rewinds', 'artwork_media_chain_revisions'];
   async function snapshot(chain) {
@@ -209,5 +213,116 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     assert.equal(target.recoveryCachePurgePending, false);
     assert.deepEqual(await snapshot(CHAIN), after, 'purge retry must not delete or bump revision again');
     evidence.results.push({scenario: 'post_commit_purge_retry', after, noRepeatedRewind: true});
+  });
+
+  const bid = (amount=2500,bidder=WINNER) => ({auctionId:1,bidder,bidAmount:amount,depositAmount:10000});
+  const ending = {auctionId:1,winner:WINNER,winningBid:2500,settlementDeadline:1700172800};
+  const settled = {auctionId:1,artworkId:1,winner:WINNER,finalPrice:2500,tokenId:7};
+  const floor = {artworkId:1,tokenId:7,floorPrice:2500};
+  const defaulted = {auctionId:1,winner:WINNER,artistAmount:800,platformAmount:200};
+  async function primary() {
+    const all = await snapshot(CHAIN);
+    return {artworks:all.v41_artworks,auctions:all.v41_auctions};
+  }
+  async function retainedOutbox() {
+    return (await pool.query('SELECT to_jsonb(o) AS value FROM outbox_events o ORDER BY id')).rows.map(row=>row.value);
+  }
+  await t.test('orphaned bid and extension restore retained values and notification identities', async () => {
+    await apply(target,'BidPlaced',106,bid(1500));
+    await apply(target,'BidPlaced',106,bid(1700,CREATOR),1);
+    await apply(target,'AuctionExtended',107,{auctionId:1,oldEndTime:1700086400,newEndTime:1700086500});
+    await apply(target,'AuctionExtended',107,{auctionId:1,oldEndTime:1700086500,newEndTime:1700086600},1);
+    const before=await primary(), outboxBefore=await retainedOutbox(), otherBefore=await snapshot(OTHER_CHAIN);
+    await apply(target,'BidPlaced',112,bid(2500,CREATOR));
+    await apply(target,'AuctionExtended',113,{auctionId:1,oldEndTime:1700086600,newEndTime:1700086700});
+    await target._handleReorg(BOUNDARY);
+    assert.deepEqual(await primary(),before);
+    assert.deepEqual(await retainedOutbox(),outboxBefore,'retained notifications are not regenerated');
+    assert.deepEqual(await snapshot(OTHER_CHAIN),otherBefore);
+  });
+  for (const name of ['SettlementCompleted','SettlementDefaulted']) {
+    await t.test(`orphaned ${name} restores payment state and preserves independent trust flags`, async () => {
+      await apply(target,'BidPlaced',106,bid());
+      await apply(target,'AuctionEnded',108,ending);
+      const before=await primary();
+      await pool.query(`INSERT INTO v41_trust_signals(chain_id,user_address,suspicious_flags)
+        VALUES($1,$2,9)`,[CHAIN,WINNER]);
+      if(name==='SettlementCompleted') await apply(target,'CanonicalFloorUpdated',115,floor,0);
+      await apply(target,name,115,name==='SettlementCompleted'?settled:defaulted,1);
+      assert.notDeepEqual(await primary(),before);
+      await target._handleReorg(BOUNDARY);
+      assert.deepEqual(await primary(),before);
+      const trust=(await snapshot(CHAIN)).v41_trust_signals[0];
+      assert.equal(trust.successful_settlements,0);assert.equal(trust.failed_settlements,0);
+      assert.equal(trust.suspicious_flags,9);assert.equal(trust.last_updated_block,null);
+      const again=await primary();
+      await target._handleReorg(BOUNDARY);
+      assert.deepEqual(await primary(),again,'repeated rewind cannot increment counters or change primary projections');
+    });
+  }
+  await t.test('orphaned no-bid ending and new round restore the older active auction', async () => {
+    const before=await primary();
+    await apply(target,'AuctionEnded',112,{auctionId:1,winner:`0x${'0'.repeat(40)}`,winningBid:0,settlementDeadline:0});
+    await apply(target,'AuctionCreated',114,{auctionId:2,artworkId:1,creator:CREATOR,startPrice:2000,duration:86400,endTime:1700186400});
+    await target._handleReorg(BOUNDARY);
+    assert.deepEqual(await primary(),before);
+  });
+  await t.test('retained mint and floor survive a later orphaned floor increase', async () => {
+    await apply(target,'BidPlaced',106,bid());await apply(target,'AuctionEnded',107,ending);
+    await apply(target,'CanonicalFloorUpdated',108,floor,0);await apply(target,'SettlementCompleted',108,settled,1);
+    const before=await primary(),trustBefore=(await snapshot(CHAIN)).v41_trust_signals;
+    await apply(target,'CanonicalFloorUpdated',112,{...floor,floorPrice:9000});
+    await target._handleReorg(BOUNDARY);
+    assert.deepEqual(await primary(),before);
+    assert.deepEqual((await snapshot(CHAIN)).v41_trust_signals,trustBefore);
+  });
+  await t.test('trust recount retains earlier settlements after a later default is orphaned', async () => {
+    await apply(target,'BidPlaced',106,bid());await apply(target,'AuctionEnded',107,ending);
+    await apply(target,'CanonicalFloorUpdated',108,floor,0);await apply(target,'SettlementCompleted',108,settled,1);
+    await pool.query('UPDATE v41_trust_signals SET suspicious_flags=9 WHERE chain_id=$1',[CHAIN]);
+    const before=(await snapshot(CHAIN)).v41_trust_signals;
+    await apply(target,'ArtworkRegistered',109,{artworkId:2,creator:CREATOR,metadataURI:'ipfs://second-fixture'});
+    await apply(target,'AuctionCreated',109,{auctionId:2,artworkId:2,creator:CREATOR,
+      startPrice:1000,duration:86400,endTime:1700186400},1);
+    await apply(target,'BidPlaced',112,{...bid(),auctionId:2});
+    await apply(target,'AuctionEnded',113,{...ending,auctionId:2});
+    await apply(target,'SettlementDefaulted',115,{...defaulted,auctionId:2});
+    assert.equal((await snapshot(CHAIN)).v41_trust_signals[0].failed_settlements,1);
+    await target._handleReorg(BOUNDARY);
+    assert.deepEqual((await snapshot(CHAIN)).v41_trust_signals,before);
+  });
+  await t.test('replacement lifecycle matches clean replay including metrics and trust', async () => {
+    const replacement=async()=>{
+      await apply(target,'BidPlaced',112,bid());await apply(target,'AuctionEnded',113,ending);
+      await apply(target,'CanonicalFloorUpdated',115,floor,0);await apply(target,'SettlementCompleted',115,settled,1);
+    };
+    const comparable=async()=>{
+      const all=await snapshot(CHAIN);
+      return Object.fromEntries(['v41_artworks','v41_auctions','v41_bids','v41_settlements',
+        'v41_auction_endings','v41_floor_history','v41_trust_signals','v41_public_metrics',
+        'v41_public_metric_events','v41_public_metric_participants'].map(table=>[table,
+        all[table].map(({id,...row})=>{
+          // The aggregate trigger records the wall-clock rewind time; compare
+          // its canonical totals/boundary, not that observation timestamp.
+          if(table==='v41_public_metrics') delete row.updated_at;
+          return row;
+        })]));
+    };
+    await replacement();const expected=await comparable();
+    await reset();
+    await apply(target,'BidPlaced',112,bid(3000));await apply(target,'AuctionEnded',113,{...ending,winningBid:3000});
+    await apply(target,'SettlementDefaulted',115,defaulted);
+    await target._handleReorg(BOUNDARY);await replacement();
+    assert.deepEqual(await comparable(),expected);
+  });
+  await t.test('failure during projection reconstruction rolls back deletion and cursor together', async () => {
+    await apply(target,'BidPlaced',112,bid());const before=await snapshot(CHAIN);
+    await pool.query(`CREATE FUNCTION fixture_fail_projection() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_PROJECTION_FAILURE'; END $f$;
+      CREATE TRIGGER fixture_fail_projection BEFORE UPDATE ON v41_auctions
+      FOR EACH ROW EXECUTE FUNCTION fixture_fail_projection()`);
+    try {await assert.rejects(target._handleReorg(BOUNDARY),/FORCED_PROJECTION_FAILURE/);}
+    finally {await pool.query('DROP TRIGGER fixture_fail_projection ON v41_auctions; DROP FUNCTION fixture_fail_projection()');}
+    assert.deepEqual(await snapshot(CHAIN),before);
   });
 });
