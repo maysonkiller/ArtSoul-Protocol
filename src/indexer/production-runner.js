@@ -93,13 +93,7 @@ class ProductionIndexer {
             }
         );
         this.leaderCheckInterval = null;
-        this.syncEngine.getRecoveryAuthority = () => {
-            const lock = this.distributedLock;
-            const fencingToken = lock.getFencingToken();
-            return { lockName: lock.lockName, instanceId: lock.instanceId, fencingToken,
-                isCurrent: () => this.isLeader && this.isRunning && lock.isLeaderInstance() &&
-                    lock.getFencingToken() === fencingToken };
-        };
+        this.syncEngine.getRecoveryAuthority = () => this._getRecoveryAuthority();
 
         this.confirmationDepth = config.confirmationDepth || 12;
         this.pollInterval = config.pollInterval || 15000;
@@ -112,7 +106,9 @@ class ProductionIndexer {
         this.lastObservedBlock = null;
         this.isLeader = false;
         this.isRunning = false;
+        this.isStopping = false;
         this.leaderElectionInProgress = false;
+        this.leaderElectionInFlight = null;
         this.leadershipLossInProgress = false;
         this.catchUpInProgress = false;
         this.confirmationTimer = null;
@@ -143,13 +139,19 @@ class ProductionIndexer {
         console.log('  Distributed Lock:', 'Enabled (multi-instance safe)');
     }
 
-    /**
-     * Try to become leader
-     */
+    _getRecoveryAuthority() {
+        const lock = this.distributedLock;
+        const fencingToken = lock.getFencingToken();
+        const epoch = lock.epoch;
+        return { lockName: lock.lockName, instanceId: lock.instanceId, fencingToken,
+            isCurrent: () => this.isLeader && this.isRunning && !this.isStopping &&
+                lock.isLeaderInstance() && lock.epoch === epoch && lock.getFencingToken() === fencingToken };
+    }
+
     async _tryBecomeLeader() {
         // A previous leader's pending poll must drain before this instance
         // starts again, or its follower cleanup could stop the new engine.
-        if (this.leadershipLossInProgress) return false;
+        if (this.leadershipLossInProgress || this.isStopping) return false;
 
         if (this.isLeader === true) {
             return true;
@@ -160,26 +162,38 @@ class ProductionIndexer {
         }
 
         this.leaderElectionInProgress = true;
-
-        try {
-        const acquired = await this.distributedLock.tryAcquire();
-
-        if (acquired && !this.isLeader) {
-            this.isLeader = true;
-            console.log('[ProductionIndexer] 👑 Became leader, starting indexer');
-            await this._startAsLeader();
-        } else if (!acquired && (this.isLeader || this.isRunning)) {
-            console.log('[ProductionIndexer] 👥 Lost leadership, stopping indexer');
-            await this._stopAsFollower();
-        }
-
-        return acquired;
-        } catch (error) {
-            this.isLeader = false;
-            throw error;
-        } finally {
+        this.leaderElectionInFlight = (async () => {
+            try {
+                const acquired = await this.distributedLock.tryAcquire();
+                if (this.isStopping) return false;
+                if (acquired && !this.isLeader) {
+                    this.isLeader = true;
+                    console.log('[ProductionIndexer] 👑 Became leader, starting indexer');
+                    await this._startAsLeader();
+                } else if (!acquired && (this.isLeader || this.isRunning)) {
+                    console.log('[ProductionIndexer] 👥 Lost leadership, stopping indexer');
+                    await this._stopAsFollower();
+                }
+                return acquired && this.isLeader;
+            } catch (error) {
+                this.isLeader = false;
+                try {
+                    await this._stopAsFollower();
+                } catch (cleanupError) {
+                    console.error('[ProductionIndexer] Failed startup cleanup:', cleanupError.message);
+                }
+                try {
+                    await this.distributedLock.release();
+                } catch (cleanupError) {
+                    console.error('[ProductionIndexer] Failed startup lock release:', cleanupError.message);
+                }
+                throw error;
+            }
+        })().finally(() => {
             this.leaderElectionInProgress = false;
-        }
+            this.leaderElectionInFlight = null;
+        });
+        return this.leaderElectionInFlight;
     }
 
     async _handleLeadershipLost(reason) {
@@ -203,7 +217,7 @@ class ProductionIndexer {
      * Start as leader
      */
     async _startAsLeader() {
-        if (this.isRunning) {
+        if (this.isRunning || this.isStopping) {
             return;
         }
 
@@ -216,22 +230,25 @@ class ProductionIndexer {
         this.isRunning = true;
         this.resaleCursor = '0';
         this.resaleSweepEnd = null;
-        await this.syncEngine.start();
+        const authority = this._getRecoveryAuthority();
+        // Startup recovery and catch-up share the poll's drainable operation.
+        // Leadership loss must finish this work before the engine can restart.
+        this.confirmationInFlight = (async () => {
+            if (!authority.isCurrent()) return;
+            await this.syncEngine.start();
+            if (!authority.isCurrent()) return;
 
-        // One authoritative read of the failure registry at startup, so the
-        // gauge is correct before any range runs (and after a restart that
-        // inherited failures from a previous process).
-        await this._refreshEventFailureMetric('startup');
+            // Refresh once before ranges run, including inherited failures.
+            await this._refreshEventFailureMetric('startup');
+            if (!authority.isCurrent()) return;
+            await this._catchUpToSafeBlock('leader_start');
+            if (!authority.isCurrent()) return;
 
-        await this._catchUpToSafeBlock('leader_start');
-
-        // Start confirmation polling
-        this._startConfirmationPolling();
-
-        // Start stuck processor reaper
-        this._startStuckProcessorReaper();
-
-        console.log('[ProductionIndexer] Leader started');
+            this._startConfirmationPolling();
+            this._startStuckProcessorReaper();
+            console.log('[ProductionIndexer] Leader started');
+        })().finally(() => { this.confirmationInFlight = null; });
+        return this.confirmationInFlight;
     }
 
     /**
@@ -308,7 +325,7 @@ class ProductionIndexer {
 
         // Stop indexer
         this.isRunning = false;
-        if (this.confirmationInFlight) await this.confirmationInFlight;
+        if (this.confirmationInFlight) await this.confirmationInFlight.catch(() => {});
         await this.syncEngine.stop();
 
         console.log('[ProductionIndexer] Follower stopped');
@@ -318,8 +335,12 @@ class ProductionIndexer {
      * Start leader election loop
      */
     _startLeaderElection() {
+        if (this.isStopping) return;
+        const attempt = () => this._tryBecomeLeader().catch(error => {
+            console.error('[ProductionIndexer] Leader startup failed; retrying next election:', error.message);
+        });
         // Try to become leader immediately
-        this._tryBecomeLeader();
+        attempt();
 
         // Check leadership every 5 seconds
         this.leaderCheckInterval = setInterval(async () => {
@@ -327,7 +348,7 @@ class ProductionIndexer {
                 return;
             }
 
-            await this._tryBecomeLeader();
+            await attempt();
         }, 5000);
 
         console.log('[ProductionIndexer] Leader election started');
@@ -438,6 +459,7 @@ class ProductionIndexer {
         console.log('[ProductionIndexer] Stopping gracefully...');
 
         // Mark as stopping (prevents new work)
+        this.isStopping = true;
         this.isLeader = false;
         this.isRunning = false;
 
@@ -449,10 +471,15 @@ class ProductionIndexer {
             clearInterval(this.confirmationTimer);
             this.confirmationTimer = null;
         }
+        if (this.reaperTimer) {
+            clearInterval(this.reaperTimer);
+            this.reaperTimer = null;
+        }
 
         // Wait for current operations to complete (drain)
         console.log('[ProductionIndexer] Draining current operations...');
-        if (this.confirmationInFlight) await this.confirmationInFlight;
+        if (this.leaderElectionInFlight) await this.leaderElectionInFlight.catch(() => {});
+        if (this.confirmationInFlight) await this.confirmationInFlight.catch(() => {});
         if (this.searchMetadataInFlight) await this.searchMetadataInFlight;
         await this._drainOperations();
 
@@ -664,16 +691,14 @@ class ProductionIndexer {
 
     async _refreshResaleState(blockNumber) {
         if (this.config.chainId !== 84532 || !this.isLeader || !this.isRunning) return;
-        const lock = this.distributedLock;
-        const fencingToken = lock.getFencingToken();
-        const isCurrent = () => this.isLeader && this.isRunning && lock.isLeaderInstance() &&
-            lock.getFencingToken() === fencingToken;
+        const leader = this._getRecoveryAuthority();
+        const { isCurrent } = leader;
         if (!isCurrent()) return;
         try {
             const result = await reconcileResaleState(this.db, {
                 chainId: this.config.chainId, coreAddress: this.config.contractAddress, blockNumber,
                 cursor: this.resaleCursor, sweepEnd: this.resaleSweepEnd,
-                leader: { lockName: lock.lockName, instanceId: lock.instanceId, fencingToken }, isCurrent
+                leader, isCurrent
             }, snapshot => readResaleStateAtBlock(this.eventListener, snapshot));
             if (!isCurrent()) return;
             this.resaleCursor = result.cursor;

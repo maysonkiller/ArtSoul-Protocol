@@ -15,8 +15,10 @@ candidate `a375be94` passed CI40937573466: Linux 2,947 pass/two skips, Windows
 The boundary-pinned resale slice was merged in PR #397 as `f40bbaa8` after
 candidate `dfd9e5b1` passed CI40940342981: Linux 2,978 pass/two skips, Windows
 2,535 pass/34 skips, 49 contract checks each, builds and static checks.
-The legacy-predecessor slice below is locally tested and requires its own
-exact-candidate CI before merge.
+The legacy-predecessor slice was merged in PR #398 as `bda1d519` after
+candidate `c95e075e` passed CI40941394054: Linux 2,985 pass/two skips, Windows
+2,535 pass/34 skips, 49 contract checks each, builds and static checks.
+The startup slice below is locally tested and awaits exact-candidate CI.
 Production indexer activation is **not done**.
 Full reorg reconstruction remains open. Passing the atomicity tests must not be
 presented as a complete reorg acceptance or Phase B closure.
@@ -57,9 +59,9 @@ successful completion, permitting catch-up on the next poll after a failure.
   digest recomputation, and cursor/hash update. SQL failure rolls back all of
   these effects, including the existing media revision/quarantine effects.
 - Never advance either cursor during rewind; reject invalid block boundaries
-  and absent state before event deletion. Startup recovery uses the same path
-  and replays from the actual committed cursor, even when a queued safe-block
-  hint is ahead of that cursor.
+  and absent state before event deletion. Startup recovery uses the same path;
+  the startup follow-up below rejects stale versioned hints and delegates replay
+  to the runner's confirmed-head catch-up.
 - Preserve the egress fix: the database returns one SHA-256 digest, never its
   complete block-hash history. The transaction computes that digest from its
   own post-delete state.
@@ -215,11 +217,38 @@ The corrected candidate passed the entire suite before merge.
 The diagnostic baseline remains separately preserved; it is not a green
 regression test that asserts broken projection behavior as acceptable.
 
+## Startup recovery and leadership drain
+
+Startup previously queued a `system-recovery` job without a matching consumer,
+then continued catch-up. Its callable recovery path also replayed through the
+current unconfirmed head. A failed start could leave the runner marked running,
+preventing a later election from retrying correctly.
+
+Startup now completes the atomic rewind synchronously before catch-up. It uses
+the original versioned state snapshot and rejects changed cursor, deployment or
+row revision. Authority is mandatory even when there are no resale rows. A
+captured local lock epoch prevents reuse of an old authority after reacquisition
+with the same token and instance. Startup recovery and catch-up are drainable:
+leadership loss and shutdown wait for them, and a failed start releases the lock
+and remains retryable. A stopped attempt cannot install polling timers.
+
+Validation: 27 focused unit tests; 64 real PostgreSQL scenarios (65 TAP tests
+including the parent); 22 compatibility checks, three Docker skips. Independent
+read-only review found no blocker in this bounded slice. The root full unit run
+initially found four existing mock-query failures because the state SELECT now
+includes its row revision. The fixture was updated without relaxing the event
+integrity assertions; the final local suite passed 2,574 tests with 34 skips.
+That local total includes unrelated untracked policy tests; clean CI remains
+the release authority. Private logs: `b35-startup-full-unit-final.log`, disposable
+cluster evidence `reorg-atomicity-1793303753685-23764-16eb52b2/evidence.json`.
+The disposable PostgreSQL cluster was stopped. No live recovery was performed.
+
 ## Open acceptance and exact next step
 
-Next: require the legacy slice's exact-candidate CI, then fence event writers and
-queued recovery against stale leadership and concurrent replay. Extend the
-clean-replay oracle to delivery deduplication.
+Next: require the startup slice's exact-candidate CI, then fence all event,
+block-hash and cursor writers against stale leadership and concurrent replay.
+Startup guards do not fence every writer or status update. Extend the clean-replay
+oracle to delivery deduplication.
 Primary auction/end/extension/payment/default, mint/floor, trust and metrics
 now have the local recovery evidence above. Full owner/provenance acceptance
 still needs to account for transfers absent from the prototype event stream.

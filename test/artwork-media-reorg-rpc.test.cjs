@@ -617,6 +617,9 @@ test('media registration and indexer rollback share an atomic revision fence (Po
         chain_id NUMERIC(78,0) PRIMARY KEY, last_indexed_block BIGINT NOT NULL,
         last_confirmed_block BIGINT NOT NULL, confirmation_depth INTEGER NOT NULL,
         last_indexed_at TIMESTAMPTZ, state_hash TEXT, contract_address TEXT);
+        CREATE TABLE public.distributed_locks(lock_name TEXT PRIMARY KEY,instance_id TEXT NOT NULL,
+          fencing_token BIGINT NOT NULL,expires_at TIMESTAMPTZ NOT NULL);
+        INSERT INTO public.distributed_locks VALUES('fixture-recovery','fixture-worker',1,clock_timestamp()+INTERVAL '1 hour');
         CREATE TABLE public.block_hashes(chain_id NUMERIC(78,0) NOT NULL,block_number BIGINT NOT NULL,
           block_hash VARCHAR(66) NOT NULL,parent_hash VARCHAR(66) NOT NULL,timestamp BIGINT NOT NULL,
           indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(chain_id,block_number));`);
@@ -648,6 +651,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
           const before=await snapshot(),beforeWorker=await workerState(),beforeClaim=await claimRow(value);
           const foreignClaim=await claimRow(foreign),observed=await revision();
           const engine=new IndexerSyncEngine(database,{chainId:84532,async getCurrentBlock(){networkReads++;return 119;}});
+          engine.getRecoveryAuthority=()=>({lockName:'fixture-recovery',instanceId:'fixture-worker',fencingToken:'1',isCurrent:()=>true});
           const run=async()=>method==='_handleReorg'?engine._handleReorg(120):engine.recoverFromSafeBlock(await engine.getIndexerState());
           if(failRollback) {
             await pool.query(`CREATE FUNCTION public._fail_worker_reorg() RETURNS trigger LANGUAGE plpgsql AS $f$
@@ -662,7 +666,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
           } else {
             await run();
             assert.equal(await revision(),'1');assert.equal(purges,1);
-            assert.equal(networkReads,method==='recoverFromSafeBlock'?1:0);
+            assert.equal(networkReads,0);
             await assert.rejects(reconcile(value,evidence(value),observed),/MEDIA_REGISTRATION_STALE_REVISION/);
             const after=await snapshot(),afterWorker=await workerState(),afterClaim=await claimRow(value);
             assert.equal(afterClaim.claim_status,'conflict');

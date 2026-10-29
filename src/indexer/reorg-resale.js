@@ -15,30 +15,37 @@ function requireCurrent(plan) {
 // All archive RPC reads finish before the rewind transaction takes locks. A
 // prepared snapshot is disposable: cursor/row/leadership changes require a new
 // preparation, never partial application or a fallback to latest state.
-export async function prepareResaleRewind(client, chainId, requestedBoundary, listener, getAuthority) {
+export async function prepareResaleRewind(client, chainId, requestedBoundary, listener, getAuthority, expectedState = null) {
+    const authority = getAuthority?.();
+    if (!authority?.lockName || !authority.instanceId ||
+        !uintPattern.test(String(authority.fencingToken)) || typeof authority.isCurrent !== 'function') {
+        throw new Error('Reorg authority or deployment unavailable');
+    }
+    requireCurrent({ authority });
     const { rows } = await client.query(stateSql, [String(chainId)]);
     if (rows.length !== 1) throw new Error('Missing indexer state for reorg');
     const state = rows[0];
+    if (expectedState && (String(expectedState.chain_id) !== String(chainId) ||
+        ['last_indexed_block','last_confirmed_block','contract_address','revision']
+            .some(key => String(state[key]) !== String(expectedState[key])))) {
+        throw new Error('Startup recovery snapshot is stale');
+    }
     const indexed = Number(state.last_indexed_block), confirmed = Number(state.last_confirmed_block);
     if (![indexed, confirmed].every(value => Number.isSafeInteger(value) && value >= 0)) {
         throw new Error('Invalid indexer cursor for reorg');
     }
     const rewindTo = Math.min(indexed, requestedBoundary - 1);
-    // A queued hint ahead of the real cursor must not retain facts after the
-    // state snapshot boundary. The replay and deletion boundaries agree.
+    // Never retain facts after the state snapshot boundary.
     const boundary = rewindTo + 1;
-    const plan = { chainId: String(chainId), state, rewindTo, boundary,
+    const plan = { chainId: String(chainId), state, rewindTo, boundary, authority,
         confirmedTo: Math.min(confirmed, rewindTo), rows: [], listings: [] };
     plan.rows = (await client.query(rowsSql, [plan.chainId, boundary])).rows;
     if (!plan.rows.length) return plan;
-    const authority = getAuthority?.();
     if (Number(chainId) !== 84532 || !addressPattern.test(listener?.contractAddress || '') ||
         listener.contractAddress.toLowerCase() !== state.contract_address?.toLowerCase() ||
-        Number(listener.chainId) !== Number(chainId) || !authority?.lockName || !authority.instanceId ||
-        !uintPattern.test(String(authority.fencingToken)) || typeof authority.isCurrent !== 'function') {
+        Number(listener.chainId) !== Number(chainId)) {
         throw new Error('Reorg resale authority or deployment unavailable');
     }
-    plan.authority = authority;
     requireCurrent(plan);
     const hashes = (await client.query(`SELECT block_hash FROM public.block_hashes
         WHERE chain_id=$1 AND block_number=$2`, [plan.chainId, rewindTo])).rows;
@@ -64,7 +71,6 @@ export async function prepareResaleRewind(client, chainId, requestedBoundary, li
 }
 
 export async function verifyResaleRewindAuthority(client, plan) {
-    if (!plan.authority) return;
     requireCurrent(plan);
     const { lockName, instanceId, fencingToken } = plan.authority;
     // Run after acquiring the row lock and again immediately before commit.
@@ -76,14 +82,12 @@ export async function verifyResaleRewindAuthority(client, plan) {
 }
 
 export async function lockResaleRewind(client, plan) {
-    if (plan.authority) {
-        const { lockName, instanceId, fencingToken } = plan.authority;
-        const locked = await client.query(`SELECT lock_name FROM public.distributed_locks
-            WHERE lock_name=$1 AND instance_id=$2 AND fencing_token=$3 FOR SHARE`,
-        [lockName, instanceId, String(fencingToken)]);
-        if (locked.rows.length !== 1) throw new Error('Reorg resale leadership changed');
-        await verifyResaleRewindAuthority(client, plan);
-    }
+    const { lockName, instanceId, fencingToken } = plan.authority;
+    const locked = await client.query(`SELECT lock_name FROM public.distributed_locks
+        WHERE lock_name=$1 AND instance_id=$2 AND fencing_token=$3 FOR SHARE`,
+    [lockName, instanceId, String(fencingToken)]);
+    if (locked.rows.length !== 1) throw new Error('Reorg resale leadership changed');
+    await verifyResaleRewindAuthority(client, plan);
     const { rows } = await client.query(`${stateSql} FOR UPDATE`, [plan.chainId]);
     const state = rows[0];
     if (rows.length !== 1 || ['last_indexed_block','last_confirmed_block','contract_address','revision']
