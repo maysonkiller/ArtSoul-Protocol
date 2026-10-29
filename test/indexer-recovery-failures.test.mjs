@@ -66,6 +66,15 @@ test('startup recovery propagates failure before any chain read or replay', asyn
     await assert.rejects(engine.recoverFromSafeBlock({ last_confirmed_block: '109' }), error => error === failure);
 });
 
+test('startup replay begins after the actual cursor when its supplied safe-block hint is ahead', async () => {
+    const { engine } = transactionFixture({ indexed: 99, confirmed: 90 });
+    let replay;
+    engine.eventListener = { async getCurrentBlock() { return 115; } };
+    engine.syncHistoricalEvents = async (...args) => { replay = args; };
+    await engine.recoverFromSafeBlock({ last_confirmed_block: '109' });
+    assert.deepEqual(replay, [100, 115], 'do not skip the range between the actual cursor and queued hint');
+});
+
 test('a detected mismatch cannot swallow recovery failure as an RPC error', async t => {
     t.mock.method(console, 'error', () => {});
     const engine = Object.create(Engine.prototype);

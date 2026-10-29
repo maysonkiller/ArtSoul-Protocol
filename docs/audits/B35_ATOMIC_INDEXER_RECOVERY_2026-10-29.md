@@ -46,7 +46,9 @@ successful completion, permitting catch-up on the next poll after a failure.
   digest recomputation, and cursor/hash update. SQL failure rolls back all of
   these effects, including the existing media revision/quarantine effects.
 - Never advance either cursor during rewind; reject invalid block boundaries
-  and absent state before event deletion. Startup recovery uses the same path.
+  and absent state before event deletion. Startup recovery uses the same path
+  and replays from the actual committed cursor, even when a queued safe-block
+  hint is ahead of that cursor.
 - Preserve the egress fix: the database returns one SHA-256 digest, never its
   complete block-hash history. The transaction computes that digest from its
   own post-delete state.
@@ -64,7 +66,7 @@ was added.
 
 - `node --test test/indexer-recovery-failures.test.mjs
   test/indexer-state-hash-egress.test.mjs test/indexer-leadership-drain.test.mjs
-  test/resale-state-reconciliation.test.mjs`: 21 pass, one Docker-dependent skip.
+  test/resale-state-reconciliation.test.mjs`: 22 pass, one Docker-dependent skip.
 - With `ARTSOUL_TEST_POSTGRES_BIN` set to installed local binaries,
   `node --test test/indexer-reorg-atomicity.test.cjs`: seven pass, no skips.
   A fresh loopback-only cluster is created and stopped by the test; no existing
@@ -72,7 +74,7 @@ was added.
   hash deletion and cursor update, and post-commit cache retry are exercised.
   Rollback preserves both chains byte-for-byte in the SQL snapshots; successful
   rewind changes only its own chain and keeps the digest/cursor consistent.
-- `npm run test:unit`: 2,563 pass, 34 environment-dependent skips, zero failures.
+- `npm run test:unit`: 2,564 pass, 34 environment-dependent skips, zero failures.
   The local total includes pre-existing untracked authority-policy tests, which
   are not part of this change. The new real-PostgreSQL test was run separately
   as described above, rather than counted as exercised by this generic run.
@@ -85,6 +87,11 @@ was added.
 Private local evidence: `docs/private/b34-unit-focused.log`,
 `b34-postgres.log`, `b34-full-unit.log`, and the retained disposable-cluster
 evidence under `reorg-atomicity-1793298457004-17656-b12339a6`.
+Final replay-boundary/fixture-portability recheck: `b35-focused-final.log`
+(29 pass, one Docker skip, including seven real PostgreSQL checks) and
+`b35-full-unit-final.log`. Baseline candidate ef11878d also passed exact
+Linux/Windows builds, units, contracts and static CI40931945276; the final
+candidate requires its own CI result before merge.
 The diagnostic baseline remains separately preserved; it is not a green
 regression test that asserts broken projection behavior as acceptable.
 

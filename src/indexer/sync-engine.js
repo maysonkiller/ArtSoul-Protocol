@@ -200,13 +200,13 @@ class IndexerSyncEngine {
 
         const safeBlock = Number(state.last_confirmed_block);
         // Startup recovery must use the same atomic rewind as a detected reorg.
-        await this._handleReorg(safeBlock + 1);
+        const replayFrom = (await this._handleReorg(safeBlock + 1)) + 1;
 
         // Reprocess missing blocks only after a successful rewind and purge.
         const currentBlock = await this.eventListener.getCurrentBlock();
-        if (currentBlock > safeBlock) {
-            console.log(`[IndexerSyncEngine] Reprocessing blocks ${safeBlock + 1} to ${currentBlock}`);
-            await this.syncHistoricalEvents(safeBlock + 1, currentBlock);
+        if (currentBlock >= replayFrom) {
+            console.log(`[IndexerSyncEngine] Reprocessing blocks ${replayFrom} to ${currentBlock}`);
+            await this.syncHistoricalEvents(replayFrom, currentBlock);
         }
 
         console.log(`[IndexerSyncEngine] Self-healing recovery complete.`);
@@ -575,6 +575,7 @@ class IndexerSyncEngine {
         }
         console.log(`[IndexerSyncEngine] Handling reorg from block ${reorgBlock}`);
         const client = await this.db.pool.connect();
+        let rewindTo;
         try {
             await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
             const { rows } = await client.query(
@@ -582,7 +583,7 @@ class IndexerSyncEngine {
                 [this._chainIdString()]
             );
             if (rows.length !== 1) throw new Error('Missing indexer state for reorg');
-            const rewindTo = Math.min(Number(rows[0].last_indexed_block), reorgBlock - 1);
+            rewindTo = Math.min(Number(rows[0].last_indexed_block), reorgBlock - 1);
             const confirmedTo = Math.min(Number(rows[0].last_confirmed_block), rewindTo);
             await client.query('SELECT rollback_events_from_block($1, $2)', [reorgBlock, this._chainIdString()]);
             await client.query('DELETE FROM block_hashes WHERE chain_id = $1 AND block_number >= $2',
@@ -602,7 +603,8 @@ class IndexerSyncEngine {
         }
         this.recoveryCachePurgePending = true;
         await this._purgeRecoveryCache();
-        console.log(`[IndexerSyncEngine] Indexer state reset to block ${reorgBlock - 1}`);
+        console.log(`[IndexerSyncEngine] Indexer state reset to block ${rewindTo}`);
+        return rewindTo;
     }
 
     async _purgeRecoveryCache() {

@@ -53,6 +53,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const directory = path.join(ROOT, 'docs', 'private', `reorg-atomicity-${suffix}`);
   const data = path.join(directory, 'cluster');
   const executable = name => path.join(path.resolve(BIN), `${name}${process.platform === 'win32' ? '.exe' : ''}`);
+  fs.mkdirSync(path.dirname(directory), {recursive: true});
   fs.mkdirSync(directory); // Never reuse or overwrite another cluster.
   const port = await freePort();
   const evidence = {kind: 'atomic-rewind-regression', directory, port, host: '127.0.0.1', results: []};
