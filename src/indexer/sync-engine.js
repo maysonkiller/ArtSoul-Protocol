@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { enqueueAIJob } from '../queue.js';
 import { projectDonation } from './donation-events.js';
-import { restorePrimaryReorgProjections } from './reorg-projections.js';
+import { restorePrimaryReorgProjections, captureLegacyReorgUsers, restoreLegacyReorgProjections } from './reorg-projections.js';
 import { prepareResaleRewind, lockResaleRewind, applyResaleRewind, verifyResaleRewindAuthority } from './reorg-resale.js';
 import cacheService from '../services/cache-service.js';
 import {
@@ -585,9 +585,11 @@ class IndexerSyncEngine {
             await lockResaleRewind(client, plan);
             rewindTo = plan.rewindTo;
             const confirmedTo = plan.confirmedTo;
+            const legacyUsers = await captureLegacyReorgUsers(client, this._chainIdString(), plan.boundary);
             await client.query('SELECT rollback_events_from_block($1, $2)', [plan.boundary, this._chainIdString()]);
             await restorePrimaryReorgProjections(client, this._chainIdString(), plan.boundary);
             await applyResaleRewind(client, plan);
+            await restoreLegacyReorgProjections(client, this._chainIdString(), plan.boundary, legacyUsers);
             await client.query('DELETE FROM block_hashes WHERE chain_id = $1 AND block_number >= $2',
                 [this._chainIdString(), plan.boundary]);
             const stateHash = await this._computeStateHash(confirmedTo, client);

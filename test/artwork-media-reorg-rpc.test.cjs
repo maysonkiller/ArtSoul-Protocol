@@ -130,6 +130,11 @@ test('media registration and indexer rollback share an atomic revision fence (Po
         ADD artwork_id NUMERIC(78,0), ADD token_id NUMERIC(78,0), ADD floor_price NUMERIC(78,0),
         ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
       ALTER TABLE public.v41_resale_listings ADD token_id NUMERIC(78,0), ADD last_updated_block BIGINT;
+      ALTER TABLE public.v41_project_eligibility ADD user_address TEXT, ADD eligibility_hash TEXT,
+        ADD achieved BOOLEAN, ADD transaction_hash TEXT, ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_genesis_holders ADD user_address TEXT, ADD token_id NUMERIC(78,0),
+        ADD eligibility_hash TEXT, ADD transaction_hash TEXT, ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      ALTER TABLE public.contract_events ADD event_name TEXT, ADD event_data JSONB, ADD indexed_at TIMESTAMPTZ;
       CREATE TABLE public.v41_trust_signals(chain_id NUMERIC(78,0),user_address TEXT,
         successful_settlements INTEGER,failed_settlements INTEGER,suspicious_flags INTEGER,
         last_updated_block BIGINT,last_updated_at TIMESTAMPTZ);`);
