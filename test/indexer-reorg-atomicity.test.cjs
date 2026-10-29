@@ -1,5 +1,5 @@
 // Atomic rewind, primary projections and boundary-pinned resale regression.
-// Includes legacy prototype predecessors; writer fencing remains a separate gate.
+// Includes legacy prototype predecessors and concurrent writer recovery fences.
 // Run with ARTSOUL_TEST_POSTGRES_BIN pointing at local PostgreSQL binaries.
 // Always creates its own loopback-only cluster; never accepts a database URL.
 const assert = require('node:assert/strict');
@@ -26,6 +26,12 @@ async function freePort() {
   const port = server.address().port;
   await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   return port;
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return {promise, resolve};
 }
 
 function isolatedEngineSource() {
@@ -101,19 +107,33 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const engineFile = path.join(directory, 'isolated-engine.mjs');
   fs.writeFileSync(engineFile, isolatedEngineSource());
   const Engine = (await import(pathToFileURL(engineFile).href)).default;
+  // Exercise the shipped confirmation method without importing runner startup,
+  // dotenv configuration, provider constructors or monitoring timers.
+  const runnerSource = read('src/indexer/production-runner.js');
+  const confirmationStart = runnerSource.indexOf('    async _processConfirmations(');
+  const confirmationEnd = runnerSource.indexOf('\n    async getHealth(',confirmationStart);
+  assert.ok(confirmationStart>0 && confirmationEnd>confirmationStart);
+  const runnerFile = path.join(directory,'isolated-confirmation-runner.mjs');
+  fs.writeFileSync(runnerFile,`export default class ConfirmationRunner {\n${runnerSource.slice(confirmationStart,confirmationEnd)}\n}\n`);
+  const ConfirmationRunner = (await import(pathToFileURL(runnerFile).href)).default;
+  const Database = (await import(pathToFileURL(path.join(ROOT, 'src/indexer/postgresql-database.js')).href)).default;
   let beforeSql = null;
   const db = {pool: {async connect() {
     const client = await pool.connect();
     return {async query(sql, values) {await beforeSql?.(sql, client);return client.query(sql, values);},
       release: () => client.release()};
-  }}, query: async (sql, values) => (await pool.query(sql, values)).rows};
+  }}, query: async (sql, values) => (await pool.query(sql, values)).rows,
+    batchInsert: Database.prototype.batchInsert};
   const engine = chain => new Engine(db, {chainId: chain,contractAddress:CORE});
   const target = engine(CHAIN), other = engine(OTHER_CHAIN);
   const resaleInterface = new Interface(['function resaleListings(uint256) view returns(address seller,uint256 price,bool active)']);
   const resaleStates = new Map(), resaleReads = [];
-  let rpcHook = null, leaderCurrent = true;
-  target.getRecoveryAuthority = () => ({lockName:'fixture-reorg',instanceId:'fixture-worker',fencingToken:'1',
-    isCurrent: () => leaderCurrent});
+  let rpcHook = null, leaderCurrent = true, leaderEpoch = 0;
+  target.getRecoveryAuthority = () => {
+    const epoch = leaderEpoch;
+    return {lockName:'fixture-reorg',instanceId:'fixture-worker',fencingToken:'1',
+      isCurrent: () => leaderCurrent && leaderEpoch === epoch};
+  };
   target.eventListener._readRpcCall = async operation => operation({async send(method, params) {
     await rpcHook?.(method,params);
     if(method==='eth_chainId') return '0x14a34';
@@ -158,7 +178,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   async function reset() {
     // Local database only; all included tables were just created by this test.
     await pool.query(`TRUNCATE ${tables.join(',')},outbox_events,distributed_locks CASCADE`);
-    beforeSql = null;rpcHook = null;leaderCurrent = true;resaleStates.clear();resaleReads.length=0;
+    beforeSql = null;rpcHook = null;leaderCurrent = true;leaderEpoch = 0;resaleStates.clear();resaleReads.length=0;
     await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
       VALUES('fixture-reorg','fixture-worker',1,clock_timestamp()+INTERVAL '1 hour')`);
     await pool.query('INSERT INTO artwork_media_chain_revisions VALUES(84532,0)');
@@ -179,6 +199,323 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     }
   }
   t.beforeEach(reset);
+  function historicalWriter(events) {
+    const writer = engine(CHAIN);
+    writer.getRecoveryAuthority = target.getRecoveryAuthority;
+    writer._shouldSkipEmptyBlockHashBackfill = () => true;
+    Object.assign(writer.eventListener, {
+      queryAllHistoricalEvents: async () => events,
+      getCurrentBlock: async () => 132,
+      getBlock: async number => ({hash:hash(number),parentHash:hash(number-1),timestamp:1700000000+number*2})
+    });
+    return writer;
+  }
+  function bufferedBid(block = 118) {
+    return {eventName:'BidPlaced',eventData:{auctionId:1,bidder:WINNER,bidAmount:2500,depositAmount:10000},
+      blockNumber:block,transactionHash:hash(block+10000),logIndex:0,contractAddress:CORE,
+      blockHash:hash(block),timestamp:1700000000000+block*2000};
+  }
+  async function writerSnapshot() {
+    return {chain:await snapshot(CHAIN),
+      outbox:(await pool.query('SELECT to_jsonb(o) AS value FROM outbox_events o ORDER BY id')).rows.map(row=>row.value)};
+  }
+  const fenceLost = error => error?.code === 'INDEXER_WRITE_FENCE_LOST';
+  const settle = operation => operation.then(value=>({value}),error=>({error}));
+  async function reach(gate, operation) {
+    await Promise.race([gate.promise, operation.then(outcome => {
+      throw new Error(`Operation finished before reaching its concurrency gate: ${outcome.error?.message || 'unexpected success'}`);
+    })]);
+  }
+  for (const withEvent of [true,false]) await t.test(`stale buffered ${withEvent?'event':'empty header-only'} range cannot write after rewind`, async () => {
+    const entered = deferred(), release = deferred();
+    const events = withEvent ? [bufferedBid()] : [];
+    const writer = historicalWriter(events);
+    writer.eventListener.queryAllHistoricalEvents = async () => {entered.resolve();await release.promise;return events;};
+    const result = settle(writer.syncHistoricalEvents(116,120,{currentBlock:132}));
+    await reach(entered,result);
+    let before;
+    try {await target._handleReorg(BOUNDARY);before=await writerSnapshot();}
+    finally {release.resolve();}
+    const outcome = await result, after = await writerSnapshot();
+    evidence.results.push({scenario:`buffered_${withEvent?'event':'empty'}_range_after_rewind`,
+      rejected:Boolean(outcome.error),error:outcome.error?.message,before,after});
+    assert.ok(fenceLost(outcome.error),'a range fetched before recovery must fail with its original fence');
+    assert.deepEqual(after,before,'stale logs cannot change projections, registry, outbox, headers, digest or cursors');
+  });
+  await t.test('same-cursor recovery changes the generation and rejects the older buffered range', async () => {
+    const entered = deferred(), release = deferred(), writer = historicalWriter([bufferedBid()]);
+    writer.eventListener.queryAllHistoricalEvents = async () => {entered.resolve();await release.promise;return [bufferedBid()];};
+    const stateBefore = await target.getIndexerState();
+    const result = settle(writer.syncHistoricalEvents(116,120,{currentBlock:132}));
+    await reach(entered,result);
+    let before;
+    try {
+      await target._handleReorg(116);
+      const stateAfter = await target.getIndexerState();
+      assert.equal(stateAfter.last_indexed_block,stateBefore.last_indexed_block);
+      assert.equal(stateAfter.last_confirmed_block,stateBefore.last_confirmed_block);
+      assert.notEqual(stateAfter.revision,stateBefore.revision);
+      before = await writerSnapshot();
+    } finally {release.resolve();}
+    const outcome = await result;
+    assert.ok(fenceLost(outcome.error));
+    assert.deepEqual(await writerSnapshot(),before);
+    evidence.results.push({scenario:'buffered_range_same_cursor_rewind_ABA',rejected:true,cursorsUnchanged:true});
+  });
+  for (const loss of ['local leadership loss','same-token epoch ABA','database token replaced','database lease expired']) {
+    await t.test(`${loss} during log RPC rejects all later range writes`, async () => {
+      const entered = deferred(), release = deferred(), writer = historicalWriter([bufferedBid()]);
+      writer.eventListener.queryAllHistoricalEvents = async () => {entered.resolve();await release.promise;return [bufferedBid()];};
+      const result = settle(writer.syncHistoricalEvents(116,120,{currentBlock:132}));
+      await reach(entered,result);
+      let before;
+      try {
+        if (loss === 'local leadership loss') leaderCurrent = false;
+        if (loss === 'same-token epoch ABA') leaderEpoch++;
+        if (loss === 'database token replaced') await pool.query('UPDATE distributed_locks SET fencing_token=2');
+        if (loss === 'database lease expired') await pool.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second'");
+        before = await writerSnapshot();
+      } finally {release.resolve();}
+      const outcome = await result;
+      assert.ok(fenceLost(outcome.error));
+      assert.deepEqual(await writerSnapshot(),before);
+      evidence.results.push({scenario:`range_RPC_${loss}`,rejected:true,noWrites:true});
+    });
+  }
+  await t.test('a header response buffered before recovery cannot overwrite its boundary afterward', async () => {
+    const entered = deferred(), release = deferred(), writer = historicalWriter([]);
+    writer.eventListener.getBlock = async number => {
+      entered.resolve();await release.promise;
+      return {hash:hash(number),parentHash:hash(number-1),timestamp:1700000000+number*2};
+    };
+    const result = settle(writer.syncHistoricalEvents(116,120,{currentBlock:132}));
+    await reach(entered,result);
+    let before;
+    try {await target._handleReorg(BOUNDARY);before=await writerSnapshot();}
+    finally {release.resolve();}
+    const outcome = await result;
+    assert.ok(fenceLost(outcome.error));
+    assert.deepEqual(await writerSnapshot(),before);
+  });
+  await t.test('an event with a committed claim waits behind rewind and cannot adopt its new generation', async () => {
+    const writer = historicalWriter([bufferedBid()]), context = await writer._captureWriteContext();
+    const eventPaused = deferred(), releaseEvent = deferred(), rewindLocked = deferred(), releaseRewind = deferred();
+    let eventLocks = 0, eventClient, rewindClient, rewindStarted = false;
+    beforeSql = async (sql, client) => {
+      if (!rewindStarted && /FROM\s+(?:public\.)?indexer_state\b/i.test(sql) && /FOR UPDATE/i.test(sql) && ++eventLocks === 2) {
+        eventClient=client;eventPaused.resolve();await releaseEvent.promise;
+      }
+      if (sql.includes('SELECT rollback_events_from_block')) {
+        rewindClient=client;rewindLocked.resolve();await releaseRewind.promise;
+      }
+    };
+    const eventResult = settle(writer.processEvent(bufferedBid(),context));
+    await reach(eventPaused,eventResult);
+    const claim = await pool.query('SELECT processing_status FROM event_processing_registry WHERE chain_id=$1 AND transaction_hash=$2',
+      [CHAIN,bufferedBid().transactionHash]);
+    assert.equal(claim.rows[0]?.processing_status,'processing','the first claim must already be committed');
+    rewindStarted=true;
+    const rewindResult = settle(target._handleReorg(BOUNDARY));
+    try {
+      await reach(rewindLocked,rewindResult);
+      releaseEvent.resolve();
+      const deadline = Date.now()+5000;
+      let blocked = false;
+      while (Date.now()<deadline && !blocked) {
+        blocked = (await pool.query('SELECT $2::INT=ANY(pg_blocking_pids($1::INT)) AS blocked',
+          [eventClient.processID,rewindClient.processID])).rows[0].blocked;
+        if (!blocked) await new Promise(resolve=>setTimeout(resolve,10));
+      }
+      assert.equal(blocked,true,'the event must wait on the real rewind transaction, not a JavaScript-only gate');
+    } finally {releaseEvent.resolve();releaseRewind.resolve();}
+    const rewind = await rewindResult, outcome = await eventResult;
+    assert.ifError(rewind.error);assert.ok(fenceLost(outcome.error));
+    const after = await writerSnapshot();
+    assert.equal(after.chain.v41_bids.length,0);
+    assert.equal(after.chain.event_processing_registry.some(row=>row.transaction_hash===bufferedBid().transactionHash),false);
+    assert.equal(after.chain.indexer_state[0].last_indexed_block,109);
+    await assert.rejects(writer.processEvent(bufferedBid(),context),fenceLost);
+    assert.deepEqual(await writerSnapshot(),after,'retrying the same payload must retain its original fence');
+    evidence.results.push({scenario:'committed_claim_projection_waits_for_rewind',blockedInPostgres:true,retryRejected:true});
+  });
+  await t.test('header SQL failure rejects the range before events or checkpoint writes', async () => {
+    const writer = historicalWriter([bufferedBid()]), before = await writerSnapshot();
+    await pool.query(`CREATE FUNCTION fixture_fail_header() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_HEADER_FAILURE'; END $f$;
+      CREATE TRIGGER fixture_fail_header BEFORE INSERT OR UPDATE ON block_hashes
+      FOR EACH ROW EXECUTE FUNCTION fixture_fail_header()`);
+    try {await assert.rejects(writer.syncHistoricalEvents(116,120,{currentBlock:132}),/FORCED_HEADER_FAILURE/);}
+    finally {await pool.query('DROP TRIGGER fixture_fail_header ON block_hashes; DROP FUNCTION fixture_fail_header()');}
+    assert.deepEqual(await writerSnapshot(),before);
+  });
+  for (const failure of ['digest calculation','checkpoint update']) await t.test(`${failure} failure preserves both cursors and the previous digest atomically`, async () => {
+    const writer = historicalWriter([]), before = (await snapshot(CHAIN)).indexer_state;
+    let failed = false;
+    if (failure === 'digest calculation') beforeSql = async (sql,client) => {
+      if (sql.includes('string_agg')) {failed=true;await client.query('SELECT 1/0');}
+    };
+    else await pool.query(`CREATE FUNCTION fixture_fail_checkpoint() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_CHECKPOINT_FAILURE'; END $f$;
+      CREATE TRIGGER fixture_fail_checkpoint BEFORE UPDATE OF state_hash ON indexer_state
+      FOR EACH ROW EXECUTE FUNCTION fixture_fail_checkpoint()`);
+    try {await assert.rejects(writer.syncHistoricalEvents(116,120,{currentBlock:132}),/division by zero|FORCED_CHECKPOINT_FAILURE/);}
+    finally {
+      beforeSql=null;
+      if (failure === 'checkpoint update') await pool.query('DROP TRIGGER fixture_fail_checkpoint ON indexer_state; DROP FUNCTION fixture_fail_checkpoint()');
+    }
+    if (failure === 'digest calculation') assert.equal(failed,true,'digest computation must use the fenced transaction client');
+    assert.deepEqual((await snapshot(CHAIN)).indexer_state,before,'neither cursor nor timestamp/total may escape the failed checkpoint transaction');
+    await writer.syncHistoricalEvents(116,120,{currentBlock:132});
+    const after = await target.getIndexerState();
+    assert.equal(after.last_indexed_block,120);assert.equal(after.last_confirmed_block,120);
+    assert.equal(after.state_hash,await target._computeStateHash(120));
+    evidence.results.push({scenario:`checkpoint_${failure}_rollback`,bothCursorsAndDigestPreserved:true,retrySucceeded:true});
+  });
+  await t.test('a fresh range commits ordered events and one coherent checkpoint under the same generation', async () => {
+    const first = bufferedBid(118), second = bufferedBid(119);
+    second.eventData.bidAmount=3500;second.eventData.bidder=CREATOR;
+    const writer = historicalWriter([second,first]), foreign = await snapshot(OTHER_CHAIN);
+    assert.equal(await writer.syncHistoricalEvents(116,120,{currentBlock:132}),2);
+    const after = await snapshot(CHAIN), state = await target.getIndexerState();
+    assert.equal(after.v41_bids.length,2);
+    assert.equal(String(after.v41_auctions[0].current_bid),'3500');
+    assert.equal(after.v41_auctions[0].current_bidder,CREATOR);
+    assert.equal(after.event_processing_registry.filter(row=>row.block_number>115 && row.processing_status==='completed').length,2);
+    assert.equal(state.last_indexed_block,120);assert.equal(state.last_confirmed_block,120);
+    assert.equal(state.state_hash,await target._computeStateHash(120));
+    assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);
+    evidence.results.push({scenario:'fresh_ordered_range',events:2,cursor:120,digest:state.state_hash});
+  });
+  await t.test('a missing header rejects the range before any event or checkpoint is written', async () => {
+    const writer = historicalWriter([bufferedBid()]), before = await writerSnapshot();
+    writer.eventListener.getBlock = async () => null;
+    await assert.rejects(writer.syncHistoricalEvents(116,120,{currentBlock:132}),/Missing or invalid header/);
+    assert.deepEqual(await writerSnapshot(),before);
+  });
+  for (const operation of ['range','event','start']) await t.test(`unconfigured ${operation} authority cannot write`, async () => {
+    const writer = historicalWriter([bufferedBid()]), before = await writerSnapshot();
+    writer.getRecoveryAuthority=undefined;
+    writer.eventListener.queryAllHistoricalEvents=async()=>assert.fail('unconfigured authority must fail before log RPC');
+    const run = operation==='range' ? ()=>writer.syncHistoricalEvents(116,120,{currentBlock:132})
+      : operation==='event' ? ()=>writer.processEvent(bufferedBid()) : ()=>writer.start();
+    await assert.rejects(run(),fenceLost);
+    assert.deepEqual(await writerSnapshot(),before);
+  });
+  await t.test('leadership expiry after the handler rolls back event, projections and notification writes', async () => {
+    await apply(target,'BidPlaced',111,{auctionId:1,bidder:CREATOR,bidAmount:1500,depositAmount:10000});
+    const writer = historicalWriter([bufferedBid()]), context = await writer._captureWriteContext();
+    const before = await writerSnapshot();
+    let handlerCompleted = false;
+    beforeSql = async (sql,client) => {
+      if (sql.includes("SET processing_status = 'completed'")) {
+        handlerCompleted=true;
+        assert.equal((await client.query('SELECT COUNT(*)::INT AS count FROM v41_bids WHERE chain_id=$1',[CHAIN])).rows[0].count,2);
+        assert.ok((await client.query('SELECT COUNT(*)::INT AS count FROM outbox_events')).rows[0].count>before.outbox.length,
+          'the outbid notification must have been written inside the transaction');
+        await client.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second'");
+      }
+    };
+    try {await assert.rejects(writer.processEvent(bufferedBid(),context),fenceLost);}
+    finally {beforeSql=null;}
+    assert.equal(handlerCompleted,true);
+    const after = await writerSnapshot(), claim = after.chain.event_processing_registry.find(row=>row.transaction_hash===bufferedBid().transactionHash);
+    assert.ok(claim);assert.notEqual(claim.processing_status,'completed');
+    after.chain.event_processing_registry=after.chain.event_processing_registry.filter(row=>row.transaction_hash!==bufferedBid().transactionHash);
+    assert.deepEqual(after,before,'only the separately committed processing claim may survive');
+    evidence.results.push({scenario:'event_expiry_after_handler',handlerAndNotificationExecuted:true,allProjectionWritesRolledBack:true});
+  });
+  await t.test('startup expiry before commit leaves the original status and cursor unchanged', async () => {
+    const writer = historicalWriter([]), before = await writerSnapshot();
+    let attempted = false;
+    beforeSql = async (sql,client) => {
+      if (sql.includes("status = 'running'")) {
+        attempted=true;await client.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second'");
+      }
+    };
+    try {await assert.rejects(writer.start(),fenceLost);}
+    finally {beforeSql=null;}
+    assert.equal(attempted,true);assert.equal(writer.isRunning,false);
+    assert.deepEqual(await writerSnapshot(),before);
+  });
+  await t.test('stopping after leadership loss cannot overwrite the successor running status', async () => {
+    const writer = historicalWriter([]);
+    writer.isRunning=true;writer.eventListener.stopListening=async()=>{};
+    leaderCurrent=false;
+    await pool.query("UPDATE distributed_locks SET instance_id='successor',fencing_token=2");
+    await pool.query("UPDATE indexer_state SET status='running',last_indexed_at=clock_timestamp() WHERE chain_id=$1",[CHAIN]);
+    const before=await writerSnapshot();
+    await writer.stop();
+    assert.equal(writer.isRunning,false);assert.deepEqual(await writerSnapshot(),before);
+  });
+  await t.test('a stop awaiting its listener cannot adopt same-token leadership from a later epoch', async () => {
+    const writer = historicalWriter([]), entered=deferred(), release=deferred();
+    writer.isRunning=true;
+    writer.eventListener.stopListening=async()=>{entered.resolve();await release.promise;};
+    const result=settle(writer.stop());
+    await reach(entered,result);
+    let before;
+    try {
+      leaderEpoch++;
+      await pool.query("UPDATE indexer_state SET status='running',last_indexed_at=clock_timestamp() WHERE chain_id=$1",[CHAIN]);
+      before=await writerSnapshot();
+    } finally {release.resolve();}
+    const outcome=await result;assert.ifError(outcome.error);
+    assert.equal(writer.isRunning,false);assert.deepEqual(await writerSnapshot(),before);
+    evidence.results.push({scenario:'stop_same_token_epoch_ABA',successorStatusPreserved:true});
+  });
+  async function confirmationRunner() {
+    await pool.query('UPDATE indexer_state SET last_confirmed_block=105,state_hash=$1 WHERE chain_id=$2',
+      [await target._computeStateHash(105),CHAIN]);
+    const writer=historicalWriter([]);
+    return Object.assign(new ConfirmationRunner(),{config:{chainId:CHAIN},syncEngine:writer,
+      eventListener:writer.eventListener,confirmationDepth:12});
+  }
+  for (const interruption of ['rewind','leadership loss']) await t.test(`confirmation head RPC buffered before ${interruption} cannot advance state afterward`, async () => {
+    const runner=await confirmationRunner(), entered=deferred(), release=deferred();
+    runner.eventListener.getCurrentBlock=async()=>{entered.resolve();await release.promise;return 132;};
+    const result=settle(runner._processConfirmations());
+    await reach(entered,result);
+    let before;
+    try {
+      if(interruption==='rewind') await target._handleReorg(BOUNDARY);
+      else leaderCurrent=false;
+      before=await writerSnapshot();
+    } finally {release.resolve();}
+    const outcome=await result;assert.ok(fenceLost(outcome.error));
+    assert.deepEqual(await writerSnapshot(),before);
+    evidence.results.push({scenario:`confirmation_RPC_${interruption}`,staleCheckpointRejected:true});
+  });
+  await t.test('confirmation commits its clamped cursor and matching digest together', async () => {
+    const runner=await confirmationRunner();
+    runner.eventListener.getCurrentBlock=async()=>assert.fail('an observed head should not trigger another RPC');
+    await runner._processConfirmations(132);
+    const state=await target.getIndexerState();
+    assert.equal(state.last_indexed_block,115);assert.equal(state.last_confirmed_block,115);
+    assert.equal(state.state_hash,await target._computeStateHash(115));
+  });
+  await t.test('confirmation failure at commit rolls back the already written cursor and digest', async () => {
+    const runner=await confirmationRunner(), before=await writerSnapshot();
+    const expectedDigest=await target._computeStateHash(115);
+    await pool.query(`CREATE FUNCTION fixture_fail_confirmation_commit() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_CONFIRMATION_COMMIT_FAILURE'; END $f$;
+      CREATE CONSTRAINT TRIGGER fixture_fail_confirmation_commit AFTER UPDATE ON indexer_state
+      DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fixture_fail_confirmation_commit()`);
+    let updated=false;
+    beforeSql=async(sql,client)=>{
+      if(sql==='COMMIT') {
+        const state=(await client.query('SELECT last_confirmed_block,state_hash FROM indexer_state WHERE chain_id=$1',[CHAIN])).rows[0];
+        assert.equal(Number(state.last_confirmed_block),115);assert.equal(state.state_hash,expectedDigest);updated=true;
+      }
+    };
+    try {await assert.rejects(runner._processConfirmations(132),/FORCED_CONFIRMATION_COMMIT_FAILURE/);}
+    finally {
+      beforeSql=null;
+      await pool.query('DROP TRIGGER fixture_fail_confirmation_commit ON indexer_state; DROP FUNCTION fixture_fail_confirmation_commit()');
+    }
+    assert.equal(updated,true,'both values must have been written before PostgreSQL rejects COMMIT');
+    assert.deepEqual(await writerSnapshot(),before);
+    evidence.results.push({scenario:'confirmation_deferred_commit_failure',cursorAndDigestWrittenBeforeFailure:true,allStateRolledBack:true});
+  });
   async function assertRewound(otherBefore) {
     const after = await snapshot(CHAIN);
     assert.equal(after.v41_bids.length, 0);

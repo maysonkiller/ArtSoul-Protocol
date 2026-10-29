@@ -27,6 +27,8 @@ test('lifecycle inbox uses actual indexer events and private versioned PostgreSQ
   for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');await delay(100);await pool.query('SELECT 1');break;}catch(error){if(attempt>=80)throw error;await delay(250);}}
   await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
   for(const migration of listIndexerMigrations())await pool.query(migration.sql);
+  await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+    VALUES('notification-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query(`CREATE TABLE artwork_moderation_visibility(chain_id NUMERIC,artwork_id NUMERIC,hidden BOOLEAN);
     CREATE TABLE artwork_media_chain_revisions(chain_id NUMERIC PRIMARY KEY,revision NUMERIC(78,0) NOT NULL);
     INSERT INTO artwork_media_chain_revisions VALUES(84532,0);
@@ -51,14 +53,16 @@ test('lifecycle inbox uses actual indexer events and private versioned PostgreSQ
   assert.equal(await v1Snapshot(),v1Hash,'install preserves v1 function definitions, existing columns and constraints');
   const {default:Engine}=await import('../src/indexer/sync-engine.js');
   const engine=new Engine({pool,query:async(q,p)=>(await pool.query(q,p)).rows},{chainId:84532,contractAddress:CORE,donationAddress:OLD});
+  engine.getRecoveryAuthority=()=>({lockName:'notification-fixture',instanceId:'worker-fixture',fencingToken:'1',isCurrent:()=>true});
   let block=100;
   const hash=n=>`0x${BigInt(n).toString(16).padStart(64,'0')}`;
   async function event(name,data,source=CORE){
+    const context=await engine._captureWriteContext();
     const n=++block;
     await pool.query('INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp) VALUES(84532,$1,$2,$3,$4)',[n,hash(n+10000),hash(n+9999),1700000000+n]);
     const value={eventName:name,eventData:data,blockNumber:n,logIndex:0,transactionHash:hash(n),timestamp:(1700000000+n)*1000};
     if(source!==null)value.contractAddress=source;
-    await engine._processEvent(value);return value;
+    await engine._processEvent(value,context);return value;
   }
   const register=id=>event('ArtworkRegistered',{artworkId:String(id),creator:A,metadataURI:'ipfs://fixture'});
   const auction=(id,artwork=id,source=CORE)=>event('AuctionCreated',{auctionId:String(id),artworkId:String(artwork),creator:A,startPrice:'1000',duration:'86400',endTime:'2000000000',chainId:'84532'},source);
@@ -93,7 +97,7 @@ test('lifecycle inbox uses actual indexer events and private versioned PostgreSQ
     assert.ok(bidRows.find(row=>row.payload.type==='outbid').idempotency_key.endsWith('-0-notification'));
     assert.equal(bidRows.find(row=>row.payload.type==='bid_received').idempotency_key,
       `notification-v2-${crypto.createHash('sha256').update(`84532-${second.transactionHash}-0-notification-bid_received-${A}`).digest('hex')}`);
-    for(const value of [second,settlement,resaleEvent]){const before=await sourceRows(value);await engine._processEvent(value);assert.deepEqual(await sourceRows(value),before);}
+    for(const value of [second,settlement,resaleEvent]){const before=await sourceRows(value);await engine._processEvent(value,await engine._captureWriteContext());assert.deepEqual(await sourceRows(value),before);}
     for(const wallet of [A,B,C])for(const item of (await read(wallet)).items)assert.equal(typeof item.id,'string');
   });
 
@@ -179,8 +183,8 @@ test('lifecycle inbox uses actual indexer events and private versioned PostgreSQ
     assert.equal((await sourceRows(completed)).length,0);
     assert.equal((await pool.query('SELECT count(*)::INT n FROM auction_notification_reads WHERE outbox_id=ANY($1::BIGINT[])',[rows.map(row=>row.id)])).rows[0].n,0);
     assert.deepEqual(await mark(B,[rows[0].id],true),{updated:false});
-    await engine._processEvent(completed);const rebuilt=await sourceRows(completed);assert.equal(rebuilt.length,2);
-    await engine._processEvent(completed);assert.deepEqual(await sourceRows(completed),rebuilt);
+    await engine._processEvent(completed,await engine._captureWriteContext());const rebuilt=await sourceRows(completed);assert.equal(rebuilt.length,2);
+    await engine._processEvent(completed,await engine._captureWriteContext());assert.deepEqual(await sourceRows(completed),rebuilt);
     for(const row of rebuilt)assert.equal((await read(row.payload.recipient)).items.find(item=>item.id===row.id).read,false);
   });
 
@@ -198,8 +202,8 @@ test('lifecycle inbox uses actual indexer events and private versioned PostgreSQ
     await pool.query('DROP TRIGGER reject_sale_notice_fixture ON outbox_events; DROP FUNCTION reject_sale_notice_fixture();');
     const retry={eventName:'SettlementCompleted',eventData:{auctionId:'61',artworkId:'61',winner:B,finalPrice:'2000',tokenId:'61'},
       blockNumber:block,logIndex:0,transactionHash:failedTx,timestamp:(1700000000+block)*1000,contractAddress:CORE};
-    await engine._processEvent(retry);assert.equal((await sourceRows(retry)).length,2);
-    await engine._processEvent(retry);assert.equal((await sourceRows(retry)).length,2);
+    await engine._processEvent(retry,await engine._captureWriteContext());assert.equal((await sourceRows(retry)).length,2);
+    await engine._processEvent(retry,await engine._captureWriteContext());assert.equal((await sourceRows(retry)).length,2);
   });
 
   await t.test('completed pre-rollout events are not replayed to backfill lifecycle notices',async()=>{
@@ -208,7 +212,7 @@ test('lifecycle inbox uses actual indexer events and private versioned PostgreSQ
     let historical;
     try{engine._writeAuctionLifecycleNotificationsTx=async()=>{};historical=await bid(62);}finally{engine._writeAuctionLifecycleNotificationsTx=producer;}
     assert.equal((await sourceRows(historical)).length,0);
-    await engine._processEvent(historical);assert.equal((await sourceRows(historical)).length,0);
+    await engine._processEvent(historical,await engine._captureWriteContext());assert.equal((await sourceRows(historical)).length,0);
   });
 
   await t.test('v2 RPCs have explicit grants, private helpers and fail-closed revision state after idempotent install',async()=>{

@@ -169,25 +169,55 @@ test('a recovered range refreshes the gauge back to zero', async () => {
 
 test('reaping an abandoned lease refreshes the failure gauge immediately', async () => {
     const { indexer, calls, setCounts } = await createIndexer();
+    const { default: Engine } = await import(moduleUrl('src/indexer/sync-engine.js'));
+    const state = { chain_id: String(CHAIN_ID), contract_address: 'fixture-core', revision: '1',
+        last_indexed_block: 100, last_confirmed_block: 100 };
+    const authority = { lockName: 'reaper-fixture', instanceId: 'worker-fixture',
+        fencingToken: '1', isCurrent: () => true };
+    const statements = [];
+    const previousCounts = indexer.syncEngine.getEventFailureCounts;
     indexer.db.query = async (sql, params) => {
+        assert.match(sql, /SELECT \*, xmin::TEXT AS revision FROM indexer_state/);
+        assert.deepEqual(params, [String(CHAIN_ID)]);
+        return [{ ...state }];
+    };
+    indexer.db.pool = { async connect() { return {
+      async query(sql, params) {
+        statements.push(sql);
+        if (/^BEGIN|^COMMIT|^ROLLBACK/.test(sql)) return { rows: [] };
+        if (/FROM public\.distributed_locks/.test(sql)) {
+            assert.deepEqual(params, [authority.lockName, authority.instanceId, authority.fencingToken]);
+            return { rows: [{ lock_name: authority.lockName }] };
+        }
+        if (/SELECT \*, xmin::TEXT AS revision FROM indexer_state/.test(sql)) {
+            assert.match(sql, /FOR UPDATE$/);
+            return { rows: [{ ...state }] };
+        }
         assert.match(sql, /SET processing_status = 'failed'/);
         assert.doesNotMatch(sql, /retry_count\s*=/);
         assert.deepEqual(params, [String(CHAIN_ID), 120000]);
         setCounts({ failed: 1, dead: 0 });
-        return [{
+        return { rows: [{
             event_hash: '0xstale',
             event_name: 'BidPlaced',
             retry_count: 0,
             previous_owner: 'worker-before-crash',
             stale_seconds: 125
-        }];
-    };
+        }] };
+      },
+      release() { statements.push('release'); }
+    }; } };
+    indexer.syncEngine = new Engine(indexer.db, { chainId: CHAIN_ID, contractAddress: 'fixture-core' });
+    indexer.syncEngine.getRecoveryAuthority = () => authority;
+    indexer.syncEngine.getEventFailureCounts = previousCounts;
 
     const reaped = await indexer._reapStaleEventProcessingLeases();
 
     assert.equal(reaped.length, 1);
     assert.equal(calls.failureCounts, 1);
     assert.deepEqual(calls.gaugeWrites, [{ failed: 1, dead: 0 }]);
+    assert.match(statements[1], /distributed_locks[\s\S]*FOR SHARE$/);
+    assert.deepEqual(statements.slice(-2), ['COMMIT', 'release']);
 });
 
 test('an empty range performs no failure-registry query', async () => {

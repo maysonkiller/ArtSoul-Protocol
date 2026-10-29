@@ -69,18 +69,23 @@ test('canonical log order preserves dependent projections and stops at the first
     }
     await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
     for (const migration of listIndexerMigrations()) await pool.query(migration.sql);
+    await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+        VALUES('log-order-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
     await pool.query(`INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,
         confirmation_depth,last_indexed_at,started_at) VALUES(84532,$1,100,100,3,now(),now())`, [CORE]);
     const db = { pool, query: async (sql, params) => (await pool.query(sql, params)).rows, isBackpressure: () => false };
     let supplied = [];
     const metrics = { recordBlockProcessed() {}, recordEventProcessed() {}, updateBackpressure() {}, updateConcurrency(value) { this.concurrency = value; } };
-    const engine = new Engine(db, { chainId: 84532, queryAllHistoricalEvents: async () => supplied }, metrics);
+    const engine = new Engine(db, { chainId: 84532, contractAddress: CORE, queryAllHistoricalEvents: async () => supplied }, metrics);
+    engine.getRecoveryAuthority = () => ({ lockName: 'log-order-fixture', instanceId: 'worker-fixture',
+        fencingToken: '1', isCurrent: () => true });
     // Block fetching is unrelated to event order and cannot access live RPCs.
     engine._shouldSkipEmptyBlockHashBackfill = () => true;
     engine._storeBlockHashesForBlocks = async () => {};
     async function run(events) {
         supplied = events;
-        const from = Math.min(...events.map(item => item.blockNumber));
+        const from = Math.min(Number((await engine.getIndexerState()).last_indexed_block) + 1,
+            ...events.map(item => item.blockNumber));
         const to = Math.max(...events.map(item => item.blockNumber));
         return engine.syncHistoricalEvents(from, to, { currentBlock: to + 3 });
     }

@@ -27,6 +27,8 @@ test('auction inbox proves source, recipient, confirmation and durable private s
   for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');await delay(100);await pool.query('SELECT 1');break;}catch(error){if(attempt>=80)throw error;await delay(250);}}
   await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
   for(const migration of listIndexerMigrations())await pool.query(migration.sql);
+  await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+    VALUES('notification-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query(`CREATE TABLE artwork_moderation_visibility(chain_id NUMERIC,artwork_id NUMERIC,hidden BOOLEAN);
     CREATE TABLE artwork_media_chain_revisions(chain_id NUMERIC PRIMARY KEY,revision NUMERIC(78,0) NOT NULL);
     INSERT INTO artwork_media_chain_revisions VALUES(84532,0);
@@ -36,14 +38,16 @@ test('auction inbox proves source, recipient, confirmation and durable private s
   await pool.query('INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,last_indexed_at,started_at) VALUES(84532,$1,1000,1000,now(),now())',[CORE]);
   const {default:Engine}=await import('../src/indexer/sync-engine.js');
   const engine=new Engine({pool,query:async(q,p)=>(await pool.query(q,p)).rows},{chainId:84532,contractAddress:CORE,donationAddress:OLD});
+  engine.getRecoveryAuthority=()=>({lockName:'notification-fixture',instanceId:'worker-fixture',fencingToken:'1',isCurrent:()=>true});
   let block=100;
   const hash=n=>`0x${BigInt(n).toString(16).padStart(64,'0')}`;
   async function event(name,data,source=CORE){
+    const context=await engine._captureWriteContext();
     const n=++block,tx=hash(n);
     await pool.query('INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp) VALUES(84532,$1,$2,$3,$4)',[n,hash(n+1000),hash(n+999),1700000000+n]);
     const value={eventName:name,eventData:data,blockNumber:n,logIndex:0,transactionHash:tx,timestamp:(1700000000+n)*1000};
     if(source!==null)value.contractAddress=source;
-    await engine._processEvent(value);return {block:n,tx};
+    await engine._processEvent(value,context);return {block:n,tx};
   }
   const register=(id,source=CORE)=>event('ArtworkRegistered',{artworkId:String(id),creator:A,metadataURI:'ipfs://fixture'},source);
   const auction=(id,artwork=id,source=CORE)=>event('AuctionCreated',{auctionId:String(id),artworkId:String(artwork),creator:A,startPrice:'1000',duration:'86400',endTime:'2000000000',chainId:'84532'},source);

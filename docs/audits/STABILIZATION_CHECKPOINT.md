@@ -1,3 +1,153 @@
+October 29 B35 buffered writer fence / local checks complete, CI pending:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / base HEAD d02fa6e3.
+Baseline paused ranges resurrected a bid/header/cursor after rewind109.
+New short-lived immutable authority/state-version context precedes RPC; header,
+event claim/projection/failure, checkpoint, status, reaper and confirmation writes
+reject stale context. Confirmation digest/cursor atomic. Missing headers fail.
+Read-only API rebuild rejects before deletion; invalid deployment fails startup.
+90 real-PG tests pass, no skips; cluster stopped. Local full compatibility run
+2577 pass/34 skips, four focused entrypoint checks and build/route/CSS pass.
+Independent review found no blocker; all three bounded helpers have finished.
+No production worker activation, live rollback, migration, billing or contracts.
+Recovery patch/docs and unrelated untracked files retained. See B35 audit for
+before/after evidence. Renewal waits behind slow SQL remain a liveness risk.
+Exactly next: submit this bounded candidate and require Linux/Windows CI,
+including Docker integration, before merge; then delivery deduplication.
+
+October 29 continuation / Protocol search COMPLETE / B35 startup MERGED:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+HEAD d02fa6e3c70a008e95c109ec8cdd5d16edc4bbf0 (main, PR400).
+PR399 / d48fd9f5 released core robots.txt and sitemap.xml after exact
+CI40945901458. Preview/apex both files return 200 and match source. Google
+verified artsoulprotocol.com ownership for artsoulprotocol@gmail.com after
+explicit DNS approval; sitemap Success, three discovered pages. Screenshot:
+docs/private/search-console-protocol-sitemap-success-20261029.jpg.
+No OS DNS/access changes, billing changes or new service purchase by the agent.
+PR398 legacy reconstruction merged bda1d519 after CI40941394054.
+PR400 startup recovery now precedes confirmed catch-up, requires versioned
+snapshot/leadership including zero-resale rewinds, captures lock epoch and drains
+startup before shutdown/reacquisition. Candidate 4d833e09 passed CI40947174617:
+Linux 3007 pass/two skips; Windows 2545 pass/34 skips; 49 contract checks each;
+both builds/static. Local final units 2574 pass/34 skips includes unrelated
+untracked tests. Four earlier mock-query failures fixed without changing event
+integrity assertions. 64 isolated real-PG scenarios passed; cluster stopped.
+No production indexer activation, live rollback, schema/contract/economic change.
+PRs399/400 attachment attempt hit app's 100-identity limit; PR URLs remain in
+reports. All helpers finished; no pending device action or signature required.
+Remaining tracked local diff: this checkpoint and B35 audit/backlog final status.
+Unrelated untracked .codex/, output/, infrastructure report/model and authority
+policy source/test are preserved. Generated build CSS copied to private evidence
+then restored to tracked source; no unrelated implementation staged.
+Risk: full buffered event/header/cursor writer fencing, delivery dedupe, durable
+cache invalidation and independent DB/object restore remain open. B is NOT closed.
+Exactly next: reproduce a buffered pre-rewind range writing after recovery in
+the existing disposable PostgreSQL fixture, then apply shared writer fencing.
+See docs/private/B35_NEXT_RECOVERY_SLICE.md; never reproduce via live rollback.
+
+October 29 Phase B / B35 resale MERGED, legacy follow-up under validation:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+HEAD f40bbaa80bf852e8a96359a8cf4c5c7909303797. PR397 candidate dfd9e5b1
+passed exact CI40940342981: Linux 2978 pass/two skips, Windows 2535 pass/34
+skips, 49 contracts each, both builds/static. Both PostgreSQL recovery fixtures
+passed; local focused 68 pass/two skips includes 46 real-schema checks. Full
+local units 2564 pass/34 skips includes unrelated untracked policy tests.
+Resale restore uses exact boundary hash, eight-read batches, cursor/row revision
+checks and locked leadership checks after waits/before commit. No worker rollout.
+Legacy predecessor restoration is the current small uncommitted follow-up:
+reorg-projections.js, sync-engine.js and two database fixtures. First local run
+68 pass/one Docker skip includes 53 real PostgreSQL checks; full checks pending.
+Independent bounded reviewer found no blocker; all helpers finished. Unrelated
+untracked files and prior recovery copies/stash remain preserved. No paid service,
+live RPC/database/rollback/migration/signature or production indexer activation.
+Exactly next: finish legacy exact-candidate validation and reviewed PR, then
+address shared recovery/event-writer fencing before worker activation.
+
+October 29 Phase B continuation / B33 released / B35 primary reconstruction:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+HEAD a9ef3e3f89214e50f2e9a63f90194ddb13ed7863. PR396 merged after final
+candidate a375be94 passed CI40937573466: Linux 2947 pass/two skips,
+Windows 2535 pass/34 skips, 49 contracts each, both builds and static checks.
+Both Linux recovery fixtures passed, including all 15 real-schema checks.
+PR395 previously merged after final
+candidate b4fddec0 passed CI40932702941. B34 remains media-backup issue394;
+B35 is the incremental reorg correction. No worker rollout yet.
+B33 PR392/main0d2f547e is released: exact CI40859544072, seven local tests,
+build and actual Chrome outage navigation/mobile/theme/keyboard checks pass.
+Preview/apex serve identical profile-DEXcc0Jf.js bytes; read the B33 evidence.
+Temporary local server stopped, viewport reset and test tab closed.
+B35 primary helper now restores retained auction/artwork/trust fields inside
+the rewind transaction without replaying notification handlers. Real-schema
+tests cover lifecycle, same-block ordering, retained trust counts, clean replay
+equivalence and rollback on reconstruction failure. Existing Docker media
+fixture supplies all reconstruction columns; Linux CI requires isolated PG.
+37 focused passes/two Docker skips, including 15 real PG tests; full local units
+2564 pass/34 skips, zero failures (includes unrelated untracked policy tests).
+Cluster reorg-atomicity-1793300349291-24008-bc72ef9e stopped. Focused independent
+review finished without a remaining primary-slice blocker; all helpers finished.
+Primary follow-up PR396 is merged. Prior candidate
+CI40936553945 passed Windows and both Linux recovery fixtures but failed an
+unrelated TOTP fixture at a 30s boundary. Its test-only setup was corrected;
+38 local crypto checks pass. No production auth logic or acceptance window changed.
+Worker NOT activated. No live rollback,
+migration, billing change, paid service, contract change or signature.
+See audits/B35_ATOMIC_INDEXER_RECOVERY_2026-10-29.md and private
+b35-projection-focused-final.log / b35-projection-unit-final.log.
+Primary implementation/test/CI/audit/backlog changes are committed and pushed;
+all other existing dirty/untracked files remain preserved.
+Uncommitted research report/model and checkpoint preserved; unrelated policy
+source/test, .codex/ and output/ remain untouched. Recovery copies and stash
+'B33 preserve infrastructure checkpoint 2026-10-29' remain available.
+Exactly next: implement hash-pinned resale restoration at the rewind boundary,
+using the existing RPC primitive and explicit cursor/row/leadership checks;
+see docs/private/B35_NEXT_RECOVERY_SLICE.md for insertion points and acceptance.
+Resale/legacy recovery, writer fencing, reincluded delivery deduplication and
+long-history/restore acceptance remain open before production worker activation.
+Phase B stays open: B1 cohort, B2 operational window, B3 remaining defects and
+B5 founder inputs are not replaced by automated checks. B4 tooling is accepted;
+final Snapshot A remains deferred to late C.
+PR396 source merge does not activate the Hetzner indexer. No live rollout or
+new wallet ceremony occurred. Attachment tool rejected PR396 because this
+chat already exceeds 100 artifact identities; do not delete unrelated attachments.
+Hosted B18 follow-up is retained in the private handoff: in-bounds desktop/
+mobile-emulated menu, but actual Escape does not close it. Do not convert the
+earlier fixture-only Escape pass into hosted acceptance. Browser restored/closed.
+
+October 29 infrastructure research COMPLETE (supersedes older
+provider-state statements below; preserves their historical evidence):
+Workspace C:\Projects\ArtSoul / codex/takeover-audit /
+HEAD0520e3f382469c57305ec311bed20c7f45ee6413; release main4653b47a.
+Mission ARTSOUL_PROTOCOL_INFRA_SCALE_COST_RESEARCH_20261029 is READ_ONLY.
+Owner changed Spend Cap outside this research; dashboard now verifies disabled,
+current cycle Oct29-Nov24 and projected $25. Support distinguishes historical
+pre-disable usage from potentially chargeable later overage. This research did
+not change billing, send messages, deploy, merge, migrate, or sign anything.
+Populated public API and profile reads succeed. Old heavy SQL call count is
+unchanged; replacement returns one row/call. Current short-window usage is small
+but does not certify a daily/monthly budget. Three bounded research helpers are
+finished; their source reviews are in ignored docs/private/infra-*-research files.
+Potential reorg projection reconstruction defect is source- and live-definition
+verified, not reproduced as a production incident; disposable-DB proof remains.
+Vercel account is Hobby; commercial-use eligibility is a separate deployment gate.
+Preserve unrelated untracked policy files, .codex/ and output/.
+Completed local deliverables: docs/audits/INFRA_SCALE_COST_REVIEW_2026-10-29.md
+and docs/audits/infra-capacity-model-2026-10-29.mjs. They cover A-I, five hosting
+options, four explicit load/cost scenarios, threat model, restore/cutover gates,
+prioritized work and 16 additional ideas. No runtime code was modified.
+At17:43 correct exact-detail/feed reads returned HTTP200 with populated data and
+no warnings. At17:44 artwork34 media_url returned HTTP200 and25763 original
+response bytes; this is a bounded availability check, not a backup.
+Validation: node docs/audits/infra-capacity-model-2026-10-29.mjs and ignored
+docs/private/verify-infra-report-2026-10-29.mjs passed arithmetic/structure/link
+checks; git diff --check passed. Independent bounded review corrected SIWE chain
+allowlist and signed-upload enforcement wording. No application suite/build,
+load test, restore or new transaction was run in this research mission.
+Working diff is this checkpoint plus the new report/model; unrelated untracked
+files preserved. No commit/push. All research helpers finished.
+Exactly next: reproduce the pre-boundary-object/orphaned-update reorg case in a
+disposable PostgreSQL fixture before designing a correction; never run rollback
+against production to investigate it. Reconcile PR393 and issue394 first.
+Phase B stays open; no paid service or migration follows from this research.
+
 October 29 B32 RELEASED / B30 owner cost decision:
 Workspace C:\Projects\ArtSoul / codex/takeover-audit / release4653b47a.
 PR391 / candidate488ead5a, CI40794075910 pass: Linux2913/Windows2516 units,

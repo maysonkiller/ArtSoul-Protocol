@@ -27,6 +27,8 @@ test('private current reminders preserve legacy history and prove deadlines in P
   for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');await delay(100);await pool.query('SELECT 1');break;}catch(error){if(attempt>=80)throw error;await delay(250);}}
   await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
   for(const migration of listIndexerMigrations())await pool.query(migration.sql);
+  await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+    VALUES('notification-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query(`CREATE TABLE artwork_moderation_visibility(chain_id NUMERIC,artwork_id NUMERIC,hidden BOOLEAN);
     CREATE TABLE artwork_media_chain_revisions(chain_id NUMERIC PRIMARY KEY,revision NUMERIC(78,0) NOT NULL);
     INSERT INTO artwork_media_chain_revisions VALUES(84532,0);
@@ -45,11 +47,13 @@ test('private current reminders preserve legacy history and prove deadlines in P
   await pool.query('INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp) VALUES(84532,10000,$1,$2,$3)',[hash(10000),hash(9999),now]);
   const {default:Engine}=await import('../src/indexer/sync-engine.js');
   const engine=new Engine({pool,query:async(q,p)=>(await pool.query(q,p)).rows},{chainId:84532,contractAddress:CORE,donationAddress:OLD});
+  engine.getRecoveryAuthority=()=>({lockName:'notification-fixture',instanceId:'worker-fixture',fencingToken:'1',isCurrent:()=>true});
   let block=100;
   async function event(name,data,source=CORE){
+    const context=await engine._captureWriteContext();
     const n=++block,value={eventName:name,eventData:data,blockNumber:n,logIndex:0,transactionHash:hash(n),timestamp:now*1000};
     await pool.query('INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp) VALUES(84532,$1,$2,$3,$4)',[n,hash(n+20000),hash(n+19999),now]);
-    if(source!==null)value.contractAddress=source;await engine._processEvent(value);return value;
+    if(source!==null)value.contractAddress=source;await engine._processEvent(value,context);return value;
   }
   const register=id=>event('ArtworkRegistered',{artworkId:String(id),creator:A,metadataURI:'ipfs://fixture'});
   const auction=(id,artwork=id,deadline=now+1800,source=CORE)=>event('AuctionCreated',{auctionId:String(id),artworkId:String(artwork),creator:A,startPrice:'1000',duration:'86400',endTime:String(deadline),chainId:'84532'},source);

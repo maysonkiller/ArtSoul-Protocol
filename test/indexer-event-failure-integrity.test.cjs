@@ -16,6 +16,8 @@ const { pathToFileURL } = require('node:url');
 const ROOT = path.resolve(__dirname, '..');
 const CHAIN_ID = '84532';
 const OTHER_CHAIN_ID = '11155111';
+const AUTHORITY = { lockName: 'event-failure-fixture', instanceId: 'worker-fixture',
+    fencingToken: '1', isCurrent: () => true };
 
 // The global.setTimeout 30000->1 shim this suite used to install is gone:
 // processEvent now wakes its heartbeat sleep during teardown (A-41), so every
@@ -105,6 +107,11 @@ function createFakeDatabase(options = {}) {
     }
 
     function runQuery(sql, params, store, isTransaction) {
+        if (/FROM public\.distributed_locks/i.test(sql)) {
+            assert.ok(isTransaction, 'leadership must be checked inside a transaction');
+            assert.deepEqual(params, [AUTHORITY.lockName, AUTHORITY.instanceId, AUTHORITY.fencingToken]);
+            return [{ lock_name: AUTHORITY.lockName }];
+        }
         if (/^\s*SELECT encode\(/i.test(sql)) return [{ hash: 'a'.repeat(64) }];
         if (/SELECT block_hash FROM block_hashes/i.test(sql)) return [];
         if (/INSERT INTO block_hashes/i.test(sql)) return [];
@@ -213,7 +220,7 @@ function createFakeDatabase(options = {}) {
             return indexerErrors.filter(row => row.chain_id === String(params[0]) && !row.resolved);
         }
 
-        if (/^\s*(BEGIN|COMMIT|ROLLBACK)\s*$/i.test(sql)) return [];
+        if (/^\s*(BEGIN(?: ISOLATION LEVEL READ COMMITTED)?|COMMIT|ROLLBACK)\s*$/i.test(sql)) return [];
 
         throw new Error(`Unexpected SQL: ${sql.slice(0, 120)}`);
     }
@@ -254,7 +261,7 @@ function createFakeDatabase(options = {}) {
 
                 return {
                     async query(sql, params = []) {
-                        if (/^\s*BEGIN\s*$/i.test(sql)) {
+                        if (/^\s*BEGIN(?: ISOLATION LEVEL READ COMMITTED)?\s*$/i.test(sql)) {
                             overlay = new Map();
                             return { rows: [] };
                         }
@@ -313,6 +320,11 @@ function createEventListener(eventsByRange, currentBlock = 200) {
     return {
         calls,
         chainId: Number(CHAIN_ID),
+        contractAddress: '0xcore',
+        async getBlock(number) {
+            return { hash: `0x${String(number).padStart(64, '0')}`,
+                parentHash: `0x${String(number - 1).padStart(64, '0')}`, timestamp: 1700000000 + number };
+        },
         async queryAllHistoricalEvents(fromBlock, toBlock) {
             calls.push({ fromBlock, toBlock });
             const events = eventsByRange(fromBlock, toBlock);
@@ -336,14 +348,11 @@ async function createEngine({ events, failures = {}, currentBlock = 200 } = {}) 
 
     const engine = new IndexerSyncEngine(db, listener, null);
     engine.chainId = Number(CHAIN_ID);
+    engine.getRecoveryAuthority = () => AUTHORITY;
 
     // Replace the event-specific handlers with a controllable stub. The claim,
     // transaction, rollback, failure-record and cursor logic under test are
     // untouched.
-    const originalProcess = engine.processEvent.bind(engine);
-    engine.processEvent = async function patchedProcessEvent(event) {
-        return originalProcess(event);
-    };
     engine._handleAuctionCreatedTx = async function stubHandler(event) {
         db.stats.handlerCalls.push(`${event.transactionHash}:${event.logIndex}`);
         const key = `${event.transactionHash}:${event.logIndex}`;
@@ -593,6 +602,7 @@ test('a completed record is never downgraded by a late failure write', async () 
     // Simulate a straggling worker recording a failure for an event another
     // worker already completed.
     await engine._recordEventFailure({
+        context: await engine._captureWriteContext(),
         lease: {
             eventHash: completed.event_hash,
             chainId: completed.chain_id,
@@ -632,6 +642,7 @@ test('a repeated failure write cannot mutate a lease after its first terminal tr
         processingStartedAt: first.processing_started_at
     };
     await engine._recordEventFailure({
+        context: await engine._captureWriteContext(),
         lease,
         status: 'dead',
         error: new Error('late duplicate failure')

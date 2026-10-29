@@ -30,6 +30,8 @@ test('event-only backfill keeps one range boundary header for truthful reminder 
   for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');await delay(100);await pool.query('SELECT 1');break;}catch(error){if(attempt>=80)throw error;await delay(250);}}
   await pool.query('CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;');
   for(const migration of listIndexerMigrations())await pool.query(migration.sql);
+  await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+    VALUES('reminder-boundary-fixture','worker-fixture',1,clock_timestamp()+interval '1 hour')`);
   await pool.query(`CREATE TABLE artwork_moderation_visibility(chain_id NUMERIC,artwork_id NUMERIC,hidden BOOLEAN);
     CREATE TABLE artwork_media_chain_revisions(chain_id NUMERIC PRIMARY KEY,revision NUMERIC(78,0) NOT NULL);
     INSERT INTO artwork_media_chain_revisions VALUES(84532,0);`);
@@ -47,6 +49,7 @@ test('event-only backfill keeps one range boundary header for truthful reminder 
     async getBlock(number){fetches.push(number);if(failure==='throw')throw new Error('fixture header unavailable');if(failure==='null')return null;
       return {hash:hash(number),parentHash:hash(number-1),timestamp:seconds};}};
   const {default:Engine}=await import('../src/indexer/sync-engine.js');const engine=new Engine(db,listener);
+  engine.getRecoveryAuthority=()=>({lockName:'reminder-boundary-fixture',instanceId:'worker-fixture',fencingToken:'1',isCurrent:()=>true});
   const event=(eventName,blockNumber,eventData,logIndex=0)=>({eventName,blockNumber,eventData,logIndex,contractAddress:CORE,
     transactionHash:hash(blockNumber*10+logIndex),timestamp:seconds*1000});
   const register=(id,n,logIndex=0)=>event('ArtworkRegistered',n,{artworkId:String(id),creator:A,metadataURI:'ipfs://fixture'},logIndex);
@@ -74,15 +77,22 @@ test('event-only backfill keeps one range boundary header for truthful reminder 
     assert.deepEqual((await headers()).map(row=>row.number),[100000,100002,100010,100013,100020]);
   });
 
-  await t.test('failed or absent boundary headers keep history readable but suppress reminders without fabricated timestamps',async()=>{
+  await t.test('failed or absent boundary headers preserve the prior checkpoint without fabricated timestamps',async()=>{
     const before=await read(),reminderId=before.reminders[0].id;
+    const priorState=(await pool.query('SELECT * FROM indexer_state WHERE chain_id=84532')).rows[0];
     for(const [mode,boundary] of [['throw',100030],['null',100040]]){
-      failure=mode;assert.equal(await run(boundary-9,boundary),0);assert.deepEqual(fetches,[boundary]);
+      failure=mode;await assert.rejects(run(100021,boundary),/fixture header unavailable|Missing or invalid header/);assert.deepEqual(fetches,[boundary]);
       assert.equal((await pool.query('SELECT count(*)::INT n FROM block_hashes WHERE chain_id=84532 AND block_number=$1',[boundary])).rows[0].n,0);
-      const unavailable=await read();assert.equal(unavailable.remindersAvailable,false);assert.deepEqual(unavailable.reminders,[]);assert.deepEqual(unavailable.items,before.items);
-      assert.deepEqual((await pool.query('SELECT mark_auction_notifications_v3($1,$2,$3,true) result',[A,CORE,[reminderId]])).rows[0].result,{updated:false});
+      assert.deepEqual((await pool.query('SELECT * FROM indexer_state WHERE chain_id=84532')).rows[0],priorState);
+      const retained=await read();assert.equal(retained.remindersAvailable,true);assert.equal(retained.reminders[0].id,reminderId);assert.deepEqual(retained.items,before.items);
     }
-    failure=null;await run(100041,100050);const recovered=await read();assert.equal(recovered.remindersAvailable,true);assert.equal(recovered.reminders[0].id,reminderId);
+    // A failed range cannot refresh the previous checkpoint indefinitely.
+    // Once it becomes stale, existing history remains readable but reminder
+    // reads and mutations must still fail closed as before.
+    await pool.query("UPDATE indexer_state SET last_indexed_at=now()-interval '121 seconds' WHERE chain_id=84532");
+    const unavailable=await read();assert.equal(unavailable.remindersAvailable,false);assert.deepEqual(unavailable.reminders,[]);assert.deepEqual(unavailable.items,before.items);
+    assert.deepEqual((await pool.query('SELECT mark_auction_notifications_v3($1,$2,$3,true) result',[A,CORE,[reminderId]])).rows[0].result,{updated:false});
+    failure=null;await run(100021,100050);const recovered=await read();assert.equal(recovered.remindersAvailable,true);assert.equal(recovered.reminders[0].id,reminderId);
   });
 
   await t.test('explicit full backfill retains its existing all-block behavior',async()=>{

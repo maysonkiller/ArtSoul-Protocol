@@ -3,6 +3,8 @@ import { enqueueAIJob } from '../queue.js';
 import { projectDonation } from './donation-events.js';
 import { restorePrimaryReorgProjections, captureLegacyReorgUsers, restoreLegacyReorgProjections } from './reorg-projections.js';
 import { prepareResaleRewind, lockResaleRewind, applyResaleRewind, verifyResaleRewindAuthority } from './reorg-resale.js';
+import { captureWriteContext, lockWriteContext, withWriteContext, verifyWriteAuthority,
+    requireWriteAuthority, IndexerWriteFenceLostError } from './write-fence.js';
 import cacheService from '../services/cache-service.js';
 import {
     V41_EVENT_REQUIRED_FIELDS,
@@ -183,10 +185,11 @@ class IndexerSyncEngine {
             await this.recoverFromSafeBlock(state);
         }
         if (authority && !authority.isCurrent()) throw new Error('Startup leadership changed');
-        await this.db.query(
+        const context = await this._captureWriteContext(authority);
+        await this._withWriteContext(context, client => client.query(
             `UPDATE indexer_state SET status = 'running', last_indexed_at = NOW() WHERE chain_id = $1`,
             [this._chainIdString()]
-        );
+        ));
         if (authority && !authority.isCurrent()) throw new Error('Startup leadership changed');
         this.isRunning = true;
 
@@ -214,19 +217,35 @@ class IndexerSyncEngine {
             return;
         }
 
+        const authority = this.getRecoveryAuthority?.({ allowStopping: true });
         this.isRunning = false;
         await this.eventListener.stopListening();
 
-        await this.db.query(
-            `UPDATE indexer_state SET status = 'stopped', last_indexed_at = NOW() WHERE chain_id = $1`,
-            [this._chainIdString()]
-        );
+        // A lost leader must not overwrite its successor's status. Graceful
+        // shutdown may still own the lock after admission of new work stops.
+        if (authority?.isCurrent()) {
+            try {
+                const context = await this._captureWriteContext(authority);
+                await this._withWriteContext(context, client => client.query(
+                    `UPDATE indexer_state SET status = 'stopped', last_indexed_at = NOW() WHERE chain_id = $1`,
+                    [this._chainIdString()]
+                ));
+            } catch (error) {
+                if (error.code !== 'INDEXER_WRITE_FENCE_LOST') throw error;
+            }
+        }
 
         console.log('[IndexerSyncEngine] Stopped');
     }
 
     async syncHistoricalEvents(fromBlock, toBlock, options = {}) {
         console.log(`[IndexerSyncEngine] Syncing historical events from ${fromBlock} to ${toBlock}`);
+
+        const context = await this._captureWriteContext();
+        if (![fromBlock, toBlock].every(value => Number.isSafeInteger(value) && value >= 0) ||
+            fromBlock > toBlock || fromBlock > context.lastIndexedBlock + 1) {
+            throw new IndexerWriteFenceLostError('range no longer follows the indexed cursor');
+        }
 
         // Projection handlers depend on earlier logs (including within one
         // block). Keep their writes in canonical order, regardless of retrieval
@@ -249,9 +268,9 @@ class IndexerSyncEngine {
                 `${fromBlock}-${toBlock}; storing ${retainedBlockNumbers.length} event/boundary block hashes only.`
             );
 
-            await this._storeBlockHashesForBlocks(retainedBlockNumbers);
+            await this._storeBlockHashesForBlocks(retainedBlockNumbers, context);
         } else {
-            await this._storeBlockHashes(fromBlock, toBlock);
+            await this._storeBlockHashes(fromBlock, toBlock, context);
         }
 
         // Record blocks processed
@@ -284,7 +303,7 @@ class IndexerSyncEngine {
                 this.metrics.updateBackpressure(this.db.isBackpressure());
             }
 
-            const results = await this._processBatchInOrder(batch);
+            const results = await this._processBatchInOrder(batch, context);
 
             processedCount += results.filter(r => r.success).length;
             for (const result of results) {
@@ -295,7 +314,8 @@ class IndexerSyncEngine {
                     logIndex: result.event?.logIndex,
                     eventName: result.event?.eventName,
                     blockNumber: result.event?.blockNumber,
-                    error: result.error?.message
+                    error: result.error?.message,
+                    code: result.error?.code
                 });
             }
             // Do not start the next batch after an earlier event failed.
@@ -333,35 +353,32 @@ class IndexerSyncEngine {
             throw rangeError;
         }
 
-        // Update state with toBlock (not fromBlock + events.length)
-        // This ensures we track the actual block range processed
-        await this.db.query(
-            `UPDATE indexer_state
-             SET last_indexed_block = $1,
-                 last_indexed_at = NOW(),
-                 total_events_indexed = total_events_indexed + $2
-             WHERE chain_id = $3`,
-            [toBlock, processedCount, this._chainIdString()]
-        );
-
-        // Update confirmation state if depth is reached
+        // Finish RPC reads before locking. The checkpoint is atomic, including
+        // its digest; an error cannot leave one cursor ahead of the other.
         const currentBlock = Number.isFinite(Number(options.currentBlock))
             ? Number(options.currentBlock)
             : await this.eventListener.getCurrentBlock();
-        const state = await this.getIndexerState();
-        const safeBlock = currentBlock - state.confirmation_depth;
-
-        if (toBlock <= safeBlock && toBlock > state.last_confirmed_block) {
-            const newStateHash = await this._computeStateHash(toBlock);
-            await this.db.query(
+        await this._withWriteContext(context, async (client, state) => {
+            await client.query(
                 `UPDATE indexer_state
-                 SET last_confirmed_block = $1,
-                     state_hash = $2
+                 SET last_indexed_block = GREATEST(last_indexed_block, $1),
+                     last_indexed_at = NOW(),
+                     total_events_indexed = total_events_indexed + $2
                  WHERE chain_id = $3`,
-                [toBlock, newStateHash, this._chainIdString()]
+                [toBlock, processedCount, this._chainIdString()]
             );
-            console.log(`[IndexerSyncEngine] Block ${toBlock} confirmed as safe. State hash updated.`);
-        }
+            const safeBlock = currentBlock - state.confirmation_depth;
+            if (toBlock <= safeBlock && toBlock > state.last_confirmed_block) {
+                const newStateHash = await this._computeStateHash(toBlock, client);
+                await client.query(
+                    `UPDATE indexer_state
+                     SET last_confirmed_block = $1,
+                         state_hash = $2
+                     WHERE chain_id = $3`,
+                    [toBlock, newStateHash, this._chainIdString()]
+                );
+            }
+        });
 
         // Reaching this point means every event in the range completed.
         console.log(`[IndexerSyncEngine] Synced ${processedCount}/${events.length} historical events`);
@@ -369,7 +386,18 @@ class IndexerSyncEngine {
         return processedCount;
     }
 
-    async _storeBlockHashes(fromBlock, toBlock) {
+    _captureWriteContext(authority) {
+        return captureWriteContext(this, authority);
+    }
+
+    _withWriteContext(context, operation) {
+        if (!context || context.chainId !== this._chainIdString()) {
+            throw new IndexerWriteFenceLostError('missing context or wrong chain');
+        }
+        return withWriteContext(this.db, context, operation);
+    }
+
+    async _storeBlockHashes(fromBlock, toBlock, context) {
         // Store ALL block hashes for reliable reorg detection
         // This is critical for data integrity
         const blocks = [];
@@ -377,7 +405,7 @@ class IndexerSyncEngine {
             blocks.push(block);
         }
 
-        await this._storeBlockHashesForBlocks(blocks);
+        await this._storeBlockHashesForBlocks(blocks, context);
     }
 
     _shouldSkipEmptyBlockHashBackfill() {
@@ -385,79 +413,37 @@ class IndexerSyncEngine {
         return value === '1' || value === 'true' || value === 'yes';
     }
 
-    async _storeBlockHashesForBlocks(blockNumbers) {
+    async _storeBlockHashesForBlocks(blockNumbers, context) {
         const blocks = [...new Set(
             (blockNumbers || [])
                 .map(blockNumber => Number(blockNumber))
                 .filter(Number.isSafeInteger)
         )].sort((a, b) => a - b);
 
-        if (blocks.length === 0) {
-            return;
-        }
-
-        // Batch fetch blocks to reduce RPC calls
+        // Fetch before taking database locks. A missing/failed header must fail
+        // the range, not silently advance a digest over incomplete evidence.
         const FETCH_BATCH_SIZE = 10;
-        const INSERT_BATCH_SIZE = 50;
-
-        let allBlockData = [];
-
         for (let i = 0; i < blocks.length; i += FETCH_BATCH_SIZE) {
+            requireWriteAuthority(context?.authority);
             const batch = blocks.slice(i, i + FETCH_BATCH_SIZE);
-
-            try {
-                // Fetch blocks in parallel
-                const blockPromises = batch.map(blockNumber =>
-                    this.eventListener.getBlock(Number(blockNumber))
-                        .catch(error => {
-                            console.error(`[IndexerSyncEngine] Failed to fetch block ${blockNumber}:`, error.message);
-                            return null;
-                        })
-                );
-
-                const fetchedBlocks = await Promise.all(blockPromises);
-
-                // Collect block data for batch insert
-                for (let j = 0; j < fetchedBlocks.length; j++) {
-                    const block = fetchedBlocks[j];
-                    if (block) {
-                        allBlockData.push([
-                            this._chainIdString(),
-                            batch[j],
-                            block.hash,
-                            block.parentHash,
-                            block.timestamp
-                        ]);
-                    }
+            const fetched = await Promise.all(batch.map(number => this.eventListener.getBlock(number)));
+            const values = [];
+            const tuples = fetched.map((block, index) => {
+                if (!block || !/^0x[0-9a-f]{64}$/i.test(block.hash || '') ||
+                    !/^0x[0-9a-f]{64}$/i.test(block.parentHash || '') ||
+                    !Number.isSafeInteger(Number(block.timestamp)) || Number(block.timestamp) < 0) {
+                    throw new Error(`Missing or invalid header for block ${batch[index]}`);
                 }
-
-                // Insert in batches when we have enough data
-                if (allBlockData.length >= INSERT_BATCH_SIZE) {
-                    const toInsert = allBlockData.splice(0, INSERT_BATCH_SIZE);
-                    await this.db.batchInsert(
-                        'block_hashes',
-                        ['chain_id', 'block_number', 'block_hash', 'parent_hash', 'timestamp'],
-                        toInsert,
-                        '(chain_id, block_number) DO UPDATE SET block_hash = EXCLUDED.block_hash, parent_hash = EXCLUDED.parent_hash, timestamp = EXCLUDED.timestamp'
-                    );
-                }
-            } catch (error) {
-                console.error(`[IndexerSyncEngine] Failed to store block hash batch:`, error.message);
-            }
-        }
-
-        // Insert remaining blocks
-        if (allBlockData.length > 0) {
-            try {
-                await this.db.batchInsert(
-                    'block_hashes',
-                    ['chain_id', 'block_number', 'block_hash', 'parent_hash', 'timestamp'],
-                    allBlockData,
-                    '(chain_id, block_number) DO UPDATE SET block_hash = EXCLUDED.block_hash, parent_hash = EXCLUDED.parent_hash, timestamp = EXCLUDED.timestamp'
-                );
-            } catch (error) {
-                console.error(`[IndexerSyncEngine] Failed to store remaining block hashes:`, error.message);
-            }
+                const offset = values.length;
+                values.push(this._chainIdString(), batch[index], block.hash, block.parentHash, block.timestamp);
+                return `(${[1, 2, 3, 4, 5].map(n => `$${offset + n}`).join(', ')})`;
+            });
+            await this._withWriteContext(context, client => client.query(
+                `INSERT INTO block_hashes (chain_id, block_number, block_hash, parent_hash, timestamp)
+                 VALUES ${tuples.join(', ')} ON CONFLICT (chain_id, block_number) DO UPDATE
+                 SET block_hash=EXCLUDED.block_hash, parent_hash=EXCLUDED.parent_hash, timestamp=EXCLUDED.timestamp`,
+                values
+            ));
         }
     }
 
@@ -612,12 +598,12 @@ class IndexerSyncEngine {
         this.recoveryCachePurgePending = false;
     }
 
-    async _processBatchInOrder(events) {
+    async _processBatchInOrder(events, context) {
         const results = [];
 
         for (const event of events) {
             try {
-                await this._processEvent(event);
+                await this._processEvent(event, context);
                 if (this.metrics) {
                     this.metrics.recordEventProcessed(event.eventName, true);
                 }
@@ -638,8 +624,8 @@ class IndexerSyncEngine {
         return results;
     }
 
-    async _processEvent(event) {
-        return this.processEvent(event);
+    async _processEvent(event, context) {
+        return this.processEvent(event, context);
     }
 
     /**
@@ -647,9 +633,11 @@ class IndexerSyncEngine {
      * current. A stale attempt must never overwrite a newer owner or completed
      * work.
      */
-    async _recordEventFailure({ lease, status, error }) {
+    async _recordEventFailure({ lease, status, error, context }) {
         try {
-            return await recordEventProcessingFailure(this.db, lease, { status, error });
+            return await this._withWriteContext(context, client =>
+                recordEventProcessingFailure({ query: async (sql, values) =>
+                    (await client.query(sql, values)).rows }, lease, { status, error }));
         } catch (registryError) {
             console.error(JSON.stringify({
                 event_hash: lease.eventHash,
@@ -693,12 +681,15 @@ class IndexerSyncEngine {
         return counts;
     }
 
-    async processEvent(event) {
+    async processEvent(event, context) {
+        requireWriteAuthority(context?.authority);
         const eventHash = await this._computeEventHash(event);
         const workerId = process.env.WORKER_ID || `worker-${process.pid}`;
         const correlationId = `${event.transactionHash}-${event.logIndex}`;
         const startTime = Date.now();
-        const lease = await claimEventProcessingLease(this.db, {
+        const lease = await this._withWriteContext(context, client => claimEventProcessingLease({
+            query: async (sql, values) => (await client.query(sql, values)).rows
+        }, {
             eventHash,
             chainId: this._chainIdString(),
             transactionHash: event.transactionHash,
@@ -707,7 +698,7 @@ class IndexerSyncEngine {
             blockNumber: event.blockNumber,
             workerId,
             correlationId
-        });
+        }));
 
         const logData = {
             event_hash: eventHash,
@@ -775,6 +766,10 @@ class IndexerSyncEngine {
                 if (isShuttingDown) break;
 
                 try {
+                    // This update is identity-bound and cannot claim/recreate a
+                    // row. Do not take the state lock here: the projection owns
+                    // it while draining this heartbeat before commit.
+                    requireWriteAuthority(context.authority);
                     const refreshed = await refreshEventProcessingLease(this.db, lease);
                     if (!refreshed) {
                         leaseLost = true;
@@ -787,6 +782,10 @@ class IndexerSyncEngine {
                         break;
                     }
                 } catch (error) {
+                    if (error.code === 'INDEXER_WRITE_FENCE_LOST') {
+                        leaseLost = true;
+                        break;
+                    }
                     console.error(JSON.stringify({
                         event_hash: eventHash,
                         worker_id: workerId,
@@ -808,8 +807,9 @@ class IndexerSyncEngine {
 
         try {
             client = await this.db.pool.connect();
-            await client.query('BEGIN');
+            await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
             transactionStarted = true;
+            await lockWriteContext(client, context);
 
             if (!event.eventData) {
                 throw new Error('Invalid event structure: missing eventData');
@@ -902,6 +902,7 @@ class IndexerSyncEngine {
             }
 
             await completeEventProcessingLease(client, lease);
+            await verifyWriteAuthority(client, context);
             await client.query('COMMIT');
             transactionStarted = false;
 
@@ -951,7 +952,8 @@ class IndexerSyncEngine {
             const recordedFailure = await this._recordEventFailure({
                 lease,
                 status: shouldDLQ ? 'dead' : 'failed',
-                error
+                error,
+                context
             });
 
             console.error(JSON.stringify({

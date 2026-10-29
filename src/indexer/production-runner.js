@@ -93,7 +93,7 @@ class ProductionIndexer {
             }
         );
         this.leaderCheckInterval = null;
-        this.syncEngine.getRecoveryAuthority = () => this._getRecoveryAuthority();
+        this.syncEngine.getRecoveryAuthority = options => this._getRecoveryAuthority(options);
 
         this.confirmationDepth = config.confirmationDepth || 12;
         this.pollInterval = config.pollInterval || 15000;
@@ -139,12 +139,12 @@ class ProductionIndexer {
         console.log('  Distributed Lock:', 'Enabled (multi-instance safe)');
     }
 
-    _getRecoveryAuthority() {
+    _getRecoveryAuthority({ allowStopping = false } = {}) {
         const lock = this.distributedLock;
         const fencingToken = lock.getFencingToken();
         const epoch = lock.epoch;
         return { lockName: lock.lockName, instanceId: lock.instanceId, fencingToken,
-            isCurrent: () => this.isLeader && this.isRunning && !this.isStopping &&
+            isCurrent: () => (allowStopping || (this.isLeader && this.isRunning && !this.isStopping)) &&
                 lock.isLeaderInstance() && lock.epoch === epoch && lock.getFencingToken() === fencingToken };
     }
 
@@ -273,9 +273,12 @@ class ProductionIndexer {
     }
 
     async _reapStaleEventProcessingLeases() {
-        const stuckEvents = await reapStaleEventProcessingLeases(this.db, {
+        const context = await this.syncEngine._captureWriteContext();
+        const stuckEvents = await this.syncEngine._withWriteContext(context, client => reapStaleEventProcessingLeases({
+            query: async (sql, values) => (await client.query(sql, values)).rows
+        }, {
             chainId: this.config.chainId.toString()
-        });
+        }));
 
         if (stuckEvents.length > 0) {
             console.warn(JSON.stringify({
@@ -562,24 +565,8 @@ class ProductionIndexer {
             const hasInvalidChainId = !state.chain_id || parseInt(state.chain_id) === 0;
 
             if (hasInvalidAddress || hasInvalidChainId) {
-                console.warn(`[ProductionIndexer] Detected corrupted state - fixing...`);
-                console.warn(`  Old Contract: ${state.contract_address}`);
-                console.warn(`  Old Chain ID: ${state.chain_id}`);
-
-                // Fix corrupted state
-                await this.db.query(
-                    `UPDATE indexer_state
-                     SET contract_address = $1,
-                         chain_id = $2,
-                         last_indexed_at = NOW()
-                     WHERE chain_id = $2`,
-                    [this.config.contractAddress, this.config.chainId]
-                );
-
-                console.log(`[ProductionIndexer] State fixed:`);
-                console.log(`  New Contract: ${this.config.contractAddress}`);
-                console.log(`  New Chain ID: ${this.config.chainId}`);
-                console.log(`  Resuming from block ${state.last_indexed_block}`);
+                // Startup is not authority to assign old data to a deployment.
+                throw new Error('[ProductionIndexer] Invalid persisted deployment; explicit recovery required');
             } else {
                 // Validate existing state matches config
                 if (state.contract_address !== this.config.contractAddress) {
@@ -785,10 +772,11 @@ class ProductionIndexer {
     }
 
     async _processConfirmations(observedBlock = null) {
-        const currentBlock = Number.isFinite(Number(observedBlock))
+        const context = await this.syncEngine._captureWriteContext();
+        const currentBlock = observedBlock !== null && Number.isFinite(Number(observedBlock))
             ? Number(observedBlock)
             : await this.eventListener.getCurrentBlock();
-        const state = await this.syncEngine.getIndexerState();
+        await this.syncEngine._withWriteContext(context, async (client, state) => {
 
         // A block can never be confirmed before it has been indexed. When a
         // range fails closed, last_indexed_block stops advancing, so this
@@ -804,7 +792,7 @@ class ProductionIndexer {
 
             // Count already-completed events in this confirmed range. The
             // current registry does not store a separate confirmation flag.
-            const result = await this.db.query(
+            const result = await client.query(
                 `SELECT COUNT(*)::BIGINT as count
                  FROM event_processing_registry
                  WHERE chain_id = $1
@@ -813,19 +801,22 @@ class ProductionIndexer {
                 [this.config.chainId.toString(), confirmedBlock]
             );
 
-            const confirmedCount = result[0].count;
+            const confirmedCount = result.rows[0].count;
 
             // Update indexer state
-            await this.db.query(
+            const stateHash = await this.syncEngine._computeStateHash(confirmedBlock, client);
+            await client.query(
                 `UPDATE indexer_state
                  SET last_confirmed_block = $1,
+                     state_hash = $3,
                      last_indexed_at = NOW()
                  WHERE chain_id = $2`,
-                [confirmedBlock, this.config.chainId.toString()]
+                [confirmedBlock, this.config.chainId.toString(), stateHash]
             );
 
             console.log(`[ProductionIndexer] Confirmed ${confirmedCount} events up to block ${confirmedBlock}`);
         }
+        });
     }
 
     async getHealth() {

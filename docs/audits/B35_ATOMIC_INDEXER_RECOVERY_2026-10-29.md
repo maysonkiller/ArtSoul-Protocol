@@ -18,7 +18,7 @@ candidate `dfd9e5b1` passed CI40940342981: Linux 2,978 pass/two skips, Windows
 The legacy-predecessor slice was merged in PR #398 as `bda1d519` after
 candidate `c95e075e` passed CI40941394054: Linux 2,985 pass/two skips, Windows
 2,535 pass/34 skips, 49 contract checks each, builds and static checks.
-The startup slice below is locally tested and awaits exact-candidate CI.
+The startup slice was merged in PR #400 as `d02fa6e3` after candidate `4d833e09` passed CI40947174617: Linux 3,007 pass/two skips, Windows 2,545 pass/34 skips, 49 contract checks each, builds and static checks.
 Production indexer activation is **not done**.
 Full reorg reconstruction remains open. Passing the atomicity tests must not be
 presented as a complete reorg acceptance or Phase B closure.
@@ -243,12 +243,64 @@ the release authority. Private logs: `b35-startup-full-unit-final.log`, disposab
 cluster evidence `reorg-atomicity-1793303753685-23764-16eb52b2/evidence.json`.
 The disposable PostgreSQL cluster was stopped. No live recovery was performed.
 
+## Buffered writer fencing (October 29 follow-up)
+
+Reproduction on the previous `d02fa6e3` source: pause a range's log response,
+rewind from 115 to 109, then resume it. Both a buffered BidPlaced at 118 and an
+empty range restored old headers and advanced indexed/confirmed cursors to 120.
+The event case also resurrected the bid and completed registry row. Both new
+regression cases failed before the patch; the 64 earlier scenarios still passed.
+
+The writer now captures leadership and the indexer-state row version before
+fetching logs/headers. Every header batch, event claim/projection/failure and
+checkpoint locks leadership then state before writing; changed versions,
+deployment or authority reject the original payload. A retry fetches a new
+range instead of giving an old response a fresh context. Same-cursor recovery
+and same-token local leadership reacquisition are explicitly tested. Cursor,
+event total and digest updates commit together; separate confirmation writes
+now use the same guard and atomic digest update. Missing headers stop the range.
+
+Start/stop status and stale-lease reaping use this fence too. Shutdown captures
+its lock epoch before awaiting listener shutdown. The processing heartbeat
+remains a narrowly identity-bound UPDATE, with the original authority precheck;
+it cannot create/claim a row and deliberately avoids the state lock held by the
+event transaction that drains it. Event commit still verifies authority.
+
+The read-only API's legacy rebuild now rejects before any deletion; its former
+delete-and-replay path did not own leadership and was not atomic. Invalid
+persisted deployment identity now fails startup rather than being relabelled.
+Bootstrap INSERT and confirmation-depth metadata reconciliation do not advance
+existing cursors; they are not claimed as fenced projection writes.
+
+Validation before CI: 90 real PostgreSQL tests (89 nested, including 25 new
+cases), no failures or skips, disposable cluster stopped. Real lock waits are
+observed with pg_blocking_pids; deferred commit failures prove cursor/digest
+rollback. Full local compatibility run: 2,577 pass, 34 explicit environment
+skips, zero failures (includes unrelated untracked policy tests). Four focused
+entry-point checks, including a subsequently added invalid-cursor check, pass.
+Build, built-route verification and Tailwind verification pass. Docker-only
+integration fixtures are adapted but await Linux CI, not claimed from local
+skips. Independent source review found no remaining blocker in this slice.
+
+Private evidence: `b35-writer-fence-before.log`,
+`reorg-atomicity-1793305692857-34644-2bac29fa/evidence.json`,
+`b35-writer-fence-after-confirmations.log`,
+`reorg-atomicity-1793306355572-14588-83a8ab96/evidence.json`,
+`b35-writer-build.log`, `b35-writer-entrypoints.log`.
+
+Implementation interpretation: xmin is a short-lived, in-memory row-version
+guard, not a persistent/global transaction identity; any intervening state
+update safely invalidates that range. It introduces no schema or economic rule.
+Leadership SHARE locks can delay renewal during slow SQL; the existing renewal
+timeout then fails closed, potentially causing election churn. Bounded history
+and transaction-duration acceptance remain activation gates. No production
+worker activation, live recovery or migration was performed.
+
 ## Open acceptance and exact next step
 
-Next: require the startup slice's exact-candidate CI, then fence all event,
-block-hash and cursor writers against stale leadership and concurrent replay.
-Startup guards do not fence every writer or status update. Extend the clean-replay
-oracle to delivery deduplication.
+Next: accept the writer-fence candidate through Linux/Windows CI, then extend the
+clean-replay oracle to delivery deduplication. Keep the worker inactive until
+the remaining recovery gates have independent evidence.
 Primary auction/end/extension/payment/default, mint/floor, trust and metrics
 now have the local recovery evidence above. Full owner/provenance acceptance
 still needs to account for transfers absent from the prototype event stream.
