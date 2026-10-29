@@ -93,6 +93,13 @@ class ProductionIndexer {
             }
         );
         this.leaderCheckInterval = null;
+        this.syncEngine.getRecoveryAuthority = () => {
+            const lock = this.distributedLock;
+            const fencingToken = lock.getFencingToken();
+            return { lockName: lock.lockName, instanceId: lock.instanceId, fencingToken,
+                isCurrent: () => this.isLeader && this.isRunning && lock.isLeaderInstance() &&
+                    lock.getFencingToken() === fencingToken };
+        };
 
         this.confirmationDepth = config.confirmationDepth || 12;
         this.pollInterval = config.pollInterval || 15000;

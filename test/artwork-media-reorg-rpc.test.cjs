@@ -129,6 +129,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
       ALTER TABLE public.v41_floor_history
         ADD artwork_id NUMERIC(78,0), ADD token_id NUMERIC(78,0), ADD floor_price NUMERIC(78,0),
         ADD log_index INTEGER, ADD indexed_at TIMESTAMPTZ;
+      ALTER TABLE public.v41_resale_listings ADD token_id NUMERIC(78,0), ADD last_updated_block BIGINT;
       CREATE TABLE public.v41_trust_signals(chain_id NUMERIC(78,0),user_address TEXT,
         successful_settlements INTEGER,failed_settlements INTEGER,suspicious_flags INTEGER,
         last_updated_block BIGINT,last_updated_at TIMESTAMPTZ);`);
@@ -610,7 +611,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
       await workerPool.query(`CREATE TABLE public.indexer_state(
         chain_id NUMERIC(78,0) PRIMARY KEY, last_indexed_block BIGINT NOT NULL,
         last_confirmed_block BIGINT NOT NULL, confirmation_depth INTEGER NOT NULL,
-        last_indexed_at TIMESTAMPTZ, state_hash TEXT);
+        last_indexed_at TIMESTAMPTZ, state_hash TEXT, contract_address TEXT);
         CREATE TABLE public.block_hashes(chain_id NUMERIC(78,0) NOT NULL,block_number BIGINT NOT NULL,
           block_hash VARCHAR(66) NOT NULL,parent_hash VARCHAR(66) NOT NULL,timestamp BIGINT NOT NULL,
           indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(chain_id,block_number));`);

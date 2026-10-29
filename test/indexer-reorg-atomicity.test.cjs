@@ -1,5 +1,5 @@
-// Atomic rewind and primary-projection reconstruction regression. Resale state,
-// legacy eligibility and writer fencing remain separate acceptance gates.
+// Atomic rewind, primary projections and boundary-pinned resale regression.
+// Legacy eligibility and writer fencing remain separate acceptance gates.
 // Run with ARTSOUL_TEST_POSTGRES_BIN pointing at local PostgreSQL binaries.
 // Always creates its own loopback-only cluster; never accepts a database URL.
 const assert = require('node:assert/strict');
@@ -11,6 +11,7 @@ const test = require('node:test');
 const {execFileSync} = require('node:child_process');
 const {pathToFileURL} = require('node:url');
 const {Pool} = require('pg');
+const {Interface} = require('ethers');
 
 const ROOT = path.resolve(__dirname, '..');
 const BIN = process.env.ARTSOUL_TEST_POSTGRES_BIN;
@@ -101,9 +102,28 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const engineFile = path.join(directory, 'isolated-engine.mjs');
   fs.writeFileSync(engineFile, isolatedEngineSource());
   const Engine = (await import(pathToFileURL(engineFile).href)).default;
-  const db = {pool, query: async (sql, values) => (await pool.query(sql, values)).rows};
-  const engine = chain => new Engine(db, {chainId: chain});
+  let beforeSql = null;
+  const db = {pool: {async connect() {
+    const client = await pool.connect();
+    return {async query(sql, values) {await beforeSql?.(sql, client);return client.query(sql, values);},
+      release: () => client.release()};
+  }}, query: async (sql, values) => (await pool.query(sql, values)).rows};
+  const engine = chain => new Engine(db, {chainId: chain,contractAddress:CORE});
   const target = engine(CHAIN), other = engine(OTHER_CHAIN);
+  const resaleInterface = new Interface(['function resaleListings(uint256) view returns(address seller,uint256 price,bool active)']);
+  const resaleStates = new Map(), resaleReads = [];
+  let rpcHook = null, leaderCurrent = true;
+  target.getRecoveryAuthority = () => ({lockName:'fixture-reorg',instanceId:'fixture-worker',fencingToken:'1',
+    isCurrent: () => leaderCurrent});
+  target.eventListener._readRpcCall = async operation => operation({async send(method, params) {
+    await rpcHook?.(method,params);
+    if(method==='eth_chainId') return '0x14a34';
+    if(method==='eth_getBlockByNumber') return {hash:hash(Number(BigInt(params[0])))};
+    assert.equal(method,'eth_call');assert.deepEqual(params[1],{blockHash:hash(109),requireCanonical:true});
+    const id = resaleInterface.decodeFunctionData('resaleListings',params[0].data)[0].toString();
+    resaleReads.push(id);
+    return resaleInterface.encodeFunctionResult('resaleListings',resaleStates.get(id) || [WINNER,2500n,true]);
+  }});
   async function apply(instance, name, block, eventData, logIndex = 0) {
     const transactionHash = '0x' + crypto.createHash('sha256')
       .update(JSON.stringify([instance.chainId,name,block,eventData,logIndex])).digest('hex');
@@ -127,7 +147,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     'v41_auction_extensions','v41_auction_endings','v41_floor_history',
     'v41_public_metric_events','v41_public_metric_participants','v41_public_metrics',
     'contract_events', 'event_processing_registry', 'indexer_state', 'block_hashes',
-    'artwork_media_rewinds', 'artwork_media_chain_revisions'];
+    'artwork_media_rewinds', 'artwork_media_chain_revisions','v41_resale_listings','v41_resale_history'];
   async function snapshot(chain) {
     const result = {};
     for (const table of tables) result[table] = (await pool.query(
@@ -137,7 +157,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   }
   async function reset() {
     // Local database only; all included tables were just created by this test.
-    await pool.query(`TRUNCATE ${tables.join(',')},outbox_events CASCADE`);
+    await pool.query(`TRUNCATE ${tables.join(',')},outbox_events,distributed_locks CASCADE`);
+    beforeSql = null;rpcHook = null;leaderCurrent = true;resaleStates.clear();resaleReads.length=0;
+    await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
+      VALUES('fixture-reorg','fixture-worker',1,clock_timestamp()+INTERVAL '1 hour')`);
     await pool.query('INSERT INTO artwork_media_chain_revisions VALUES(84532,0)');
     for (const instance of [target, other]) {
       instance.fixtureFailCachePurge = false;
@@ -323,6 +346,147 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       FOR EACH ROW EXECUTE FUNCTION fixture_fail_projection()`);
     try {await assert.rejects(target._handleReorg(BOUNDARY),/FORCED_PROJECTION_FAILURE/);}
     finally {await pool.query('DROP TRIGGER fixture_fail_projection ON v41_auctions; DROP FUNCTION fixture_fail_projection()');}
+    assert.deepEqual(await snapshot(CHAIN),before);
+  });
+
+  async function resaleFixture() {
+    await apply(target,'ResaleListed',108,{tokenId:7,seller:WINNER,price:2500});
+    await apply(other,'ResaleListed',108,{tokenId:7,seller:WINNER,price:2500});
+    await pool.query(`INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
+      VALUES($1,109,$2,$3,1700000218)`,[CHAIN,hash(109),hash(108)]);
+  }
+  const resaleRow = async () => (await pool.query('SELECT * FROM v41_resale_listings WHERE chain_id=$1 AND token_id=7',[CHAIN])).rows[0];
+  const dirtyResale = async (active=false) => pool.query(`UPDATE v41_resale_listings
+    SET active=$1,last_updated_block=112 WHERE chain_id=$2 AND token_id=7`,[active,CHAIN]);
+  for (const active of [true,false]) for (const matching of [true,false]) await t.test(`rewind restores ${active?'active':'cancelled'} boundary state from ${matching?'matching':'opposite'} future observations`,async()=>{
+    await resaleFixture();const before=await resaleRow(),foreign=await snapshot(OTHER_CHAIN);
+    await dirtyResale(matching?active:!active);resaleStates.set('7',[WINNER,2500n,active]);
+    const outboxBefore=await retainedOutbox();
+    await target._handleReorg(BOUNDARY);
+    const after=await resaleRow();assert.equal(after.active,active);assert.equal(after.last_updated_block,'109');
+    for (const field of ['seller','price','block_number','transaction_hash','log_index','indexed_at']) assert.deepEqual(after[field],before[field]);
+    assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);assert.deepEqual(await retainedOutbox(),outboxBefore);
+    const saved=await snapshot(CHAIN);await target._handleReorg(BOUNDARY);
+    assert.deepEqual((await snapshot(CHAIN)).v41_resale_listings,saved.v41_resale_listings);
+    assert.equal(resaleReads.length,1,'repeated rewind does not reread restored observations');
+  });
+  await t.test('orphaned resale completion and reprice restore the retained listing and delete new orphan listings',async()=>{
+    await resaleFixture();const original=await resaleRow();
+    await apply(target,'ResaleCompleted',112,{tokenId:7,seller:WINNER,buyer:CREATOR,price:2500,royaltyAmount:100,platformFee:10});
+    await apply(target,'ResaleListed',113,{tokenId:7,seller:CREATOR,price:9000});
+    await apply(target,'ResaleListed',113,{tokenId:8,seller:CREATOR,price:9000},1);
+    await target._handleReorg(BOUNDARY);
+    const after=await resaleRow();assert.equal(after.seller,WINNER);assert.equal(after.price,'2500');assert.equal(after.active,true);
+    for(const field of ['block_number','transaction_hash','log_index','indexed_at']) assert.deepEqual(after[field],original[field]);
+    assert.equal((await snapshot(CHAIN)).v41_resale_listings.length,1);
+    assert.equal((await snapshot(CHAIN)).v41_resale_history.length,0);assert.deepEqual(resaleReads,['7']);
+  });
+  await t.test('all resale batches use the same boundary and remain bounded to eight reads',async()=>{
+    await resaleFixture();
+    for(let id=8;id<17;id++) await apply(target,'ResaleListed',108,{tokenId:id,seller:WINNER,price:2500},id);
+    await pool.query('UPDATE v41_resale_listings SET last_updated_block=112 WHERE chain_id=$1',[CHAIN]);
+    const original=target.eventListener._readRpcCall;const sizes=[];
+    target.eventListener._readRpcCall=async operation=>{const start=resaleReads.length;const result=await original(operation);sizes.push(resaleReads.length-start);return result;};
+    try{await target._handleReorg(BOUNDARY);}finally{target.eventListener._readRpcCall=original;}
+    assert.deepEqual(sizes,[8,2]);assert.equal(new Set(resaleReads).size,10);
+    assert.ok((await snapshot(CHAIN)).v41_resale_listings.every(row=>row.last_updated_block===109));
+  });
+  await t.test('recovered resale state and replacement events match clean replay with an eventless cancellation',async()=>{
+    const {reconcileResaleState}=await import('../src/indexer/resale-state-reconciliation.js');
+    const beforeReplacement=async()=>{
+      await resaleFixture();resaleStates.set('7',[WINNER,2500n,false]);
+    };
+    const replacement=()=>apply(target,'ResaleListed',114,{tokenId:7,seller:WINNER,price:3000});
+    const comparable=async()=>{
+      const data=await snapshot(CHAIN);
+      return {listings:data.v41_resale_listings,history:data.v41_resale_history,
+        events:data.contract_events.filter(row=>row.event_name.startsWith('Resale')).map(({id,...row})=>row)};
+    };
+    await beforeReplacement();
+    await pool.query('UPDATE indexer_state SET last_indexed_block=109,last_confirmed_block=109 WHERE chain_id=$1',[CHAIN]);
+    await reconcileResaleState(db,{chainId:CHAIN,coreAddress:CORE,blockNumber:109,
+      leader:target.getRecoveryAuthority(),isCurrent:()=>true},async()=>[{tokenId:'7',seller:WINNER,price:'2500',active:false}]);
+    await replacement();const expected=await comparable();
+    await reset();await beforeReplacement();
+    await apply(target,'ResaleListed',112,{tokenId:7,seller:WINNER,price:9000});
+    await target._handleReorg(BOUNDARY);assert.equal((await resaleRow()).active,false);
+    await replacement();assert.deepEqual(await comparable(),expected);
+  });
+  for(const reason of ['missing authority','wrong deployment','wrong listener chain']) await t.test(`${reason} fails before any archive read`,async()=>{
+    await resaleFixture();await dirtyResale();const before=await snapshot(CHAIN);
+    const authority=target.getRecoveryAuthority,listener={...target.eventListener};
+    if(reason==='missing authority')target.getRecoveryAuthority=undefined;
+    if(reason==='wrong deployment')target.eventListener.contractAddress=CREATOR;
+    if(reason==='wrong listener chain')target.eventListener.chainId=1;
+    try{await assert.rejects(target._handleReorg(BOUNDARY),/authority or deployment unavailable/);}
+    finally{target.getRecoveryAuthority=authority;Object.assign(target.eventListener,listener);}
+    assert.equal(resaleReads.length,0);assert.deepEqual(await snapshot(CHAIN),before);
+  });
+  for(const failure of ['missing header','conflicting header','archive unavailable','wrong chain','header changed after read','default mapping','partial batch']) {
+    await t.test(`${failure} aborts resale recovery without SQL mutations`,async()=>{
+      await resaleFixture();await dirtyResale();
+      const original=target.eventListener._readRpcCall;
+      if(failure==='missing header') await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number=109',[CHAIN]);
+      if(failure==='conflicting header') await pool.query('UPDATE block_hashes SET block_hash=$1 WHERE chain_id=$2 AND block_number=109',[hash(999),CHAIN]);
+      if(failure==='archive unavailable') rpcHook=async method=>{if(method==='eth_call')throw new Error('archive unavailable');};
+      if(failure==='wrong chain') target.eventListener._readRpcCall=operation=>operation({async send(){return '0x1';}});
+      if(failure==='header changed after read') {
+        let headers=0;rpcHook=async method=>{if(method==='eth_getBlockByNumber'&&++headers===2)throw new Error('canonical block changed');};
+      }
+      if(failure==='default mapping') resaleStates.set('7',['0x'+'0'.repeat(40),0n,false]);
+      if(failure==='partial batch') target.eventListener._readRpcCall=async()=>[];
+      const before=await snapshot(CHAIN);
+      try{await assert.rejects(target._handleReorg(BOUNDARY),/boundary unavailable|canonical block changed|archive unavailable|chain mismatch|Invalid reorg resale snapshot/);}
+      finally{target.eventListener._readRpcCall=original;}
+      assert.deepEqual(await snapshot(CHAIN),before);assert.equal(target.recoveryCachePurgePending,false);
+    });
+  }
+  const preparationMutations = {
+    'cursor moved':()=>pool.query('UPDATE indexer_state SET last_indexed_block=116 WHERE chain_id=$1',[CHAIN]),
+    'cursor ABA':()=>pool.query('UPDATE indexer_state SET last_indexed_block=last_indexed_block WHERE chain_id=$1',[CHAIN]),
+    'deployment changed':()=>pool.query('UPDATE indexer_state SET contract_address=$1 WHERE chain_id=$2',[CREATOR,CHAIN]),
+    'row changed':()=>pool.query('UPDATE v41_resale_listings SET price=9000 WHERE chain_id=$1',[CHAIN]),
+    'row deleted and reinserted':async()=>{const row=await resaleRow();await pool.query('DELETE FROM v41_resale_listings WHERE chain_id=$1',[CHAIN]);
+      await pool.query('INSERT INTO v41_resale_listings SELECT * FROM json_populate_record(NULL::v41_resale_listings,$1)',[JSON.stringify(row)]);},
+    'affected token added':async()=>{await apply(target,'ResaleListed',108,{tokenId:8,seller:WINNER,price:2500},1);
+      await pool.query('UPDATE v41_resale_listings SET last_updated_block=112 WHERE chain_id=$1 AND token_id=8',[CHAIN]);},
+    'leader replaced':()=>pool.query("UPDATE distributed_locks SET fencing_token=2 WHERE lock_name='fixture-reorg'"),
+    'leader expired':()=>pool.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE lock_name='fixture-reorg'"),
+    'local leader lost':async()=>{leaderCurrent=false;},
+    'stored header replaced':()=>pool.query('UPDATE block_hashes SET block_hash=$1 WHERE chain_id=$2 AND block_number=109',[hash(999),CHAIN])
+  };
+  for(const [name,mutate] of Object.entries(preparationMutations)) await t.test(`${name} rejects the prepared snapshot`,async()=>{
+    await resaleFixture();await dirtyResale();let concurrentState;
+    rpcHook=async method=>{if(method==='eth_call'&&!concurrentState){await mutate();concurrentState=await snapshot(CHAIN);}};
+    await assert.rejects(target._handleReorg(BOUNDARY),/Reorg preparation is stale|Reorg resale (rows changed|leadership|boundary changed)/);
+    assert.deepEqual(await snapshot(CHAIN),concurrentState,'only the injected concurrent change persists');
+    assert.equal(target.recoveryCachePurgePending,false);
+  });
+  await t.test('leadership expiry after lock wait cannot authorize a rewind',async()=>{
+    await resaleFixture();await dirtyResale();const before=await snapshot(CHAIN);
+    const holder=await pool.connect();await holder.query('BEGIN');
+    await holder.query("UPDATE distributed_locks SET expires_at=clock_timestamp()+INTERVAL '100 milliseconds' WHERE lock_name='fixture-reorg'");
+    let attempting;const waiting=new Promise(resolve=>{attempting=resolve;});
+    beforeSql=async sql=>{if(sql.includes('SELECT lock_name FROM public.distributed_locks'))attempting();};
+    const rejected=assert.rejects(target._handleReorg(BOUNDARY),/leadership expired/);
+    try{await waiting;await holder.query('SELECT pg_sleep(0.2)');await holder.query('COMMIT');await rejected;}
+    finally{await holder.query('ROLLBACK');holder.release();}
+    assert.deepEqual(await snapshot(CHAIN),before);
+  });
+  await t.test('leadership expiry during reconstruction rolls back every prior write',async()=>{
+    await resaleFixture();await dirtyResale();const before=await snapshot(CHAIN);
+    beforeSql=async(sql,client)=>{if(sql.startsWith('UPDATE indexer_state'))await client.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second'");};
+    await assert.rejects(target._handleReorg(BOUNDARY),/leadership expired/);
+    assert.deepEqual(await snapshot(CHAIN),before);
+  });
+  for(const missing of [false,true]) await t.test(`resale ${missing?'lost row':'apply failure'} rolls back deletion, projections, media revision and cursor`,async()=>{
+    await resaleFixture();await dirtyResale();await apply(target,'BidPlaced',112,bid());
+    const before=await snapshot(CHAIN);
+    await pool.query(`CREATE FUNCTION fixture_fail_resale() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN ${missing?"RETURN NULL;":"RAISE EXCEPTION 'FORCED_RESALE_FAILURE';"} END $f$;
+      CREATE TRIGGER fixture_fail_resale BEFORE UPDATE ON v41_resale_listings FOR EACH ROW EXECUTE FUNCTION fixture_fail_resale()`);
+    try{await assert.rejects(target._handleReorg(BOUNDARY),missing?/application lost its row/:/FORCED_RESALE_FAILURE/);}
+    finally{await pool.query('DROP TRIGGER fixture_fail_resale ON v41_resale_listings; DROP FUNCTION fixture_fail_resale()');}
     assert.deepEqual(await snapshot(CHAIN),before);
   });
 });

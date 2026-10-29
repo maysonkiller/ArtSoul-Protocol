@@ -9,7 +9,11 @@ No contract, schema, network, billing or live data change is included.
 
 The atomicity slice was merged in PR #395 as `e10831fe` after final-candidate
 CI40932702941 passed Linux/Windows builds, units, contracts and static checks.
-The primary-projection slice below is implemented and locally tested.
+The primary-projection slice was merged in PR #396 as `a9ef3e3f` after
+candidate `a375be94` passed CI40937573466: Linux 2,947 pass/two skips, Windows
+2,535 pass/34 skips, 49 contract checks each, builds and static checks.
+The boundary-pinned resale slice below is implemented and locally tested;
+its own exact-candidate CI is required before merge.
 Production indexer activation is **not done**.
 Full reorg reconstruction remains open. Passing the atomicity tests must not be
 presented as a complete reorg acceptance or Phase B closure.
@@ -88,6 +92,49 @@ inferred from the prototype's event history alone and must use the existing
 hash-pinned reconciliation path. It is not reconstructed as an active listing
 merely because an older listing event survives.
 
+## Boundary-pinned resale correction
+
+Cancellation has no event in the current prototype. Before starting the rewind
+transaction, capture the cursor pair, deployment and PostgreSQL row revision,
+then read affected retained listings, including inactive listings and observations
+whose values happen to match the boundary state. Read `resaleListings` through
+the existing RPC primitive in batches of eight, pinned to the exact retained
+block hash with EIP-1898 `requireCanonical`. Do not read `latest`.
+
+The transaction revalidates the captured cursor revision (including ABA changes),
+complete affected listing set and each row revision. It locks and verifies the
+current worker lease after any wait and again immediately before commit. An
+expired/replaced worker, changed deployment/cursor/row/header, incomplete response
+or failed write aborts the entire rewind. Original listing event provenance is
+preserved; seller, price, active state and observation boundary are restored.
+New orphaned listings are deleted by the existing rollback. No event or delivery
+is invented for cancellation. If a queued boundary is ahead of the persisted
+cursor, deletion and replay both use the actual cursor plus one.
+
+The exact retained header is required. Sparse history without that header fails
+closed; it does not substitute a nearby block or overwrite a conflicting header.
+This deliberate limitation must be handled by the broader common-ancestor and
+recovery acceptance before worker activation. The new checks do not prevent an
+unfenced event writer from committing later; shared writer fencing remains open.
+
+Local validation: 68 focused passes, two Docker-dependent skips, zero failures,
+including 46 real-schema PostgreSQL checks. Cases include retained/orphaned
+eventless cancellations, repricing, resale completion, new orphan listing removal,
+ten affected listings in batches of eight/two, identical values with a future
+observation marker, repeated rewind, row/cursor ABA, extra affected rows,
+leadership loss/expiry during a lock wait or reconstruction, missing/conflicting
+headers, unavailable archive state, wrong chain, malformed/partial responses,
+lost-row writes and atomic rollback on failure. Replacement events after recovery
+match clean replay with a cancellation observed through normal reconciliation.
+
+Evidence: `docs/private/b35-resale-focused-final.log` and stopped isolated cluster
+`reorg-atomicity-1793301929764-35228-322136fa`. No live database, RPC, wallet or
+worker was used. Independent source review found no blocker within this slice.
+The full local unit suite also passed: 2,564 pass, 34 environment-dependent skips,
+zero failures (`docs/private/b35-resale-unit-final.log`). As above, that local
+total includes the unrelated pre-existing authority-policy tests; they are not
+included in this change.
+
 ## Validation
 
 - `node --test test/indexer-recovery-failures.test.mjs
@@ -130,21 +177,21 @@ First-slice final replay-boundary/fixture-portability recheck:
 `b35-focused-final.log` (29 pass, one Docker skip, seven real PostgreSQL checks)
 and `b35-full-unit-final.log`. PR #395 final candidate
 `b4fddec0ababeac93b7cda30c4f706b08094102a` passed CI40932702941.
-The primary-projection follow-up requires its own exact-candidate CI before merge.
-Its first CI40936553945 passed Windows and both Linux recovery fixtures but
+The primary-projection follow-up passed exact-candidate CI40937573466 and was
+merged as recorded above. Its first CI40936553945 passed Windows and both Linux recovery fixtures but
 failed an unrelated TOTP setup fixture at a 30-second boundary. Even a previous
 step computed as a SQL argument can expire before the function obtains its
 locks. The test helper now enrolls with the current step, then explicitly
 models a prior-step enrollment in the disposable fixture. Production code,
 accepted time windows, replay checks and real activation cases are unchanged.
-The corrected candidate must pass the entire suite before merge.
+The corrected candidate passed the entire suite before merge.
 The diagnostic baseline remains separately preserved; it is not a green
 regression test that asserts broken projection behavior as acceptable.
 
 ## Open acceptance and exact next step
 
-Next: reconstruct affected resale observations and legacy eligibility at the
-rewind boundary without inventing an active listing after cancellation. Then
+Next: require the resale slice's exact-candidate CI, then restore legacy
+eligibility predecessors at the rewind boundary. Then
 extend the clean-replay oracle to those fields and delivery deduplication.
 Primary auction/end/extension/payment/default, mint/floor, trust and metrics
 now have the local recovery evidence above. Full owner/provenance acceptance
