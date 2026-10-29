@@ -63,10 +63,13 @@ test('A8e TOTP persistence uses actual PostgreSQL transactions', {skip:available
   const completeSql = (factor,attempt,step) => `SELECT a8e_complete_totp_attempt('${factor.wallet}','${attempt}',${step==null?'NULL':step})`;
   function active(target=wallet) {
     const factor=pending(target),attempt=claim(factor,'enrollment');
-    // Set up the active SQL fixture at database execution time. A previous-step
-    // code calculated before a Docker round trip can age out at the 30s edge.
-    // Actual encryption/code matching is exercised by the completion tests.
-    assert.equal(sql(completeSql(factor,attempt,'(floor(extract(epoch FROM clock_timestamp())/30)::BIGINT-1)')),'OK');
+    // Enroll with the current step: even a database-side previous-step argument
+    // can expire between argument evaluation and the function's locked check.
+    // Then model an enrollment from the prior step so authentication fixtures
+    // can use the current code. Only disposable test data is adjusted; actual
+    // encryption, activation and replay protection have separate cases below.
+    assert.equal(sql(completeSql(factor,attempt,'floor(extract(epoch FROM clock_timestamp())/30)::BIGINT')),'OK');
+    sql(`UPDATE artsoul_staff_totp_factors SET last_consumed_step=last_consumed_step-1 WHERE id='${factor.id}'`);
     return factor;
   }
   async function holdWrite(query,name,seconds=1) {

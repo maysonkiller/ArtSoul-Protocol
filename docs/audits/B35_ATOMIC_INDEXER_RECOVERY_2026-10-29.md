@@ -131,6 +131,13 @@ First-slice final replay-boundary/fixture-portability recheck:
 and `b35-full-unit-final.log`. PR #395 final candidate
 `b4fddec0ababeac93b7cda30c4f706b08094102a` passed CI40932702941.
 The primary-projection follow-up requires its own exact-candidate CI before merge.
+Its first CI40936553945 passed Windows and both Linux recovery fixtures but
+failed an unrelated TOTP setup fixture at a 30-second boundary. Even a previous
+step computed as a SQL argument can expire before the function obtains its
+locks. The test helper now enrolls with the current step, then explicitly
+models a prior-step enrollment in the disposable fixture. Production code,
+accepted time windows, replay checks and real activation cases are unchanged.
+The corrected candidate must pass the entire suite before merge.
 The diagnostic baseline remains separately preserved; it is not a green
 regression test that asserts broken projection behavior as acceptable.
 
