@@ -1040,11 +1040,30 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     fs.writeFileSync(file,source.replace("import { getRedisConnection } from '../queue.js';",
       'const getRedisConnection = async () => { throw new Error("External Redis disabled in recovery fixture"); };'));
     const cache=(await import(pathToFileURL(file).href)).default;
-    const data=new Map(),calls={keys:0,deletes:0};
+    // This is only the PostgreSQL fixture's transport adapter, not real Redis.
+    // The Docker cache-recovery-rpc suite verifies the actual Lua/Redis behavior.
+    const data=new Map(),expires=new Map(),calls={keys:0,deletes:0};
+    const current=key=>{
+      if(expires.has(key)&&expires.get(key)<=Date.now()){data.delete(key);expires.delete(key);}
+      return data.get(key)??null;
+    };
+    const set=(key,value,...options)=>{
+      if(options.includes('NX')&&current(key)!==null)return null;
+      data.set(key,value);
+      const ex=options.indexOf('EX');
+      if(ex>=0)expires.set(key,Date.now()+Number(options[ex+1])*1000);else expires.delete(key);
+      return 'OK';
+    };
     cache.getRedis=async()=>({
-      async get(key){return data.get(key)??null;},async set(key,value){data.set(key,value);},
+      async get(key){return current(key);},async set(...args){return set(...args);},
       async keys(pattern){assert.equal(pattern,'artsoul:*');calls.keys++;return [...data.keys()];},
-      async del(...keys){calls.deletes++;for(const key of keys)data.delete(key);}
+      async del(...keys){calls.deletes++;for(const key of keys){data.delete(key);expires.delete(key);}},
+      async eval(script,keyCount,generationKey,key,generation,value,ttl){
+        assert.equal(typeof script,'string');assert.equal(keyCount,2);
+        assert.equal(generationKey,'artsoul:cache:recovery-generation');
+        if(current(generationKey)!==generation)return 0;
+        set(key,value,'EX',ttl);return 1;
+      }
     });
     return {cache,data,calls};
   }

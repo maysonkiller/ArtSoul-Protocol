@@ -5,7 +5,8 @@
 This records incremental corrections for a locally reproduced Phase B3 indexer defect.
 It changes failure handling and database transaction boundaries, not Bible
 sections 3 (auction/settlement economics), 5 (provenance) or 17 (roadmap).
-No contract, schema, network, billing or live data change is included.
+The initial atomicity slice added no schema. Later source migrations are recorded
+below; no contract, network, billing or live data change is included.
 
 The atomicity slice was merged in PR #395 as `e10831fe` after final-candidate
 CI40932702941 passed Linux/Windows builds, units, contracts and static checks.
@@ -429,7 +430,10 @@ Focused runtime/admission checks: 35 pass, one explicit environment skip.
 Full local suite: 2,579 pass / 34 explicit environment skips / zero failures;
 it includes unrelated untracked policy tests. Build, built-route and Tailwind
 checks pass. Independent source review found no remaining blocker in this slice.
-Linux Docker/no-default-grant verification and exact candidate CI are pending.
+Candidate6187df00 passed CI40965512672: Linux3,072 pass/two skips, Windows2,550
+pass/34 skips,49 contract checks each,both builds/static green. Linux exercised
+Docker media and no-default-grant checks. PR404 merged as51cda1b4; source only.
+Private logs: b35-cache-ci-linux.log and b35-cache-ci-windows.log.
 The older minimal media fixture installs the actual cache migration with an
 explicitly inert notification-detach adapter; full retention is tested only by
 the complete-schema atomicity fixture, not that adapter.
@@ -450,13 +454,67 @@ is running. Preserve pending obligations and rehearse any rollback on the isolat
 restore copy first. The normal 001-017 bootstrap runner is not extended by this
 separately gated feature migration.
 
+## Delayed cache refill: reproduction and source correction
+
+The next failure was reproduced using the actual cache service and a local Map
+transport: a query captured bid 2500 before rewind, finished after a successful
+purge, and cached 2500 while the authoritative fixture value was 0. The next read
+served 2500 without fetching. This is a controlled cache-boundary reproduction,
+not a live database or Redis claim. The failing baseline is preserved in
+`docs/private/b35-cache-refill-before.log` and `b35-cache-refill-evidence.json`.
+
+Recovery purge now rotates a random generation before enumerating/deleting data
+keys, and retains that marker. A cache miss captures a nonempty generation before
+its authoritative fetch. A small Redis script compares that original generation
+and writes with the original TTL atomically. A delayed pre-purge fetch therefore
+cannot refill the cleared cache. A missing marker is initialized with a fresh
+UUID using SET NX; eviction/recreation cannot reuse an empty default generation.
+Cache hits retain the original single GET path.
+
+On a rejected or uncertain guarded write, the reader fetches once more without
+caching. Errors in that final read propagate; the old result is not a fallback.
+Repeated purges cannot produce an unbounded retry loop. This interpretation is
+limited to read-only fetchers, as used by the current auction, bid and health
+readers. The implementation uses existing ioredis and Node crypto; no dependency,
+SQL migration, fee or user authorization change is added by this slice.
+
+Redis documents atomic Lua execution and SET NX semantics in its official
+[scripting guide](https://redis.io/docs/latest/develop/programmability/eval-intro/)
+and [SET reference](https://redis.io/docs/latest/commands/set/).
+The short fixed script has no scan or loop; existing full-prefix purge cost is
+not solved by this change.
+
+Activation must drain every legacy cache-filling process before the reviewed
+recovery purge: old code or a raw SET can bypass the generation guard. The current
+production cache-fill call sites all use remember; the separate direct set helper
+is only used by test seeding. Restoring/failing over Redis to an older snapshot can
+restore its old marker too, so that operation requires a fresh durable purge
+obligation and purge before reusing cache data. No Redis restoration acceptance
+or mixed-version rollout guarantee is claimed.
+
+Local verification: 26 focused boundary/failure tests pass; the full local suite
+passes 2,586 tests with 35 explicit environment skips (including unrelated
+untracked policy tests). Build, route and Tailwind checks pass. The retained
+PostgreSQL 18.4 fixture passes all 124 tests, zero skips, cluster stopped. Evidence:
+`docs/private/b35-refill-focused.log`, `b35-refill-full-units.log`,
+`b35-refill-build.log`, `b35-cache-refill-postgres.log`, and
+`reorg-atomicity-1793313646570-31908-1bd21110/evidence.json`.
+Independent runtime review found no blocker for this scoped refill race and
+identified the mixed-version/Redis-restoration limitations above.
+
+The new disposable Redis suite uses two real clients and the actual cache source
+to exercise TTL, overlapping purges, missing-marker recreation, concurrent NX,
+and actual Redis ACL failures. Local Windows explicitly skips because no Linux
+Docker server is available; Linux CI requires this suite to run. Its result is
+still pending and is not replaced by the Map transport tests.
+
 ## Open acceptance and exact next step
 
-Exactly next: reproduce a public cache refill that starts before rewind and writes
-its old result after purge/acknowledgement. Durable purge intent fixes the process-
-crash gap; it does not fence such external cache writers. The existing full-prefix
-Redis scan, unversioned keys and independent CDN caches remain separate acceptance
-gates. No all-cache convergence or production-scale recovery claim is made.
+This slice still needs actual Redis integration and exact-candidate CI evidence.
+Ordinary per-key invalidation can race a delayed fetch independently of recovery;
+unversioned deployment keys, full-prefix scan cost and independent CDN caches
+remain separate gates. Reads already in flight are not cancelled by a purge.
+No all-cache convergence or production-scale recovery claim is made.
 
 Keep the worker inactive until the remaining gates have independent evidence.
 Full owner/provenance acceptance still needs to account for transfers absent from
