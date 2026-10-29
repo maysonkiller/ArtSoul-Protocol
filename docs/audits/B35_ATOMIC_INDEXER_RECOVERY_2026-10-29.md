@@ -12,8 +12,11 @@ CI40932702941 passed Linux/Windows builds, units, contracts and static checks.
 The primary-projection slice was merged in PR #396 as `a9ef3e3f` after
 candidate `a375be94` passed CI40937573466: Linux 2,947 pass/two skips, Windows
 2,535 pass/34 skips, 49 contract checks each, builds and static checks.
-The boundary-pinned resale slice below is implemented and locally tested;
-its own exact-candidate CI is required before merge.
+The boundary-pinned resale slice was merged in PR #397 as `f40bbaa8` after
+candidate `dfd9e5b1` passed CI40940342981: Linux 2,978 pass/two skips, Windows
+2,535 pass/34 skips, 49 contract checks each, builds and static checks.
+The legacy-predecessor slice below is locally tested and requires its own
+exact-candidate CI before merge.
 Production indexer activation is **not done**.
 Full reorg reconstruction remains open. Passing the atomicity tests must not be
 presented as a complete reorg acceptance or Phase B closure.
@@ -135,6 +138,30 @@ zero failures (`docs/private/b35-resale-unit-final.log`). As above, that local
 total includes the unrelated pre-existing authority-policy tests; they are not
 included in this change.
 
+## Legacy prototype predecessors
+
+The legacy `ProjectNFTEligibilityAchieved` and `ProjectNFTMinted` handlers upsert
+one row per user, replacing the original row's block and transaction fields.
+Deleting an orphaned newest row therefore lost an older surviving fact.
+Capture and lock affected users inside the rewind transaction before deletion.
+After deletion, restore their latest retained event by block/log order directly
+into the existing projection tables. A user with no predecessor remains absent.
+An insertion or uniqueness failure aborts the whole rewind.
+
+This reconstructs historical testnet prototype facts, not mainnet Genesis grants
+or eligibility. Retained raw contract source addresses are untouched, including
+unknown/null provenance. No event handler, notification or AI job is replayed.
+Unchanged users and other chains are preserved. No schema or policy amendment.
+
+Validation: 75 focused passes/two Docker-dependent skips, including 53 real-schema
+PostgreSQL checks; zero failures. The seven added cases cover both projections,
+latest/same-block ordering, missing predecessors, independent users and chains,
+known/unknown provenance, repeat rewind, failed inserts and replacement-versus-
+clean-replay equality. Full local units remain 2,564 pass/34 skips with the same
+unrelated pre-existing tests excluded from the PR. Evidence:
+`docs/private/b35-legacy-focused-final.log`, `b35-legacy-unit-final.log`.
+All disposable clusters were stopped. Independent source review found no blocker.
+
 ## Validation
 
 - `node --test test/indexer-recovery-failures.test.mjs
@@ -190,14 +217,13 @@ regression test that asserts broken projection behavior as acceptable.
 
 ## Open acceptance and exact next step
 
-Next: require the resale slice's exact-candidate CI, then restore legacy
-eligibility predecessors at the rewind boundary. Then
-extend the clean-replay oracle to those fields and delivery deduplication.
+Next: require the legacy slice's exact-candidate CI, then fence event writers and
+queued recovery against stale leadership and concurrent replay. Extend the
+clean-replay oracle to delivery deduplication.
 Primary auction/end/extension/payment/default, mint/floor, trust and metrics
 now have the local recovery evidence above. Full owner/provenance acceptance
 still needs to account for transfers absent from the prototype event stream.
-Fence event writers and queued recovery against stale leadership and concurrent
-replay. Prove bounded processing for long history and a production-like restore.
+Prove bounded processing for long history and a production-like restore.
 
 The in-memory pending purge is not a durable crash-recovery record; cache purge
 still uses the existing full-prefix Redis scan. Neither limitation is declared

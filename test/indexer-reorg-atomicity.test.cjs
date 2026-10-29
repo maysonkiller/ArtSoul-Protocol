@@ -1,5 +1,5 @@
 // Atomic rewind, primary projections and boundary-pinned resale regression.
-// Legacy eligibility and writer fencing remain separate acceptance gates.
+// Includes legacy prototype predecessors; writer fencing remains a separate gate.
 // Run with ARTSOUL_TEST_POSTGRES_BIN pointing at local PostgreSQL binaries.
 // Always creates its own loopback-only cluster; never accepts a database URL.
 const assert = require('node:assert/strict');
@@ -147,7 +147,8 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     'v41_auction_extensions','v41_auction_endings','v41_floor_history',
     'v41_public_metric_events','v41_public_metric_participants','v41_public_metrics',
     'contract_events', 'event_processing_registry', 'indexer_state', 'block_hashes',
-    'artwork_media_rewinds', 'artwork_media_chain_revisions','v41_resale_listings','v41_resale_history'];
+    'artwork_media_rewinds', 'artwork_media_chain_revisions','v41_resale_listings','v41_resale_history',
+    'v41_project_eligibility','v41_genesis_holders'];
   async function snapshot(chain) {
     const result = {};
     for (const table of tables) result[table] = (await pool.query(
@@ -488,5 +489,62 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     try{await assert.rejects(target._handleReorg(BOUNDARY),missing?/application lost its row/:/FORCED_RESALE_FAILURE/);}
     finally{await pool.query('DROP TRIGGER fixture_fail_resale ON v41_resale_listings; DROP FUNCTION fixture_fail_resale()');}
     assert.deepEqual(await snapshot(CHAIN),before);
+  });
+
+  const legacyKinds = [
+    ['ProjectNFTEligibilityAchieved','v41_project_eligibility'],
+    ['ProjectNFTMinted','v41_genesis_holders']
+  ];
+  for(const [name,table] of legacyKinds) for(const retained of [true,false]) {
+    await t.test(`${name} ${retained?'restores its last retained predecessor':'has no row without a retained predecessor'}`,async()=>{
+      const payload=(value,user=WINNER)=>({user,eligibilityHash:hash(value),...(name==='ProjectNFTMinted'?{tokenId:value}:{})});
+      await apply(other,name,108,payload(5));const foreign=await snapshot(OTHER_CHAIN);
+      if(retained) {
+        await apply(target,name,107,payload(1));await apply(target,name,108,payload(2));
+        await apply(target,name,108,payload(3),1);
+      }
+      // A separate retained user and its unknown source must remain unchanged.
+      await apply(target,name,106,payload(6,CREATOR));
+      const expected=(await snapshot(CHAIN))[table];
+      const rawBefore=(await snapshot(CHAIN)).contract_events;
+      const notifications=await retainedOutbox();
+      await apply(target,name,112,payload(4));
+      await target._handleReorg(BOUNDARY);
+      const recovered=await snapshot(CHAIN);
+      assert.deepEqual(recovered[table],expected);
+      assert.deepEqual(recovered.contract_events,rawBefore,'unknown source provenance stays unknown');
+      assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);assert.deepEqual(await retainedOutbox(),notifications);
+      await target._handleReorg(BOUNDARY);assert.deepEqual((await snapshot(CHAIN))[table],expected);
+    });
+  }
+  for(const [name,table] of legacyKinds) await t.test(`${name} reconstruction failure rolls back the entire rewind`,async()=>{
+    const payload=value=>({user:WINNER,eligibilityHash:hash(value),...(name==='ProjectNFTMinted'?{tokenId:value}:{})});
+    await apply(target,name,108,payload(1));await apply(target,name,112,payload(2));
+    const before=await snapshot(CHAIN);
+    await pool.query(`CREATE FUNCTION fixture_fail_legacy() RETURNS trigger LANGUAGE plpgsql AS $f$
+      BEGIN RAISE EXCEPTION 'FORCED_LEGACY_FAILURE'; END $f$;
+      CREATE TRIGGER fixture_fail_legacy BEFORE INSERT ON ${table} FOR EACH ROW EXECUTE FUNCTION fixture_fail_legacy()`);
+    try{await assert.rejects(target._handleReorg(BOUNDARY),/FORCED_LEGACY_FAILURE/);}
+    finally{await pool.query(`DROP TRIGGER fixture_fail_legacy ON ${table}; DROP FUNCTION fixture_fail_legacy()`);}
+    assert.deepEqual(await snapshot(CHAIN),before);
+  });
+  await t.test('legacy replacement facts match clean replay without source fabrication',async()=>{
+    const prefix=async()=>{
+      await apply(target,'ProjectNFTEligibilityAchieved',108,{user:WINNER,eligibilityHash:hash(1)});
+      await pool.query("UPDATE contract_events SET contract_address=$1 WHERE chain_id=$2 AND event_name='ProjectNFTEligibilityAchieved'",[CORE,CHAIN]);
+    };
+    const replacement=async()=>{
+      await apply(target,'ProjectNFTEligibilityAchieved',114,{user:WINNER,eligibilityHash:hash(3)});
+      await apply(target,'ProjectNFTMinted',115,{user:WINNER,eligibilityHash:hash(3),tokenId:7});
+    };
+    const comparable=async()=>{
+      const rows=await snapshot(CHAIN);return {eligibility:rows.v41_project_eligibility,holders:rows.v41_genesis_holders,
+        events:rows.contract_events.filter(row=>row.event_name.startsWith('ProjectNFT')).map(({id,...row})=>row)};
+    };
+    await prefix();await replacement();const expected=await comparable();
+    await reset();await prefix();
+    await apply(target,'ProjectNFTEligibilityAchieved',112,{user:WINNER,eligibilityHash:hash(2)});
+    await apply(target,'ProjectNFTMinted',113,{user:WINNER,eligibilityHash:hash(2),tokenId:9});
+    await target._handleReorg(BOUNDARY);await replacement();assert.deepEqual(await comparable(),expected);
   });
 });

@@ -1,7 +1,7 @@
 // Rebuild primary lifecycle fields from retained facts in the caller's rewind
 // transaction. Never replay event handlers: they enqueue delivery and increment
 // trust. Off-chain fields, media, moderation and retained row identities survive.
-// Resale observations and legacy eligibility need separate recovery acceptance.
+// Resale observations are restored separately from hash-pinned contract state.
 export async function restorePrimaryReorgProjections(client, chainId, boundary) {
     const scope = [String(chainId), boundary];
     await client.query(`WITH restored AS (
@@ -94,4 +94,33 @@ export async function restorePrimaryReorgProjections(client, chainId, boundary) 
         failed_settlements=r.failed,last_updated_block=r.block_number,
         last_updated_at=COALESCE(r.indexed_at,t.last_updated_at)
       FROM restored r WHERE t.chain_id=r.chain_id AND t.user_address=r.user_address`, scope);
+}
+
+// The legacy prototype upserts these rows with the newest event's block number.
+// Capture affected users before deletion, then restore only their latest retained
+// facts. These tables are historical prototype records, not mainnet Genesis grants.
+export async function captureLegacyReorgUsers(client, chainId, boundary) {
+    const scope = [String(chainId), boundary];
+    const eligibility = await client.query(`SELECT user_address FROM public.v41_project_eligibility
+        WHERE chain_id=$1 AND block_number>=$2 ORDER BY user_address FOR UPDATE`, scope);
+    const holders = await client.query(`SELECT user_address FROM public.v41_genesis_holders
+        WHERE chain_id=$1 AND block_number>=$2 ORDER BY user_address FOR UPDATE`, scope);
+    return { eligibility: eligibility.rows.map(row => row.user_address), holders: holders.rows.map(row => row.user_address) };
+}
+
+export async function restoreLegacyReorgProjections(client, chainId, boundary, users) {
+    if (users.eligibility.length) await client.query(`INSERT INTO public.v41_project_eligibility
+        (chain_id,user_address,eligibility_hash,achieved,block_number,transaction_hash,log_index,indexed_at)
+        SELECT DISTINCT ON (event_data->>'user') chain_id,event_data->>'user',event_data->>'eligibilityHash',
+            TRUE,block_number,transaction_hash,log_index,indexed_at
+        FROM public.contract_events WHERE chain_id=$1 AND block_number<$2
+            AND event_name='ProjectNFTEligibilityAchieved' AND event_data->>'user'=ANY($3::TEXT[])
+        ORDER BY event_data->>'user',block_number DESC,log_index DESC`, [String(chainId), boundary, users.eligibility]);
+    if (users.holders.length) await client.query(`INSERT INTO public.v41_genesis_holders
+        (chain_id,user_address,token_id,eligibility_hash,block_number,transaction_hash,log_index,indexed_at)
+        SELECT DISTINCT ON (event_data->>'user') chain_id,event_data->>'user',(event_data->>'tokenId')::NUMERIC,
+            event_data->>'eligibilityHash',block_number,transaction_hash,log_index,indexed_at
+        FROM public.contract_events WHERE chain_id=$1 AND block_number<$2
+            AND event_name='ProjectNFTMinted' AND event_data->>'user'=ANY($3::TEXT[])
+        ORDER BY event_data->>'user',block_number DESC,log_index DESC`, [String(chainId), boundary, users.holders]);
 }
