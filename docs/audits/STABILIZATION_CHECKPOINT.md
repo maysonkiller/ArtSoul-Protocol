@@ -1,6 +1,32 @@
-October 29 B35 durable cache recovery / LOCAL VERIFIED CANDIDATE:
+October 29 B35 delayed cache refill / source candidate:
+Workspace C:\Projects\ArtSoul / codex/recovery-cache-refill-fence /
+base HEAD 51cda1b4387ee73ec5fef37f511951ec470f3ce3 (main, PR404).
+Preserved original diff; no new worktree or source-tree copying.
+Actual cache-method baseline reproduced old bid2500 refilling after purge while
+authoritative fixture bid is0; original failing evidence remains unchanged.
+Recovery purge now rotates a UUID marker; misses capture it before fetching;
+atomic Redis comparison refuses writes from retired generations. Rejection or
+uncertain write permits only one uncached fresh read, whose errors propagate.
+Cache-hit command count remains unchanged. No dependency or new schema in this slice.
+26 focused checks pass; full local suite 2,586 pass /35 environment skips (includes
+untracked policy tests); build/11 routes/173 Tailwind utilities pass. All124 real
+PostgreSQL18.4 checks retained, zero skips; clusterStopped=true. Evidence:
+docs/private/b35-refill-{focused,full-units,build}.log,
+b35-cache-refill-postgres.log and
+reorg-atomicity-1793313646570-31908-1bd21110/evidence.json.
+Disposable real-Redis suite is added: local Windows explicitly skips because
+Linux Docker is unavailable; Linux CI requires execution. Independent review
+found no scoped blocker. Mixed old writers must drain before activation; restoring
+an older Redis snapshot requires a new purge before cache reuse. Ordinary per-key
+refill, CDN, bounded scans, owner transfer/history and independent restore remain
+gates. No live migration, cache purge, billing, mainnet or worker activation.
+Unrelated B27 docs/untracked files preserved. Exactly next: submit the reviewed
+source PR and require the real Redis suite and all exact-candidate CI checks.
+Phase B is NOT closed.
+
+October 29 B35 durable cache recovery / PR404 MERGED:
 Workspace C:\Projects\ArtSoul / codex/durable-recovery-cache /
-base HEAD 1eaed6486449a7603162af27068248ff9884ef08 (main, PR403).
+HEAD 51cda1b4387ee73ec5fef37f511951ec470f3ce3 (main, PR404).
 Original tracked doc diff preserved in docs/private/b35-cache-continuation-docs-before.patch.
 Durable UUID obligation is created in the rewind transaction and survives process
 exit. Startup and each poll drain it; acknowledgement requires original chain,
@@ -13,10 +39,16 @@ b35-durable-cache-admission.log. Actual child exit86 and real cache methods with
 Map transport; no real Redis/server-reader acceptance is claimed.
 Full local units: 2,579 pass/34 skips (includes untracked policy tests), build and
 static checks pass. Focused runtime35 pass/one skip. Independent review complete.
-Exact release CI/PR pending. Current source/test/migration/docs diff is this B35
-slice; prior B27 release docs and unrelated untracked files remain preserved.
-Exactly next: finish exact candidate CI/release, then reproduce a pre-rewind
-cache fetch writing its stale result after purge. External refill/CDN/scan cost,
+Candidate6187df00 passed CI40965512672: Linux3072 pass/two skips, Windows2550
+pass/34 skips,49 contracts each,both builds/static green. PR404 merged. Source
+only: no live feature migration or indexer worker activation. App attachment
+attempt hit100-identity limit; PR URL remains in report. Prior B27 release docs
+and unrelated untracked files remain preserved. No helper agent remains active.
+Next defect reproduced: old pre-rewind fetch writes2500 after successful purge;
+next cache read returns2500 while authoritative fixture value is0. Actual cache
+methods/Map transport, no live service. Evidence b35-cache-refill-before.log and
+b35-cache-refill-evidence.json; one intended assertion failure, no skips.
+Exactly next: fence cache writes by the generation captured before fetching. External refill/CDN/scan cost,
 owner-transfer gaps, bounded recovery and independent restore remain gates.
 Phase B is NOT closed. No mainnet, billing, live reset or deployment activation.
 
