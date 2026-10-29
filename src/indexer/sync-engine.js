@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { enqueueAIJob } from '../queue.js';
 import { projectDonation } from './donation-events.js';
 import { restorePrimaryReorgProjections } from './reorg-projections.js';
+import { prepareResaleRewind, lockResaleRewind, applyResaleRewind, verifyResaleRewindAuthority } from './reorg-resale.js';
 import cacheService from '../services/cache-service.js';
 import {
     V41_EVENT_REQUIRED_FIELDS,
@@ -578,24 +579,24 @@ class IndexerSyncEngine {
         const client = await this.db.pool.connect();
         let rewindTo;
         try {
+            const plan = await prepareResaleRewind(client, this._chainIdString(), reorgBlock,
+                this.eventListener, this.getRecoveryAuthority);
             await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
-            const { rows } = await client.query(
-                'SELECT last_indexed_block, last_confirmed_block FROM indexer_state WHERE chain_id = $1 FOR UPDATE',
-                [this._chainIdString()]
-            );
-            if (rows.length !== 1) throw new Error('Missing indexer state for reorg');
-            rewindTo = Math.min(Number(rows[0].last_indexed_block), reorgBlock - 1);
-            const confirmedTo = Math.min(Number(rows[0].last_confirmed_block), rewindTo);
-            await client.query('SELECT rollback_events_from_block($1, $2)', [reorgBlock, this._chainIdString()]);
-            await restorePrimaryReorgProjections(client, this._chainIdString(), reorgBlock);
+            await lockResaleRewind(client, plan);
+            rewindTo = plan.rewindTo;
+            const confirmedTo = plan.confirmedTo;
+            await client.query('SELECT rollback_events_from_block($1, $2)', [plan.boundary, this._chainIdString()]);
+            await restorePrimaryReorgProjections(client, this._chainIdString(), plan.boundary);
+            await applyResaleRewind(client, plan);
             await client.query('DELETE FROM block_hashes WHERE chain_id = $1 AND block_number >= $2',
-                [this._chainIdString(), reorgBlock]);
+                [this._chainIdString(), plan.boundary]);
             const stateHash = await this._computeStateHash(confirmedTo, client);
             await client.query(
                 `UPDATE indexer_state SET last_indexed_block = $1, last_confirmed_block = $2,
                     state_hash = $3, last_indexed_at = NOW() WHERE chain_id = $4`,
                 [rewindTo, confirmedTo, stateHash, this._chainIdString()]
             );
+            await verifyResaleRewindAuthority(client, plan);
             await client.query('COMMIT');
         } catch (error) {
             try { await client.query('ROLLBACK'); } catch { /* Preserve the recovery error. */ }

@@ -12,7 +12,8 @@ function transactionFixture({ failAt, emptyState = false, indexed = 115, confirm
             calls.push({ sql, params });
             if (failAt?.test(sql)) throw failure;
             if (sql.startsWith('SELECT last_indexed_block')) return { rows: emptyState ? [] : [{
-                last_indexed_block: String(indexed), last_confirmed_block: String(confirmed)
+                last_indexed_block: String(indexed), last_confirmed_block: String(confirmed),
+                contract_address: 'fixture-core', revision: '1'
             }] };
             if (sql.includes('string_agg')) return { rows: [{ hash: 'a'.repeat(64) }] };
             return { rows: [] };
@@ -30,12 +31,14 @@ function transactionFixture({ failAt, emptyState = false, indexed = 115, confirm
 test('rewind uses one client, commits before cache work and never advances a cursor', async () => {
     const { engine, calls } = transactionFixture({ indexed: 99, confirmed: 90 });
     await engine._handleReorg(110);
-    assert.equal(calls[1].sql, 'BEGIN ISOLATION LEVEL READ COMMITTED');
-    assert.match(calls[2].sql, /FOR UPDATE$/);
+    const begin = calls.findIndex(call => call.sql === 'BEGIN ISOLATION LEVEL READ COMMITTED');
+    assert.ok(begin > 1, 'prepare before taking transaction locks');
+    assert.match(calls[begin + 1].sql, /FOR UPDATE$/);
     const update = calls.find(call => call.sql.startsWith('UPDATE indexer_state'));
     assert.deepEqual(update.params, [99, 90, `0x${'a'.repeat(64)}`, '84532']);
     assert.deepEqual(calls.slice(-3).map(call => call.sql), ['COMMIT', 'release', 'purge']);
     assert.deepEqual(calls.find(call => call.sql.includes('string_agg')).params, ['84532', 90]);
+    assert.deepEqual(calls.find(call => call.sql.includes('rollback_events_from_block')).params, [100, '84532']);
 });
 
 for (const failAt of [/^BEGIN/, /^SELECT last_indexed_block/, /rollback_events_from_block/,
