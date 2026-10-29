@@ -1,6 +1,6 @@
 # B32 — Honest feed failure and retry presentation
 
-Status: locally verified; release pending.
+Status: released in PR #391; exact CI and hosted artifact/API checks pass.
 Scope: Phase B reliability, homepage/gallery read presentation. Canon sections
 1 (projection truth), 5 (public display), 15/17 (operational readiness). No
 contract, economic, permission, database, hosting or billing change.
@@ -55,3 +55,24 @@ this patch. B30 provider recovery remains open. Phase B is not complete.
 
 Rollback: revert the reviewed B32 change; no data reversal is required. That
 would restore misleading empty-state presentation and is not recommended.
+
+## Release evidence
+
+PR #391 merged exact candidate `488ead5abc170cdfaa9a4c013650427946b03b47`
+as `4653b47a51869f85d1d682e4b2cba1076f3b3abc` at 00:30:59 UTC on
+October 29 (identical trees). Candidate CI 40794075910 passed: Linux 2,913
+unit checks / two skips; Windows 2,516 / 33 skips; 49 contract tests per runner;
+both builds and static checks. Local full units additionally contained the
+unrelated untracked policy suite (2,545 passed / 33 skips); it was not shipped.
+
+Production deployment 7400801876 succeeded. At 00:28:44 UTC on preview and
+00:31:48 UTC on the apex, both changed page-entry assets matched the locally
+tested build byte-for-byte. Homepage error/retry markup was present. Real feed
+and direct artwork reads still correctly returned HTTP503 / ARTWORKS_UNAVAILABLE
+with private/no-store. Evidence: private b32-preview-http.json and
+b32-production-http.json. This confirms release and continuing restriction,
+not populated-data recovery.
+
+Hosted preview browser navigation was denied by browser URL policy. No bypass
+was attempted; no hosted visual acceptance is claimed. Actual rendered UI
+evidence is the local built-page desktop/390px checks described above.

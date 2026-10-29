@@ -1,5 +1,9 @@
-October 29 B32 local completion / B30 owner cost decision:
-Workspace C:\Projects\ArtSoul / codex/takeover-audit / parent16bc6041.
+October 29 B32 RELEASED / B30 owner cost decision:
+Workspace C:\Projects\ArtSoul / codex/takeover-audit / release4653b47a.
+PR391 / candidate488ead5a, CI40794075910 pass: Linux2913/Windows2516 units,
+49 contracts each, builds/static. Production7400801876 succeeded; preview/apex
+both serve exact entry assets and expected uncached503 API failures. No provider
+restoration inferred. Hosted browser preview blocked by URL policy; no bypass.
 Owner declined all paid overage. Billing draft cancelled; Spend Cap remains
 enabled. No migration, support message, chargeable service or credential change.
 Current source remains restricted; do not ask again to disable Spend Cap.
@@ -13,8 +17,9 @@ overflow; viewport restored. No live-provider recovery inferred. One bounded
 read-only reviewer finished; no helpers left running. See B32_FEED_RECOVERY and
 B30_DATABASE_EGRESS for evidence and no-new-subscription hosting comparison.
 Preserve unrelated untracked policy files, .codex/ and output/.
-Exactly next: release B32 through exact-candidate CI and verify production error
-presentation. Provider restoration/live acceptance remain a separate open gate.
+Exactly next: continue B18 capability-label reconciliation against actual
+collection/assistant availability using local fixtures; paid overage stays
+refused. B30 provider restoration/live acceptance remain a separate open gate.
 
 October 29 B30 owner-login follow-up: correct Supabase organization dashboard
 now verified. Current cycle Oct24-Nov24 shows 782.023 GB uncached egress /250 GB;
