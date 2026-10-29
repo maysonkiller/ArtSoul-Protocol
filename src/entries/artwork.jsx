@@ -158,23 +158,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const imageDialogRef = React.useRef(null);
             const imageCloseRef = React.useRef(null);
             const imageReturnFocusRef = React.useRef(null);
-            const imageMenuRef = React.useRef(null);
             const mediaType = media?.type || 'unknown';
             const url = media?.url || '';
             const poster = media?.poster || '';
             const sanitizedTitle = window.ArtSoulSecurity?.sanitizeText(title) || 'Artwork';
             const isSafeMediaUrl = window.ArtSoulSecurity?.isValidStorageUrl(url);
-            const originalUrl = isSafeMediaUrl && /^https:\/\//i.test(url) ? url : '';
-            let downloadUrl = '';
-            if (originalUrl) {
-                const asset = new URL(originalUrl);
-                // Public Storage serves this response as an attachment, without
-                // buffering the original in the browser or requesting credentials.
-                if (asset.hostname.endsWith('.supabase.co') && asset.pathname.startsWith('/storage/v1/object/public/')) {
-                    asset.searchParams.set('download', '');
-                    downloadUrl = asset.href;
-                }
-            }
             const decodedImage = useDecodedImage(isSafeMediaUrl && ['image', 'gif'].includes(mediaType) ? url : '');
             const canOpenImage = isSafeMediaUrl && ['image', 'gif'].includes(mediaType) && !mediaError && !decodedImage.failed;
 
@@ -183,25 +171,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 setVideoLoaded(false);
                 setIsImageFullscreen(false);
             }, [url, mediaType]);
-
-            React.useEffect(() => {
-                const closeMenu = (event) => {
-                    const menu = imageMenuRef.current;
-                    if (!menu?.open) return;
-                    if (event.type === 'keydown') {
-                        if (event.key !== 'Escape') return;
-                        event.preventDefault();
-                        menu.open = false;
-                        menu.querySelector('summary')?.focus();
-                    } else if (!menu.contains(event.target)) menu.open = false;
-                };
-                document.addEventListener('pointerdown', closeMenu);
-                document.addEventListener('keydown', closeMenu);
-                return () => {
-                    document.removeEventListener('pointerdown', closeMenu);
-                    document.removeEventListener('keydown', closeMenu);
-                };
-            }, []);
 
             React.useEffect(() => {
                 const dialog = imageDialogRef.current;
@@ -219,15 +188,8 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             }, [isImageFullscreen, canOpenImage, url]);
 
             const openImage = (event) => {
-                if (imageMenuRef.current) imageMenuRef.current.open = false;
                 imageReturnFocusRef.current = event.currentTarget;
                 setIsImageFullscreen(true);
-            };
-            const closeImageMenu = () => {
-                const menu = imageMenuRef.current;
-                if (!menu) return;
-                menu.open = false;
-                menu.querySelector('summary')?.focus({preventScroll: true});
             };
 
             const renderMediaFallback = (message = 'Media unavailable') => (
@@ -347,13 +309,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         <button type="button" data-allow-rapid="true" onClick={openImage} aria-label="View full size" title="View full size" aria-haspopup="dialog">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5" /></svg>
                         </button>
-                        {originalUrl && <details className="artwork-image-menu" ref={imageMenuRef}>
-                            <summary aria-label="Image options" title="Image options"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></summary>
-                            <div className="artwork-image-menu-items">
-                                {downloadUrl && <a href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={closeImageMenu}>Download image</a>}
-                                <a href={originalUrl} target="_blank" rel="noopener noreferrer" aria-label="Open original artwork in a new tab" onClick={closeImageMenu}>Open original file</a>
-                            </div>
-                        </details>}
                     </div>
                     {isImageFullscreen && window.ReactDOM?.createPortal?.(
                         <dialog
