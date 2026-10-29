@@ -563,12 +563,60 @@ reinitialization, overlapping recovery, competing NX and actual ACL failures.
 Docker is unavailable locally, so Redis explicitly skipped; Linux CI requires
 the real fixture. No live Redis or database was contacted by these fixtures.
 
+Candidate `400c6867a1ec3f55fed2eb996e5de623d03200d7` passed exact CI40969928038:
+Linux 3,106 pass/two skips, Windows 2,560 pass/35 skips, both builds/static checks
+and 49 contract checks per platform. All 23 real-Redis subtests ran successfully
+against Redis 7.4.12 on Linux; the fixture was not skipped there. PR #406 merged
+at October 29 23:04:20 UTC as `c8e57cce95c4a0bedee3ec829a5120eede44311e`.
+Private evidence: `b35-entry-ci-linux.log` and `b35-entry-ci-windows.log`.
+This is source readiness only; no separate worker activation or live migration.
+
+## Bounded recovery purge (October 30 local time)
+
+The old cache source uses full-keyspace KEYS followed by a single DEL containing
+every matching key. Ten deterministic boundary/failure checks failed against
+that source; evidence is preserved in `docs/private/b35-bounded-purge-before.log`.
+The correction uses SCAN with a count hint of 128, deletes at most 128 keys per
+command, and permits at most 1,024 scan/delete commands after the generation SET.
+The cursor is kept as an opaque decimal string; empty pages and duplicate keys
+are valid. The recovery marker and other namespaces are not deleted. Success
+requires cursor zero and completion of every deletion. Invalid responses,
+partial errors and exhausted budgets leave the durable obligation pending.
+
+These are internal execution bounds, not protocol parameters. Redis documents
+that [SCAN COUNT is a hint](https://redis.io/docs/latest/commands/scan/): it does
+not bound response bytes or wall time. MATCH still traverses the entire Redis
+database. Many unrelated keys can exhaust every attempt before cursor zero,
+leaving recovery safely blocked; namespace isolation or resumable progress must
+be reviewed before a large shared-cache deployment. No new dependency or schema
+change is introduced. Existing queue connection timeout/retry behavior is unchanged.
+
+Validation: 39 focused checks; full local suite 2,599 pass/35 explicit environment
+skips (includes unrelated untracked policy tests); build/11 routes/173 utilities
+pass. Isolated PostgreSQL passes 125/125, zero skips, cluster stopped, including
+partial cache deletion followed by scan failure, retained obligation and complete
+retry. Evidence: `docs/private/b35-bounded-purge-{focused,full-units,build,postgres}.log`
+and `reorg-atomicity-1793317277847-29848-ed107ccf/evidence.json`.
+The disposable Redis suite adds 1,200-key multi-page iteration, bounded deletion,
+old-fill fencing and partial SCAN/DEL failures followed by successful retry.
+Local Docker explicitly skipped; Linux CI must run all 26 Redis subtests.
+Independent review found no scoped blocker and identified the shared-keyspace
+progress limit above. Exact candidate CI and merge remain pending.
+
+Existing deployment was checked read-only at October 30 00:40:44 Europe/Warsaw:
+the existing Hetzner Base Sepolia worker was online, /health returned 200/healthy,
+database healthy, observed lag 11 blocks and zero reported errors. The deployed
+sync-engine hash matched the retained B30 egress correction; newer B35 writer
+fencing was absent. Vercel deploys the website/API, not this long-running worker.
+No new server is planned or created. The Protocol and OS separation evidence
+remains the October 29 record, not a fresh full audit of OS.
+
 ## Open acceptance and exact next step
 
-The ordinary-invalidation slice still needs real Redis integration and
-exact-candidate CI evidence. Unversioned deployment keys,
-full-prefix scan cost and independent CDN caches
-remain separate gates. Reads already in flight are not cancelled by a purge.
+Exactly next: require the real-Redis integration and all exact-candidate CI gates
+for this bounded purge slice before merge. Deployment namespace/progress bounds,
+Redis restoration and independent CDN caches remain separate gates.
+Reads already in flight are not cancelled by a purge.
 No all-cache convergence or production-scale recovery claim is made.
 
 Keep the worker inactive until the remaining gates have independent evidence.

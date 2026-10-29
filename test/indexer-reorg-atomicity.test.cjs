@@ -1056,7 +1056,10 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     };
     cache.getRedis=async()=>({
       async get(key){return current(key);},async set(...args){return set(...args);},
-      async keys(pattern){assert.equal(pattern,'artsoul:*');calls.keys++;return [...data.keys()];},
+      async scan(cursor,...options){
+        assert.equal(cursor,'0');assert.deepEqual(options,['MATCH','artsoul:*','COUNT',128]);
+        calls.keys++;return ['0',[...data.keys()].filter(key=>key.startsWith('artsoul:'))];
+      },
       async del(...keys){calls.deletes++;for(const key of keys){data.delete(key);expires.delete(key);}},
       async eval(script,keyCount,...args){
         assert.equal(typeof script,'string');
@@ -1147,6 +1150,34 @@ const {pathToFileURL}=require('node:url');
     replacement.fixtureFailCachePurge=false;
     await replacement.start();assert.equal(replacement.isRunning,true);assert.equal(await recoveryToken(),null);
     assert.deepEqual((await snapshot(CHAIN)).artwork_media_chain_revisions,before.artwork_media_chain_revisions);
+  });
+  await t.test('partial cache scanning cannot acknowledge the durable obligation before a complete retry',async()=>{
+    const token=await requestPurge(),before=await snapshot(CHAIN),replacement=historicalWriter([]);
+    const {cache,data,calls}=await recoveryCache(),redis=await cache.getRedis();
+    const firstKey=cache.keys.auction('partial-scan-first'),lastKey=cache.keys.bids('partial-scan-last');
+    await cache.set(firstKey,{bid:100});await cache.set(lastKey,[100]);
+    let fail=true,scans=0;
+    // This injected two-page transport proves the PostgreSQL acknowledgement
+    // boundary; actual multi-page Redis behavior belongs to cache-recovery-rpc.
+    cache.getRedis=async()=>({...redis,async scan(...args){
+      if(!fail)return redis.scan(...args);
+      calls.keys++;
+      if(++scans===1)return ['1',[firstKey]];
+      throw new Error('fixture partial recovery SCAN failure');
+    }});
+    replacement.fixtureCachePurgeHook=options=>cache.purge(options);
+    await assert.rejects(replacement.start(),/fixture partial recovery SCAN failure/);
+    assert.equal(scans,2);assert.equal(calls.deletes,1);
+    assert.equal(data.has(firstKey),false);assert.equal(data.has(lastKey),true);
+    assert.equal(replacement.isRunning,false);assert.equal(await recoveryToken(),token);
+    assert.deepEqual(await snapshot(CHAIN),before,'partial deletion must not acknowledge or alter database state');
+    fail=false;
+    await replacement.start();
+    assert.equal(replacement.isRunning,true);assert.equal(await recoveryToken(),null);
+    assert.equal(calls.deletes,2);assert.deepEqual([...data.keys()],['artsoul:cache:recovery-generation']);
+    assert.deepEqual((await snapshot(CHAIN)).artwork_media_chain_revisions,before.artwork_media_chain_revisions);
+    evidence.results.push({scenario:'partial_scan_retains_recovery_obligation',
+      partialDeletion:true,tokenRetained:true,retryAcknowledged:true,redisTransport:'local Map; actual cache-service methods'});
   });
   await t.test('a successful purge with failed acknowledgement is retried by the next worker',async()=>{
     const token=await requestPurge(),replacement=historicalWriter([]);let purges=0;

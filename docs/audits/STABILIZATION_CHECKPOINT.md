@@ -1,6 +1,28 @@
-October 29 B35 ordinary invalidation refill / source candidate:
+October 30 B35 bounded recovery purge / source candidate:
+Workspace C:\Projects\ArtSoul / codex/bounded-recovery-cache-purge /
+base HEAD c8e57cce95c4a0bedee3ec829a5120eede44311e (main, PR406).
+Preserved prior diff in docs/private/b35-bounded-purge-before-docs.patch.
+Replaced recovery KEYS/single unbounded DEL with SCAN hint128, DEL batches128
+and a 1,024 scan/delete command limit after UUID rotation. Empty/duplicate pages,
+opaque cursors, partial failures and durable retry are handled. No dependency,
+SQL migration, economics or contract change. Full SCAN response bytes/time are
+not bounded; unrelated keys may exhaust the pass budget and keep recovery pending.
+39 focused checks; full local2,599 pass/35 skips; build/routes/CSS pass.
+125 isolated PostgreSQL checks pass, zero skips, cluster stopped. Logs:
+docs/private/b35-bounded-purge-{before,focused,full-units,build,postgres}.log;
+fixture reorg-atomicity-1793317277847-29848-ed107ccf/evidence.json.
+Real Redis suite adds multi-page/partial-failure cases; local Docker unavailable,
+explicitly skipped. Linux CI must run all26 nested Redis cases. Independent review
+found no scoped blocker. Exactly next: submit this source PR and require exact
+Linux real-Redis/PostgreSQL, Windows, contract/build/static checks before merge.
+Existing Hetzner worker read-only check at October30 00:40:44 Warsaw was healthy;
+B30 egress patch present, B35 not activated. Website/API remains on Vercel.
+No new server, live migration/cache purge/worker update, billing or mainnet change.
+Unrelated B27 docs/untracked files preserved. Phase B remains open.
+
+October 30 local / October 29 UTC B35 ordinary invalidation refill / PR406 MERGED:
 Workspace C:\Projects\ArtSoul / codex/auction-cache-invalidation-fence /
-base HEAD 92b1b330436d706984bb3e5d7ed5eccc2afa5c12 (main, PR405).
+HEAD c8e57cce95c4a0bedee3ec829a5120eede44311e (main, PR406).
 PR405 candidate ca44ddeb passed exact CI40968117393: Linux3,092 pass/two skips
 including actual Redis7.4.12, Windows/builds/static green,49 contracts each.
 Source merged; no live migration, cache purge or separate indexer activation.
@@ -18,10 +40,17 @@ b35-key-invalidation-postgres.log; PostgreSQL fixture
 reorg-atomicity-1793314445789-33136-cc1510a5/evidence.json.
 Independent review found no blocker. Ordinary invalidation remains best-effort
 and sequential across auction/bids; markers add bounded-lived cache entries.
-Real Redis adds 11 regression cases; Docker is unavailable locally, explicitly
-skipped. Linux CI requires execution. No live services were used for these tests.
-Exactly next: submit the isolated source correction and require exact-candidate
-Linux real-Redis, PostgreSQL, Windows, contract and build CI.
+Candidate 400c6867 passed exact CI40969928038: Linux 3,106 pass/two skips,
+including all 23 real Redis subtests (Redis 7.4.12); Windows 2,560 pass/35 skips;
+49 contract tests each; builds/static and Vercel preview green. Retained CI logs:
+docs/private/b35-entry-ci-{linux,windows}.log. Merged October29 23:04:20 UTC.
+Local Docker explicitly skipped; required Linux fixture passed. No live services
+were used for the fixtures. Source merge does not activate the separate worker.
+Exactly next: replace the recovery purge's full-prefix KEYS/unbounded DEL with
+bounded enumeration/deletion, preserving durable retry and generation fencing;
+reproduce partial-scan failure before implementation and verify on real Redis.
+Release-record edits in this checkpoint, B35 audit and BACKLOG remain local;
+all source/test changes are committed and merged. No new worktree was created.
 Unrelated B27 release docs/untracked files preserved; Phase B is NOT closed.
 
 October 29 B35 delayed cache refill / source candidate:

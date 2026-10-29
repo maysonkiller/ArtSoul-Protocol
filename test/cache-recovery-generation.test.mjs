@@ -23,10 +23,14 @@ function fixture(t, overrides = {}) {
             values.set(key, value);
             return 'OK';
         },
-        async keys(pattern) {
+        async scan(cursor, match, pattern, count, size) {
             calls.keys++;
+            assert.equal(cursor, '0');
+            assert.equal(match, 'MATCH');
+            assert.equal(count, 'COUNT');
+            assert.equal(size, 128);
             assert.equal(pattern, 'artsoul:*');
-            return [...values.keys()];
+            return ['0', [...values.keys()]];
         },
         async del(...keys) { calls.deletes++; keys.forEach(key => values.delete(key)); },
         async eval(script, count, ...args) {

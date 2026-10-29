@@ -201,7 +201,7 @@ test('real cache purge propagates deletion failure only for strict recovery', as
     let fail = true, deletes = 0;
     t.mock.method(cacheService, 'getRedis', async () => ({
         async set() { return 'OK'; },
-        async keys() { return ['artsoul:auction:1']; },
+        async scan() { return ['0', ['artsoul:auction:1']]; },
         async del() { deletes++; if (fail) throw failure; }
     }));
     const engine = Object.create(Engine.prototype);

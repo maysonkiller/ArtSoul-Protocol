@@ -133,12 +133,16 @@ test('recovery and entry generations fence cache refill against real Redis', {
         await fetching.promise;
         await first.set('artsoul:auction:existing', 'obsolete');
         const old = await first.get(GENERATION);
-        const purgerA = service(transport(first, { keys: async pattern => {
-            const keys = await first.keys(pattern); scanA.resolve(); await releaseA.promise; return keys;
-        } }));
-        const purgerB = service(transport(second, { keys: async pattern => {
-            const keys = await second.keys(pattern); scanB.resolve(); await releaseB.promise; return keys;
-        } }));
+        const pausedPurger = (client, entered, release) => {
+            let initial = true;
+            return service(transport(client, { scan: async (...args) => {
+                const page = await client.scan(...args);
+                if (initial) { initial = false; entered.resolve(); await release.promise; }
+                return page;
+            } }));
+        };
+        const purgerA = pausedPurger(first, scanA, releaseA);
+        const purgerB = pausedPurger(second, scanB, releaseB);
         const a = purgerA.purge({ strict: true });
         let b, latest;
         try {
@@ -163,6 +167,82 @@ test('recovery and entry generations fence cache refill against real Redis', {
         assert.equal(await cacheB.purge({ strict: true }), true);
         const next = await first.get(GENERATION); assert.match(next, UUID); assert.notEqual(next, initial);
         assert.deepEqual(await first.keys('artsoul:*'), [GENERATION]);
+    });
+
+    async function seedPurgeKeys() {
+        const keys = Array.from({ length: 1200 }, (_, index) => `artsoul:auction:bulk-${index}`);
+        await first.mset(...keys.flatMap(key => [key, 'obsolete']), 'other:cache:keep', 'unrelated', 'bull:queue:keep', 'queued');
+        return keys;
+    }
+    const assertPurgeComplete = async () => {
+        assert.deepEqual(await first.keys('artsoul:*'), [GENERATION]);
+        assert.match(await first.get(GENERATION), UUID);
+        assert.equal(await first.ttl(GENERATION), -1);
+        assert.deepEqual(await first.mget('other:cache:keep', 'bull:queue:keep'), ['unrelated', 'queued']);
+    };
+    await t.test('multi-page purge bounds deletion batches, preserves other namespaces and fences an old fill', async () => {
+        await seedPurgeKeys();
+        const key = 'artsoul:auction:multi-page-fill', pending = delayedFill(cacheA, key);
+        let scans = 0;
+        const batches = [], deleted = new Set();
+        const purger = service(transport(second, {
+            keys: async () => assert.fail('recovery purge must not use KEYS'),
+            scan: async (cursor, ...options) => {
+                assert.match(cursor, /^\d+$/);
+                assert.deepEqual(options, ['MATCH', 'artsoul:*', 'COUNT', 128]);
+                scans++;
+                return second.scan(cursor, ...options);
+            },
+            del: async (...keys) => {
+                assert.ok(keys.length > 0 && keys.length <= 128);
+                assert.ok(!keys.includes(GENERATION));
+                batches.push(keys.length);
+                for (const key of keys) deleted.add(key);
+                return second.del(...keys);
+            }
+        }));
+        try {
+            await pending.entered.promise;
+            const before = await first.get(GENERATION);
+            assert.equal(await purger.purge({ strict: true }), true);
+            assert.notEqual(await first.get(GENERATION), before);
+            assert.ok(scans > 1, 'the fixture must traverse multiple real Redis cursor pages');
+            assert.ok(batches.length > 1);
+            assert.equal(deleted.size, 1201, 'duplicate SCAN results remain valid and harmless');
+            await assertPurgeComplete();
+        } finally { pending.release.resolve(); }
+        assert.equal(await pending.reading, 200); assert.equal(pending.reads(), 2);
+        assert.equal(await first.get(key), null);
+    });
+    for (const failure of ['scan', 'del']) await t.test(`partial ${failure.toUpperCase()} failure does not report purge completion and a retry drains real Redis`, async () => {
+        const keys = await seedPurgeKeys(), original = crypto.randomUUID();
+        await first.set(GENERATION, original);
+        let inject = true, deletedBatches = 0;
+        const purger = service(transport(second, {
+            scan: async (...args) => {
+                if (failure === 'scan' && inject && deletedBatches > 0) {
+                    inject = false; throw new Error('fixture partial SCAN failure');
+                }
+                return second.scan(...args);
+            },
+            del: async (...batch) => {
+                assert.ok(batch.length > 0 && batch.length <= 128);
+                if (failure === 'del' && inject && deletedBatches > 0) {
+                    inject = false; throw new Error('fixture partial DEL failure');
+                }
+                const removed = await second.del(...batch); deletedBatches++;
+                return removed;
+            }
+        }));
+        await assert.rejects(purger.purge({ strict: true }), new RegExp(`fixture partial ${failure.toUpperCase()} failure`));
+        assert.equal(inject, false); assert.ok(deletedBatches > 0); assert.equal(purger.isEnabled, false);
+        const surviving = (await first.mget(...keys)).filter(value => value !== null).length;
+        assert.ok(surviving > 0 && surviving < keys.length, 'failure follows actual partial deletion');
+        const failedGeneration = await first.get(GENERATION);
+        assert.match(failedGeneration, UUID); assert.notEqual(failedGeneration, original);
+        assert.equal(await purger.purge({ strict: true }), true);
+        assert.notEqual(await first.get(GENERATION), failedGeneration);
+        await assertPurgeComplete();
     });
 
     for (const reinitialize of [false, true]) await t.test(`marker loss during a fetch ${reinitialize ? 'cannot reuse its previous generation' : 'cannot authorize a write'}`, async () => {
@@ -337,7 +417,7 @@ test('recovery and entry generations fence cache refill against real Redis', {
         try { client = await connect({ username: name, password }); await run(service(client)); }
         finally { client?.disconnect(); await first.acl('DELUSER', name); }
     }
-    for (const command of ['set', 'keys', 'del']) await t.test(`strict purge propagates a real Redis ${command.toUpperCase()} denial`, async () => {
+    for (const command of ['set', 'scan', 'del']) await t.test(`strict purge propagates a real Redis ${command.toUpperCase()} denial`, async () => {
         const original = crypto.randomUUID();
         await first.set(GENERATION, original); await first.set('artsoul:auction:retained', 'stale');
         await denied(command, cache => assert.rejects(cache.purge({ strict: true }), /NOPERM|permission/i));
