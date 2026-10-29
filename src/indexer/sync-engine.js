@@ -110,11 +110,14 @@ class IndexerSyncEngine {
      * Compute deterministic state hash for a given block number.
      * Hashes the sequence of block hashes up to the specified block.
      */
-    async _computeStateHash(blockNumber) {
+    async _computeStateHash(blockNumber, client = null) {
         // Keep the existing ordered comma-separated SHA-256 format, but return
         // only its digest. Downloading the entire history on every sync cycle
         // makes database egress grow with both history length and poll count.
-        const result = await this.db.query(
+        const query = client
+            ? async (sql, values) => (await client.query(sql, values)).rows
+            : this.db.query.bind(this.db);
+        const result = await query(
             `SELECT encode(digest(
                  COALESCE(string_agg(block_hash, ',' ORDER BY block_number ASC), ''),
                  'sha256'), 'hex') AS hash
@@ -195,31 +198,11 @@ class IndexerSyncEngine {
     async recoverFromSafeBlock(state) {
         console.log(`[IndexerSyncEngine] Executing self-healing recovery from block ${state.last_confirmed_block}`);
 
-        const safeBlock = state.last_confirmed_block;
+        const safeBlock = Number(state.last_confirmed_block);
+        // Startup recovery must use the same atomic rewind as a detected reorg.
+        await this._handleReorg(safeBlock + 1);
 
-        // 1. Rollback any unconfirmed data
-        await this.db.query(`SELECT rollback_events_from_block($1, $2)`, [safeBlock + 1, this._chainIdString()]);
-        await this.db.query(
-            `DELETE FROM block_hashes WHERE chain_id = $1 AND block_number > $2`,
-            [this._chainIdString(), safeBlock]
-        );
-
-        // --- CACHE PURGE ---
-        // During recovery, we cannot trust any cached state
-        const cacheService = (await import('../services/cache-service.js')).default;
-        await cacheService.purge();
-        // -------------------
-
-        // 2. Reset state to safe block
-        await this.db.query(
-            `UPDATE indexer_state
-             SET last_indexed_block = $1,
-                 last_indexed_at = NOW()
-             WHERE chain_id = $2`,
-            [safeBlock, this._chainIdString()]
-        );
-
-        // 3. Reprocess missing blocks in batch
+        // Reprocess missing blocks only after a successful rewind and purge.
         const currentBlock = await this.eventListener.getCurrentBlock();
         if (currentBlock > safeBlock) {
             console.log(`[IndexerSyncEngine] Reprocessing blocks ${safeBlock + 1} to ${currentBlock}`);
@@ -483,6 +466,11 @@ class IndexerSyncEngine {
     }
 
     async detectReorg(options = {}) {
+        // Retry an interrupted post-commit purge without repeating the rewind.
+        if (this.recoveryCachePurgePending) {
+            await this._purgeRecoveryCache();
+            return true;
+        }
         const state = await this.getIndexerState();
         if (!state) return false;
 
@@ -527,26 +515,29 @@ class IndexerSyncEngine {
 
         // Check block hash mismatches
         for (const stored of storedBlocks) {
+            let currentBlock;
             try {
-                const currentBlock = await this.eventListener.getBlock(Number(stored.block_number));
-
-                if (currentBlock && currentBlock.hash !== stored.block_hash) {
-                    console.error(`[IndexerSyncEngine]  REORG DETECTED at block ${stored.block_number}`);
-                    console.error(`  Stored hash: ${stored.block_hash}`);
-                    console.error(`  Current hash: ${currentBlock.hash}`);
-                    console.error(`  Depth: ${state.last_indexed_block - stored.block_number} blocks`);
-
-                    // Record reorg in metrics
-                    if (this.metrics) {
-                        const depth = state.last_indexed_block - stored.block_number;
-                        this.metrics.recordReorg(depth);
-                    }
-
-                    await this._handleReorg(Number(stored.block_number));
-                    return true;
-                }
+                currentBlock = await this.eventListener.getBlock(Number(stored.block_number));
             } catch (error) {
                 console.error(`[IndexerSyncEngine] Error checking block ${stored.block_number}:`, error.message);
+                continue;
+            }
+            // A failed rollback is not an RPC read failure. Let it stop this
+            // poll instead of continuing catch-up against a partial recovery.
+            if (currentBlock && currentBlock.hash !== stored.block_hash) {
+                console.error(`[IndexerSyncEngine]  REORG DETECTED at block ${stored.block_number}`);
+                console.error(`  Stored hash: ${stored.block_hash}`);
+                console.error(`  Current hash: ${currentBlock.hash}`);
+                console.error(`  Depth: ${state.last_indexed_block - stored.block_number} blocks`);
+
+                // Record reorg in metrics
+                if (this.metrics) {
+                    const depth = state.last_indexed_block - stored.block_number;
+                    this.metrics.recordReorg(depth);
+                }
+
+                await this._handleReorg(Number(stored.block_number));
+                return true;
             }
         }
 
@@ -578,40 +569,46 @@ class IndexerSyncEngine {
     }
 
     async _handleReorg(reorgBlock) {
+        reorgBlock = Number(reorgBlock);
+        if (!Number.isSafeInteger(reorgBlock) || reorgBlock < 1) {
+            throw new Error('Invalid reorg boundary');
+        }
         console.log(`[IndexerSyncEngine] Handling reorg from block ${reorgBlock}`);
-
-        // Rollback unconfirmed data
-        const result = await this.db.query(
-            `SELECT rollback_events_from_block($1, $2)`,
-            [reorgBlock, this._chainIdString()]
-        );
-
-        console.log(`[IndexerSyncEngine] Rolled back events from block ${reorgBlock}`);
-        console.log(`  Result:`, result[0]);
-
-        // --- CACHE PURGE ---
-        // Chain reorg means data we cached is now invalid
-        const cacheService = (await import('../services/cache-service.js')).default;
-        await cacheService.purge();
-        // -------------------
-
-        // Reset indexer state to reorg point
-        await this.db.query(
-            `UPDATE indexer_state
-             SET last_indexed_block = $1,
-                 last_confirmed_block = LEAST(last_confirmed_block, $1),
-                 last_indexed_at = NOW()
-             WHERE chain_id = $2`,
-            [reorgBlock - 1, this._chainIdString()]
-        );
-
-        // Delete block hashes from reorg point
-        await this.db.query(
-            `DELETE FROM block_hashes WHERE chain_id = $1 AND block_number >= $2`,
-            [this._chainIdString(), reorgBlock]
-        );
-
+        const client = await this.db.pool.connect();
+        try {
+            await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+            const { rows } = await client.query(
+                'SELECT last_indexed_block, last_confirmed_block FROM indexer_state WHERE chain_id = $1 FOR UPDATE',
+                [this._chainIdString()]
+            );
+            if (rows.length !== 1) throw new Error('Missing indexer state for reorg');
+            const rewindTo = Math.min(Number(rows[0].last_indexed_block), reorgBlock - 1);
+            const confirmedTo = Math.min(Number(rows[0].last_confirmed_block), rewindTo);
+            await client.query('SELECT rollback_events_from_block($1, $2)', [reorgBlock, this._chainIdString()]);
+            await client.query('DELETE FROM block_hashes WHERE chain_id = $1 AND block_number >= $2',
+                [this._chainIdString(), reorgBlock]);
+            const stateHash = await this._computeStateHash(confirmedTo, client);
+            await client.query(
+                `UPDATE indexer_state SET last_indexed_block = $1, last_confirmed_block = $2,
+                    state_hash = $3, last_indexed_at = NOW() WHERE chain_id = $4`,
+                [rewindTo, confirmedTo, stateHash, this._chainIdString()]
+            );
+            await client.query('COMMIT');
+        } catch (error) {
+            try { await client.query('ROLLBACK'); } catch { /* Preserve the recovery error. */ }
+            throw error;
+        } finally {
+            client.release();
+        }
+        this.recoveryCachePurgePending = true;
+        await this._purgeRecoveryCache();
         console.log(`[IndexerSyncEngine] Indexer state reset to block ${reorgBlock - 1}`);
+    }
+
+    async _purgeRecoveryCache() {
+        const cacheService = (await import('../services/cache-service.js')).default;
+        await cacheService.purge({ strict: true });
+        this.recoveryCachePurgePending = false;
     }
 
     async _processBatchInOrder(events) {

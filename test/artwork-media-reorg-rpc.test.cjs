@@ -78,7 +78,8 @@ test('media registration and indexer rollback share an atomic revision fence (Po
     catch {await delay(250);}
   }
   assert(ready,'disposable PostgreSQL is ready');
-  await pool.query(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+  await pool.query(`CREATE EXTENSION pgcrypto;
+    CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE ROLE postgres LOGIN NOSUPERUSER BYPASSRLS PASSWORD 'local-media-worker-only';
     GRANT USAGE,CREATE ON SCHEMA public TO postgres;`);
   const fenceMigration = migration('sql/migrations/artwork_media_reorg.sql');
@@ -574,7 +575,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
       await workerPool.query(`CREATE TABLE public.indexer_state(
         chain_id NUMERIC(78,0) PRIMARY KEY, last_indexed_block BIGINT NOT NULL,
         last_confirmed_block BIGINT NOT NULL, confirmation_depth INTEGER NOT NULL,
-        last_indexed_at TIMESTAMPTZ);
+        last_indexed_at TIMESTAMPTZ, state_hash TEXT);
         CREATE TABLE public.block_hashes(chain_id NUMERIC(78,0) NOT NULL,block_number BIGINT NOT NULL,
           block_hash VARCHAR(66) NOT NULL,parent_hash VARCHAR(66) NOT NULL,timestamp BIGINT NOT NULL,
           indexed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(chain_id,block_number));`);
@@ -584,7 +585,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
       assert.deepEqual(role,{name:'postgres',rolsuper:false,rolbypassrls:true,can_rollback:true});
       assert.equal((await workerPool.query(`SELECT pg_get_userbyid(proowner) AS owner FROM pg_proc
         WHERE oid='public.rollback_events_from_block(bigint,numeric)'::regprocedure`)).rows[0].owner,'postgres');
-      const database={async query(sql,params){return (await workerPool.query(sql,params)).rows;}};
+      const database={pool:workerPool,async query(sql,params){return (await workerPool.query(sql,params)).rows;}};
       const workerState=async()=>({
         cursors:(await pool.query('SELECT * FROM public.indexer_state ORDER BY chain_id')).rows,
         hashes:(await pool.query('SELECT * FROM public.block_hashes ORDER BY chain_id,block_number')).rows
@@ -598,7 +599,7 @@ test('media registration and indexer rollback share an atomic revision fence (Po
           await claimed(value);await started(value,method==='_handleReorg');await reconcile(value);
           await claimed(foreign);await pool.query(identityQuery(foreign));
           await seedProjection();await seedProjection(123,11155111);
-          await pool.query(`INSERT INTO public.indexer_state VALUES(84532,130,$1,3,'2026-10-23T00:00:00Z'),
+          await pool.query(`INSERT INTO public.indexer_state(chain_id,last_indexed_block,last_confirmed_block,confirmation_depth,last_indexed_at) VALUES(84532,130,$1,3,'2026-10-23T00:00:00Z'),
             (11155111,777,700,12,'2026-10-22T00:00:00Z')`,[method==='_handleReorg'?125:119]);
           await pool.query(`INSERT INTO public.block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
             SELECT chain_id,block_number,$1,$2,1792713600 FROM unnest(ARRAY[84532,11155111]) AS chain_id

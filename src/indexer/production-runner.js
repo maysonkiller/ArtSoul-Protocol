@@ -623,10 +623,12 @@ class ProductionIndexer {
             try {
                 const now = Date.now();
                 if (now - this.lastReorgCheckAt >= this.reorgCheckInterval) {
-                    this.lastReorgCheckAt = now;
                     const reorgDetected = await this.syncEngine.detectReorg({
                         sampleSize: this.reorgSampleSize
                     });
+                    // Failed recovery must retry before any later catch-up;
+                    // it must not be treated as a completed periodic check.
+                    this.lastReorgCheckAt = now;
                     if (reorgDetected) {
                         this.resaleCursor = '0';
                         this.resaleSweepEnd = null;

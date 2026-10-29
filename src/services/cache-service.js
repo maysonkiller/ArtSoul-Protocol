@@ -24,9 +24,12 @@ class CacheService {
         ]);
     }
 
-    async purge() {
+    async purge({ strict = false } = {}) {
         const redis = await this.getRedis();
-        if (!redis) return;
+        if (!redis) {
+            if (strict && process.env.REDIS_URL) throw new Error('Recovery cache connection unavailable');
+            return;
+        }
 
         try {
             const keys = await redis.keys('artsoul:*');
@@ -36,6 +39,7 @@ class CacheService {
             }
         } catch (error) {
             this.handleRedisError('purge', error);
+            if (strict) throw error;
         }
     }
 
