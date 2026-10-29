@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 const RECOVERY_GENERATION_KEY = 'artsoul:cache:recovery-generation';
 const entryGenerationKey = key => `artsoul:cache:entry-generation:${key}`;
 const INVALIDATION_MARKER_TTL = 3600;
+const PURGE_BATCH_SIZE = 128;
+const PURGE_COMMAND_LIMIT = 1024;
 // The comparison and write must be indivisible across API/indexer processes.
 const STORE_IN_GENERATION = `
     if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
@@ -63,11 +65,27 @@ class CacheService {
             if (await redis.set(RECOVERY_GENERATION_KEY, randomUUID()) !== 'OK') {
                 throw new Error('Recovery cache generation unavailable');
             }
-            const keys = (await redis.keys('artsoul:*')).filter(key => key !== RECOVERY_GENERATION_KEY);
-            if (keys.length > 0) {
-                await redis.del(...keys);
-                console.log(`[Cache] Recovery purge cleared ${keys.length} keys`);
-            }
+            let cursor = '0', commands = 0;
+            const countCommand = () => {
+                if (++commands > PURGE_COMMAND_LIMIT) throw new Error('Recovery cache purge command limit reached');
+            };
+            do {
+                countCommand();
+                const page = await redis.scan(cursor, 'MATCH', 'artsoul:*', 'COUNT', PURGE_BATCH_SIZE);
+                if (!Array.isArray(page) || page.length !== 2 || typeof page[0] !== 'string' ||
+                    !/^\d+$/.test(page[0]) || !Array.isArray(page[1]) ||
+                    page[1].some(key => typeof key !== 'string')) {
+                    throw new Error('Invalid recovery cache scan response');
+                }
+                cursor = page[0];
+                // COUNT is only a hint; bound deletion even for an oversized page.
+                // Empty pages/duplicates are valid. Only cursor 0 completes a pass.
+                const keys = page[1].filter(key => key !== RECOVERY_GENERATION_KEY && key.startsWith('artsoul:'));
+                for (let start = 0; start < keys.length; start += PURGE_BATCH_SIZE) {
+                    countCommand();
+                    await redis.del(...keys.slice(start, start + PURGE_BATCH_SIZE));
+                }
+            } while (cursor !== '0');
             return true;
         } catch (error) {
             this.handleRedisError('purge', error);
