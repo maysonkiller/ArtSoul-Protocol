@@ -36,8 +36,10 @@ unrecognized fragments select Discovery; explicit category links and the older
 ## Verification
 
 - Focused gallery/profile checks: 16 pass, no skips or failures.
-- Full unit suite before the final copy/CSS refinement: 2,600 pass, 35
-  environment-dependent skips, no failures. Final candidate is subject to CI.
+- Final local unit suite: 2,601 pass, 35 environment-dependent skips, no failures.
+- Exact candidate `0afa71b4` passed Linux/Windows CI, static checks and Vercel
+  preview. PR409 merged October31 as `517b3d40`; its production deployment is
+  successful. The apex browser confirms the default avatar and gallery order.
 - Final local build passes, including 11 HTML-route and Tailwind checks.
 - Chromium fixture uses the actual summary/editor markup, shared CSS and real
   dialog component, with synthetic profile data and local persistence handlers.
