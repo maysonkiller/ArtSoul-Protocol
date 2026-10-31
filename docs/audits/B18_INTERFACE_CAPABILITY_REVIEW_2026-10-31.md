@@ -138,6 +138,8 @@ stable summary, unread clearing, zero JavaScript page errors. Widths 320/390/136
 screenshots inspected. It remains a design study, not production acceptance.
 First rerun after an asset edit hit a development-server reload; the subsequent
 unchanged-file run passed. No production failure is inferred from that event.
+The repository-wide grid guard also caught a generic `grid` class in the
+standalone study. It was renamed `study-grid`; the guard was not weakened.
 
 ## Verification mark policy
 
