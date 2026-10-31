@@ -89,7 +89,8 @@ variant was freshly executed in this review.
 | Use voice/text assistant | Bounded English/Russian commands, shared WebMCP tools, real PC voice acceptance | Not universal-language conversational AI; paid provider activation remains deferred |
 | Obtain Genesis | Dedicated mainnet-only design | No testnet entitlement/claim button; future audited issuance rather than a missing beta feature |
 
-Primary sources: `src/entries/{profile,gallery,artwork,upload,collection-builder,admin}.jsx`,
+Primary sources: `src/entries/{profile,gallery,artwork,collection-builder,admin}.jsx`,
+`src/entries/upload.js`,
 `src/features/admin/artwork-catalog.jsx`, `src/features/moderation/notification-inbox.jsx`,
 `src/api/routes/public/config.js`, `webmcp-tools.js`, `voice-commands.js`,
 `docs/BACKLOG.md`, `docs/PHASE_A_CLOSE_OUT.md` and the dated B12 receipts linked there.
