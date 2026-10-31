@@ -105,13 +105,13 @@ test('Discovery cards can show all three persisted signal counts', () => {
 test('gallery markup keeps the requested order and default without card signals', () => {
     const gallery = fs.readFileSync('gallery.html', 'utf8') + fs.readFileSync('src/entries/gallery.jsx', 'utf8');
     const auctions = gallery.indexOf("{ id: 'live_auctions', label: 'Auctions' }");
-    const nft = gallery.indexOf("{ id: 'nft', label: 'NFT' }");
+    const nft = gallery.indexOf("{ id: 'nft', label: 'NFTs' }");
     const discover = gallery.indexOf("{ id: 'discover', label: 'Discovery' }");
     const marketplace = gallery.indexOf("{ id: 'marketplace', label: 'Marketplace' }");
     const collections = gallery.indexOf("{ id: 'collections', label: 'Collections' }");
 
-    assert.ok(auctions < nft && nft < discover && discover < marketplace && marketplace < collections);
-    assert.match(gallery, /\? tabId : 'live_auctions'/);
+    assert.ok(discover >= 0 && discover < auctions && auctions < nft && nft < marketplace && marketplace < collections);
+    assert.match(gallery, /\? tabId : 'discover'/);
     assert.doesNotMatch(gallery, /showSignals=/);
     assert.match(gallery, /ArtSoulArtworkCard\?\.hasSafeMedia/);
     assert.match(gallery, /TODO: Add a "Make an offer" action to NFT cards/);

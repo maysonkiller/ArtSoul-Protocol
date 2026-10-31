@@ -5472,6 +5472,41 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
 
 .profile-social-action-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .profile-social-action-row > .profile-inline-edit-action { margin-top: 0; }
+.profile-avatar-column { align-self: center; }
+.profile-summary { min-width: 0; }
+.profile-stat-grid { align-items: stretch; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto auto; row-gap: 0.25rem !important; }
+.profile-stat-card { display: grid; grid-row: span 3; grid-template-rows: subgrid; min-width: 0; }
+.profile-stat-card > div { margin: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.profile-stat-card > .text-lg,
+.profile-stat-card > .text-xl { font-size: 1.125rem; }
+.profile-edit-dialog {
+    width: min(48rem, calc(100% - 1.5rem));
+    max-width: none;
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    padding: 1.25rem;
+    border: 1px solid var(--c-border);
+    border-radius: 1rem;
+    color: var(--c-text);
+    background: var(--c-surface);
+    overflow: auto;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+}
+.profile-edit-dialog::backdrop { background: var(--c-modal-backdrop); }
+.profile-edit-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.profile-edit-heading h2 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+.profile-edit-heading button { min-height: 44px; }
+.profile-edit-layout { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 1.25rem; }
+.profile-edit-layout .profile-avatar-column { align-self: start; }
+.profile-edit-fields { min-width: 0; }
+.profile-edit-dialog .profile-actions { margin: 1rem 0 0; width: 100%; }
+.profile-edit-dialog .profile-connection-grid { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+    .profile-edit-dialog { padding: 1rem; }
+    .profile-edit-layout { grid-template-columns: 1fr; gap: 1rem; }
+    .profile-edit-layout .profile-avatar-column { justify-self: center; }
+}
 
 .profile-social-links {
     display: grid !important;
@@ -5596,14 +5631,12 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         column-gap: 1rem;
-        align-items: start;
+        align-items: center;
     }
-    .profile-display-details > :not(.profile-stat-grid) { grid-column: 1; min-width: 0; }
     .profile-display-details > .profile-stat-grid {
         grid-column: 2;
-        grid-row: 1 / span 4;
         margin-top: 0 !important;
-        gap: 0.5rem !important;
+        column-gap: 0.5rem !important;
     }
     .profile-display-details .profile-stat-card { padding: 0.625rem !important; }
     .profile-display-details .profile-social-action-row { flex-wrap: nowrap; gap: 0.5rem; }
@@ -6118,9 +6151,15 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     .profile-identity-layout {
         display: grid !important;
         grid-template-columns: 72px minmax(0, 1fr);
-        align-items: start !important;
+        align-items: center !important;
         gap: 0.8rem !important;
     }
+
+    .profile-identity-copy,
+    .profile-display-details,
+    .profile-summary { display: contents; }
+    .profile-identity-layout > .profile-avatar-column { grid-column: 1; grid-row: 1 / span 3; }
+    .profile-summary > :not(.profile-social-action-row) { grid-column: 2; min-width: 0; }
 
     .profile-avatar-column,
     .profile-avatar-shell {
@@ -6142,8 +6181,9 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
     }
 
     .profile-social-action-row {
-        margin-left: calc(-72px - 0.8rem);
-        width: calc(100% + 72px + 0.8rem);
+        grid-column: 1 / -1;
+        margin-left: 0;
+        width: 100%;
     }
 
     .profile-social-links {
@@ -6184,31 +6224,26 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         font-size: 0.78rem;
     }
 
-    /* .profile-stat-grid / .profile-oauth-notice / .profile-actions render nested
-       inside .profile-identity-copy, so `grid-column: 1 / -1` never reaches the
-       actual grid container -- pull them back over the avatar column instead so
-       they use the full card width rather than being squeezed into the name column. */
+    /* Display contents lets the shared summary use real full-width grid rows,
+       without pulling controls underneath the avatar with negative margins. */
     .profile-stat-grid,
     .profile-oauth-notice,
     .profile-actions {
-        margin-left: calc(-72px - 0.8rem);
-        width: calc(100% + 72px + 0.8rem);
+        grid-column: 1 / -1;
+        margin-left: 0;
+        width: 100%;
     }
 
     .profile-stat-grid {
         display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 0.55rem !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        column-gap: 0.55rem !important;
         margin-top: 0.75rem !important;
     }
 
     .profile-stat-card {
         min-width: 0;
         padding: 0.65rem !important;
-    }
-
-    .profile-stat-card:nth-child(3) {
-        grid-column: 1 / -1;
     }
 
     .profile-stat-card > div:first-child {
@@ -6268,22 +6303,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         font-size: 1rem !important;
     }
 
-    .profile-hero.is-editing .profile-identity-layout {
-        grid-template-columns: 1fr;
-    }
-
     .profile-connection-grid { grid-template-columns: 1fr; }
-
-    .profile-hero.is-editing .profile-avatar-column {
-        justify-self: center;
-    }
-
-    .profile-hero.is-editing .profile-stat-grid,
-    .profile-hero.is-editing .profile-oauth-notice,
-    .profile-hero.is-editing .profile-actions {
-        margin-left: 0;
-        width: 100%;
-    }
 
     .site-header *,
     .site-header *::before,

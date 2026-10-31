@@ -8,8 +8,8 @@ const { renderToStaticMarkup } = require('react-dom/server');
 
 const source = fs.readFileSync('src/entries/profile.jsx', 'utf8').replace(/\r\n/g, '\n');
 const emailSource = fs.readFileSync('src/features/profile/email-connection.jsx', 'utf8');
-const editorStart = source.indexOf('{editMode ? (');
-const editorEnd = source.indexOf(') : (\n                                        <div className="profile-display-details">\n                                            <h1', editorStart);
+const editorStart = source.indexOf('{editMode && <ProfileEditDialog');
+const editorEnd = source.indexOf('</ProfileEditDialog>}', editorStart);
 
 test('the complete profile first render evaluates confirmation dependencies before every loading or guest return', async () => {
   const { transformWithOxc } = await import('vite');
@@ -35,7 +35,8 @@ test('the complete profile first render evaluates confirmation dependencies befo
 test('all connection controls are in the edit branch and private email keeps owner and rollout gates', () => {
   assert.ok(editorStart >= 0 && editorEnd > editorStart);
   const editor = source.slice(editorStart, editorEnd);
-  const readOnly = source.slice(editorEnd, source.indexOf('{profileLoadError', editorEnd));
+  const readOnlyStart = source.indexOf('<div className="profile-display-details">');
+  const readOnly = source.slice(readOnlyStart, source.indexOf('{profileLoadError', readOnlyStart));
   assert.match(editor, /aria-labelledby="profileConnectionsTitle"/);
   assert.match(editor, /emailVerificationEnabled && isOwnProfile && walletStateSettled && connectedWalletAddress/);
   assert.equal((source.match(/<EmailConnection\b/g) || []).length, 1);
