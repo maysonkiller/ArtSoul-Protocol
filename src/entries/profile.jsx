@@ -1,3 +1,4 @@
+import { ProfileEditDialog } from '../features/profile/profile-edit-dialog.jsx';
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
@@ -1463,24 +1464,9 @@ const { useState, useEffect, useRef } = React;
                 );
             }
 
-            const profileAddress = profile?.wallet_address || viewAddress || connectedWalletAddress;
-            const resolvedProfileName = getProfileDisplayName(profile, profileAddress);
-
-            return (
-                <div className={`min-h-screen ${bgClass} transition-all duration-500`}>
-                    {/* Main Content */}
-                    <main className="site-page-container profile-page-main py-8">
-                        {/* Profile Header */}
-                        <div className={`profile-hero ${editMode ? 'is-editing' : ''} rounded-xl p-5 mb-5 ${
-                            isClassic
-                                ? 'bg-gray-800/50 border border-gray-700'
-                                : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30 neon-border'
-                        }`}>
-                            <div className="profile-identity-layout flex items-start gap-5 flex-wrap">
-                                {/* Avatar */}
-                                <div className="profile-avatar-column flex-shrink-0">
+            function renderAvatar(editable) { return (<div className="profile-avatar-column flex-shrink-0">
                                     <div
-                                        className={`profile-avatar-shell w-24 h-24 rounded-full overflow-hidden ${editMode ? 'cursor-pointer' : ''} ${
+                                        className={`profile-avatar-shell w-24 h-24 rounded-full overflow-hidden ${editable ? 'cursor-pointer' : ''} ${
                                             isClassic
                                                 ? 'bg-gray-700 border-4 border-gray-600'
                                                 : 'bg-gradient-to-br from-purple-900 to-cyan-900 border-4 border-cyan-400 neon-border'
@@ -1489,7 +1475,11 @@ const { useState, useEffect, useRef } = React;
                                             boxShadow: '0 0 20px rgba(var(--c-accent-rgb), 0.5)',
                                             animation: 'colorShift 8s ease-in-out infinite'
                                         } : {}}
-                                        onClick={() => editMode && fileInputRef.current?.click()}
+                                        onClick={() => editable && fileInputRef.current?.click()}
+                                        role={editable ? "button" : undefined}
+                                        tabIndex={editable ? 0 : undefined}
+                                        aria-label={editable ? "Change profile photo" : undefined}
+                                        onKeyDown={event => { if (editable && ["Enter", " "].includes(event.key)) { event.preventDefault(); fileInputRef.current?.click(); } }}
                                         aria-busy={Boolean(resolvedAvatarUrl && !decodedProfileAvatarUrl && !profileAvatarFailed)}
                                     >
                                         {decodedProfileAvatarUrl ? (
@@ -1501,13 +1491,11 @@ const { useState, useEffect, useRef } = React;
                                         ) : resolvedAvatarUrl ? (
                                             <div className="w-full h-full" aria-hidden="true"></div>
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-sm opacity-50">
-                                                No Avatar
-                                            </div>
+                                            <img src="/default-avatar.png" alt="Default profile avatar" className="w-full h-full object-cover" />
                                         )}
                                     </div>
-                                    {editMode && (
-                                        <label className="block mt-3 text-center text-sm cursor-pointer opacity-0 hover:opacity-100 transition-opacity">
+                                    {editable && (
+                                        <label className="block mt-3 text-center text-sm cursor-pointer">
                                             <input
                                                 type="file"
                                                 accept="image/*,video/*"
@@ -1515,14 +1503,183 @@ const { useState, useEffect, useRef } = React;
                                                 className="hidden"
                                                 ref={fileInputRef}
                                             />
+                                            Change photo
                                         </label>
                                     )}
-                                </div>
+                                </div>); }
+
+            const profileAddress = profile?.wallet_address || viewAddress || connectedWalletAddress;
+            const resolvedProfileName = getProfileDisplayName(profile, profileAddress);
+
+            return (
+                <div className={`min-h-screen ${bgClass} transition-all duration-500`}>
+                    {/* Main Content */}
+                    <main className="site-page-container profile-page-main py-8">
+                        {/* Profile Header */}
+                        <div className={`profile-hero rounded-xl p-5 mb-5 ${
+                            isClassic
+                                ? 'bg-gray-800/50 border border-gray-700'
+                                : 'bg-gray-900/50 backdrop-blur-md border border-cyan-500/30 neon-border'
+                        }`}>
+                            <div className="profile-identity-layout flex items-start gap-5 flex-wrap">
+                                {/* Avatar */}
+                                {renderAvatar(false)}
 
                                 {/* Profile Info */}
                                 <div className="profile-identity-copy flex-1 min-w-0">
-                                    {editMode ? (
-                                        <div className="profile-identity-editor">
+<div className="profile-display-details">
+                                            <div className="profile-summary">
+                                            <h1 className={`profile-display-name font-bold mb-1 break-words ${
+                                                isClassic ? 'text-gray-100' : ''
+                                            }`}>
+                                                {resolvedProfileName}
+                                            </h1>
+                                            {profile?.wallet_address && (
+                                                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyAddress(profile.wallet_address)}
+                                                        aria-label={addressCopied ? 'Wallet address copied' : 'Copy wallet address'}
+                                                        title={addressCopied ? 'Copied' : 'Click to copy address'}
+                                                        className="inline-flex items-center gap-1.5 font-mono text-xs opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 p-0 transition-opacity"
+                                                    >
+                                                        <span className="break-all">
+                                                            {profile.wallet_address.slice(0, 6)}...{profile.wallet_address.slice(-4)}
+                                                        </span>
+                                                        {addressCopied ? (
+                                                            <span className="inline-flex items-center gap-1 flex-shrink-0">
+                                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                                                <span className="not-italic">Copied</span>
+                                                            </span>
+                                                        ) : (
+                                                            <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                        )}
+                                                    </button>
+                                                    {getExplorerAddressUrl(profile.wallet_address) && (
+                                                        <a
+                                                            href={getExplorerAddressUrl(profile.wallet_address)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            aria-label="View wallet on BaseScan"
+                                                            title="View on BaseScan"
+                                                            className={`inline-flex items-center justify-center w-6 h-6 cursor-pointer opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ${
+                                                                isClassic ? 'text-gray-300' : 'text-cyan-300'
+                                                            }`}
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <p className="profile-display-bio">
+                                                {profile?.bio || 'No bio yet'}
+                                            </p>
+                                            <div className="profile-social-action-row">
+                                                <div className="profile-social-links flex gap-3 flex-wrap">
+                                                    {getProfileXLinks(profile).map(link => (
+                                                        <a
+                                                            key={link.handle.toLowerCase()}
+                                                            href={`https://x.com/${encodeURIComponent(link.handle)}`}
+                                                            aria-label={`View ${link.connected ? 'verified X profile' : 'public X link'} @${link.handle}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity max-w-full ${
+                                                            isClassic
+                                                                ? 'bg-gray-700 text-gray-200 border border-gray-600'
+                                                                : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/30 shadow-[0_0_15px_rgba(var(--c-accent-rgb),0.3)]'
+                                                        }`}>
+                                                            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                                            </svg>
+                                                            <span className="truncate min-w-0">@{link.handle}{!link.connected && ' (public link)'}</span>
+                                                        </a>
+                                                    ))}
+                                                    {profile?.discord_username && (
+                                                        <DiscordProfileLink href={discordProfileUrl || undefined}
+                                                            target={discordProfileUrl ? '_blank' : undefined}
+                                                            rel={discordProfileUrl ? 'noopener noreferrer' : undefined}
+                                                            aria-label={discordProfileUrl ? `View verified Discord profile ${profile.discord_username}` : undefined}
+                                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg max-w-full ${discordProfileUrl ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} ${
+                                                            isClassic
+                                                                ? 'bg-gray-700 text-gray-200 border border-gray-600'
+                                                                : 'bg-purple-900/50 text-purple-300 border border-purple-500/30 shadow-[0_0_15px_rgba(var(--c-accent-2-rgb),0.3)]'
+                                                        }`}>
+                                                            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                                                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+                                                            </svg>
+                                                            <span className="truncate min-w-0">{profile.discord_username.replace('#0', '')}{profile.discord_connected !== true && ' (self-reported)'}</span>
+                                                        </DiscordProfileLink>
+                                                    )}
+                                                </div>
+                                                {isOwnProfile && (
+                                                    <div className="profile-inline-edit-action">
+                                                        <button onClick={startProfileEdit} className="btn-main">
+                                                            Edit Profile
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            </div>
+                                            {discoveryProfile && (
+                                                <div className={`profile-stat-grid mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm ${
+                                                    isClassic ? 'text-gray-200' : 'text-cyan-100'
+                                                }`}>
+                                                    <div className={`profile-stat-card p-3 rounded-lg ${
+                                                        isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
+                                                    }`}>
+                                                        <div className="opacity-70 mb-1">Trust score</div>
+                                                        <div className="text-xl font-bold">{discoveryProfile.trust.score}</div>
+                                                        <div className="text-xs opacity-70">{discoveryProfile.trust.tier}</div>
+                                                    </div>
+                                                    <div className={`profile-stat-card p-3 rounded-lg ${
+                                                        isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-purple-900/20 border border-purple-500/30'
+                                                    }`}>
+                                                        <div className="opacity-70 mb-1">Genesis</div>
+                                                        <div className="text-lg font-bold">
+                                                            Mainnet only
+                                                        </div>
+                                                        <div className="text-xs opacity-70">
+                                                            Testnet does not qualify.
+                                                        </div>
+                                                    </div>
+                                                    <div className={`profile-stat-card p-3 rounded-lg ${
+                                                        isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
+                                                    }`}>
+                                                        <div className="opacity-70 mb-1" title="Discovery influence">Discovery</div>
+                                                        <div className="text-xl font-bold">{discoveryProfile.trust.influenceWeight}x</div>
+                                                        <div className="text-xs opacity-70">Ranking only. No price impact.</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+
+
+                                    {profileLoadError && (
+                                        <div className="profile-oauth-notice is-error mt-4" role="alert">
+                                            {profileLoadError}{' '}
+                                            <button type="button" onClick={retryProfile}>Retry</button>
+                                        </div>
+                                    )}
+                                    {oauthNotice && (
+                                        <p
+                                            className={`profile-oauth-notice mt-4 ${oauthNotice.type === 'error' ? 'is-error' : 'is-success'}`}
+                                            role={oauthNotice.type === 'error' ? 'alert' : 'status'}
+                                        >
+                                            {oauthNotice.message}
+                                        </p>
+                                    )}
+
+
+                                </div>
+                            </div>
+                        </div>
+
+                        {editMode && <ProfileEditDialog onCancel={cancelProfileEdit}>
+                            <div className="profile-edit-layout">
+                                {renderAvatar(true)}
+                                <div className="profile-edit-fields">
+                                    <div className="profile-identity-editor">
                                             <div className="profile-detail-field">
                                                 <label htmlFor="profileName">Name</label>
                                                 <input
@@ -1645,149 +1802,7 @@ const { useState, useEffect, useRef } = React;
                                                 </div>
                                             </section>
                                         </div>
-                                    ) : (
-                                        <div className="profile-display-details">
-                                            <h1 className={`profile-display-name font-bold mb-1 break-words ${
-                                                isClassic ? 'text-gray-100' : ''
-                                            }`}>
-                                                {resolvedProfileName}
-                                            </h1>
-                                            {profile?.wallet_address && (
-                                                <div className="flex items-center gap-2 mb-3 flex-wrap">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleCopyAddress(profile.wallet_address)}
-                                                        aria-label={addressCopied ? 'Wallet address copied' : 'Copy wallet address'}
-                                                        title={addressCopied ? 'Copied' : 'Click to copy address'}
-                                                        className="inline-flex items-center gap-1.5 font-mono text-xs opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 p-0 transition-opacity"
-                                                    >
-                                                        <span className="break-all">
-                                                            {profile.wallet_address.slice(0, 6)}...{profile.wallet_address.slice(-4)}
-                                                        </span>
-                                                        {addressCopied ? (
-                                                            <span className="inline-flex items-center gap-1 flex-shrink-0">
-                                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                                                                <span className="not-italic">Copied</span>
-                                                            </span>
-                                                        ) : (
-                                                            <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                                        )}
-                                                    </button>
-                                                    {getExplorerAddressUrl(profile.wallet_address) && (
-                                                        <a
-                                                            href={getExplorerAddressUrl(profile.wallet_address)}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            aria-label="View wallet on BaseScan"
-                                                            title="View on BaseScan"
-                                                            className={`inline-flex items-center justify-center w-6 h-6 cursor-pointer opacity-70 hover:opacity-100 transition-opacity flex-shrink-0 ${
-                                                                isClassic ? 'text-gray-300' : 'text-cyan-300'
-                                                            }`}
-                                                        >
-                                                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            )}
-                                            <p className="profile-display-bio">
-                                                {profile?.bio || 'No bio yet'}
-                                            </p>
-                                            <div className="profile-social-action-row">
-                                                <div className="profile-social-links flex gap-3 flex-wrap">
-                                                    {getProfileXLinks(profile).map(link => (
-                                                        <a
-                                                            key={link.handle.toLowerCase()}
-                                                            href={`https://x.com/${encodeURIComponent(link.handle)}`}
-                                                            aria-label={`View ${link.connected ? 'verified X profile' : 'public X link'} @${link.handle}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity max-w-full ${
-                                                            isClassic
-                                                                ? 'bg-gray-700 text-gray-200 border border-gray-600'
-                                                                : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/30 shadow-[0_0_15px_rgba(var(--c-accent-rgb),0.3)]'
-                                                        }`}>
-                                                            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                                                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                                            </svg>
-                                                            <span className="truncate min-w-0">@{link.handle}{!link.connected && ' (public link)'}</span>
-                                                        </a>
-                                                    ))}
-                                                    {profile?.discord_username && (
-                                                        <DiscordProfileLink href={discordProfileUrl || undefined}
-                                                            target={discordProfileUrl ? '_blank' : undefined}
-                                                            rel={discordProfileUrl ? 'noopener noreferrer' : undefined}
-                                                            aria-label={discordProfileUrl ? `View verified Discord profile ${profile.discord_username}` : undefined}
-                                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg max-w-full ${discordProfileUrl ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} ${
-                                                            isClassic
-                                                                ? 'bg-gray-700 text-gray-200 border border-gray-600'
-                                                                : 'bg-purple-900/50 text-purple-300 border border-purple-500/30 shadow-[0_0_15px_rgba(var(--c-accent-2-rgb),0.3)]'
-                                                        }`}>
-                                                            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                                                                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
-                                                            </svg>
-                                                            <span className="truncate min-w-0">{profile.discord_username.replace('#0', '')}{profile.discord_connected !== true && ' (self-reported)'}</span>
-                                                        </DiscordProfileLink>
-                                                    )}
-                                                </div>
-                                                {isOwnProfile && (
-                                                    <div className="profile-inline-edit-action">
-                                                        <button onClick={startProfileEdit} className="btn-main">
-                                                            Edit Profile
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {discoveryProfile && (
-                                                <div className={`profile-stat-grid mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm ${
-                                                    isClassic ? 'text-gray-200' : 'text-cyan-100'
-                                                }`}>
-                                                    <div className={`profile-stat-card p-3 rounded-lg ${
-                                                        isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
-                                                    }`}>
-                                                        <div className="opacity-70 mb-1">Trust Weight</div>
-                                                        <div className="text-xl font-bold">{discoveryProfile.trust.score}</div>
-                                                        <div className="text-xs opacity-70">{discoveryProfile.trust.tier}</div>
-                                                    </div>
-                                                    <div className={`profile-stat-card p-3 rounded-lg ${
-                                                        isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-purple-900/20 border border-purple-500/30'
-                                                    }`}>
-                                                        <div className="opacity-70 mb-1">Genesis Status</div>
-                                                        <div className="text-lg font-bold">
-                                                            Mainnet only
-                                                        </div>
-                                                        <div className="text-xs opacity-70">
-                                                            Testnet activity does not qualify for Genesis.
-                                                        </div>
-                                                    </div>
-                                                    <div className={`profile-stat-card p-3 rounded-lg ${
-                                                        isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
-                                                    }`}>
-                                                        <div className="opacity-70 mb-1">Discovery Influence</div>
-                                                        <div className="text-xl font-bold">{discoveryProfile.trust.influenceWeight}x</div>
-                                                        <div className="text-xs opacity-70">Affects ranking only, not protocol economics.</div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {profileLoadError && (
-                                        <div className="profile-oauth-notice is-error mt-4" role="alert">
-                                            {profileLoadError}{' '}
-                                            <button type="button" onClick={retryProfile}>Retry</button>
-                                        </div>
-                                    )}
-                                    {oauthNotice && (
-                                        <p
-                                            className={`profile-oauth-notice mt-4 ${oauthNotice.type === 'error' ? 'is-error' : 'is-success'}`}
-                                            role={oauthNotice.type === 'error' ? 'alert' : 'status'}
-                                        >
-                                            {oauthNotice.message}
-                                        </p>
-                                    )}
-
-                                    {editMode && (
-                                        <div className="profile-actions mt-4 flex gap-3 flex-wrap">
+                                    <div className="profile-actions mt-4 flex gap-3 flex-wrap">
                                             <>
                                                 <button onClick={saveProfile} className="btn-main">
                                                     Save Profile
@@ -1802,10 +1817,9 @@ const { useState, useEffect, useRef } = React;
                                                 </button>
                                             </>
                                         </div>
-                                    )}
                                 </div>
                             </div>
-                        </div>
+                        </ProfileEditDialog>}
 
                         {/* Profile customization is paused by the founder. Stored layouts and the editor remain available for a future release. */}
 

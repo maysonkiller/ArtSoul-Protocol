@@ -7,9 +7,9 @@ import '../features/saved/saved-ui.js';
 const { useState, useEffect, useMemo, useRef } = React;
 
         const GALLERY_TABS = [
-            { id: 'live_auctions', label: 'Auctions' },
-            { id: 'nft', label: 'NFT' },
             { id: 'discover', label: 'Discovery' },
+            { id: 'live_auctions', label: 'Auctions' },
+            { id: 'nft', label: 'NFTs' },
             { id: 'marketplace', label: 'Marketplace' },
             { id: 'collections', label: 'Collections' }
         ];
@@ -31,7 +31,7 @@ const { useState, useEffect, useMemo, useRef } = React;
         function getInitialGalleryTab() {
             const hash = (window.location.hash || '').replace('#', '');
             const tabId = GALLERY_TAB_ALIASES[hash] || hash;
-            return GALLERY_TABS.some(tab => tab.id === tabId) ? tabId : 'live_auctions';
+            return GALLERY_TABS.some(tab => tab.id === tabId) ? tabId : 'discover';
         }
 
         function GalleryPage() {
@@ -358,7 +358,6 @@ const { useState, useEffect, useMemo, useRef } = React;
             }
 
             function clearFilters() {
-                selectGalleryTab('live_auctions');
                 setStatusFilter('all');
                 setSortBy('discovery');
                 setMinPrice('');

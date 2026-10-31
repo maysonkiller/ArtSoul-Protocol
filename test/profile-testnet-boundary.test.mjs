@@ -26,6 +26,6 @@ test('neither large testnet activity nor prototype flags can satisfy invented Ge
     assert.equal(progress.total, 0);
     assert.equal(progress.requirements.length, 0);
     assert.equal(progress.availability, 'mainnet-only');
-    assert.match(source, /Testnet activity does not qualify for Genesis\./);
+    assert.match(source, /Testnet does not qualify\./);
     assert.doesNotMatch(source, /'Genesis Holder'|genesisProgress\.completed/);
 });
