@@ -293,3 +293,21 @@ October 26 founder-prioritized interface follow-up released in PR #363: compact 
 Contract extensibility and network planning remain under C-06/C1; canon
 reconciliation precedes those decisions. The draft cost model supports C-25;
 it creates no budget, funding commitment or external submission.
+
+## October 31 interface review — B18 follow-up
+
+Source: [Interface/capability review](audits/B18_INTERFACE_CAPABILITY_REVIEW_2026-10-31.md).
+This is one B18 review slice, not closure of B35, beta operation or Phase B.
+
+| Reference | Finding / requested result | Status | Acceptance / evidence |
+| --- | --- | --- | --- |
+| B18-V1/V2 | Consistent default avatar, compact profile/editor and Discovery first | done | PR409 / 517b3d40; 2,601 local pass/35 skips; exact CI, eight fixture cases and live default/order checks |
+| B18-V3 | Make current ownership explicit when the same address is First Collector | planned | Artwork13 and shouldShowOwnerRole reproduce the missing explicit role; retain both meanings without duplicate people or altered ownership |
+| B18-V4 | Reduce Future frame competition and nested scrolling | proposed | Separate interactive study; 36 page/theme/width and 24 dialog cases; needs staged production integration, no wholesale replacement |
+| B18-V5 | Explain specialist actions with accessible contextual guidance | planned | Would Buy, Watching, Trust, floor and settlement; reuse existing explained-action/Docs, support touch and keyboard |
+| B18-V6 | Align public contact with approved project mailbox | planned | index.html still exposes the personal mailbox; copy-only update, no provider/account change |
+| B18-V7 | Intermittent custom creator-avatar loss | observation | Not reproduced: creator photo loaded in both sampled surfaces. Do not call the default-avatar patch a repair of an unknown image failure |
+
+Verification registry and authoritative aura assignment remain future work under
+the October7 origin-review policy/C14; presentation helpers are not an issued badge.
+Exactly next engineering slice remains B35 common-ancestor proof before mutation.
