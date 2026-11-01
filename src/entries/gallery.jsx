@@ -511,6 +511,27 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 </div>
                             )}
 
+                            {/* B18-V5: concise meaning, not a second ranking engine. */}
+                            <details className="gallery-signal-help">
+                                <summary>What do Discovery Rank and signals mean?</summary>
+                                <div className="gallery-signal-help-content">
+                                    <dl>
+                                        <div><dt>Discovery Rank</dt><dd>Shows community interest and public auction history. It does not determine a winner or sale price.</dd></div>
+                                        <div><dt>Would Buy</dt><dd>An expression of interest, not a bid, offer or payment.</dd></div>
+                                        <div><dt>Watching</dt><dd>A signal that someone is following an artwork. It does not guarantee a purchase.</dd></div>
+                                        <div><dt>Trust</dt><dd>Changes discovery visibility only, never ownership, price, floor or royalties.</dd></div>
+                                        <div><dt>Floor</dt><dd>Exists only after a successful primary auction settlement, not when artwork is published.</dd></div>
+                                    </dl>
+                                    <p>
+                                        <a href="/docs-protocol#trust-community">Community signals</a>
+                                        <span aria-hidden="true"> · </span>
+                                        <a href="/docs-protocol#discovery">Ranking</a>
+                                        <span aria-hidden="true"> · </span>
+                                        <a href="/docs-protocol#settlement">Settlement</a>
+                                    </p>
+                                </div>
+                            </details>
+
                             {/* Results Count */}
                             <div className="mt-4 text-sm opacity-70" aria-live="polite">
                                 {loading
