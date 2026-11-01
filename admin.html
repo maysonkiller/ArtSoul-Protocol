@@ -22,12 +22,13 @@
     <script src="/header-prepaint.js?v=10"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=67">
+    <link rel="stylesheet" href="/unified-styles.css?v=69">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <script src="/storage-image.js?v=3" defer></script>
     <script src="/base-network.js?v=2" defer></script>
     <script src="/src/ui/theme-manager.js?v=1" defer></script>
+    <script src="/src/ui/header-theme-toggle.js?v=1" defer></script>
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
     <script src="/modal-system.js?v=2" defer></script>
     <script type="module" src="/supabase-client.js"></script>
@@ -75,6 +76,12 @@
                             </div>
                         </section>
                     </div>
+                    <button type="button" class="site-theme-toggle" data-artsoul-theme-toggle
+                        aria-label="Future appearance" aria-pressed="false" title="Switch appearance">
+                        <span class="site-theme-toggle-glyph" aria-hidden="true">
+                            <span class="site-theme-toggle-classic"></span><span class="site-theme-toggle-future"></span>
+                        </span>
+                    </button>
                     <div id="navButtons" class="site-header-nav" data-avatar-render-key="initializing">
                         <div class="avatar-dropdown-container">
                             <button class="avatar-button" type="button" data-allow-rapid aria-label="ArtSoul account menu" aria-controls="avatarDropdownMenu" aria-expanded="false" onclick="window.AvatarDropdown?.toggle()">

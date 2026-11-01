@@ -8239,3 +8239,292 @@ html.classic body *::after {
     transition: none !important;
     scroll-behavior: auto !important;
 }
+
+/* B18: responsive real-art Home showcase. No new media/data provider and no
+   duplicate feed; both original themes own their palette via --c-* variables. */
+body:is(.classic, .future) #homeSection .home-hero {
+    align-items: center;
+    gap: clamp(20px, 3.5vw, 46px);
+}
+body:is(.classic, .future) .home-showcase {
+    width: 100%;
+    min-width: 0;
+    max-width: 620px;
+    margin-inline: auto;
+}
+body:is(.classic, .future) .home-showcase-shell {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    min-height: 280px;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 24px;
+    background: var(--c-surface);
+}
+body:is(.classic, .future) .home-showcase-intro {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
+    gap: 14px;
+    box-sizing: border-box;
+    height: 100%;
+    padding: clamp(20px, 4vw, 40px);
+    background: radial-gradient(ellipse at 83% 18%, var(--c-surface-muted), transparent 65%);
+    color: var(--c-text);
+}
+body:is(.classic, .future) .home-showcase-intro[hidden],
+body:is(.classic, .future) .home-showcase-stage[hidden],
+body:is(.classic, .future) .home-showcase-controls[hidden],
+body:is(.classic, .future) .home-showcase-slide[hidden] { display: none !important; }
+body:is(.classic, .future) .home-showcase-intro-overline,
+body:is(.classic, .future) .home-showcase-label {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--c-accent);
+}
+body:is(.classic, .future) .home-showcase-intro > strong {
+    max-width: 360px;
+    font-size: clamp(27px, 3vw, 39px);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+}
+body:is(.classic, .future) .home-showcase-intro > span:not(.home-showcase-intro-overline) {
+    font-size: 14px;
+    color: var(--c-text-muted);
+}
+body:is(.classic, .future) .home-showcase-intro > a {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 8px;
+    color: var(--c-accent);
+    font-weight: 600;
+    text-decoration: none;
+}
+body:is(.classic, .future) .home-showcase-stage {
+    position: absolute;
+    inset: 0;
+}
+body:is(.classic, .future) .home-showcase-slide {
+    position: absolute;
+    inset: 0;
+    display: block;
+    color: var(--c-text);
+    text-decoration: none;
+}
+body:is(.classic, .future) .home-showcase-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: var(--c-surface-muted);
+}
+body:is(.classic, .future) .home-showcase-caption {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 34px 22px 48px;
+    background: linear-gradient(to top, var(--c-bg), transparent);
+}
+body:is(.classic, .future) .home-showcase-title {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: clamp(18px, 2vw, 25px);
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body:is(.classic, .future) .home-showcase-creator {
+    font-size: 13px;
+    color: var(--c-text-muted);
+    overflow-wrap: anywhere;
+}
+body:is(.classic, .future) .home-showcase-controls {
+    position: absolute;
+    z-index: 2;
+    right: 12px;
+    bottom: 9px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 9999px;
+    background: var(--c-surface);
+    color: var(--c-text);
+}
+body:is(.classic, .future) .home-showcase-controls button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--c-text);
+    font-size: 25px;
+    line-height: 1;
+}
+body:is(.classic, .future) .home-showcase-controls button:hover { background: var(--c-surface-muted); }
+body:is(.classic, .future) .home-showcase-controls button:focus-visible,
+body:is(.classic, .future) .home-showcase-slide:focus-visible,
+body:is(.classic, .future) .home-showcase-intro > a:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -3px;
+}
+body:is(.classic, .future) #homeShowcaseCount { min-width: 40px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+@media (min-width: 1050px) {
+    body:is(.classic, .future) #homeSection .home-hero {
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+        padding-block: 24px 46px;
+        text-align: left;
+    }
+    body:is(.classic, .future) #homeSection .home-hero-copy {
+        width: 100%;
+        max-width: 570px;
+        justify-self: stretch;
+        text-align: left;
+    }
+    body:is(.classic, .future) #homeSection .home-hero h1,
+    body:is(.classic, .future) #homeSection .home-hero p { margin-inline: 0; }
+    body:is(.classic, .future) #homeSection .home-hero-actions { justify-content: flex-start !important; }
+}
+@media (max-width: 1049px) {
+    body:is(.classic, .future) #homeSection .home-hero {
+        grid-template-columns: minmax(0, 1fr);
+        padding-bottom: 26px;
+    }
+}
+@media (min-width: 1200px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 5; --home-loading-gap: 14px; }
+    body:is(.classic, .future) #homeSection #artworkGallery {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 14px;
+    }
+}
+@media (min-width: 1050px) and (max-width: 1199px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 4; --home-loading-gap: 14px; }
+    body:is(.classic, .future) #homeSection #artworkGallery {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
+}
+@media (max-width: 640px) {
+    body:is(.classic, .future) .home-showcase-shell { aspect-ratio: 16 / 11; min-height: 230px; border-radius: 18px; }
+    body:is(.classic, .future) .home-showcase-caption { padding: 28px 16px 50px; }
+    body:is(.classic, .future) .home-showcase-intro { padding: 22px; }
+}
+@media (max-width: 360px) {
+    body:is(.classic, .future) #homeSection #artworkGallery {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 1; }
+}
+
+/* The new image may fade into view only in Future. Classic stays instant/static
+   and system reduced-motion preference always takes precedence. */
+@keyframes artsoulShowcaseEnter {
+    from { opacity: 0.9; }
+    to { opacity: 1; }
+}
+body.future .home-showcase-slide:not([hidden]) {
+    animation: artsoulShowcaseEnter 420ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+    body.future .home-showcase-slide:not([hidden]) { animation: none !important; }
+}
+
+/* B18: compact Apple-like split appearance control, driven only by the
+   existing persisted ThemeManager. The old menu control remains a fail-safe
+   only if this tiny adapter has not initialized successfully. */
+body:is(.classic, .future) .site-header-actions > .site-theme-toggle {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 1px solid var(--c-border);
+    border-radius: 50%;
+    background: var(--c-surface);
+    box-shadow: none;
+    color: var(--c-text);
+    cursor: pointer;
+}
+body:is(.classic, .future) .site-theme-toggle-glyph {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    overflow: hidden;
+    border: 1.5px solid var(--c-accent);
+    border-radius: 50%;
+    transform: rotate(-35deg);
+}
+body:is(.classic, .future) .site-theme-toggle-classic { background: var(--c-text); }
+body:is(.classic, .future) .site-theme-toggle-future { background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2)); }
+body.classic .site-theme-toggle[data-current-theme="classic"] { border-color: var(--c-accent); }
+body.future .site-theme-toggle[data-current-theme="future"] { border-color: var(--c-accent-2); }
+body:is(.classic, .future) .site-theme-toggle:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+body:is(.classic, .future) .site-header:has(.site-theme-toggle[data-theme-ready="true"]) .avatar-theme-section {
+    display: none !important;
+}
+@media (max-width: 360px) {
+    body:is(.classic, .future) .site-header-shell { padding-inline: 6px !important; }
+    body:is(.classic, .future) .site-header-row { column-gap: 2px !important; }
+    body:is(.classic, .future) .site-header-actions { gap: 0 !important; }
+    body:is(.classic, .future) .site-header .site-wordmark { font-size: 19px !important; letter-spacing: -1.5px; }
+    body:is(.classic, .future) .site-wordmark > span { font-size: 6px; letter-spacing: 0.15em; }
+}
+
+/* November 1: the product headline, real gallery and live showcase are the
+   content. No duplicate marketing slide or second gallery grid. */
+body:is(.classic, .future) #homeSection .home-hero {
+    text-align: left !important;
+}
+body:is(.classic, .future) #homeSection .home-hero-copy {
+    justify-self: start;
+    text-align: left !important;
+}
+body:is(.classic, .future) #homeSection .home-hero h1,
+body:is(.classic, .future) #homeSection .home-hero p {
+    margin-inline: 0 !important;
+    text-align: left !important;
+}
+body:is(.classic, .future) #homeSection .home-hero-actions {
+    justify-content: flex-start !important;
+}
+body:is(.classic, .future) .home-showcase-intro {
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    background: var(--c-surface);
+}
+body:is(.classic, .future) .home-showcase-status {
+    color: var(--c-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: 0;
+}
+body:is(.classic, .future) .home-showcase-controls #homeShowcasePause {
+    border-right: 1px solid var(--c-border-soft);
+    border-radius: 999px 0 0 999px;
+    font-size: 18px;
+}
