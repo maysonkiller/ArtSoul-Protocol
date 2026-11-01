@@ -230,7 +230,9 @@ test('touch tapping Pause cannot be misread as keyboard focus Resume', () => {
 
 test('counter is the only pause control and no opaque pause icon is rendered', () => {
     const html = readFileSync('index.html', 'utf8');
-    const markup = html.match(/id="homeShowcaseControls"[\\s\\S]*?<\\/div>/)?.[0] || '';
+    const start = html.indexOf('id="homeShowcaseControls"');
+    const end = html.indexOf('</div>', start);
+    const markup = start >= 0 && end > start ? html.slice(start, end + 6) : '';
     assert.doesNotMatch(markup, /homeShowcasePause|>Ⅱ<|>▶</);
     assert.match(markup, /<button id="homeShowcaseCount"[^>]*aria-pressed="false"/);
     assert.equal((markup.match(/<button /g) || []).length, 3);
