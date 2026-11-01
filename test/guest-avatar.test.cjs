@@ -273,8 +273,7 @@ test('an avatar image failure records the failure instead of claiming a successf
   assert.match(avatarDropdown, /button\.dataset\.avatarContentKey = failed\s*\? `\$\{snapshot\.contentKey\}\|image-error`\s*: snapshot\.contentKey;/);
 });
 
-test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
-  assert.ok(avatarDropdown.indexOf("href: '/profile'") < avatarDropdown.indexOf("href: '/'"));
-  assert.doesNotMatch(avatarDropdown, /filter\(item => !\(item\.profile && options\.isOwnProfile\)\)/);
-  assert.doesNotMatch(avatarDropdown, /filter\(item => item\.profile \|\| !this\.isCurrentNavigationItem/);
+test('Profile is a native top-level destination and never repeats inside account controls', () => {
+  assert.match(avatarDropdown, /\.filter\(item => !item\.profile && !document\.querySelector\('\.site-primary-nav'\)\)/);
+  assert.doesNotMatch(avatarDropdown, /filter\(item => item\.profile \|\| !document\.querySelector/);
 });

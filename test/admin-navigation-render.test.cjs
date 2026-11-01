@@ -72,3 +72,26 @@ test('a factor dialog has one stable location before the protected body',()=>{
         assert(html.indexOf('data-fixture="factor"')<html.indexOf('data-fixture="staff"'));
     }
 });
+
+test('the ready workspace groups moderation, history and authority controls without duplicating actions', () => {
+    const html = render({state: 'ready', staff: true, authority: true, section: 'queue'});
+    const nav = html.match(/<nav\b[\s\S]*?<\/nav>/)?.[0];
+    assert.ok(nav);
+    for (const group of ['Moderate', 'History', 'Access']) {
+        assert.match(nav, new RegExp('aria-label="' + group + '"'), group);
+    }
+    for (const label of ['Reports', 'Artworks', 'Hidden', 'Audit log', 'Delivery', 'Staff access']) {
+        assert.ok(nav.includes('>' + label + '</button>'), label);
+    }
+    assert.equal((nav.match(/aria-current="page"/g) || []).length, 1);
+    assert.match(html, /role="group" aria-label="Current workspace counts"/);
+    assert.match(html, /Reports in view/);
+    assert.match(html, /Hidden works/);
+    assert.match(html, /Delivery records/);
+    assert.match(html, /Review reports, manage artwork visibility and inspect records/);
+});
+
+test('an ineligible guest never sees protected navigation or workspace counters', () => {
+    const html = render({state: 'ineligible', staff: false, authority: false});
+    assert.doesNotMatch(html, /Current workspace counts|Protocol Admin sections|data-fixture="staff"/);
+});
