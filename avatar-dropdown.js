@@ -149,7 +149,24 @@
         // Storage can be unavailable in privacy-restricted browsers.
     }
 
-    const ETHEREUM_NETWORK_ICON = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMiIgZmlsbD0iIzYyN0VFQSIvPjxwYXRoIGQ9Ik0xMiA0TDYgMTJMMTIgMTZMMTggMTJMMTIgNFoiIGZpbGw9IndoaXRlIi8+PHBhdGggZD0iTTEyIDE3TDYgMTNMMTIgMjBMMTggMTNMMTIgMTdaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==';
+    // Official local marks; provenance is recorded in public/brand/README.md.
+    const IDENTITY_MARKS = Object.freeze({
+        base: '/brand/base.svg',
+        eth: '/brand/eth.png',
+        rabby: '/brand/rabby.png'
+    });
+    // Foreign wallet networks are display-only. Base Sepolia remains the only
+    // selectable product network and the shared write guard is unchanged.
+    const NETWORK_IDENTITIES = Object.freeze({
+        84532: { name: 'Base Sepolia', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
+        8453: { name: 'Base Mainnet', icon: IDENTITY_MARKS.base, mark: 'base', currency: 'ETH' },
+        11155111: { name: 'Ethereum Sepolia', icon: IDENTITY_MARKS.eth, mark: 'eth', currency: 'ETH' },
+        1: { name: 'Ethereum Mainnet', icon: IDENTITY_MARKS.eth, mark: 'eth', currency: 'ETH' }
+    });
+    const escapeMenuText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+    const networkBalanceText = (value) => /^(?:\d{1,24}(?:\.\d{1,8})?|…)$/u.test(String(value)) ? String(value) : '…';
 
     class AvatarDropdown {
         constructor() {
@@ -503,6 +520,8 @@
         updateStableMenu(html, menuKey) {
             const structure = this.getStableStructure();
             if (!structure) return null;
+            const identity = this.getMenuIdentity(this.identityWallet);
+            menuKey = `${menuKey}:${identity.wallet}:${identity.name}`;
             if (structure.menu.dataset.menuKey !== menuKey) {
                 structure.menu.innerHTML = html;
                 structure.menu.dataset.menuKey = menuKey;
@@ -743,6 +762,8 @@
         cacheHeaderIdentity(profile, walletAddress) {
             const wallet = String(walletAddress || profile?.wallet_address || '').toLowerCase();
             if (!wallet) return;
+            const profileWallet = String(profile?.wallet_address || '').toLowerCase();
+            if (profileWallet && profileWallet !== wallet) return;
             const identity = {
                 wallet,
                 name: this.getProfileDisplayName(profile, wallet),
@@ -896,8 +917,18 @@
             try {
                 const cached = JSON.parse(localStorage.getItem(this.headerNetworkStorageKey) || 'null');
                 if (!cached || String(cached.wallet || '').toLowerCase() !== normalizedWallet) return null;
-                if (!cached.name || !cached.icon || !cached.chainId) return null;
-                return cached;
+                const chainId = cached.chainId;
+                const network = Number.isSafeInteger(chainId) && NETWORK_IDENTITIES[chainId];
+                if (!network) return null;
+                // Storage is only a presentation hint. Never restore image URLs,
+                // markup or a wallet-provider claim supplied by stored data.
+                return {
+                    ...network,
+                    wallet: normalizedWallet,
+                    chainId,
+                    balance: networkBalanceText(cached.balance),
+                    baseSepoliaConfirmed: cached.baseSepoliaConfirmed === true
+                };
             } catch {
                 return null;
             }
@@ -1273,40 +1304,20 @@
                 console.warn('Unable to confirm the live wallet network:', error);
             }
 
-            // Network mapping with proper icons (matching AppKit)
-            const networks = {
-                84532: {
-                    name: 'Base Sepolia',
-                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTExIiBoZWlnaHQ9IjExMSIgdmlld0JveD0iMCAwIDExMSAxMTEiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01NC45MjEgMTEwLjAzNEM4NS4zNTkgMTEwLjAzNCAxMTAuMDQyIDg1LjM1MDggMTEwLjA0MiA1NC45MTI5QzExMC4wNDIgMjQuNDc1IDg1LjM1OSAtMC4yMDgwMDggNTQuOTIxIC0wLjIwODAwOEMyNi4wODM4IC0wLjIwODAwOCAxLjgzMzU4IDIyLjQwMTYgMC4wNDIwNTMyIDUwLjUwNzlIMzEuNjcyNkMzMy4zMzE5IDM4Ljk5MzEgNDMuMjU1MSAzMC4xNTQ2IDU0LjkyMSAzMC4xNTQ2QzY3LjU5MzggMzAuMTU0NiA3Ny44OTc0IDQwLjQ1ODMgNzcuODk3NCA1My4xMzExQzc3Ljg5NzQgNjUuODAzOSA2Ny41OTM4IDc2LjEwNzYgNTQuOTIxIDc2LjEwNzZDNDMuMjU1MSA3Ni4xMDc2IDMzLjMzMTkgNjcuMjY5MSAzMS42NzI2IDU1Ljc1NDJIMS4wNDIwNTNDMi44MzM1OCA4My44NjA1IDI2LjA4MzggMTA2LjQ3IDU0LjkyMSAxMDYuNDdWMTEwLjAzNFoiIGZpbGw9IiMwMDUyRkYiLz4KPC9zdmc+Cg==',
-                    color: '#0052FF',
-                    currency: 'ETH'
-                },
-                11155111: {
-                    name: 'Ethereum Sepolia',
-                    icon: ETHEREUM_NETWORK_ICON,
-                    color: '#627EEA',
-                    currency: 'ETH'
-                }
-            };
-
-            // Mainnet networks can be returned by a connected wallet session.
-            // They are display-only here; Base Sepolia remains the operational
-            // write network enforced by the shared transaction guard.
-            networks[8453] = { ...networks[84532], name: 'Base Mainnet' };
-            networks[1] = { ...networks[11155111], name: 'Ethereum Mainnet' };
-            this.baseNetworkIcon = networks[84532].icon;
+            const walletProvider = this.getWalletProviderIdentity(provider);
 
             const baseSepoliaConfirmed = typeof window.isArtSoulBaseSepoliaConfirmed === 'function'
                 ? window.isArtSoulBaseSepoliaConfirmed()
                 : chainId === 84532;
             if (chainId === 84532 && !baseSepoliaConfirmed) {
                 return {
-                    ...networks[84532],
+                    ...NETWORK_IDENTITIES[84532],
                     name: 'Base Sepolia',
                     balance: 'Tap to switch',
                     currency: '',
                     chainId: null,
-                    requiresConfirmation: true
+                    requiresConfirmation: true,
+                    walletProvider
                 };
             }
 
@@ -1355,42 +1366,94 @@
                         }
                     }, 500);
                 }
-                return { name: 'Connecting...', icon: '', color: '#888888', currency: 'ETH', balance: options.includeBalance === false ? '…' : '0.0000' };
+                return { name: 'Connecting...', icon: '', currency: '', balance: '', walletProvider };
             }
 
-            const network = networks[chainId];
+            const network = NETWORK_IDENTITIES[chainId];
             if (!network) {
                 // Unsupported network
-                return { name: 'Unsupported', icon: '', color: '#ff6b6b', currency: 'ETH', balance: options.includeBalance === false ? '…' : '0.0000' };
+                return { name: 'Unsupported', icon: '', currency: '', balance: '', walletProvider };
             }
 
             const networkInfo = {
                 ...network,
                 balance,
                 chainId,
-                baseSepoliaConfirmed: chainId === 84532 && baseSepoliaConfirmed
+                baseSepoliaConfirmed: chainId === 84532 && baseSepoliaConfirmed,
+                walletProvider
             };
             this.cacheHeaderNetwork(networkInfo, walletAddress, chainId);
             return networkInfo;
+        }
+
+        getWalletProviderIdentity(provider) {
+            // Read only the active provider already used by the network row.
+            // Compatibility flags such as isMetaMask and cached AppKit wallet
+            // selections do not reliably identify the connected wallet brand.
+            if (!provider || !window.currentWalletAddress) return null;
+            if (provider.isRabby === true) return { name: 'Rabby', mark: 'rabby' };
+            const name = provider.session?.peer?.metadata?.name;
+            if (typeof name !== 'string' || !name.trim()) return null;
+            const label = name.trim().slice(0, 80);
+            return { name: label, mark: /^rabby(?: wallet)?$/i.test(label) ? 'rabby' : null };
+        }
+
+        renderIdentityMark(mark) {
+            if (!Object.prototype.hasOwnProperty.call(IDENTITY_MARKS, mark)) return '';
+            return `<img class="avatar-identity-mark avatar-identity-mark--${mark}" src="${IDENTITY_MARKS[mark]}" width="20" height="20" alt="" aria-hidden="true" />`;
+        }
+
+        renderNetworkBalance(networkInfo) {
+            if (networkInfo?.requiresConfirmation) return '<span class="network-balance-value">Tap to switch</span>';
+            const network = NETWORK_IDENTITIES[Number(networkInfo?.chainId)];
+            if (!network) return '';
+            const currency = [84532, 11155111].includes(Number(networkInfo.chainId)) ? 'test ETH' : 'ETH';
+            return `${this.renderIdentityMark('eth')}<span class="network-balance-value">${networkBalanceText(networkInfo.balance)} ${currency}</span>`;
+        }
+
+        renderWalletProvider(walletProvider) {
+            if (!walletProvider?.name) return '';
+            return `<div class="avatar-wallet-provider">${this.renderIdentityMark(walletProvider.mark)}<span>${escapeMenuText(walletProvider.name)}</span></div>`;
+        }
+
+        getMenuIdentity(walletAddress, restoring = false) {
+            const wallet = String(walletAddress || '').toLowerCase();
+            if (!WALLET_ADDRESS_PATTERN.test(wallet)) return { name: 'ArtSoul Guest', wallet: '' };
+            const profileWallet = String(this.profile?.wallet_address || '').toLowerCase();
+            const profileBound = this.identityWallet === wallet && this.resolvedIdentityWallet === wallet
+                && (!profileWallet || profileWallet === wallet);
+            const cached = restoring || (this.identityWallet === wallet && this.resolvedIdentityWallet !== wallet)
+                ? this.getCachedHeaderIdentity(wallet)
+                : null;
+            const name = profileBound
+                ? this.getProfileDisplayName(this.profile, wallet)
+                : cached?.name || this.getProfileDisplayName(null, wallet);
+            return { name, wallet };
+        }
+
+        renderMenuIdentity(walletAddress, restoring) {
+            const identity = this.getMenuIdentity(walletAddress, restoring);
+            return `<div class="avatar-menu-identity"><span class="avatar-menu-name">${escapeMenuText(identity.name)}</span>${identity.wallet ? `<span class="avatar-menu-address">${escapeMenuText(identity.wallet)}</span>` : ''}</div>`;
         }
 
         /**
          * Update network display dynamically
          */
         async updateNetworkDisplay() {
+            const walletAddress = window.currentWalletAddress;
+            const renderKey = this.pendingRenderKey;
             const networkInfo = await this.getCurrentNetworkInfo();
+            if (walletAddress !== window.currentWalletAddress || renderKey !== this.pendingRenderKey) return;
             const networkButton = document.querySelector('.network-switcher-btn');
             if (networkButton) {
-                const icon = networkButton.querySelector('img');
+                const icon = networkButton.querySelector('[data-network-mark]');
                 const name = networkButton.querySelector('[data-network-name]');
                 const balance = networkButton.querySelector('[data-network-balance]');
-                if (icon) {
-                    icon.src = networkInfo.icon;
-                    icon.alt = networkInfo.name;
-                    icon.style.display = networkInfo.icon ? '' : 'none';
-                }
+                if (icon) icon.innerHTML = this.renderIdentityMark(networkInfo.mark);
                 if (name) name.textContent = networkInfo.name;
-                if (balance) balance.textContent = `${networkInfo.balance} ${networkInfo.currency}`.trim();
+                if (balance) balance.innerHTML = this.renderNetworkBalance(networkInfo);
+                const providerSlot = document.querySelector('[data-wallet-provider]');
+                if (providerSlot) providerSlot.innerHTML = this.renderWalletProvider(networkInfo.walletProvider);
             }
         }
 
@@ -1409,7 +1472,7 @@
                         class="dropdown-item avatar-network-option"
                         onclick="window.AvatarDropdown.selectNetwork(84532, event)"
                     >
-                        <img src="${this.baseNetworkIcon || ''}" alt="" aria-hidden="true" />
+                        ${this.renderIdentityMark('base')}
                         <span class="network-option-name">Base Sepolia</span>
                     </button>
                 </div>
@@ -1423,18 +1486,19 @@
         networkMenuKeySegment(networkInfo) {
             if (!networkInfo) return 'none';
             if (networkInfo.requiresConfirmation) return 'pending';
-            return networkInfo.chainId ? `chain${networkInfo.chainId}` : 'unknown';
+            const network = networkInfo.chainId ? `chain${networkInfo.chainId}` : 'unknown';
+            return `${network}:${networkInfo.walletProvider?.name || ''}`;
         }
 
-        renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false, connected = false }) {
+        renderMenuContent({ currentPath, isOwnProfile, networkInfo = null, restoring = false, connected = false, walletAddress = '' }) {
             const networkOptions = networkInfo
                 ? this.renderNetworkOptions(networkInfo.chainId, networkInfo.requiresConfirmation)
                 : '';
             const networkRowContent = networkInfo ? `
-                    <img src="${networkInfo.icon}" alt="${networkInfo.name}" onerror="this.style.display='none'" />
+                    <span class="avatar-network-mark" data-network-mark>${this.renderIdentityMark(networkInfo.mark)}</span>
                     <div class="network-switcher-copy">
-                        <div><span data-network-name>${networkInfo.name}</span></div>
-                        <div data-network-balance>${networkInfo.balance} ${networkInfo.currency}</div>
+                        <div><span data-network-name>${escapeMenuText(networkInfo.name)}</span></div>
+                        <div data-network-balance>${this.renderNetworkBalance(networkInfo)}</div>
                     </div>
             ` : '';
             let networkCurrentRow = '';
@@ -1473,6 +1537,7 @@
             const networkSection = networkInfo ? `
                 ${networkCurrentRow}
                 ${networkOptions}
+                <div data-wallet-provider>${this.renderWalletProvider(networkInfo.walletProvider)}</div>
                 <div class="avatar-dropdown-divider"></div>
             ` : '';
 
@@ -1502,6 +1567,7 @@
             }
 
             return `
+                ${this.renderMenuIdentity(walletAddress || (isConnected ? this.identityWallet || window.currentWalletAddress : ''), restoring)}
                 <div class="avatar-theme-section">
                     <div class="avatar-theme-label">Theme Mode</div>
                     <div class="theme-toggle avatar-theme-switch">
@@ -1924,7 +1990,6 @@
             const shortAddress = `${storedWallet.slice(0, 6)}...${storedWallet.slice(-4)}`;
             let networkInfo = this.getCachedHeaderNetwork(storedWallet);
             if (isMobileUA && networkInfo?.chainId === 84532 && networkInfo.baseSepoliaConfirmed !== true) {
-                this.baseNetworkIcon = networkInfo.icon;
                 networkInfo = {
                     ...networkInfo,
                     name: 'Base Sepolia',
@@ -1957,7 +2022,8 @@
                     currentPath,
                     isOwnProfile,
                     networkInfo,
-                    restoring: true
+                    restoring: true,
+                    walletAddress: storedWallet
                 }),
                 networkInfo
                     ? `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
@@ -2003,7 +2069,7 @@
                 persistUiState: false
             });
             this.updateStableMenu(
-                this.renderMenuContent({ currentPath, isOwnProfile: restoringOwnProfile, restoring: true }),
+                this.renderMenuContent({ currentPath, isOwnProfile: restoringOwnProfile, restoring: true, walletAddress: storedWallet }),
                 `resolving:${currentPath}:${restoringOwnProfile}`
             );
             this.applyThemeStyles();

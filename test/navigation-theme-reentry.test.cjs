@@ -3,17 +3,19 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const test = require('node:test');
 
-function boot(order, pathname = '/gallery') {
+function boot(order, pathname = '/gallery', { primaryNavigation = false, existingBack = false } = {}) {
     const errors = [], elements = new Map(), storage = new Map();
     function element() {
         const classes = new Set();
         return { style: {}, classList: { add: (...names) => names.forEach(n => classes.add(n)), remove: (...names) => names.forEach(n => classes.delete(n)), contains: name => classes.has(name) } };
     }
     const nav = { insertBefore(button) { elements.set(button.id, button); } };
+    if (existingBack) elements.set('backButton', element());
     const document = {
         readyState: 'complete', documentElement: element(), body: element(),
         getElementById: id => elements.get(id) || null,
-        querySelector: () => nav, createElement: () => element()
+        querySelector: selector => selector === '.site-primary-nav' ? (primaryNavigation ? nav : null) : nav,
+        createElement: () => element()
     };
     const store = { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) };
     const window = { location: { pathname, href: pathname } };
@@ -22,6 +24,23 @@ function boot(order, pathname = '/gallery') {
     for (const file of order) vm.runInContext(fs.readFileSync(`src/ui/${file}-manager.js`, 'utf8'), context, { timeout: 1000 });
     return { window, document, elements, errors };
 }
+
+test('shared primary navigation never receives the legacy fixed Back overlay', () => {
+    const { window, elements } = boot(['navigation'], '/gallery', { primaryNavigation: true });
+    assert.equal(elements.has('backButton'), false);
+    window.NavigationManager.pushHistory('/profile');
+    window.NavigationManager.pushHistory('/gallery');
+    window.goBack();
+    assert.equal(window.location.href, '/profile', 'history navigation remains available');
+});
+
+test('explicit page Back controls keep their handler alongside primary navigation', () => {
+    const { window, elements } = boot(['navigation'], '/gallery', { primaryNavigation: true, existingBack: true });
+    const button = elements.get('backButton');
+    assert.equal(typeof button.onclick, 'function');
+    button.onclick();
+    assert.equal(window.location.href, '/');
+});
 
 test('Publish keeps history navigation without inserting a Back control over its logo', () => {
     for (const pathname of ['/upload', '/upload.html', '/upload/']) {
