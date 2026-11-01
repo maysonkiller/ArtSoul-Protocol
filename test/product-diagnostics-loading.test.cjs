@@ -27,3 +27,14 @@ for (const [page, entry] of Object.entries(entries)) {
         assert.match(html, /window\.ArtSoulHeaderPrepaint\?\.hydrate\(document\.getElementById\('navButtons'\)\)/);
     });
 }
+
+test('product services do not load legacy AI demos; live guidance keeps its authenticated client', () => {
+    const services = fs.readFileSync(path.join(root, 'src/index.js'), 'utf8');
+    assert.doesNotMatch(services, /import\s+['"].*(?:ai\/index|ai-evaluation-panel)\.js['"]/);
+    for (const page of ['artwork', 'upload']) {
+        const html = fs.readFileSync(path.join(root, `${page}.html`), 'utf8');
+        assert.match(html, /src="\/src\/features\/artwork\/ai-valuation-client\.js\?v=4"/);
+    }
+    const client = fs.readFileSync(path.join(root, 'src/features/artwork/ai-valuation-client.js'), 'utf8');
+    assert.match(client, /\/api\/ai\/analyze/);
+});
