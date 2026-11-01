@@ -932,3 +932,65 @@ were corrected only in that private harness, then the whole unchanged public
 patch reran successfully. Earlier failed evidence is retained. Final local
 units pass2,878/35 explicit environment skips and the build verifies11 routes
 and172 utilities. Exact-candidate hosted CI/release verification is pending.
+
+Released through PR420: candidate `59c7118e6cbab5814acb094df51a24ef46da523b`,
+merge `e1faa425d8830ad3f1b980ad36b0a6f99c5bf897`. CI41268756634 passed
+Linux3,416/two skips and Windows2,849/35 skips,49 contract tests on each,
+both builds/static. Preview7467979886 and production7468037607 succeeded;
+six apex routes retain the exact previously tested stylesheet hash. Logs:
+`docs/private/b35-nft-coverage-{ci,preview-release,production-release}.log`.
+This is a code release, not a live migration or worker activation.
+
+The bounded free-origin follow-up located creation transaction
+`0x9a72e3433da68094a5c2c9a2285c41014064083338d1abe252b59c24d60ecef5`
+at block41,976,856. Base's receipt and transaction agree with Blockscout and
+the CREATE address derivation; the embedded runtime matches the pinned NFT
+hash. Only the metadata trailer differs from the local artifact. Both existing
+RPCs still reject the historical canonical header. A receipt/explorer match is
+not substituted for the required origin/range proof. This narrows the missing
+evidence without claiming bootstrap success or adding a paid provider.
+Details and raw public responses: `docs/private/b35-nft-origin-free-review.md`.
+
+## November 1 fenced atomic NFT range writer
+
+The dormant `syncNftTransferRange` helper captures existing leadership, Core
+deployment and state revision before reading coverage or RPC. It verifies a
+bounded range through the existing reader, then locks leadership, state and
+the same coverage row in the recovery order. Continuation must match the
+previous endpoint/hash and both runtime pins; bootstrap requires absent
+coverage and the reader's zero-supply proof. It cannot run ahead of the Core
+checkpoint or accept changed engine/listener chain, deployment or authority.
+
+Journal insertion and coverage advancement share one transaction. Exact
+retained facts can replay after invalidation; differing payload, source, time,
+unproven artwork association or extra retained range events reject the whole
+write. Token IDs stay exact. Transfer rows deliberately have no artwork_id
+until a separate source-qualified mapping exists. The helper runs no economic,
+mint, AI, metric or notification handler and does not advance the Core cursor.
+
+Bootstrap, ranges containing transfers and empty ranges reaching the Core
+checkpoint rotate the existing durable cache-purge token, then reinsert the
+validated coverage in that transaction. Partial empty ranges only advance
+coverage and state revision. Configured caching blocks further writes until
+the existing fenced purge path acknowledges the obligation. No new worker
+loop or automatic activation is included; operational purge frequency and
+public-reader readiness remain integration concerns.
+
+Local verification: the full isolated PostgreSQL run passed171 checks; two
+additional post-proof listener-chain regressions passed in a filtered run
+(three tests including its parent). Both clusters stopped. Evidence:
+`docs/private/b35-nft-writer-postgres.log`,
+`docs/private/b35-nft-writer-chain-fence.log`, and the corresponding
+`reorg-atomicity-1793503502413-54004-ee9b201e` /
+`reorg-atomicity-1793503891551-61800-2d737dbe` evidence directories.
+The final full local units pass2,878/35 environment skips (29 unrelated
+untracked authority-policy passes excluded from this candidate); the build
+verifies11 routes/172 utilities. Focused security/proof checks pass194 with
+one unavailable-Docker skip. Exact hosted CI/release is pending. The local
+full database matrix exceeded its earlier300-second allowance, so its overall
+limit is now360 seconds; individual statement/concurrency bounds are unchanged.
+
+This adds no new interpretation of economics or NFT lifecycle. It implements
+the same canon §§1,4,5,9 source and non-sale-transfer boundaries. Historical
+bootstrap, source-qualified public ownership/timeline reads, independent
+restore, external delivery/cache acceptance and worker activation remain open.
