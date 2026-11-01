@@ -106,10 +106,10 @@ function renderedShowcaseHarness(mode = 'classic', reducedMotion = false) {
     const ids = Object.fromEntries([
         'homeShowcase', 'homeShowcaseStage', 'homeShowcaseIntro',
         'homeShowcaseControls', 'homeShowcasePrev', 'homeShowcaseNext',
-        'homeShowcasePause', 'homeShowcaseCount', 'homeShowcaseStatus'
+        'homeShowcaseCount', 'homeShowcaseStatus'
     ].map(id => [id, new Element()]));
     ids.homeShowcase.append(ids.homeShowcaseIntro, ids.homeShowcaseStage, ids.homeShowcaseControls);
-    ids.homeShowcaseControls.append(ids.homeShowcasePrev, ids.homeShowcaseCount, ids.homeShowcaseNext, ids.homeShowcasePause);
+    ids.homeShowcaseControls.append(ids.homeShowcasePrev, ids.homeShowcaseCount, ids.homeShowcaseNext);
     let counter = 0;
     const timers = new Map(), durations = [];
     const window = {
@@ -150,18 +150,18 @@ test('rendered carousel actually changes slides every eight seconds in both Clas
             assert.equal(h.timers.size, 1);
             [...h.timers.values()][0]();
             assert.equal(h.ids.homeShowcaseCount.textContent, '2 / 3', theme);
-            h.ids.homeShowcasePause.onclick();
-            assert.equal(h.ids.homeShowcasePause.attributes['aria-pressed'], 'true');
+            h.ids.homeShowcaseCount.onclick();
+            assert.equal(h.ids.homeShowcaseCount.attributes['aria-pressed'], 'true');
             assert.equal(h.timers.size, 0);
-            h.document.activeElement = h.ids.homeShowcasePause;
-            h.ids.homeShowcasePause.onclick();
+            h.document.activeElement = h.ids.homeShowcaseCount;
+            h.ids.homeShowcaseCount.onclick();
             assert.equal(h.timers.size, 1, 'explicit resume must function with focus on pause');
             h.ids.homeShowcase.fire('focusin', { target: h.ids.homeShowcaseNext });
             assert.equal(h.timers.size, 0, 'navigating between controls stops auto-rotation');
             h.document.activeElement = null;
             h.ids.homeShowcase.fire('focusout', { relatedTarget: null });
             assert.equal(h.timers.size, 0, 'keyboard focus pause persists after focus leaves');
-            h.ids.homeShowcasePause.onclick();
+            h.ids.homeShowcaseCount.onclick();
             assert.equal(h.timers.size, 1, 'only explicit resume restarts the rotation');
             h.document.visibilityState = 'hidden';
             h.document.fire('visibilitychange');
@@ -213,17 +213,25 @@ test('touch tapping Pause cannot be misread as keyboard focus Resume', () => {
         renderHomeShowcase([SLOT(ART(1)), SLOT(ART(2))]);
         assert.equal(h.timers.size, 1);
         h.ids.homeShowcase.fire('pointerdown', {});
-        h.document.activeElement = h.ids.homeShowcasePause;
-        h.ids.homeShowcase.fire('focusin', { target: h.ids.homeShowcasePause });
-        h.ids.homeShowcasePause.onclick();
-        assert.equal(h.ids.homeShowcasePause.attributes['aria-pressed'], 'true');
+        h.document.activeElement = h.ids.homeShowcaseCount;
+        h.ids.homeShowcase.fire('focusin', { target: h.ids.homeShowcaseCount });
+        h.ids.homeShowcaseCount.onclick();
+        assert.equal(h.ids.homeShowcaseCount.attributes['aria-pressed'], 'true');
         assert.equal(h.timers.size, 0, 'single iPhone tap should pause carousel');
         h.ids.homeShowcase.fire('pointerup', {});
-        h.ids.homeShowcasePause.onclick();
-        assert.equal(h.ids.homeShowcasePause.attributes['aria-pressed'], 'false');
+        h.ids.homeShowcaseCount.onclick();
+        assert.equal(h.ids.homeShowcaseCount.attributes['aria-pressed'], 'false');
         assert.equal(h.timers.size, 1, 'explicit resume still starts while pause retains focus');
     } finally {
         globalThis.window = oldW;
         globalThis.document = oldD;
     }
+});
+
+test('counter is the only pause control and no opaque pause icon is rendered', () => {
+    const html = readFileSync('index.html', 'utf8');
+    const markup = html.match(/id="homeShowcaseControls"[\\s\\S]*?<\\/div>/)?.[0] || '';
+    assert.doesNotMatch(markup, /homeShowcasePause|>Ⅱ<|>▶</);
+    assert.match(markup, /<button id="homeShowcaseCount"[^>]*aria-pressed="false"/);
+    assert.equal((markup.match(/<button /g) || []).length, 3);
 });
