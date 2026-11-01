@@ -294,6 +294,15 @@ Contract extensibility and network planning remain under C-06/C1; canon
 reconciliation precedes those decisions. The draft cost model supports C-25;
 it creates no budget, funding commitment or external submission.
 
+November 1 B35 transfer-history prerequisite: PR419 released the read-only
+deployment proof. The next local slice reads strict bounded NFT ranges and
+adds dormant atomic coverage storage, without enabling a writer or public
+owner projection.161 focused checks,142 isolated PostgreSQL checks and2,878
+local units pass (35 environment skips); exact hosted CI is pending. Both
+existing RPCs verified a real historical mint, but prune the candidate origin.
+Historical bootstrap, fenced ingestion, public-read/cache consistency and the
+existing-worker update remain open. See the B35 audit for exact evidence.
+
 ## October 31 interface review — B18 follow-up
 
 Source: [Interface/capability review](audits/B18_INTERFACE_CAPABILITY_REVIEW_2026-10-31.md).

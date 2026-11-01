@@ -35,7 +35,8 @@ const features = [
   'artwork_media_submission', 'artwork_media_registration', 'artwork_media_reorg', 'artwork_media_legacy_intake', 'saved_artworks',
   'public_artwork_search', 'public_artwork_search_current_round', 'profile_layouts', 'auction_notifications', 'auction_notification_lifecycle',
   'auction_notification_reminders', 'notification_summary', 'notification_inbox_removal',
-  '20261029212603_notification_reorg_identity', '20261029220854_recovery_cache_obligation'
+  '20261029212603_notification_reorg_identity', '20261029220854_recovery_cache_obligation',
+  '20261101120000_nft_transfer_coverage'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [
@@ -46,6 +47,9 @@ const rpcOnly = [
   'artwork_media_chain_revisions', 'artwork_media_rewinds', 'profile_layouts',
   'auction_notification_reads', 'auction_notification_preferences'
 ];
+// The indexer writes coverage through its fenced direct PostgreSQL connection.
+// No Data API role may create or advance a coverage attestation.
+const indexerReadOnly = ['nft_transfer_coverage'];
 
 test('new table migrations must join the no-default-grant rehearsal', () => {
   // These immutable historical files are covered by the legacy 18.7b
@@ -138,6 +142,7 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
       'artsoul_private.notification_source_identity(text,text,jsonb,text,boolean)',
       'artsoul_private.detach_reorg_notifications(bigint,numeric)',
       'artsoul_private.mark_deployment_cache_obligation()',
+      'artsoul_private.invalidate_nft_transfer_coverage()',
       'public.write_recoverable_notification(text,text,jsonb,text,text,text)'
     ];
     for (const signature of internalFunctions) {
@@ -179,7 +184,7 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     }
   });
   await t.test('authority, factor and publication identity tables remain RPC-only', () => {
-    for (const name of rpcOnly) {
+    for (const name of [...rpcOnly, ...indexerReadOnly]) {
       assert.equal(query(`SELECT has_table_privilege('service_role','public.${name}','INSERT,UPDATE,DELETE');`), 'f', name);
     }
     assert.throws(() => query('SET ROLE service_role; DELETE FROM public.artsoul_staff_roles WHERE false;'),
@@ -191,7 +196,7 @@ test('Data API migrations work without implicit table or sequence grants (Postgr
     assert.equal(query(`SELECT c.relname FROM pg_class c
       CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE')) p(name)
       WHERE c.relnamespace='public'::regnamespace AND c.relkind IN ('r','p')
-        AND c.relname NOT IN (${rpcOnly.map(name => `'${name}'`).join(',')})
+        AND c.relname NOT IN (${[...rpcOnly,...indexerReadOnly].map(name => `'${name}'`).join(',')})
         AND NOT has_table_privilege('service_role',c.oid,p.name);`), '');
   });
   await t.test('server writes still work for a signal, email and identity-backed auth event', () => {
