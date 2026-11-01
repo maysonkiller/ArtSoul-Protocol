@@ -237,6 +237,39 @@
         return Boolean(artwork.minted) || Boolean(tokenId && tokenId !== '0' && tokenId !== 'none');
     }
 
+    // A card only claims an NFT once the source confirms minting. Chain names
+    // come from the artwork projection (or its canonical v4.1 identifier),
+    // never from whichever network happens to be selected in the viewer's wallet.
+    function cardNetworkLabel(artwork = {}) {
+        const encodedChain = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\\d+):/i)?.[1];
+        const raw = artwork.chain_id ?? artwork.chainId ?? encodedChain;
+        const chain = Number(raw);
+        if (!raw || !Number.isSafeInteger(chain) || chain <= 0) return 'Network pending';
+        const labels = {
+            1: 'Ethereum', 10: 'Optimism', 137: 'Polygon', 8453: 'Base',
+            84532: 'Base Sepolia', 11155111: 'Sepolia',
+            42161: 'Arbitrum', 421614: 'Arbitrum Sepolia'
+        };
+        return labels[chain] || `Chain ${chain}`;
+    }
+
+    function cardMintLabel(artwork = {}) {
+        return isMinted(artwork) ? 'NFT' : 'Not minted';
+    }
+
+    function createCardProvenance(artwork = {}) {
+        const row = document.createElement('div');
+        row.className = 'artsoul-card-provenance';
+        const network = document.createElement('span');
+        network.className = 'artsoul-card-network';
+        network.textContent = cardNetworkLabel(artwork);
+        const mint = document.createElement('span');
+        mint.className = `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}`;
+        mint.textContent = cardMintLabel(artwork);
+        row.append(network, mint);
+        return row;
+    }
+
     function isListedForSale(artwork = {}) {
         const listingStatus = normalize(artwork.listing_status || artwork.resale_status || artwork.status);
         const listingPrice = toNumber(artwork.sale_price || artwork.resale_price || artwork.listing_price);
@@ -775,6 +808,7 @@
 
         body.appendChild(title);
         body.appendChild(creator);
+        body.appendChild(createCardProvenance(artwork));
         body.appendChild(meta);
         const menu = href ? createActionMenu(artwork) : null;
         if (artwork.pending_auction_sync) {
@@ -1024,6 +1058,10 @@
             h('div', { className: 'artsoul-card-body' },
                 h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
                 h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
+                h('div', { className: 'artsoul-card-provenance' },
+                    h('span', { className: 'artsoul-card-network' }, cardNetworkLabel(artwork)),
+                    h('span', { className: `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}` }, cardMintLabel(artwork))
+                ),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
                     price ? h('span', { className: 'artsoul-card-price' }, price) : null
@@ -1067,6 +1105,8 @@
         cardActionItems,
         creatorLabel,
         formatPrice,
+        cardNetworkLabel,
+        cardMintLabel,
         statusInfo,
         auctionEndTimestamp,
         formatAuctionCountdown,
