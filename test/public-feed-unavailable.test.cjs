@@ -27,7 +27,9 @@ function homeHarness(read) {
   const window = { ArtSoulDB: { getPublicProjectionArtworks: async (options, strict) => {
     assert.equal(strict, true); return read(options);
   } }, ArtSoulArtworkCard: { hasSafeMedia: () => true, createCardElement: art => Object.assign(new Element(), { artwork: art }) } };
-  const context = vm.createContext({ window, document: { getElementById: id => ids[id], createElement: () => new Element() },
+  // Slice harness intentionally strips imports; the real showcase has its own
+  // focused tests and must not override public-feed error semantics here.
+  const context = vm.createContext({ window, renderHomeShowcase: () => {}, document: { getElementById: id => ids[id], createElement: () => new Element() },
     localStorage: { getItem: () => '[]' }, console: { error() {} } });
   vm.runInContext(source.slice(source.indexOf('        function normalizeProtocolArtworkId'),
     source.indexOf('        // The entry is mounted')), context);
