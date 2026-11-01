@@ -336,7 +336,10 @@ copy remain open. Opt-in integration was released in PR424 after exact CI and
 preview/production checks; it is still disabled. A local next slice publishes
 Core/NFT facts atomically, caps publication to one attempt per10seconds and
 avoids empty-range purges.262 focused and20 real PostgreSQL scenarios pass;
-full candidate verification remains required.
+the final isolated follow-up passes24 scenarios (25 including the parent),
+including retained-event replay rejection.255 focused API checks pass; the first
+full local matrix's two reset timeouts are retained in the audit. Exact candidate
+CI and complete local-suite verification remain required.
 Measured per-range RPC/purge cost and transient coverage availability remain
 activation gates. No migration, new NFT writer or ownership reader is activated
 live; the existing worker stays B30. See the B35 audit for exact evidence,

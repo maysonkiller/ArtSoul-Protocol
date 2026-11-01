@@ -2084,20 +2084,26 @@ const {pathToFileURL}=require('node:url');
         ?{auctionId:1,artworkId:1,winner:WINNER,finalPrice:2000,tokenId:7}
         :{auctionId:1,bidder:WINNER,bidAmount:2000,depositAmount:100},timestamp:100000};
       f.coreEvents=[event];
+      if(name==='BidPlaced')f.coreEvents.push({...event,transactionHash:hash(11601),logIndex:1,
+        transactionIndex:1,eventData:{...event.eventData,bidder:CREATOR,bidAmount:3000}});
       const client=await pool.connect();
       try {
-        await client.query('BEGIN');await target._applyEventProjectionTx(event,client);
-        if(name==='BidPlaced') {
-          // A later retained bid must not be overwritten by the older event.
-          await target._applyEventProjectionTx({...event,transactionHash:hash(11601),logIndex:1,
-            transactionIndex:1,eventData:{...event.eventData,bidder:CREATOR,bidAmount:3000}},client);
+        await client.query('BEGIN');
+        for(const retained of f.coreEvents){
+          await client.query(`INSERT INTO event_processing_registry(event_hash,chain_id,transaction_hash,
+            log_index,event_name,block_number,processing_status) VALUES($1,$2,$3,$4,$5,$6,'completed')`,
+          [await target._computeEventHash(retained),CHAIN,retained.transactionHash,
+            retained.logIndex,retained.eventName,retained.blockNumber]);
+          await target._applyEventProjectionTx(retained,client);
         }
+        // Simulate losing the first completion after its projection committed;
+        // a later retained bid remains completed and must not be overwritten.
+        await client.query('DELETE FROM event_processing_registry WHERE chain_id=$1 AND transaction_hash=$2',
+          [CHAIN,event.transactionHash]);
         await client.query('COMMIT');
       } catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
       // The extra-journal guard is independently covered. Supply the later event
       // too, so this check exercises the missing completion specifically.
-      if(name==='BidPlaced')f.coreEvents.push({...event,transactionHash:hash(11601),logIndex:1,
-        transactionIndex:1,eventData:{...event.eventData,bidder:CREATOR,bidAmount:3000}});
       const before=await writerSnapshot();
       await assert.rejects(f.publish(),/missing its completed processing record/);
       const after=await writerSnapshot(),failed=after.chain.event_processing_registry

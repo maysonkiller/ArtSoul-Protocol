@@ -1271,3 +1271,15 @@ database suite was running. Evidence is retained in
 `docs/private/b35-atomic-postgres-full.log`; the cluster stopped successfully.
 This is not recorded as a passing matrix. The final two new regressions and
 isolated reruns, plus exact candidate CI, remain required before release.
+
+The isolated follow-up now passes25/25 (24 scenarios and the parent), including
+both timed-out cases and22 coordinated scenarios. Its new bid fixture initially
+lacked the processing record required by notification provenance; it now seeds
+completed processing normally, then removes only the first completion to model
+the reported inconsistency. No production guard was weakened to satisfy it.
+Final evidence: `docs/private/b35-atomic-pg-recheck-final.log` and
+`reorg-atomicity-1793512314091-61636-cdc44aaf/evidence.json`; cluster stopped.
+The first fixture failure remains in `b35-atomic-pg-recheck.log`.
+Preview7469179359 serves the exact six-route stylesheet and successful real
+artwork13/provenance reads, using520,393 response bytes for the bounded check.
+These existing-data reads exercise the disabled ownership gate, not activation.
