@@ -43,8 +43,8 @@ old layout. It does not amend the architecture or original theme palettes.
 
 ## Verified candidate
 
-- Focused Node checks: 119 passed (first paint/navigation, Gallery default,
-  Artwork layout, profile connections, collection drafts).
+- Focused Node checks: 126 passed (first paint/navigation, Gallery default,
+  Artwork layout/presentation, profile connections, collection drafts).
 - Production build: 11 HTML routes; 172 generated Tailwind utilities verified.
 - Isolated Chromium checks against built output: Home 249 assertions / 20
   layouts; Artwork 566 / 14; collection 266 / 24 step-layouts; Docs 70 / 8;
@@ -68,6 +68,12 @@ Independent review found one genuine Classic hover conflict: the transparent
 secondary Home action inherited a page-colored foreground from the old hover
 style. An explicit theme-variable foreground fixes it; both themes' hover states
 were checked. The reviewer reported no remaining material findings.
+
+The first full CI run found two presentation tests still requiring Classic's old
+non-collapsible markup and different panel order. Updated those expectations to
+the founder-approved shared layout, checking both themes' disclosure defaults,
+always-visible ownership identities, and single-instance actions/media. No
+economic or authorization check was removed.
 
 Private evidence: `b18-shared-*-result.json`,
 `b18-shared-focused-final.log`, `b18-shared-build.log` in `docs/private/`;

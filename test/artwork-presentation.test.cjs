@@ -101,30 +101,34 @@ test('profile text remains escaped in combined identity rows', () => {
     assert.doesNotMatch(html, /<img src=x/);
 });
 
-test('Future uses native initially closed guidance and metadata with initially open history', () => {
-    const panels = render();
-    for (const key of ['detailsPanel', 'guidancePanel']) {
-        assert.match(panels[key], /^<details\b/);
-        assert.match(panels[key], /<summary\b/);
-        assert.doesNotMatch(panels[key], /<details[^>]*\bopen=/);
+test('both themes use native initially closed guidance and metadata with initially open history', () => {
+    for (const isClassic of [true, false]) {
+        const panels = render({ isClassic });
+        for (const key of ['detailsPanel', 'guidancePanel']) {
+            assert.match(panels[key], /^<details\b/);
+            assert.match(panels[key], /<summary\b/);
+            assert.doesNotMatch(panels[key], /<details[^>]*\bopen=/);
+        }
+        assert.match(panels.provenancePanel, /^<details open=""/);
+        assert.match(panels.provenancePanel, /<summary\b[^>]*><h3 id="provenanceTitle"/);
+        assert.match(panels.provenancePanel, /No indexer history is available yet/);
+        assert.match(panels.guidancePanel, /Guidance only\. It does not affect settlement, floor, royalties, or mint rights/);
     }
-    assert.match(panels.provenancePanel, /^<details open=""/);
-    assert.match(panels.provenancePanel, /<summary\b[^>]*><h3 id="provenanceTitle"/);
-    assert.match(panels.provenancePanel, /No indexer history is available yet/);
-    assert.match(panels.guidancePanel, /Guidance only\. It does not affect settlement, floor, royalties, or mint rights/);
 });
 
-test('Classic keeps visible section and div content without disclosure semantics', () => {
-    const panels = render({ isClassic: true });
-    assert.match(panels.detailsPanel, /^<div\b/);
-    assert.match(panels.guidancePanel, /^<section\b/);
-    assert.match(panels.provenancePanel, /^<section\b/);
-    for (const html of Object.values(panels)) assert.doesNotMatch(html, /<details|<summary|\bopen=/);
+test('both themes keep creator and collector identities outside collapsed details', () => {
+    for (const isClassic of [true, false]) {
+        const html = render({ isClassic }).ownershipPanel;
+        assert.match(html, /^<div class="artwork-page-panel artwork-page-people/);
+        assert.match(html, />Creator<\/div>/);
+        assert.match(html, />First Collector · Owner<\/div>/);
+        assert.doesNotMatch(html, /<details|<summary/);
+    }
 });
 
 test('the layout reuses each keyed panel and keeps a single support/media/action implementation', () => {
-    assert.match(source, /\? \[mediaPanel, contextPanel, communityPanel, guidancePanel\]\s*: \[mediaPanel, contextPanel, ownershipPanel, auctionPanel, communityPanel, provenancePanel, guidancePanel, detailsPanel\]/);
-    assert.match(source, /\? \[ownershipPanel, provenancePanel, auctionPanel\]\s*: null/);
+    assert.match(source, /\{\[mediaPanel, contextPanel, ownershipPanel, auctionPanel, communityPanel, provenancePanel, guidancePanel, detailsPanel\]\}/);
+    assert.doesNotMatch(source, /\{isClassic && detailsPanel\}|\? \[ownershipPanel, provenancePanel, auctionPanel\]/);
     assert.equal((source.match(/<MediaViewer\b/g) || []).length, 1);
     assert.equal((source.match(/<ArtistSupport\b/g) || []).length, 1);
     assert.equal((source.match(/id="artwork-actions"/g) || []).length, 1);
