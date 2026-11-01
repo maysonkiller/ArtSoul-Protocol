@@ -8434,8 +8434,8 @@ body:is(.classic, .future) #homeShowcaseCount { min-width: 40px; text-align: cen
 /* The new image may fade into view only in Future. Classic stays instant/static
    and system reduced-motion preference always takes precedence. */
 @keyframes artsoulShowcaseEnter {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0.9; }
+    to { opacity: 1; }
 }
 body.future .home-showcase-slide:not([hidden]) {
     animation: artsoulShowcaseEnter 420ms ease-out both;
@@ -8491,4 +8491,40 @@ body:is(.classic, .future) .site-header:has(.site-theme-toggle[data-theme-ready=
     body:is(.classic, .future) .site-header-actions { gap: 0 !important; }
     body:is(.classic, .future) .site-header .site-wordmark { font-size: 19px !important; letter-spacing: -1.5px; }
     body:is(.classic, .future) .site-wordmark > span { font-size: 6px; letter-spacing: 0.15em; }
+}
+
+/* November 1: the product headline, real gallery and live showcase are the
+   content. No duplicate marketing slide or second gallery grid. */
+body:is(.classic, .future) #homeSection .home-hero {
+    text-align: left !important;
+}
+body:is(.classic, .future) #homeSection .home-hero-copy {
+    justify-self: start;
+    text-align: left !important;
+}
+body:is(.classic, .future) #homeSection .home-hero h1,
+body:is(.classic, .future) #homeSection .home-hero p {
+    margin-inline: 0 !important;
+    text-align: left !important;
+}
+body:is(.classic, .future) #homeSection .home-hero-actions {
+    justify-content: flex-start !important;
+}
+body:is(.classic, .future) .home-showcase-intro {
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    background: var(--c-surface);
+}
+body:is(.classic, .future) .home-showcase-status {
+    color: var(--c-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: 0;
+}
+body:is(.classic, .future) .home-showcase-controls #homeShowcasePause {
+    border-left: 1px solid var(--c-border-soft);
+    border-radius: 0 999px 999px 0;
+    font-size: 18px;
 }

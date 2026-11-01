@@ -284,37 +284,32 @@
     <main id="homeSection" class="section active site-page-container relative z-10" style="padding-top: 1.25rem; padding-bottom: 3rem;">
 
         <!-- Hero Section -->
-        <div class="home-hero text-center mb-8">
+        <div class="home-hero mb-8">
             <div class="home-hero-copy">
-            <p class="home-hero-eyebrow">Art first. Ownership next.</p>
-            <h1 class="text-3xl md:text-5xl font-bold mb-3">
-                Discover a work. <br class="home-hero-break">Start its next chapter.
-            </h1>
-            <p class="text-base md:text-xl font-light opacity-90 mb-5 max-w-2xl mx-auto">
-                Discover independent artists, follow auctions, and collect after settlement.
+            <h1 class="text-3xl md:text-5xl font-bold mb-3">Discover artworks.</h1>
+            <p class="text-base md:text-xl font-light opacity-90 mb-5 max-w-2xl">
+                Original pieces, live auctions and ownership history—all in one place.
             </p>
             <div class="home-hero-actions flex flex-wrap gap-4 justify-center">
                 <a href="/gallery" class="btn-main text-lg px-7 py-3">
-                    Explore art <span aria-hidden="true">↗</span>
+                    Explore gallery <span aria-hidden="true">↗</span>
                 </a>
                 <a href="/upload" class="btn-secondary text-lg px-7 py-3">
-                    Share your work <span aria-hidden="true">→</span>
+                    Publish artwork <span aria-hidden="true">→</span>
                 </a>
             </div>
             </div>
-            <aside class="home-showcase" id="homeShowcase" data-state="empty" aria-label="Featured discoveries">
+            <aside class="home-showcase" id="homeShowcase" data-state="loading" aria-label="Featured artworks">
                 <div class="home-showcase-shell">
                     <div id="homeShowcaseIntro" class="home-showcase-intro">
-                        <span class="home-showcase-intro-overline">CURATED DISCOVERY</span>
-                        <strong>Art worth a closer look.</strong>
-                        <span>Explore original work from independent artists.</span>
-                        <a href="/gallery#discover">Discover artworks <span aria-hidden="true">↗</span></a>
+                        <span id="homeShowcaseStatus" class="home-showcase-status" role="status">Loading selected works…</span>
                     </div>
                     <div id="homeShowcaseStage" class="home-showcase-stage" aria-roledescription="carousel" aria-label="Featured artworks" aria-live="off" hidden></div>
                     <div id="homeShowcaseControls" class="home-showcase-controls" aria-label="Showcase controls" hidden>
                         <button id="homeShowcasePrev" type="button" aria-label="Previous featured artwork" data-allow-rapid>‹</button>
                         <span id="homeShowcaseCount" aria-live="off"></span>
                         <button id="homeShowcaseNext" type="button" aria-label="Next featured artwork" data-allow-rapid>›</button>
+                        <button id="homeShowcasePause" type="button" aria-label="Pause automatic rotation" aria-pressed="false" data-allow-rapid>Ⅱ</button>
                     </div>
                 </div>
             </aside>
@@ -324,10 +319,9 @@
         <div class="home-spotlight mb-12">
             <div class="home-spotlight-heading">
             <div>
-            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center">Find your next connection</h2>
-            <p>Art to discover, auctions to follow.</p>
+            <h2 class="text-2xl md:text-3xl font-bold mb-6">From the gallery</h2>
             </div>
-            <a href="/gallery#discover" class="home-section-link">Explore all art <span aria-hidden="true">→</span></a>
+            <a href="/gallery#discover" class="home-section-link">View all <span aria-hidden="true">→</span></a>
             </div>
             <div id="homepageFeedError" class="home-protocol-section mb-4" role="status" hidden>
                 <p id="homepageFeedErrorMessage">Artworks are temporarily unavailable. Please retry.</p>
@@ -364,18 +358,6 @@
             </ol>
         </section>
 
-        <section id="homepageFeaturedSection" class="home-protocol-section" aria-labelledby="homepageFeaturedTitle" hidden>
-            <div class="home-section-heading home-section-heading-row">
-                <div>
-                    <p class="home-section-kicker">Current activity</p>
-                    <h2 id="homepageFeaturedTitle">Live and Featured</h2>
-                </div>
-                <a href="/gallery" class="home-section-link">View all art</a>
-            </div>
-            <p id="homepageFeaturedSummary" class="home-section-summary">Live auctions first, followed by recent Discovery works.</p>
-            <div id="homepageFeaturedRow" class="home-featured-row" aria-live="polite"></div>
-        </section>
-
         <section class="home-protocol-section" aria-labelledby="protocolHighlightsTitle">
             <div class="home-section-heading">
                 <p class="home-section-kicker">Built for honest discovery</p>
@@ -394,18 +376,6 @@
                     <h3>AI Value Guidance</h3>
                     <p>Optional Gemini guidance never sets price, floor, ownership, or settlement.</p>
                 </article>
-            </div>
-        </section>
-
-        <section class="home-protocol-cta" aria-labelledby="homePublishCtaTitle">
-            <div>
-                <p class="home-section-kicker">Create or collect</p>
-                <h2 id="homePublishCtaTitle">Bring new art into discovery</h2>
-                <p>Publish a work for community discovery, or explore auctions already underway.</p>
-            </div>
-            <div class="home-protocol-cta-actions">
-                <a href="/upload" class="btn-main">Publish Artwork</a>
-                <a href="/gallery" class="btn-secondary">Explore Gallery</a>
             </div>
         </section>
 
