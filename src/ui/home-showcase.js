@@ -85,11 +85,14 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
 
     let active = 0;
     let timer = null;
+    let mediaUnavailable = false;
     const fallback = () => {
-        root.dataset.state = unavailable ? 'unavailable' : 'empty';
+        root.dataset.state = unavailable || mediaUnavailable ? 'unavailable' : 'empty';
         status.textContent = unavailable
             ? 'Featured artworks are temporarily unavailable.'
-            : 'No featured artworks available yet.';
+            : mediaUnavailable
+                ? 'Artwork previews are temporarily unavailable.'
+                : 'No featured artworks available yet.';
         intro.hidden = false;
         stage.hidden = true;
         controls.hidden = true;
@@ -132,6 +135,7 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
         link.append(picture, caption);
 
         picture.addEventListener('error', () => {
+            mediaUnavailable = true;
             const wasVisible = !link.hidden;
             link.remove();
             if (!stage.children.length) {
