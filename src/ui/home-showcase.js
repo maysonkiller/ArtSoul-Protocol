@@ -173,13 +173,14 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     // An explicit press of Resume wins over the hover/focus pause until focus
     // moves to another control. Simply focusing the carousel always pauses it.
     let explicitResume = false;
+    let focusPaused = false;
     const mayAdvance = () => shouldAutoAdvanceShowcase({
         slideCount: stage.children.length,
         visibility: document.visibilityState,
         reducedMotion: Boolean(motion?.matches),
         hovered: root.matches(':hover') && !explicitResume,
         focused: root.contains(document.activeElement) && !explicitResume,
-        paused: userPaused
+        paused: userPaused || focusPaused
     });
     const stop = () => {
         if (timer !== null) window.clearInterval(timer);
@@ -197,16 +198,27 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     };
     const restart = () => { stop(); start(); };
     const syncPause = () => {
-        pause.textContent = userPaused ? '▶' : 'Ⅱ';
-        pause.setAttribute('aria-pressed', String(userPaused));
-        pause.setAttribute('aria-label', userPaused ? 'Resume automatic rotation' : 'Pause automatic rotation');
-        pause.title = userPaused ? 'Resume slideshow' : 'Pause slideshow';
+        const stopped = userPaused || focusPaused;
+        pause.textContent = stopped ? '▶' : 'Ⅱ';
+        pause.setAttribute('aria-pressed', String(stopped));
+        pause.setAttribute('aria-label', stopped ? 'Resume automatic rotation' : 'Pause automatic rotation');
+        pause.title = stopped ? 'Resume slideshow' : 'Pause slideshow';
+        stage.setAttribute('aria-live', stopped || motion?.matches ? 'polite' : 'off');
+        pause.disabled = Boolean(motion?.matches);
+        if (pause.disabled) {
+            pause.title = 'Autoplay disabled by reduced motion preference';
+            pause.setAttribute('aria-label', pause.title);
+        }
     };
     previous.onclick = () => { show(active - 1); restart(); };
     next.onclick = () => { show(active + 1); restart(); };
     pause.onclick = () => {
-        userPaused = !userPaused;
-        explicitResume = !userPaused;
+        // Keyboard focus can pause before click: the first click then resumes,
+        // rather than toggling the already-stopped carousel back to "paused".
+        const wasStopped = userPaused || focusPaused;
+        userPaused = !wasStopped;
+        focusPaused = false;
+        explicitResume = wasStopped;
         syncPause();
         restart();
     };
@@ -217,11 +229,15 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     const onFocus = event => {
         if (explicitResume && event.target === pause) return;
         explicitResume = false;
+        focusPaused = true;
+        syncPause();
         stop();
     };
     const onBlur = event => {
         if (!root.contains(event.relatedTarget)) {
             explicitResume = false;
+            // Per WAI-ARIA, keyboard-focus pause survives blur until
+            // the visitor expressly uses the rotation control.
             start();
         }
     };
@@ -229,7 +245,7 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
         if (document.visibilityState === 'visible') start();
         else stop();
     };
-    const onMotion = () => { if (motion?.matches) stop(); else start(); };
+    const onMotion = () => { syncPause(); if (motion?.matches) stop(); else start(); };
     const pageHide = () => stop();
     const pageShow = () => start();
     root.addEventListener('mouseenter', onHover);
