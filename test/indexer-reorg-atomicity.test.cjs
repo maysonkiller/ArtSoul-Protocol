@@ -110,7 +110,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const notificationMigrations = ['phase18_artwork_moderation_visibility','a8b_artwork_report_intake',
     'a8c_protocol_admin_review','artist_support','artist_support_moderation','auction_notifications',
     'auction_notification_lifecycle','auction_notification_reminders','notification_summary','notification_inbox_removal',
-    '20261029212603_notification_reorg_identity','20261029220854_recovery_cache_obligation'];
+    '20261029212603_notification_reorg_identity','20261029220854_recovery_cache_obligation','20261101120000_nft_transfer_coverage'];
   for (const name of notificationMigrations) await pool.query(read(`sql/migrations/${name}.sql`));
   evidence.migrations = [...migrations, ...['identity', 'preparation', 'submission', 'registration', 'reorg']
     .map(name => `sql/migrations/artwork_media_${name}.sql`), ...notificationMigrations.map(name=>`sql/migrations/${name}.sql`)];
@@ -177,7 +177,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     'v41_public_metric_events','v41_public_metric_participants','v41_public_metrics',
     'contract_events', 'event_processing_registry', 'indexer_state', 'block_hashes',
     'artwork_media_rewinds', 'artwork_media_chain_revisions','v41_resale_listings','v41_resale_history',
-    'v41_project_eligibility','v41_genesis_holders'];
+    'v41_project_eligibility','v41_genesis_holders','nft_transfer_coverage'];
   async function snapshot(chain) {
     const result = {};
     for (const table of tables) result[table] = (await pool.query(
@@ -209,6 +209,15 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       await pool.query('UPDATE indexer_state SET state_hash=$1 WHERE chain_id=$2',
         [await instance._computeStateHash(115), instance.chainId]);
     }
+  }
+  async function seedCoverage(chain=CHAIN, changes={}, client=pool) {
+    const row={chain_id:chain,core_address:CORE,nft_address:'0x'+'d'.repeat(40),from_block:100,
+      origin_block_hash:hash(99),covered_through:115,covered_hash:hash(115),core_code_hash:hash(900),nft_code_hash:hash(901),...changes};
+    const keys=Object.keys(row);
+    await client.query('INSERT INTO nft_transfer_coverage('+keys.join(',')+') VALUES('+keys.map((_,i)=>'$'+(i+1)).join(',')+')',Object.values(row));
+  }
+  async function coverageRows(chain) {
+    return (await pool.query('SELECT * FROM nft_transfer_coverage WHERE chain_id=$1 ORDER BY core_address,nft_address',[chain])).rows;
   }
   t.beforeEach(reset);
 
@@ -1053,8 +1062,9 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     assert.deepEqual((await snapshot(CHAIN)).artwork_media_chain_revisions, after.artwork_media_chain_revisions);
     assert.equal((await target.getIndexerState()).last_indexed_block, 109);
   });
-  for (const failedTable of ['contract_events', 'block_hashes', 'indexer_state']) {
+  for (const failedTable of ['contract_events', 'block_hashes', 'indexer_state', 'nft_transfer_coverage']) {
     await t.test(`failure at ${failedTable} rolls back all earlier SQL including media revision`, async () => {
+      await seedCoverage(); await seedCoverage(OTHER_CHAIN);
       await apply(target, 'BidPlaced', 112, {auctionId: 1, bidder: WINNER, bidAmount: 2500, depositAmount: 10000});
       const before = await snapshot(CHAIN), otherBefore = await snapshot(OTHER_CHAIN);
       await pool.query(`CREATE FUNCTION fixture_fail_rewind() RETURNS trigger LANGUAGE plpgsql AS $f$
@@ -1690,4 +1700,116 @@ const {pathToFileURL}=require('node:url');
     await apply(target,'ProjectNFTMinted',113,{user:WINNER,eligibilityHash:hash(2),tokenId:9});
     await target._handleReorg(BOUNDARY);await replacement();assert.deepEqual(await comparable(),expected);
   });
+  await t.test('NFT coverage migration preserves rows on reapplication and grants read-only service access', async () => {
+    await seedCoverage(); const before = await coverageRows(CHAIN);
+    await pool.query(read('sql/migrations/20261101120000_nft_transfer_coverage.sql'));
+    assert.deepEqual(await coverageRows(CHAIN), before);
+    const flags = (await pool.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='public.nft_transfer_coverage'::regclass")).rows[0];
+    assert.deepEqual(flags, {relrowsecurity:true,relforcerowsecurity:true});
+    const role = await pool.connect();
+    try {
+      for (const name of ['anon','authenticated','service_role']) {
+        await role.query(`SET ROLE ${name}`);
+        if (name === 'service_role') assert.equal((await role.query('SELECT * FROM public.nft_transfer_coverage')).rows.length, 1);
+        else await assert.rejects(role.query('SELECT * FROM public.nft_transfer_coverage'), error => error.code === '42501');
+        for (const sql of ['INSERT INTO public.nft_transfer_coverage SELECT * FROM public.nft_transfer_coverage',
+          'UPDATE public.nft_transfer_coverage SET covered_through=covered_through',
+          'DELETE FROM public.nft_transfer_coverage','TRUNCATE public.nft_transfer_coverage']) {
+          await assert.rejects(role.query(sql), error => error.code === '42501');
+        }
+        await role.query('RESET ROLE');
+      }
+    } finally { await role.query('RESET ROLE'); role.release(); }
+    assert.deepEqual(await coverageRows(CHAIN), before);
+  });
+  await t.test('NFT coverage rejects invalid origin and checkpoint identities', async () => {
+    for (const invalid of [
+      {from_block:0},{covered_through:98},{covered_through:99,covered_hash:hash(98)},
+      {core_address:'0x0'},{nft_address:CORE},{nft_address:`0x${'0'.repeat(40)}`},
+      {origin_block_hash:'bad'},{covered_hash:`0x${'0'.repeat(64)}`},{core_code_hash:null},{nft_code_hash:'bad'}
+    ]) await assert.rejects(seedCoverage(CHAIN,invalid), error => ['23514','23502'].includes(error.code));
+    await assert.rejects(seedCoverage(999), error => error.code === '23503');
+    await seedCoverage(CHAIN,{covered_through:99,covered_hash:hash(99)});
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'99');
+  });
+  await t.test('NFT token index supports source-scoped ordered transfer lookup', async () => {
+    const nft=`0x${'d'.repeat(40)}`, foreign=`0x${'e'.repeat(40)}`, token='9007199254740993';
+    for (const [chain,source,id,block,log] of [[CHAIN,nft,token,110,3],[CHAIN,nft,token,110,9],
+      [CHAIN,foreign,token,111,1],[OTHER_CHAIN,nft,token,112,1],[CHAIN,nft,'2',113,1]]) {
+      await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,event_data,block_number,transaction_hash,log_index)
+        VALUES($1,'Transfer',$2,$3,$4,$5,$6)`,[chain,source,JSON.stringify({tokenId:id,from:CREATOR,to:WINNER}),block,hash(block*100+log),log]);
+    }
+    const sql=`SELECT block_number,log_index FROM contract_events WHERE chain_id=$1 AND contract_address=$2
+      AND event_name='Transfer' AND event_data->>'tokenId'=$3 ORDER BY block_number DESC,log_index DESC LIMIT 1`;
+    assert.deepEqual((await pool.query(sql,[CHAIN,nft,token])).rows,[{block_number:'110',log_index:9}]);
+    const client=await pool.connect();
+    try {
+      await client.query('SET enable_seqscan=off');
+      const plan=(await client.query('EXPLAIN (COSTS OFF) '+sql,[CHAIN,nft,token])).rows.map(row=>row['QUERY PLAN']).join('\n');
+      assert.match(plan,/contract_events_nft_transfer_token/);
+    } finally {await client.query('RESET enable_seqscan');client.release();}
+  });
+  await t.test('ordinary cursor writes, unchanged purge tokens and acknowledgements preserve NFT coverage', async () => {
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+    await seedCoverage(); const before=await coverageRows(CHAIN);
+    await pool.query('UPDATE indexer_state SET last_indexed_block=last_indexed_block+1 WHERE chain_id=$1',[CHAIN]);
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=recovery_cache_token WHERE chain_id=$1',[CHAIN]);
+    await pool.query('UPDATE indexer_state SET contract_address=upper(contract_address) WHERE chain_id=$1',[CHAIN]);
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[CHAIN]);
+    assert.deepEqual(await coverageRows(CHAIN),before);
+  });
+  for (const [label,boundary,oneArgument] of [['chain-scoped',110,false],['legacy wrapper',110,true],['empty range',200,false]]) {
+    await t.test(`direct ${label} rollback atomically invalidates NFT coverage`, async () => {
+      await seedCoverage(); await seedCoverage(OTHER_CHAIN); const foreign=await snapshot(OTHER_CHAIN);
+      if (boundary===110) await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,event_data,block_number,transaction_hash,log_index)
+        VALUES($1,'Transfer',$2,'{"tokenId":"1"}',112,$3,1)`,[CHAIN,`0x${'d'.repeat(40)}`,hash(12001)]);
+      await pool.query(oneArgument ? 'SELECT rollback_events_from_block($1)' : 'SELECT rollback_events_from_block($1,$2)',
+        oneArgument ? [boundary] : [boundary,CHAIN]);
+      assert.deepEqual(await coverageRows(CHAIN),[]);
+      assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);
+      assert.equal((await pool.query('SELECT count(*)::INTEGER AS n FROM contract_events WHERE chain_id=$1 AND block_number>=$2',[CHAIN,boundary])).rows[0].n,0);
+      assert.ok((await target.getIndexerState()).recovery_cache_token);
+    });
+  }
+  for (const operation of ['replace Core','delete state']) await t.test(`${operation} removes previous deployment NFT coverage`, async () => {
+    await seedCoverage(); await seedCoverage(OTHER_CHAIN); const foreign=await coverageRows(OTHER_CHAIN);
+    if (operation==='replace Core') await pool.query('UPDATE indexer_state SET contract_address=$1 WHERE chain_id=$2',[`0x${'e'.repeat(40)}`,CHAIN]);
+    else await pool.query('DELETE FROM indexer_state WHERE chain_id=$1',[CHAIN]);
+    assert.deepEqual(await coverageRows(CHAIN),[]); assert.deepEqual(await coverageRows(OTHER_CHAIN),foreign);
+  });
+  await t.test('a state-locked token rotation and new NFT checkpoint commit together and survive purge acknowledgement', async () => {
+    await seedCoverage(); await seedCoverage(OTHER_CHAIN); const foreign=await coverageRows(OTHER_CHAIN), before=await snapshot(CHAIN);
+    const client=await pool.connect();
+    try {
+      for (const commit of [false,true]) {
+        await client.query('BEGIN');
+        await client.query('SELECT * FROM indexer_state WHERE chain_id=$1 FOR UPDATE',[CHAIN]);
+        const prior=(await client.query('SELECT * FROM nft_transfer_coverage WHERE chain_id=$1 FOR UPDATE',[CHAIN])).rows[0];
+        assert.equal(prior.covered_through,'115');
+        await client.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+        assert.equal((await client.query('SELECT * FROM nft_transfer_coverage WHERE chain_id=$1',[CHAIN])).rows.length,0);
+        await seedCoverage(CHAIN,{covered_through:116,covered_hash:hash(116)},client);
+        await client.query(commit?'COMMIT':'ROLLBACK');
+        if (!commit) assert.deepEqual(await snapshot(CHAIN),before);
+      }
+    } finally {await client.query('ROLLBACK');client.release();}
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'116');
+    assert.ok((await target.getIndexerState()).recovery_cache_token);
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[CHAIN]);
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'116');
+    assert.deepEqual(await coverageRows(OTHER_CHAIN),foreign);
+  });
+  await t.test('direct rollback waits for a state-locked NFT checkpoint and deletes the committed coverage', async () => {
+    await seedCoverage(); const writer=await pool.connect(),owner=await pool.connect(); let rolling;
+    try {
+      await writer.query('BEGIN');
+      await writer.query('SELECT * FROM indexer_state WHERE chain_id=$1 FOR UPDATE',[CHAIN]);
+      await writer.query('UPDATE nft_transfer_coverage SET covered_through=116,covered_hash=$1 WHERE chain_id=$2',[hash(116),CHAIN]);
+      rolling=settle(owner.query('SELECT rollback_events_from_block($1,$2)',[200,CHAIN]));
+      await assertPostgresWait(owner.processID,writer.processID);
+      await writer.query('COMMIT'); assert.ifError((await rolling).error);
+      assert.deepEqual(await coverageRows(CHAIN),[]);
+    } finally {await writer.query('ROLLBACK');if(rolling) await rolling;writer.release();owner.release();}
+  });
+
 });

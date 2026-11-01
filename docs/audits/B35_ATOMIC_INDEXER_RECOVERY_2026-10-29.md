@@ -826,3 +826,109 @@ precedes SettlementCompleted, and wallet transfers remain non-sale events.
 Expected Transfer parse failures must stop coverage progress. Recovery must
 invalidate/clamp coverage with journal rewind under existing writer/cache fences.
 The existing server worker remains on B30; no new server or activation is implied.
+
+## November 1 proof release and historical-source limitation
+
+PR #419 merged as `c9c911bf8d774096d9b6a35cce2fb51423988a26` from
+`b7dcfe8eb5d8e40592b52e90d567b65d5d6623dd`. Exact CI41267051306 passed:
+Linux3,349/two skips, Windows2,794/35 skips,49 contracts on each platform,
+both builds and static checks. Preview7467751424 and production7467785503
+succeeded. Six apex routes serve the exact tested stylesheet hash
+`39b90d05b45c77084d9df94b80b93d1c63ee5d1afe4b123290bce5d6e03df884`.
+This release does not activate NFT transfer indexing.
+
+The real read-only proof passed independently through both existing RPCs at
+Base Sepolia block52,892,193, hash
+`0x3458cb1b41c81e6236fbc9c5d2a108abb057c71ba3af98ee6cf535e6f9e7cfe3`.
+Both matched the existing reviewed Core/NFT addresses, runtime hashes and
+reciprocal bindings. Evidence: ignored `b35-nft-proof-live.json` and
+`b35-nft-proof-{ci,preview-release,production-release}.log` under `docs/private`.
+This observation establishes identity at one block, not historical coverage.
+
+The tracked historical runbook supplies41976861 as a candidate start, with
+no creation receipt/hash manifest. A read-only probe of its predecessor41976860
+on both existing RPCs failed with error4444, pruned historical state, earliest
+available46500000. Evidence: `docs/private/b35-nft-history-origin.json`.
+Do not move the start forward or treat the error as an empty history. Historical
+activation requires an archive-capable source or independently verified origin
+evidence; no paid endpoint or provider setting was added.
+
+For the reviewed NFT runtime, a hash-pinned zero `totalSupply()` at the
+predecessor proves no earlier tokens: its supply only increments and has no
+reset/decrement path. That origin proof is distinct from the range endpoint.
+The immutable original Core-to-NFT binding and original Core settlement/token
+mapping determine token membership; a later change to mutable `NFT.core()`
+does not invalidate ownership of previously minted tokens. These are explicit
+indexer interpretations of canon §§1,4,5,9, not changes to minting or economics.
+
+## November 1 bounded transfer reader
+
+The existing deployment-proof module now also reads a bounded Transfer range.
+The original reciprocal-proof interface retains its behavior and106 regressions.
+The range reader verifies the immutable Core-to-NFT binding, both pinned runtime
+hashes, predecessor and endpoint, every represented log's canonical block and
+timestamp, and the final chain/endpoint again. Bootstrap additionally verifies
+the predecessor's NFT runtime and zero supply. Continuation cannot be mistaken
+for bootstrap. Ranges are limited to1,000 blocks/10,000 logs, with complete
+provider restart under the existing timeout/failover and stale-callback fence.
+Malformed expected logs, foreign sources, removed logs, duplicate/conflicting
+positions, missing timestamps or pruned state reject the whole range. IDs remain
+exact decimal strings; mint and ordinary transfer facts carry no price or sale.
+
+Combined offline proof/range checks pass161/161. Full local units pass2,878
+with35 environment skips, including29 unrelated authority-policy checks outside
+this candidate. Build verifies11 routes/172 utilities. Evidence:
+`docs/private/b35-nft-range-{focused,build}.log` and
+`docs/private/b35-nft-coverage-units-final.log`.
+
+Both existing live RPCs independently returned the same successful empty recent
+range52,896,213–52,896,222. They also returned the same actual mint of token7
+at block51,484,121, transaction
+`0x9276c36e2d3df54fa13b6c3e8efdadda2b6c38b5c368027dd2dee9d6125d457f`,
+matching the previously accepted Taes settlement. Only historical reads were
+performed; no wallet operation was repeated. Evidence:
+`docs/private/b35-nft-range-live{,-historical}.json`.
+Neither sampled range proves the missing contiguous prefix.
+
+A single bounded probe of the [documented public BlockReq endpoint](https://blockreq.com/docs/build/api-reference/base-sepolia/)
+also rejected the origin: its public service exposes only the most recent1,024
+blocks. No account, API key, paid access or runtime endpoint change was created.
+Original-history activation therefore remains open.
+
+## November 1 atomic transfer coverage storage
+
+The ordered `20261101120000_nft_transfer_coverage.sql` feature migration adds
+an empty, deployment-scoped coverage table and a partial token journal index.
+It does not create a cursor from existing rows or activate an NFT writer/reader.
+The table records the predecessor hash, runtime pins and contiguous upper bound;
+its declarations alone do not attest those values. A fenced writer must supply
+verified origin and range evidence. Chain identity follows the existing INTEGER
+state key; token IDs remain exact decimal strings in the event journal.
+
+Recovery-token rotation, Core replacement and state deletion invalidate the
+coverage in the same database transaction. This also covers direct SQL rewinds
+that delete no events. A successful cache acknowledgement to NULL preserves
+newly verified coverage; unchanged tokens and case-only Core changes do not
+invalidate it. Recovery conservatively requires verified reconstruction rather
+than guessing a retained coverage hash. The existing journal rollback deletes
+NFT events with other events; no lifecycle handler is copied or replayed here.
+
+Forced RLS and explicit SELECT-only access for `service_role` deny Data API
+writes. The migration joins both the no-default-grant rehearsal and migration
+disposition ledger, independently of historical Supabase defaults. It has not
+been applied to the live database. Remaining gates: fenced atomic ingestion,
+source-qualified token/artwork association, consistent public ownership and
+timeline reads, cache/external delivery recovery, historical bootstrap and
+the separately verified existing-worker update.
+
+The unchanged migration/recovery patch passed142/142 checks in isolated
+PostgreSQL, including direct/empty rewinds, failed writes, concurrent state
+locking, source-scoped token ordering, idempotence and all API-role denials.
+The cluster was stopped. Evidence:
+`docs/private/b35-coverage-check/postgres-tests-relocation-recheck.log` and
+`docs/private/reorg-atomicity-1793502828309-49912-c70185bc/evidence.json`.
+The first private relocated harness had three relative-import failures; those
+were corrected only in that private harness, then the whole unchanged public
+patch reran successfully. Earlier failed evidence is retained. Final local
+units pass2,878/35 explicit environment skips and the build verifies11 routes
+and172 utilities. Exact-candidate hosted CI/release verification is pending.
