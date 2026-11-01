@@ -1,6 +1,14 @@
 // Discovery-driven Home showcase. Presentation only: it reuses the public Home
 // response, existing artwork URL/media safety helpers and current ranking.
 // Never invent a highlighted work or issue a database/network request here.
+// Eight seconds leaves time to read a title and creator name without requiring
+// a long wait. Motion preference applies to BOTH themes, visual animation only
+// to Future. A real pause button prevents uncontrollable auto-rotation.
+export const HOME_SHOWCASE_CYCLE_MS = 8000;
+
+export function shouldAutoAdvanceShowcase({ slideCount = 0, visibility = 'visible', reducedMotion = false, hovered = false, focused = false, paused = false } = {}) {
+    return slideCount > 1 && visibility === 'visible' && !reducedMotion && !hovered && !focused && !paused;
+}
 export function pickHomeShowcaseSlides(slots, {
     mediaDescriptor,
     isValidStorageUrl,
@@ -52,8 +60,9 @@ export function pickHomeShowcaseSlides(slots, {
 }
 
 let disposePrevious = () => {};
+let userPaused = false;
 
-export function renderHomeShowcase(slots) {
+export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     const root = document.getElementById('homeShowcase');
     const stage = document.getElementById('homeShowcaseStage');
     const intro = document.getElementById('homeShowcaseIntro');
@@ -61,7 +70,9 @@ export function renderHomeShowcase(slots) {
     const previous = document.getElementById('homeShowcasePrev');
     const next = document.getElementById('homeShowcaseNext');
     const count = document.getElementById('homeShowcaseCount');
-    if (![root, stage, intro, controls, previous, next, count].every(Boolean)) return;
+    const pause = document.getElementById('homeShowcasePause');
+    const status = document.getElementById('homeShowcaseStatus');
+    if (![root, stage, intro, controls, previous, next, count, pause, status].every(Boolean)) return;
 
     disposePrevious();
     const slides = pickHomeShowcaseSlides(slots, {
@@ -75,7 +86,10 @@ export function renderHomeShowcase(slots) {
     let active = 0;
     let timer = null;
     const fallback = () => {
-        root.dataset.state = 'empty';
+        root.dataset.state = unavailable ? 'unavailable' : 'empty';
+        status.textContent = unavailable
+            ? 'Featured artworks are temporarily unavailable.'
+            : 'No featured artworks available yet.';
         intro.hidden = false;
         stage.hidden = true;
         controls.hidden = true;
@@ -97,7 +111,7 @@ export function renderHomeShowcase(slots) {
         const picture = document.createElement('img');
         picture.className = 'home-showcase-media';
         picture.alt = item.title;
-        picture.loading = 'lazy';
+        picture.loading = 'eager';
         picture.decoding = 'async';
         // Only the visible slide downloads a new image. The others get a URL
         // when first selected; Supabase thumbnails retain the existing bounds.
@@ -155,35 +169,73 @@ export function renderHomeShowcase(slots) {
     intro.hidden = true;
     stage.hidden = false;
     show(0);
-    previous.onclick = () => show(active - 1);
-    next.onclick = () => show(active + 1);
-
-    const advance = () => {
-        if (stage.children.length < 2 ||
-            document.visibilityState === 'hidden' ||
-            document.documentElement.classList.contains('classic') ||
-            window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ||
-            root.matches(':hover') ||
-            root.contains(document.activeElement)) return;
-        show(active + 1);
-    };
-    const start = () => {
-        if (timer === null && stage.children.length > 1) timer = window.setInterval(advance, 5000);
-    };
+    const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const mayAdvance = () => shouldAutoAdvanceShowcase({
+        slideCount: stage.children.length,
+        visibility: document.visibilityState,
+        reducedMotion: Boolean(motion?.matches),
+        hovered: root.matches(':hover'),
+        focused: root.contains(document.activeElement),
+        paused: userPaused
+    });
     const stop = () => {
         if (timer !== null) window.clearInterval(timer);
         timer = null;
     };
+    const advance = () => {
+        if (!mayAdvance()) {
+            stop();
+            return;
+        }
+        show(active + 1);
+    };
+    const start = () => {
+        if (timer === null && mayAdvance()) timer = window.setInterval(advance, HOME_SHOWCASE_CYCLE_MS);
+    };
+    const restart = () => { stop(); start(); };
+    const syncPause = () => {
+        pause.textContent = userPaused ? '▶' : 'Ⅱ';
+        pause.setAttribute('aria-pressed', String(userPaused));
+        pause.setAttribute('aria-label', userPaused ? 'Resume automatic rotation' : 'Pause automatic rotation');
+        pause.title = userPaused ? 'Resume slideshow' : 'Pause slideshow';
+    };
+    previous.onclick = () => { show(active - 1); restart(); };
+    next.onclick = () => { show(active + 1); restart(); };
+    pause.onclick = () => { userPaused = !userPaused; syncPause(); restart(); };
+    syncPause();
+
+    const onHover = () => stop();
+    const onLeave = () => start();
+    const onFocus = () => stop();
+    const onBlur = event => { if (!root.contains(event.relatedTarget)) start(); };
+    const onVisibility = () => {
+        if (document.visibilityState === 'visible') start();
+        else stop();
+    };
+    const onMotion = () => { if (motion?.matches) stop(); else start(); };
     const pageHide = () => stop();
     const pageShow = () => start();
+    root.addEventListener('mouseenter', onHover);
+    root.addEventListener('mouseleave', onLeave);
+    root.addEventListener('focusin', onFocus);
+    root.addEventListener('focusout', onBlur);
+    document.addEventListener('visibilitychange', onVisibility);
+    motion?.addEventListener?.('change', onMotion);
     window.addEventListener('pagehide', pageHide);
     window.addEventListener('pageshow', pageShow);
     start();
     disposePrevious = () => {
         stop();
+        root.removeEventListener('mouseenter', onHover);
+        root.removeEventListener('mouseleave', onLeave);
+        root.removeEventListener('focusin', onFocus);
+        root.removeEventListener('focusout', onBlur);
+        document.removeEventListener('visibilitychange', onVisibility);
+        motion?.removeEventListener?.('change', onMotion);
         window.removeEventListener('pagehide', pageHide);
         window.removeEventListener('pageshow', pageShow);
         previous.onclick = null;
         next.onclick = null;
+        pause.onclick = null;
     };
 }
