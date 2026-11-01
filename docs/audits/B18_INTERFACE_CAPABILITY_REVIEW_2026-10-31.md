@@ -448,7 +448,7 @@ Live public Artwork13, creator profile, Publish, Guide and guest Admin pass at
 labels are visible. No protected guest rows or wallet operations. Evidence:
 `docs/private/b18-detail-{ci,preview-release,production-release,live-check}.log`.
 
-## Collection draft presentation — November 1 candidate
+## Collection draft presentation — November 1 release
 
 Future-only CSS adapts the existing Collection/Phases/Review flow: 44px actions,
 16px fields, wrapping long text and quiet panels. Classic, both palettes, the
@@ -459,7 +459,44 @@ eight theme/width layouts and all three steps, including actual browser-local
 save/load, valid/invalid import, blank/undo, phase reorder/remove/undo, review
 errors, keyboard explanation and quota failure preserving the saved copy.
 Evidence: `docs/private/b18-{built-collection-browser-check,collection-units,
-collection-build}.log`; no remote writes or wallet operations. Release pending.
+collection-build}.log`; no remote writes or wallet operations.
+
+Released PR417 / `b4416d92` from candidate `fd3a3d2b`. Exact CI41264742604
+passed Linux3,243/two skips, Windows2,688/35 skips,49 contract tests per platform,
+both builds and static checks. Preview7467441395 and production7467479143
+succeeded. The apex collection entry and stylesheet match the built bytes;
+collection CSS SHA256 is
+`723bc0325e8cdbaa9eb0b9c56469d51b7a10207d57bc21f7c8612b8ad593d8d3`.
+Real guest390/1366 layouts show all three steps and the unpublished boundary
+without horizontal overflow. Logs: `docs/private/b18-collection-{ci,
+preview-release,production-release,live-check}.log`.
+
+## Assistant, notification overlays and payment guidance — November 1 candidate
+
+Future overlay presentation retains the actual existing components, a sticky
+close/settings area, wrapping long responses,44px controls and a single popup
+scroll region. Both original palettes and Classic presentation are unchanged.
+There is no new speech provider, listening behavior, wallet permission or fee.
+Native artwork payment guidance links to the existing settlement/deposit Guide;
+it distinguishes the paid auction price, withdrawable excess and non-guaranteed
+market value. This is explanatory copy, not an economic amendment.
+
+The real notification component exposed one related bug during browser testing:
+preferences saved successfully but their success notice appeared only in the
+hidden personal view. Pending/saved feedback now appears inside Settings too.
+The unchanged API error remains visible in that same view.
+
+Final local units:2,717 pass/35 explicit skips, including29 unrelated untracked
+authority-policy checks; no failures. Build verifies11 routes/172 utilities.
+Source and built assistant checks each pass342 assertions over20 language,
+theme and viewport cases, including synthetic recognition errors and long
+results. Built artwork checks pass394 assertions, including keyboard payment
+guidance and dialog restoration. Source notification browser acceptance passes
+10 layouts plus settings validation/save, read-on-open, current mock deletion
+APIs, hidden groups, staff gates and close/focus behavior. No real private inbox,
+microphone capture or transaction is used. Built notification acceptance and
+exact CI/release checks remain pending. Evidence: `docs/private/b18-overlay-*.log`
+and `b18-built-overlay-*.log`; screenshots in `output/playwright/b18-notification*`.
 
 ## Verification mark policy
 
