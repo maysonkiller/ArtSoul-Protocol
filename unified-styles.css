@@ -6087,19 +6087,19 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         overflow-x: clip;
     }
 
-    #homeSection .home-hero {
+    body.classic #homeSection .home-hero {
         margin-bottom: 1.5rem !important;
         padding-top: 0.15rem;
     }
 
-    #homeSection .home-hero h1 {
+    body.classic #homeSection .home-hero h1 {
         margin-bottom: 0.65rem !important;
         font-size: clamp(1.65rem, 7.4vw, 2rem) !important;
         line-height: 1.1;
         text-wrap: balance;
     }
 
-    #homeSection .home-hero p {
+    body.classic #homeSection .home-hero p {
         width: min(32rem, 92%);
         margin-bottom: 0.9rem !important;
         font-size: 0.85rem !important;
@@ -6107,14 +6107,14 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         text-wrap: balance;
     }
 
-    #homeSection .home-hero-actions {
+    body.classic #homeSection .home-hero-actions {
         width: 100%;
         flex-wrap: nowrap !important;
         gap: 0.6rem !important;
     }
 
-    #homeSection .home-hero .btn-main,
-    #homeSection .home-hero .btn-secondary {
+    body.classic #homeSection .home-hero .btn-main,
+    body.classic #homeSection .home-hero .btn-secondary {
         min-width: 0;
         min-height: 42px;
         flex: 1 1 0;
@@ -7005,7 +7005,8 @@ body.future .artsoul-artwork-card .artsoul-card-price {
     padding-inline: 0;
     font-variant-numeric: tabular-nums;
 }
-body.future .artsoul-card-menu-toggle { border-radius: 12px; }
+body.future .artsoul-card-menu-toggle,
+body.future .artsoul-artwork-card .saved-button-overlay { border-radius: 50%; }
 body.future .artsoul-card-menu-list { border-radius: 12px; padding: 6px; }
 body.future .artsoul-card-menu-list a { min-height: 44px; border-radius: 8px; }
 
@@ -7042,13 +7043,18 @@ body.future .artsoul-card-menu-list a { min-height: 44px; border-radius: 8px; }
 
 /* Native links are present at first paint. The accepted Future navigation uses
    the existing header and account controls, with no second navigation runtime. */
-body.future .site-header-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+html.future { --site-header-height: 78px; }
+body.future .site-header-shell { max-width: 1368px !important; padding: 16.5px 24px !important; }
+body.future .site-header { box-shadow: none !important; }
+body.future .site-header-row { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 44px; gap: 24px; }
 body.future .site-header #navButtons,
 body.future .site-header #navButtons .avatar-dropdown-container,
 body.future .site-header #navButtons .avatar-button { height: 44px !important; min-height: 44px !important; max-height: 44px !important; }
 body.future .site-header .site-primary-nav {
     display: flex !important;
-    gap: 4px;
+    justify-content: flex-start;
+    padding: 0;
+    gap: 8px;
 }
 body.future .site-primary-nav a {
     display: inline-flex;
@@ -7056,41 +7062,49 @@ body.future .site-primary-nav a {
     justify-content: center;
     min-width: 44px;
     min-height: 44px;
-    padding: 8px 14px;
-    border-radius: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
     color: var(--c-text-muted);
-    font-size: 14px;
-    line-height: 1.25;
-    font-weight: 500;
+    font-size: 15px;
+    line-height: 1.5;
+    font-weight: 400;
     text-decoration: none;
     white-space: nowrap;
 }
-body.future .site-primary-nav a:hover,
+body.future .site-primary-nav a:hover { background: var(--c-surface-muted); }
 body.future .site-primary-nav a[aria-current="page"] {
     color: var(--c-accent);
-    background: var(--c-surface-strong);
+    background: transparent;
+    box-shadow: inset 0 -2px var(--c-accent);
 }
-body.future .site-primary-nav a[aria-current="page"] { font-weight: 650; }
 body.future .site-primary-nav a:focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: 2px;
 }
-body.future .site-header .logo-link:has(.site-wordmark) { width: auto; text-decoration: none; }
+body.future .site-header .logo-link:has(.site-wordmark) { width: auto; height: 44px; text-decoration: none; }
 body.future .site-header .logo-link:has(.site-wordmark) > .site-logo { display: none !important; }
 body.future .site-header .site-wordmark {
     display: flex;
-    align-items: baseline;
-    gap: 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
     color: var(--c-accent);
-    font-size: 28px;
-    font-weight: 600;
+    font-size: 26px;
+    font-weight: 650;
     line-height: 1;
-    letter-spacing: -0.06em;
+    letter-spacing: -1.3px;
 }
 body.future .site-wordmark > span {
     color: var(--c-text-muted);
-    font-size: 9px;
-    letter-spacing: 0.15em;
+    font-size: 8px;
+    letter-spacing: 2.9px;
+}
+body.future .site-header .notification-toggle { border-radius: 50%; }
+body.future .site-header #navButtons .avatar-button {
+    border: 1px solid var(--c-border) !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 .avatar-identity-mark { width: 24px; height: 24px; flex: 0 0 24px; object-fit: contain; }
 .avatar-identity-mark--eth { padding: 2px; border-radius: 50%; background: var(--c-text); }
@@ -7105,9 +7119,10 @@ body.future .site-wordmark > span {
     .site-header .network-switcher-btn .avatar-network-mark > img { width: 16px; height: 16px; flex-basis: 16px; }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1000px) {
     html.future { --site-header-height: 129px; }
     body.future .site-header { min-height: var(--site-header-height) !important; }
+    body.future .site-header-shell { padding-block: 10px !important; }
     body.future .site-header-row { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 56px 44px; gap: 8px; }
     body.future .site-header .site-primary-nav { grid-row: 2; grid-column: 1 / -1; justify-content: start; }
     body.future .site-header-actions { grid-row: 1; grid-column: 2; }
@@ -7128,7 +7143,7 @@ body.future .site-wordmark > span {
         width: 44px !important;
         min-width: 44px !important;
         max-width: 44px !important;
-        border-radius: 50%;
+        border-radius: 50% !important;
     }
     /* The account identity remains in the accessible name/menu. Never crop it
        into a partial label or remove the microphone to make the header fit. */
@@ -7155,33 +7170,45 @@ body.future .site-wordmark > span {
 
 /* Adopt the accepted Future discovery composition around the real feeds and
    controls. The illustration is decorative, not a listing or a second fetch. */
+body.future #homeSection {
+    max-width: 1320px !important;
+    padding: 40px 24px 72px !important;
+    flex-direction: column;
+}
+body.future #homeSection.active { display: flex; }
+/* Metrics remain available below discovery; the artwork is the first content
+   after the hero. Classic keeps the existing document order. */
+body.future #homeSection .home-hero { order: -2; }
+body.future #homeSection .home-spotlight { order: -1; }
 body.future #homeSection .home-hero {
     display: grid;
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    gap: clamp(24px, 5vw, 64px);
-    padding-block: 24px 40px;
-    margin-bottom: 24px;
+    gap: 64px;
+    padding-block: 26px 50px;
+    margin-bottom: 0 !important;
     text-align: left;
 }
 body.future .home-hero-copy { min-width: 0; }
 body.future #homeSection .home-hero-break { display: initial !important; }
 body.future #homeSection .home-hero h1 {
     max-width: 560px;
-    margin: 14px 0 20px;
+    margin: 16px 0 20px;
     font-size: clamp(32px, 4vw, 52px);
     line-height: 1.08;
     font-weight: 600;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.045em;
     color: var(--c-text);
     background: none;
     -webkit-text-fill-color: currentColor;
-    text-wrap: balance;
+    text-wrap: initial;
 }
 body.future #homeSection .home-hero p {
-    margin-inline: 0;
+    margin: 0;
     max-width: 470px;
     font-size: 17px;
     line-height: 1.5;
+    font-weight: 400;
+    opacity: 1;
     color: var(--c-text-muted);
 }
 body.future #homeSection .home-hero .home-hero-eyebrow {
@@ -7193,22 +7220,33 @@ body.future #homeSection .home-hero .home-hero-eyebrow {
     text-transform: uppercase;
     letter-spacing: 0.13em;
 }
-body.future #homeSection .home-hero-actions { justify-content: flex-start; margin-top: 24px; gap: 10px; }
+body.future #homeSection .home-hero-actions { justify-content: flex-start !important; flex-wrap: wrap !important; margin-top: 26px; gap: 8px; }
 body.future #homeSection .home-hero-actions > a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-height: 44px;
+    flex: 0 1 auto !important;
+    padding: 10px 16px !important;
+    font-size: 15px !important;
+    line-height: 1.5;
+    gap: 4px;
     border-radius: 12px;
     clip-path: none;
     transform: none;
     box-shadow: none;
+    animation: none !important;
+    text-shadow: none !important;
 }
+body.future #homeSection .home-hero-actions > a::before,
+body.future #homeSection .home-hero-actions > a::after { display: none; }
 body.future #homeSection .home-hero-actions > .btn-main {
-    background: var(--c-accent);
+    background: linear-gradient(120deg, var(--c-accent), var(--c-accent-2));
     color: var(--c-bg);
     -webkit-text-fill-color: currentColor;
 }
+body.future #homeSection .home-hero-actions > .btn-secondary { border-color: transparent; background: transparent; font-weight: 400; }
+body.future #homeSection .home-hero-actions > a:hover { transform: none; box-shadow: none; filter: brightness(1.08); }
 body.future .home-hero-art {
     display: block;
     height: 340px;
@@ -7219,7 +7257,7 @@ body.future .home-hero-art {
 }
 body.future .home-hero-ribbon {
     position: absolute;
-    inset: 35px 20%;
+    inset: 35px 80px;
     border: 36px solid var(--c-accent);
     border-radius: 45% 55% 35% 65%;
     box-shadow: inset 15px 0 32px var(--c-accent-2), 13px 10px 35px var(--c-modal-backdrop);
@@ -7235,10 +7273,10 @@ body.future .home-hero-ribbon::after {
     transform: rotate(80deg);
     opacity: 0.65;
 }
-body.future .home-hero-caption { position: absolute; bottom: 16px; left: 20px; color: var(--c-text-muted); font-size: 12px; }
-body.future .home-spotlight-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-body.future .home-spotlight-heading h2 { margin: 0 0 5px; text-align: left; font-size: clamp(22px, 2.4vw, 28px); }
-body.future .home-spotlight-heading p { margin: 0; color: var(--c-text-muted); font-size: 14px; }
+body.future .home-hero-caption { position: absolute; bottom: 20px; left: 22px; color: var(--c-text-muted); font-size: 12px; }
+body.future .home-spotlight-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 10px 0 20px; }
+body.future .home-spotlight-heading h2 { margin: 0 0 5px; text-align: left; font-size: 24px; line-height: 1.5; letter-spacing: -0.025em; color: var(--c-text); background: none; -webkit-text-fill-color: currentColor; }
+body.future .home-spotlight-heading p { margin: 0; color: var(--c-text-muted); font-size: 15px; line-height: 1.5; }
 body.future .home-section-link { display: inline-flex; align-items: center; min-height: 44px; gap: 8px; border-color: transparent; border-radius: 12px; font-size: 14px; }
 body.future #homeSection .home-protocol-section,
 body.future #homeSection .home-metrics-section,
@@ -7290,20 +7328,28 @@ body.future .gallery-price-grid { margin-bottom: 16px; }
     body.future .gallery-filter-actions { grid-column: 1 / -1; }
     body.future .gallery-filter-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 768px) {
-    body.future #homeSection .home-hero { grid-template-columns: minmax(0, 1fr); padding-block: 12px 16px; gap: 16px; }
-    body.future #homeSection .home-hero h1 { font-size: clamp(30px, 8vw, 40px) !important; margin-block: 12px 16px !important; }
-    body.future #homeSection .home-hero p { width: 100%; font-size: 16px !important; text-wrap: pretty; }
+@media (max-width: 1000px) {
+    body.future #homeSection .home-hero { gap: 24px; }
+    body.future .home-hero-art { height: 300px; }
+    body.future .home-hero-ribbon { inset: 40px 50px; }
+}
+@media (max-width: 640px) {
+    body.future #homeSection { padding: 25px 18px 48px !important; }
+    body.future #homeSection .home-hero { grid-template-columns: minmax(0, 1fr); padding-block: 10px 28px; gap: 22px; }
+    body.future #homeSection .home-hero h1 { font-size: clamp(32px, 9.75vw, 38px) !important; margin-block: 12px 16px !important; }
+    body.future #homeSection .home-hero p { width: 100%; font-size: 15px !important; text-wrap: pretty; }
     body.future #homeSection .home-hero .home-hero-eyebrow { font-size: 11px !important; }
-    body.future #homeSection .home-hero-actions { margin-top: 16px; }
+    body.future #homeSection .home-hero-actions { margin-top: 20px; }
     body.future #homeSection .home-hero-actions > a { min-height: 44px; }
-    body.future .home-hero-art { height: 190px; }
-    body.future .home-hero-ribbon { inset: 20px 28%; border-width: 24px; }
+    body.future .home-hero-art { height: 230px; }
+    body.future .home-hero-ribbon { inset: 30px 28%; border-width: 24px; }
     body.future .home-hero-ribbon::after { border-width: 18px; inset: -18px -25px; }
     body.future .home-hero-caption { font-size: 11px; bottom: 10px; }
     body.future .home-spotlight-heading { align-items: flex-start; gap: 8px; }
     body.future .home-spotlight-heading .home-section-link { padding-inline: 6px; font-size: 12px; }
     body.future .home-spotlight-heading h2 { font-size: 22px; }
+}
+@media (max-width: 768px) {
     body.future .gallery-control-grid { gap: 8px; }
     body.future .gallery-search-input,
     body.future .gallery-price-input { font-size: 16px; }
