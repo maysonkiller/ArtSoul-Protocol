@@ -9152,3 +9152,134 @@ body:is(.classic, .future) .gallery-signal-help-content a:focus-visible {
         gap: 9px;
     }
 }
+
+/* B18.3 — single idle/interaction treatment for the five circular header
+   tools: Search, Voice, Notifications, Appearance and Wallet. The bell is the
+   reference design. Do not turn theme selection into an always-active ring.
+   This is presentation only: no listener, menu or notification state changed. */
+
+/* A unified 44px ring for icon-only tools; the avatar keeps its separately
+   accepted desktop identity width and its mobile 44px circle. */
+body:is(.classic, .future) .site-header .site-header-actions :is(
+    .site-search-button,
+    .artsoul-voice-button,
+    .notification-inbox > .notification-toggle,
+    .site-theme-toggle
+) {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    flex: 0 0 44px !important;
+    padding: 0 !important;
+}
+
+/* Same border, surface and text color at REST in Classic and Future. Prior
+   Future avatar gradients, accent/magenta theme rings, custom microphone fill
+   and JS-injected wallet box shadows must not override this visual baseline. */
+body:is(.classic, .future) .site-header .site-header-actions :is(
+    .site-search-button,
+    .artsoul-voice-button,
+    .notification-inbox > .notification-toggle,
+    .site-theme-toggle,
+    .avatar-button
+) {
+    box-sizing: border-box;
+    border: 1px solid var(--c-border-soft) !important;
+    border-radius: 999px !important;
+    background: var(--c-surface) !important;
+    color: var(--c-text) !important;
+    -webkit-text-fill-color: currentColor;
+    box-shadow: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+}
+
+/* Hover only on actual hover devices: iPhone browsers should not retain the
+   glow from a synthetic/sticky :hover after closing the wallet or popover. */
+@media (hover: hover) and (pointer: fine) {
+    body:is(.classic, .future) .site-header .site-header-actions :is(
+        .site-search-button,
+        .artsoul-voice-button,
+        .notification-inbox > .notification-toggle,
+        .site-theme-toggle,
+        .avatar-button
+    ):hover {
+        border-color: var(--c-accent) !important;
+        background: var(--c-surface-strong) !important;
+        color: var(--c-accent) !important;
+        box-shadow: 0 0 0 1px var(--c-glow), 0 0 14px var(--c-glow) !important;
+    }
+}
+
+/* Keyboard focus, pointer-pressed and actual OPEN state use the same ring.
+   Theme's aria-pressed is a saved preference, not an open popover: do not use
+   it to permanently light up the Appearance button. */
+body:is(.classic, .future) .site-header .site-header-actions :is(
+    .site-search-button,
+    .artsoul-voice-button,
+    .notification-inbox > .notification-toggle,
+    .site-theme-toggle,
+    .avatar-button
+):is(:focus-visible, :active, [aria-expanded="true"]) {
+    border-color: var(--c-accent) !important;
+    background: var(--c-surface-strong) !important;
+    color: var(--c-accent) !important;
+    box-shadow: 0 0 0 1px var(--c-glow), 0 0 14px var(--c-glow) !important;
+}
+body:is(.classic, .future) .site-header .site-header-actions :is(
+    .site-search-button,
+    .artsoul-voice-button,
+    .notification-inbox > .notification-toggle,
+    .site-theme-toggle,
+    .avatar-button
+):focus-visible {
+    outline: 2px solid var(--c-accent) !important;
+    outline-offset: 3px !important;
+}
+
+/* The guest bell opens a native popover before React hydrates; keep its open
+   ring visible even when the fallback button has no aria-expanded attribute. */
+body:is(.classic, .future) .site-header .site-header-actions
+#header-notifications:has(#notification-preview-panel:popover-open) .notification-toggle {
+    border-color: var(--c-accent) !important;
+    background: var(--c-surface-strong) !important;
+    color: var(--c-accent) !important;
+    box-shadow: 0 0 0 1px var(--c-glow), 0 0 14px var(--c-glow) !important;
+}
+
+/* Search opens a native dialog outside the header. Keep its ring highlighted
+   until the dialog actually closes, matching wallet and notification controls. */
+body:is(.classic, .future):has(#artsoul-search-dialog[open]) .site-header .site-header-actions .site-search-button {
+    border-color: var(--c-accent) !important;
+    background: var(--c-surface-strong) !important;
+    color: var(--c-accent) !important;
+    box-shadow: 0 0 0 1px var(--c-glow), 0 0 14px var(--c-glow) !important;
+}
+
+/* Recording is safety-critical: never disguise an active microphone as idle.
+   This exception is state-owned, not the theme's ambient decorative glow. */
+body:is(.classic, .future) .site-header .site-header-actions .artsoul-voice-button.artsoul-voice-button.is-listening {
+    border-color: var(--c-accent) !important;
+    background: var(--c-accent) !important;
+    color: var(--c-bg) !important;
+    box-shadow: 0 0 0 1px var(--c-glow), 0 0 14px var(--c-glow) !important;
+    animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    body:is(.classic, .future) .site-header .site-header-actions :is(
+        .site-search-button,
+        .artsoul-voice-button,
+        .notification-inbox > .notification-toggle,
+        .site-theme-toggle,
+        .avatar-button
+    ) {
+        animation: none !important;
+        transition: none !important;
+    }
+}
