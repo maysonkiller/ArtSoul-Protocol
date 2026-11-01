@@ -722,3 +722,107 @@ with the disposable cluster stopped. Evidence:
 These supersede the earlier incomplete local runs, without hiding their timing
 failures. The separate server worker and live schema remain unchanged; the
 remaining B35 gates above still apply.
+
+## November 1 transfer-source fixture and implementation boundary
+
+At source commit `723461df21dfc50116c5ab64c46f4a207d81e7fa`, the next
+owner/provenance gap is reproduced offline by
+`test/fixtures/b35-nft-transfer-recovery.mjs`. Run it explicitly with
+`node --test test/fixtures/b35-nft-transfer-recovery.mjs`.
+This is a standalone failing evidence fixture, deliberately outside the normal
+`*.test.*` unit collection until the transfer path is implemented. It asserts
+the desired behavior rather than treating the missing transfer as correct.
+
+The fixture encodes standard ERC-721 logs: settlement mints to A at block100;
+A transfers to B at110/log3; B transfers to C at110/log9; C transfers to D
+at120. There is no `ResaleCompleted`. Shuffled inputs include another NFT
+deployment, another token, and the legacy chain with a colliding token ID.
+Retained snapshot inputs cover boundaries111,101 and100. These are supplied
+in-memory snapshots, not execution or proof of PostgreSQL rollback.
+The real listener and both public API handlers run with injected offline
+sources. No environment file, live RPC, database, service or wallet is used.
+
+Result: **5 controls pass; 6 desired transfer checks fail**, exit1. Controls
+preserve settlement-only ownership, First Collector/floor semantics, removal
+of all subsequent transfers, removal of settlement, and the legacy identity.
+Failures show missing listener ingestion, stale public-card owner, stale
+provenance owner, absent transfer timeline, missing same-block ownership order,
+and failure to derive C from the retained snapshot after D is orphaned.
+The fixture does not establish real-chain occurrence or affected user counts.
+
+The existing relevant suites pass **77/77**, zero skips/failures:
+
+```text
+node --test test/donation-event-listener.test.mjs test/public-provenance-projection.test.cjs test/artwork-provenance-timeline.test.cjs test/indexer-reorg-ancestor.test.mjs
+```
+
+The source boundary is larger than a recovery-helper correction:
+
+- `src/indexer/event-listener.js::_queryLogsChunk` requests and accepts only
+  configured Core/donation addresses. The Core ABI contains no NFT `Transfer`.
+- `src/indexer/sync-engine.js` also validates non-donation journal sources
+  against Core. Merely adding an NFT log filter would fail that write fence.
+- `src/api/routes/public/artworks.js::ownershipProjection` and
+  `src/api/routes/public/artwork-provenance.js` derive ownership from settlement,
+  resale history and listing state. Neither consumes NFT transfer facts.
+- `src/indexer/reorg-projections.js` restores lifecycle state; there is no
+  transfer-backed owner projection to restore. The existing journal has
+  `contract_address` and chain-scoped rollback, so a new transfer table must
+  not be assumed necessary.
+
+The next implementation should first bind the NFT to the configured chain/Core
+deployment, then ingest its ordered transfer facts through the existing fenced
+journal. It must establish bounded historical coverage before publishing a
+transfer-backed owner: adding only future logs cannot repair earlier movements.
+Review a bounded/indexed token-and-deployment lookup and coverage checkpoint
+before deciding whether storage/index migration is needed. Apply ownership to
+all public card hydration paths, owner filters and provenance, and resolve the
+token to its artwork for invalidation. Keep mint/resale timeline attribution
+distinct from non-sale movement; a Transfer must not create sale volume, floor,
+royalties, Trust changes, or sale notifications. Retained transfers must survive
+rewind while orphan transfers disappear under the existing recovery fences.
+
+Interpretation: canon §§1,4,5,9 require indexer-backed current ownership and
+non-sale wallet movement without changing settlement-defined First Collector or
+floor. This fixture proposes no protocol amendment. Historical records lacking
+deployment/transfer coverage are not silently assigned the current deployment.
+No runtime source, migration, contract, worker activation or operational gate
+was changed by this evidence slice. Full owner/provenance acceptance remains open.
+
+## November 1 deployment-proof foundation
+
+The next bounded implementation adds `nft-deployment-proof.js`, with no runner,
+listener-ingestion or public-API import. It verifies the configured Base Sepolia
+Core/NFT pair at one explicit canonical block, comparing both runtime-code hashes
+against required caller-supplied pins and checking `Core.nftContract()` and
+`NFT.core()`. The NFT reverse binding is mutable; a successful observation at one
+block does not prove any earlier or later interval, transfer coverage or readiness.
+
+All code/getter reads use the block hash with `requireCanonical: true`, as defined
+by [EIP-1898](https://eips.ethereum.org/EIPS/eip-1898). Chain and canonical header
+are checked before and after the reads. Eight sequential calls per provider
+attempt are bounded by the existing read-RPC timeout/failover. A failed provider
+restarts the complete proof; late timed-out callbacks cannot continue issuing
+reads or publish their old result. Inputs are captured immutably; changing
+leadership or listener chain/Core/configured NFT invalidates an in-flight proof.
+Unsupported hash-pinned reads fail, without a latest-state fallback.
+
+Focused helper/ancestor/resale tests pass150 with one explicit environment skip.
+The helper has106 offline cases including malformed and mismatched sources,
+changed reverse bindings, unsupported providers, complete failover and late
+callbacks. These use the real listener timeout code with synthetic providers;
+no live RPC, database, credential, transaction or deployment is involved.
+Full local units pass2,823 with35 explicit environment skips (including29
+pre-existing untracked authority-policy checks outside this candidate). The
+production build verifies11 routes and172 utilities. Exact CI/release results
+remain pending. Evidence: ignored `docs/private/b35-nft-proof-{focused,units,build}.log`.
+
+Interpretation of canon §§1,4,5,9: this is a prerequisite for source-correct
+ownership, not a new token rule or economic change. Historical coverage still
+requires a deployment-scoped contiguous lower/upper boundary. Reuse the existing
+event journal with an indexed token/deployment lookup; add coverage independently
+of the Core cursor before exposing Transfer-derived ownership. Mint Transfer
+precedes SettlementCompleted, and wallet transfers remain non-sale events.
+Expected Transfer parse failures must stop coverage progress. Recovery must
+invalidate/clamp coverage with journal rewind under existing writer/cache fences.
+The existing server worker remains on B30; no new server or activation is implied.
