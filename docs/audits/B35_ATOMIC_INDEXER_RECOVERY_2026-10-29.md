@@ -1177,7 +1177,9 @@ one cancellation and one environment skip: disposable database readiness and a
 60-second ordered-catch-up timeout under concurrent database load. Both affected
 files subsequently passed all 45 checks in a serial rerun with no skips. The
 expanded 250-check recovery matrix also exceeded its 480-second limit under
-that load; its isolated rerun and exact hosted CI remain required. Failed logs
+that load. Its overall allowance is now 900 seconds for the expanded Windows
+matrix; individual SQL, lease and concurrency bounds are unchanged. The final
+isolated rerun and exact hosted CI remain required. Failed logs
 are retained rather than counted as passes. Evidence: `docs/private/b35-runner-*.log`
 and `b35-checkpoint-postgres*.log`.
 

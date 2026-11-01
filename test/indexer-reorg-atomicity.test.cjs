@@ -53,9 +53,10 @@ function isolatedEngineSource() {
 
 test('rewind events, cursor, hashes and media revision atomically (isolated PostgreSQL)', {
   skip: BIN ? false : 'Set ARTSOUL_TEST_POSTGRES_BIN; no database connection attempted',
-  // Full migration/recovery/transfer matrix also runs on slower Windows disks;
-  // individual SQL statements and concurrency gates retain their short bounds.
-  timeout: 480000
+  // The complete 250-check matrix includes ownership/history joins and also
+  // runs on Windows disks. Only its overall allowance grows; individual SQL
+  // statements, lease expiry and concurrency gates retain their short bounds.
+  timeout: 900000
 }, async t => {
   const suffix = `${Date.now()}-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   const directory = path.join(ROOT, 'docs', 'private', `reorg-atomicity-${suffix}`);
