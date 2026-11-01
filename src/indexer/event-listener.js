@@ -30,6 +30,7 @@ class EventListener {
         this.readProviders = this.readRpcs.map(url => new ethers.JsonRpcProvider(url));
         this.readRpcUnavailableUntil = this.readRpcs.map(() => 0);
         this.contractAddress = config.contractAddress;
+        this.nftAddress = String(config.nftAddress || '').toLowerCase();
         this.contract = new ethers.Contract(this.contractAddress, V41_CORE_ABI, this.provider);
         this.chainId = config.chainId;
         this.donationAddress = String(config.donationAddress || '').toLowerCase();

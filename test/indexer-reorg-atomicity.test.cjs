@@ -1814,6 +1814,7 @@ const {pathToFileURL}=require('node:url');
   });
 
   const {syncNftTransferRange} = await import(pathToFileURL(path.join(ROOT,'src/indexer/nft-transfer-sync.js')).href);
+  const {readNftTransferProgress,syncNftTransferCheckpoint} = await import(pathToFileURL(path.join(ROOT,'src/indexer/nft-transfer-checkpoint.js')).href);
   function nftFixture(subtest) {
     const original=target.eventListener, originalChain=target.chainId;
     subtest.after(()=>{target.eventListener=original;target.chainId=originalChain;});
@@ -1845,6 +1846,27 @@ const {pathToFileURL}=require('node:url');
     return f;
   }
   const nftRows=async()=> (await pool.query("SELECT * FROM contract_events WHERE chain_id=$1 AND event_name='Transfer' ORDER BY block_number,log_index",[CHAIN])).rows;
+  await t.test('NFT runner checkpoint executes its bounded writer and purge against real PostgreSQL',async sub=>{
+    const f=nftFixture(sub);target.eventListener.getBlock=async number=>({number,hash:hash(number)});
+    const config={...f.options,maxBlocks:11};
+    let result=await syncNftTransferCheckpoint(target,config);
+    assert.equal(result.advanced,true);assert.equal(result.result.throughBlock,110);
+    let progress=await readNftTransferProgress(target,config,await target.getIndexerState());
+    assert.equal(progress.blocksBehind,5);assert.equal(progress.cacheReady,true);assert.equal(progress.ready,false);
+    f.logs=[];result=await syncNftTransferCheckpoint(target,config);
+    assert.equal(result.result.throughBlock,115);
+    progress=await readNftTransferProgress(target,config,await target.getIndexerState());
+    assert.equal(progress.ready,true);assert.equal(progress.blocksBehind,0);
+    f.calls=[];result=await syncNftTransferCheckpoint(target,config);assert.equal(result.advanced,false);assert.deepEqual(f.calls,[]);
+  });
+  for(const change of ['revision','cursor','cache'])await t.test(`NFT progress rejects a changed ${change} boundary in PostgreSQL`,async sub=>{
+    const f=nftFixture(sub);await f.run();
+    const captured=await target.getIndexerState();
+    if(change==='revision')await pool.query('UPDATE indexer_state SET last_indexed_block=last_indexed_block WHERE chain_id=$1',[CHAIN]);
+    if(change==='cursor')await pool.query('UPDATE indexer_state SET last_indexed_block=116 WHERE chain_id=$1',[CHAIN]);
+    if(change==='cache')await pool.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+    await assert.rejects(readNftTransferProgress(target,f.options,captured),/state changed/);
+  });
   await t.test('NFT writer commits ordered source facts and coverage without changing economic projections or Core progress',async sub=>{
     const f=nftFixture(sub),before=await snapshot(CHAIN),foreign=await snapshot(OTHER_CHAIN);
     const result=await f.run(),after=await snapshot(CHAIN),rows=await nftRows();
@@ -1869,6 +1891,44 @@ const {pathToFileURL}=require('node:url');
     f.continue(115,115);assert.equal((await f.run()).cacheInvalidationPending,true);
     assert.equal((await coverageRows(CHAIN))[0].from_block,'100');
     assert.equal((await coverageRows(CHAIN))[0].origin_block_hash,hash(99));
+  });
+  await t.test('NFT terminal range commits only at the exact retained Core checkpoint hash',async sub=>{
+    const f=nftFixture(sub);f.options.blockNumber=115;f.options.blockHash=hash(115);
+    const before=await snapshot(CHAIN),result=await f.run(),after=await snapshot(CHAIN);
+    assert.equal(result.throughBlock,115);assert.equal(result.eventCount,3);assert.equal(result.cacheInvalidationPending,true);
+    assert.equal((await coverageRows(CHAIN))[0].covered_hash,hash(115));
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'115');
+    assert.deepEqual(after.block_hashes,before.block_hashes);
+    for(const name of tables.filter(name=>!['contract_events','indexer_state','nft_transfer_coverage'].includes(name)))
+      assert.deepEqual(after[name],before[name],name);
+  });
+  for(const [label,value] of [['missing',null],['wrong',hash(999)],['zero',hash(0)],['malformed','0x1234']]) {
+    await t.test(`NFT terminal range rejects a ${label} Core checkpoint hash before RPC`,async sub=>{
+      const f=nftFixture(sub);f.options.blockNumber=115;f.options.blockHash=hash(115);
+      if(value===null)await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number=115',[CHAIN]);
+      else await pool.query('UPDATE block_hashes SET block_hash=$2 WHERE chain_id=$1 AND block_number=115',[CHAIN,value]);
+      const before=await snapshot(CHAIN),foreign=await snapshot(OTHER_CHAIN);
+      await assert.rejects(f.run(),/retained Core checkpoint hash/);assert.deepEqual(f.calls,[]);
+      assert.deepEqual(await snapshot(CHAIN),before);assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);
+    });
+  }
+  for(const change of ['changed','deleted'])await t.test(`NFT terminal range rejects its Core header ${change} during RPC without range writes`,async sub=>{
+    const f=nftFixture(sub);f.options.blockNumber=115;f.options.blockHash=hash(115);let externalChange;
+    f.hook=async method=>{if(method!=='eth_getLogs')return;f.hook=null;
+      if(change==='changed')await pool.query('UPDATE block_hashes SET block_hash=$2 WHERE chain_id=$1 AND block_number=115',[CHAIN,hash(999)]);
+      else await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number=115',[CHAIN]);
+      externalChange=await snapshot(CHAIN);
+    };
+    await assert.rejects(f.run(),/retained Core checkpoint hash/);
+    assert.ok(f.calls.includes('eth_getLogs'));assert.ok(externalChange);
+    assert.deepEqual(await snapshot(CHAIN),externalChange);assert.deepEqual(await coverageRows(CHAIN),[]);
+  });
+  await t.test('NFT historical range does not require a retained Core header at its earlier endpoint',async sub=>{
+    const f=nftFixture(sub);
+    await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number=110',[CHAIN]);
+    const before=(await snapshot(CHAIN)).block_hashes;
+    assert.equal((await f.run()).throughBlock,110);assert.equal((await coverageRows(CHAIN))[0].covered_hash,hash(110));
+    assert.deepEqual((await snapshot(CHAIN)).block_hashes,before);
   });
   for(const change of [{fromBlock:112},{previousBlockHash:hash(88)},{expectedNftCodeHash:hash(777)},
     {expectedCoreCodeHash:hash(778)},{bootstrap:true},{blockNumber:116,blockHash:hash(116)}]) {

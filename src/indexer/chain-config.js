@@ -83,8 +83,58 @@ function resolveRpcUrls(chain) {
     return uniqueRpcUrls([...(chain.defaultRpcUrls || []), ...configured]);
 }
 
-function resolveReadRpcUrls(chain, rpcUrls) {
+function resolveReadRpcUrls(chain, rpcUrls, chainId) {
+    const override = process.env.BASE_SEPOLIA_READ_RPC_URLS;
+    if (chain.slug === 'base-sepolia' && chainId === 84532 && override !== undefined) {
+        const urls = override.split(',').map(value => value.trim());
+        if (urls.some(value => {
+            try { return !value || !['http:', 'https:'].includes(new URL(value).protocol); }
+            catch { return true; }
+        })) throw new Error('Invalid BASE_SEPOLIA_READ_RPC_URLS');
+        return uniqueRpcUrls(urls);
+    }
     return uniqueRpcUrls(rpcUrls);
+}
+
+// An explicit origin is a prerequisite, not a coverage claim. The range
+// reader must still prove its predecessor and pinned deployment before writing.
+export function resolveNftTransferConfig(chain, env = process.env) {
+    const flag = env.ARTSOUL_NFT_TRANSFER_INDEX_ENABLED;
+    if (flag === undefined || flag === 'false') return null;
+    const invalid = label => { throw new Error(`Invalid NFT transfer configuration: ${label}`); };
+    if (flag !== 'true') invalid('ARTSOUL_NFT_TRANSFER_INDEX_ENABLED');
+    if (chain?.chainId !== 84532 || (chain.slug !== undefined && chain.slug !== 'base-sepolia') ||
+        (env.BASE_SEPOLIA_CHAIN_ID !== undefined && env.BASE_SEPOLIA_CHAIN_ID !== '84532')) {
+        invalid('Base Sepolia chain required');
+    }
+    const address = (value, label) => {
+        if (typeof value !== 'string') invalid(label);
+        const normalized = value.trim().toLowerCase();
+        if (!/^0x[0-9a-f]{40}$/.test(normalized) || /^0x0{40}$/.test(normalized)) invalid(label);
+        return normalized;
+    };
+    const hash = name => {
+        const value = env[name];
+        if (typeof value !== 'string' || !/^0x[0-9a-f]{64}$/i.test(value) || /^0x0{64}$/i.test(value)) invalid(name);
+        return value.toLowerCase();
+    };
+    const integer = (name, maximum, fallback) => {
+        const value = env[name];
+        if (value === undefined && fallback !== undefined) return fallback;
+        if (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value) ||
+            !Number.isSafeInteger(Number(value)) || Number(value) > maximum) invalid(name);
+        return Number(value);
+    };
+    const coreAddress = address(env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA, 'ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA');
+    const nftAddress = address(env.ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA, 'ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA');
+    if (coreAddress === nftAddress || coreAddress !== address(chain.coreAddress, 'resolved Core address') ||
+        nftAddress !== address(chain.nftAddress, 'resolved NFT address')) invalid('deployment mismatch');
+    return Object.freeze({ chainId: 84532, coreAddress, nftAddress,
+        expectedCoreCodeHash: hash('ARTSOUL_NFT_OWNERSHIP_CORE_CODE_HASH'),
+        expectedNftCodeHash: hash('ARTSOUL_NFT_OWNERSHIP_NFT_CODE_HASH'),
+        fromBlock: integer('ARTSOUL_NFT_TRANSFER_FROM_BLOCK', Number.MAX_SAFE_INTEGER),
+        previousBlockHash: hash('ARTSOUL_NFT_TRANSFER_ORIGIN_BLOCK_HASH'),
+        maxBlocks: integer('ARTSOUL_NFT_TRANSFER_MAX_BLOCKS', 100000, 1000) });
 }
 
 export function resolveChainSlug(value) {
@@ -149,13 +199,14 @@ export function resolveIndexerChainConfig(slug) {
     }
 
     const rpcUrls = resolveRpcUrls(chain);
+    const chainId = resolveChainId(chain);
 
     return {
         slug: chain.slug,
         label: chain.label,
-        chainId: resolveChainId(chain),
+        chainId,
         rpcUrl: rpcUrls,
-        readRpcUrls: resolveReadRpcUrls(chain, rpcUrls),
+        readRpcUrls: resolveReadRpcUrls(chain, rpcUrls, chainId),
         coreAddress: requireEnv(chain.coreAddressEnv, `${chain.label} ArtSoulCore address`),
         nftAddress: readEnv(chain.nftAddressEnv),
         projectNFTAddress: readEnv(chain.projectNFTAddressEnv),
