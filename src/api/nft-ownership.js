@@ -9,6 +9,46 @@ const unavailable = () => Object.assign(new Error('Ownership information is temp
 });
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
+class OwnershipBoundaryMoved extends Error {
+  constructor(config) {
+    super('Ownership information is temporarily unavailable.');
+    this.code = 'NFT_OWNERSHIP_BOUNDARY_MOVED'; this.statusCode = 503; this.config = config;
+  }
+}
+const ownershipError = error => error instanceof OwnershipBoundaryMoved ? error : unavailable();
+
+function requireSameBoundary(initial, snapshots) {
+  let moved = false;
+  for (const snapshot of snapshots) {
+    const fresh = boundary(snapshot, initial.config);
+    if (fresh.marker === initial.marker) continue;
+    // Only a forward, fully confirmed publication can justify another read.
+    // Recovery, same-height rewrites and malformed evidence remain unavailable.
+    if (BigInt(fresh.indexed_through) <= BigInt(initial.indexed_through) ||
+        fresh.confirmed_through !== fresh.indexed_through || fresh.covered_hash === initial.covered_hash ||
+        fresh.state_revision === initial.state_revision) throw unavailable();
+    moved = true;
+  }
+  if (moved) throw new OwnershipBoundaryMoved(initial.config);
+}
+
+// Entry points own the single retry. Projection/proof helpers never restart a
+// partial read, and the second attempt cannot switch deployment or gate state.
+export async function readWithNftOwnershipRetry(operation) {
+  try { return await operation(); }
+  catch (error) {
+    if (!(error instanceof OwnershipBoundaryMoved)) throw error;
+    requireCurrent(error.config);
+    try {
+      const result = await operation();
+      requireCurrent(error.config);
+      return result;
+    } catch (retryError) {
+      throw retryError instanceof OwnershipBoundaryMoved ? unavailable() : retryError;
+    }
+  }
+}
+
 export function readNftOwnershipConfig() {
   const flag = process.env.ARTSOUL_NFT_OWNERSHIP_ENABLED;
   if (flag === undefined || flag === 'false') return null;
@@ -95,10 +135,11 @@ function transferRow(event, initial, allowMint = true) {
 }
 
 function ownerRow(row, artwork, initial) {
+  // A token/mint identity disagreement remains unavailable even if the boundary advanced.
   if (!row || row.artwork_id !== artwork.artwork_id || typeof row.verified !== 'boolean' ||
       (row.token_id !== null && !uint256(row.token_id)) ||
-      (row.token_id !== null && row.token_id !== artwork.token_id) ||
-      boundary(row, initial.config).marker !== initial.marker) throw unavailable();
+      (row.token_id !== null && row.token_id !== artwork.token_id)) throw unavailable();
+  initial = boundary(row, initial.config);
   let transfer = null;
   if (row.verified) {
     if (!artwork.minted || row.token_id !== artwork.token_id ||
@@ -152,8 +193,10 @@ export async function readNftOwnership(artworks, initialBoundary) {
       return batch.map(item => ownerRow(byId.get(item.artwork_id), item, initial));
     }));
     requireCurrent(config);
-    return Object.freeze({ ...initial, artworks: requested, rows: Object.freeze(pages.flat()) });
-  } catch { throw unavailable(); }
+    const rows = Object.freeze(pages.flat());
+    requireSameBoundary(initial, rows);
+    return Object.freeze({ ...initial, artworks: requested, rows });
+  } catch (error) { throw ownershipError(error); }
 }
 
 export async function recheckNftOwnershipBoundary(initial) {
@@ -163,9 +206,10 @@ export async function recheckNftOwnershipBoundary(initial) {
       return null;
     }
     const fresh = await readNftOwnershipBoundary();
-    if (!fresh || fresh.marker !== initial.marker || !same(fresh.config, initial.config)) throw unavailable();
+    if (!fresh || !same(fresh.config, initial.config)) throw unavailable();
+    requireSameBoundary(initial, [fresh]);
     return initial;
-  } catch { throw unavailable(); }
+  } catch (error) { throw ownershipError(error); }
 }
 
 export async function recheckNftOwnership(snapshot) {
@@ -178,7 +222,7 @@ export async function recheckNftOwnership(snapshot) {
          !same(fresh.lifecycle, snapshot.lifecycle) || fresh.lifecycle_available !== snapshot.lifecycle_available ||
          fresh.lifecycle_complete !== snapshot.lifecycle_complete))) throw unavailable();
     return snapshot;
-  } catch { throw unavailable(); }
+  } catch (error) { throw ownershipError(error); }
 }
 
 // History is a separate bounded RPC so association, owner and every returned
@@ -200,10 +244,11 @@ export async function readNftHistory(artwork, initialBoundary) {
     const data = await rpc('read_verified_nft_history', config, { p_artwork_id: requested[0].artwork_id });
     if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data.transfers) ||
         data.transfers.length > 201 || typeof data.complete !== 'boolean') throw unavailable();
-    const proof = ownerRow(data.ownership, requested[0], initial);
+    const current = boundary(data.ownership, config);
+    const proof = ownerRow(data.ownership, requested[0], current);
     if (data.complete !== (proof.verified && data.transfers.length <= 200) ||
         (!proof.verified && data.transfers.length)) throw unavailable();
-    const transfers = data.transfers.map(event => transferRow(event, initial, false));
+    const transfers = data.transfers.map(event => transferRow(event, current, false));
     if (proof.verified && proof.latest_transfer.from_address === ZERO && transfers.length) throw unavailable();
     const order = (a, b) => a.block_number - b.block_number || a.log_index - b.log_index;
     const identities = new Set(), transactions = new Map();
@@ -229,7 +274,7 @@ export async function readNftHistory(artwork, initialBoundary) {
           event.contract_address !== config.coreAddress || !event.event_data || typeof event.event_data !== 'object' ||
           Array.isArray(event.event_data) || Object.values(event.event_data).some(value =>
             value !== null && typeof value !== 'string' && !(typeof value === 'number' && Number.isSafeInteger(value)))) throw unavailable();
-      const identity = transferRow({ ...event, recorded_at: event.indexed_at, from_address: ZERO, to_address: config.coreAddress }, initial);
+      const identity = transferRow({ ...event, recorded_at: event.indexed_at, from_address: ZERO, to_address: config.coreAddress }, current);
       const key = `${identity.transaction_hash}:${identity.log_index}`, payload = { ...event.event_data }, name = event.event_name;
       if (lifecycleIds.has(key) || (index > 0 && order(data.lifecycle[index - 1], identity) >= 0) ||
           (lifecycleTransactions.has(identity.transaction_hash) && lifecycleTransactions.get(identity.transaction_hash) !== identity.block_number) ||
@@ -250,9 +295,10 @@ export async function readNftHistory(artwork, initialBoundary) {
     });
     if (data.lifecycle_available && lifecycle.length === 0) throw unavailable();
     requireCurrent(config);
+    requireSameBoundary(initial, [current]);
     return Object.freeze({ ...initial, artworks: requested, rows: Object.freeze([proof]),
       transfers: Object.freeze(transfers.slice(0, 200)), complete: data.complete,
       lifecycle: Object.freeze(lifecycle.slice(0, 200)), lifecycle_available: data.lifecycle_available,
       lifecycle_complete: data.lifecycle_complete });
-  } catch { throw unavailable(); }
+  } catch (error) { throw ownershipError(error); }
 }

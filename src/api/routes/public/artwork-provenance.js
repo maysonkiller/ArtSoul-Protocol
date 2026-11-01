@@ -1,6 +1,6 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
-import { readNftOwnershipBoundary, readNftHistory, recheckNftOwnership } from '../../nft-ownership.js';
+import { readNftOwnershipBoundary, readNftHistory, recheckNftOwnership, readWithNftOwnershipRetry } from '../../nft-ownership.js';
 
 const PUBLIC_CHAIN_IDS = new Set([84532, 11155111]);
 const MAX_ROWS_PER_SOURCE = 200;
@@ -173,10 +173,11 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
 
   try {
+    const response = await readWithNftOwnershipRetry(async () => {
     const chainId = Number(req.query?.chain_id);
     const artworkId = protocolId(validateArtworkId(req.query?.artwork_id));
     if (!PUBLIC_CHAIN_IDS.has(chainId) || !artworkId) {
-      return res.status(400).json({ error: 'INVALID_ARTWORK_LOOKUP' });
+      return { statusCode: 400, body: { error: 'INVALID_ARTWORK_LOOKUP' } };
     }
 
     const chainFilter = `eq.${chainId}`;
@@ -195,14 +196,14 @@ export default async function handler(req, res) {
 
     const artwork = artworkRows[0] || null;
     if (!artwork) {
-      return res.status(404).json({ error: 'ARTWORK_NOT_FOUND' });
+      return { statusCode: 404, body: { error: 'ARTWORK_NOT_FOUND' } };
     }
 
     const hidden = moderationRows[0]?.hidden === true;
     if (hidden) {
       const access = await getModerationAccess(req);
       if (!access.canModerate) {
-        return res.status(404).json({ error: 'ARTWORK_UNAVAILABLE' });
+        return { statusCode: 404, body: { error: 'ARTWORK_UNAVAILABLE' } };
       }
     }
 
@@ -216,13 +217,12 @@ export default async function handler(req, res) {
       if (!history.lifecycle_complete) truncatedSources.push('lifecycle');
       if (artwork.minted && !history.complete) truncatedSources.push('transfers');
       await recheckNftOwnership(history);
-      res.setHeader('Cache-Control', 'private, no-store');
-      return res.status(200).json({
+      return { statusCode: 200, cacheControl: 'private, no-store', body: {
         success: true, source: 'v41_provenance_projection', chain_id: chainId, artwork_id: artworkId,
         roles: { creator_address: addressOrNull(history.lifecycle[0].event_data.creator),
           first_collector_address: proof.first_collector_address, current_owner_address: proof.current_owner_address },
         events: verifiedTimeline(history), complete: truncatedSources.length === 0, truncated_sources: truncatedSources
-      });
+      } };
     }
     const tokenId = protocolId(artwork.token_id);
     const auctionsPromise = readRows(
@@ -289,10 +289,10 @@ export default async function handler(req, res) {
       .map(([source]) => source);
     if (chainId === 84532) await recheckNftOwnership(ownershipBoundary);
 
-    res.setHeader('Cache-Control', hidden
+    const cacheControl = hidden
       ? 'private, no-store'
-      : `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 4}`);
-    res.status(200).json({
+      : `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 4}`;
+    return { statusCode: 200, cacheControl, body: {
       success: true,
       source: 'v41_provenance_projection',
       chain_id: chainId,
@@ -312,7 +312,10 @@ export default async function handler(req, res) {
       }),
       complete: truncatedSources.length === 0,
       truncated_sources: truncatedSources
+    } };
     });
+    if (response.cacheControl) res.setHeader('Cache-Control', response.cacheControl);
+    return res.status(response.statusCode).json(response.body);
   } catch (error) {
     res.setHeader('Cache-Control', 'private, no-store');
     sendError(res, error);

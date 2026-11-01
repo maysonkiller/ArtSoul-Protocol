@@ -830,90 +830,7 @@ class IndexerSyncEngine {
             transactionStarted = true;
             await lockWriteContext(client, context);
 
-            if (!event.eventData) {
-                throw new Error('Invalid event structure: missing eventData');
-            }
-
-            const required = V41_EVENT_REQUIRED_FIELDS[event.eventName];
-            if (required) {
-                for (const field of required) {
-                    if (event.eventData[field] === undefined) {
-                        throw new Error(`Invalid event structure: missing required field '${field}' for ${event.eventName}`);
-                    }
-                }
-            }
-
-            // Only the log's actual source proves its deployment. Never fill
-            // missing historical provenance from the current configuration.
-            let sourceAddress = null;
-            if (event.contractAddress !== undefined && event.contractAddress !== null) {
-                sourceAddress = String(event.contractAddress).toLowerCase();
-                const expectedSource = String(event.eventName === 'Donation'
-                    ? this.eventListener.donationAddress : this.eventListener.contractAddress).toLowerCase();
-                if (!/^0x[0-9a-f]{40}$/.test(sourceAddress) || /^0x0{40}$/.test(sourceAddress) || sourceAddress !== expectedSource) {
-                    throw new Error('Event contract source does not match its configured listener');
-                }
-            }
-            await client.query(
-                `INSERT INTO contract_events (chain_id, event_name, artwork_id, block_number, transaction_hash, log_index, event_data, indexed_at${sourceAddress ? ', contract_address' : ''})
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8${sourceAddress ? ', $9' : ''})
-                 ON CONFLICT (chain_id, transaction_hash, log_index) DO NOTHING`,
-                [
-                    this._chainIdString(),
-                    event.eventName,
-                    this._getEventArtworkId(event),
-                    event.blockNumber,
-                    event.transactionHash,
-                    event.logIndex,
-                    this._serializeEventData(event.eventData),
-                    new Date(this._getEventTimestamp(event)),
-                    ...(sourceAddress ? [sourceAddress] : [])
-                ]
-            );
-
-            const handlers = {
-                'ArtworkRegistered': this._handleArtworkRegisteredTx.bind(this),
-                'AuctionCreated': this._handleAuctionCreatedTx.bind(this),
-                'BidPlaced': this._handleBidPlacedTx.bind(this),
-                'BidDepositWithdrawn': this._handleBidDepositWithdrawnTx.bind(this),
-                'AuctionExtended': this._handleAuctionExtendedTx.bind(this),
-                'AuctionEnded': this._handleAuctionEndedTx.bind(this),
-                'SettlementCompleted': this._handleSettlementCompletedTx.bind(this),
-                'SettlementDefaulted': this._handleSettlementDefaultedTx.bind(this),
-                'CanonicalFloorUpdated': this._handleCanonicalFloorUpdatedTx.bind(this),
-                'ResaleListed': this._handleResaleListedTx.bind(this),
-                'ResaleCompleted': this._handleResaleCompletedTx.bind(this),
-                'ProjectNFTEligibilityAchieved': this._handleProjectNFTEligibilityAchievedTx.bind(this),
-                'ProjectNFTMinted': this._handleProjectNFTMintedTx.bind(this)
-            };
-
-            const handler = handlers[event.eventName];
-            if (handler) {
-                await handler(event, client);
-            }
-            await this._writeAuctionLifecycleNotificationsTx(event, client);
-            if (event.eventName === 'Donation') {
-                let timestamp = event.timestamp;
-                if (timestamp === undefined || timestamp === null) {
-                    // Historical log objects omit time. Reuse the chain-scoped
-                    // block data already fetched by historical sync, not index time.
-                    const result = await client.query(
-                        'SELECT timestamp FROM block_hashes WHERE chain_id = $1 AND block_number = $2',
-                        [this._chainIdString(), event.blockNumber]
-                    );
-                    const seconds = Number(result.rows?.[0]?.timestamp);
-                    if (result.rows?.length !== 1 || result.rows[0].timestamp === null
-                        || !Number.isSafeInteger(seconds) || seconds < 0 || !Number.isSafeInteger(seconds * 1000)) {
-                        throw new Error('Donation block timestamp is unavailable; retry this range.');
-                    }
-                    timestamp = seconds * 1000;
-                }
-                const recordedAt = new Date(Number(timestamp));
-                if (!Number.isFinite(recordedAt.getTime())) throw new Error('Donation block timestamp is invalid.');
-                await projectDonation(client, event, this.chainId, this.eventListener.donationAddress,
-                    recordedAt);
-            }
-            await this._recordPublicMetricEventTx(event, client);
+            await this._applyEventProjectionTx(event, client);
 
             await stopHeartbeat();
             if (leaseLost) {
@@ -933,23 +850,7 @@ class IndexerSyncEngine {
                 message: 'Event processed successfully'
             }));
 
-            const artworkId = this._getEventArtworkId(event);
-            if (artworkId) {
-                await cacheService.invalidateAuctionState(`${this._chainIdString()}:artwork:${artworkId}`);
-            }
-
-            if (V41_GLOBAL_STATS_EVENTS.has(event.eventName)) {
-                await cacheService.del(cacheService.keys.stats(`global:${this._chainIdString()}`));
-            }
-
-            if (event.eventName !== 'Donation') {
-                await enqueueAIJob(
-                    event.eventName,
-                    event.eventData,
-                    workerId,
-                    correlationId
-                );
-            }
+            await this._afterEventCommit(event, workerId, correlationId);
         } catch (error) {
             if (transactionStarted && client) {
                 try {
@@ -1000,6 +901,115 @@ class IndexerSyncEngine {
             }
 
             client?.release();
+        }
+    }
+
+    // Transaction ownership stays with the caller so a verified range can
+    // publish all projections and NFT ownership at one database boundary.
+    async _applyEventProjectionTx(event, client) {
+        if (!event.eventData) {
+            throw new Error('Invalid event structure: missing eventData');
+        }
+
+        const required = V41_EVENT_REQUIRED_FIELDS[event.eventName];
+        if (required) {
+            for (const field of required) {
+                if (event.eventData[field] === undefined) {
+                    throw new Error(`Invalid event structure: missing required field '${field}' for ${event.eventName}`);
+                }
+            }
+        }
+
+        // Only the log's actual source proves its deployment. Never fill
+        // missing historical provenance from the current configuration.
+        let sourceAddress = null;
+        if (event.contractAddress !== undefined && event.contractAddress !== null) {
+            sourceAddress = String(event.contractAddress).toLowerCase();
+            const expectedSource = String(event.eventName === 'Donation'
+                ? this.eventListener.donationAddress : this.eventListener.contractAddress).toLowerCase();
+            if (!/^0x[0-9a-f]{40}$/.test(sourceAddress) || /^0x0{40}$/.test(sourceAddress) || sourceAddress !== expectedSource) {
+                throw new Error('Event contract source does not match its configured listener');
+            }
+        }
+        await client.query(
+            `INSERT INTO contract_events (chain_id, event_name, artwork_id, block_number, transaction_hash, log_index, event_data, indexed_at${sourceAddress ? ', contract_address' : ''})
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8${sourceAddress ? ', $9' : ''})
+             ON CONFLICT (chain_id, transaction_hash, log_index) DO NOTHING`,
+            [
+                this._chainIdString(),
+                event.eventName,
+                this._getEventArtworkId(event),
+                event.blockNumber,
+                event.transactionHash,
+                event.logIndex,
+                this._serializeEventData(event.eventData),
+                new Date(this._getEventTimestamp(event)),
+                ...(sourceAddress ? [sourceAddress] : [])
+            ]
+        );
+
+        const handlers = {
+            'ArtworkRegistered': this._handleArtworkRegisteredTx.bind(this),
+            'AuctionCreated': this._handleAuctionCreatedTx.bind(this),
+            'BidPlaced': this._handleBidPlacedTx.bind(this),
+            'BidDepositWithdrawn': this._handleBidDepositWithdrawnTx.bind(this),
+            'AuctionExtended': this._handleAuctionExtendedTx.bind(this),
+            'AuctionEnded': this._handleAuctionEndedTx.bind(this),
+            'SettlementCompleted': this._handleSettlementCompletedTx.bind(this),
+            'SettlementDefaulted': this._handleSettlementDefaultedTx.bind(this),
+            'CanonicalFloorUpdated': this._handleCanonicalFloorUpdatedTx.bind(this),
+            'ResaleListed': this._handleResaleListedTx.bind(this),
+            'ResaleCompleted': this._handleResaleCompletedTx.bind(this),
+            'ProjectNFTEligibilityAchieved': this._handleProjectNFTEligibilityAchievedTx.bind(this),
+            'ProjectNFTMinted': this._handleProjectNFTMintedTx.bind(this)
+        };
+
+        const handler = handlers[event.eventName];
+        if (handler) {
+            await handler(event, client);
+        }
+        await this._writeAuctionLifecycleNotificationsTx(event, client);
+        if (event.eventName === 'Donation') {
+            let timestamp = event.timestamp;
+            if (timestamp === undefined || timestamp === null) {
+                // Historical log objects omit time. Reuse the chain-scoped
+                // block data already fetched by historical sync, not index time.
+                const result = await client.query(
+                    'SELECT timestamp FROM block_hashes WHERE chain_id = $1 AND block_number = $2',
+                    [this._chainIdString(), event.blockNumber]
+                );
+                const seconds = Number(result.rows?.[0]?.timestamp);
+                if (result.rows?.length !== 1 || result.rows[0].timestamp === null
+                    || !Number.isSafeInteger(seconds) || seconds < 0 || !Number.isSafeInteger(seconds * 1000)) {
+                    throw new Error('Donation block timestamp is unavailable; retry this range.');
+                }
+                timestamp = seconds * 1000;
+            }
+            const recordedAt = new Date(Number(timestamp));
+            if (!Number.isFinite(recordedAt.getTime())) throw new Error('Donation block timestamp is invalid.');
+            await projectDonation(client, event, this.chainId, this.eventListener.donationAddress,
+                recordedAt);
+        }
+        await this._recordPublicMetricEventTx(event, client);
+    }
+
+    async _afterEventCommit(event, workerId, correlationId) {
+        const artworkId = this._getEventArtworkId(event);
+        if (artworkId) {
+            await cacheService.invalidateAuctionState(`${this._chainIdString()}:artwork:${artworkId}`);
+        }
+
+        if (V41_GLOBAL_STATS_EVENTS.has(event.eventName)) {
+            await cacheService.del(cacheService.keys.stats(`global:${this._chainIdString()}`));
+        }
+
+        if (event.eventName !== 'Donation') {
+            await enqueueAIJob(
+                event.eventName,
+                event.eventData,
+                workerId,
+                correlationId
+            );
         }
     }
 

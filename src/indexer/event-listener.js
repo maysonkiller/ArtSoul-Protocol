@@ -560,7 +560,7 @@ class EventListener {
         }, `queryHistoricalEvents(${eventName})`);
     }
 
-    async queryAllHistoricalEvents(fromBlock, toBlock) {
+    async queryAllHistoricalEvents(fromBlock, toBlock, { strict = false } = {}) {
         console.log(`[EventListener] Querying all events from block ${fromBlock} to ${toBlock}`);
 
         // Split into chunks if range exceeds RPC limit
@@ -573,7 +573,7 @@ class EventListener {
 
             while (currentFrom <= toBlock) {
                 const currentTo = Math.min(currentFrom + this.maxBlockRange - 1, toBlock);
-                const chunkEvents = await this._queryLogsChunk(currentFrom, currentTo);
+                const chunkEvents = await this._queryLogsChunk(currentFrom, currentTo, { strict });
                 allEvents.push(...chunkEvents);
                 currentFrom = currentTo + 1;
             }
@@ -583,10 +583,10 @@ class EventListener {
         }
 
         // Single query if within limit
-        return await this._queryLogsChunk(fromBlock, toBlock);
+        return await this._queryLogsChunk(fromBlock, toBlock, { strict });
     }
 
-    async _queryLogsChunk(fromBlock, toBlock) {
+    async _queryLogsChunk(fromBlock, toBlock, { strict = false } = {}) {
         return await this._retryRpcCall(async () => {
             // Query all events at once using contract filter
             const filter = {
@@ -617,7 +617,10 @@ class EventListener {
                 for (const log of logs) {
                     try {
                         const isDonation = Boolean(this.donationAddress) && log.address?.toLowerCase() === this.donationAddress;
-                        if (!isDonation && log.address?.toLowerCase() !== this.contractAddress.toLowerCase()) continue;
+                        if (!isDonation && log.address?.toLowerCase() !== this.contractAddress.toLowerCase()) {
+                            if (strict) throw new Error('Historical log has a different source');
+                            continue;
+                        }
                         const parsedLog = (isDonation ? this.donationInterface : this.contract.interface).parseLog({
                             topics: log.topics,
                             data: log.data
@@ -629,11 +632,17 @@ class EventListener {
                                 eventData: isDonation ? parseDonationEvent(parsedLog.args) : this._parseEventData(parsedLog.name, parsedLog.args),
                                 contractAddress: log.address,
                                 blockNumber: log.blockNumber,
+                                blockHash: log.blockHash,
+                                transactionIndex: log.transactionIndex,
+                                removed: log.removed,
                                 transactionHash: log.transactionHash,
                                 logIndex: log.index
                             });
                         }
                     } catch (error) {
+                        // A verified checkpoint cannot silently omit a malformed
+                        // event. Unknown valid ABI topics still return null above.
+                        if (strict) throw new Error('Historical range contains an invalid event', { cause: error });
                         // Skip logs that don't match our ABI
                         continue;
                     }

@@ -18,6 +18,7 @@ import { reapStaleEventProcessingLeases } from './event-processing-lease.js';
 import { refreshSearchMetadata } from './search-metadata.js';
 import { readResaleStateAtBlock, reconcileResaleState } from './resale-state-reconciliation.js';
 import { readNftTransferProgress, syncNftTransferCheckpoint } from './nft-transfer-checkpoint.js';
+import { syncCoordinatedCheckpoint } from './coordinated-checkpoint.js';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -752,6 +753,27 @@ class ProductionIndexer {
             const state = await this.syncEngine.getIndexerState();
             const lastIndexedBlock = Number(state.last_indexed_block || 0);
 
+            const nftConfig = this.config.nftTransferConfig;
+            if (nftConfig) {
+                // Keep observing head/leadership/recovery at the normal cadence.
+                // Publish verified ranges at most once per ten seconds, including
+                // failed attempts, instead of repeating deployment proof every poll.
+                if (Date.now() < (this.nextNftPublicationAt || 0)) return;
+                this.nextNftPublicationAt = Date.now() + 10000;
+                const progress = await readNftTransferProgress(this.syncEngine, nftConfig, state);
+                if (!progress.ready) {
+                    await this._syncNftTransfers();
+                    return; // Bootstrap cannot chase a Core cursor moving ahead.
+                }
+                if (safeBlock > lastIndexedBlock) {
+                    const through = Math.min(safeBlock, lastIndexedBlock + nftConfig.maxBlocks);
+                    const result = await this._publishCoordinatedRange(nftConfig, through, currentBlock);
+                    this.nftTransferError = null;
+                    if (result.processedCount > 0) await this._refreshEventFailureMetric('range_completed');
+                    return { currentBlock, safeBlock: through, lastIndexedBlock: through };
+                }
+            }
+
             if (safeBlock <= lastIndexedBlock) {
                 return { currentBlock, safeBlock, lastIndexedBlock };
             }
@@ -780,6 +802,7 @@ class ProductionIndexer {
 
             return { currentBlock, safeBlock, lastIndexedBlock: safeBlock };
         } catch (error) {
+            if (this.config.nftTransferConfig) this.nftTransferError = 'Verified publication refresh failed';
             console.error(JSON.stringify({
                 phase: 'catch_up',
                 action: 'error',
@@ -794,6 +817,10 @@ class ProductionIndexer {
         } finally {
             this.catchUpInProgress = false;
         }
+    }
+
+    _publishCoordinatedRange(config, through, head) {
+        return syncCoordinatedCheckpoint(this.syncEngine, config, through, head);
     }
 
     async _processConfirmations(observedBlock = null) {

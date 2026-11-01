@@ -106,3 +106,28 @@ test('support log volume does not add per-event RPC requests', async () => {
   assert.equal(parsed.length, 100);
   assert.equal(queries.length, 1);
 });
+
+test('verified ranges preserve canonical log metadata and reject malformed known events', async () => {
+  const valid = {...log(coreInterface, 'ArtworkRegistered', [28, CREATOR, 'ipfs://work'], CORE, 101, 1),
+    transactionIndex: 3, removed: false};
+  const {instance} = listener([valid]);
+  const [event] = await instance.queryAllHistoricalEvents(100, 110, {strict: true});
+  assert.equal(event.blockHash, valid.blockHash);
+  assert.equal(event.transactionIndex, 3); assert.equal(event.removed, false);
+  for (const broken of [{...valid, data: '0x'}, {...valid, address: FOREIGN}, {...donation('valid'), data: '0x'}]) {
+    const {instance: bad} = listener([valid, broken]);
+    await assert.rejects(bad.queryAllHistoricalEvents(100, 110, {strict: true}), /invalid event/);
+  }
+});
+
+test('verified chunked reads keep strict parsing on every chunk and allow unknown valid topics', async () => {
+  const unknown = {address: CORE, topics: [hash(998)], data: '0x', blockNumber: 100, index: 0};
+  const {instance} = listener([unknown]);
+  instance.maxBlockRange = 5;
+  let count = 0;
+  instance.provider.getLogs = async () => ++count === 1 ? [unknown] : [{...donation('broken'), data: '0x'}];
+  await assert.rejects(instance.queryAllHistoricalEvents(100, 110, {strict: true}), /invalid event/);
+  assert.equal(count, 2);
+  const {instance: valid} = listener([unknown]);
+  assert.deepEqual(await valid.queryAllHistoricalEvents(100, 110, {strict: true}), []);
+});

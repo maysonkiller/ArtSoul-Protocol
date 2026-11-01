@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readNftOwnershipConfig, readNftOwnershipBoundary, readNftOwnership,
-  readNftHistory, recheckNftOwnershipBoundary, recheckNftOwnership } from '../src/api/nft-ownership.js';
+  readNftHistory, recheckNftOwnershipBoundary, recheckNftOwnership, readWithNftOwnershipRetry } from '../src/api/nft-ownership.js';
 
 const CORE = `0x${'a'.repeat(40)}`, NFT = `0x${'b'.repeat(40)}`;
 const FIRST = `0x${'c'.repeat(40)}`, OWNER = `0x${'d'.repeat(40)}`, ZERO = `0x${'0'.repeat(40)}`;
@@ -344,5 +344,78 @@ test('shared NFT ownership reads validate deployment, evidence and snapshot cont
     const data = history(); alter(data);
     respond = name => name === 'read_verified_nft_boundary' ? [checkpoint()] : data;
     await assert.rejects(readNftHistory(artwork()), unavailable);
+  });
+
+  const advanced = () => ({ indexed_through: 121, confirmed_through: 121, covered_hash: hash(121), state_revision: '1235' });
+  await t.test('one complete retry uses a fresh boundary after a fully validated forward publication', async () => {
+    let marker = checkpoint(), attempts = 0;
+    respond = (name, body) => {
+      if (name === 'read_verified_nft_boundary') { const result = [{ ...marker }]; marker = advanced(); return result; }
+      return body.p_artwork_ids.map(id => owner(id, marker));
+    };
+    const result = await readWithNftOwnershipRetry(async () => { attempts++; return readNftOwnership([artwork()]); });
+    assert.equal(attempts, 2); assert.equal(result.indexed_through, '121');
+    assert.deepEqual(calls.map(call => call.name), ['read_verified_nft_boundary','read_verified_nft_cards',
+      'read_verified_nft_boundary','read_verified_nft_cards']);
+  });
+  await t.test('another forward movement exhausts the single retry and returns ordinary unavailable', async () => {
+    let height = 120, attempts = 0;
+    respond = (name, body) => {
+      const marker = { indexed_through: height, confirmed_through: height, covered_hash: hash(height), state_revision: String(height) };
+      if (name === 'read_verified_nft_boundary') { height++; return [marker]; }
+      return body.p_artwork_ids.map(id => owner(id, marker));
+    };
+    await assert.rejects(readWithNftOwnershipRetry(async () => { attempts++; return readNftOwnership([artwork()]); }), unavailable);
+    assert.equal(attempts, 2); assert.equal(calls.length, 4);
+  });
+  for (const change of [{ state_revision: '1235' }, { indexed_through: 119, confirmed_through: 119, covered_hash: hash(119) },
+    { ...advanced(), confirmed_through: 120 }]) await t.test(`non-publication boundary changes do not retry: ${JSON.stringify(change)}`, async () => {
+    let attempts = 0;
+    respond = name => name === 'read_verified_nft_boundary' ? [checkpoint()] : [owner('1', change)];
+    await assert.rejects(readWithNftOwnershipRetry(async () => { attempts++; return readNftOwnership([artwork()]); }), unavailable);
+    assert.equal(attempts, 1);
+  });
+  await t.test('a malformed later owner batch overrides valid forward movement in an earlier batch', async () => {
+    let attempts = 0;
+    respond = (name, body) => name === 'read_verified_nft_boundary' ? [checkpoint()] :
+      body.p_artwork_ids.map(id => owner(id, { ...advanced(), ...(id === '21' ? { current_owner_address: ZERO } : {}) }));
+    await assert.rejects(readWithNftOwnershipRetry(async () => {
+      attempts++; return readNftOwnership(Array.from({ length: 21 }, (_, i) => artwork(String(i + 1))));
+    }), unavailable);
+    assert.equal(attempts, 1); assert.equal(calls.length, 3);
+  });
+  await t.test('foreign lifecycle source is never masked by forward ownership movement', async () => {
+    const data = history(); Object.assign(data.ownership, advanced()); data.lifecycle[0].contract_address = NFT;
+    respond = name => name === 'read_verified_nft_boundary' ? [checkpoint()] : data;
+    let attempts = 0;
+    await assert.rejects(readWithNftOwnershipRetry(async () => { attempts++; return readNftHistory(artwork()); }), unavailable);
+    assert.equal(attempts, 1);
+  });
+  for (const [key, value] of [['ARTSOUL_NFT_OWNERSHIP_ENABLED','false'], ['ARTSOUL_NFT_OWNERSHIP_NFT_CODE_HASH',hash(3)]]) {
+    await t.test(`configuration change before retry prevents a replacement read: ${key}`, async () => {
+      respond = name => name === 'read_verified_nft_boundary' ? [checkpoint()] : [owner('1', advanced())];
+      let attempts = 0;
+      await assert.rejects(readWithNftOwnershipRetry(async () => {
+        attempts++;
+        try { return await readNftOwnership([artwork()]); }
+        catch (error) { process.env[key] = value; throw error; }
+      }), unavailable);
+      assert.equal(attempts, 1); assert.equal(calls.length, 2);
+    });
+  }
+  await t.test('a forged retry code cannot restart an unavailable source', async () => {
+    let attempts = 0;
+    await assert.rejects(readWithNftOwnershipRetry(() => {
+      attempts++; throw Object.assign(new Error('source failure'), { code: 'NFT_OWNERSHIP_BOUNDARY_MOVED' });
+    }), /source failure/);
+    assert.equal(attempts, 1);
+  });
+  await t.test('an overlapping mint does not retry an unproven old artwork identity', async () => {
+    respond = name => name === 'read_verified_nft_boundary' ? [checkpoint()] : [owner('1', advanced())];
+    let attempts = 0;
+    await assert.rejects(readWithNftOwnershipRetry(async () => {
+      attempts++; return readNftOwnership([{ ...artwork(), minted: false, token_id: null }]);
+    }), unavailable);
+    assert.equal(attempts, 1);
   });
 });

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import artworks, { readVisibleArtworkCard, readVisibleArtworkCards } from '../src/api/routes/public/artworks.js';
 import provenance from '../src/api/routes/public/artwork-provenance.js';
 
@@ -35,6 +37,31 @@ const fixture = () => ({
   v41_resale_history: [{ chain_id: 84532, token_id: '7', seller: FIRST, buyer: BUYER,
     price: '3000000000000000000', block_number: 30, log_index: 5, transaction_hash: hash(30) }],
   v41_resale_listings: [{ chain_id: 84532, token_id: '7', seller: BUYER, active: true, price: '4000000000000000000', last_updated_block: 40 }]
+});
+
+test('public handlers send nothing before the whole-read retry guard completes', async () => {
+  for (const file of ['artworks.js','artwork-provenance.js']) {
+    const source = readFileSync(new URL(`../src/api/routes/public/${file}`, import.meta.url), 'utf8');
+    const scope = {
+      allowMethods: () => true, PUBLIC_CHAIN_IDS: new Set([84532]), CANONICAL_PUBLIC_CHAIN_ID: 84532,
+      PROJECTION_CACHE_MS: 30000, parseDirectLookup: () => null, protocolId: () => '', validateArtworkId: () => null,
+      getProjectionSnapshot: async () => ({ cards: [], bids: new Map(), diagnostics: {}, warnings: [], publicMetrics: null, ownership: null }),
+      filterCards: cards => cards, recheckNftOwnership: async () => null,
+      readWithNftOwnershipRetry: async operation => {
+        await operation();
+        throw Object.assign(new Error('Configuration changed after the retry completed'), { statusCode: 503, code: 'NFT_OWNERSHIP_UNAVAILABLE' });
+      },
+      sendError: (res, error) => res.status(error.statusCode).json({ error: error.code })
+    };
+    vm.runInNewContext(source.slice(source.indexOf('export default async function handler'))
+      .replace('export default async function handler', 'this.handler = async function handler'), scope);
+    const res = response(), sent = [];
+    res.json = function(body) { sent.push({ status: this.statusCode, body }); return this; };
+    await scope.handler(request(), res);
+    assert.equal(sent.length, 1, file);
+    assert.equal(sent[0].status, 503, file); assert.equal(sent[0].body.error, 'NFT_OWNERSHIP_UNAVAILABLE');
+    assert.equal(res.headers['cache-control'], 'private, no-store');
+  }
 });
 const response = () => ({ statusCode: 200, headers: {}, status(code) { this.statusCode = code; return this; },
   setHeader(name, value) { this.headers[name.toLowerCase()] = value; }, json(body) { this.body = body; return this; }, end() {} });
@@ -214,5 +241,82 @@ test('public NFT consumers use one verified history across cards, filters, saved
     const res = await cardRequest({ id: 'v41:11155111:77' }); assert.equal(res.statusCode, 200);
     assert.equal(res.body.data[0].chain_id, 11155111);
     assert.equal(calls.some(call => call.name.startsWith('rpc/read_verified_nft_')), false);
+  });
+
+  function publishNextBoundary() {
+    const height = Number(marker.indexed_through) + 1;
+    marker = { indexed_through: height, confirmed_through: height, covered_hash: hash(height),
+      state_revision: String(Number(marker.state_revision) + 1) };
+    const moved = { ...transfer(), block_number: height, transaction_hash: hash(height),
+      from_address: owners[0].current_owner_address, to_address: CREATOR };
+    Object.assign(owners[0], { current_owner_address: CREATOR, latest_transfer: moved });
+    history.transfers.push(moved);
+  }
+  const entrypoints = {
+    direct: async () => { const res = await cardRequest({ id: '77' }); assert.equal(res.statusCode, 200); return res.body.data[0]; },
+    feed: async () => { const res = await cardRequest({ owner: CREATOR }); assert.equal(res.statusCode, 200); assert.equal(res.body.count, 1); return res.body.data[0]; },
+    Saved: () => readVisibleArtworkCard(84532, '77'),
+    search: async () => (await readVisibleArtworkCards(84532, ['77'], CORE))[0],
+    provenance: async () => { const res = await historyRequest(); assert.equal(res.statusCode, 200); return res.body.roles; }
+  };
+  for (const [name, run] of Object.entries(entrypoints)) await t.test(`${name} restarts its entire read once after a forward publication`, async () => {
+    afterRead = request => {
+      if (request === 'rpc/read_verified_nft_boundary') { afterRead = null; publishNextBoundary(); }
+    };
+    assert.equal((await run()).current_owner_address, CREATOR);
+    assert.equal(calls.filter(call => call.name === 'rpc/read_verified_nft_boundary').length, 2);
+    const lifecycleRequest = name === 'search' ? 'rpc/read_public_search_cards' : 'v41_artworks';
+    assert.equal(calls.filter(call => call.name === lifecycleRequest).length, 2, 'lifecycle inputs must be read again');
+  });
+  for (const [name, trigger] of [['direct','profiles'], ['search','artwork_moderation_visibility'], ['provenance','rpc/read_verified_nft_history']]) {
+    await t.test(`${name} discards hydrated results when its final proof sees a new publication`, async () => {
+      afterRead = request => { if (request === trigger) { afterRead = null; publishNextBoundary(); } };
+      assert.equal((await entrypoints[name]()).current_owner_address, CREATOR);
+      assert.equal(calls.filter(call => call.name === 'rpc/read_verified_nft_boundary').length, 2);
+      assert.equal(calls.filter(call => call.name === (name === 'search' ? 'rpc/read_public_search_cards' : 'v41_artworks')).length, 2);
+    });
+  }
+  await t.test('a mutable projection from a valid newer checkpoint restarts before serialization', async () => {
+    afterRead = request => {
+      if (request === 'rpc/read_verified_nft_boundary') {
+        afterRead = null; publishNextBoundary(); rows.v41_artworks[0].last_updated_block = marker.indexed_through;
+      }
+    };
+    const res = await cardRequest({ id: '77' }); assert.equal(res.statusCode, 200);
+    assert.equal(res.body.data[0].current_owner_address, CREATOR);
+    assert.equal(calls.filter(call => call.name === 'v41_artworks').length, 2);
+  });
+  for (const surface of ['direct','provenance']) await t.test(`${surface} returns unavailable after a second publication instead of nesting retries`, async () => {
+    afterRead = request => { if (request === 'rpc/read_verified_nft_boundary') publishNextBoundary(); };
+    const res = surface === 'direct' ? await cardRequest({ id: '77' }) : await historyRequest();
+    assert.equal(res.statusCode, 503); assert.equal(res.body.error, 'NFT_OWNERSHIP_UNAVAILABLE');
+    assert.equal(res.headers['cache-control'], 'private, no-store');
+    assert.equal(calls.filter(call => call.name === 'rpc/read_verified_nft_boundary').length, 2);
+    assert.equal(calls.filter(call => call.name === 'v41_artworks').length, 2);
+  });
+  for (const key of ['ARTSOUL_NFT_OWNERSHIP_ENABLED','ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA']) await t.test(`retry cannot fall back after ${key} changes`, async () => {
+    let boundaryReads = 0;
+    afterRead = request => {
+      if (request !== 'rpc/read_verified_nft_boundary') return;
+      if (++boundaryReads === 1) publishNextBoundary();
+      else process.env[key] = key.endsWith('ENABLED') ? 'false' : CREATOR;
+    };
+    const res = await cardRequest({ id: '77' }); assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error, 'NFT_OWNERSHIP_UNAVAILABLE'); assert.equal(boundaryReads, 2);
+    assert.equal(calls.filter(call => call.name === 'v41_artworks').length, 1, 'changed configuration stops before replacement lifecycle reads');
+  });
+  await t.test('a malformed advanced owner proof is not retried', async () => {
+    afterRead = request => {
+      if (request === 'rpc/read_verified_nft_boundary') { afterRead = null; publishNextBoundary(); owners[0].token_id = '8'; }
+    };
+    const res = await cardRequest({ id: '77' }); assert.equal(res.statusCode, 503);
+    assert.equal(calls.filter(call => call.name === 'rpc/read_verified_nft_boundary').length, 1);
+  });
+  await t.test('a foreign source in advanced history is not retried', async () => {
+    afterRead = request => {
+      if (request === 'rpc/read_verified_nft_boundary') { afterRead = null; publishNextBoundary(); history.lifecycle[0].contract_address = NFT; }
+    };
+    const res = await historyRequest(); assert.equal(res.statusCode, 503);
+    assert.equal(calls.filter(call => call.name === 'rpc/read_verified_nft_boundary').length, 1);
   });
 });

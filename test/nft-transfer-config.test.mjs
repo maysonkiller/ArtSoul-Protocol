@@ -5,11 +5,21 @@ import { resolveIndexerChainConfig, resolveNftTransferConfig } from '../src/inde
 const CORE = `0x${'a'.repeat(40)}`, NFT = `0x${'b'.repeat(40)}`, OTHER = `0x${'c'.repeat(40)}`;
 const hash = value => `0x${value.repeat(64)}`;
 const chain = () => ({ chainId: 84532, coreAddress: CORE, nftAddress: NFT });
-const environment = () => ({ ARTSOUL_NFT_TRANSFER_INDEX_ENABLED: 'true',
+const environment = () => ({ ARTSOUL_NFT_TRANSFER_INDEX_ENABLED: 'true', REDIS_URL: 'redis://127.0.0.1:6379',
     ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA: CORE, ARTSOUL_NFT_ADDRESS_BASE_SEPOLIA: NFT,
     ARTSOUL_NFT_OWNERSHIP_CORE_CODE_HASH: hash('1'), ARTSOUL_NFT_OWNERSHIP_NFT_CODE_HASH: hash('2'),
     ARTSOUL_NFT_TRANSFER_FROM_BLOCK: '41976861', ARTSOUL_NFT_TRANSFER_ORIGIN_BLOCK_HASH: hash('3') });
 const invalid = error => error.message.startsWith('Invalid NFT transfer configuration:');
+
+test('enabled NFT indexing requires a usable recovery cache configuration without exposing its URL', () => {
+    for (const value of [undefined, '', ' ', 'invalid', 'https://private.example', 123, ' redis://localhost']) {
+        assert.throws(() => resolveNftTransferConfig(chain(), { ...environment(), REDIS_URL: value }),
+            { message: 'Invalid NFT transfer configuration: recovery-capable REDIS_URL required' });
+    }
+    for (const value of ['redis://localhost:6379', 'rediss://user:fixture-secret@private.example:6380/0']) {
+        assert.equal(resolveNftTransferConfig(chain(), { ...environment(), REDIS_URL: value }).chainId, 84532);
+    }
+});
 
 test('NFT indexing is disabled without new deployment requirements unless explicitly true', () => {
     assert.equal(resolveNftTransferConfig(null, {}), null);

@@ -2,7 +2,7 @@ import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../
 import { getModerationAccess } from '../../moderation-access.js';
 import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
-import { readNftOwnershipConfig, readNftOwnershipBoundary, readNftOwnership, recheckNftOwnership } from '../../nft-ownership.js';
+import { readNftOwnershipConfig, readNftOwnershipBoundary, readNftOwnership, recheckNftOwnership, recheckNftOwnershipBoundary, readWithNftOwnershipRetry } from '../../nft-ownership.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
 // The active product chain. Ethereum Sepolia rows stay readable but are never
@@ -701,6 +701,7 @@ function parseDirectLookup(query = {}) {
 }
 
 async function projectTableData(tableData, warnings, publicMetrics = null, preload = {}) {
+  let futureMutableProjection = false;
   if (preload.ownershipBoundary) {
     const end = BigInt(preload.ownershipBoundary.indexed_through);
     const unavailable = () => Object.assign(new Error('Artwork history is still updating. Please retry.'), { statusCode: 503, code: 'NFT_OWNERSHIP_UNAVAILABLE' });
@@ -713,12 +714,16 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
         const value = row[mutable ? 'last_updated_block' : 'block_number'];
         if (!/^(0|[1-9][0-9]*)$/.test(String(value)) || (typeof value === 'number' && !Number.isSafeInteger(value))) throw unavailable();
         if (BigInt(value) <= end) return true;
-        if (mutable) throw unavailable();
-        return false;
+        if (mutable) futureMutableProjection = true;
+        return mutable;
       });
     }
   }
   const ownership = preload.legacyOnly ? null : await readNftOwnership(tableData.v41_artworks, preload.ownershipBoundary);
+  if (futureMutableProjection) {
+    await recheckNftOwnershipBoundary(preload.ownershipBoundary);
+    throw Object.assign(new Error('Artwork history is still updating. Please retry.'), { statusCode: 503, code: 'NFT_OWNERSHIP_UNAVAILABLE' });
+  }
   // Creator names and immutable metadata are independent reads. Starting them
   // together removes one serial network round trip from a cold projection.
   let [publicIdentities, metadataRows] = await Promise.all([
@@ -1041,10 +1046,12 @@ function getDirectProjectionSnapshot(lookup, fresh = false) {
 // Reuse the exact public projection for bounded private bookmark hydration.
 // This helper never takes a staff session and never bypasses hidden visibility.
 export async function readVisibleArtworkCard(chain, artworkId) {
+  return readWithNftOwnershipRetry(async () => {
   const snapshot = await getDirectProjectionSnapshot({ chain, artworkId });
   if (snapshot.warnings.length) throw new Error('Artwork projection is unavailable');
   const card = snapshot.cards.find(row => Number(row.chain_id) === chain && String(row.artwork_id) === artworkId);
   return card && card.moderation_hidden !== true ? card : null;
+  });
 }
 
 // Bounded search hydration reuses the public serializer once. The RPC returns
@@ -1054,6 +1061,7 @@ export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
       artworkIds.some(id => typeof id !== 'string' || !/^[1-9][0-9]{0,77}$/.test(id) || BigInt(id) >= 2n ** 256n) ||
       !/^0x[0-9a-f]{40}$/.test(coreAddress) || /^0x0{40}$/.test(coreAddress)) throw new Error('Invalid search page');
   const ids = [...new Set(artworkIds)];
+  return readWithNftOwnershipRetry(async () => {
   const ownershipBoundary = await readNftOwnershipBoundary();
   const data = await supabaseRest('rpc/read_public_search_cards', {
     method: 'POST', body: { p_artwork_ids: ids, p_core_address: coreAddress }
@@ -1088,12 +1096,14 @@ export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
     current.get(card.artwork_id)?.transaction_hash === card.transaction_hash).map(card => [card.artwork_id, card]));
   await recheckNftOwnership(snapshot.ownership);
   return ids.map(id => cards.get(id)).filter(Boolean);
+  });
 }
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
 
   try {
+    const response = await readWithNftOwnershipRetry(async () => {
     const requestQuery = req.query || {};
     const directLookup = parseDirectLookup(requestQuery);
     const { cards, bids, diagnostics, warnings, publicMetrics, ownership } = directLookup
@@ -1102,10 +1112,9 @@ export default async function handler(req, res) {
     // A failed source read is not an empty catalogue. In particular, quota
     // restrictions must not become CDN-cacheable successful empty responses.
     if (warnings.some(warning => warning.table === 'v41_artworks')) {
-      res.setHeader('Cache-Control', 'private, no-store');
-      return sendError(res, Object.assign(new Error('Artworks are temporarily unavailable. Please try again later.'), {
+      throw Object.assign(new Error('Artworks are temporarily unavailable. Please try again later.'), {
         code: 'ARTWORKS_UNAVAILABLE', statusCode: 503
-      }));
+      });
     }
     const suppressedArtworkIds = cards
       .filter(card => card.moderation_hidden === true)
@@ -1133,11 +1142,11 @@ export default async function handler(req, res) {
     // list responses are CDN-cacheable.
     const cacheSeconds = Math.max(1, Math.round(PROJECTION_CACHE_MS / 1000));
     if (!directLookup || directLookup.chain === CANONICAL_PUBLIC_CHAIN_ID) await recheckNftOwnership(ownership);
-    res.setHeader('Cache-Control', isDirectArtworkLookup || ownership
+    const cacheControl = isDirectArtworkLookup || ownership
       ? 'private, no-store'
-      : `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 4}`);
+      : `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 4}`;
 
-    res.status(200).json({
+    return { cacheControl, body: {
       success: true,
       source: 'v41_projection',
       data,
@@ -1146,7 +1155,10 @@ export default async function handler(req, res) {
       public_metrics: isDirectArtworkLookup ? null : publicMetrics,
       diagnostics,
       warnings
+    } };
     });
+    res.setHeader('Cache-Control', response.cacheControl);
+    return res.status(200).json(response.body);
   } catch (error) {
     res.setHeader('Cache-Control', 'private, no-store');
     sendError(res, error);
