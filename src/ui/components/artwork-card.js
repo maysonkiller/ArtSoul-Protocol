@@ -241,7 +241,7 @@
     // come from the artwork projection (or its canonical v4.1 identifier),
     // never from whichever network happens to be selected in the viewer's wallet.
     function cardNetworkLabel(artwork = {}) {
-        const encodedChain = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\\d+):/i)?.[1];
+        const encodedChain = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):/i)?.[1];
         const raw = artwork.chain_id ?? artwork.chainId ?? encodedChain;
         const chain = Number(raw);
         if (!raw || !Number.isSafeInteger(chain) || chain <= 0) return 'Network pending';
