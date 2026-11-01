@@ -514,15 +514,27 @@ function ProtocolAdminPage() {
     const statusLabel = { loading: 'Checking access', unauthenticated: 'Wallet sign-in required', step_up: 'Verification required',
         ready: 'Verified', authority: 'Approval access', setup: 'Set up sign-in', setup_verified: 'Verified',
         error: 'Access needs attention', ineligible: 'No staff role', disabled: 'Unavailable' }[accessState];
+    // One organized navigation and one compact summary; all counts come from
+    // the already-authorized queue response. Do not add public/staff requests.
+    const adminGroups = [
+        { title: 'Moderate', items: [['queue', 'Reports'], ['artworks', 'Artworks'], ['hidden', 'Hidden']] },
+        { title: 'History', items: [['audit', 'Audit log'], ['notifications', 'Delivery']] },
+        ...(rosterWallet ? [{ title: 'Access', items: [['staff', authorityWallet ? 'Staff access' : 'Team directory']] }] : [])
+    ];
 
     return (
         <div className="protocol-admin-shell">
             <header className="protocol-admin-heading" ref={accessHeading} tabIndex={-1}>
                 <div>
-                    <p className="protocol-admin-kicker">Protected workspace</p>
+                    <p className="protocol-admin-kicker">ArtSoul / Workspace</p>
                     <h1>Admin panel</h1>
-                    <p>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : 'No staff wallet connected'}{roleLabel ? ` · ${roleLabel}` : ''}</p>
-                    <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
+                    <p className="protocol-admin-description">{ready
+                        ? 'Review reports, manage artwork visibility and inspect records.'
+                        : 'Secure moderation tools for verified staff wallets.'}</p>
+                    <div className="protocol-admin-session">
+                        <span className={`protocol-admin-access-status${ready ? ' is-verified' : ''}`} role="status">{statusLabel}</span>
+                        <span>{connectedWallet ? `Wallet ${shortWallet(connectedWallet)}` : 'No staff wallet connected'}{roleLabel ? ` · ${roleLabel}` : ''}</span>
+                    </div>
                 </div>
                 <div className="protocol-admin-header-actions">
                     {accessState === 'unauthenticated' && <button type="button" className="protocol-admin-primary" onClick={authenticate} disabled={busy}>{connectedWallet ? 'Verify wallet' : 'Connect staff wallet'}</button>}
@@ -534,19 +546,31 @@ function ProtocolAdminPage() {
             {verification}
             {!ready && <AccessGate state={accessState} message={message} walletAddress={connectedWallet} />}
 
-            {ready && <nav className="protocol-admin-tabs" aria-label="Protocol Admin sections">
-                {(rosterWallet ? ['queue', 'artworks', 'hidden', 'audit', 'notifications', 'staff'] : ['queue', 'artworks', 'hidden', 'audit', 'notifications']).map(value => (
-                    <button
-                        key={value}
-                        type="button"
-                        className={activeSection === value ? 'is-active' : ''}
-                        aria-current={activeSection === value ? 'page' : undefined}
-                        onClick={() => setSection(value)}
-                    >
-                        {value === 'queue' ? 'Review queue' : value === 'artworks' ? 'Artworks' : value === 'hidden' ? 'Hidden artwork' : value === 'audit' ? 'Audit log' : value === 'staff' ? authorityWallet ? 'Staff access' : 'Team directory' : 'Notification ledger'}
-                    </button>
-                ))}
-            </nav>}
+            {ready && <>
+                <div className="protocol-admin-overview" role="group" aria-label="Current workspace counts">
+                    <div><span>Reports in view</span><strong>{data.reports.length}</strong></div>
+                    <div><span>Hidden works</span><strong>{data.hidden.length}</strong></div>
+                    <div><span>Delivery records</span><strong>{data.notifications.length}</strong></div>
+                </div>
+                <nav className="protocol-admin-tabs" aria-label="Protocol Admin sections">
+                    {adminGroups.map(group => (
+                        <div className="protocol-admin-tab-group" key={group.title} role="group" aria-label={group.title}>
+                            <span className="protocol-admin-tab-label" aria-hidden="true">{group.title}</span>
+                            {group.items.map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    className={activeSection === value ? 'is-active' : ''}
+                                    aria-current={activeSection === value ? 'page' : undefined}
+                                    onClick={() => setSection(value)}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    ))}
+                </nav>
+            </>}
 
             {rosterWallet && <div key="staff" hidden={ready && activeSection !== 'staff'}>{authorityControls}</div>}
 
@@ -566,7 +590,7 @@ function ProtocolAdminPage() {
                         <div className="protocol-admin-status-filter">
                             {[...(queueTarget ? ['all'] : []), 'pending_review', 'actioned', 'dismissed', 'resolved'].map(status => (
                                 <button key={status} type="button" className={queueStatus === status ? 'is-active' : ''} aria-pressed={queueStatus === status} onClick={() => changeQueueStatus(status)}>
-                                    {status.replace('_', ' ')}
+                                    {status === 'pending_review' ? 'Pending' : status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
                                 </button>
                             ))}
                         </div>
