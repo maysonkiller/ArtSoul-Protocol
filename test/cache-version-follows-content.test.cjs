@@ -18,6 +18,7 @@ const fs = require('node:fs');
  * updated together, which is the only way the two can stay honest.
  */
 const RUNTIME = {
+  'src/ui/themed-selects.js': { version: 2, sha256: 'eb27f318d3931a11' },
   'src/ui/theme-manager.js': { version: 1, sha256: 'aba43648758927f8' },
   'src/ui/navigation-manager.js': { version: 8, sha256: '618e006edefcf241' },
   'src/ui/components/artwork-card.js': { version: 23, sha256: 'ef343be5c814bd8a' },
@@ -25,7 +26,7 @@ const RUNTIME = {
   'modal-system.js': { version: 2, sha256: 'dc931033974954d0' },
   'webmcp-tools.js': { version: 11, sha256: '52ae4a2991fc6f60' },
   'voice-commands.js': { version: 12, sha256: '46d4f593c9de2b27' },
-  'avatar-dropdown.js': { version: 58, sha256: 'dc9ae18f3070879e' },
+  'avatar-dropdown.js': { version: 59, sha256: 'ee94c03db7e5ceab' },
   'header-prepaint.js': { version: 9, sha256: '58f7520017a6b5c5' },
   'data-prefetch.js': { version: 6, sha256: '339cad21ebc03f47' },
   'base-network.js': { version: 2, sha256: 'bc527f32ea3df5f9' },

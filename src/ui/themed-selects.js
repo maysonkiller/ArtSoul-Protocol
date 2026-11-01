@@ -29,7 +29,8 @@
     }
 
     function enhanceSelect(select) {
-        if (!(select instanceof global.HTMLSelectElement) || enhancedSelects.has(select)) {
+        if (!(select instanceof global.HTMLSelectElement) || enhancedSelects.has(select)
+            || select.multiple || select.size > 1) {
             return;
         }
 
@@ -40,10 +41,15 @@
         const listbox = document.createElement('div');
         const listboxId = `artsoul-select-list-${++optionSequence}`;
         let activeIndex = Math.max(select.selectedIndex, 0);
+        const labelIds = Array.from(select.labels || []).map((label, index) => {
+            if (!label.id) label.id = `${listboxId}-label-${index}`;
+            return label.id;
+        }).join(' ');
 
         root.className = 'artsoul-themed-select';
         root.dataset.selectFor = select.id || select.name || listboxId;
         button.type = 'button';
+        button.tabIndex = select.tabIndex;
         button.className = 'artsoul-themed-select__button';
         button.setAttribute('role', 'combobox');
         button.setAttribute('aria-haspopup', 'listbox');
@@ -60,7 +66,6 @@
 
         button.append(value, arrow);
         root.append(button, listbox);
-        select.classList.add('artsoul-themed-select__native');
         select.insertAdjacentElement('afterend', root);
 
         function isOpen() {
@@ -71,6 +76,16 @@
             const selectedOption = select.options[select.selectedIndex] || select.options[0];
             value.textContent = selectedOption?.textContent.trim() || '';
             button.setAttribute('aria-label', select.getAttribute('aria-label') || select.name || 'Choose an option');
+            const labelledBy = select.getAttribute('aria-labelledby')
+                || (!select.getAttribute('aria-label') ? labelIds : '');
+            if (labelledBy) button.setAttribute('aria-labelledby', labelledBy);
+            else button.removeAttribute('aria-labelledby');
+            for (const attribute of ['aria-describedby', 'aria-invalid']) {
+                const attributeValue = select.getAttribute(attribute);
+                if (attributeValue !== null) button.setAttribute(attribute, attributeValue);
+                else button.removeAttribute(attribute);
+            }
+            button.setAttribute('aria-required', String(select.required));
             button.disabled = select.disabled;
             root.classList.toggle('is-disabled', select.disabled);
             activeIndex = Math.max(select.selectedIndex, 0);
@@ -181,6 +196,13 @@
         });
 
         select.addEventListener('change', sync);
+        // Labels and form validation can still focus/click the native field.
+        // Keep their target usable without opening an invisible native picker.
+        select.addEventListener('focus', () => button.focus());
+        select.addEventListener('click', (event) => {
+            event.preventDefault();
+            button.focus();
+        });
         select.form?.addEventListener('reset', () => global.setTimeout(sync, 0));
         document.addEventListener('artsoul-select-open', (event) => {
             if (event.detail !== root) close();
@@ -194,13 +216,20 @@
         });
         observer.observe(select, {
             attributes: true,
-            attributeFilter: ['disabled', 'data-artsoul-value', 'aria-label'],
+            attributeFilter: ['disabled', 'required', 'name', 'data-artsoul-value',
+                'aria-label', 'aria-labelledby', 'aria-describedby', 'aria-invalid'],
             childList: true,
             subtree: true
         });
 
-        enhancedSelects.set(select, { root, sync, observer });
         renderOptions();
+        enhancedSelects.set(select, { root, sync, observer });
+        // The native field remains enabled for form submission and events, but
+        // only the ready custom combobox participates in focus/accessibility.
+        if (document.activeElement === select) button.focus();
+        select.tabIndex = -1;
+        select.setAttribute('aria-hidden', 'true');
+        select.classList.add('artsoul-themed-select__native');
     }
 
     function scan(root = document) {
