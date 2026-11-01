@@ -85,7 +85,7 @@ function ProtocolDocsApp() {
             const section = document.getElementById(id);
             section?.querySelector('.protocol-section-trigger')?.focus({ preventScroll: true });
             section?.scrollIntoView({
-                behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth',
+                behavior: document.documentElement.classList.contains('classic') || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth',
                 block: 'start'
             });
         });

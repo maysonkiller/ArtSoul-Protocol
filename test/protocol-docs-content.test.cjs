@@ -76,12 +76,12 @@ test('shared blocks render text safely and retain table and ordered-list semanti
   assert.match(closed, /id="what-is-artsoul-content"[^>]*hidden=""/);
 });
 
-async function harness(hash = '') {
+async function harness(hash = '', theme = 'future') {
   const values = [], effects = [], frames = new Map(), scrolls = [], focuses = [], navigationEvents = [], windowEvents = new Map(), documentEvents = new Map();
   let index = 0, frameId = 0, mounted = false;
   const window = {location: new URL('https://artsoul.example/docs-protocol' + hash),
     addEventListener: (name, fn) => windowEvents.set(name, fn), removeEventListener: name => windowEvents.delete(name)};
-  const document = {getElementById: id => ({
+  const document = {documentElement: {classList: {contains: value => value === theme}}, getElementById: id => ({
       scrollIntoView: options => { scrolls.push({id, ...options}); navigationEvents.push(`scroll:${id}`); },
       querySelector: selector => selector === '.protocol-section-trigger' ? {
         focus: options => { focuses.push({id, ...options}); navigationEvents.push(`focus:${id}`); }
@@ -142,6 +142,14 @@ test('contents navigation remains available when the browser has no motion-query
   const button = findElement(h.render(), element => element.type === 'button' && element.props.children === 'Frequently Asked Questions');
   button.props.onClick(); h.render(); h.flush();
   assert.deepEqual(h.scrolls, [{id: 'faq', behavior: 'smooth', block: 'start'}]);
+});
+
+test('Classic contents navigation is immediate even when motion is allowed', async () => {
+  const h = await harness('', 'classic');
+  h.window.matchMedia = () => ({matches: false});
+  const button = findElement(h.render(), element => element.type === 'button' && element.props.children === 'Frequently Asked Questions');
+  button.props.onClick(); h.render(); h.flush();
+  assert.deepEqual(h.scrolls, [{id: 'faq', behavior: 'auto', block: 'start'}]);
 });
 
 test('initial section links open and reveal the requested accordion without closing others', async () => {

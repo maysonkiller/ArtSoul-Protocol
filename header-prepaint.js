@@ -1,4 +1,4 @@
-// Restores visual identity only; never authenticates or unlocks wallet actions.
+// Visual identity only; never authenticates or unlocks wallet actions.
 (function () {
     'use strict';
 
@@ -33,8 +33,9 @@
     const cachedUiState = read('artsoul_header_ui_state');
     const walletHint = String(read('artsoul_wallet') || '').toLowerCase();
     const identity = readIdentity();
-    const appKitDisconnectedAtBoot = !MOBILE_PATTERN.test(navigator.userAgent)
-        && read('@appkit/connection_status') === 'disconnected';
+    const appKitDisconnectedAtBoot = read('artsoul_disconnecting') === 'true'
+        || (!MOBILE_PATTERN.test(navigator.userAgent)
+            && read('@appkit/connection_status') === 'disconnected');
     const wallet = WALLET_PATTERN.test(walletHint)
         ? walletHint
         : (cachedUiState === 'connected' ? identity?.wallet || '' : '');

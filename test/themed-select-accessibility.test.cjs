@@ -15,8 +15,16 @@ function boot(options = {}) {
             this.listeners = new Map();
             this.id = '';
             this.disabled = false;
+            this.isConnected = true;
             this.tabIndex = 0;
             this.textContent = '';
+            this.style = { top: '', left: '', width: '', maxHeight: '' };
+            this.scrollTop = 0;
+            this.offsetTop = 0;
+            this.offsetHeight = 44;
+            this.clientHeight = 42;
+            this.scrollHeight = 132;
+            this.rect = { left: 20, right: 220, top: 100, bottom: 144, width: 200, height: 44 };
             const classes = new Set();
             this.classList = {
                 add: value => classes.add(value), remove: value => classes.delete(value),
@@ -27,7 +35,12 @@ function boot(options = {}) {
         setAttribute(name, value) { this.attributes.set(name, String(value)); }
         getAttribute(name) { return this.attributes.get(name) ?? null; }
         removeAttribute(name) { this.attributes.delete(name); }
-        append(...children) { this.children.push(...children); }
+        append(...children) {
+            for (const child of children) {
+                child.offsetTop = this.children.length * 44;
+                this.children.push(child);
+            }
+        }
         replaceChildren(...children) { this.children = [...children]; }
         insertAdjacentElement(position, element) { assert.equal(position, 'afterend'); this.adjacent = element; }
         addEventListener(type, listener) {
@@ -35,13 +48,17 @@ function boot(options = {}) {
             listeners.push(listener);
             this.listeners.set(type, listeners);
         }
+        removeEventListener(type, listener) {
+            this.listeners.set(type, (this.listeners.get(type) || []).filter(value => value !== listener));
+        }
         dispatchEvent(event) {
             for (const listener of this.listeners.get(event.type) || []) listener(event);
             return !event.defaultPrevented;
         }
         focus() { if (!this.disabled) { activeElement = this; this.dispatchEvent(new Event('focus')); } }
         contains(element) { return this === element || this.children.some(child => child.contains(element)); }
-        scrollIntoView() {}
+        scrollIntoView() { assert.fail('option navigation must not scroll the surrounding page'); }
+        getBoundingClientRect() { return this.rect; }
         querySelectorAll() { return []; }
     }
     class Select extends Element {
@@ -71,7 +88,12 @@ function boot(options = {}) {
     Object.defineProperty(document, 'activeElement', { get: () => activeElement });
     document.readyState = 'loading';
     document.createElement = tagName => new Element(tagName);
-    const window = { HTMLSelectElement: Select, Element, setTimeout: fn => timers.push(fn) };
+    const viewport = Object.assign(new Element('viewport'), { width: 390, height: 844, offsetLeft: 0, offsetTop: 0 });
+    const window = Object.assign(new Element('window'), {
+        HTMLSelectElement: Select, Element, setTimeout: fn => timers.push(fn),
+        innerWidth: 390, innerHeight: 844, visualViewport: viewport,
+        getComputedStyle: () => ({ position: window.popupPosition }), popupPosition: 'absolute'
+    });
     const context = vm.createContext({ window, document, Event,
         CustomEvent: class extends Event { constructor(type, init) { super(type); this.detail = init.detail; } },
         MutationObserver: class {
@@ -80,7 +102,7 @@ function boot(options = {}) {
         }
     });
     vm.runInContext(fs.readFileSync('src/ui/themed-selects.js', 'utf8'), context);
-    return { select, label, enhance: () => window.ArtSoulThemedSelects.enhance(select),
+    return { select, label, window, viewport, document, enhance: () => window.ArtSoulThemedSelects.enhance(select),
         button: () => select.adjacent?.children[0], listbox: () => select.adjacent?.children[1],
         mutate: () => observers.filter(observer => observer.target === select).forEach(observer => observer.callback()),
         flush: () => timers.splice(0).forEach(fn => fn()), focused: () => activeElement };
@@ -206,4 +228,167 @@ test('a field that has not been enhanced retains native focus and accessibility'
     assert.equal(h.select.tabIndex, 0);
     h.select.focus();
     assert.equal(h.focused(), h.select);
+});
+
+function mobileSelect(options) {
+    const h = boot(options);
+    h.enhance();
+    h.window.popupPosition = 'fixed';
+    Object.assign(h.listbox(), { scrollHeight: 190, clientHeight: 190, offsetHeight: 192 });
+    return h;
+}
+
+function popupBounds(h) {
+    const style = h.listbox().style;
+    const left = parseFloat(style.left), top = parseFloat(style.top);
+    const width = parseFloat(style.width), height = parseFloat(style.maxHeight);
+    assert.ok([left, top, width, height].every(Number.isFinite), 'popup geometry must be finite');
+    assert.ok(width > 0 && height > 0);
+    return { left, top, width, height, right: left + width, bottom: top + height };
+}
+
+function positionListenerCount(h) {
+    return [h.window, h.viewport].reduce((total, target) => total
+        + (target.listeners.get('scroll') || []).length
+        + (target.listeners.get('resize') || []).length, 0);
+}
+
+test('a mobile popup opens beside its trigger instead of the screen bottom', () => {
+    const h = mobileSelect();
+    h.button().dispatchEvent(new Event('click'));
+    const popup = popupBounds(h), trigger = h.button().rect;
+    assert.equal(popup.left, trigger.left);
+    assert.equal(popup.width, trigger.width);
+    assert.ok(popup.top > trigger.bottom && popup.top - trigger.bottom < 12);
+    assert.ok(popup.bottom < h.viewport.height - 100, 'short menu must not be pinned to the bottom');
+    assert.equal(h.button().getAttribute('aria-expanded'), 'true');
+    assert.equal(h.button().getAttribute('aria-activedescendant'), h.listbox().children[0].id);
+});
+
+test('a mobile popup flips above a low trigger and clamps its right edge', () => {
+    const h = mobileSelect();
+    h.button().rect = { left: 300, right: 500, top: 740, bottom: 784, width: 200, height: 44 };
+    h.button().dispatchEvent(new Event('click'));
+    const popup = popupBounds(h);
+    assert.ok(popup.bottom < h.button().rect.top && h.button().rect.top - popup.bottom < 12);
+    assert.ok(popup.left >= 0 && popup.right < h.viewport.width);
+    assert.equal(popup.height, 192, 'short options remain fully visible when there is room above');
+});
+
+test('a long mobile menu fits the available landscape space and visual viewport offsets', () => {
+    const h = mobileSelect();
+    Object.assign(h.viewport, { width: 320, height: 240, offsetLeft: 30, offsetTop: 50 });
+    h.button().rect = { left: 20, right: 520, top: 148, bottom: 192, width: 500, height: 44 };
+    h.listbox().scrollHeight = 1000;
+    press(h.button(), 'Enter');
+    const popup = popupBounds(h);
+    assert.ok(popup.left >= 30 && popup.right <= 350);
+    assert.ok(popup.top >= 50 && popup.bottom <= 290);
+    assert.ok(popup.height < h.listbox().scrollHeight, 'long options remain internally scrollable');
+    assert.ok(popup.top > h.button().rect.bottom && popup.top - h.button().rect.bottom < 12);
+});
+
+test('invalid or unavailable visual viewport measurements use finite window bounds', () => {
+    for (const visualViewport of [undefined, { width: NaN, height: Infinity, offsetLeft: NaN, offsetTop: Infinity }]) {
+        const h = mobileSelect();
+        if (visualViewport) Object.assign(h.viewport, visualViewport);
+        else h.window.visualViewport = undefined;
+        press(h.button(), 'Enter');
+        const popup = popupBounds(h);
+        assert.ok(popup.left >= 0 && popup.right <= h.window.innerWidth);
+        assert.ok(popup.top >= 0 && popup.bottom <= h.window.innerHeight);
+        press(h.button(), 'Escape');
+        assert.equal(positionListenerCount(h), 0);
+    }
+});
+
+test('unusable geometry closes the menu without leaving active descendants or listeners', () => {
+    const cases = [
+        h => { h.viewport.height = 20; },
+        h => { h.button().rect.top = NaN; },
+        h => { h.button().rect.top = 900; h.button().rect.bottom = 944; },
+        h => { h.viewport.width = NaN; h.window.innerWidth = NaN; },
+        h => { h.select.adjacent.isConnected = false; }
+    ];
+    for (const change of cases) {
+        const h = mobileSelect();
+        change(h);
+        press(h.button(), 'ArrowDown');
+        assert.equal(h.button().getAttribute('aria-expanded'), 'false');
+        assert.equal(h.button().getAttribute('aria-activedescendant'), null);
+        assert.equal(h.listbox().hidden, true);
+        assert.equal(positionListenerCount(h), 0);
+    }
+});
+
+test('open popups follow scrolling and viewport changes while closed controls have no positioning listeners', () => {
+    const h = mobileSelect();
+    assert.equal(positionListenerCount(h), 0);
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+        press(h.button(), 'Enter');
+        assert.equal(positionListenerCount(h), 4);
+        h.button().rect = { left: 30, right: 230, top: 200, bottom: 244, width: 200, height: 44 };
+        h.window.dispatchEvent(new Event('scroll'));
+        assert.ok(popupBounds(h).top > 244);
+        Object.assign(h.viewport, { height: 400, offsetTop: 100 });
+        h.viewport.dispatchEvent(new Event('resize'));
+        const popup = popupBounds(h);
+        assert.ok(popup.top >= 100 && popup.bottom <= 500);
+        h.viewport.dispatchEvent(new Event('scroll'));
+        press(h.button(), 'Tab');
+        assert.equal(positionListenerCount(h), 0);
+        assert.deepEqual(h.listbox().style, { top: '', left: '', width: '', maxHeight: '' });
+    }
+});
+
+test('desktop CSS placement is restored when an open popup changes input layout', () => {
+    const h = mobileSelect();
+    press(h.button(), 'Enter');
+    popupBounds(h);
+    h.window.popupPosition = 'absolute';
+    h.window.dispatchEvent(new Event('resize'));
+    assert.deepEqual(h.listbox().style, { top: '', left: '', width: '', maxHeight: '' });
+    assert.equal(h.button().getAttribute('aria-expanded'), 'true');
+    h.window.popupPosition = 'fixed';
+    h.window.dispatchEvent(new Event('resize'));
+    popupBounds(h);
+    press(h.button(), 'Escape');
+    assert.equal(positionListenerCount(h), 0);
+});
+
+test('keyboard navigation scrolls only the option list and retains the focused combobox', () => {
+    const h = mobileSelect({ options: Array.from({ length: 10 }, (_, index) => ({
+        value: String(index), textContent: `Option ${index}`, disabled: index === 8
+    })) });
+    Object.assign(h.listbox(), { scrollHeight: 440, clientHeight: 88, offsetHeight: 90 });
+    h.button().focus();
+    press(h.button(), 'Enter');
+    press(h.button(), 'End');
+    assert.equal(h.listbox().scrollTop, 352);
+    assert.equal(h.focused(), h.button());
+    press(h.button(), 'ArrowUp');
+    assert.equal(h.button().getAttribute('aria-activedescendant'), h.listbox().children[7].id);
+    press(h.button(), 'Home');
+    assert.equal(h.listbox().scrollTop, 0);
+    press(h.button(), 'End');
+    press(h.button(), 'Enter');
+    assert.equal(h.select.value, '9');
+    assert.equal(positionListenerCount(h), 0);
+});
+
+test('outside dismissal, another select, disabling and detaching release popup listeners', () => {
+    const dismissals = [
+        h => h.document.dispatchEvent(new Event('pointerdown')),
+        h => h.document.dispatchEvent(Object.assign(new Event('artsoul-select-open'), { detail: {} })),
+        h => { h.select.disabled = true; h.mutate(); },
+        h => { h.select.adjacent.isConnected = false; h.window.dispatchEvent(new Event('scroll')); }
+    ];
+    for (const dismiss of dismissals) {
+        const h = mobileSelect();
+        press(h.button(), 'Enter');
+        dismiss(h);
+        assert.equal(h.listbox().hidden, true);
+        assert.equal(positionListenerCount(h), 0);
+        assert.equal(h.button().getAttribute('aria-activedescendant'), null);
+    }
 });

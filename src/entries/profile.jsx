@@ -1537,6 +1537,7 @@ const { useState, useEffect, useRef } = React;
                                 <div className="profile-identity-copy flex-1 min-w-0">
 <div className="profile-display-details">
                                             <div className="profile-summary">
+                                            <div className="profile-heading">
                                             <h1 className={`profile-display-name font-bold mb-1 break-words ${
                                                 isClassic ? 'text-gray-100' : ''
                                             }`}>
@@ -1579,6 +1580,7 @@ const { useState, useEffect, useRef } = React;
                                                     )}
                                                 </div>
                                             )}
+                                            </div>
                                             <p className="profile-display-bio">
                                                 {profile?.bio || 'No bio yet'}
                                             </p>

@@ -10,18 +10,18 @@ const policy = read('src/config/upload-policy.js').replace(/^export /gm, '');
 const amounts = read('src/features/auction/eth-amount.js').replace(/^export /gm, '');
 const upload = withoutImports(read('src/entries/upload.js')).replace(/^\s*bindUploadFlow\(\);\s*$/m, '');
 
-function client() {
+function client(theme = 'classic') {
     const elements = new Map();
     const element = id => {
         if (!elements.has(id)) elements.set(id, {
             value: '', checked: false, style: {}, dataset: {}, offsetParent: {}, disabled: false,
             classList: { add() {}, remove() {} }, setAttribute(name, value) { this[name] = value; },
-            removeAttribute(name) { delete this[name]; }, scrollIntoView() {}, focus() { this.focused = true; }
+            removeAttribute(name) { delete this[name]; }, scrollIntoView(options) { this.scrollBehavior = options.behavior; }, focus() { this.focused = true; }
         });
         return elements.get(id);
     };
     const context = vm.createContext({ console, window: { setTimeout() {} },
-        document: { getElementById: element, querySelectorAll: () => [] } });
+        document: { documentElement: {classList: {contains: value => value === theme}}, getElementById: element, querySelectorAll: () => [] } });
     vm.runInContext(`${policy}\n${amounts}\n${upload}`, context);
     return { context, element };
 }
@@ -65,6 +65,7 @@ test('description and price failures focus their own fields and clear after corr
     element('artDescription').value = 'Short';
     await context.handleUpload();
     assert.equal(element('artDescription').focused, true);
+    assert.equal(element('artDescription').scrollBehavior, 'auto', 'Classic focuses errors without animated scrolling');
     assert.equal(element('artTitle').focused, undefined);
     assert.match(element('artDescriptionError').textContent, /12 characters/);
     assert.equal(element('artDescription')['aria-invalid'], 'true');

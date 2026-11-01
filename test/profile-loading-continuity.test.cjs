@@ -36,7 +36,7 @@ test('React adopts the static profile loading frame instead of replacing it', ()
 
 test('immediate profile loading feedback bypasses the placeholder delay', () => {
   assert.match(skeletons, /ProfilePageSkeleton\(\{ className = '', immediate = false \}\)/);
-  assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/);
+  assert.match(skeletons, /return immediate \|\| ready \? '' : PLACEHOLDER;/);
   assert.match(skeletons, /<LoadingMark label="Loading profile" \/>/);
 });
 

@@ -230,6 +230,21 @@ function cachedIdentityStorage(wallet, name, avatarUrl) {
 for (const userAgent of [DESKTOP_UA, IPHONE_UA]) {
   const device = userAgent === IPHONE_UA ? 'mobile' : 'desktop';
 
+  test(`[${device}] explicit site logout overrides stale identity before and after header hydration`, async () => {
+    const wallet = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const harness = bootHarness({ userAgent, settled: false, storage: {
+      ...cachedIdentityStorage(wallet, 'Previous account', 'https://example.test/avatar.png'),
+      artsoul_disconnecting: 'true'
+    } });
+    harness.context.window.ArtSoulHeaderPrepaint.hydrate(harness.navButtons);
+    assert.equal(harness.avatarName(), 'ArtSoul Guest');
+    assert.equal(harness.context.window.ArtSoulHeaderPrepaint.boot.notificationWallet, '');
+    harness.dropdown.renderInitializingState();
+    await harness.flush();
+    assert.equal(harness.avatarName(), 'ArtSoul Guest');
+    assert.deepEqual(harness.imageLoads, []);
+  });
+
   test(`[${device}] a never-connected guest keeps the decoded shell image through hydration`, async () => {
     const harness = bootHarness({ userAgent, settled: false, storage: {} });
     const image = harness.avatarImage();
@@ -558,12 +573,12 @@ test('every shared-header page boots the header in the same order with the same 
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
     assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=66">/, `${page} stylesheet pin`);
-    assert.match(html, /<script src="\/header-prepaint\.js\?v=9"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=59" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/header-prepaint\.js\?v=10"><\/script>/, `${page} prepaint pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=60" defer><\/script>/, `${page} component pin`);
 
     const stylesheet = html.indexOf('unified-styles.css?v=66');
-    const prepaint = html.indexOf('header-prepaint.js?v=9');
-    const component = html.indexOf('avatar-dropdown.js?v=59');
+    const prepaint = html.indexOf('header-prepaint.js?v=10');
+    const component = html.indexOf('avatar-dropdown.js?v=60');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
     // wallet-runtime-loader.js and appkit-init is imported from inside it. The
     // ordering this guard protects is unchanged: the header component still has

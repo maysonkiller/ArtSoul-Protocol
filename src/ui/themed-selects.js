@@ -41,6 +41,7 @@
         const listbox = document.createElement('div');
         const listboxId = `artsoul-select-list-${++optionSequence}`;
         let activeIndex = Math.max(select.selectedIndex, 0);
+        let releasePosition;
         const labelIds = Array.from(select.labels || []).map((label, index) => {
             if (!label.id) label.id = `${listboxId}-label-${index}`;
             return label.id;
@@ -72,6 +73,65 @@
             return button.getAttribute('aria-expanded') === 'true';
         }
 
+        function clearPosition() {
+            for (const property of ['top', 'left', 'width', 'maxHeight']) listbox.style[property] = '';
+        }
+
+        function positionListbox() {
+            if (!isOpen()) return;
+            if (!root.isConnected) return close();
+            if (global.getComputedStyle(listbox).position !== 'fixed') {
+                clearPosition();
+                return;
+            }
+            const viewport = global.visualViewport;
+            const positive = value => Number.isFinite(value) && value > 0;
+            const width = positive(viewport?.width) ? viewport.width : global.innerWidth;
+            const height = positive(viewport?.height) ? viewport.height : global.innerHeight;
+            const offsetLeft = Number.isFinite(viewport?.offsetLeft) ? viewport.offsetLeft : 0;
+            const offsetTop = Number.isFinite(viewport?.offsetTop) ? viewport.offsetTop : 0;
+            const rect = button.getBoundingClientRect();
+            if (!positive(width) || !positive(height) || width <= 24 || height <= 24
+                || ![rect.left, rect.right, rect.top, rect.bottom, rect.width].every(Number.isFinite)
+                || rect.width <= 0 || rect.bottom <= offsetTop || rect.top >= offsetTop + height
+                || rect.right <= offsetLeft || rect.left >= offsetLeft + width) return close();
+
+            const left = offsetLeft + 12;
+            const top = offsetTop + 12;
+            const popupWidth = Math.min(rect.width, width - 24);
+            listbox.style.width = `${popupWidth}px`;
+            const desiredHeight = Math.min(360, height * 0.6,
+                listbox.scrollHeight + listbox.offsetHeight - listbox.clientHeight);
+            const below = Math.max(0, offsetTop + height - 12 - rect.bottom - 7);
+            const above = Math.max(0, rect.top - 7 - top);
+            const opensAbove = below < desiredHeight && above > below;
+            const popupHeight = Math.min(desiredHeight, opensAbove ? above : below);
+            if (!positive(popupHeight) || popupHeight < Math.min(44, desiredHeight)) return close();
+            listbox.style.maxHeight = `${popupHeight}px`;
+            listbox.style.left = `${Math.max(left, Math.min(rect.left, offsetLeft + width - 12 - popupWidth))}px`;
+            listbox.style.top = `${Math.max(top, Math.min(opensAbove ? rect.top - 7 - popupHeight : rect.bottom + 7,
+                offsetTop + height - 12 - popupHeight))}px`;
+        }
+
+        function bindPosition() {
+            const viewport = global.visualViewport;
+            const update = event => {
+                if (event.target !== listbox) positionListbox();
+            };
+            global.addEventListener('scroll', update, true);
+            global.addEventListener('resize', update);
+            viewport?.addEventListener('scroll', update);
+            viewport?.addEventListener('resize', update);
+            releasePosition = () => {
+                global.removeEventListener('scroll', update, true);
+                global.removeEventListener('resize', update);
+                viewport?.removeEventListener('scroll', update);
+                viewport?.removeEventListener('resize', update);
+                releasePosition = undefined;
+            };
+            positionListbox();
+        }
+
         function sync() {
             const selectedOption = select.options[select.selectedIndex] || select.options[0];
             value.textContent = selectedOption?.textContent.trim() || '';
@@ -95,6 +155,7 @@
                 optionElement.setAttribute('aria-selected', String(selected));
                 optionElement.classList.toggle('is-selected', selected);
             });
+            if (select.disabled) close();
         }
 
         function renderOptions() {
@@ -120,6 +181,10 @@
                 listbox.append(optionElement);
             });
             sync();
+            if (isOpen()) {
+                positionListbox();
+                if (isOpen()) setActiveOption(activeIndex);
+            }
         }
 
         function setActiveOption(index) {
@@ -136,7 +201,14 @@
             activeIndex = Math.max(0, Math.min(nextIndex, options.length - 1));
             const activeOption = listbox.children[activeIndex];
             button.setAttribute('aria-activedescendant', activeOption?.id || '');
-            activeOption?.scrollIntoView({ block: 'nearest' });
+            if (activeOption) {
+                const top = activeOption.offsetTop;
+                const bottom = top + activeOption.offsetHeight;
+                if (top < listbox.scrollTop) listbox.scrollTop = top;
+                else if (bottom > listbox.scrollTop + listbox.clientHeight) {
+                    listbox.scrollTop = bottom - listbox.clientHeight;
+                }
+            }
 
             Array.from(listbox.children).forEach((element, optionIndex) => {
                 element.classList.toggle('is-active', optionIndex === activeIndex);
@@ -150,11 +222,14 @@
             button.setAttribute('aria-expanded', 'true');
             root.classList.add('is-open');
             sync();
-            setActiveOption(activeIndex);
+            bindPosition();
+            if (isOpen()) setActiveOption(activeIndex);
         }
 
         function close() {
             if (!isOpen()) return;
+            releasePosition?.();
+            clearPosition();
             listbox.hidden = true;
             button.setAttribute('aria-expanded', 'false');
             button.removeAttribute('aria-activedescendant');
@@ -189,6 +264,7 @@
             if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
                 event.preventDefault();
                 if (!isOpen()) open();
+                if (!isOpen()) return;
                 if (event.key === 'Home') setActiveOption(0);
                 else if (event.key === 'End') setActiveOption(lastIndex);
                 else setActiveOption(activeIndex + (event.key === 'ArrowDown' ? 1 : -1));
