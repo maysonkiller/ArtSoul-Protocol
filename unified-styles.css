@@ -9255,7 +9255,7 @@ body:is(.classic, .future) .site-header .site-header-actions
 
 /* Recording is safety-critical: never disguise an active microphone as idle.
    This exception is state-owned, not the theme's ambient decorative glow. */
-body:is(.classic, .future) .site-header .site-header-actions .artsoul-voice-button.is-listening {
+body:is(.classic, .future) .site-header .site-header-actions .artsoul-voice-button.artsoul-voice-button.is-listening {
     border-color: var(--c-accent) !important;
     background: var(--c-accent) !important;
     color: var(--c-bg) !important;

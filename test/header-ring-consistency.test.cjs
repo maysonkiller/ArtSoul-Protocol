@@ -47,7 +47,8 @@ test('hover, keyboard focus and open state show one common theme-aware glow', ()
 });
 
 test('voice listening state remains explicit; all buttons keep 44px targets', () => {
-  assert.match(block, /\.artsoul-voice-button\.is-listening \{[\s\S]*?background: var\(--c-accent\) !important/);
+  // Matching :hover must never disguise an active microphone as an idle button.
+  assert.match(block, /\.artsoul-voice-button\.artsoul-voice-button\.is-listening \{[\s\S]*?background: var\(--c-accent\) !important/);
   assert.match(block, /width: 44px !important/);
   assert.match(block, /min-height: 44px !important/);
   assert.match(block, /@media \(prefers-reduced-motion: reduce\)/);
