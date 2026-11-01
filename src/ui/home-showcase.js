@@ -170,12 +170,15 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     stage.hidden = false;
     show(0);
     const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    // An explicit press of Resume wins over the hover/focus pause until focus
+    // moves to another control. Simply focusing the carousel always pauses it.
+    let explicitResume = false;
     const mayAdvance = () => shouldAutoAdvanceShowcase({
         slideCount: stage.children.length,
         visibility: document.visibilityState,
         reducedMotion: Boolean(motion?.matches),
-        hovered: root.matches(':hover'),
-        focused: root.contains(document.activeElement),
+        hovered: root.matches(':hover') && !explicitResume,
+        focused: root.contains(document.activeElement) && !explicitResume,
         paused: userPaused
     });
     const stop = () => {
@@ -201,13 +204,27 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     };
     previous.onclick = () => { show(active - 1); restart(); };
     next.onclick = () => { show(active + 1); restart(); };
-    pause.onclick = () => { userPaused = !userPaused; syncPause(); restart(); };
+    pause.onclick = () => {
+        userPaused = !userPaused;
+        explicitResume = !userPaused;
+        syncPause();
+        restart();
+    };
     syncPause();
 
-    const onHover = () => stop();
-    const onLeave = () => start();
-    const onFocus = () => stop();
-    const onBlur = event => { if (!root.contains(event.relatedTarget)) start(); };
+    const onHover = () => { explicitResume = false; stop(); };
+    const onLeave = () => { explicitResume = false; start(); };
+    const onFocus = event => {
+        if (explicitResume && event.target === pause) return;
+        explicitResume = false;
+        stop();
+    };
+    const onBlur = event => {
+        if (!root.contains(event.relatedTarget)) {
+            explicitResume = false;
+            start();
+        }
+    };
     const onVisibility = () => {
         if (document.visibilityState === 'visible') start();
         else stop();
