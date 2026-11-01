@@ -398,7 +398,7 @@ with no horizontal overflow. These public reads made no wallet operations.
 Evidence: docs/private/b18-discovery-*.log and output/playwright/b18-discovery-*.
 No native iPhone or wallet acceptance is inferred from synthetic transport.
 
-## Profile, artwork, publish, Admin and Docs adoption — November 1 candidate
+## Profile, artwork, publish, Admin and Docs adoption — November 1 release
 
 Based on PR415 / `e396dfb5`, in the same `C:\Projects\ArtSoul` checkout.
 Future now uses the accepted compact profile summary and equal statistics,
@@ -436,7 +436,30 @@ Interpretations: publication steps are orientation, not a new state machine;
 disclosures do not hide required publication or auction actions; the changed
 layout does not amend economics or lifecycle. Collection drafts are the next
 presentation slice; issuance, badges and contract deployment remain unfinished
-capabilities rather than enabled demonstration buttons. Release proof pending.
+capabilities rather than enabled demonstration buttons.
+
+Released PR416 / `8b687411` from candidate `2cce8c70`. Exact CI41264138384
+passed Linux3,243/two skips, Windows2,688/35 skips, 49 contract tests per
+platform, both builds and static checks. Preview7467359680 and production
+7467399560 succeeded. Six apex routes serve the exact stylesheet SHA256
+`752d553ee5845c45f1854c26b7beeb6cfc01dd4dae82afb594fea78306897182`.
+Live public Artwork13, creator profile, Publish, Guide and guest Admin pass at
+390/1366 without horizontal overflow; actual indexed First Collector/Owner
+labels are visible. No protected guest rows or wallet operations. Evidence:
+`docs/private/b18-detail-{ci,preview-release,production-release,live-check}.log`.
+
+## Collection draft presentation — November 1 candidate
+
+Future-only CSS adapts the existing Collection/Phases/Review flow: 44px actions,
+16px fields, wrapping long text and quiet panels. Classic, both palettes, the
+existing draft model and unavailable publication boundary remain unchanged.
+This is not Collection Launch activation. All 29 draft/capability unit tests and
+build pass. Source and built-browser passes each verify194 assertions across
+eight theme/width layouts and all three steps, including actual browser-local
+save/load, valid/invalid import, blank/undo, phase reorder/remove/undo, review
+errors, keyboard explanation and quota failure preserving the saved copy.
+Evidence: `docs/private/b18-{built-collection-browser-check,collection-units,
+collection-build}.log`; no remote writes or wallet operations. Release pending.
 
 ## Verification mark policy
 
