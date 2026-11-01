@@ -112,6 +112,39 @@ test('public NFT consumers use one verified history across cards, filters, saved
     assert.notEqual(card.status, 'for_sale'); assert.equal(card.sale_price, '0'); assert.equal(card.canonical_floor, '2');
   };
 
+  for (const size of [1, 20, 200]) await t.test(`a stable ${size}-work feed stays within two ownership proof passes`, async () => {
+    rows.v41_artworks = Array.from({ length: size }, (_, i) => ({ ...rows.v41_artworks[0],
+      artwork_id: String(i + 1), token_id: String(i + 1) }));
+    owners = rows.v41_artworks.map(row => ({ ...proof(), artwork_id: row.artwork_id, token_id: row.token_id }));
+    const res = await cardRequest({});
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.count, Math.min(size, 100));
+    const batches = calls.filter(call => call.name === 'rpc/read_verified_nft_cards');
+    assert.ok(batches.length <= 2 * Math.ceil(size / 20), 'no intermediate full proof before the response guard');
+    assert.ok(batches.every(call => call.body.p_artwork_ids.length <= 20));
+    assert.equal(calls.filter(call => call.name === 'rpc/read_verified_nft_boundary').length, 1);
+  });
+
+  for (const surface of ['direct', 'feed', 'Saved', 'search']) await t.test(`${surface} rejects a changed owner under an unchanged boundary`, async () => {
+    afterRead = name => {
+      if (name !== 'rpc/read_verified_nft_cards') return;
+      afterRead = null;
+      owners[0].current_owner_address = CREATOR;
+      owners[0].latest_transfer.to_address = CREATOR;
+    };
+    if (surface === 'Saved' || surface === 'search') {
+      await assert.rejects(surface === 'Saved'
+        ? readVisibleArtworkCard(84532, '77')
+        : readVisibleArtworkCards(84532, ['77'], CORE), error => error.code === 'NFT_OWNERSHIP_UNAVAILABLE');
+    } else {
+      const res = await cardRequest(surface === 'direct' ? { id: '77' } : {});
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.body.error, 'NFT_OWNERSHIP_UNAVAILABLE');
+      assert.equal(res.headers['cache-control'], 'private, no-store');
+    }
+    assert.equal(calls.filter(call => call.name === 'rpc/read_verified_nft_boundary').length, 1, 'same-boundary mutation cannot retry');
+  });
+
   await t.test('direct card uses transfer owner, keeps First Collector and suppresses stale listing', async () => {
     const res = await cardRequest({ id: '77' }); assert.equal(res.statusCode, 200); assertOwner(res.body.data[0]);
     assert.equal(res.headers['cache-control'], 'private, no-store');

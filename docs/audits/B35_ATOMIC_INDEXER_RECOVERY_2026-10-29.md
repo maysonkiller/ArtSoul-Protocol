@@ -1283,3 +1283,68 @@ The first fixture failure remains in `b35-atomic-pg-recheck.log`.
 Preview7469179359 serves the exact six-route stylesheet and successful real
 artwork13/provenance reads, using520,393 response bytes for the bounded check.
 These existing-data reads exercise the disabled ownership gate, not activation.
+
+
+## November 1 object-byte recovery rehearsal
+
+The fresh database archive above is now paired with all 159 public objects in
+the Protocol artworks bucket (115,603,645 bytes). Each conditional download
+matched the archived ETag and size; 158 ordinary ETags also matched the byte
+MD5. The one multipart ETag was checked as an opaque version identifier, not
+incorrectly treated as a full-file MD5. Every saved object has a SHA-256 digest.
+
+A separate offline restore reconstructed every original bucket/key path from
+the manifest and verified all 159 sizes and SHA-256 digests, with no source
+writes and no missing or extra inventory keys. This is the Protocol project
+only; ArtSoul OS was not accessed. Manifest SHA-256:
+`bc3a8818db0c5ba1be4d6caf6f8a8865232254d41b6c512dca498acf4e435d3b`.
+Private evidence: `docs/private/b35-storage-restore-summary.json`.
+
+This closes the local object-byte recovery check, not the independent durable
+encrypted-copy gate. Both local copies share one computer. No new storage
+subscription, billing change, migration, live writer or ownership flag was
+enabled. The next independent work is the bounded poll/cache cost and API
+boundary acceptance rehearsal; an independent backup destination and recovery
+procedure remain necessary before activation.
+
+
+## November 1 API response-boundary cost reduction
+
+A bounded offline measurement used the current public handler and its existing
+synthetic ownership fixture for 1, 20 and 200 works. It included stable reads,
+one forward publication and two consecutive forward publications. No network,
+real database, provider latency or paid usage was involved. The initial probe
+incorrectly expected all 200 cards in the response; the existing default page
+cap is 100. That probe failure is retained and its expectation was corrected.
+
+The measurement exposed three complete ownership proof passes per feed: initial
+hydration, an intermediate projection check and the terminal response check.
+The intermediate check was removed; the Saved single-card entry point now owns
+its terminal check explicitly. HTTP and search retain their checks after all
+visibility/permission reads. Proof contents, same-boundary mutation rejection,
+one whole-read retry and unavailable responses are unchanged. This is API
+orchestration within canon sections 1/4/5/9, not an economic or lifecycle change.
+
+At 200 fixture works, stable reads fell from 43 to 33 database HTTP requests,
+30 to 20 ownership batches, and 549,031 to 415,037 response body bytes (24.4%).
+These are fixture payloads excluding headers/TLS; they are not billed egress or
+a production latency claim. A single forward publication fell from 66 to 56
+requests; a second move still returned 503 after the single permitted retry.
+
+Three cost regressions failed before the patch and pass afterward. Four new
+cases prove direct/feed/Saved/search reject owner changes under an unchanged
+boundary. The Saved extraction fixture initially lacked the newly explicit
+guard dependencies; it now supplies them and asserts both execution and denial.
+Final focused validation: 224/224 checks and the 11-route/172-utility build pass.
+Private evidence: `b35-api-cost-{acceptance-final,after-guard}.json`,
+`b35-redundant-read-reproduction.log` and `b35-response-guard-final.log`.
+
+The combined poll/RPC/SQL/cache workload and independent encrypted backup copy
+remain open. This patch does not enable the ownership API or update the live
+worker. Exact release checks remain necessary.
+
+Independent review found no regression in the changed entry points. Existing
+acceptance limitation: Saved pages hydrate separate groups of cards, and global
+search may await artist profiles alongside card hydration. Per-card/segment
+proof does not by itself establish one publication boundary for the entire
+outer response. That broader acceptance remains open before activation.
