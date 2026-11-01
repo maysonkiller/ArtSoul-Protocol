@@ -471,7 +471,7 @@ Real guest390/1366 layouts show all three steps and the unpublished boundary
 without horizontal overflow. Logs: `docs/private/b18-collection-{ci,
 preview-release,production-release,live-check}.log`.
 
-## Assistant, notification overlays and payment guidance — November 1 candidate
+## Assistant, notification overlays and payment guidance — November 1 release
 
 Future overlay presentation retains the actual existing components, a sticky
 close/settings area, wrapping long responses,44px controls and a single popup
@@ -494,9 +494,31 @@ results. Built artwork checks pass394 assertions, including keyboard payment
 guidance and dialog restoration. Source notification browser acceptance passes
 10 layouts plus settings validation/save, read-on-open, current mock deletion
 APIs, hidden groups, staff gates and close/focus behavior. No real private inbox,
-microphone capture or transaction is used. Built notification acceptance and
-exact CI/release checks remain pending. Evidence: `docs/private/b18-overlay-*.log`
-and `b18-built-overlay-*.log`; screenshots in `output/playwright/b18-notification*`.
+microphone capture or transaction is used. Built notification acceptance also
+passes all10 layouts and interaction cases with the actual production bundle.
+Its isolated fixture needed a protected nested config loader and selectors that
+exclude the deliberately hidden native select; no product workaround was added.
+
+Released PR418 /cc574d85, exact candidate ecc17962. CI41265999428 passes
+Linux3243/2 explicit skips, Windows2688/35 skips,49 contracts on each platform,
+both builds and static checks. Preview7467618072 and production7467706320
+are successful. Six apex routes serve the exact local stylesheet bytes,
+SHA25639b90d05b45c77084d9df94b80b93d1c63ee5d1afe4b123290bce5d6e03df884.
+Real guest checks at390/1366 verify payment-guide links, an actual assistant
+help response, close behavior and the notification sign-in prompt without page
+overflow. No real inbox, microphone or wallet action was used in that pass.
+Evidence: `docs/private/b18-overlay-{ci,preview-release,production-release,live-check}.log`,
+`b18-built-overlay-notifications-final.log` and the earlier source/built logs;
+screenshots in `output/playwright/b18-{built-notification,overlay-live}*`.
+
+The accepted composition is now adopted across shared navigation/cards, Home,
+Gallery, Profile, artwork, Publish, collection drafts, Admin, Guide, assistant
+and notifications (PR413–418). Both original palettes are retained. This closes
+the page-adoption implementation, not native-device acceptance or all Phase B.
+Keep tappable tabs and native browser navigation for this release. Whole-page
+swipe interception is deferred until a real-device check can establish that it
+does not conflict with Back, media controls, scrolling or text selection. No
+unimplemented swipe control is presented to users.
 
 ## Verification mark policy
 
