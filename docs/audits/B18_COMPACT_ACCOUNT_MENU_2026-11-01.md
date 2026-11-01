@@ -47,6 +47,17 @@ These are UI choices, not new roles, permissions or architecture amendments.
 
 ## Release status
 
-Local implementation and build verified. Release/CI results will be added after
-the exact candidate is checked. Phase B remains open: this UI change does not
-complete the independent recovery and existing-worker activation gates.
+PR #429 candidate b00a008a passed exact CI 41293396255: Linux 3,953 passes /
+2 skips, Windows 3,256 passes / 35 skips, 49 contract checks each, both builds
+and static checks. It merged as 571240b0. Production deployment 7471237527
+serves the exact reviewed stylesheet and runtime assets on all six checked
+routes. Real artwork 13 and its four provenance events load successfully.
+
+The published guest menu passes four browser combinations (390px and 1366px,
+both themes), including touch target sizes, selected theme state, bounds and
+absence of Admin access. No browser errors occurred. Account/staff states were
+checked in the isolated rendered matrix, not with the owner's live wallet.
+
+Phase B remains open: this UI change does not complete the independent recovery
+and existing-worker activation gates. Private evidence is retained in
+`b18-menu-production-{assets,routes,browser}.json` and both CI logs.

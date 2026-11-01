@@ -761,7 +761,9 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
     return acc;
   }, {});
 
-  if (!preload.legacyOnly) await recheckNftOwnership(ownership);
+  // The consuming entry point rechecks after its final asynchronous read.
+  // Repeating the full proof here adds a database batch per 20 artworks without
+  // protecting the later visibility, staff-access or response boundary.
   return { cards, bids: maps.bids, diagnostics, warnings, publicMetrics, ownership };
 }
 
@@ -1050,6 +1052,7 @@ export async function readVisibleArtworkCard(chain, artworkId) {
   const snapshot = await getDirectProjectionSnapshot({ chain, artworkId });
   if (snapshot.warnings.length) throw new Error('Artwork projection is unavailable');
   const card = snapshot.cards.find(row => Number(row.chain_id) === chain && String(row.artwork_id) === artworkId);
+  if (chain === CANONICAL_PUBLIC_CHAIN_ID) await recheckNftOwnership(snapshot.ownership);
   return card && card.moderation_hidden !== true ? card : null;
   });
 }

@@ -198,15 +198,22 @@ test('Saved projection reuse never grants a staff visibility exception or accept
   const end=module.indexOf('export default async function handler',start);
   const code=module.slice(start,end).replace(/^export /gm,'');
   const card={chain_id:84532,artwork_id:'7',title:'Public'};
+  const createRead=(snapshot,recheck)=>new Function('readWithNftOwnershipRetry','getDirectProjectionSnapshot',
+    'CANONICAL_PUBLIC_CHAIN_ID','recheckNftOwnership',code+';return readVisibleArtworkCard;')(
+      operation=>operation(),async lookup=>{
+        assert.deepEqual(lookup,{chain:84532,artworkId:'7'});return snapshot;
+      },84532,recheck);
   for(const [snapshot,expected] of [[{cards:[card],warnings:[]},card],
     [{cards:[{...card,moderation_hidden:true}],warnings:[]},null],[{cards:[],warnings:[]},null],
     [{cards:[{...card,chain_id:11155111}],warnings:[]},null]]){
-    const read=new Function('readWithNftOwnershipRetry','getDirectProjectionSnapshot',code+';return readVisibleArtworkCard;')(operation=>operation(),async lookup=>{
-      assert.deepEqual(lookup,{chain:84532,artworkId:'7'});return snapshot;
-    });
+    let checked=false;
+    const read=createRead(snapshot,async ownership=>{assert.equal(ownership,snapshot.ownership);checked=true;});
     assert.deepEqual(await read(84532,'7'),expected);
+    assert.equal(checked,true);
   }
-  const unavailable=new Function('readWithNftOwnershipRetry','getDirectProjectionSnapshot',code+';return readVisibleArtworkCard;')(
-    operation=>operation(),async()=>({cards:[card],warnings:[{table:'artwork_moderation_visibility',code:'QUERY_FAILED'}]}));
+  const unavailable=createRead({cards:[card],warnings:[{table:'artwork_moderation_visibility',code:'QUERY_FAILED'}]},
+    async()=>assert.fail('failed projection cannot reach ownership response guard'));
   await assert.rejects(unavailable(84532,'7'),/unavailable/);
+  const changed=createRead({cards:[card],warnings:[]},async()=>{throw Error('ownership changed');});
+  await assert.rejects(changed(84532,'7'),/ownership changed/);
 });
