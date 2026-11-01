@@ -12,6 +12,50 @@ function requireCurrent(plan) {
     if (!plan.authority?.isCurrent()) throw new Error('Reorg resale leadership changed');
 }
 
+function requireDeployment(plan, listener) {
+    requireCurrent(plan);
+    if (!Number.isSafeInteger(Number(plan.chainId)) || Number(plan.chainId) <= 0 ||
+        Number(listener?.chainId) !== Number(plan.chainId) ||
+        !addressPattern.test(listener?.contractAddress || '') ||
+        listener.contractAddress.toLowerCase() !== plan.state.contract_address?.toLowerCase() ||
+        typeof listener._readRpcCall !== 'function') {
+        throw new Error('Reorg authority or deployment unavailable');
+    }
+}
+
+async function readCanonicalHeader(plan, listener, blockNumber) {
+    requireDeployment(plan, listener);
+    let active = true, generation = 0;
+    try {
+        const header = await listener._readRpcCall(async provider => {
+            const attempt = ++generation;
+            const check = () => {
+                requireDeployment(plan, listener);
+                // RPC timeouts do not cancel an already-running callback.
+                if (!active || attempt !== generation) throw new Error('Reorg header read superseded');
+            };
+            check();
+            const chain = await provider.send('eth_chainId', []);
+            check();
+            if (BigInt(chain) !== BigInt(plan.chainId)) throw new Error('Reorg RPC chain changed');
+            const block = await provider.send('eth_getBlockByNumber', [`0x${blockNumber.toString(16)}`, false]);
+            check();
+            if (!hashPattern.test(block?.hash || '') || !/^0x[0-9a-f]+$/i.test(block?.number || '') ||
+                BigInt(block.number) !== BigInt(blockNumber)) throw new Error('Invalid reorg ancestor header');
+            const finalChain = await provider.send('eth_chainId', []);
+            check();
+            if (BigInt(finalChain) !== BigInt(plan.chainId)) throw new Error('Reorg RPC chain changed');
+            return block;
+        });
+        requireDeployment(plan, listener);
+        if (!hashPattern.test(header?.hash || '') || !/^0x[0-9a-f]+$/i.test(header?.number || '') ||
+            BigInt(header.number) !== BigInt(blockNumber)) throw new Error('Invalid reorg ancestor header');
+        return header;
+    } finally {
+        active = false;
+    }
+}
+
 // All archive RPC reads finish before the rewind transaction takes locks. A
 // prepared snapshot is disposable: cursor/row/leadership changes require a new
 // preparation, never partial application or a fallback to latest state.
@@ -34,25 +78,32 @@ export async function prepareResaleRewind(client, chainId, requestedBoundary, li
     if (![indexed, confirmed].every(value => Number.isSafeInteger(value) && value >= 0)) {
         throw new Error('Invalid indexer cursor for reorg');
     }
-    const rewindTo = Math.min(indexed, requestedBoundary - 1);
-    // Never retain facts after the state snapshot boundary.
-    const boundary = rewindTo + 1;
-    const plan = { chainId: String(chainId), state, rewindTo, boundary, authority,
-        confirmedTo: Math.min(confirmed, rewindTo), rows: [], listings: [] };
-    plan.rows = (await client.query(rowsSql, [plan.chainId, boundary])).rows;
-    if (!plan.rows.length) return plan;
-    if (Number(chainId) !== 84532 || !addressPattern.test(listener?.contractAddress || '') ||
-        listener.contractAddress.toLowerCase() !== state.contract_address?.toLowerCase() ||
-        Number(listener.chainId) !== Number(chainId)) {
-        throw new Error('Reorg resale authority or deployment unavailable');
+    if (!Number.isSafeInteger(requestedBoundary) || requestedBoundary <= 0) throw new Error('Invalid reorg boundary');
+    const plan = { chainId: String(chainId), state, authority, rows: [], listings: [] };
+    requireDeployment(plan, listener);
+    // A sampled mismatch is not the fork boundary. Retain only a header whose
+    // hash still agrees with the chain, bounded by the captured indexed cursor.
+    const ceiling = Math.min(indexed, requestedBoundary - 1);
+    const candidates = (await client.query(`SELECT block_number, block_hash FROM public.block_hashes
+        WHERE chain_id=$1 AND block_number<=$2 ORDER BY block_number DESC LIMIT 64`,
+    [plan.chainId, ceiling])).rows;
+    for (const candidate of candidates) {
+        const number = Number(candidate.block_number);
+        if (!Number.isSafeInteger(number) || number < 0 || number > ceiling ||
+            !hashPattern.test(candidate.block_hash || '')) throw new Error('Invalid retained ancestor header');
+        const header = await readCanonicalHeader(plan, listener, number);
+        if (header.hash.toLowerCase() === candidate.block_hash.toLowerCase()) {
+            plan.rewindTo = number;
+            plan.blockHash = candidate.block_hash;
+            break;
+        }
     }
-    requireCurrent(plan);
-    const hashes = (await client.query(`SELECT block_hash FROM public.block_hashes
-        WHERE chain_id=$1 AND block_number=$2`, [plan.chainId, rewindTo])).rows;
-    plan.blockHash = hashes[0]?.block_hash;
-    // Sparse historical indexing may not have this exact header. Do not use a
-    // nearby header or overwrite a conflicting one to force recovery through.
-    if (!hashPattern.test(plan.blockHash || '')) throw new Error('Reorg resale boundary unavailable');
+    if (!plan.blockHash) throw new Error('No proven reorg ancestor within retained header budget');
+    const rewindTo = plan.rewindTo;
+    plan.boundary = rewindTo + 1;
+    plan.confirmedTo = Math.min(confirmed, rewindTo);
+    plan.rows = (await client.query(rowsSql, [plan.chainId, plan.boundary])).rows;
+    if (plan.rows.length && Number(chainId) !== 84532) throw new Error('Reorg resale chain unavailable');
     for (let offset = 0; offset < plan.rows.length; offset += RESALE_RECONCILIATION_BATCH_SIZE) {
         requireCurrent(plan);
         const batch = plan.rows.slice(offset, offset + RESALE_RECONCILIATION_BATCH_SIZE);
@@ -66,7 +117,8 @@ export async function prepareResaleRewind(client, chainId, requestedBoundary, li
             typeof listing.active !== 'boolean')) throw new Error('Invalid reorg resale snapshot');
         plan.listings.push(...listings);
     }
-    requireCurrent(plan);
+    const finalHeader = await readCanonicalHeader(plan, listener, rewindTo);
+    if (finalHeader.hash.toLowerCase() !== plan.blockHash.toLowerCase()) throw new Error('Reorg ancestor changed during preparation');
     return plan;
 }
 

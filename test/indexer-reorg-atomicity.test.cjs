@@ -53,7 +53,9 @@ function isolatedEngineSource() {
 
 test('rewind events, cursor, hashes and media revision atomically (isolated PostgreSQL)', {
   skip: BIN ? false : 'Set ARTSOUL_TEST_POSTGRES_BIN; no database connection attempted',
-  timeout: 120000
+  // Full migration/recovery matrix also runs on slower local Windows disks;
+  // individual SQL statements and concurrency gates retain their short bounds.
+  timeout: 300000
 }, async t => {
   const suffix = `${Date.now()}-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   const directory = path.join(ROOT, 'docs', 'private', `reorg-atomicity-${suffix}`);
@@ -65,7 +67,8 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const evidence = {kind: 'atomic-rewind-regression', directory, port, host: '127.0.0.1', results: []};
   let pool, initialized = false;
   const command = (name, args) => execFileSync(executable(name), args, {
-    cwd: directory, encoding: 'utf8', windowsHide: true, timeout: 30000,
+    cwd: directory, encoding: 'utf8', windowsHide: true,
+    timeout: name === 'pg_ctl' && args.includes('stop') ? 185000 : 30000,
     // A Windows server child can retain inherited pipe handles after pg_ctl
     // exits. Server startup output is already captured by its explicit log.
     stdio: name === 'pg_ctl' && args.includes('start') ? 'ignore' : ['ignore', 'pipe', 'pipe'], env: {
@@ -79,7 +82,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       let running = false;
       try {command('pg_ctl', ['-D', data, 'status']); running = true;}
       catch (error) {if (error.status !== 3) throw error;}
-      if (running) command('pg_ctl', ['-D', data, '-m', 'fast', '-w', 'stop']);
+      if (running) command('pg_ctl', ['-D', data, '-m', 'fast', '-t', '180', '-w', 'stop']);
       evidence.clusterStopped = true;
     }
     fs.writeFileSync(path.join(directory, 'evidence.json'), JSON.stringify(evidence, null, 2));
@@ -135,7 +138,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const target = engine(CHAIN), other = engine(OTHER_CHAIN);
   const resaleInterface = new Interface(['function resaleListings(uint256) view returns(address seller,uint256 price,bool active)']);
   const resaleStates = new Map(), resaleReads = [];
-  let rpcHook = null, leaderCurrent = true, leaderEpoch = 0;
+  let rpcHook = null, headerHash = hash, leaderCurrent = true, leaderEpoch = 0;
   target.getRecoveryAuthority = () => {
     const epoch = leaderEpoch;
     return {lockName:'fixture-reorg',instanceId:'fixture-worker',fencingToken:'1',
@@ -144,7 +147,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   target.eventListener._readRpcCall = async operation => operation({async send(method, params) {
     await rpcHook?.(method,params);
     if(method==='eth_chainId') return '0x14a34';
-    if(method==='eth_getBlockByNumber') return {hash:hash(Number(BigInt(params[0])))};
+    if(method==='eth_getBlockByNumber') return {number:params[0],hash:headerHash(Number(BigInt(params[0])))};
     assert.equal(method,'eth_call');assert.deepEqual(params[1],{blockHash:hash(109),requireCanonical:true});
     const id = resaleInterface.decodeFunctionData('resaleListings',params[0].data)[0].toString();
     resaleReads.push(id);
@@ -186,7 +189,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     // Local database only; all included tables were just created by this test.
     await pool.query(`TRUNCATE ${tables.join(',')},outbox_events,distributed_locks,
       auction_notification_reads,auction_notification_preferences CASCADE`);
-    beforeSql = null;rpcHook = null;leaderCurrent = true;leaderEpoch = 0;resaleStates.clear();resaleReads.length=0;
+    beforeSql = null;rpcHook = null;headerHash = hash;leaderCurrent = true;leaderEpoch = 0;resaleStates.clear();resaleReads.length=0;
     await pool.query(`INSERT INTO distributed_locks(lock_name,instance_id,fencing_token,expires_at)
       VALUES('fixture-reorg','fixture-worker',1,clock_timestamp()+INTERVAL '1 hour')`);
     await pool.query('INSERT INTO artwork_media_chain_revisions VALUES(84532,0)');
@@ -197,7 +200,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
       instance.isRunning = false;
       await pool.query(`INSERT INTO indexer_state(chain_id,contract_address,last_indexed_block,last_confirmed_block,
         last_indexed_at,started_at,state_hash,recovery_cache_token) VALUES($1,$2,115,115,NOW(),NOW(),'0x0',NULL)`, [instance.chainId, CORE]);
-      for (const block of [100, 105, 110, 115]) await pool.query(`INSERT INTO block_hashes
+      for (const block of [100, 105, 109, 110, 115]) await pool.query(`INSERT INTO block_hashes
         (chain_id,block_number,block_hash,parent_hash,timestamp) VALUES($1,$2,$3,$4,$5)`,
         [instance.chainId, block, hash(block), hash(block - 1), 1700000000 + block * 2]);
       await apply(instance, 'ArtworkRegistered', 100, {artworkId: 1, creator: CREATOR, metadataURI: 'ipfs://fixture-only'});
@@ -208,11 +211,63 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     }
   }
   t.beforeEach(reset);
+
+  for (const sampleSize of [12, 2, undefined]) await t.test(
+    `a fork before sparse sampled headers removes every orphan auction (sample ${sampleSize ?? 'default'})`, async () => {
+      await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number=109',[CHAIN]);
+      if (sampleSize === undefined) {
+        for (let number=111;number<=124;number++) await pool.query(`INSERT INTO block_hashes
+          (chain_id,block_number,block_hash,parent_hash,timestamp) VALUES($1,$2,$3,$4,$5)
+          ON CONFLICT(chain_id,block_number) DO NOTHING`,[CHAIN,number,hash(number),hash(number-1),1700000000+number*2]);
+        await pool.query('UPDATE indexer_state SET last_indexed_block=124,last_confirmed_block=124,state_hash=$1 WHERE chain_id=$2',
+          [await target._computeStateHash(124),CHAIN]);
+      }
+      headerHash=number=>hash(number>=103?number+10000:number);
+      const original=target.eventListener.getBlock, queried=[];
+      target.eventListener.getBlock=async number=>{queried.push(number);return {hash:headerHash(number)};};
+      const foreign=await snapshot(OTHER_CHAIN);
+      assert.equal((await snapshot(CHAIN)).v41_auctions.length,1);
+      try { assert.equal(await target.detectReorg({sampleSize}),true); }
+      finally {target.eventListener.getBlock=original;}
+      const after=await snapshot(CHAIN);
+      assert.equal(after.v41_auctions.length,0,'an orphan predating the first sampled mismatch must not survive');
+      assert.equal(after.v41_artworks.length,1,'the retained registration remains');
+      assert.deepEqual(after.contract_events.map(row=>row.event_name),['ArtworkRegistered']);
+      assert.equal(after.indexer_state[0].last_indexed_block,100);
+      assert.equal(after.indexer_state[0].last_confirmed_block,100);
+      assert.deepEqual(after.block_hashes.map(row=>row.block_number),[100]);
+      assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);
+      evidence.results.push({name:'sparse common ancestor',sampleSize:sampleSize??'default',forkStart:103,
+        queried,rewindTo:100,orphanAuctions:after.v41_auctions.length});
+    });
+
+  await t.test('a state revision changed during detection cannot authorize a fresh rewind',async()=>{
+    const original=target.eventListener.getBlock;
+    let concurrent;
+    target.eventListener.getBlock=async()=>{
+      await pool.query('UPDATE indexer_state SET last_indexed_block=last_indexed_block WHERE chain_id=$1',[CHAIN]);
+      concurrent=await snapshot(CHAIN);
+      return {hash:hash(999)};
+    };
+    try {await assert.rejects(target.detectReorg(),/snapshot is stale/);}
+    finally {target.eventListener.getBlock=original;}
+    assert.deepEqual(await snapshot(CHAIN),concurrent);
+  });
+
+  await t.test('a changed final ancestor aborts zero-resale recovery before any database mutation',async()=>{
+    let headers=0;
+    rpcHook=async method=>{if(method==='eth_getBlockByNumber'&&++headers===2)headerHash=()=>hash(999);};
+    const before=await snapshot(CHAIN);
+    await assert.rejects(target._handleReorg(BOUNDARY),/ancestor changed/);
+    assert.deepEqual(await snapshot(CHAIN),before);
+  });
+
   function historicalWriter(events) {
     const writer = engine(CHAIN);
     writer.getRecoveryAuthority = target.getRecoveryAuthority;
     writer._shouldSkipEmptyBlockHashBackfill = () => true;
     Object.assign(writer.eventListener, {
+      _readRpcCall: target.eventListener._readRpcCall,
       queryAllHistoricalEvents: async () => events,
       getCurrentBlock: async () => 132,
       getBlock: async number => ({hash:hash(number),parentHash:hash(number-1),timestamp:1700000000+number*2})
@@ -913,7 +968,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     assert.equal(after.contract_events.length, 2);
     assert.equal(after.indexer_state[0].last_indexed_block, BOUNDARY - 1);
     assert.equal(after.indexer_state[0].last_confirmed_block, BOUNDARY - 1);
-    assert.deepEqual(after.block_hashes.map(row => row.block_number), [100, 105]);
+    assert.deepEqual(after.block_hashes.map(row => row.block_number), [100, 105, 109]);
     assert.equal(after.indexer_state[0].state_hash, await target._computeStateHash(BOUNDARY - 1));
     assert.equal(after.artwork_media_chain_revisions[0].revision, 1);
     assert.deepEqual(await snapshot(OTHER_CHAIN), otherBefore, 'foreign chain is unchanged');
@@ -1097,6 +1152,11 @@ const {pathToFileURL}=require('node:url');
     connectionTimeoutMillis:2000,statement_timeout:10000});
   const db={pool,query:async(sql,values)=>(await pool.query(sql,values)).rows};
   const engine=new Engine(db,{chainId:config.chain,contractAddress:config.core});
+  engine.eventListener._readRpcCall=operation=>operation({async send(method,params){
+    if(method==='eth_chainId')return '0x14a34';
+    if(method!=='eth_getBlockByNumber')throw new Error('Unexpected fixture RPC');
+    return {number:params[0],hash:'0x'+BigInt(params[0]).toString(16).padStart(64,'0')};
+  }});
   engine.getRecoveryAuthority=()=>({lockName:'fixture-reorg',instanceId:'fixture-worker',fencingToken:'1',isCurrent:()=>true});
   engine.fixtureCachePurgeHook=async options=>{
     const state=await engine.getIndexerState();
@@ -1406,7 +1466,7 @@ const {pathToFileURL}=require('node:url');
     await apply(target,'ResaleListed',108,{tokenId:7,seller:WINNER,price:2500});
     await apply(other,'ResaleListed',108,{tokenId:7,seller:WINNER,price:2500});
     await pool.query(`INSERT INTO block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
-      VALUES($1,109,$2,$3,1700000218)`,[CHAIN,hash(109),hash(108)]);
+      VALUES($1,109,$2,$3,1700000218) ON CONFLICT(chain_id,block_number) DO NOTHING`,[CHAIN,hash(109),hash(108)]);
   }
   const resaleRow = async () => (await pool.query('SELECT * FROM v41_resale_listings WHERE chain_id=$1 AND token_id=7',[CHAIN])).rows[0];
   const dirtyResale = async (active=false) => pool.query(`UPDATE v41_resale_listings
@@ -1469,7 +1529,7 @@ const {pathToFileURL}=require('node:url');
     const original=target.eventListener._readRpcCall;const sizes=[];
     target.eventListener._readRpcCall=async operation=>{const start=resaleReads.length;const result=await original(operation);sizes.push(resaleReads.length-start);return result;};
     try{await target._handleReorg(BOUNDARY);}finally{target.eventListener._readRpcCall=original;}
-    assert.deepEqual(sizes,[8,2]);assert.equal(new Set(resaleReads).size,10);
+    assert.deepEqual(sizes.filter(size=>size>0),[8,2]);assert.equal(new Set(resaleReads).size,10);
     assert.ok((await snapshot(CHAIN)).v41_resale_listings.every(row=>row.last_updated_block===109));
   });
   await t.test('recovered resale state and replacement events match clean replay with an eventless cancellation',async()=>{
@@ -1507,17 +1567,20 @@ const {pathToFileURL}=require('node:url');
     await t.test(`${failure} aborts resale recovery without SQL mutations`,async()=>{
       await resaleFixture();await dirtyResale();
       const original=target.eventListener._readRpcCall;
-      if(failure==='missing header') await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number=109',[CHAIN]);
-      if(failure==='conflicting header') await pool.query('UPDATE block_hashes SET block_hash=$1 WHERE chain_id=$2 AND block_number=109',[hash(999),CHAIN]);
+      if(failure==='missing header') await pool.query('DELETE FROM block_hashes WHERE chain_id=$1 AND block_number<=109',[CHAIN]);
+      if(failure==='conflicting header') await pool.query('UPDATE block_hashes SET block_hash=$1 WHERE chain_id=$2 AND block_number<=109',[hash(999),CHAIN]);
       if(failure==='archive unavailable') rpcHook=async method=>{if(method==='eth_call')throw new Error('archive unavailable');};
       if(failure==='wrong chain') target.eventListener._readRpcCall=operation=>operation({async send(){return '0x1';}});
       if(failure==='header changed after read') {
         let headers=0;rpcHook=async method=>{if(method==='eth_getBlockByNumber'&&++headers===2)throw new Error('canonical block changed');};
       }
       if(failure==='default mapping') resaleStates.set('7',['0x'+'0'.repeat(40),0n,false]);
-      if(failure==='partial batch') target.eventListener._readRpcCall=async()=>[];
+      if(failure==='partial batch') target.eventListener._readRpcCall=async operation=>{
+        const start=resaleReads.length;const result=await original(operation);
+        return resaleReads.length>start?[]:result;
+      };
       const before=await snapshot(CHAIN);
-      try{await assert.rejects(target._handleReorg(BOUNDARY),/boundary unavailable|canonical block changed|archive unavailable|chain mismatch|Invalid reorg resale snapshot/);}
+      try{await assert.rejects(target._handleReorg(BOUNDARY),/No proven reorg ancestor|canonical block changed|archive unavailable|RPC chain changed|Invalid reorg resale snapshot/);}
       finally{target.eventListener._readRpcCall=original;}
       assert.deepEqual(await snapshot(CHAIN),before);assert.equal(target.recoveryCachePurgePending,false);
     });

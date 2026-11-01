@@ -4,6 +4,9 @@ import Engine from '../src/indexer/sync-engine.js';
 import ProductionIndexer from '../src/indexer/production-runner.js';
 import cacheService from '../src/services/cache-service.js';
 
+const CORE = `0x${'1'.repeat(40)}`;
+const HEADER_HASH = `0x${'2'.repeat(64)}`;
+
 function transactionFixture({ failAt, emptyState = false, indexed = 115, confirmed = 115 } = {}) {
     const calls = [];
     const failure = new Error('forced transaction failure');
@@ -13,12 +16,13 @@ function transactionFixture({ failAt, emptyState = false, indexed = 115, confirm
             if (failAt?.test(sql)) throw failure;
             if (sql.startsWith('SELECT last_indexed_block')) return { rows: emptyState ? [] : [{
                 last_indexed_block: String(indexed), last_confirmed_block: String(confirmed),
-                contract_address: 'fixture-core', revision: '1'
+                contract_address: CORE, revision: '1'
             }] };
             if (sql.startsWith('SELECT *, xmin::TEXT AS revision')) return { rows: emptyState ? [] : [{
                 chain_id: '84532', last_indexed_block: indexed, last_confirmed_block: confirmed,
-                contract_address: 'fixture-core', revision: '1'
+                contract_address: CORE, revision: '1'
             }] };
+            if (sql.includes('FROM public.block_hashes')) return { rows: [{ block_number: String(params[1]), block_hash: HEADER_HASH }] };
             if (sql.includes('FROM public.distributed_locks')) return { rows: [{ lock_name: 'fixture' }] };
             if (sql.includes('string_agg')) return { rows: [{ hash: 'a'.repeat(64) }] };
             return { rows: [] };
@@ -27,6 +31,12 @@ function transactionFixture({ failAt, emptyState = false, indexed = 115, confirm
     };
     const engine = Object.create(Engine.prototype);
     Object.assign(engine, { chainId: 84532,
+        eventListener: { chainId: 84532, contractAddress: CORE,
+            _readRpcCall: operation => operation({ async send(method, params) {
+                if (method === 'eth_chainId') return '0x14a34';
+                assert.equal(method, 'eth_getBlockByNumber');
+                return { number: params[0], hash: HEADER_HASH };
+            } }) },
         getRecoveryAuthority: () => ({ lockName: 'fixture', instanceId: 'worker', fencingToken: '1', isCurrent: () => true }), db: {
         query() { throw new Error('pooled query used inside a transaction'); },
         pool: { async connect() { calls.push({ sql: 'connect' }); return client; } }
@@ -69,12 +79,12 @@ test('missing state cannot delete events; invalid boundary cannot acquire a conn
     assert.deepEqual(calls, []);
 });
 
-test('startup recovery propagates failure before any chain read or replay', async () => {
+test('startup recovery propagates failure before catch-up or replay', async () => {
     const { engine, failure } = transactionFixture({ failAt: /^UPDATE indexer_state/, confirmed: 109 });
-    engine.eventListener = { getCurrentBlock() { assert.fail('must not read chain after failed rewind'); } };
+    engine.eventListener.getCurrentBlock = () => assert.fail('must not read head after failed rewind');
     engine.syncHistoricalEvents = () => assert.fail('must not replay after failed rewind');
     await assert.rejects(engine.recoverFromSafeBlock({ chain_id: '84532', last_indexed_block: 115,
-        last_confirmed_block: 109, contract_address: 'fixture-core', revision: '1' }), error => error === failure);
+        last_confirmed_block: 109, contract_address: CORE, revision: '1' }), error => error === failure);
 });
 
 test('startup rejects unversioned hints and changed snapshots without deleting events', async () => {
@@ -82,16 +92,16 @@ test('startup rejects unversioned hints and changed snapshots without deleting e
     await assert.rejects(engine.recoverFromSafeBlock({ last_confirmed_block: '109' }), /Invalid startup recovery snapshot/);
     assert.deepEqual(calls, []);
     await assert.rejects(engine.recoverFromSafeBlock({ chain_id: '84532', last_indexed_block: 115,
-        last_confirmed_block: 109, contract_address: 'fixture-core', revision: '1' }), /snapshot is stale/);
+        last_confirmed_block: 109, contract_address: CORE, revision: '1' }), /snapshot is stale/);
     assert.equal(calls.some(call => call.sql.includes('rollback_events_from_block')), false);
 });
 
 test('startup finishes its rewind before becoming running and leaves replay to confirmed catch-up', async () => {
     const { engine, calls } = transactionFixture({ indexed: 115, confirmed: 109 });
     engine.getIndexerState = async () => ({ chain_id: '84532', last_indexed_block: 115,
-        last_confirmed_block: 109, contract_address: 'fixture-core', revision: '1' });
+        last_confirmed_block: 109, contract_address: CORE, revision: '1' });
     engine.db.query = async sql => { calls.push({ sql }); };
-    engine.eventListener = { contractAddress: 'fixture-core', getCurrentBlock() { assert.fail('startup must not replay to unconfirmed head'); } };
+    engine.eventListener.getCurrentBlock = () => assert.fail('startup must not replay to unconfirmed head');
     engine.syncHistoricalEvents = () => assert.fail('catch-up belongs to runner');
     await engine.start();
     assert.equal(engine.isRunning, true);
@@ -104,13 +114,13 @@ test('a failed startup purge retries before reading state without another rewind
     const calls = [];
     let fail = true;
     Object.assign(engine, { chainId: 84532, recoveryCachePurgePending: true,
-        eventListener: { contractAddress: 'fixture-core' },
+        eventListener: { contractAddress: CORE },
         async _purgeRecoveryCache() {
             calls.push('purge');
             if (fail) throw new Error('purge failed');
             this.recoveryCachePurgePending = false;
         },
-        async getIndexerState() { calls.push('state'); return { chain_id: '84532', contract_address: 'fixture-core',
+        async getIndexerState() { calls.push('state'); return { chain_id: '84532', contract_address: CORE,
             revision: '1', last_indexed_block: 109, last_confirmed_block: 109 }; },
         async recoverFromSafeBlock() { assert.fail('committed rewind must not repeat'); }
     });
@@ -147,6 +157,35 @@ test('a detected mismatch cannot swallow recovery failure as an RPC error', asyn
     });
     await assert.rejects(engine.detectReorg(), error => error === failure);
 });
+
+for (const reason of ['state digest', 'sampled hash', 'parent continuity']) {
+    test(`${reason} detection keeps its original versioned state for recovery`, async t => {
+        t.mock.method(console, 'error', () => {});
+        const state = { chain_id: '84532', contract_address: CORE, revision: '1',
+            last_indexed_block: 115, last_confirmed_block: 109, state_hash: 'stored' };
+        let rewinds = 0;
+        const engine = Object.assign(Object.create(Engine.prototype), {
+            chainId: 84532,
+            async _purgeRecoveryCache() { return false; },
+            async getIndexerState() { return state; },
+            async _computeStateHash() { return reason === 'state digest' ? 'different' : 'stored'; },
+            db: { async query() { return [
+                { block_number: '110', block_hash: 'old', parent_hash: 'previous' },
+                { block_number: '111', block_hash: 'next', parent_hash: 'broken' }
+            ]; } },
+            eventListener: { async getBlock(number) {
+                return { hash: reason === 'sampled hash' ? 'replacement' : number === 110 ? 'old' : 'next' };
+            } },
+            async _handleReorg(boundary, captured) {
+                assert.equal(captured, state, 'recovery must reject a database version changed since detection');
+                assert.equal(boundary, reason === 'state digest' ? 109 : reason === 'sampled hash' ? 110 : 111);
+                rewinds++;
+            }
+        });
+        assert.equal(await engine.detectReorg(), true);
+        assert.equal(rewinds, 1);
+    });
+}
 
 test('runner retries recovery on the next poll before catch-up or confirmations', async t => {
     t.mock.method(console, 'error', () => {});
@@ -207,12 +246,12 @@ test('real cache purge propagates deletion failure only for strict recovery', as
     const engine = Object.create(Engine.prototype);
     let token = '1d4d37bb-3aa3-4e7e-9ec9-900222329923';
     const contexts = [];
-    engine._captureWriteContext = async () => ({ recoveryCacheToken: token, chainId: '84532', contractAddress: 'fixture-core' });
+    engine._captureWriteContext = async () => ({ recoveryCacheToken: token, chainId: '84532', contractAddress: CORE });
     engine._withWriteContext = async (context, operation) => {
         contexts.push(context);
         await operation({ async query(sql, params) {
             assert.match(sql, /SET recovery_cache_token = NULL[\s\S]*RETURNING chain_id/);
-            assert.deepEqual(params, ['84532', 'fixture-core', token]);
+            assert.deepEqual(params, ['84532', CORE, token]);
             token = null;
             return { rows: [{ chain_id: '84532' }] };
         } });

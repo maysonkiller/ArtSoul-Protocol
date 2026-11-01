@@ -651,12 +651,18 @@ test('media registration and indexer rollback share an atomic revision fence (Po
           await seedProjection();await seedProjection(123,11155111);
           await pool.query(`INSERT INTO public.indexer_state(chain_id,last_indexed_block,last_confirmed_block,confirmation_depth,last_indexed_at) VALUES(84532,130,$1,3,'2026-10-23T00:00:00Z'),
             (11155111,777,700,12,'2026-10-22T00:00:00Z')`,[method==='_handleReorg'?125:119]);
+          await pool.query('UPDATE public.indexer_state SET contract_address=$1 WHERE chain_id=84532',[core]);
           await pool.query(`INSERT INTO public.block_hashes(chain_id,block_number,block_hash,parent_hash,timestamp)
             SELECT chain_id,block_number,$1,$2,1792713600 FROM unnest(ARRAY[84532,11155111]) AS chain_id
             CROSS JOIN unnest(ARRAY[119,120,123,130]) AS block_number`,['0x'+'ab'.repeat(32),'0x'+'bc'.repeat(32)]);
           const before=await snapshot(),beforeWorker=await workerState(),beforeClaim=await claimRow(value);
           const foreignClaim=await claimRow(foreign),observed=await revision();
           const engine=new IndexerSyncEngine(database,{chainId:84532,contractAddress:core,async getCurrentBlock(){networkReads++;return 119;}});
+          engine.eventListener._readRpcCall=operation=>operation({async send(method,params){
+            if(method==='eth_chainId')return '0x14a34';
+            assert.equal(method,'eth_getBlockByNumber');
+            return {number:params[0],hash:'0x'+'ab'.repeat(32)};
+          }});
           engine.getRecoveryAuthority=()=>({lockName:'fixture-recovery',instanceId:'fixture-worker',fencingToken:'1',isCurrent:()=>true});
           const run=async()=>method==='_handleReorg'?engine._handleReorg(120):engine.recoverFromSafeBlock(await engine.getIndexerState());
           if(failRollback) {

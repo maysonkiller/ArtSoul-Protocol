@@ -467,7 +467,7 @@ class IndexerSyncEngine {
                 console.error(`  Stored hash: ${state.state_hash}`);
                 console.error(`  Current hash: ${currentHash}`);
 
-                await this._handleReorg(state.last_confirmed_block);
+                await this._handleReorg(state.last_confirmed_block, state);
                 return true;
             }
         }
@@ -515,7 +515,7 @@ class IndexerSyncEngine {
                     this.metrics.recordReorg(depth);
                 }
 
-                await this._handleReorg(Number(stored.block_number));
+                await this._handleReorg(Number(stored.block_number), state);
                 return true;
             }
         }
@@ -538,7 +538,7 @@ class IndexerSyncEngine {
                         this.metrics.recordReorg(depth);
                     }
 
-                    await this._handleReorg(Number(current.block_number));
+                    await this._handleReorg(Number(current.block_number), state);
                     return true;
                 }
             }
