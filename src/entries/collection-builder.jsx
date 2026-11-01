@@ -124,19 +124,19 @@ function Builder() {
 
     return <main className="launch-page">
         <div className="launch-topline">
-            <a href="/upload">← Publish a 1/1 artwork</a>
+            <a href="/upload">← Create a single artwork</a>
             <span className="launch-pill">Local draft · Unpublished</span>
         </div>
         <div className="launch-hero">
             <div><p className="launch-eyebrow">Collection Launch</p><h1>Shape your collection.</h1><p>Plan the work, the phases, and how collectors can take part. All settings remain editable in this browser.</p></div>
-            <div className="launch-actions"><button type="button" className="launch-primary" onClick={save}>Save draft</button><button type="button" onClick={exportDraft}>Export JSON</button></div>
+            <div className="launch-actions"><button type="button" className="launch-primary" onClick={save}>Save draft</button><button type="button" onClick={exportDraft} title="Download a draft file to keep or open on another device">Download draft</button></div>
         </div>
         <LocalDraftNotice />
         <div className="launch-draft-tools">
             <div className="launch-actions">
-                <button type="button" onClick={() => importInput.current?.click()}>Import JSON</button>
-                <button type="button" onClick={restore}>Load saved</button>
-                <button type="button" onClick={() => replaceDraft(createDraft(), 'Blank draft opened.')}>Blank draft</button>
+                <button type="button" onClick={() => importInput.current?.click()} title="Open a previously downloaded collection draft">Open draft file</button>
+                <button type="button" onClick={restore} title="Restore the last draft saved in this browser">Load saved draft</button>
+                <button type="button" onClick={() => replaceDraft(createDraft(), 'Blank draft opened.')}>New draft</button>
                 <button type="button" onClick={() => replaceDraft(createOriginDraft(), 'Origin proposal opened. Supply, allocations, pricing and utility are proposals, not approved launch settings.')}>Origin proposal</button>
                 {previousDraft && <button type="button" onClick={() => { setDraft(previousDraft); setPreviousDraft(null); setMessage('Previous working draft restored.'); }}>Undo replacement</button>}
                 <input ref={importInput} type="file" accept="application/json,.json" aria-label="Import collection draft" hidden onChange={importDraft} />

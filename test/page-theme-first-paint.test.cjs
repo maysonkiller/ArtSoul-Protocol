@@ -4,6 +4,18 @@ const vm = require('node:vm');
 const test = require('node:test');
 
 const pages = ['index', 'gallery', 'artwork', 'profile', 'upload', 'collection-builder', 'admin', 'docs-protocol'];
+
+test('both creation routes identify the Create section before scripts or wallet login', () => {
+    for (const page of ['upload', 'collection-builder']) {
+        const html = fs.readFileSync(`${page}.html`, 'utf8');
+        const nav = html.match(/<nav[^>]*site-primary-nav[\s\S]*?<\/nav>/)?.[0];
+        assert.ok(nav, `${page} has native primary navigation`);
+        const current = [...nav.matchAll(/<a\b([^>]*\baria-current="(?:page|location)"[^>]*)>(.*?)<\/a>/g)];
+        assert.equal(current.length, 1, `${page} marks one section`);
+        assert.equal(current[0][2], 'Create');
+        assert.match(current[0][1], /href="\/upload"/);
+    }
+});
 function element(...initial) {
     const classes = new Set(initial);
     return { classList: {
