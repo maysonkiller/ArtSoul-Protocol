@@ -818,7 +818,8 @@ body.future .artwork-page-compact-action {
     min-width: 0;
     height: 100%;
     overflow: hidden;
-    border-radius: 8px;
+    --artwork-card-radius: 8px;
+    border-radius: var(--artwork-card-radius);
     background: var(--c-surface);
     /* C-14 will bind verified status to the shared presentation-only aura frame. */
     border: 1px solid var(--c-card-border);
@@ -3291,7 +3292,7 @@ body.future .resale-modal {
 .artsoul-artwork-card:has(.artsoul-card-menu) .artsoul-card-countdown { left: 10px; right: auto; }
 .artsoul-artwork-card:has(.artsoul-card-menu):has(.artsoul-card-countdown) .artsoul-card-media-badge,
 .artsoul-artwork-card:has(.artsoul-card-menu):has(.artsoul-card-countdown) .artsoul-card-audio-label { top: 42px; }
-.artsoul-artwork-card .artsoul-card-media { border-radius: 7px 7px 0 0; }
+.artsoul-artwork-card .artsoul-card-media { border-radius: calc(var(--artwork-card-radius) - 1px) calc(var(--artwork-card-radius) - 1px) 0 0; }
 .artsoul-card-menu-list {
     position: absolute;
     top: 48px;
@@ -6299,7 +6300,7 @@ html.wallet-state-resolving .site-header #navButtons [data-avatar-resolving] {
         margin-bottom: 0.85rem !important;
     }
 
-    .profile-gallery-panel h3 {
+    .profile-gallery-panel h3:not(.artsoul-card-title) {
         font-size: 1rem !important;
     }
 
@@ -6962,4 +6963,76 @@ dialog.artsoul-search-dialog[open] { display: flex; flex-direction: column; }
         -webkit-line-clamp: 2;
         flex-shrink: 0;
     }
+}
+
+/* Accepted Future composition, shared by Home, Gallery, Profile and Saved.
+   Classic retains its layout; both themes retain the existing card behavior. */
+body.future :is(#artworkGallery, .home-featured-row, .gallery-results-grid, .profile-artwork-grid.grid) {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    overflow: visible;
+    scroll-snap-type: none;
+}
+body.future .artsoul-artwork-card {
+    --artwork-card-radius: 18px;
+    border-color: var(--c-border-soft);
+}
+body.future .artsoul-artwork-card:hover,
+body.future .artsoul-artwork-card:focus-within {
+    border-color: var(--c-border);
+    transform: none;
+    box-shadow: 0 4px 16px rgba(var(--c-accent-rgb), 0.08);
+}
+body.future .artsoul-card-media {
+    aspect-ratio: 4 / 3;
+    /* Keep action, label and playback rows separate even in narrow Saved cards. */
+    min-height: 144px;
+}
+body.future .artsoul-card-body { padding: 16px; gap: 8px; }
+body.future .artsoul-card-title { font-size: 17px; line-height: 1.35; font-weight: 600; }
+body.future .artsoul-card-creator { font-size: 12px; line-height: 1.4; margin: 0; }
+body.future .artsoul-card-meta { gap: 10px; }
+body.future .artsoul-artwork-card :is(.artsoul-card-status, .artsoul-card-price) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+body.future .artsoul-artwork-card .artsoul-card-price {
+    background: none;
+    padding-inline: 0;
+    font-variant-numeric: tabular-nums;
+}
+body.future .artsoul-card-menu-toggle { border-radius: 12px; }
+body.future .artsoul-card-menu-list { border-radius: 12px; padding: 6px; }
+body.future .artsoul-card-menu-list a { min-height: 44px; border-radius: 8px; }
+
+@media (max-width: 1100px) {
+    body.future :is(#artworkGallery, .home-featured-row, .gallery-results-grid, .profile-artwork-grid.grid) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+    }
+}
+@media (max-width: 768px) {
+    body.future :is(#artworkGallery, .home-featured-row, .gallery-results-grid, .profile-artwork-grid.grid) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+    body.future .artsoul-card-media { aspect-ratio: 1; }
+}
+@container (max-width: 250px) {
+    body.future .artsoul-card-media { aspect-ratio: 1; }
+    body.future .artsoul-card-body { padding: 12px; }
+    body.future .artsoul-card-title { font-size: 15px; }
+    body.future .artsoul-card-meta { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    body.future .artsoul-artwork-card .artsoul-card-price,
+    body.future .artsoul-artwork-card .artsoul-card-status {
+        justify-self: start;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        text-align: left;
+        line-height: 1.4;
+    }
+}
+@container (max-width: 175px) {
+    body.future .artsoul-card-media-controls { right: 4px; }
 }
