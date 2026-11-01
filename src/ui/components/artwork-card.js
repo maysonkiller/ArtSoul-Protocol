@@ -896,6 +896,7 @@
             }
         });
         if (countdown) card.appendChild(countdown);
+        card.appendChild(previewBadge);
         if (href) {
             link = document.createElement('a');
             link.className = 'artsoul-card-link';
@@ -904,7 +905,6 @@
             link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
             card.appendChild(link);
         }
-        card.appendChild(previewBadge);
         return card;
     }
 
@@ -1142,10 +1142,10 @@
             href || onOpen ? h(ReactActionMenu, { artwork }) : null,
             href || onOpen ? h(ReactSavedControl, { artwork }) : null,
             h(ReactCountdown, { artwork, onEnd: refreshAuctionState }),
-            href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
-                'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null,
             h('span', { className: `artsoul-card-preview-badge artsoul-card-preview-badge-${cardPreviewInfo(artwork).key}`,
-                'aria-hidden': 'true' }, cardPreviewInfo(artwork).label)
+                'aria-hidden': 'true' }, cardPreviewInfo(artwork).label),
+            href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
+                'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null
         );
     }
 
