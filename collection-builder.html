@@ -21,7 +21,7 @@
     <script src="/header-prepaint.js?v=9"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=62">
+    <link rel="stylesheet" href="/unified-styles.css?v=63">
     <link rel="stylesheet" href="/mobile-no-motion.css?v=2">
     <link rel="stylesheet" href="/tailwind-build.css?v=1">
     <script src="/storage-image.js?v=3" defer></script>
@@ -30,7 +30,7 @@
     <script src="/modal-system.js?v=2" defer></script>
     <script type="module" src="/supabase-client.js"></script>
     <script type="module" src="/supabase-auth.js?v=2"></script>
-    <script src="/avatar-dropdown.js?v=57" defer></script>
+    <script src="/avatar-dropdown.js?v=58" defer></script>
     <script src="/webmcp-tools.js?v=11" defer></script>
     <script src="/voice-commands.js?v=12" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
@@ -48,7 +48,12 @@
                         <span class="site-wordmark" aria-hidden="true">ArtSoul<span>PROTOCOL</span></span>
                     </a>
                 </div>
-                <div class="site-header-center page-context"></div>
+                <nav class="site-header-center page-context site-primary-nav" aria-label="Main navigation">
+                    <a href="/">Home</a>
+                    <a href="/gallery#discover">Explore</a>
+                    <a href="/upload">Create</a>
+                    <a href="/docs-protocol">Guide</a>
+                </nav>
                 <div class="site-header-actions">
                     <div id="networkBadge"></div>
                     <button type="button" class="site-search-button" data-artsoul-search aria-label="Search ArtSoul" title="Search ArtSoul (Ctrl K)" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">

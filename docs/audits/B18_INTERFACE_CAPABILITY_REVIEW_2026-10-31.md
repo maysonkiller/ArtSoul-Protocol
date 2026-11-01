@@ -20,7 +20,7 @@ are illustrative; they must not replace the real guide or protected workspace.
 
 | Adoption surface | Existing implementation to retain | Required acceptance |
 | --- | --- | --- |
-| Shared header, cards and media | `src/ui/simplified-header.js`, `src/ui/components/artwork-card.js`, shared search, notifications, voice and Saved | Real wallet/account states; no false network support; the same actions and pressed states on Home, Gallery, Profile and detail; image/audio/video; both palettes |
+| Shared header, cards and media | static shared headers, `header-prepaint.js`, `avatar-dropdown.js`, `src/ui/components/artwork-card.js`, shared search, notifications, voice and Saved | Real wallet/account states; no false network support; the same actions and pressed states on Home, Gallery, Profile and detail; image/audio/video; both palettes |
 | Home and Gallery | `src/entries/index.js`, `src/entries/gallery.jsx` | Discovery default/order, filters and search meaning, current auction status/timers, Back/scroll restoration |
 | Artwork | `src/entries/artwork.jsx` and existing transaction handlers | Creator, First Collector and current Owner remain explicit; full provenance retained; bid/settle/withdraw/list/edit/remove/buy eligibility, pending and confirmed outcomes preserved; Donate and Report keep their actual targets |
 | Profile | `src/entries/profile.jsx`, `src/features/profile/profile-edit-dialog.jsx` | Own/public distinction, all tabs including private Saved, Edit profile, account connections and notifications preserved; customization remains intentionally paused |
@@ -87,6 +87,41 @@ The next B18 implementation slice is the shared real artwork-card presentation,
 using `src/ui/components/artwork-card.js` across all existing consumers. Keep it
 separate from the pending B35 recovery work and from a wholesale site rewrite.
 
+## November 1 shared navigation adoption
+
+Local candidate on codex/interface-navigation-adoption, based on723461df. Eight
+product pages ship native Home, Explore, Create and Guide links in their existing
+header. Future displays them at first paint, on a second row below1101px. Classic
+keeps its previous composition and both palettes are unchanged. Mobile Future
+uses a44px avatar control and exposes the full bound identity inside its menu;
+search, microphone and notifications remain reachable. Admin/Docs routes and
+permission checks remain real. No new navigation dependency or wallet SDK.
+
+Local Base/ETH and conditional Rabby marks identify the actual recognized chain,
+asset and provider. Unknown providers have no invented brand. Cached values do
+not supply image URLs or provider identity; labels are escaped and late network
+responses cannot overwrite another wallet. Base Sepolia remains the sole switch
+target. The legacy navigation manager no longer inserts a fixed Back overlay
+into the new primary links; explicit page Back controls/history remain intact.
+
+Validation: 2678 local unit tests pass,35 environment skips. Initial run found
+three stale cache-pin expectations, corrected with the new runtime hashes. Build
+passes11 routes and172 utilities. Browser matrix covers80 static first-frame
+layouts (eight pages, two themes,320/390/768/1024/1366), six connected-menu layouts,
+plus four long-provider/foreign-network layouts. No overlap or horizontal
+overflow; header height matches popup/sticky offsets. Native notification popup
+opens/closes below the header. Local marks decode successfully. Synthetic wallet
+fixtures perform no signing or real authentication; no new iPhone acceptance is
+claimed. Independent review found two compact-menu risks, addressed and rendered:
+wrapped network marks preserve16px sizing and long provider names wrap.
+
+Evidence: ignored b18-navigation-{layout,menu,long,units-final,build-final}.log,
+output/playwright/b18-navigation-*.png. CSS63, avatar58, navigation8. Release and
+exact candidate CI are pending. Interpretation: the accepted study's mobile
+avatar-only presentation needs a full identity in its menu; the working microphone
+remains visible. No architecture/economics change. Next: adopt Home/Gallery page
+composition and existing controls, then artwork/Profile/forms.
+
 ## November 1 shared production-card adoption
 
 The first implementation slice uses the existing shared DOM/React card; no new
@@ -134,6 +169,19 @@ while preserving all 44px primary overlay targets. No change to Bible sections 5
 16 or17 architecture, economics, roles, deployment or supported networks.
 The wider page/header/detail redesign, mobile gestures and remaining B35 gates
 are not closed by this slice.
+
+Release: PR #413 merged November 1 at 00:50:01 UTC as
+723461df21dfc50116c5ab64c46f4a207d81e7fa. Exact candidate
+19b572eb64cb22ee3f44856cab18e1588236df2c passed CI41258135755:
+Linux 3,171/two skips; Windows 2,616/35 skips; 49 contract tests on each platform;
+both builds/static checks and Vercel preview. Production deployment7466638111
+is green. Home/Gallery/Profile/artwork13/Admin/Docs return200 and share the
+exact built unified-styles-C97qIvTY.css. Live guest Gallery renders28 actual
+Discovery works at1366/390 in four/two Future columns with18px frames and no
+horizontal overflow. Menu links target the same work. No authenticated write or
+native-device acceptance is inferred. Owned browser sessions and preview4211
+are stopped; the pre-existing4198 study server is retained. Evidence:
+`docs/private/b18-card-{production,preview-final,live-visual}-check.log`.
 
 ## Scope, versions and method
 

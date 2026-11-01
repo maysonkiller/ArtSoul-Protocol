@@ -184,7 +184,9 @@ class NavigationManager {
         // Create back button if it doesn't exist
         let backBtn = document.getElementById('backButton');
 
-        if (!backBtn) {
+        // The shared primary links replace the legacy fixed Back overlay.
+        // Existing page-level Back controls still use their normal handler.
+        if (!backBtn && !document.querySelector('.site-primary-nav')) {
             backBtn = this.createBackButton();
         }
 
