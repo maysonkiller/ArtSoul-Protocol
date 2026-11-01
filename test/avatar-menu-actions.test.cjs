@@ -21,7 +21,7 @@ test('single activation copies the full displayed wallet and confirms only after
     harness.context.navigator.clipboard = { writeText(value) { writes.push(value); return new Promise(r => { resolve = r; }); } };
     const pending = harness.dropdown.copyMenuAddress(event);
     assert.equal(button.disabled, true);
-    assert.equal(status.textContent, 'Copy address');
+    assert.equal(status.textContent, '');
     await harness.dropdown.copyMenuAddress(event);
     assert.deepEqual(writes, [WALLET]);
     resolve();
@@ -37,7 +37,8 @@ test('unavailable or denied clipboard gives a recoverable message and never clai
         await harness.dropdown.copyMenuAddress(event);
         assert.match(status.textContent, /Could not copy/);
         assert.equal(button.disabled, false);
-        assert.equal(button.querySelector('.avatar-menu-address-value').textContent, WALLET);
+        assert.equal(button.querySelector('.avatar-menu-address-value').textContent, '0x1111...1111');
+        assert.equal(button.dataset.walletAddress, WALLET);
     }
 });
 
@@ -52,8 +53,8 @@ test('copy feedback from an older account never changes the new account menu', a
     resolve();
     await pending;
     assert.equal(status.textContent, 'Copied');
-    assert.equal(next.querySelector('.avatar-menu-copy-status').textContent, 'Copy address');
-    assert.equal(next.querySelector('.avatar-menu-address-value').textContent, nextWallet);
+    assert.equal(next.querySelector('.avatar-menu-copy-status').textContent, '');
+    assert.equal(next.querySelector('.avatar-menu-address-value').textContent, '0x2222...2222');
 });
 
 test('account menu keeps the profile destination without repeating visible primary navigation', () => {
@@ -86,7 +87,7 @@ test('account shortcuts precede wallet details and appearance without changing n
     const positions = ['avatar-menu-identity', 'avatar-account-links', 'avatar-wallet-section', 'avatar-theme-section', 'avatar-account-action'].map(value => html.indexOf(value));
     assert.ok(positions.every((value, i) => value >= 0 && (!i || value > positions[i - 1])));
     assert.match(html, /href="\/profile"/);
-    assert.match(html, /href="\/admin"/);
+    assert.doesNotMatch(html, /href="\/admin"/, 'Admin belongs to Profile, not wallet controls');
     assert.match(html, /data-wallet-provider/);
     assert.match(html, /network-current-row" role="status"/);
     assert.doesNotMatch(html, /aria-controls="avatarNetworkOptions"/);
@@ -104,4 +105,13 @@ test('theme buttons expose the current choice after each mode change', () => {
         assert.equal(harness.document.getElementById('classicBtnDropdown').getAttribute('aria-pressed'), String(theme === 'classic'));
         assert.equal(harness.document.getElementById('futureBtnDropdown').getAttribute('aria-pressed'), String(theme === 'future'));
     }
+});
+
+test('wallet menu uses a short address without showing a Copy button label', () => {
+    const h = createAvatarHarness();
+    const html = h.dropdown.renderMenuIdentity(WALLET);
+    assert.match(html, /0x1111\.\.\.1111/);
+    assert.match(html, /data-wallet-address="0x1111111111111111111111111111111111111111"/);
+    assert.doesNotMatch(html, />Copy address<|class="avatar-menu-copy-button"/);
+    assert.match(html, /aria-label="Copy wallet address /);
 });

@@ -637,26 +637,20 @@
                 .join('');
         }
 
-        renderProtocolAdminSlot(currentPath = window.location.pathname) {
-            const isCurrentPage = this.isPage(currentPath, 'admin');
-            const link = this.protocolAdminEligible && !isCurrentPage
-                ? `
-                    <a href="/admin" class="dropdown-item dropdown-protocol-admin-item">
-                        <span>Admin panel</span>
-                    </a>
-                `
-                : '';
-            return `<div class="protocol-admin-menu-slot" data-protocol-admin-slot>${link}</div>`;
+        // The compact account popover handles wallet and profile navigation.
+        // Admin access now lives on the owner's Profile page, not in this menu.
+        // Keep the existing server-only eligibility/cache logic intact; do not
+        // ever infer privileges from an address, profile name or browser cache.
+        renderProtocolAdminSlot() {
+            return '<div class="protocol-admin-menu-slot" data-protocol-admin-slot hidden></div>';
         }
 
         updateProtocolAdminSlot() {
             const slot = this.getNavContainer()?.querySelector('[data-protocol-admin-slot]');
-            if (!slot) return;
-            const currentPath = window.location.pathname;
-            slot.innerHTML = this.protocolAdminEligible && !this.isPage(currentPath, 'admin')
-                ? '<a href="/admin" class="dropdown-item dropdown-protocol-admin-item"><span>Admin panel</span></a>'
-                : '';
-            this.applyThemeStyles();
+            if (slot) {
+                slot.innerHTML = '';
+                slot.hidden = true;
+            }
         }
 
         clearProtocolAdminAccess() {
@@ -1439,10 +1433,11 @@
 
         renderMenuIdentity(walletAddress, restoring) {
             const identity = this.getMenuIdentity(walletAddress, restoring);
+            const shortAddress = identity.wallet ? this.shortWalletAddress(identity.wallet) : '';
             return `<div class="avatar-menu-identity"><span class="avatar-menu-name">${escapeMenuText(identity.name)}</span>${identity.wallet ? `
-                <button type="button" class="avatar-menu-address" data-wallet-address="${escapeMenuText(identity.wallet)}" onclick="window.AvatarDropdown.copyMenuAddress(event)" aria-label="Copy wallet address ${escapeMenuText(identity.wallet)}">
-                    <span class="avatar-menu-address-value">${escapeMenuText(identity.wallet)}</span>
-                    <span class="avatar-menu-copy-status" aria-live="polite">Copy address</span>
+                <button type="button" class="avatar-menu-address" data-wallet-address="${escapeMenuText(identity.wallet)}" onclick="window.AvatarDropdown.copyMenuAddress(event)" aria-label="Copy wallet address ${escapeMenuText(identity.wallet)}" title="Tap address to copy">
+                    <span class="avatar-menu-address-value">${escapeMenuText(shortAddress)}</span>
+                    <span class="avatar-menu-copy-status" aria-live="polite"></span>
                 </button>` : ''}</div>`;
         }
 

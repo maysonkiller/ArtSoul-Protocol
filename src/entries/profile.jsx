@@ -48,6 +48,81 @@ const { useState, useEffect, useRef } = React;
             );
         }
 
+        // Protocol Admin belongs to the owner/staff's own Profile controls,
+        // not to the global wallet popover. The sole eligibility authority is
+        // the existing authenticated server access check in AvatarDropdown.
+        // A cached name, a displayed profile or a matching address alone never
+        // grants an administrative shortcut.
+        function ProfileAdminShortcut({ walletAddress }) {
+            const [authorizedWallet, setAuthorizedWallet] = useState('');
+
+            useEffect(() => {
+                let disposed = false;
+                let generation = 0;
+                const validSession = () => {
+                    const wallet = String(walletAddress || '').toLowerCase();
+                    const liveWallet = String(
+                        window.currentWalletAddress || window.artsoulSettledWalletState?.address || ''
+                    ).toLowerCase();
+                    const authenticatedWallet = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+                    return /^0x[a-f0-9]{40}$/.test(wallet)
+                        && wallet === liveWallet
+                        && wallet === authenticatedWallet
+                        && window.artsoulWalletStateSettled === true
+                        && window.artsoulSettledWalletState?.isConnected === true;
+                };
+
+                const refresh = async () => {
+                    const epoch = ++generation;
+                    if (!validSession()) {
+                        if (!disposed) setAuthorizedWallet('');
+                        return;
+                    }
+                    try {
+                        const permitted = await window.AvatarDropdown?.requestProtocolAdminAccessOnce?.();
+                        if (disposed || epoch !== generation || !validSession()) return;
+                        setAuthorizedWallet(permitted === true && window.AvatarDropdown?.protocolAdminEligible === true
+                            ? String(walletAddress || '').toLowerCase() : '');
+                    } catch {
+                        if (!disposed && epoch === generation) setAuthorizedWallet('');
+                    }
+                };
+                const dismiss = () => { generation++; if (!disposed) setAuthorizedWallet(''); };
+                const onStorage = event => {
+                    if (!event.key || event.key === 'artsoul_authenticated_wallet') dismiss();
+                };
+                void refresh();
+                window.addEventListener('artsoul:wallet-state-settled', refresh);
+                window.addEventListener('artsoul:wallet-state-changed', refresh);
+                window.addEventListener('artsoul:auth-state-changed', refresh);
+                window.addEventListener('pageshow', refresh);
+                window.addEventListener('pagehide', dismiss);
+                window.addEventListener('storage', onStorage);
+                return () => {
+                    disposed = true;
+                    generation++;
+                    window.removeEventListener('artsoul:wallet-state-settled', refresh);
+                    window.removeEventListener('artsoul:wallet-state-changed', refresh);
+                    window.removeEventListener('artsoul:auth-state-changed', refresh);
+                    window.removeEventListener('pageshow', refresh);
+                    window.removeEventListener('pagehide', dismiss);
+                    window.removeEventListener('storage', onStorage);
+                };
+            }, [walletAddress]);
+
+            // Fail closed synchronously on account changes, even before React
+            // runs the effect cleanup for an older authorized wallet.
+            const live = String(
+                window.currentWalletAddress || window.artsoulSettledWalletState?.address || ''
+            ).toLowerCase();
+            const signedIn = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+            const expected = String(walletAddress || '').toLowerCase();
+            if (!expected || authorizedWallet !== expected || live !== expected || signedIn !== expected
+                || window.artsoulWalletStateSettled !== true
+                || window.artsoulSettledWalletState?.isConnected !== true) return null;
+            return <a href="/admin" className="profile-admin-shortcut">Admin panel</a>;
+        }
+
         function ProfilePage({ initialSkeletonVisible = false }) {
             const savedEnabled = useSavedEnabled();
             const initialViewAddress = getViewAddress();
@@ -1643,6 +1718,7 @@ const { useState, useEffect, useRef } = React;
                                                         <button onClick={startProfileEdit} className="btn-main">
                                                             Edit Profile
                                                         </button>
+                                                        <ProfileAdminShortcut walletAddress={connectedWalletAddress} />
                                                     </div>
                                                 )}
                                             </div>

@@ -70,7 +70,9 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     const previous = document.getElementById('homeShowcasePrev');
     const next = document.getElementById('homeShowcaseNext');
     const count = document.getElementById('homeShowcaseCount');
-    const pause = document.getElementById('homeShowcasePause');
+    // The visible slide counter doubles as an accessible pause/resume control;
+    // no separate pause icon or opaque control bar covers the artwork.
+    const pause = count;
     const status = document.getElementById('homeShowcaseStatus');
     if (![root, stage, intro, controls, previous, next, count, pause, status].every(Boolean)) return;
 
@@ -167,6 +169,7 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
         });
         count.textContent = `${active + 1} / ${items.length}`;
         controls.hidden = items.length <= 1;
+        count.setAttribute('aria-label', `Artwork ${active + 1} of ${items.length}. Activate to pause or resume automatic rotation.`);
     };
 
     root.dataset.state = 'ready';
@@ -207,16 +210,20 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     const restart = () => { stop(); start(); };
     const syncPause = () => {
         const stopped = userPaused || focusPaused;
-        pause.textContent = stopped ? '▶' : 'Ⅱ';
+        // Preserve the visible 2 / 4 counter in all states. Pause is an action
+        // on this counter, announced to assistive technology rather than shown
+        // as a distracting extra icon over the artwork.
         pause.setAttribute('aria-pressed', String(stopped));
-        pause.setAttribute('aria-label', stopped ? 'Resume automatic rotation' : 'Pause automatic rotation');
-        pause.title = stopped ? 'Resume slideshow' : 'Pause slideshow';
-        stage.setAttribute('aria-live', stopped || motion?.matches ? 'polite' : 'off');
-        pause.disabled = Boolean(motion?.matches);
-        if (pause.disabled) {
-            pause.title = 'Autoplay disabled by reduced motion preference';
-            pause.setAttribute('aria-label', pause.title);
-        }
+        const current = active + 1;
+        const total = stage.children.length;
+        const reduced = Boolean(motion?.matches);
+        pause.setAttribute('aria-label', reduced
+            ? `Artwork ${current} of ${total}. Automatic rotation disabled by motion preference.`
+            : `Artwork ${current} of ${total}. ${stopped ? 'Resume' : 'Pause'} automatic rotation.`);
+        pause.title = reduced ? 'Autoplay disabled by motion preference'
+            : stopped ? 'Resume slideshow' : 'Pause slideshow';
+        stage.setAttribute('aria-live', stopped || reduced ? 'polite' : 'off');
+        pause.disabled = reduced;
     };
     previous.onclick = () => { show(active - 1); restart(); };
     next.onclick = () => { show(active + 1); restart(); };
