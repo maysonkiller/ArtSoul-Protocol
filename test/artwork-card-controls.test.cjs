@@ -158,7 +158,7 @@ function loadActualClickGuard() {
     listeners.DOMContentLoaded();
     return { timers, click(button) {
         button.classList.contains = name => (button.className || '').split(' ').includes(name);
-        listeners.click({ target: { closest: () => button } });
+        listeners.click?.({ target: { closest: () => button } });
     } };
 }
 
@@ -168,7 +168,7 @@ function descendantButtons(node) {
     return self.concat((node.children || []).flat().flatMap(descendantButtons));
 }
 
-test('DOM audio and video controls remain enabled through the existing rapid-click guard', () => {
+test('DOM audio and video controls remain enabled after shared performance initialization', () => {
     const { api } = loadDomCardRuntime();
     const guard = loadActualClickGuard();
     for (const [file_type, file_url] of [['audio', 'track.mp3'], ['video', 'clip.mp4']]) {
@@ -183,7 +183,7 @@ test('DOM audio and video controls remain enabled through the existing rapid-cli
     assert.equal(guard.timers.length, 0);
 });
 
-test('React audio and video controls use the same rapid-click exemption', () => {
+test('React audio and video controls remain enabled after shared performance initialization', () => {
     const { api, window } = loadDomCardRuntime();
     window.React = {
         createElement: (type, props, ...children) => typeof type === 'function' ? type(props) : ({ type, props, children }),
@@ -205,25 +205,22 @@ test('React audio and video controls use the same rapid-click exemption', () => 
     assert.equal(guard.timers.length, 0);
 });
 
-test('ordinary action buttons still receive the existing double-click protection', () => {
+test('shared performance initialization leaves ordinary action buttons to their handlers', () => {
     const guard = loadActualClickGuard();
     const button = new FakeElement('button', []);
     guard.click(button);
-    assert.equal(button.disabled, true);
-    assert.equal(guard.timers.length, 1);
-    assert.equal(guard.timers[0].duration, 500);
-    guard.timers[0].callback();
-    assert.equal(button.disabled, false);
+    assert.notEqual(button.disabled, true);
+    assert.equal(guard.timers.length, 0);
 });
 
-test('Saved owns its pending guard and reaches its handler after the global capture guard', () => {
+test('Saved owns its pending guard and reaches its handler after shared performance initialization', () => {
     const { api, window } = loadDomCardRuntime();
     const guard = loadActualClickGuard();
     for (const detail of [false, true]) {
         const button = api.createSavedControl({ chain_id: 84532, artwork_id: '34' }, { detail });
         let writes = 0;
         window.ArtSoulSaved = { toggle(control) { if (!control.disabled) writes++; } };
-        // The real document listener runs in capture, before the target handler.
+        // Any document capture listener runs before the target handler.
         guard.click(button);
         button.dispatch('click');
         assert.equal(writes, 1, 'Saved must receive the first click on every surface');

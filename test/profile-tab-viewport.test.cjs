@@ -6,7 +6,7 @@ const source = fs.readFileSync('src/entries/profile.jsx', 'utf8');
 const tabs = source.slice(source.indexOf('className="profile-section-tabs'));
 const body = tabs.match(/onClick=\{\(\) => \{([\s\S]*?)\n\s*\}\}/)?.[1];
 assert.ok(body, 'the profile tab click handler is present');
-const click = new Function('gallery', 'selectedGallery', 'setArtworksLoading', 'setSelectedGallery', 'galleryPanelRef', 'window', 'artworksRequestRef', body);
+const click = new Function('gallery', 'selectedGallery', 'setArtworksLoading', 'setSelectedGallery', 'galleryPanelRef', 'window', 'artworksRequestRef', 'setArtworksError = () => {}', body);
 
 for (const [top, expected] of [[220, 624], [-120, 964], [1100, 0]]) {
   test(`tab replacement reserves the current viewport below gallery top ${top}`, () => {

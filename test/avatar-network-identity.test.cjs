@@ -29,11 +29,11 @@ async function readMenu(harness) {
     return { network, html: menuHtml(harness, network) };
 }
 
-test('confirmed Base Sepolia uses official local Base and test ETH marks without a duplicate switch', async () => {
+test('confirmed Base Sepolia uses one network mark and a clearly labelled test ETH balance', async () => {
     const harness = networkHarness();
     const { html } = await readMenu(harness);
     assert.match(html, /data-network-mark><img[^>]+src="\/brand\/base\.svg"/);
-    assert.match(html, /data-network-balance><img[^>]+src="\/brand\/eth\.png"/);
+    assert.doesNotMatch(html, /src="\/brand\/eth\.png"/);
     assert.match(html, /class="network-balance-value">… test ETH<\/span>/);
     assert.match(html, /network-current-row" role="status"/);
     assert.doesNotMatch(html, /selectNetwork\(|avatar-wallet-provider|src="(?:https?:|data:)/);
@@ -64,7 +64,7 @@ for (const [chainId, name, mark, currency] of [
         assert.ok(html.includes(`0.0000 ${currency}</span>`));
         const balance = html.match(/data-network-balance>(.*?)<\/div>/)?.[1];
         assert.ok(balance);
-        assert.equal(balance.includes('/brand/eth.png'), mark !== 'eth.png', 'do not repeat the network glyph in the balance');
+        assert.equal(balance.includes('<img'), false, 'the currency is text beside one network mark');
         assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532]);
         assert.match(html, /aria-controls="avatarNetworkOptions"/);
     });
@@ -161,7 +161,7 @@ test('no active wallet means no provider identity, even if a provider object rem
     assert.equal(harness.dropdown.getWalletProviderIdentity({ isRabby: true }), null);
 });
 
-test('live balance refresh retains token markup and removes an unavailable provider identity', async () => {
+test('live balance refresh retains currency text and removes an unavailable provider identity', async () => {
     const harness = networkHarness({ provider: { isRabby: true } });
     const { html } = await readMenu(harness);
     harness.menu().innerHTML = html;
@@ -169,7 +169,7 @@ test('live balance refresh retains token markup and removes an unavailable provi
     harness.context.window.ArtSoulBaseSepolia = { rpc: async () => '0xde0b6b3a7640000' };
     await harness.dropdown.updateNetworkDisplay();
     const balance = harness.menu().querySelector('[data-network-balance]');
-    assert.match(balance.innerHTML, /src="\/brand\/eth\.png"/);
+    assert.doesNotMatch(balance.innerHTML, /<img/);
     assert.match(balance.innerHTML, /1\.0000 test ETH/);
     assert.equal(harness.menu().querySelector('[data-wallet-provider]').innerHTML, '');
 });

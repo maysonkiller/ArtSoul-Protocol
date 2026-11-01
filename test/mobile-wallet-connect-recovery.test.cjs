@@ -448,12 +448,12 @@ test('protected actions open the wallet flow via a single hydration-aware entry 
     assert.doesNotMatch(profile, /alert\('Please connect your wallet'\)/);
 });
 
-test('wallet buttons are exempt from the global double-click guard that swallowed mobile taps', () => {
+test('wallet buttons retain their action-owned pending state without a global click guard', () => {
     const avatar = read('avatar-dropdown.js');
     assert.match(avatar, /id="connectBtn" data-allow-rapid/);
     assert.match(avatar, /resetWalletConnection\(\)" data-allow-rapid/);
     const perf = read(path.join('src', 'core', 'utils', 'performance-utils.js'));
-    assert.match(perf, /dataset\.allowRapid/);
+    assert.doesNotMatch(perf, /document\.addEventListener\('click'/);
 });
 
 test('mobile external metadata carries NO redirect: the user returns to the SAME tab', () => {

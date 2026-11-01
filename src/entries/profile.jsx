@@ -71,6 +71,7 @@ const { useState, useEffect, useRef } = React;
             const [hasSettledArtworks, setHasSettledArtworks] = useState(false);
             const [loading, setLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
             const [artworksLoading, setArtworksLoading] = useState(() => Boolean(initialViewAddress || hasInitialWalletHint));
+            const [artworksError, setArtworksError] = useState(null);
             const [isOwnProfile, setIsOwnProfile] = useState(false);
             const [walletStateSettled, setWalletStateSettled] = useState(initiallySettled);
             const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(false);
@@ -830,6 +831,7 @@ const { useState, useEffect, useRef } = React;
 
                 const requestId = ++profileRequestRef.current;
                 setProfileLoadError(null);
+                setArtworksError(null);
                 // Initial loads and tab loads write the same list. They must
                 // share one generation so the slower writer cannot win later.
                 const artworkRequestId = ++artworksRequestRef.current;
@@ -923,22 +925,23 @@ const { useState, useEffect, useRef } = React;
 
                     const [artworksResult, genesisResult] = await secondaryResults;
                     if (requestId !== profileRequestRef.current) return;
-                    const artworkData = artworksResult.status === 'fulfilled'
+                    const galleryAvailable = artworksResult.status === 'fulfilled';
+                    const cached = galleryCacheRef.current.get(`${normalizedAddress}:${requestedGallery}`);
+                    const artworkData = galleryAvailable
                         ? artworksResult.value
-                        : { items: [], corpus: [] };
+                        : { items: cached || [], corpus: [] };
                     const genesisState = genesisResult.status === 'fulfilled'
                         ? genesisResult.value
                         : { owned: false, tokenId: null, eligibilityHash: null, source: 'indexer-pending' };
-                    const nextDiscoveryProfile = buildDiscoveryProfile(profileData, artworkData.corpus, genesisState);
-
                     if (artworkRequestId === artworksRequestRef.current) {
-                        galleryCacheRef.current.set(`${normalizedAddress}:${requestedGallery}`, artworkData.items);
+                        if (galleryAvailable) galleryCacheRef.current.set(`${normalizedAddress}:${requestedGallery}`, artworkData.items);
+                        else setArtworksError('Artworks could not be loaded. Please retry.');
                         setMyArtworks(artworkData.items);
                         setDisplayedGallery(requestedGallery);
-                        setHasSettledArtworks(true);
+                        setHasSettledArtworks(galleryAvailable || Boolean(cached));
                         setArtworksLoading(false);
                     }
-                    setDiscoveryProfile(nextDiscoveryProfile);
+                    if (galleryAvailable) setDiscoveryProfile(buildDiscoveryProfile(profileData, artworkData.corpus, genesisState));
                     loadedProfileAddressRef.current = normalizedAddress;
 
                     // A-79: the frame is published, so the rest of the corpus can
@@ -970,6 +973,9 @@ const { useState, useEffect, useRef } = React;
                         } catch (error) {
                             // The bounded frame is already correct and on screen;
                             // failing to extend it is not worth replacing it.
+                            if (requestId === profileRequestRef.current && artworkRequestId === artworksRequestRef.current) {
+                                setArtworksError('More artworks could not be loaded. Please retry.');
+                            }
                             console.warn('Could not load the rest of the gallery:', error);
                         }
                     }
@@ -1013,6 +1019,7 @@ const { useState, useEffect, useRef } = React;
 
                 const walletAddress = activeProfile.wallet_address;
                 const db = dbOverride || await waitForArtSoulDB();
+                if (!db?.getPublicProjectionArtworks) throw new Error('Artwork data source is not ready');
                 const suppressedArtworkIds = new Set();
                 const rememberSuppressedArtworks = (rows = []) => {
                     (rows.suppressed_artwork_ids || []).forEach(value => {
@@ -1025,7 +1032,7 @@ const { useState, useEffect, useRef } = React;
                     ? { owner: walletAddress, limit }
                     : { creator: walletAddress, limit, ...(galleryType === 'auction' ? { view: 'auctions' } : {}) };
                 const projected = rememberSuppressedArtworks(
-                    await db?.getPublicProjectionArtworks?.(options) || []
+                    await db.getPublicProjectionArtworks(options, true)
                 );
                 const filtered = filterCanonicalProfileArtworks(projected, walletAddress, galleryType);
                 const pendingIndexerArtworks = loadPendingIndexerArtworks(walletAddress, galleryType)
@@ -1041,13 +1048,18 @@ const { useState, useEffect, useRef } = React;
             async function loadMyArtworks(profileOverride = null, { fresh = false } = {}) {
                 if (selectedGallery === 'saved') return;
                 const requestId = ++artworksRequestRef.current;
+                setArtworksError(null);
                 const activeProfile = profileOverride || profile;
                 const requestedGallery = selectedGallery;
                 // Keyed by wallet as well as tab, so one profile can never read
                 // another's cached list. A transaction just changed the chain,
                 // so those callers ask for a fresh read.
                 const cacheKey = `${String(activeProfile?.wallet_address || '').toLowerCase()}:${requestedGallery}`;
+                const cached = galleryCacheRef.current.get(cacheKey);
                 if (fresh) galleryCacheRef.current.clear();
+                // Keep only this tab's previous successful presentation while
+                // refreshing; a failed request must not erase those cards.
+                if (cached) galleryCacheRef.current.set(cacheKey, cached);
 
                 // Switching tabs used to go to the network every time, so the
                 // previous tab's cards stayed on screen for the round trip and
@@ -1058,7 +1070,6 @@ const { useState, useEffect, useRef } = React;
                 // It is a presentation cache and never a source of truth: it
                 // lives in a ref, dies with the page, is dropped whenever the
                 // profile changes, and the network result always replaces it.
-                const cached = galleryCacheRef.current.get(cacheKey);
                 if (cached) {
                     setMyArtworks(cached);
                     setDisplayedGallery(requestedGallery);
@@ -1070,19 +1081,25 @@ const { useState, useEffect, useRef } = React;
 
                 try {
                     const result = await fetchProfileArtworks(activeProfile, requestedGallery);
+                    const genesisState = requestedGallery === 'created' && activeProfile?.wallet_address
+                        ? await getGenesisState(activeProfile.wallet_address).catch(() => null) : null;
                     if (requestId === artworksRequestRef.current) {
                         galleryCacheRef.current.set(cacheKey, result.items);
                         // One commit: the list and the tab it belongs to.
                         setMyArtworks(result.items);
                         setDisplayedGallery(requestedGallery);
                         setHasSettledArtworks(true);
+                        if (genesisState) setDiscoveryProfile(buildDiscoveryProfile(activeProfile, result.corpus, genesisState));
                     }
                 } catch (error) {
                     console.error('Error loading artworks:', error);
-                    if (requestId === artworksRequestRef.current && !cached) {
-                        setMyArtworks([]);
-                        setDisplayedGallery(requestedGallery);
-                        setHasSettledArtworks(true);
+                    if (requestId === artworksRequestRef.current) {
+                        setArtworksError('Artworks could not be loaded. Please retry.');
+                        if (!cached) {
+                            setMyArtworks([]);
+                            setDisplayedGallery(requestedGallery);
+                            setHasSettledArtworks(false);
+                        }
                     }
                 } finally {
                     if (requestId === artworksRequestRef.current) setArtworksLoading(false);
@@ -1847,6 +1864,7 @@ const { useState, useEffect, useRef } = React;
                                                 // Retire the outgoing read before the next effect
                                                 // starts its load, so it cannot settle this tab.
                                                 artworksRequestRef.current++;
+                                                setArtworksError(null);
                                                 // Keep the viewport filled while the next tab
                                                 // loads; release it when that tab's result commits.
                                                 const panel = galleryPanelRef.current;
@@ -1888,7 +1906,7 @@ const { useState, useEffect, useRef } = React;
                                     >
                                         Loading{'…'}
                                     </span>
-                                ) : !artworksLoading && (
+                                ) : !artworksError && (
                                     <span className={`text-sm ${
                                         isClassic ? 'text-gray-400' : 'text-purple-300'
                                     }`}>
@@ -1897,6 +1915,12 @@ const { useState, useEffect, useRef } = React;
                                 )}
                             </div>
 
+                            {artworksError && (
+                                <div className="profile-oauth-notice is-error mb-4" role="alert">
+                                    {artworksError}{' '}
+                                    <button type="button" className="btn-secondary" disabled={artworksLoading} onClick={() => void loadMyArtworks()}>Retry artworks</button>
+                                </div>
+                            )}
                             <div className="profile-artwork-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" aria-busy={artworksLoading}>
                                 {displayedGallery !== selectedGallery || (artworksLoading && !hasSettledArtworks) ? null : (
                                     <>
@@ -1925,7 +1949,7 @@ const { useState, useEffect, useRef } = React;
                                             <ProfileArtworkCard key={artwork.id} artwork={artwork} />
                                         ))}
 
-                                        {myArtworks.length === 0 && (
+                                        {!artworksError && myArtworks.length === 0 && (
                                             <div className="profile-empty-state col-span-full p-6 text-center text-sm opacity-70">
                                                 {selectedGallery === 'created' && 'No created artworks yet.'}
                                                 {selectedGallery === 'auction' && 'No auctions to show.'}

@@ -30,7 +30,7 @@ test('Add New is Created-only and tab loading draws no transient card grid', () 
   assert.doesNotMatch(profile, /CardGridSkeleton/);
   assert.match(profile, /displayedGallery !== selectedGallery \|\| \(artworksLoading && !hasSettledArtworks\) \? null : \(/);
   assert.match(profile, /profile-gallery-loading-note text-sm/);
-  assert.match(profile, /!artworksLoading && \([\s\S]*myArtworks\.length\} items/);
+  assert.match(profile, /!artworksError && \([\s\S]*myArtworks\.length\} items/);
   assert.doesNotMatch(profile, /Creator action|Prepare a new auction|Open publisher/);
 });
 

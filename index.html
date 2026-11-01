@@ -42,7 +42,7 @@
     <script src="/header-prepaint.js?v=10"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=66">
+    <link rel="stylesheet" href="/unified-styles.css?v=67">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/ai-ui-styles.css?v=1">
     <link rel="stylesheet" href="/simplified-ui.css?v=1">
@@ -51,31 +51,7 @@
     <script src="/base-network.js?v=2" defer></script>
     <script src="/src/ui/theme-manager.js?v=1" defer></script>
     <script defer src="/src/ui/themed-selects.js?v=3"></script>
-    <script defer src="/src/ui/theme-validator.js"></script>
     <script src="/src/ui/navigation-manager.js?v=8" defer></script>
-    <script defer src="/src/ui/system-logger.js"></script>
-    <script defer src="/src/ui/log-viewer-ui.js"></script>
-    <script src="/src/ui/admin-control-panel.js" defer></script>
-    <script defer src="/src/ui/status-banner-system.js"></script>
-    <script>
-        // Initialize UI systems after page load
-        window.addEventListener('load', () => {
-            if (window.SystemLogger && window.LogViewerUI) {
-                window.logViewer = new LogViewerUI(window.SystemLogger);
-                console.log(' Log Viewer ready (Ctrl+L to toggle)');
-            }
-
-            if (window.AdminControlPanel) {
-                window.adminPanel = new AdminControlPanel();
-                console.log(' Admin Panel ready (Ctrl+A to toggle)');
-            }
-
-            if (window.StatusBannerSystem) {
-                window.statusBanners = new StatusBannerSystem();
-                console.log('🚦 Status Banners ready');
-            }
-        });
-    </script>
     <script src="/modal-system.js?v=2" defer></script>
     <script src="/src/features/discovery/discovery-service.js?v=1" defer></script>
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
@@ -228,7 +204,7 @@
         }
     </style>
     <script src="/data-prefetch.js?v=6" async></script>
-    <script src="/avatar-dropdown.js?v=61" defer></script>
+    <script src="/avatar-dropdown.js?v=62" defer></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
     <script src="/webmcp-tools.js?v=11" defer></script>
@@ -541,23 +517,5 @@
     <!-- Theme Functions -->
     <script type="module" src="/src/entries/index.js"></script>
 
-    <!-- Theme Validation (Development Mode) -->
-    <script>
-        // Run theme validation after page load
-        if (window.ThemeManager && window.ThemeValidator) {
-            window.addEventListener('load', () => {
-                setTimeout(() => {
-                    const validator = new ThemeValidator(window.ThemeManager);
-                    const passed = validator.validate();
-
-                    if (!passed) {
-                        console.warn('🔍 Theme validation failed. Run validator.autoFix() to fix issues.');
-                        // Store validator for manual inspection
-                        window.themeValidator = validator;
-                    }
-                }, 1000); // Wait 1s for all components to load
-            });
-        }
-    </script>
 </body>
 </html>

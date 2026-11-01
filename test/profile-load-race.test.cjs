@@ -35,7 +35,7 @@ function harness() {
     getViewAddress: () => '', getActiveWalletAddress: () => '',
     isWalletStateSettled: () => true, resolveProfileOwnership: () => false,
     waitForArtSoulDB: async () => ({ getProfile: async wallet_address => ({ wallet_address }) }),
-    getGenesisState: async () => ({}), buildDiscoveryProfile: () => ({}),
+    getGenesisState: async () => ({}), buildDiscoveryProfile: (profile, corpus) => ({wallet: profile.wallet_address, corpus}),
     fetchProfileArtworks(profile, gallery) {
       const read = { ...deferred(), address: profile.wallet_address, gallery };
       reads.push(read);
@@ -47,8 +47,9 @@ function harness() {
     setSelectedGallery: value => { scope.selectedGallery = value; },
     setHasSettledArtworks: value => { state.settled = value; },
     setArtworksLoading: value => { state.loading = scope.artworksLoading = value; },
+    setArtworksError: value => { state.error = value; },
     setLoading: value => { state.profileLoading = value; },
-    setDiscoveryProfile() {}, setIsOwnProfile() {}, setEditMode() {}, setProfileLoadError() {}
+    setDiscoveryProfile: value => {state.discovery = value;}, setIsOwnProfile() {}, setEditMode() {}, setProfileLoadError() {}
   };
   vm.runInNewContext(loadProfile + '\n' + loadTab + '\nfunction selectGallery(gallery) {' + tabClick + '\n}\nthis.api = { loadProfile, loadMyArtworks, selectGallery };', scope);
   for (const effect of effects) cleanups.push(effect());
@@ -111,6 +112,100 @@ test('the first gallery settles and seeds its own per-profile tab cache', async 
   await initial;
   assert.equal(h.state.settled, true);
   assert.equal(h.scope.galleryCacheRef.current.get('0xalice:created')[0].id, 'alice-created');
+});
+
+test('an initial gallery outage keeps identity, exposes retry and does not cache an empty success', async t => {
+  const h = harness(); t.after(h.unmount);
+  const initial = h.loadProfile('0xalice'); await tick();
+  h.reads[0].reject(new Error('Gallery unavailable')); await initial;
+  assert.equal(h.scope.profile.wallet_address, '0xalice');
+  assert.match(h.state.error, /could not be loaded/i);
+  assert.equal(h.state.loading, false);
+  assert.equal(h.scope.galleryCacheRef.current.has('0xalice:created'), false);
+  const retry = h.loadMyArtworks();
+  assert.equal(h.reads.length, 2, 'only the user retry starts another gallery read');
+  h.reads[1].resolve(result('recovered')); await retry;
+  assert.equal(h.state.items[0].id, 'recovered'); assert.equal(h.state.error, null);
+  assert.equal(h.state.discovery.corpus[0].id, 'recovered', 'retry restores stats from the successful corpus');
+});
+
+for (const fresh of [false, true]) test(`a failed ${fresh ? 'confirmed' : 'cached'} refresh preserves the same wallet and tab`, async t => {
+  const h = harness(); t.after(h.unmount);
+  h.scope.profile = {wallet_address: '0xalice'};
+  h.scope.selectedGallery = 'sold';
+  h.scope.galleryCacheRef.current.set('0xalice:sold', result('retained').items);
+  h.scope.galleryCacheRef.current.set('0xalice:created', result('other-tab').items);
+  const refresh = h.loadMyArtworks(null, {fresh});
+  h.reads[0].reject(new Error('Gallery unavailable')); await refresh;
+  assert.equal(h.state.items[0]?.id, 'retained'); assert.equal(h.state.gallery, 'sold');
+  assert.equal(h.scope.galleryCacheRef.current.get('0xalice:sold')[0].id, 'retained');
+  assert.equal(h.scope.galleryCacheRef.current.has('0xalice:created'), !fresh);
+  assert.match(h.state.error, /could not be loaded/i);
+});
+
+test('a failed forced profile refresh preserves its successful gallery and reports the outage', async t => {
+  const h = harness(); t.after(h.unmount);
+  let pending = h.loadProfile('0xalice'); await tick();
+  h.reads[0].resolve(result('retained')); await pending;
+  pending = h.loadProfile('0xalice', {force: true}); await tick();
+  h.reads[1].reject(new Error('Gallery unavailable')); await pending;
+  assert.equal(h.state.items[0]?.id, 'retained');
+  assert.match(h.state.error, /could not be loaded/i);
+});
+
+test('a failed remainder preserves the first page and a single retry can replace it', async t => {
+  const h = harness(); t.after(h.unmount);
+  const initial = h.loadProfile('0xalice'); await tick();
+  const first = {items: [{id: 'first-page'}], corpus: Array.from({length: 24}, (_, id) => ({id}))};
+  h.reads[0].resolve(first); await tick();
+  assert.equal(h.reads.length, 2); assert.equal(h.state.items[0].id, 'first-page');
+  h.reads[1].reject(new Error('Remainder unavailable')); await initial;
+  assert.equal(h.state.items[0].id, 'first-page'); assert.equal(h.state.loading, false);
+  assert.match(h.state.error, /could not be loaded/i);
+  const retry = h.loadMyArtworks();
+  assert.equal(h.reads.length, 3);
+  h.reads[2].resolve(result('full-gallery')); await retry;
+  assert.equal(h.state.items[0].id, 'full-gallery'); assert.equal(h.state.error, null);
+  assert.equal(h.state.discovery.corpus[0].id, 'full-gallery');
+});
+
+test('a late remainder failure cannot put an error on a newer tab', async t => {
+  const h = harness(); t.after(h.unmount);
+  const initial = h.loadProfile('0xalice'); await tick();
+  h.reads[0].resolve({items: [{id: 'first'}], corpus: Array.from({length: 24}, (_, id) => ({id}))});
+  await tick();
+  h.scope.selectedGallery = 'sold'; const tab = h.loadMyArtworks();
+  h.reads[2].resolve(result('sale')); await tab;
+  h.reads[1].reject(new Error('Old remainder failed')); await initial;
+  assert.equal(h.state.error, null); assert.equal(h.state.items[0].id, 'sale');
+});
+
+test('an old gallery failure cannot replace a newer tab or leak a previous wallet cache', async t => {
+  const h = harness(); t.after(h.unmount);
+  const old = h.loadProfile('0xalice'); await tick();
+  h.scope.selectedGallery = 'sold';
+  const tab = h.loadMyArtworks(); h.reads[1].resolve(result('sale')); await tab;
+  h.reads[0].reject(new Error('Old gallery failed')); await old;
+  assert.equal(h.state.error, null); assert.equal(h.state.items[0].id, 'sale');
+  const replacement = h.loadProfile('0xbob'); await tick();
+  h.reads[2].reject(new Error('New gallery failed')); await replacement;
+  assert.equal(h.scope.profile.wallet_address, '0xbob'); assert.equal(h.state.items.length, 0);
+  assert.equal(h.scope.galleryCacheRef.current.size, 0); assert.match(h.state.error, /could not be loaded/i);
+});
+
+test('the actual profile gallery reader propagates unavailable projections instead of returning empty cards', async () => {
+  const block = source.slice(source.indexOf('async function fetchProfileArtworks('), source.indexOf('async function loadMyArtworks('));
+  const scope = {selectedGallery: 'created', FULL_GALLERY_LIMIT: 200,
+    filterCanonicalProfileArtworks: rows => rows, loadPendingIndexerArtworks: () => [],
+    sortNewestFirst: rows => rows, mergePendingIndexerArtworks: rows => rows,
+    window: {ArtSoulArtworkCard: {hasSafeMedia: () => true}}};
+  vm.runInNewContext(block + ';this.read = fetchProfileArtworks;', scope);
+  let reads = 0;
+  const db = {getPublicProjectionArtworks: async (options, strict) => {
+    reads++; if (strict) throw new Error('Projection unavailable'); return [];
+  }};
+  await assert.rejects(scope.read({wallet_address: '0xalice'}, 'created', db), /unavailable/);
+  assert.equal(reads, 1);
 });
 
 for (const outcome of ['empty', 'populated', 'failed']) {

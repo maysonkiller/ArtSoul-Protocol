@@ -69,6 +69,31 @@ test('Activity names the existing Sales subset without pretending to be a comple
   assert.doesNotMatch(auctions, /awaiting completion|settlement/);
 });
 
+test('a gallery outage renders one retry, keeps existing cards and never claims an empty collection', async () => {
+  const start = profile.indexOf('<div ref={galleryPanelRef} className="profile-gallery-panel');
+  const markup = profile.slice(start, profile.indexOf('\n                        )}', start));
+  for (const isClassic of [false, true]) {
+    for (const items of [[], [{id: 'retained'}]]) {
+      let retries = 0;
+      const view = await fixture(markup, {isClassic, selectedGallery: 'created', displayedGallery: 'created',
+        galleryPanelRef: {current: null}, artworksLoading: false, hasSettledArtworks: items.length > 0,
+        artworksError: 'Artworks could not be loaded. Please retry.', myArtworks: items, isOwnProfile: false,
+        loadMyArtworks: () => {retries++;}, ProfileArtworkCard: ({artwork}) => React.createElement('article', null, artwork.id)}, types);
+      const html = render(view);
+      assert.match(html, /role="alert"/); assert.match(html, /Retry artworks/);
+      assert.doesNotMatch(html, /No created artworks yet|0 items/);
+      assert.equal(elements(view, node => node.type === 'button').length, 1);
+      elements(view, node => node.type === 'button')[0].props.onClick();
+      assert.equal(retries, 1);
+      assert.equal(html.includes('retained'), items.length > 0);
+    }
+  }
+  const empty = render(await fixture(markup, {isClassic: true, selectedGallery: 'created', displayedGallery: 'created',
+    galleryPanelRef: {current: null}, artworksLoading: false, hasSettledArtworks: true,
+    artworksError: null, myArtworks: [], isOwnProfile: false}, types));
+  assert.match(empty, /No created artworks yet/); assert.doesNotMatch(empty, /Retry artworks/);
+});
+
 test('email shares the provider grid but never mounts for another wallet or an unsettled owner', async () => {
   const values = {emailVerificationEnabled: true, isOwnProfile: true, walletStateSettled: true,
     connectedWalletAddress: '0x' + '1'.repeat(40), profile: {}, isClassic: true,

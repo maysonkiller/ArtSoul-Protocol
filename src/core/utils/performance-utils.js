@@ -176,16 +176,8 @@ function initPerformanceOptimizations() {
         }, 150);
     });
 
-    // Prevent rapid button clicks globally
-    document.addEventListener('click', (e) => {
-        const button = e.target.closest('button, [role="button"]');
-        if (button && !button.disabled) {
-            // Don't prevent if it's a toggle or has data-allow-rapid
-            if (!button.dataset.allowRapid && !button.classList.contains('toggle')) {
-                preventDoubleClick(button, 500);
-            }
-        }
-    }, true);
+    // Action handlers own pending state. A document-wide timer can swallow the
+    // first click or re-enable a control before its operation has completed.
 
     console.log('Performance optimizations initialized');
 }

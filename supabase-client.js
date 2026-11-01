@@ -16,7 +16,7 @@ async function loadSupabasePublicConfig() {
 
     if (!supabaseSingleton.configPromise) {
         const started = window.ArtSoulPrefetch?.take?.('/api/public/config');
-        supabaseSingleton.configPromise = (started || fetch('/api/public/config', {
+        const request = (started || fetch('/api/public/config', {
             method: 'GET',
             credentials: 'omit'
         })).then(async response => {
@@ -31,7 +31,11 @@ async function loadSupabasePublicConfig() {
             window.ArtSoulPublicConfigData = data;
             window.SUPABASE_ANON_KEY = data.supabaseAnonKey;
             return data;
+        }).catch(error => {
+            if (supabaseSingleton.configPromise === request) supabaseSingleton.configPromise = null;
+            throw error;
         });
+        supabaseSingleton.configPromise = request;
     }
 
     return supabaseSingleton.configPromise;

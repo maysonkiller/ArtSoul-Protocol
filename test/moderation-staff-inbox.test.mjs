@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNotificationInbox} from '../src/features/moderation/notification-inbox-state.js';
+import {createNotificationReadQueue} from '../src/features/moderation/notification-read-queue.js';
 
 const OWNER = '0x' + '11'.repeat(20), OTHER = '0x' + '22'.repeat(20);
 const access = fields => ({authenticated: true, eligible: true, enabled: true, access: {stepUpActive: true}, ...fields});
@@ -133,13 +134,102 @@ test('a retained outcome can be marked read after an older page fails without lo
   assert.deepEqual({status: state.status, retryCursor: state.retryCursor, nextCursor: state.nextCursor}, retryState);
 });
 
-test('initial pagination stays unavailable until staff discovery finishes', async () => {
+test('personal history and pagination become ready before optional staff discovery finishes', async () => {
   const h = harness(), pending = deferred(); h.accessFetch = () => pending.promise;
   const loading = h.inbox.load(); await tick();
   assert.equal(h.state.items.length, 1); assert.equal(h.state.nextCursor, '1');
-  assert.equal(h.state.status, 'loading', 'the UI only offers older pages after ready');
+  assert.equal(h.state.status, 'ready', 'optional staff discovery cannot block personal history');
   pending.resolve(Response.json(access())); await loading;
   assert.equal(h.state.status, 'ready'); assert.equal(h.state.staffReview.count, 1);
+});
+
+for (const stage of ['access', 'queue']) test(`pagination can retire a slow staff ${stage} without refetching or accepting its late authority`, async () => {
+  const h = harness(), pending = deferred();
+  if (stage === 'access') h.accessFetch = () => pending.promise;
+  else h.queueFetch = () => pending.promise;
+  const initial = h.inbox.load(); await tick();
+  assert.equal(h.state.status, 'ready');
+  await h.inbox.load('1');
+  pending.resolve(Response.json(stage === 'access' ? access() : h.queue)); await initial;
+  assert.equal(h.state.status, 'ready'); assert.equal(h.state.staffReview?.status || null, stage === 'access' ? null : 'unavailable');
+  assert.equal(h.calls.filter(call => call.path.includes('/access?')).length, 1);
+  assert.equal(h.calls.filter(call => call.path.includes('review-queue')).length, stage === 'access' ? 0 : 1);
+});
+
+for (const stage of ['access', 'queue']) test(`a late ${stage} 401 clears already usable personal history`, async () => {
+  const h = harness(), pending = deferred();
+  if (stage === 'access') h.accessFetch = () => pending.promise;
+  else h.queueFetch = () => pending.promise;
+  const initial = h.inbox.load(); await tick();
+  assert.equal(h.state.status, 'ready'); assert.equal(h.state.items.length, 1);
+  pending.resolve(Response.json({}, {status: 401})); await initial;
+  assert.equal(h.state.status, 'auth'); assert.equal(h.state.staffReview, null); assert.deepEqual(h.state.items, []);
+});
+
+function clock(t) {
+  let id = 0;
+  const pending = new Map();
+  t.mock.method(globalThis, 'setTimeout', (callback, delay) => {pending.set(++id, {callback, delay}); return id;});
+  t.mock.method(globalThis, 'clearTimeout', timer => pending.delete(timer));
+  return {pending, expire() {for (const [timer, entry] of [...pending]) {pending.delete(timer); entry.callback();}}};
+}
+
+test('read deadlines bound optional staff loading without removing personal history', async t => {
+  const time = clock(t), h = harness(), pending = deferred(); h.queueFetch = () => pending.promise;
+  const initial = h.inbox.load(); await tick();
+  assert.equal(h.state.status, 'ready'); assert.equal(h.state.staffReview.status, 'loading');
+  assert.equal(time.pending.size, 1, 'the completed personal read releases its deadline');
+  assert.equal([...time.pending.values()][0].delay, 15000);
+  time.expire(); assert.equal(h.calls.at(-1).options.signal.aborted, true);
+  pending.resolve(Response.json(h.queue)); await initial;
+  assert.equal(h.state.status, 'ready'); assert.equal(h.state.staffReview.status, 'unavailable');
+  assert.equal(h.state.items.length, 1); assert.equal(time.pending.size, 0); assert.equal(h.calls.length, 3);
+});
+
+test('a personal read deadline rejects a late parsed payload and remains explicitly retryable', async t => {
+  const time = clock(t), data = deferred(); let state, reads = 0;
+  const inbox = createNotificationInbox({wallet: OWNER, getWallet: () => OWNER, onChange: value => {state = value;}, fetchPage: async path => {
+    if (path.includes('/access?')) return Response.json({authenticated: true, eligible: false});
+    reads++; return reads === 1 ? {ok: true, status: 200, json: () => data.promise}
+      : Response.json({wallet: OWNER, items: [{id: '1'}], nextCursor: null});
+  }});
+  const loading = inbox.load(); await tick();
+  assert.equal(time.pending.size, 1); time.expire();
+  data.resolve({wallet: OWNER, items: [{id: '999'}], nextCursor: null}); await loading;
+  assert.equal(state.status, 'error'); assert.deepEqual(state.items, []); assert.equal(reads, 1);
+  await inbox.load(); assert.equal(state.status, 'ready'); assert.equal(state.items[0].id, '1');
+  assert.equal(time.pending.size, 0);
+});
+
+test('wallet invalidation cancels all read deadlines and rejects late privileged replies', async t => {
+  const time = clock(t), h = harness(), pending = deferred(); h.accessFetch = () => pending.promise;
+  const loading = h.inbox.load(); await tick(); assert.equal(time.pending.size, 1);
+  h.setWallet(OTHER); h.inbox.invalidate('auth');
+  assert.equal(time.pending.size, 0); assert.equal(h.calls[1].options.signal.aborted, true);
+  pending.resolve(Response.json(access())); await loading;
+  assert.equal(h.state.status, 'auth'); assert.deepEqual(h.state.items, []);
+  assert.equal(h.calls.some(call => call.path.includes('review-queue')), false);
+});
+
+test('opening a personal message saves its read state while the staff queue is stalled', async t => {
+  const time = clock(t), pending = deferred(), calls = []; let state;
+  const inbox = createNotificationInbox({wallet: OWNER, getWallet: () => OWNER, onChange: value => {state = value;}, fetchPage: async (path, options) => {
+    calls.push({path, options});
+    if (options.method === 'PUT') return Response.json({wallet: OWNER, updated: ['1'], read: true});
+    if (path.includes('/access?')) return Response.json(access());
+    if (path.includes('review-queue')) return pending.promise;
+    return Response.json({wallet: OWNER, items: [{id: '1', read: false}], nextCursor: '1'});
+  }});
+  inbox.configure({summaryEnabled: true});
+  const initial = inbox.load(); await tick();
+  const queue = createNotificationReadQueue({canRun: () => !['loading', 'idle'].includes(state.status) && !state.pendingId});
+  await queue.add('personal:1', () => inbox.markRead('1', true));
+  assert.equal(calls.filter(call => call.options.method === 'PUT').length, 1);
+  assert.equal(state.items[0].read, true); assert.equal(queue.hasWork(), false);
+  assert.equal(calls.find(call => call.path.includes('review-queue')).options.signal.aborted, true);
+  assert.equal(time.pending.size, 0); assert.equal(state.staffReview.status, 'unavailable');
+  pending.resolve(Response.json({data: {reports: [report]}})); await initial;
+  assert.equal(state.items[0].read, true); assert.equal(state.staffReview.status, 'unavailable');
 });
 
 test('staff eligibility appears while both the recipient page and review queue are still pending', async () => {

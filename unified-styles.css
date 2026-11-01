@@ -6917,6 +6917,17 @@ body:is(.classic, .future) :is(#artworkGallery, .home-featured-row, .gallery-res
     overflow: visible;
     scroll-snap-type: none;
 }
+/* Reserve the first real card row during the initial feed request. This keeps
+   the following sections out of the loading gap without animating fake cards.
+   The reservation follows the same columns/media proportions as the grid. */
+.home-spotlight { container-type: inline-size; }
+#artworkGallery[aria-busy="true"] {
+    --home-loading-columns: 4;
+    --home-loading-gap: 20px;
+    --home-loading-media-ratio: 0.75;
+    min-block-size: calc((100cqw - (var(--home-loading-columns) - 1) * var(--home-loading-gap)) / var(--home-loading-columns) * var(--home-loading-media-ratio) + 136px);
+    align-content: start;
+}
 body:is(.classic, .future) .artsoul-artwork-card {
     --artwork-card-radius: 18px;
     border-color: var(--c-border-soft);
@@ -6951,12 +6962,14 @@ body:is(.classic, .future) .artsoul-card-menu-list { border-radius: 12px; paddin
 body:is(.classic, .future) .artsoul-card-menu-list a { min-height: 44px; border-radius: 8px; }
 
 @media (max-width: 1100px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 3; --home-loading-gap: 16px; }
     body:is(.classic, .future) :is(#artworkGallery, .home-featured-row, .gallery-results-grid, .profile-artwork-grid.grid) {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
     }
 }
 @media (max-width: 768px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 2; --home-loading-gap: 12px; --home-loading-media-ratio: 1; }
     body:is(.classic, .future) :is(#artworkGallery, .home-featured-row, .gallery-results-grid, .profile-artwork-grid.grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
