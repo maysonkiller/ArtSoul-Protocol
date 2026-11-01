@@ -51,6 +51,7 @@ function harness({ active = '', hint = OWNER, view = '', result = { success: tru
     setProfile(value) { state.profile = value; scope.profile = value; },
     setProfileDraft(value) { state.draft = typeof value === 'function' ? value(state.draft) : value; scope.profileDraft = state.draft; },
     setProfileLoadError: value => { state.loadError = value; },
+    setArtworksError: value => { state.artworksError = value; },
     setOAuthNotice: value => state.notices.push(value), alert: value => state.alerts.push(value),
     setTimeout: fn => state.timers.push(fn),
     setEditMode: value => { state.editing = value; },

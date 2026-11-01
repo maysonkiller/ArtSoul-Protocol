@@ -39,7 +39,7 @@
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
     <script src="/header-prepaint.js?v=10"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=66">
+    <link rel="stylesheet" href="/unified-styles.css?v=67">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=2">
@@ -49,18 +49,7 @@
     <script src="/base-network.js?v=2" defer></script>
     <script src="/src/ui/theme-manager.js?v=1" defer></script>
     <script defer src="/src/ui/themed-selects.js?v=3"></script>
-    <script defer src="/src/ui/theme-validator.js"></script>
-    <script defer src="/src/ui/status-banner-system.js"></script>
     <script src="/src/ui/navigation-manager.js?v=8" defer></script>
-    <script defer src="/src/ui/system-logger.js"></script>
-    <script defer src="/src/ui/log-viewer-ui.js"></script>
-    <script>
-        window.addEventListener('load', () => {
-            if (window.SystemLogger && window.LogViewerUI) {
-                window.logViewer = new LogViewerUI(window.SystemLogger);
-            }
-        });
-    </script>
     <script src="/modal-system.js?v=2" defer></script>
     <script src="/src/features/discovery/discovery-service.js?v=1" defer></script>
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
@@ -113,7 +102,7 @@
         }
     </style>
     <script src="/data-prefetch.js?v=6" async></script>
-    <script src="/avatar-dropdown.js?v=61" defer></script>
+    <script src="/avatar-dropdown.js?v=62" defer></script>
     <script type="module" src="/wallet-runtime-loader.js"></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
@@ -325,13 +314,5 @@
         })();
     </script>
     <script type="module" src="/src/entries/profile.jsx" onerror="window.ArtSoulProfileEntryFailed?.()"></script>
-    <script>
-        window.addEventListener('load', () => {
-            if (window.StatusBannerSystem) {
-                window.statusBanners = new StatusBannerSystem();
-                console.log('🚦 Status Banners ready');
-            }
-        });
-    </script>
 </body>
 </html>

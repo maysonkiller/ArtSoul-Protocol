@@ -1414,8 +1414,7 @@
             const network = NETWORK_IDENTITIES[Number(networkInfo?.chainId)];
             if (!network) return '';
             const currency = [84532, 11155111].includes(Number(networkInfo.chainId)) ? 'test ETH' : 'ETH';
-            const tokenMark = network.mark === 'eth' ? '' : this.renderIdentityMark('eth');
-            return `${tokenMark}<span class="network-balance-value">${networkBalanceText(networkInfo.balance)} ${currency}</span>`;
+            return `<span class="network-balance-value">${networkBalanceText(networkInfo.balance)} ${currency}</span>`;
         }
 
         renderWalletProvider(walletProvider) {

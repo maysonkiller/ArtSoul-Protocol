@@ -138,7 +138,7 @@ test('removing the image after a load error closes the modal and restores the sc
     h.unmount();
 });
 
-test('image controls remain focusable during the global rapid-click guard window', () => {
+test('image controls remain focusable after shared performance initialization', () => {
     const listeners = new Map();
     const context = vm.createContext({
         window: {addEventListener() {}}, console: {log() {}}, setTimeout() {},
@@ -151,10 +151,10 @@ test('image controls remain focusable during the global rapid-click guard window
     const captureClick = props => {
         const target = {disabled: false, style: {}, dataset: {allowRapid: props['data-allow-rapid']},
             classList: {contains() {return false;}}, closest() {return this;}};
-        listeners.get('click')({target});
+        listeners.get('click')?.({target});
         return target.disabled;
     };
-    assert.equal(captureClick({}), true, 'the ordinary button guard is active');
+    assert.equal(captureClick({}), false, 'ordinary controls retain their own pending state');
     const h = harness();
     const trigger = descendants(h.toolbar()).find(node => node.type === 'button');
     assert.equal(captureClick(trigger.props), false, 'closing immediately can restore trigger focus');

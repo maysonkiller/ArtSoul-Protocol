@@ -28,7 +28,7 @@ test('ArtSoulDB exposes the complete auction API and profile uses the canonical 
   assert.match(client, /state: projectionAuctionState\(artwork\.status\)/);
   assert.match(client, /highestBidder: artwork\.auction_winner_address \|\| artwork\.current_bidder/);
   assert.match(client, /createAuction,[\s\S]*getAuctions,[\s\S]*getActiveAuctions/);
-  assert.match(profile, /db\?\.getPublicProjectionArtworks\?\.\(options\)/);
+  assert.match(profile, /db\.getPublicProjectionArtworks\(options, true\)/);
   assert.match(profile, /filterCanonicalProfileArtworks\(projected, walletAddress, galleryType\)/);
 });
 

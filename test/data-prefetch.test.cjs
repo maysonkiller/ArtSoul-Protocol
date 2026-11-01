@@ -150,6 +150,41 @@ test('public configuration consumes the early request once across concurrent cal
   assert.equal(fetches, 0);
 });
 
+for (const failure of ['network', 'http', 'json', 'incomplete']) {
+  test(`public configuration recovers from a ${failure} failure and shares the retry`, async () => {
+    const body = client.slice(client.indexOf('async function loadSupabasePublicConfig()'), client.indexOf('// Export for OAuth'));
+    let takes = 0, fetches = 0;
+    const failed = failure === 'network' ? Promise.reject(new Error('Offline')) : Promise.resolve({
+      ok: failure !== 'http', text: async () => failure === 'json' ? '{' : JSON.stringify({message: 'Unavailable'})
+    });
+    const window = {ArtSoulPrefetch: {take() { takes++; return takes === 1 ? failed : null; }}};
+    const singleton = {};
+    const load = new Function('window', 'supabaseSingleton', 'fetch', body + '; return loadSupabasePublicConfig;')(
+      window, singleton, async () => {fetches++; return {ok: true, text: async () => JSON.stringify({supabaseUrl: 'https://example.test', supabaseAnonKey: 'public'})};}
+    );
+    assert.deepEqual((await Promise.allSettled([load(), load()])).map(result => result.status), ['rejected', 'rejected']);
+    assert.equal(fetches, 0, 'the failed head start is consumed once');
+    const [a, b] = await Promise.all([load(), load()]);
+    assert.equal(a, b); assert.equal(fetches, 1); assert.equal(takes, 2);
+    assert.equal(await load(), a); assert.equal(fetches, 1, 'success remains cached');
+  });
+}
+
+test('a retired configuration failure cannot clear its replacement request', async () => {
+  const body = client.slice(client.indexOf('async function loadSupabasePublicConfig()'), client.indexOf('// Export for OAuth'));
+  let reject;
+  const singleton = {};
+  const load = new Function('window', 'supabaseSingleton', 'fetch', body + '; return loadSupabasePublicConfig;')(
+    {}, singleton, () => new Promise((resolve, fail) => {reject = fail;})
+  );
+  const old = load();
+  const replacement = Promise.resolve({supabaseUrl: 'https://example.test', supabaseAnonKey: 'public'});
+  singleton.configPromise = replacement;
+  reject(new Error('Old request failed'));
+  await assert.rejects(old);
+  assert.equal(singleton.configPromise, replacement);
+});
+
 test('the legacy artwork query starts the same exact projection request', () => {
   const { calls } = run('/artwork.html', '?id=v41%3A84532%3A31');
   assert.deepEqual(calls.map((call) => call.url), [

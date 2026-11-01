@@ -344,3 +344,13 @@ Measured per-range RPC/purge cost and transient coverage availability remain
 activation gates. No migration, new NFT writer or ownership reader is activated
 live; the existing worker stays B30. See the B35 audit for exact evidence,
 failed/rerun test results and remaining rollout requirements.
+
+November 1 B18 runtime/interface review: strict retryable Profile artwork reads,
+retired failed configuration promises, independent personal-inbox readiness,
+initial Home row reservation, removal of disabled diagnostics/global click
+mutation, and a single network mark are prepared. Built rendering passes 1,351
+assertions across eight product routes plus outage/late-response cases. Exact
+CI and release remain pending. Wallet SDK startup cost is a separate bounded
+follow-up because mobile persisted sessions cannot be inferred from address
+hints. See [runtime/interface audit](audits/B18_RUNTIME_INTERFACE_AUDIT_2026-11-01.md).
+This does not close the remaining native-device, B02/B11/B12 or B35 gates.
