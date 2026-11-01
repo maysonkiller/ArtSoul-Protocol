@@ -66,6 +66,11 @@ changes. Base Sepolia remains the only active product testnet.
   `b18-logout-header-*`, `b18-wallet-final` and `b18-phantom-*` prefixes. Browser
   fixtures are not native iPhone or real Phantom acceptance. CI and deployed
   asset verification are recorded in the release checkpoint after publication.
+- Initial CI41290779658 found one obsolete source-shape assertion on both OSes:
+  the artwork loading test expected the former inline immediate ternary. It now
+  verifies the shared hook receives that same immediate flag and keeps an
+  already-visible mark visible. Existing executable short/long/immediate timer
+  tests remain; all 20 related checks pass. No behavior guard was removed.
 
 ## Reversible cache move
 

@@ -193,7 +193,8 @@ test('React keeps the already-visible artwork skeleton visible when it mounts', 
 
     const skeletons = fs.readFileSync('src/entries/loading-skeletons.jsx', 'utf8');
     assert.match(skeletons, /ArtworkPageSkeleton\(\{ immediate = false, artworkId = '' \}\)/);
-    assert.match(skeletons, /\$\{immediate \? '' : PLACEHOLDER\}/);
+    assert.match(skeletons, /ArtworkPageSkeleton\([^)]*\) \{\s*const placeholder = usePlaceholderClass\(immediate\);/);
+    assert.match(skeletons, /return immediate \|\| ready \? '' : PLACEHOLDER;/);
 });
 
 test('supplementary artwork reads do not hold the primary projection behind loading', () => {
