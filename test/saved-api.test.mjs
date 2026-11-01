@@ -201,12 +201,12 @@ test('Saved projection reuse never grants a staff visibility exception or accept
   for(const [snapshot,expected] of [[{cards:[card],warnings:[]},card],
     [{cards:[{...card,moderation_hidden:true}],warnings:[]},null],[{cards:[],warnings:[]},null],
     [{cards:[{...card,chain_id:11155111}],warnings:[]},null]]){
-    const read=new Function('getDirectProjectionSnapshot',code+';return readVisibleArtworkCard;')(async lookup=>{
+    const read=new Function('readWithNftOwnershipRetry','getDirectProjectionSnapshot',code+';return readVisibleArtworkCard;')(operation=>operation(),async lookup=>{
       assert.deepEqual(lookup,{chain:84532,artworkId:'7'});return snapshot;
     });
     assert.deepEqual(await read(84532,'7'),expected);
   }
-  const unavailable=new Function('getDirectProjectionSnapshot',code+';return readVisibleArtworkCard;')(
-    async()=>({cards:[card],warnings:[{table:'artwork_moderation_visibility',code:'QUERY_FAILED'}]}));
+  const unavailable=new Function('readWithNftOwnershipRetry','getDirectProjectionSnapshot',code+';return readVisibleArtworkCard;')(
+    operation=>operation(),async()=>({cards:[card],warnings:[{table:'artwork_moderation_visibility',code:'QUERY_FAILED'}]}));
   await assert.rejects(unavailable(84532,'7'),/unavailable/);
 });

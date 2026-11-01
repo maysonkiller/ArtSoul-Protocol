@@ -2016,6 +2016,215 @@ const {pathToFileURL}=require('node:url');
     });
   }
 
+  const {syncCoordinatedCheckpoint} = await import(pathToFileURL(path.join(ROOT,'src/indexer/coordinated-checkpoint.js')).href);
+  function coordinatedEvents() {
+    const event=(eventName,eventData,index)=>({eventName,eventData,blockNumber:116,blockHash:hash(116),
+      transactionHash:hash(11600+index),transactionIndex:index,logIndex:index,contractAddress:CORE,removed:false});
+    return [event('ArtworkRegistered',{artworkId:2,creator:CREATOR,metadataURI:'ipfs://coordinated-fixture'},0),
+      event('AuctionCreated',{auctionId:2,artworkId:2,creator:CREATOR,startPrice:1000,duration:86400,
+        endTime:1700086400,chainId:CHAIN},1)];
+  }
+  async function coordinatedFixture(sub,events=[]) {
+    const f=nftFixture(sub);
+    f.options.blockNumber=115;f.options.blockHash=hash(115);
+    await f.run();await target._purgeRecoveryCache();
+    const moved={...f.logs[0],blockNumber:'0x75',blockHash:hash(117),transactionHash:hash(11700),logIndex:'0x2'};
+    f.config=Object.freeze({...f.options,maxBlocks:10});f.logs=[];f.coreEvents=events;f.calls=[];f.purges=0;
+    target.fixtureCachePurgeHook=async()=>{f.purges++;return true;};
+    target.eventListener.getBlock=async number=>({number,hash:hash(number),parentHash:hash(number-1),timestamp:100});
+    target.eventListener.queryAllHistoricalEvents=async()=>f.coreEvents;
+    f.addTransfer=()=>{f.logs=[moved];};
+    f.publish=()=>syncCoordinatedCheckpoint(target,f.config,117,132);
+    f.boundary=async()=>(await pool.query('SELECT * FROM read_verified_nft_boundary($1,$2,$3,$4)',
+      [CORE,f.config.nftAddress,f.config.expectedCoreCodeHash,f.config.expectedNftCodeHash])).rows;
+    return f;
+  }
+  await t.test('coordinated empty publication advances both cursors and coverage without a purge',async sub=>{
+    const f=await coordinatedFixture(sub),before=await writerSnapshot(),foreign=await snapshot(OTHER_CHAIN);
+    const result=await f.publish(),after=await writerSnapshot(),state=await target.getIndexerState();
+    assert.deepEqual(result,{fromBlock:116,throughBlock:117,processedCount:0});assert.equal(f.purges,0);
+    assert.equal(state.last_indexed_block,117);assert.equal(state.last_confirmed_block,117);
+    assert.equal(state.recovery_cache_token,null);assert.equal(state.state_hash,await target._computeStateHash(117));
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'117');
+    assert.equal((await f.boundary())[0].indexed_through,'117');
+    for(const table of tables.filter(name=>!['indexer_state','block_hashes','nft_transfer_coverage'].includes(name)))
+      assert.deepEqual(after.chain[table],before.chain[table],table);
+    assert.deepEqual(after.outbox,before.outbox);assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);
+  });
+  await t.test('coordinated ordered Core projections and NFT movement publish together',async sub=>{
+    const events=coordinatedEvents(),f=await coordinatedFixture(sub,[events[1],events[0]]);f.addTransfer();
+    const result=await f.publish(),after=await writerSnapshot();
+    assert.equal(result.processedCount,2);assert.equal(f.purges,1);
+    assert.equal(String(after.chain.v41_artworks.find(row=>String(row.artwork_id)==='2').active_auction_id),'2');
+    assert.equal(after.chain.v41_auctions.find(row=>String(row.auction_id)==='2').status,'active');
+    assert.equal(after.chain.event_processing_registry.filter(row=>row.block_number>115&&row.processing_status==='completed').length,2);
+    assert.equal(after.chain.contract_events.filter(row=>row.block_number>115).length,3);
+    assert.equal((await nftRows()).at(-1).block_number,'117');
+    assert.ok(after.outbox.some(row=>row.correlation_id===`${CHAIN}-${events[0].transactionHash}-0`));
+    assert.equal((await f.boundary())[0].indexed_through,'117');
+  });
+  await t.test('coordinated readers see the old complete boundary until commit and the new boundary afterwards',async sub=>{
+    const f=await coordinatedFixture(sub,coordinatedEvents()),before=await writerSnapshot();f.addTransfer();
+    const paused=deferred(),release=deferred();let intercepted=false;
+    beforeSql=async sql=>{if(sql==='COMMIT'&&!intercepted){intercepted=true;paused.resolve();await release.promise;}};
+    const publishing=settle(f.publish());
+    try {
+      await reach(paused,publishing);
+      assert.equal((await f.boundary())[0].indexed_through,'115');
+      assert.deepEqual(await writerSnapshot(),before,'uncommitted projections, headers, leases and outbox stay invisible');
+    } finally {release.resolve();beforeSql=null;}
+    assert.ifError((await publishing).error);
+    assert.equal((await f.boundary())[0].indexed_through,'117');
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'117');
+  });
+  for(const name of ['SettlementCompleted','BidPlaced'])await t.test(
+    `coordinated retained ${name} without completion cannot replay its projections`,async sub=>{
+      const f=await coordinatedFixture(sub);
+      const event={...coordinatedEvents()[0],eventName:name,eventData:name==='SettlementCompleted'
+        ?{auctionId:1,artworkId:1,winner:WINNER,finalPrice:2000,tokenId:7}
+        :{auctionId:1,bidder:WINNER,bidAmount:2000,depositAmount:100},timestamp:100000};
+      f.coreEvents=[event];
+      const client=await pool.connect();
+      try {
+        await client.query('BEGIN');await target._applyEventProjectionTx(event,client);
+        if(name==='BidPlaced') {
+          // A later retained bid must not be overwritten by the older event.
+          await target._applyEventProjectionTx({...event,transactionHash:hash(11601),logIndex:1,
+            transactionIndex:1,eventData:{...event.eventData,bidder:CREATOR,bidAmount:3000}},client);
+        }
+        await client.query('COMMIT');
+      } catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+      // The extra-journal guard is independently covered. Supply the later event
+      // too, so this check exercises the missing completion specifically.
+      if(name==='BidPlaced')f.coreEvents.push({...event,transactionHash:hash(11601),logIndex:1,
+        transactionIndex:1,eventData:{...event.eventData,bidder:CREATOR,bidAmount:3000}});
+      const before=await writerSnapshot();
+      await assert.rejects(f.publish(),/missing its completed processing record/);
+      const after=await writerSnapshot(),failed=after.chain.event_processing_registry
+        .filter(row=>row.transaction_hash===event.transactionHash);
+      assert.equal(failed.length,1);assert.equal(failed[0].processing_status,'failed');
+      after.chain.event_processing_registry=after.chain.event_processing_registry
+        .filter(row=>row.transaction_hash!==event.transactionHash);
+      assert.deepEqual(after,before,'no projection, trust, outbox, counter or boundary can change');
+      assert.equal(f.purges,0);
+    });
+  await t.test('coordinated publication clears its cache gate before optional enrichment',async sub=>{
+    const f=await coordinatedFixture(sub,coordinatedEvents());let enriched=0;
+    sub.mock.method(target,'_afterEventCommit',async()=>{
+      enriched++;assert.equal(f.purges,1);
+      assert.equal((await f.boundary())[0].indexed_through,'117');
+    });
+    await f.publish();assert.equal(enriched,2);
+  });
+  await t.test('coordinated purge failure preserves the committed range and pending obligation',async sub=>{
+    const f=await coordinatedFixture(sub,coordinatedEvents());let enriched=0;
+    sub.mock.method(target,'_afterEventCommit',async()=>{enriched++;});
+    target.fixtureCachePurgeHook=async()=>{throw new Error('fixture purge unavailable');};
+    await assert.rejects(f.publish(),/fixture purge unavailable/);
+    const committed=await writerSnapshot();
+    assert.equal((await target.getIndexerState()).last_indexed_block,117);
+    assert.ok((await target.getIndexerState()).recovery_cache_token);
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'117');
+    assert.deepEqual(await f.boundary(),[]);assert.equal(enriched,2);
+    target.fixtureCachePurgeHook=async()=>true;await target._purgeRecoveryCache();
+    assert.equal((await f.boundary())[0].indexed_through,'117');
+    const recovered=await writerSnapshot();
+    assert.deepEqual(recovered.outbox,committed.outbox);
+    assert.deepEqual(recovered.chain.contract_events,committed.chain.contract_events);
+  });
+  for(const stage of ['Core handler','NFT journal','digest','checkpoint'])await t.test(
+    `coordinated ${stage} failure rolls back the whole publication`,async sub=>{
+      const events=coordinatedEvents(),f=await coordinatedFixture(sub,events);f.addTransfer();
+      const before=await writerSnapshot();let injected=false;
+      beforeSql=async sql=>{
+        const matches=stage==='Core handler'?sql.includes('INSERT INTO v41_auctions'):
+          stage==='NFT journal'?sql.startsWith('INSERT INTO public.contract_events'):
+          stage==='digest'?sql.includes('SELECT encode(digest('):
+          sql.startsWith('UPDATE public.indexer_state SET last_indexed_block=$1');
+        if(matches){injected=true;throw new Error(`fixture coordinated ${stage} failure`);}
+      };
+      try {await assert.rejects(f.publish(),/fixture coordinated/);} finally {beforeSql=null;}
+      assert.equal(injected,true);const after=await writerSnapshot();
+      if(stage==='Core handler') {
+        const failed=after.chain.event_processing_registry.filter(row=>row.transaction_hash===events[1].transactionHash);
+        assert.equal(failed.length,1);assert.equal(failed[0].processing_status,'failed');
+        after.chain.event_processing_registry=after.chain.event_processing_registry.filter(row=>row.transaction_hash!==events[1].transactionHash);
+      }
+      assert.deepEqual(after,before,'only the failed event retry record may survive');assert.equal(f.purges,0);
+      assert.equal((await f.boundary())[0].indexed_through,'115');
+    });
+  for(const loss of ['RPC leadership loss','late lease expiry'])await t.test(
+    `coordinated ${loss} cannot publish a prepared range`,async sub=>{
+      const f=await coordinatedFixture(sub,coordinatedEvents()),before=await writerSnapshot();
+      if(loss==='RPC leadership loss')f.hook=async method=>{if(method==='eth_getLogs')leaderCurrent=false;};
+      else beforeSql=async(sql,client)=>{if(sql.startsWith('UPDATE public.indexer_state SET last_indexed_block=$1'))
+        await client.query("UPDATE distributed_locks SET expires_at=clock_timestamp()-INTERVAL '1 second'");};
+      try {await assert.rejects(f.publish(),/authority changed|fence lost/);} finally {beforeSql=null;}
+      assert.deepEqual(await writerSnapshot(),before);assert.equal(f.purges,0);
+    });
+  await t.test('coordinated direct rewind during proof rejects the stale range and preserves recovery state',async sub=>{
+    const f=await coordinatedFixture(sub,coordinatedEvents());let recovered;
+    f.hook=async method=>{if(method!=='eth_getLogs')return;f.hook=null;
+      await pool.query('SELECT rollback_events_from_block($1,$2)',[116,CHAIN]);recovered=await writerSnapshot();};
+    await assert.rejects(f.publish(),/state changed|fence lost/);
+    assert.ok(recovered);assert.deepEqual(await writerSnapshot(),recovered);assert.deepEqual(await coverageRows(CHAIN),[]);
+  });
+  for(const change of ['engine chain','Donation added','Donation replaced'])await t.test(
+    `coordinated ${change} during proof rejects even an empty range`,async sub=>{
+      const f=await coordinatedFixture(sub),before=await writerSnapshot();
+      if(change==='Donation replaced')target.eventListener.donationAddress=CREATOR;
+      const originalChain=target.chainId,originalDonation=target.eventListener.donationAddress;
+      f.hook=async method=>{if(method!=='eth_getLogs')return;
+        if(change==='engine chain')target.chainId=OTHER_CHAIN;
+        else target.eventListener.donationAddress=WINNER;
+      };
+      try {await assert.rejects(f.publish(),/changed|authority/);}
+      finally {target.chainId=originalChain;target.eventListener.donationAddress=originalDonation;}
+      assert.deepEqual(await writerSnapshot(),before);assert.equal(f.purges,0);
+    });
+  for(const mismatch of ['fork','source'])await t.test(`coordinated Core ${mismatch} mismatch fails before publication`,async sub=>{
+    const events=coordinatedEvents(),f=await coordinatedFixture(sub,events),before=await writerSnapshot();
+    if(mismatch==='fork')events[0].blockHash=hash(999);else events[0].contractAddress=WINNER;
+    await assert.rejects(f.publish(),/different fork|different source/);
+    assert.deepEqual(await writerSnapshot(),before);assert.deepEqual(f.calls,[]);
+  });
+  await t.test('coordinated Core transaction positions must agree across the entire range',async sub=>{
+    const f=await coordinatedFixture(sub),before=await writerSnapshot();
+    for(const mismatch of ['one transaction across blocks','two transactions at one position','reversed transaction order']) {
+      const events=coordinatedEvents();f.coreEvents=events;
+      if(mismatch==='one transaction across blocks')Object.assign(events[1],
+        {blockNumber:117,blockHash:hash(117),transactionHash:events[0].transactionHash});
+      if(mismatch==='two transactions at one position')events[1].transactionIndex=0;
+      if(mismatch==='reversed transaction order'){events[0].transactionIndex=1;events[1].transactionIndex=0;}
+      await assert.rejects(f.publish(),/transaction positions/);assert.deepEqual(await writerSnapshot(),before,mismatch);
+    }
+  });
+  await t.test('coordinated Core and NFT facts cannot conflict on transaction or log positions',async sub=>{
+    const events=coordinatedEvents(),f=await coordinatedFixture(sub,events),before=await writerSnapshot();
+    for(const mismatch of ['transaction across blocks','duplicate log position','shared position with different transaction']) {
+      f.addTransfer();const log=f.logs[0];
+      if(mismatch==='transaction across blocks')log.transactionHash=events[0].transactionHash;
+      else {
+        log.blockNumber='0x74';log.blockHash=hash(116);
+        if(mismatch==='duplicate log position'){log.logIndex='0x0';log.transactionHash=events[0].transactionHash;}
+        else log.transactionIndex='0x1';
+      }
+      await assert.rejects(f.publish(),/transaction positions/);assert.deepEqual(await writerSnapshot(),before,mismatch);
+    }
+  });
+  await t.test('coordinated publication rejects extra retained Core, Donation and unknown-source events',async sub=>{
+    const f=await coordinatedFixture(sub);target.eventListener.donationAddress=WINNER;
+    for(const source of [CORE,WINNER,null]) {
+      await pool.query(`INSERT INTO contract_events(chain_id,event_name,artwork_id,block_number,transaction_hash,
+        log_index,event_data,indexed_at,contract_address) VALUES($1,$2,2,116,$3,0,$4,to_timestamp(100),$5)`,
+      [CHAIN,source===WINNER?'Donation':'ArtworkRegistered',hash(11600),
+        JSON.stringify({artworkId:'2',creator:CREATOR,metadataURI:'ipfs://retained-unverified'}),source]);
+      const before=await writerSnapshot();await assert.rejects(f.publish(),/unverified range events/);
+      assert.deepEqual(await writerSnapshot(),before);assert.equal(f.purges,0);
+      await pool.query('DELETE FROM contract_events WHERE chain_id=$1 AND transaction_hash=$2',[CHAIN,hash(11600)]);
+    }
+  });
+
   const OWNER_NFT=`0x${'d'.repeat(40)}`, HOLDER=`0x${'e'.repeat(40)}`, LAST_HOLDER=`0x${'f'.repeat(40)}`;
   const ownerSql='SELECT * FROM public.read_verified_nft_owners($1,$2,$3,$4,$5)';
   const ownerParams=(ids=['1'])=>[CORE,OWNER_NFT,hash(900),hash(901),ids];

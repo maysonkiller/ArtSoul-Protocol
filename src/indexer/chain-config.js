@@ -103,6 +103,13 @@ export function resolveNftTransferConfig(chain, env = process.env) {
     if (flag === undefined || flag === 'false') return null;
     const invalid = label => { throw new Error(`Invalid NFT transfer configuration: ${label}`); };
     if (flag !== 'true') invalid('ARTSOUL_NFT_TRANSFER_INDEX_ENABLED');
+    // Coverage is exposed only after the durable cache-purge obligation has
+    // been acknowledged. Without Redis, bootstrap would stop Core catch-up.
+    try {
+        if (typeof env.REDIS_URL !== 'string' || env.REDIS_URL.trim() !== env.REDIS_URL) throw new Error();
+        const redis = new URL(env.REDIS_URL);
+        if (!['redis:', 'rediss:'].includes(redis.protocol) || !redis.hostname) throw new Error();
+    } catch { invalid('recovery-capable REDIS_URL required'); }
     if (chain?.chainId !== 84532 || (chain.slug !== undefined && chain.slug !== 'base-sepolia') ||
         (env.BASE_SEPOLIA_CHAIN_ID !== undefined && env.BASE_SEPOLIA_CHAIN_ID !== '84532')) {
         invalid('Base Sepolia chain required');

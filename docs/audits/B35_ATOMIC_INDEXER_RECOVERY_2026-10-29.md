@@ -1198,3 +1198,76 @@ assignment was introduced. Canon sections 1,4,5,9 apply unchanged. The existing
 worker remains on B30 and ownership API activation stays off. Next: finish exact
 candidate verification, then resolve poll/cache cost and availability in an
 isolated end-to-end rehearsal before any existing-worker rollout.
+
+## November 1 worker integration release and coordinated publication
+
+PR #424 candidate `49e181db` passed exact CI41276022695: Linux3,808 passes/two
+skips, Windows3,133 passes/35 skips,49 contract checks each, both builds and
+static checks. It merged as `14af0d0f`. Preview7468906592 and production7468978313
+serve the reviewed assets; six public routes match stylesheet SHA-256
+`39b90d05b45c77084d9df94b80b93d1c63ee5d1afe4b123290bce5d6e03df884`.
+The full isolated Windows recovery rerun passed250/250 in550seconds with the
+900-second overall allowance. Earlier failed runs above remain retained.
+
+The fresh November1 archive was also restored, not merely inspected:
+111 tables,286,532 rows and1,258 security declarations match the archive,
+including table digests and sequences. No invalid indexes were found. The
+one inherited NOT VALID realtime constraint is present in the source archive;
+it is not claimed as newly validated. The isolated container was stopped.
+Archive SHA-256 is
+`5105452a4aa9de17329ecf98e9bd2b97d26f37dfb2185abd786790bc97627cd3`.
+Private restore evidence: `b35-restore-1793510113311-555134dc/evidence.json`.
+Object-storage bytes and a second independent durable copy remain open gates.
+
+The next, still local slice removes a publication gap: the legacy runner
+commits mutable Core rows before its final cursor, while NFT coverage remains
+at the previous cursor. The opt-in runner now holds Core during historical NFT
+catch-up, then prepares both sources outside database locks and publishes their
+journal, projections, lifecycle outbox, event leases, retained headers, coverage
+and cursors in one fenced transaction. Existing event handlers are reused.
+Wrong sources, forks, transaction positions, extra retained logs, changed
+leadership or an expired lease abort the entire range. Only a failing event's
+retry record can survive an aborted transaction.
+
+Publication is bounded to the configured block window,1,000 Core/Donation
+events and a30-second transaction work allowance. It attempts at most one
+publication per10seconds while head/recovery observation retains its normal
+cadence. An empty already-ready range does not purge caches. A changed range
+clears its durable purge obligation before optional AI enrichment. A purge
+failure preserves the committed range and retries the obligation without
+replaying its events. Activation now requires a valid Redis configuration:
+the existing no-cache path deliberately cannot acknowledge that obligation.
+This adds no service or billing change.
+
+Local evidence at this checkpoint:262 focused checks pass;20 coordinated
+PostgreSQL scenarios (21 including the parent test) pass, including concurrent
+readers, four injected rollback stages, source/lease changes and post-commit
+cache failure. The expanded full recovery run, exact candidate CI, cost and
+API-boundary acceptance are still required. No live migration, source update,
+new writer or ownership gate has been enabled. Canon1/4/5/9 are unchanged;
+the10-second cadence is an operational cost bound, not auction economics.
+
+The ownership consumers now retry one whole read only after a validated forward,
+fully confirmed boundary change. Cards, feeds, Saved/search hydration and
+provenance discard the first attempt together. Same-height rewrites, malformed
+proofs, changed deployment settings and repeated movement remain unavailable;
+HTTP output is sent only after the final check. The focused API suites pass255
+checks. Strict historical log parsing also prevents a malformed known Core or
+Donation event from being silently omitted from a coordinated publication;
+unknown valid ABI topics retain the existing behavior.
+
+Final review found that a retained event without its completed processing record
+cannot safely be replayed: settlement handlers increment trust counters, and an
+old bid could overwrite a later completed bid. The coordinated path now rejects
+that inconsistent state before applying any projection. Recovery must reconcile
+it; no guess or automatic completion is permitted. Two additional database
+regressions cover retained settlements and bids, including unchanged counters,
+outbox, projections and boundaries.
+
+The first expanded full local run completed with267 passes and two failing
+subtests (three failures including the parent): both failed in fixture reset,
+where TRUNCATE exceeded the unchanged ten-second SQL limit while another local
+database suite was running. Evidence is retained in
+`docs/private/b35-atomic-postgres-full.log`; the cluster stopped successfully.
+This is not recorded as a passing matrix. The final two new regressions and
+isolated reruns, plus exact candidate CI, remain required before release.

@@ -74,6 +74,7 @@ function loadHandler({ missDirectArtworkOnce = false, beforeRead = async () => {
     readNftOwnershipBoundary: async () => null,
     readNftOwnership: async () => null,
     recheckNftOwnership: async () => null,
+    readWithNftOwnershipRetry: operation => operation(),
     sendError: (res, error) => res.status(error.statusCode || 500).json({ error: error.code, message: error.message }),
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },

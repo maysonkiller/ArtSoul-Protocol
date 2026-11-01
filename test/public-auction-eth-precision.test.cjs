@@ -43,6 +43,7 @@ function endpoint(name, amount, bidAmounts = [amount]) {
     readNftOwnership: async () => null,
     readNftHistory: async () => null,
     recheckNftOwnership: async () => null,
+    readWithNftOwnershipRetry: operation => operation(),
     sendError: (res, error) => res.status(500).json({ error: error.message }),
     supabaseRest: async path => rows[path.split('?')[0]] || [],
     validateArtworkId: value => String(value || '').trim() || null,
