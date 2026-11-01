@@ -326,10 +326,14 @@ Verification registry and authoritative aura assignment remain future work under
 the October7 origin-review policy/C14; presentation helpers are not an issued badge.
 Accepted Future page composition is released in PR413–418, retaining both original palettes, Admin and documentation. Remaining interface acceptance requires the new composition on a native iPhone; no old wallet test is repeated. Next engineering slice is B35 deployment-bound NFT-transfer history and recovery; the isolated proof foundation does not authorize worker activation.
 
-November1 B35: PR421 released the fenced atomic NFT journal/coverage writer after
-exact Linux/Windows CI and preview/production checks. The next dormant SQL read
-foundation joins exact original-Core registration/settlement sources to the NFT
-mint and latest transfer in one snapshot;38 real isolated PostgreSQL checks pass.
-Neither migration nor NFT writer/reader is activated live. Historical bootstrap,
-consistent API/timeline integration and worker/recovery acceptance remain open.
-See the B35 audit for evidence and explicit missing-history behavior.
+November1 B35: PR421–423 released the fenced NFT journal/coverage writer and
+source-qualified ownership/provenance consumers after exact Linux/Windows CI
+and preview/production checks. A bounded archive read and independent owner
+reconciliation now exist;178 legacy Core sources are proven but not assigned.
+The October26 database archive restores with matching111 tables/49,349 rows and
+security declarations; this excludes storage objects and current backup scope.
+Opt-in integration in the existing runner is under candidate verification.
+Measured per-range RPC/purge cost and transient coverage availability remain
+activation gates. No migration, new NFT writer or ownership reader is activated
+live; the existing worker stays B30. See the B35 audit for exact evidence,
+failed/rerun test results and remaining rollout requirements.

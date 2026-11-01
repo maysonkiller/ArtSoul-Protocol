@@ -6,6 +6,7 @@ const coverageColumns = ['chain_id','core_address','nft_address','from_block','o
 const sameCoverage = (a, b) => a === null || b === null ? a === b :
     coverageColumns.every(key => String(a[key]) === String(b[key]));
 const scopeSql = 'chain_id=$1 AND core_address=$2 AND nft_address=$3';
+const coreHeaderSql = 'SELECT block_hash FROM public.block_hashes WHERE chain_id=$1 AND block_number=$2';
 
 // Dormant until a reviewed runner supplies a verified historical origin.
 // A whole range, its journal facts and its coverage commit together. This never
@@ -18,6 +19,18 @@ export async function syncNftTransferRange(engine, options) {
         typeof input.coreAddress !== 'string' || input.coreAddress.toLowerCase() !== context.contractAddress.toLowerCase() ||
         typeof input.nftAddress !== 'string' || !Number.isSafeInteger(input.blockNumber) ||
         input.blockNumber > context.lastIndexedBlock) throw new Error('NFT range exceeds its Core deployment checkpoint');
+    const terminal = input.blockNumber === context.lastIndexedBlock;
+    const requireCoreHeader = rows => {
+        const retained = rows[0]?.block_hash;
+        if (rows.length !== 1 || typeof retained !== 'string' || !/^0x[0-9a-f]{64}$/i.test(retained) ||
+            /^0x0{64}$/i.test(retained) || typeof input.blockHash !== 'string' ||
+            retained.toLowerCase() !== input.blockHash.toLowerCase()) {
+            throw new Error('NFT range does not match its retained Core checkpoint hash');
+        }
+        return retained;
+    };
+    const headerParams = [context.chainId, input.blockNumber];
+    const coreHeader = terminal ? requireCoreHeader(await database.query(coreHeaderSql, headerParams)) : null;
     const scope = [context.chainId, input.coreAddress.toLowerCase(), input.nftAddress.toLowerCase()];
     const previousRows = await database.query(`SELECT ${coverageColumns.join(',')} FROM public.nft_transfer_coverage
         WHERE ${scopeSql}`, scope);
@@ -49,6 +62,11 @@ export async function syncNftTransferRange(engine, options) {
         if (!isCurrent() || listener.contractAddress?.toLowerCase() !== scope[1] ||
             (listener.nftAddress && listener.nftAddress.toLowerCase() !== scope[2])) {
             throw new Error('NFT range authority changed before commit');
+        }
+        // Exposure at the Core cursor requires the same retained fork. The
+        // state lock is already held; retain this header lock through commit.
+        if (terminal && requireCoreHeader((await client.query(`${coreHeaderSql} FOR SHARE`, headerParams)).rows) !== coreHeader) {
+            throw new Error('NFT retained Core checkpoint hash changed during range read');
         }
         const current = (await client.query(`SELECT ${coverageColumns.join(',')} FROM public.nft_transfer_coverage
             WHERE ${scopeSql} FOR UPDATE`, scope)).rows;

@@ -1090,7 +1090,16 @@ Evidence: `docs/private/b35-history-focused-final.log`,
 `docs/private/reorg-atomicity-1793506747109-18336-dd40ba1f/`.
 No contract, economics, public data deletion or new chain was introduced.
 Canon §§1,4,5,9 still apply; the read boundary is an implementation detail,
-not a new NFT ownership rule. Hosted candidate checks/release remain pending.
+not a new NFT ownership rule.
+
+PR423 released candidate `2034e3304ea0787f4815221fc99d3f02e9450264`,
+merge `47a3eacef2257a12a2c811b8f7eee44bd7895897`. Exact CI41272919032
+passed Linux3,654/two skips, Windows2,991/35 skips,49 contract checks on each,
+both builds and static checks. Preview7468515107 and production7468545248
+succeeded; all six apex entry routes serve the tested stylesheet. Evidence:
+`docs/private/b35-history-ci.json`, `b35-history-preview-release.log` and
+`b35-history-production-release.log`. The migration remains unapplied and
+the new ownership consumers remain disabled until the operational gates pass.
 
 ### Read-only historical coverage now available
 
@@ -1116,3 +1125,76 @@ Remaining B35 gates include original-Core journal source qualification (old
 NULL rows need event replay, not blanket address assignment), independent
 restore, recovery/cache and external-delivery acceptance, then updating and
 observing the existing worker. B35 and the full Phase B are not closed here.
+
+## November 1 source proof, archive restore and dormant runner
+
+Read-only source qualification now proves 178 legacy NULL-source Core events
+against canonical receipts and decoded ABI payloads; four Donation rows are
+explicitly excluded. Independent verification binds every database identity to
+the saved proof, re-encodes log payloads without address/number coercion, and
+checks chain/header/hash-pinned runtime/header/chain through all three providers.
+No source column was updated. Evidence: `docs/private/b35-core-source-proof-1793507642069.json`
+and `b35-core-source-final-verify-1793508123503.json`. Applying this evidence still
+requires fresh database identity checks and a reversible, bounded update.
+
+The October 26 full database archive was restored into a separate PostgreSQL
+17.6 container with no network or published ports. All 111 archived tables,
+49,349 rows, sorted content digests, sequence values and 1,241 ownership/grant/
+default/RLS declarations matched. The single unvalidated constraint,
+`realtime.messages.messages_payload_exclusive`, is explicitly `NOT VALID` in
+both the source archive and restored schema; it is not a restore regression.
+The container was stopped. This is not a current backup, storage-object restore,
+or second durable copy. Global roles and extension owners came from a separately
+captured November 1 catalog. Evidence: `docs/private/b35-restore-1793508572589-d05313b0/evidence.json`.
+The archive SHA-256 is `d8798c2b9b475f026ae95531d0014d29f29dc0e825f9d7136aa10237cec25e49`.
+
+The existing worker now has an opt-in bounded NFT range step after successful
+Core catch-up, both at startup and in the serialized poll. It uses persisted
+coverage, the same leadership fencing and drain path, and the existing durable
+cache purge. Missing coverage restarts at the explicitly reviewed origin; no
+recent-block shortcut is allowed. A terminal NFT range must match the retained
+Core checkpoint hash before RPC and again under the commit lock. Health checks
+read Core revision/cursor/cache token and coverage in one statement and reject
+a changed captured boundary. Partial, failed or unpurged coverage cannot claim
+sync completion. Disabled deployments perform no extra coverage query.
+
+Configuration is deliberately separate from the API ownership flag:
+
+- `ARTSOUL_NFT_TRANSFER_INDEX_ENABLED` defaults off; only exact `true` enables it.
+- Explicit Base Sepolia Core/NFT addresses must match the resolved worker.
+- `ARTSOUL_NFT_OWNERSHIP_CORE_CODE_HASH` and `ARTSOUL_NFT_OWNERSHIP_NFT_CODE_HASH`
+  pin both deployments; neither may be empty or zero.
+- `ARTSOUL_NFT_TRANSFER_FROM_BLOCK` and `ARTSOUL_NFT_TRANSFER_ORIGIN_BLOCK_HASH`
+  identify the reviewed origin and its predecessor. They are mandatory.
+- `ARTSOUL_NFT_TRANSFER_MAX_BLOCKS` defaults to 1,000, bounded to 1..100,000;
+  larger windows require provider/archive evidence, not guessed completeness.
+- Optional `BASE_SEPOLIA_READ_RPC_URLS` accepts an explicit HTTP(S) read-provider
+  order only for Base Sepolia. No runtime provider or default order was changed.
+
+Local lifecycle/configuration checks pass 151; build checks pass 11 routes and
+172 utilities. The first parallel full-unit run passed 3,550 with two failures,
+one cancellation and one environment skip: disposable database readiness and a
+60-second ordered-catch-up timeout under concurrent database load. Both affected
+files subsequently passed all 45 checks in a serial rerun with no skips. The
+expanded 250-check recovery matrix also exceeded its 480-second limit under
+that load. Its overall allowance is now 900 seconds for the expanded Windows
+matrix; individual SQL, lease and concurrency bounds are unchanged. The final
+isolated rerun and exact hosted CI remain required. Failed logs
+are retained rather than counted as passes. Evidence: `docs/private/b35-runner-*.log`
+and `b35-checkpoint-postgres*.log`.
+
+Six bounded read-only samples of empty five-block ranges measured nine proof
+RPCs and 44.4–44.7KB per range, excluding endpoint acquisition, SQL and purge.
+Base took 1,144–1,327ms; PublicNode took 443–452ms. These are small local samples,
+not an SLA, a provider comparison at the same finality head, or runtime approval.
+At a two-second poll, the approximately ten-call path could approach 432,000
+RPCs/day before retries. Every advancing terminal range also schedules a cache
+purge, and the API intentionally refuses incomplete coverage during catch-up.
+This measured cost/availability gate must be resolved before activation.
+Evidence: `docs/private/b35-nft-poll-cost-1793509416765.json`.
+
+No new server, contract, economics, chain, payment, live migration or source
+assignment was introduced. Canon sections 1,4,5,9 apply unchanged. The existing
+worker remains on B30 and ownership API activation stays off. Next: finish exact
+candidate verification, then resolve poll/cache cost and availability in an
+isolated end-to-end rehearsal before any existing-worker rollout.

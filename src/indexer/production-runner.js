@@ -3,7 +3,7 @@ import IndexerSyncEngine from './sync-engine.js';
 import PostgreSQLDatabase from './postgresql-database.js';
 import IndexerMetrics from './metrics.js';
 import DistributedLock from './distributed-lock.js';
-import { requireEnv, resolveIndexerChainConfigs } from './chain-config.js';
+import { requireEnv, resolveIndexerChainConfigs, resolveNftTransferConfig } from './chain-config.js';
 import { reconcileConfirmationDepth } from './confirmation-depth.js';
 import {
     resolveMetricsAuth,
@@ -17,6 +17,7 @@ import {
 import { reapStaleEventProcessingLeases } from './event-processing-lease.js';
 import { refreshSearchMetadata } from './search-metadata.js';
 import { readResaleStateAtBlock, reconcileResaleState } from './resale-state-reconciliation.js';
+import { readNftTransferProgress, syncNftTransferCheckpoint } from './nft-transfer-checkpoint.js';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -43,6 +44,7 @@ function resolveProductionIndexerConfig() {
         readRpcUrls: chain.readRpcUrls,
         contractAddress: chain.coreAddress,
         nftAddress: chain.nftAddress,
+        nftTransferConfig: resolveNftTransferConfig(chain),
         projectNFTAddress: chain.projectNFTAddress,
         chainId: chain.chainId,
         donationAddress: chain.donationAddress,
@@ -77,6 +79,7 @@ class ProductionIndexer {
             rpcUrl: rpcUrls,
             readRpcUrls: config.readRpcUrls,
             contractAddress: config.contractAddress,
+            nftAddress: config.nftAddress,
             donationAddress: config.donationAddress,
             chainId: config.chainId
         }, this.metrics);
@@ -116,6 +119,7 @@ class ProductionIndexer {
         this.resaleCursor = '0';
         this.resaleSweepEnd = null;
         this.resaleReconciliationError = null;
+        this.nftTransferError = null;
         this.lastSearchMetadataAt = 0;
         this.searchMetadataInFlight = null;
         // Set when startup fails to reconcile the persisted confirmation depth.
@@ -241,7 +245,9 @@ class ProductionIndexer {
             // Refresh once before ranges run, including inherited failures.
             await this._refreshEventFailureMetric('startup');
             if (!authority.isCurrent()) return;
-            await this._catchUpToSafeBlock('leader_start');
+            const checkpoint = await this._catchUpToSafeBlock('leader_start');
+            if (!authority.isCurrent()) return;
+            if (checkpoint) await this._syncNftTransfers();
             if (!authority.isCurrent()) return;
 
             this._startConfirmationPolling();
@@ -672,6 +678,7 @@ class ProductionIndexer {
                 if (checkpoint && this.isLeader && this.isRunning) {
                     await this._processConfirmations(checkpoint.currentBlock);
                     await this._refreshResaleState(checkpoint.safeBlock);
+                    await this._syncNftTransfers();
                     // Independent public-search enrichment never delays chain work.
                     this._refreshSearchMetadata();
                 }
@@ -680,6 +687,18 @@ class ProductionIndexer {
             }
         })().finally(() => { this.confirmationInFlight = null; });
         return this.confirmationInFlight;
+    }
+
+    async _syncNftTransfers() {
+        const config = this.config?.nftTransferConfig;
+        if (!config || !this.isLeader || !this.isRunning || this.isStopping) return;
+        try {
+            await syncNftTransferCheckpoint(this.syncEngine, config);
+            if (this.isLeader && this.isRunning && !this.isStopping) this.nftTransferError = null;
+        } catch {
+            this.nftTransferError = 'Verified NFT history refresh failed';
+            console.warn('[ProductionIndexer] Verified NFT history refresh failed; retrying next poll.');
+        }
     }
 
     async _refreshResaleState(blockNumber) {
@@ -860,13 +879,24 @@ class ProductionIndexer {
                 0
             );
 
+            let nftTransfers = { enabled: false };
+            if (this.config?.nftTransferConfig) {
+                try {
+                    nftTransfers = { enabled: true,
+                        ...await readNftTransferProgress(this.syncEngine, this.config.nftTransferConfig, state),
+                        error: this.nftTransferError || null };
+                } catch {
+                    nftTransfers = { enabled: true, ready: false, error: 'Verified NFT coverage unavailable' };
+                }
+            }
+
             // Determine overall health status
             let status = 'healthy';
             if (!this.isRunning) {
                 status = 'stopped';
-            } else if (hasErrors || this.resaleReconciliationError) {
+            } else if (hasErrors || this.resaleReconciliationError || nftTransfers.error) {
                 status = 'degraded';
-            } else if (blocksBehind > 100) {
+            } else if (blocksBehind > 100 || (nftTransfers.enabled && !nftTransfers.ready)) {
                 status = 'syncing';
             }
 
@@ -883,11 +913,12 @@ class ProductionIndexer {
                     lastConfirmedBlock: state.last_confirmed_block,
                     currentBlock: currentBlock,
                     blocksBehind: blocksBehind,
-                    isSynced: isSynced,
+                    isSynced: isSynced && (!nftTransfers.enabled || (nftTransfers.ready && !nftTransfers.error)),
                     syncThresholdBlocks: this.healthMaxBlocksBehind,
                     confirmationDepth: this.confirmationDepth,
                     confirmationDepthSyncError: this.confirmationDepthSyncError,
                     resaleReconciliationError: this.resaleReconciliationError || null,
+                    nftTransfers,
                     totalEventsIndexed: state.total_events_indexed,
                     unresolvedErrors: unresolvedErrorCount,
                     // Additive breakdown; unresolvedErrors stays the headline
