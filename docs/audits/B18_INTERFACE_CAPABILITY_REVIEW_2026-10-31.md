@@ -118,6 +118,11 @@ A further eight Saved audio/video layouts exercised actual sample playback,
 measured all five overlay regions and found no overlap or off-card controls.
 These browser checks use synthetic transport and local sample media; they do not
 claim fresh native iPhone, wallet signing or production service acceptance.
+The first exact CI run exposed three old stylesheet-version assertions. Their
+expected version is advanced to v62 without weakening the order/consistency
+guards. The full local suite then passed 2,645 checks with 35 explicit environment
+skips (including 29 pre-existing untracked authority-policy tests); exact CI runs
+only tracked tests. No product behavior changed in this follow-up.
 The same 221 assertions also passed against the production build, with zero page errors. Exact-candidate CI and release status are recorded separately.
 Evidence is retained in ignored `docs/private/b18-card-*.log`,
 `docs/private/b18-saved-toggle-check.log` and
