@@ -9547,3 +9547,229 @@ body:is(.classic, .future) .gallery-page-main.site-page-container {
         transition: none !important;
     }
 }
+
+
+/* B18.5 — compact account popover and design-study artwork metadata.
+   Owner review: the iPhone menu occupied too much viewport. Keep network,
+   copy-address, provider and disconnect access, with 44px touch targets.
+   No JavaScript wallet lifecycle, permissions or transactions are changed. */
+body:is(.classic, .future) .site-header .avatar-dropdown-menu {
+    width: min(194px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    box-sizing: border-box !important;
+    padding: 5px !important;
+    border-radius: 14px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    max-height: calc(100dvh - var(--site-header-height) - 12px) !important;
+}
+body:is(.classic, .future) .site-header .avatar-menu-identity {
+    padding: 4px 6px !important;
+    min-width: 0;
+}
+body:is(.classic, .future) .site-header .avatar-menu-name {
+    font-size: 12.5px !important;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+body:is(.classic, .future) .site-header .avatar-menu-address {
+    min-height: 44px !important;
+    gap: 3px !important;
+    padding: 2px 0 !important;
+    font-size: 11px !important;
+}
+body:is(.classic, .future) .site-header .avatar-menu-address-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body:is(.classic, .future) .site-header .avatar-wallet-section {
+    padding-block: 3px !important;
+}
+body:is(.classic, .future) .site-header .avatar-dropdown-menu .network-current-row {
+    min-height: 44px !important;
+    gap: 5px !important;
+    padding: 4px 5px !important;
+    font-size: 12px !important;
+    align-items: center;
+}
+body:is(.classic, .future) .site-header .network-switcher-copy [data-network-name] {
+    font-size: 12px !important;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+body:is(.classic, .future) .site-header .network-switcher-copy [data-network-balance] {
+    font-size: 11px !important;
+    line-height: 1.3;
+}
+body:is(.classic, .future) .site-header .avatar-wallet-provider {
+    gap: 4px !important;
+    padding: 1px 5px 3px !important;
+    font-size: 11px !important;
+}
+body:is(.classic, .future) .site-header .avatar-dropdown-navigation {
+    padding: 0 !important;
+}
+body:is(.classic, .future) .site-header .avatar-account-links:has(.dropdown-profile-item):has(.dropdown-protocol-admin-item) {
+    grid-template-columns: minmax(0, 1fr);
+}
+body:is(.classic, .future) .site-header .avatar-dropdown-divider {
+    margin: 2px 0 !important;
+}
+body:is(.classic, .future) .site-header .avatar-account-action .dropdown-item {
+    min-height: 44px !important;
+    padding: 7px 5px !important;
+    justify-content: center;
+}
+@media (max-width: 768px) {
+    body:is(.classic, .future) .site-header .avatar-dropdown-menu {
+        width: min(180px, calc(100vw - 20px)) !important;
+        max-width: calc(100vw - 20px) !important;
+        padding: 4px !important;
+    }
+}
+
+/* The accepted study shows a state chip over the top-left of every preview,
+   the actual media type in its bottom-left, the source network with its real
+   icon, and a native-ETH currency mark beside a price. */
+body:is(.classic, .future) .artsoul-artwork-card {
+    position: relative;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge {
+    position: absolute;
+    top: 9px;
+    left: 9px;
+    z-index: 4;
+    pointer-events: none;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    max-width: calc(100% - 62px);
+    min-height: 23px;
+    padding: 4px 8px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--c-bg) 86%, transparent);
+    color: var(--c-accent);
+    font-size: 10.5px;
+    font-weight: 650;
+    line-height: 1.2;
+    box-shadow: none !important;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge-sold,
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge-listed {
+    border-color: var(--c-border-soft);
+    color: var(--c-accent-2);
+}
+body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-countdown) .artsoul-card-preview-badge {
+    top: 42px;
+}
+body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+    position: absolute;
+    top: auto !important;
+    bottom: 8px !important;
+    left: 8px !important;
+    z-index: 4;
+    box-sizing: border-box;
+    min-height: 20px;
+    padding: 3px 7px !important;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--c-bg) 86%, transparent);
+    color: var(--c-accent);
+    font-size: 10px !important;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    pointer-events: none;
+}
+body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-network, .artsoul-card-price) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+}
+body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-network-mark, .artsoul-card-price-mark) {
+    display: inline-block;
+    box-sizing: border-box;
+    flex: 0 0 13px;
+    width: 13px;
+    height: 13px;
+    max-width: 13px;
+    max-height: 13px;
+    object-fit: contain;
+    border-radius: 50%;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-network-mark {
+    order: -1;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price {
+    justify-self: end;
+    background: transparent;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-provenance {
+    grid-column: 1 / -1;
+    grid-row: 1;
+}
+
+/* Keep the same 2-column iPhone gallery as the founder's screenshot.
+   Only exceptionally narrow phones use one column; Home remains two rows. */
+@media (min-width: 360px) and (max-width: 519px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 2; --home-loading-gap: 12px; }
+    body:is(.classic, .future) :is(
+        #homeSection #artworkGallery,
+        .gallery-page-main .gallery-results-grid,
+        .profile-artwork-grid.grid
+    ) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+    }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+3) {
+        display: revert !important;
+    }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+5) {
+        display: none !important;
+    }
+}
+/* A two-column phone card is narrow: square media reserves space for the
+   bookmark, context menu, countdown, media type and play/mute controls. */
+@container (max-width: 175px) {
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media {
+        aspect-ratio: 1 !important;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge {
+        top: 5px;
+        left: 5px;
+        padding: 3px 5px;
+        max-width: calc(100% - 52px);
+        font-size: 9.5px;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-countdown) .artsoul-card-preview-badge {
+        top: 39px;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-preview-badge {
+        top: 54px;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])):has(.artsoul-card-countdown) .artsoul-card-preview-badge {
+        top: 82px;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-countdown {
+        top: 51px;
+        left: 5px;
+        right: auto;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+        bottom: 4px !important;
+        left: 4px !important;
+        padding: 2px 5px !important;
+        font-size: 9px !important;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-network-mark {
+        flex-basis: 11px;
+        width: 11px;
+        height: 11px;
+    }
+}
