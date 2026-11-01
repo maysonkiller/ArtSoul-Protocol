@@ -203,3 +203,27 @@ test('homepage keeps one editorial line and removes the demo slide and repeated 
     ]) assert.equal(home.includes(repeat), false, repeat);
     assert.match(css, /#homeSection \.home-hero-copy \{[\s\S]*?text-align: left !important;/);
 });
+
+test('touch tapping Pause cannot be misread as keyboard focus Resume', () => {
+    const oldW = globalThis.window, oldD = globalThis.document;
+    try {
+        const h = renderedShowcaseHarness('classic', false);
+        globalThis.window = h.window;
+        globalThis.document = h.document;
+        renderHomeShowcase([SLOT(ART(1)), SLOT(ART(2))]);
+        assert.equal(h.timers.size, 1);
+        h.ids.homeShowcase.fire('pointerdown', {});
+        h.document.activeElement = h.ids.homeShowcasePause;
+        h.ids.homeShowcase.fire('focusin', { target: h.ids.homeShowcasePause });
+        h.ids.homeShowcasePause.onclick();
+        assert.equal(h.ids.homeShowcasePause.attributes['aria-pressed'], 'true');
+        assert.equal(h.timers.size, 0, 'single iPhone tap should pause carousel');
+        h.ids.homeShowcase.fire('pointerup', {});
+        h.ids.homeShowcasePause.onclick();
+        assert.equal(h.ids.homeShowcasePause.attributes['aria-pressed'], 'false');
+        assert.equal(h.timers.size, 1, 'explicit resume still starts while pause retains focus');
+    } finally {
+        globalThis.window = oldW;
+        globalThis.document = oldD;
+    }
+});
