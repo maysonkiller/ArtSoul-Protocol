@@ -291,6 +291,6 @@ test('Profile-only Admin placement never leaks a server role into a global walle
         currentPath: '/gallery', connected: true, walletAddress: WALLET_A
     });
     assert.doesNotMatch(text, /href="\/admin"/);
-    assert.match(text, /href="\/profile"/);
+    assert.doesNotMatch(text, /href="\/profile"/, 'Profile is now a primary tab, not a wallet-menu item');
     assert.equal(h.dropdown.protocolAdminEligible, true, 'authorization is retained for owner Profile');
 });
