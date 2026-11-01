@@ -1,7 +1,91 @@
 # Interface and capability review — October 31, 2026
 
-Status: bounded visual review completed; Phase B remains open. The separate
-Future study is a proposal, not a replacement application or an acceptance test.
+Status: bounded visual review completed; Phase B remains open. On November 1,
+the founder accepted the separate study as the implementation design target,
+with both existing ArtSoul color palettes retained. The study is not a replacement
+application or evidence that production workflows have been migrated.
+
+## Accepted target and production adoption — November 1
+
+The founder accepted the current direction and asked to stop expanding the demo,
+estimate adoption, preserve Admin and documentation, check control sizes and
+consider mobile swipes. This supersedes the study's previous proposal status;
+it does not approve replacing working routes with illustrative HTML.
+
+### Preserved routes and behavior
+
+`vite.config.js` still includes `admin.html` and `docs-protocol.html`. Neither
+route nor its implementation is removed. The study's Guide and staff preview
+are illustrative; they must not replace the real guide or protected workspace.
+
+| Adoption surface | Existing implementation to retain | Required acceptance |
+| --- | --- | --- |
+| Shared header, cards and media | `src/ui/simplified-header.js`, `src/ui/components/artwork-card.js`, shared search, notifications, voice and Saved | Real wallet/account states; no false network support; the same actions and pressed states on Home, Gallery, Profile and detail; image/audio/video; both palettes |
+| Home and Gallery | `src/entries/index.js`, `src/entries/gallery.jsx` | Discovery default/order, filters and search meaning, current auction status/timers, Back/scroll restoration |
+| Artwork | `src/entries/artwork.jsx` and existing transaction handlers | Creator, First Collector and current Owner remain explicit; full provenance retained; bid/settle/withdraw/list/edit/remove/buy eligibility, pending and confirmed outcomes preserved; Donate and Report keep their actual targets |
+| Profile | `src/entries/profile.jsx`, `src/features/profile/profile-edit-dialog.jsx` | Own/public distinction, all tabs including private Saved, Edit profile, account connections and notifications preserved; customization remains intentionally paused |
+| Publish and collection draft | `src/entries/upload.js`, `src/entries/collection-builder.jsx` | File/auth/guidance checks, durable pending publication recovery and wallet review retained; the draft builder is not presented as deployed collection publication |
+| Admin | `src/entries/admin.jsx` and current staff modules | Existing role and authority visibility, factor verification, private queue/catalog/history and recovery flows; no administrative shortcuts from demo state or cached role hints |
+| Documentation | `src/entries/docs-protocol.jsx`, `src/content/protocol-docs.js` | Existing topics, links and anchors remain reachable; contextual help links to the real content |
+
+The approved visual composition is the Future adoption target. Classic retains
+its own appearance and palette; shared behavior and usability fixes apply to
+both. Mobile and desktop retain identical theme color semantics. Existing theme
+values stay in `unified-styles.css`; no alternative palette is introduced.
+Network, token and wallet marks identify the actual selected chain, asset and
+provider. The sample Rabby mark is not a hardcoded production provider. The
+real mobile microphone entry must remain reachable even though the small-screen
+study hides its standalone header button. No new product network is enabled.
+
+### Control sizes and mobile navigation
+
+A measured 48-case check (six pages, two themes, widths 320/390/768/1366) found
+small account-menu, help, social and one tab target. Four scoped sizing rules
+now provide at least 44 by 44 CSS pixels for visible study buttons. The rerun
+found no smaller visible page buttons and no horizontal overflow. Icon artwork
+stays compact; this does not require making every button visually large.
+Evidence: ignored `docs/private/b18-adoption-button-check{,-after}.log`.
+This check is not a complete accessibility certification. After the sizing edit,
+the existing 36-layout/24-dialog and 24-artwork/42-dialog passes remained green,
+including real sample audio/video playback, shared Saved state and profile edits.
+The three focused static suites passed 19 tests with no skips. These are study
+and presentation checks, not fresh production-wallet acceptance. Logs are
+`docs/private/b18-accepted-{design,media}-check.log` and `b18-accepted-static.log`.
+
+Adoption direction for touch navigation: keep visible, tappable tabs and add
+horizontal swipe only between adjacent Gallery/Profile tabs if it remains
+unambiguous in real-device testing. Preserve the browser's edge Back gesture,
+vertical scrolling, zoom, text selection, input fields and media scrubbing.
+Ignore gestures starting in interactive controls, dialogs or a multi-touch
+sequence. Do not use swipe to bid, pay, sign, delete or moderate. Keyboard and
+tap navigation remain complete; motion respects reduced-motion preferences.
+Swipes are not implemented in the current study or production release.
+
+### Delivery estimate and order
+
+Planning estimate: **6–10 focused working days including review and contingency**,
+assuming existing data, contracts and workflows are retained and test services
+are available. This is an estimate of design adoption, not a completion promise
+for all Phase B gates or a measure of model throughput. A coherent first set of
+primary pages is approximately 2–3 working days; it is not full acceptance.
+
+1. Shared presentation: layout/spacing/type rules and real shared artwork cards,
+   retaining theme tokens and action handlers. Review both palettes at narrow
+   mobile, landscape, tablet and desktop sizes.
+2. Home, Gallery, artwork and Profile composition with existing live data/state;
+   preserve all role-specific actions and stable loading behavior.
+3. Publish, collection draft, notifications, assistant, Admin and documentation;
+   review explanatory copy, dialog sizing and keyboard/focus behavior.
+4. Full route/role/media regression, performance comparison and focused native
+   iPhone acceptance. Release coherent tested slices with recoverable commits.
+
+Demo expansion stops here apart from the requested control-sizing correction.
+No product source, contract, migration, service or paid API is changed by this
+record. B35 remains an unresolved data-integrity/release gate; visual approval
+does not close it or the remaining Phase B acceptance and operations work.
+The next B18 implementation slice is the shared real artwork-card presentation,
+using `src/ui/components/artwork-card.js` across all existing consumers. Keep it
+separate from the pending B35 recovery work and from a wholesale site rewrite.
 
 ## Scope, versions and method
 
@@ -118,20 +202,52 @@ These make appearance simpler while increasing access, readability or correctnes
 ## Separate Future study
 
 Canonical artifact: `docs/design/ARTSOUL_FUTURE_STUDY_2026-10-31.html`.
-No external assets, API, wallet, upload, microphone or persistence. All names,
+No remote asset requests, API, wallet, upload, microphone or persistence. All names,
 amounts, artwork and notifications are visibly illustrative. Its clickable
 Home/Explore/Artwork/Profile/Create/Guide pages show the design direction.
 
-- Charcoal surfaces, softer cyan/teal accents and restrained violet in Future.
-  Primary text is neutral; color indicates state, rather than decorating every line.
+- November 1 founder correction supersedes the initial alternative palette:
+  retain both existing ArtSoul palettes exactly. The root/Classic/Future color
+  definitions are copied unchanged from `unified-styles.css` into the independent
+  study; layout aliases reference those values. Brand marks and sample media
+  retain their own asset colors. No production theme file was changed.
 - One main action per region; stable header controls; compact profile metrics.
 - Saved state shared across cards/detail/profile, selected artwork preserved,
   edit Cancel/Save, search targets and read-notification feedback are interactive.
-- Disclosure controls for history, guidance and details; bounded native dialogs.
+- History/Provenance is initially expanded, with explicit ownership roles;
+  guidance/details remain disclosures. Dialogs are bounded and native.
 - A Classic reference switch illustrates separation only. It does not change
   the deployed Classic palette or promise pixel-identical reproduction.
 - Verification is shown as a **proposed mark in the guide**, not awarded to any
   demo account. It is distinct from saved checks and decorative aura.
+
+November 1 requested coverage extension (study only):
+
+- Distinct Base Sepolia network, test ETH currency and Rabby provider marks,
+  all served locally from official sources listed in `../design/study-assets/README.md`.
+  No additional networks, wallet provider integrations or payment assets enabled.
+- Image/video/audio cards; on-demand local synthetic media playback, inline video,
+  pause/stop on navigation or dialog opening, and one active player at a time.
+- Card action sheet: Donate to the original creator, Report, creation-transaction
+  explanation. No fictional transaction hash or original-file download added.
+- Creator, First Collector and current-owner meanings remain explicit, including
+  one combined person row when the latter two are the same. This is a proposed
+  display clarification, not a new ownership rule or a live application patch.
+- Mobile puts the artwork and its primary action before ownership/history.
+- Account menu exposes My profile, wallet/network information and help. Staff
+  menu entry can be explored only after explicitly selecting the demo staff state
+  in Guide; it grants no authorization and loads no private records. Real admin
+  operations are not implemented in the study. Profile customization stays paused.
+
+Additional browser evidence: 24 artwork/theme/width cases, 42 dialog cases;
+actual audio/video playback, single-player behavior, pause on navigation, correct
+Donate/Report target, same/different-owner cases, mobile content order, demo staff
+visibility and reduced motion passed. No page errors or remote requests observed.
+Original 36-layout/24-dialog regression pass also remains green. Native iPhone
+playback has not been retested; Chromium width emulation is not that evidence.
+The first CLI attempt passed multiline code incorrectly and failed to parse;
+the file-based run passed. Local favicon404 was removed with an empty data favicon.
+Private evidence: `docs/private/b18-network-media-{baseline,check}.log`.
 
 Prototype browser checks: **36 page/theme/width cases**, **24 dialog cases**,
 cross-surface favorite removal, correct search target, profile cancel/save,
@@ -198,6 +314,6 @@ current-beta gate. Collection publication, authoritative badges/aura, contract
 redesign, Genesis issuance and mainnet assurance belong to their recorded C work;
 multichain payments remain research, not an active product promise.
 
-Exactly next engineering step: resume the existing B35 sparse-ancestor regression
+Next data-integrity step: resume the existing B35 sparse-ancestor regression
 and require proof before mutation, preserving current writer/cache/lease fences.
 Do not open a second source checkout or silently close B35 based on UI success.
