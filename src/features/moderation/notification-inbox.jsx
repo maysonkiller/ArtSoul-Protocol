@@ -393,6 +393,9 @@ export function NotificationInbox({ wallet, compact = false, header = false }) {
         <div id="notification-settings-view" hidden={!settingsOpen}>
           <button type="button" className="btn-secondary" onClick={()=>showSettings(false)}>Back to notifications</button>
           <NotificationSettings state={auctionState} model={auctionActions} />
+          <div role="status" aria-live="polite">
+            {auctionState.preferencesPending ? <p>Saving notification settings…</p> : auctionState.notice && <p>{auctionState.notice}</p>}
+          </div>
           {auctionState.error && <p role="alert">{auctionState.error}</p>}
         </div>
         <div hidden={settingsOpen}>

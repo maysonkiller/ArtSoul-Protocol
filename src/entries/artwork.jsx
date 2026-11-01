@@ -3300,6 +3300,15 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             )}
                         </div>
 
+                        <details className="artwork-payment-help">
+                            <summary>About bids, payment and floor</summary>
+                            <p>Review the bid and required deposit before confirming in your wallet. The highest bid alone does not create an NFT.</p>
+                            <p>The winner completes payment within the displayed deadline. The deposit counts toward the auction price; any excess becomes withdrawable credit. Successful settlement creates the NFT and sets its floor to the paid auction price.</p>
+                            <p>ArtSoul resale listings cannot be below that floor. The floor is not an estimate or guarantee of market value.</p>
+                            <a href="/docs-protocol#settlement">Read the payment and minting guide</a>
+                            <a href="/docs-protocol#deposits">How deposits work</a>
+                        </details>
+
                         {liveAuction && (
                         <section
                                 className="bid-activity-panel mt-6 rounded-lg p-4"
