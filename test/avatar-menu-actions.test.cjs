@@ -72,3 +72,36 @@ test('legacy pages without primary navigation retain their existing destinations
     for (const href of ['/', '/profile', '/gallery', '/upload', '/docs-protocol']) assert.ok(html.includes(`href="${href}"`));
     assert.doesNotMatch(harness.dropdown.renderMenuIdentity(''), /avatar-menu-address/);
 });
+
+test('account shortcuts precede wallet details and appearance without changing network actions', () => {
+    const harness = createAvatarHarness();
+    const nav = harness.document.createElement('nav');
+    nav.className = 'site-primary-nav';
+    harness.document.body.appendChild(nav);
+    harness.dropdown.protocolAdminEligible = true;
+    const html = harness.dropdown.renderMenuContent({
+        currentPath: '/gallery', connected: true, walletAddress: WALLET,
+        networkInfo: { chainId: 84532, name: 'Base Sepolia', mark: 'base', balance: '0.23', walletProvider: { name: 'Rabby', mark: 'rabby' } }
+    });
+    const positions = ['avatar-menu-identity', 'avatar-account-links', 'avatar-wallet-section', 'avatar-theme-section', 'avatar-account-action'].map(value => html.indexOf(value));
+    assert.ok(positions.every((value, i) => value >= 0 && (!i || value > positions[i - 1])));
+    assert.match(html, /href="\/profile"/);
+    assert.match(html, /href="\/admin"/);
+    assert.match(html, /data-wallet-provider/);
+    assert.match(html, /network-current-row" role="status"/);
+    assert.doesNotMatch(html, /aria-controls="avatarNetworkOptions"/);
+    assert.match(html, /window\.resetWalletConnection\(\)/);
+    harness.dropdown.protocolAdminEligible = false;
+    assert.doesNotMatch(harness.dropdown.renderMenuContent({ currentPath: '/gallery' }), /href="\/admin"/);
+});
+
+test('theme buttons expose the current choice after each mode change', () => {
+    const harness = createAvatarHarness();
+    const structure = harness.dropdown.getStableStructure();
+    structure.menu.innerHTML = harness.dropdown.renderMenuContent({ currentPath: '/gallery' });
+    for (const theme of ['classic', 'future', 'classic']) {
+        harness.dropdown.applyThemeStyles(theme);
+        assert.equal(harness.document.getElementById('classicBtnDropdown').getAttribute('aria-pressed'), String(theme === 'classic'));
+        assert.equal(harness.document.getElementById('futureBtnDropdown').getAttribute('aria-pressed'), String(theme === 'future'));
+    }
+});

@@ -134,7 +134,7 @@ test('every product page loads the same account menu and stylesheet versions', (
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /unified-styles\.css\?v=66/, `${page} must use the shared stylesheet cache version`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=10"><\/script>/, `${page} must load the first-frame bridge`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=60" defer><\/script>/, `${page} must load the deferred account menu`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=61" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(
       html,
       /<\/header>\s*<script>window\.ArtSoulHeaderPrepaint\?\.hydrate\(document\.getElementById\('navButtons'\)\);<\/script>/,
