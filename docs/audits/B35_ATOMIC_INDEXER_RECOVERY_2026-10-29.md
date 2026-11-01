@@ -599,9 +599,16 @@ retry. Evidence: `docs/private/b35-bounded-purge-{focused,full-units,build,postg
 and `reorg-atomicity-1793317277847-29848-ed107ccf/evidence.json`.
 The disposable Redis suite adds 1,200-key multi-page iteration, bounded deletion,
 old-fill fencing and partial SCAN/DEL failures followed by successful retry.
-Local Docker explicitly skipped; Linux CI must run all 26 Redis subtests.
+Local Docker explicitly skipped; Linux CI ran all 26 Redis subtests.
 Independent review found no scoped blocker and identified the shared-keyspace
-progress limit above. Exact candidate CI and merge remain pending.
+progress limit above. Candidate `534a3ab1db5a0d4891b8520c9ab9762b0d20df67`
+passed exact CI40975324696: Linux 3,120 pass/two skips, Windows 2,570 pass/35
+skips, both builds/static checks and 49 contract checks per platform. All 26
+real-Redis subtests ran against Redis 7.4.12 on Linux. PR #407 merged as
+`4d9a04d33cc80e9b7e43c10ddb7156987b0a6a1e` at October 29 23:50:10 UTC
+(October 30 00:50:10 Europe/Warsaw). Retained private CI evidence:
+`b35-bounded-purge-ci-linux.log` and `b35-bounded-purge-ci-windows.log`.
+The source merge does not activate the separately operated worker.
 
 Existing deployment was checked read-only at October 30 00:40:44 Europe/Warsaw:
 the existing Hetzner Base Sepolia worker was online, /health returned 200/healthy,
@@ -611,17 +618,92 @@ fencing was absent. Vercel deploys the website/API, not this long-running worker
 No new server is planned or created. The Protocol and OS separation evidence
 remains the October 29 record, not a fresh full audit of OS.
 
-## Open acceptance and exact next step
+## Sparse-ancestor reproduction and correction
 
-Exactly next: require the real-Redis integration and all exact-candidate CI gates
-for this bounded purge slice before merge. Deployment namespace/progress bounds,
+The next boundary defect is now reproduced against merge `4d9a04d3` using the
+existing isolated PostgreSQL 18.4 harness, actual `detectReorg` / `_handleReorg`
+methods and shipped SQL. Only RPC headers and external queue/cache side effects
+are simulated. A fork starts at block 103; registration at 100 remains valid,
+but the old auction at 105 must disappear. The four-header control checks 100
+and 105 and removes that auction. A two-header sample first checks 110 and
+rewinds to 109, retaining it. With the normal default sample of 12 and 17 stored
+headers, detection first checks 113 and rewinds to 112, also retaining the
+orphan auction. Both failing cases incorrectly report completed recovery.
+The other chain remains unchanged in all cases. These are deliberate failing
+baseline assertions, not successful recovery acceptance: one control passes,
+two scenarios fail, and the parent test consequently fails. No skips.
+
+Evidence: `docs/private/b35-sparse-ancestor-default-before.log` and
+`reorg-atomicity-1793318334542-11260-a22bbb60/evidence.json`; the disposable
+cluster stopped cleanly. The initial two-case evidence is also retained in
+`b35-sparse-ancestor-before.log`. No product source, migration or live service
+was changed for this reproduction. The private fixture is derived from the
+existing test harness, not another application checkout.
+
+The November 1 source correction now searches up to 64 retained headers, newest
+first and no later than both the captured indexed cursor and the requested
+boundary minus one. A candidate must match a raw RPC header at exactly that
+height on the configured chain. Only that proven ancestor defines the rollback
+boundary, including when there are no resale observations. Missing, malformed,
+unavailable or exhausted evidence stops recovery before BEGIN. A missing exact
+predecessor can safely use an earlier matching retained header; it cannot
+invent an unrecorded predecessor. Resale observations are then prepared at the
+selected hash and the ancestor is checked again after all archive reads.
+The existing transaction locks and checks the captured state version and stored
+ancestor hash before mutation; leadership, row revision and cache fences remain.
+All three detection paths now pass their original state snapshot into recovery.
+Late callbacks from timed-out RPC providers cannot continue to their next send
+after abandonment or replacement by another attempt.
+
+This is an operational evidence bound, not a protocol parameter: 64 limits
+candidates, not RPC sends. Each header proof uses three calls plus configured
+provider fallback attempts, with another proof after archive preparation.
+No database/schema, contract, economic, active-chain or billing change.
+There is no atomic snapshot across RPC and PostgreSQL: a further chain change
+after the last proof remains possible and must be detected in a later recovery.
+The database digest is not itself proof of RPC canonicality.
+
+Validation and release evidence for this correction is recorded below.
+Deployment namespace/progress bounds,
 Redis restoration and independent CDN caches remain separate gates.
 Reads already in flight are not cancelled by a purge.
 No all-cache convergence or production-scale recovery claim is made.
 
-Keep the worker inactive until the remaining gates have independent evidence.
+Do not activate the new B35 worker release until the remaining gates have
+independent evidence. The existing Base Sepolia worker remains running with its
+previously verified B30 egress correction; no additional server is required.
 Full owner/provenance acceptance still needs to account for transfers absent from
-the prototype event stream. Sparse ancestor proof, bounded history/renewal time,
+the prototype event stream. Bounded history/renewal time,
 external delivery guarantees and independent database AND object-byte restoration
 remain open. Snapshot A stays at the end of public testnet; no destructive reset
 or mainnet step is authorized by this source change. Phase B remains in progress.
+
+## November 1 common-ancestor validation
+
+Independent review found no scoped blocker. The new offline ancestor suite
+passes 41/41, including late timed-out callbacks, fallback supersession, wrong
+chain/deployment, missing or malformed headers, candidate-budget exhaustion,
+final-proof changes and database hash/version locking. All three retained
+sparse-history reproductions now remove the orphan auction and rewind to100,
+while retaining registration100 and the foreign chain. Detection also rejects
+a state revision changed while sampling.
+
+Full local units: 2,645 pass, 35 explicit environment skips, zero failures.
+This workspace includes a previously untracked authority-policy test; exact
+committed-candidate CI counts are recorded separately rather than equated to it.
+The first full PostgreSQL run exposed four fixture expectations now corrected
+and hit its 120-second suite limit. A separate run reached 110 passing checks
+before the same limit. The next run encountered a real 10-second SQL timeout
+while the preceding disposable cluster completed a slow Windows checkpoint.
+These runs are not full PostgreSQL passes. The suite bound is now300 seconds;
+individual SQL10-second and concurrency5-second limits remain unchanged.
+Shutdown waits up to180 seconds for durable cleanup instead of abandoning a
+slow checkpoint after30 seconds. No durability setting was disabled.
+Logs: `docs/private/b35-common-ancestor-{targeted,postgres,postgres-final,units,build}.log`.
+The second cluster was separately verified stopped after its checkpoint.
+Exact-candidate CI and final release status are recorded in the checkpoint.
+
+Next B35 gate: reconstruct owner/provenance from transfers absent in the
+prototype core event stream, using evidence and bounded read-only fixtures
+before proposing another implementation. Worker activation remains blocked by
+the separately listed operations, recovery and restore gates.
