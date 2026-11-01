@@ -9470,6 +9470,18 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta {
     gap: 5px;
     font-size: 12px;
 }
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-provenance {
+    grid-column: 1 / -1;
+    grid-row: 1;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-status {
+    grid-column: 1;
+    grid-row: 2;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-price {
+    grid-column: 2;
+    grid-row: 2;
+}
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price {
     font-size: 12px;
     font-variant-numeric: tabular-nums;
