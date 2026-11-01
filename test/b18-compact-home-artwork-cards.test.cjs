@@ -125,7 +125,8 @@ test('Home caps rendered ranking and CSS displays at most two rows per width', (
         ['1199px', 4, 9],
         ['899px', 3, 7],
         ['768px', 2, 5],
-        ['519px', 1, 3]
+        ['519px', 2, 5],
+        ['359px', 1, 3]
     ];
     for (const [width, columns, hiddenStart] of responsive) {
         assert.ok(styles.includes(width), 'missing breakpoint ' + width);
@@ -140,4 +141,73 @@ test('account button recovers compact shape while icon tools remain circular', (
     assert.match(styles, /B18\.4[\s\S]*#navButtons \.avatar-button \{[\s\S]*?border-radius: 13px !important/);
     assert.match(styles, /#navButtons :is\(\[data-avatar-name\], \[data-avatar-address\]\)[\s\S]*animation: none !important/);
     assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?\.avatar-button[\s\S]*?44px !important/);
+});
+
+
+test('design-study category labels reflect real lifecycle states, never a fake NFT', () => {
+    const { api } = getRuntime();
+    const live = { status: 'auction', auction_id: '1', auction_end_time: '2099-01-01T00:00:00Z' };
+    assert.equal(api.cardPreviewInfo(live).label, 'Auction open');
+    assert.equal(api.cardPreviewInfo({ status: 'registered' }).label, 'Discover');
+    assert.equal(api.cardPreviewInfo({ status: 'sold', minted: true, token_id: '42' }).label, 'NFT');
+    assert.equal(api.cardPreviewInfo({ status: 'sold', token_id: '0' }).label, 'Sold');
+    assert.equal(api.cardPreviewInfo({ status: 'no_bids' }).label, 'No bids');
+    assert.equal(api.cardPreviewInfo({
+        status: 'for_sale', minted: true, token_id: '42', sale_price: '0.25'
+    }).label, 'For sale');
+    assert.equal(api.cardPreviewInfo({ status: 'pending_indexer', source: 'pending_indexer' }).label, 'Finalizing...');
+});
+
+test('network and ETH icon assets are exact bundled files, with unknown chains left unbranded', () => {
+    const { api } = getRuntime();
+    assert.equal(api.cardNetworkMark({ chain_id: 84532 }), '/brand/base.svg');
+    assert.equal(api.cardNetworkMark({ chain_id: 8453 }), '/brand/base.svg');
+    assert.equal(api.cardNetworkMark({ chain_id: 1 }), '/brand/eth.png');
+    assert.equal(api.cardNetworkMark({ chain_id: 11155111 }), '/brand/eth.png');
+    assert.equal(api.cardNetworkMark({ chain_id: 137 }), '');
+    assert.equal(api.cardNetworkMark({ chain_id: 99999 }), '');
+    assert.equal(api.cardNetworkMark({}), '');
+    assert.equal(api.cardPriceMark('0.02 ETH'), '/brand/eth.png');
+    assert.equal(api.cardPriceMark('2 USDC'), '');
+    assert.equal(api.cardPriceMark(''), '');
+    assert.ok(fs.readFileSync('public/brand/base.svg', 'utf8').includes('<svg'));
+    assert.ok(fs.statSync('public/brand/eth.png').size > 0);
+});
+
+test('DOM and React card both show an image/media type, lifecycle chip and real chain mark', () => {
+    const { api } = getRuntime();
+    const artwork = { id: 'v41:84532:14', file_type: 'image', file_url: 'image.png',
+        chain_id: 84532, title: 'Art', status: 'registered', creator_value: '0.02' };
+    const dom = api.createCardElement(artwork, { href: false });
+    const react = api.ReactCard({ artwork, href: '' });
+    for (const item of [dom, react]) {
+        let category, type, networkMark, priceMark;
+        walk(item, node => {
+            const cls = node.className || node.props?.className || '';
+            if (cls.startsWith('artsoul-card-preview-badge')) category = node;
+            if (cls.includes('artsoul-card-media-badge-image')) type = node;
+            if (cls === 'artsoul-card-network-mark') networkMark = node;
+            if (cls === 'artsoul-card-price-mark') priceMark = node;
+        });
+        assert.ok(category, 'preview category missing');
+        assert.ok(type, 'image media type missing');
+        assert.ok(networkMark, 'Base network logo missing');
+        assert.ok(priceMark, 'ETH denomination logo missing');
+        assert.match(textUnder(item), /Discover/);
+        assert.equal(networkMark.src || networkMark.props?.src, '/brand/base.svg');
+        assert.equal(priceMark.src || priceMark.props?.src, '/brand/eth.png');
+    }
+});
+
+test('iPhone keeps two thumbnail columns while account popover uses a compact, readable width', () => {
+    assert.match(styles, /B18\.5 — compact account popover/);
+    assert.match(styles, /width: min\(194px, calc\(100vw - 24px\)\) !important/);
+    assert.match(styles, /width: min\(180px, calc\(100vw - 20px\)\) !important/);
+    assert.match(styles, /min-height: 44px !important/);
+    assert.match(styles, /@media \(min-width: 360px\) and \(max-width: 519px\)/);
+    assert.match(styles, /@media \(max-width: 359px\)/);
+    assert.match(styles, /#homeSection #artworkGallery > :nth-child\(n\+5\)/);
+    assert.match(styles, /@container \(max-width: 175px\)[\s\S]*?aspect-ratio: 1 !important/);
+    assert.match(styles, /artsoul-card-preview-badge[\s\S]*?pointer-events: none/);
+    assert.match(styles, /artsoul-card-media-badge[\s\S]*?bottom: 8px !important/);
 });
