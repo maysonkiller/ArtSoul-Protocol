@@ -1564,11 +1564,11 @@
                     </div>
                 `;
             }
-            const networkSection = networkInfo ? `
+            const networkSection = networkInfo ? `<div class="avatar-wallet-section">
                 ${networkCurrentRow}
                 ${networkOptions}
                 <div data-wallet-provider>${this.renderWalletProvider(networkInfo.walletProvider)}</div>
-                <div class="avatar-dropdown-divider"></div>
+                </div>
             ` : '';
 
             const isConnected = connected || !!networkInfo;
@@ -1598,17 +1598,19 @@
 
             return `
                 ${this.renderMenuIdentity(walletAddress || (isConnected ? this.identityWallet || window.currentWalletAddress : ''), restoring)}
-                <div class="avatar-theme-section">
-                    <div class="avatar-theme-label">Theme Mode</div>
-                    <div class="theme-toggle avatar-theme-switch">
-                        <button onclick="window.setTheme('classic')" id="classicBtnDropdown" class="theme-btn">Classic</button>
-                        <button onclick="window.setTheme('future')" id="futureBtnDropdown" class="theme-btn">Future</button>
-                    </div>
-                </div>
-                ${networkSection}
-                <div class="avatar-dropdown-navigation">
+                <div class="avatar-dropdown-navigation${document.querySelector('.site-primary-nav') ? ' avatar-account-links' : ''}">
                     ${this.renderDropdownNavItems({ currentPath, isOwnProfile })}
                     ${this.renderProtocolAdminSlot(currentPath)}
+                </div>
+                ${networkSection}
+                <div class="avatar-theme-section">
+                    <div class="avatar-theme-label" id="avatarThemeLabel">Appearance</div>
+                    <div class="theme-toggle avatar-theme-switch" role="group" aria-labelledby="avatarThemeLabel">
+                        <button type="button" onclick="window.setTheme('classic')" id="classicBtnDropdown" class="theme-btn">Classic</button>
+                        <button type="button" onclick="window.setTheme('future')" id="futureBtnDropdown" class="theme-btn">Future</button>
+                    </div>
+                </div>
+                <div class="avatar-account-action">
                     ${accountAction}
                 </div>
             `;
@@ -1823,6 +1825,8 @@
 
             // Update theme toggle buttons
             if (classicBtn && futureBtn) {
+                classicBtn.setAttribute('aria-pressed', String(theme === 'classic'));
+                futureBtn.setAttribute('aria-pressed', String(theme !== 'classic'));
                 classicBtn.classList.remove('active', 'active-classic', 'active-future');
                 futureBtn.classList.remove('active', 'active-classic', 'active-future');
                 if (theme === 'classic') {
