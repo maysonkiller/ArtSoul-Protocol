@@ -11,7 +11,7 @@ const test = require('node:test');
 const {execFileSync,spawnSync} = require('node:child_process');
 const {pathToFileURL} = require('node:url');
 const {Pool} = require('pg');
-const {Interface} = require('ethers');
+const {Interface,keccak256} = require('ethers');
 
 const ROOT = path.resolve(__dirname, '..');
 const BIN = process.env.ARTSOUL_TEST_POSTGRES_BIN;
@@ -53,9 +53,9 @@ function isolatedEngineSource() {
 
 test('rewind events, cursor, hashes and media revision atomically (isolated PostgreSQL)', {
   skip: BIN ? false : 'Set ARTSOUL_TEST_POSTGRES_BIN; no database connection attempted',
-  // Full migration/recovery matrix also runs on slower local Windows disks;
+  // Full migration/recovery/transfer matrix also runs on slower Windows disks;
   // individual SQL statements and concurrency gates retain their short bounds.
-  timeout: 300000
+  timeout: 360000
 }, async t => {
   const suffix = `${Date.now()}-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   const directory = path.join(ROOT, 'docs', 'private', `reorg-atomicity-${suffix}`);
@@ -1811,5 +1811,147 @@ const {pathToFileURL}=require('node:url');
       assert.deepEqual(await coverageRows(CHAIN),[]);
     } finally {await writer.query('ROLLBACK');if(rolling) await rolling;writer.release();owner.release();}
   });
+
+  const {syncNftTransferRange} = await import(pathToFileURL(path.join(ROOT,'src/indexer/nft-transfer-sync.js')).href);
+  function nftFixture(subtest) {
+    const original=target.eventListener, originalChain=target.chainId;
+    subtest.after(()=>{target.eventListener=original;target.chainId=originalChain;});
+    const nft=`0x${'d'.repeat(40)}`, coreCode='0x6001600055', nftCode='0x6002600055';
+    const abi=new Interface(['function nftContract() view returns(address)','function totalSupply() view returns(uint256)',
+      'event Transfer(address indexed from,address indexed to,uint256 indexed tokenId)']);
+    const hex=n=>`0x${n.toString(16)}`;
+    const log=(block,index,from,to)=>({...abi.encodeEventLog('Transfer',[from,to,'9007199254740993']),
+      address:nft,blockNumber:hex(block),blockHash:hash(block),logIndex:hex(index),transactionIndex:'0x0',
+      transactionHash:hash(block*100),removed:false});
+    const f={calls:[],logs:[log(110,9,WINNER,CREATOR),log(100,1,`0x${'0'.repeat(40)}`,CREATOR),log(110,3,CREATOR,WINNER)]};
+    f.options={chainId:CHAIN,coreAddress:CORE,nftAddress:nft,expectedCoreCodeHash:keccak256(coreCode),
+      expectedNftCodeHash:keccak256(nftCode),fromBlock:100,previousBlockHash:hash(99),blockNumber:110,blockHash:hash(110),bootstrap:true};
+    target.eventListener={chainId:CHAIN,contractAddress:CORE,nftAddress:nft,
+      _readRpcCall:operation=>operation({async send(method,params){
+        f.calls.push(method);await f.hook?.(method,params);
+        if(method==='eth_chainId')return hex(CHAIN);
+        if(method==='eth_getBlockByNumber')return{number:params[0],hash:hash(Number(BigInt(params[0]))),timestamp:'0x64'};
+        if(method==='eth_getCode')return params[0]===CORE?coreCode:nftCode;
+        if(method==='eth_call'){
+          const name=abi.parseTransaction(params[0]).name;
+          return abi.encodeFunctionResult(name,[name==='totalSupply'?0n:nft]);
+        }
+        assert.equal(method,'eth_getLogs');return f.logs;
+      }})};
+    f.run=()=>syncNftTransferRange(target,f.options);
+    f.continue=(from,to,logs=[])=>{f.options={...f.options,fromBlock:from,blockNumber:to,
+      previousBlockHash:hash(from-1),blockHash:hash(to),bootstrap:false};f.logs=logs;};
+    return f;
+  }
+  const nftRows=async()=> (await pool.query("SELECT * FROM contract_events WHERE chain_id=$1 AND event_name='Transfer' ORDER BY block_number,log_index",[CHAIN])).rows;
+  await t.test('NFT writer commits ordered source facts and coverage without changing economic projections or Core progress',async sub=>{
+    const f=nftFixture(sub),before=await snapshot(CHAIN),foreign=await snapshot(OTHER_CHAIN);
+    const result=await f.run(),after=await snapshot(CHAIN),rows=await nftRows();
+    assert.equal(result.eventCount,3);assert.equal(result.cacheInvalidationPending,true);
+    assert.deepEqual(rows.map(row=>[row.block_number,row.log_index]),[['100',1],['110',3],['110',9]]);
+    assert.ok(rows.every(row=>row.artwork_id===null&&row.contract_address===f.options.nftAddress&&
+      row.event_data.tokenId==='9007199254740993'&&row.indexed_at.toISOString()==='1970-01-01T00:01:40.000Z'));
+    for(const name of tables.filter(name=>!['contract_events','indexer_state','nft_transfer_coverage'].includes(name)))assert.deepEqual(after[name],before[name],name);
+    assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);
+    assert.equal(after.indexer_state[0].last_indexed_block,before.indexer_state[0].last_indexed_block);
+    assert.equal(after.indexer_state[0].total_events_indexed,before.indexer_state[0].total_events_indexed);
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'110');
+    assert.ok(after.indexer_state[0].recovery_cache_token);
+  });
+  await t.test('empty NFT bootstrap and contiguous empty catch-up still invalidate first public exposure',async sub=>{
+    const f=nftFixture(sub);f.logs=[];await f.run();
+    assert.deepEqual(await nftRows(),[]);assert.equal((await coverageRows(CHAIN))[0].covered_through,'110');
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[CHAIN]);
+    const previousRevision=(await target.getIndexerState()).revision;
+    f.continue(111,114);assert.equal((await f.run()).cacheInvalidationPending,false);
+    assert.notEqual((await target.getIndexerState()).revision,previousRevision);
+    f.continue(115,115);assert.equal((await f.run()).cacheInvalidationPending,true);
+    assert.equal((await coverageRows(CHAIN))[0].from_block,'100');
+    assert.equal((await coverageRows(CHAIN))[0].origin_block_hash,hash(99));
+  });
+  for(const change of [{fromBlock:112},{previousBlockHash:hash(88)},{expectedNftCodeHash:hash(777)},
+    {expectedCoreCodeHash:hash(778)},{bootstrap:true},{blockNumber:116,blockHash:hash(116)}]) {
+    await t.test(`NFT continuation rejects ${Object.keys(change).join(',')} before RPC`,async sub=>{
+      const f=nftFixture(sub);await f.run();f.continue(111,114);Object.assign(f.options,change);
+      f.calls=[];const before=await snapshot(CHAIN);
+      await assert.rejects(f.run());assert.deepEqual(f.calls,[]);assert.deepEqual(await snapshot(CHAIN),before);
+    });
+  }
+  await t.test('NFT continuation without coverage cannot silently bootstrap',async sub=>{
+    const f=nftFixture(sub);f.options.bootstrap=false;await assert.rejects(f.run(),/bootstrap state/);assert.deepEqual(f.calls,[]);
+  });
+  for(const stage of ['INSERT INTO public.contract_events','UPDATE public.indexer_state SET last_indexed_block',
+    'INSERT INTO public.nft_transfer_coverage'])await t.test(`NFT range failure at ${stage} rolls back journal and coverage`,async sub=>{
+      const f=nftFixture(sub),before=await snapshot(CHAIN);
+      beforeSql=async sql=>{if(sql.startsWith(stage))throw Error('fixture NFT write failure');};
+      await assert.rejects(f.run(),/fixture NFT write failure/);assert.deepEqual(await snapshot(CHAIN),before);
+    });
+  await t.test('malformed NFT RPC range does not write partial journal facts',async sub=>{
+    const f=nftFixture(sub),before=await snapshot(CHAIN);f.logs[0].removed=true;
+    await assert.rejects(f.run(),/Invalid NFT Transfer log/);assert.deepEqual(await snapshot(CHAIN),before);
+  });
+  for(const change of ['state','coverage','leadership','listener'])await t.test(`NFT writer rejects ${change} changing while RPC is outstanding`,async sub=>{
+    const f=nftFixture(sub);await f.run();f.continue(111,114);let after;
+    f.hook=async method=>{if(method!=='eth_getLogs')return;f.hook=null;
+      if(change==='state')await pool.query('UPDATE indexer_state SET last_indexed_block=last_indexed_block WHERE chain_id=$1',[CHAIN]);
+      if(change==='coverage')await pool.query('UPDATE nft_transfer_coverage SET covered_hash=$1 WHERE chain_id=$2',[hash(888),CHAIN]);
+      if(change==='leadership')leaderCurrent=false;
+      if(change==='listener')target.eventListener.nftAddress=WINNER;
+      after=await snapshot(CHAIN);
+    };
+    await assert.rejects(f.run(),/changed|fence lost/);assert.deepEqual(await snapshot(CHAIN),after);
+  });
+  for(const [column,value] of [['contract_address',null],['contract_address',WINNER],['event_name','Other'],
+    ['artwork_id','999'],['indexed_at','2026-01-01T00:00:00Z'],['event_data','{}']]) {
+    await t.test(`NFT replay rejects retained ${column} conflicts without overwriting evidence`,async sub=>{
+      const f=nftFixture(sub);await f.run();
+      await pool.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+      await pool.query(`UPDATE contract_events SET ${column}=$1 WHERE chain_id=$2 AND transaction_hash=$3 AND log_index=1`,[value,CHAIN,hash(10000)]);
+      const before=await snapshot(CHAIN);await assert.rejects(f.run(),/journal conflicts/);
+      assert.deepEqual(await snapshot(CHAIN),before);
+    });
+  }
+  await t.test('NFT bootstrap rejects extra retained events absent from the canonical range',async sub=>{
+    const f=nftFixture(sub);await f.run();await pool.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+    f.logs=[];const before=await snapshot(CHAIN);await assert.rejects(f.run(),/unverified range events/);
+    assert.deepEqual(await snapshot(CHAIN),before);
+  });
+  await t.test('NFT bootstrap replay preserves exact retained facts and never duplicates them',async sub=>{
+    const f=nftFixture(sub);await f.run();const rows=await nftRows();
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+    await f.run();assert.deepEqual(await nftRows(),rows);assert.equal((await coverageRows(CHAIN))[0].covered_through,'110');
+  });
+  await t.test('direct rewind removes orphan NFT facts and forces verified replay before coverage returns',async sub=>{
+    const f=nftFixture(sub);await f.run();await pool.query('SELECT rollback_events_from_block($1,$2)',[110,CHAIN]);
+    assert.deepEqual((await nftRows()).map(row=>row.log_index),[1]);assert.deepEqual(await coverageRows(CHAIN),[]);
+    const mint=f.logs.find(log=>log.logIndex==='0x1');f.continue(100,109,[mint]);
+    await assert.rejects(f.run(),/bootstrap state/);f.options.bootstrap=true;await f.run();
+    assert.deepEqual((await nftRows()).map(row=>row.log_index),[1]);assert.equal((await coverageRows(CHAIN))[0].covered_through,'109');
+  });
+  await t.test('two concurrent NFT ranges cannot both advance the same captured coverage',async sub=>{
+    const f=nftFixture(sub),arrived=deferred();let reads=0;
+    f.hook=async method=>{if(method==='eth_getLogs'){if(++reads===2)arrived.resolve();await arrived.promise;}};
+    const results=await Promise.allSettled([f.run(),f.run()]);
+    assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
+    assert.match(results.find(result=>result.status==='rejected').reason.message,/state changed/);
+    assert.equal((await nftRows()).length,3);assert.equal((await coverageRows(CHAIN)).length,1);
+  });
+  await t.test('NFT writer retains a pending cache obligation and rejects configured-cache progress',async sub=>{
+    const f=nftFixture(sub);await f.run();f.continue(111,114);f.calls=[];
+    const oldRedis=process.env.REDIS_URL;process.env.REDIS_URL='redis://fixture.invalid';
+    try{await assert.rejects(f.run(),/cache purge pending/);assert.deepEqual(f.calls,[]);}
+    finally{if(oldRedis===undefined)delete process.env.REDIS_URL;else process.env.REDIS_URL=oldRedis;}
+  });
+  await t.test('NFT writer captures caller input before the first asynchronous read',async sub=>{
+    const f=nftFixture(sub);f.hook=async method=>{if(method==='eth_getLogs')f.options.nftAddress=WINNER;};
+    await f.run();assert.equal((await coverageRows(CHAIN))[0].nft_address,`0x${'d'.repeat(40)}`);
+  });
+  for(const stage of ['SELECT lock_name FROM','INSERT INTO public.contract_events']) {
+    await t.test(`NFT listener chain change after proof at ${stage} rolls back the range`,async sub=>{
+      const f=nftFixture(sub),before=await snapshot(CHAIN);
+      beforeSql=async sql=>{if(sql.startsWith(stage))target.eventListener.chainId=OTHER_CHAIN;};
+      await assert.rejects(f.run(),/authority changed/);assert.deepEqual(await snapshot(CHAIN),before);
+    });
+  }
 
 });

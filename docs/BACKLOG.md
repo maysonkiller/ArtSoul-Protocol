@@ -302,6 +302,11 @@ local units pass (35 environment skips); exact hosted CI is pending. Both
 existing RPCs verified a real historical mint, but prune the candidate origin.
 Historical bootstrap, fenced ingestion, public-read/cache consistency and the
 existing-worker update remain open. See the B35 audit for exact evidence.
+The reader/storage slice is now released as PR420 /e1faa425 after exact
+Linux3,416/two skips and Windows2,849/35 skips, contracts/builds/static and
+preview/production verification. The next dormant atomic writer passes171
+local PostgreSQL checks plus two post-proof chain-change cases, full units
+and build; its exact hosted CI is pending. No live migration or activation.
 
 ## October 31 interface review — B18 follow-up
 
