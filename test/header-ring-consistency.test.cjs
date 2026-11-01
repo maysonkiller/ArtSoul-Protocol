@@ -18,7 +18,7 @@ test('exact shared header CSS is loaded on all page shells after cache invalidat
   assert.ok(block.startsWith('/* B18.3'), 'new styles must be a final block after older theme-specific rules');
   for (const page of pages) {
     const source = fs.readFileSync(page, 'utf8');
-    assert.equal((source.match(/unified-styles\.css\?v=76/g) || []).length, 1, page);
+    assert.equal((source.match(/unified-styles\.css\?v=77/g) || []).length, 1, page);
   }
 });
 

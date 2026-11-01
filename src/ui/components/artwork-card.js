@@ -121,7 +121,7 @@
     //
     // Presentation only. mediaUrl still returns the original, so the artwork
     // page and fullscreen keep full quality and nothing projected changes.
-    // The card media box is square (aspect-ratio: 1) and crops with
+    // The responsive card media box crops with
     // object-fit: cover, so one number is asked for and the same crop is
     // simply made before the bytes are sent rather than after.
     const CARD_THUMBNAIL_SIZE = 600;
@@ -237,30 +237,6 @@
         return Boolean(artwork.minted) || Boolean(tokenId && tokenId !== '0' && tokenId !== 'none');
     }
 
-    // A card only claims an NFT once the source confirms minting. Chain names
-    // come from the artwork projection (or its canonical v4.1 identifier),
-    // never from whichever network happens to be selected in the viewer's wallet.
-    function cardNetworkLabel(artwork = {}) {
-        const encodedChain = String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):/i)?.[1];
-        const raw = artwork.chain_id ?? artwork.chainId ?? encodedChain;
-        const chain = Number(raw);
-        if (!raw || !Number.isSafeInteger(chain) || chain <= 0) return 'Network pending';
-        const labels = {
-            1: 'Ethereum', 10: 'Optimism', 137: 'Polygon', 8453: 'Base',
-            84532: 'Base Sepolia', 11155111: 'Sepolia',
-            42161: 'Arbitrum', 421614: 'Arbitrum Sepolia'
-        };
-        return labels[chain] || `Chain ${chain}`;
-    }
-
-    // Logos are bundled: never attribute an unknown network to the viewer's wallet.
-    function cardNetworkMark(artwork = {}) {
-        const label = cardNetworkLabel(artwork);
-        if (label === 'Base' || label === 'Base Sepolia') return '/brand/base.svg';
-        if (label === 'Ethereum' || label === 'Sepolia') return '/brand/eth.png';
-        return '';
-    }
-
     // Presentation only; on-chain state stays in statusInfo, used for actions.
     function cardPreviewInfo(artwork = {}, now = Date.now()) {
         const state = statusInfo(artwork, now);
@@ -271,43 +247,27 @@
         return state;
     }
 
-    function createCardPreviewBadge(artwork = {}) {
-        const state = cardPreviewInfo(artwork);
-        const badge = document.createElement('span');
-        badge.className = `artsoul-card-preview-badge artsoul-card-preview-badge-${state.key}`;
-        badge.textContent = state.label;
-        badge.setAttribute('aria-hidden', 'true');
-        return badge;
-    }
-
     function cardPriceMark(price) {
         return /\bETH$/.test(String(price || '')) ? '/brand/eth.png' : '';
     }
 
-    function cardMintLabel(artwork = {}) {
-        return isMinted(artwork) ? 'NFT' : 'Not minted';
-    }
-
-    function createCardProvenance(artwork = {}) {
-        const row = document.createElement('div');
-        row.className = 'artsoul-card-provenance';
-        const network = document.createElement('span');
-        network.className = 'artsoul-card-network';
-        network.textContent = cardNetworkLabel(artwork);
-        const networkMark = cardNetworkMark(artwork);
-        if (networkMark) {
-            const mark = document.createElement('img');
-            mark.src = networkMark;
-            mark.alt = '';
-            mark.className = 'artsoul-card-network-mark';
-            mark.setAttribute('aria-hidden', 'true');
-            network.appendChild(mark);
+    // A single contextual row, rather than repeated mint/network/status chips.
+    // A retained listing price is not an offer once the NFT is unlisted.
+    function cardSummary(artwork = {}, now = Date.now()) {
+        const state = statusInfo(artwork, now);
+        if (state.key === 'finalizing') return { label: 'Status', value: 'Updating' };
+        if (isMinted(artwork) && !isListedForSale(artwork)) {
+            return { label: 'Status', value: 'Not for sale' };
         }
-        const mint = document.createElement('span');
-        mint.className = `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}`;
-        mint.textContent = cardMintLabel(artwork);
-        row.append(network, mint);
-        return row;
+        let price = formatPrice(artwork);
+        if (!price) return { label: 'Price', value: 'Not set' };
+        const chain = Number(artwork.chain_id || artwork.chainId ||
+            String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):/i)?.[1]);
+        if ([84532, 11155111].includes(chain)) price = price.replace(/ ETH$/, ' test ETH');
+        const hasBidPrice = [artwork.current_bid, artwork.highest_bid].some(value => Number(value) > 0);
+        const label = isListedForSale(artwork) ? 'Asking price' : hasBidPrice
+            ? (state.key === 'live' ? 'Current bid' : 'Final bid') : 'Starting price';
+        return { label, value: price };
     }
 
     function isListedForSale(artwork = {}) {
@@ -509,8 +469,9 @@
     }
 
     function cardDetailsText(artwork, now = Date.now()) {
+        const summary = cardSummary(artwork, now);
         return [artwork.title || 'Untitled Artwork', `Creator: ${creatorLabel(artwork)}`,
-            `Status: ${statusInfo(artwork, now).label}`, formatPrice(artwork)].filter(Boolean).join('\n');
+            `Status: ${cardPreviewInfo(artwork, now).label}`, `${summary.label}: ${summary.value}`].filter(Boolean).join('\n');
     }
 
     // Both renderers use this disclosure; opening it only reads cached public
@@ -823,7 +784,7 @@
         card.className = `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surfaceClass}`;
         if (options.onClick) card.addEventListener('click', options.onClick);
 
-        const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
+        const status = cardPreviewInfo(artwork);
         const body = document.createElement('div');
         body.className = 'artsoul-card-body';
 
@@ -842,26 +803,24 @@
         badge.textContent = status.label;
         meta.appendChild(badge);
 
-        const price = formatPrice(artwork);
-        if (price) {
-            const priceEl = document.createElement('span');
-            priceEl.className = 'artsoul-card-price';
-            priceEl.textContent = price;
-            if (cardPriceMark(price)) {
-                const mark = document.createElement('img');
-                mark.className = 'artsoul-card-price-mark';
-                mark.src = cardPriceMark(price);
-                mark.alt = '';
-                mark.setAttribute('aria-hidden', 'true');
-                priceEl.appendChild(mark);
-            }
-            meta.appendChild(priceEl);
+        const summary = cardSummary(artwork);
+        const priceLabel = document.createElement('span');
+        priceLabel.className = 'artsoul-card-price-label';
+        priceLabel.textContent = summary.label;
+        const priceEl = document.createElement('span');
+        priceEl.className = 'artsoul-card-price';
+        if (cardPriceMark(summary.value)) {
+            const mark = document.createElement('img');
+            mark.className = 'artsoul-card-price-mark';
+            mark.src = cardPriceMark(summary.value);
+            mark.alt = '';
+            mark.setAttribute('aria-hidden', 'true');
+            priceEl.appendChild(mark);
         }
-
-        // Keep the original three-row DOM contract (title, creator, meta).
-        // The factual chain/NFT chips belong inside meta and cannot displace
-        // the status at meta.children[0], used by the shared auction clock.
-        meta.appendChild(createCardProvenance(artwork));
+        const value = document.createElement('span');
+        value.textContent = summary.value;
+        priceEl.appendChild(value);
+        meta.append(priceLabel, priceEl);
         body.appendChild(title);
         body.appendChild(creator);
         body.appendChild(meta);
@@ -879,24 +838,20 @@
         if (menu) card.appendChild(menu);
         const saved = href ? createSavedControl(artwork) : null;
         if (saved) card.appendChild(saved);
-        const previewBadge = createCardPreviewBadge(artwork);
         let link = null;
         const countdown = createCountdownElement(artwork, now => {
             // The clock changes presentation even before an indexer response.
             // Keep the body and accessible label in step with the same timer.
-            const next = statusInfo(artwork, now);
+            const next = cardPreviewInfo(artwork, now);
             badge.className = `artsoul-card-status artsoul-card-status-${next.key}`;
             badge.textContent = next.label;
-            const visual = cardPreviewInfo(artwork, now);
-            previewBadge.className = `artsoul-card-preview-badge artsoul-card-preview-badge-${visual.key}`;
-            previewBadge.textContent = visual.label;
+            priceLabel.textContent = cardSummary(artwork, now).label;
             if (link) {
                 link.title = cardDetailsText(artwork, now);
                 link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
             }
         });
         if (countdown) card.appendChild(countdown);
-        card.appendChild(previewBadge);
         if (href) {
             link = document.createElement('a');
             link.className = 'artsoul-card-link';
@@ -1098,8 +1053,8 @@
         if (respectHidden !== false && isHidden(artwork)) return null;
         if (!hasSafeMedia(artwork) || mediaUnavailable) return null;
 
-        const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
-        const price = formatPrice(artwork);
+        const status = cardPreviewInfo(artwork);
+        const summary = cardSummary(artwork);
         return h('div', {
             className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surface ? ` artsoul-artwork-card-${surface}` : ''}`,
             title: onOpen && !href ? cardDetailsText(artwork) : undefined,
@@ -1121,20 +1076,12 @@
                 h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
-                    price ? h('span', { className: 'artsoul-card-price' },
-                        cardPriceMark(price) ? h('img', {
-                            src: cardPriceMark(price), className: 'artsoul-card-price-mark',
+                    h('span', { className: 'artsoul-card-price-label' }, summary.label),
+                    h('span', { className: 'artsoul-card-price' },
+                        cardPriceMark(summary.value) ? h('img', {
+                            src: cardPriceMark(summary.value), className: 'artsoul-card-price-mark',
                             alt: '', 'aria-hidden': 'true'
-                        }) : null, price) : null,
-                    h('div', { className: 'artsoul-card-provenance' },
-                        h('span', { className: 'artsoul-card-network' },
-                            cardNetworkMark(artwork) ? h('img', {
-                                src: cardNetworkMark(artwork), className: 'artsoul-card-network-mark',
-                                alt: '', 'aria-hidden': 'true'
-                            }) : null,
-                            cardNetworkLabel(artwork)),
-                        h('span', { className: `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}` }, cardMintLabel(artwork))
-                    )
+                        }) : null, h('span', null, summary.value))
                 ),
                 artwork.pending_auction_sync ? h('p', { className: 'artsoul-card-creator', role: 'status' }, 'Transaction confirmed. Updating auction data.') : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
@@ -1142,8 +1089,6 @@
             href || onOpen ? h(ReactActionMenu, { artwork }) : null,
             href || onOpen ? h(ReactSavedControl, { artwork }) : null,
             h(ReactCountdown, { artwork, onEnd: refreshAuctionState }),
-            h('span', { className: `artsoul-card-preview-badge artsoul-card-preview-badge-${cardPreviewInfo(artwork).key}`,
-                'aria-hidden': 'true' }, cardPreviewInfo(artwork).label),
             href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
                 'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null
         );
@@ -1177,11 +1122,9 @@
         cardActionItems,
         creatorLabel,
         formatPrice,
-        cardNetworkLabel,
-        cardNetworkMark,
         cardPriceMark,
         cardPreviewInfo,
-        cardMintLabel,
+        cardSummary,
         statusInfo,
         auctionEndTimestamp,
         formatAuctionCountdown,

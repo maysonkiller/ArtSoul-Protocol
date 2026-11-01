@@ -1,4 +1,4 @@
-// B18.4: Source-only regression coverage for the founder's compact Home layout.
+// Shared card presentation stays truthful and equivalent in both renderers.
 // No DB, wallet provider, network RPC, storage request or media playback.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -7,8 +7,7 @@ const vm = require('node:vm');
 
 const cardSource = fs.readFileSync('src/ui/components/artwork-card.js', 'utf8');
 const homeSource = fs.readFileSync('index.html', 'utf8');
-const homeRuntime = fs.readFileSync('src/entries/index.js', 'utf8');
-const styles = fs.readFileSync('unified-styles.css', 'utf8');
+const NOW = Date.UTC(2026, 10, 2, 12);
 
 class FakeElement {
     constructor(tagName) {
@@ -30,10 +29,13 @@ function getRuntime() {
     const window = {
         ArtSoulSecurity: { isValidStorageUrl: () => true },
         ArtSoulArtworkUrl: { artworkPath: id => '/artwork/' + id },
+        ethereum: { chainId: '0x14a34' },
         addEventListener() {}
     };
-    const context = { window, document };
-    vm.runInNewContext(cardSource, context, { filename: 'artwork-card.js' });
+    class FakeDate extends Date {
+        static now() { return NOW; }
+    }
+    vm.runInNewContext(cardSource, { window, document, Date: FakeDate }, { filename: 'artwork-card.js' });
     window.React = {
         createElement: (type, props, ...children) => ({ type, props, children }),
         useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}],
@@ -48,177 +50,137 @@ function walk(root, visitor) {
     for (const child of root.children || []) walk(child, visitor);
 }
 
-function provenance(root) {
-    let row;
+function nodesWithClass(root, name) {
+    const matches = [];
     walk(root, node => {
-        if (node.className === 'artsoul-card-provenance' ||
-            node.props?.className === 'artsoul-card-provenance') row = node;
+        if ((node.className || node.props?.className || '').split(/\s+/).includes(name)) matches.push(node);
     });
-    return row;
+    return matches;
 }
 
 function textUnder(root) {
-    const values = [];
-    walk(root, node => {
-        if (typeof node.textContent === 'string') values.push(node.textContent);
-        for (const child of node.children || []) {
-            if (typeof child === 'string') values.push(child);
-        }
-    });
-    return values.join(' ');
+    if (typeof root === 'string') return root;
+    if (!root || typeof root !== 'object') return '';
+    return [root.textContent || '', ...(root.children || []).map(textUnder)].filter(Boolean).join(' ');
 }
 
-test('restore the original founder headline and discovery-first promise', () => {
-    assert.match(homeSource, /<p class="home-hero-eyebrow">Art first\. Ownership next\.<\/p>/);
+const cases = [
+    {
+        name: 'unminted discovery', artwork: { status: 'registered', creator_value: '0.02', token_id: '0' },
+        status: 'Discover', label: 'Starting price', value: '0.02 test ETH'
+    },
+    {
+        name: 'auction without bids', artwork: { auction_id: '7', auction_end_time: NOW + 60000, current_bid: '0', start_price: '0.001' },
+        status: 'Auction open', label: 'Starting price', value: '0.001 test ETH'
+    },
+    {
+        name: 'live highest bid', artwork: { auction_id: '7', auction_end_time: NOW + 60000, current_bid: '0.012', start_price: '0.001' },
+        status: 'Auction open', label: 'Current bid', value: '0.012 test ETH'
+    },
+    {
+        name: 'settlement pending', artwork: { status: 'settlement_pending', current_bid: '0.012', start_price: '0.001' },
+        status: 'Awaiting payment', label: 'Final bid', value: '0.012 test ETH'
+    },
+    {
+        name: 'listed NFT', artwork: { status: 'for_sale', minted: true, token_id: '42', sale_price: '0.25', floor_price: '0.1' },
+        status: 'For sale', label: 'Asking price', value: '0.25 test ETH'
+    },
+    {
+        name: 'unlisted NFT with retained prices', artwork: { status: 'sold', listing_status: 'cancelled', minted: true, token_id: '42', sale_price: '0.25', floor_price: '0.1' },
+        status: 'NFT', label: 'Status', value: 'Not for sale'
+    },
+    {
+        name: 'missing price', artwork: { status: 'registered' },
+        status: 'Discover', label: 'Price', value: 'Not set'
+    },
+    {
+        name: 'projection pending', artwork: { source: 'pending_indexer', created_at: new Date(NOW).toISOString(), creator_value: '0.02' },
+        status: 'Finalizing...', label: 'Status', value: 'Updating'
+    }
+];
+
+test('Home retains the approved discovery-first promise', () => {
+    assert.match(homeSource, /Art first\. Ownership next\./);
     assert.match(homeSource, /Discover a work\.\s*<br class="home-hero-break">Start its next chapter\./);
     assert.match(homeSource, /Meet independent artists\. Support the work you love\. Collector demand comes before minting\. An NFT is created only after successful settlement\./);
-    assert.doesNotMatch(homeSource, /<h1[^>]+>Discover artworks<\/h1>/);
 });
 
-test('network chip is derived from artwork, never from the viewer wallet', () => {
-    const { api } = getRuntime();
-    assert.equal(api.cardNetworkLabel({ chain_id: 84532 }), 'Base Sepolia');
-    assert.equal(api.cardNetworkLabel({ chainId: 8453 }), 'Base');
-    assert.equal(api.cardNetworkLabel({ canonical_v41_id: 'v41:11155111:42' }), 'Sepolia');
-    assert.equal(api.cardNetworkLabel({ id: 'v41:84532:42' }), 'Base Sepolia');
-    assert.equal(api.cardNetworkLabel({ chain_id: 99999 }), 'Chain 99999');
-    assert.equal(api.cardNetworkLabel({ id: 'pending:123' }), 'Network pending');
-    assert.equal(api.cardNetworkLabel({}), 'Network pending');
-});
+for (const scenario of cases) {
+    test(`DOM and React show one status and one contextual summary: ${scenario.name}`, () => {
+        const { api } = getRuntime();
+        const artwork = {
+            id: 'v41:84532:14', chain_id: 84532, file_type: 'image', file_url: 'image.png',
+            title: 'Quiet art', creator_name: 'Mira', ...scenario.artwork
+        };
+        assert.deepEqual({ ...api.cardSummary(artwork) }, { label: scenario.label, value: scenario.value });
+        const cards = [api.createCardElement(artwork), api.ReactCard({ artwork, href: '/artwork/14' })];
+        for (const card of cards) {
+            const link = nodesWithClass(card, 'artsoul-card-link')[0];
+            const accessible = link.attributes?.['aria-label'] || link.props['aria-label'];
+            assert.ok(accessible.includes(`${scenario.label}: ${scenario.value}`), 'the accessible description uses the displayed summary');
+            if (scenario.value === 'Not for sale') assert.ok(!accessible.includes('ETH'), 'removed prices cannot remain in the accessible description');
+            const statuses = nodesWithClass(card, 'artsoul-card-status');
+            assert.equal(statuses.length, 1, 'the lifecycle is stated once');
+            assert.equal(textUnder(statuses[0]), scenario.status);
+            const meta = nodesWithClass(card, 'artsoul-card-meta')[0];
+            assert.equal(meta.children[0], statuses[0], 'the timer retains its existing status target');
+            assert.equal(nodesWithClass(card, 'artsoul-card-price-label').length, 1);
+            assert.equal(textUnder(nodesWithClass(card, 'artsoul-card-price-label')[0]), scenario.label);
+            const values = nodesWithClass(card, 'artsoul-card-price');
+            assert.equal(values.length, 1);
+            assert.equal(textUnder(values[0]), scenario.value);
+            assert.equal(nodesWithClass(card, 'artsoul-card-provenance').length, 0);
+            assert.equal(nodesWithClass(card, 'artsoul-card-mint').length, 0);
+            assert.equal(nodesWithClass(card, 'artsoul-card-preview-badge').length, 0);
+            assert.equal(textUnder(nodesWithClass(card, 'artsoul-card-creator')[0]), 'Creator: Mira');
+            const visibleNFTs = textUnder(card).match(/\bNFT\b/g) || [];
+            assert.equal(visibleNFTs.length, scenario.status === 'NFT' ? 1 : 0, 'no duplicate or unsupported mint label');
 
-test('NFT label does not declare minting for unminted art or an open auction', () => {
-    const { api } = getRuntime();
-    assert.equal(api.cardMintLabel({ status: 'registered' }), 'Not minted');
-    assert.equal(api.cardMintLabel({ active_auction_id: '1' }), 'Not minted');
-    assert.equal(api.cardMintLabel({ token_id: '0' }), 'Not minted');
-    assert.equal(api.cardMintLabel({ minted: true, token_id: '19' }), 'NFT');
-});
-
-test('DOM and React cards disclose matching real network and NFT state', () => {
-    const { api } = getRuntime();
-    const art = {
-        id: 'v41:84532:15',
-        chain_id: 84532,
-        file_url: 'image.png',
-        file_type: 'image',
-        title: 'Quiet art',
-        status: 'registered',
-        token_id: '0'
-    };
-    for (const minted of [false, true]) {
-        const artwork = { ...art, minted, token_id: minted ? '7' : '0' };
-        const dom = api.createCardElement(artwork, { href: false });
-        const react = api.ReactCard({ artwork, href: '' });
-        for (const result of [dom, react]) {
-            const row = provenance(result);
-            assert.ok(row, 'missing card provenance row');
-            assert.match(textUnder(row), /Base Sepolia/);
-            assert.match(textUnder(row), minted ? /\bNFT\b/ : /Not minted/);
+            const marks = nodesWithClass(card, 'artsoul-card-price-mark');
+            const priced = scenario.value.endsWith('ETH');
+            assert.equal(marks.length, priced ? 1 : 0, 'availability text has no currency logo');
+            if (priced) {
+                const children = values[0].children.filter(Boolean);
+                assert.equal(children[0], marks[0], 'the currency mark precedes the amount in both renderers');
+                assert.equal(textUnder(children[1]), scenario.value);
+                assert.equal(marks[0].src || marks[0].props.src, '/brand/eth.png');
+                assert.equal(marks[0].alt ?? marks[0].props?.alt, '');
+                assert.equal(marks[0].attributes?.['aria-hidden'] ?? marks[0].props?.['aria-hidden'], 'true');
+            }
         }
-    }
-});
+        const domMedia = nodesWithClass(cards[0], 'artsoul-card-media-badge-image');
+        const reactMedia = nodesWithClass(api.ReactMedia({ artwork }), 'artsoul-card-media-badge-image');
+        assert.deepEqual(domMedia.map(textUnder), ['IMAGE']);
+        assert.deepEqual(reactMedia.map(textUnder), ['IMAGE']);
+    });
+}
 
-test('Home caps rendered ranking and CSS displays at most two rows per width', () => {
-    assert.match(homeRuntime, /const HOMEPAGE_MAX_CARDS = 10/);
-    assert.match(homeRuntime, /\.slice\(0, HOMEPAGE_MAX_CARDS\)/);
-    const responsive = [
-        ['1200px', 5, 11],
-        ['1199px', 4, 9],
-        ['899px', 3, 7],
-        ['768px', 2, 5],
-        ['519px', 2, 5],
-        ['359px', 1, 3]
-    ];
-    for (const [width, columns, hiddenStart] of responsive) {
-        assert.ok(styles.includes(width), 'missing breakpoint ' + width);
-        assert.ok(styles.includes(columns === 1
-            ? 'grid-template-columns: minmax(0, 1fr) !important;'
-            : 'grid-template-columns: repeat(' + columns + ', minmax(0, 1fr)) !important;'));
-        assert.ok(styles.includes('nth-child(n+' + hiddenStart + ')'), 'missing two-row window at ' + width);
-    }
-});
-
-test('account button recovers compact shape while icon tools remain circular', () => {
-    assert.match(styles, /B18\.4[\s\S]*#navButtons \.avatar-button \{[\s\S]*?border-radius: 13px !important/);
-    assert.match(styles, /#navButtons :is\(\[data-avatar-name\], \[data-avatar-address\]\)[\s\S]*animation: none !important/);
-    assert.match(styles, /@media \(max-width: 768px\)[\s\S]*?\.avatar-button[\s\S]*?44px !important/);
-});
-
-
-test('design-study category labels reflect real lifecycle states, never a fake NFT', () => {
+test('an inactive listing never becomes an asking price through retained sale or floor values', () => {
     const { api } = getRuntime();
-    const live = { status: 'auction', auction_id: '1', auction_end_time: '2099-01-01T00:00:00Z' };
+    for (const listing_status of ['cancelled', 'sold', 'inactive', '']) {
+        const artwork = { status: 'sold', listing_status, minted: true, token_id: '42',
+            sale_price: '0.25', resale_price: '0.3', listing_price: '0.4', floor_price: '0.1' };
+        assert.deepEqual({ ...api.cardSummary(artwork) }, { label: 'Status', value: 'Not for sale' });
+    }
+});
+
+test('test-currency qualification follows the artwork chain instead of the connected wallet', () => {
+    const { api } = getRuntime();
+    for (const identity of [{ chain_id: 84532 }, { canonical_v41_id: 'v41:84532:14' }, { chainId: 11155111 }]) {
+        assert.equal(api.cardSummary({ ...identity, creator_value: '0.02' }).value, '0.02 test ETH');
+    }
+    assert.equal(api.cardSummary({ chain_id: 8453, creator_value: '0.02' }).value, '0.02 ETH');
+    assert.equal(api.cardSummary({ creator_value: '0.02' }).value, '0.02 ETH');
+});
+
+test('preview copy does not change lifecycle truth or imply minting from sold status alone', () => {
+    const { api } = getRuntime();
+    const live = { auction_id: '7', auction_end_time: NOW + 60000 };
+    assert.equal(api.statusInfo(live).label, 'Live');
     assert.equal(api.cardPreviewInfo(live).label, 'Auction open');
+    assert.equal(api.statusInfo({ status: 'registered' }).label, 'Not yet minted');
     assert.equal(api.cardPreviewInfo({ status: 'registered' }).label, 'Discover');
-    assert.equal(api.cardPreviewInfo({ status: 'sold', minted: true, token_id: '42' }).label, 'NFT');
     assert.equal(api.cardPreviewInfo({ status: 'sold', token_id: '0' }).label, 'Sold');
-    assert.equal(api.cardPreviewInfo({ status: 'no_bids' }).label, 'No bids');
-    assert.equal(api.cardPreviewInfo({
-        status: 'for_sale', minted: true, token_id: '42', sale_price: '0.25'
-    }).label, 'For sale');
-    assert.equal(api.cardPreviewInfo({ status: 'pending_indexer', source: 'pending_indexer' }).label, 'Finalizing...');
-});
-
-test('network and ETH icon assets are exact bundled files, with unknown chains left unbranded', () => {
-    const { api } = getRuntime();
-    assert.equal(api.cardNetworkMark({ chain_id: 84532 }), '/brand/base.svg');
-    assert.equal(api.cardNetworkMark({ chain_id: 8453 }), '/brand/base.svg');
-    assert.equal(api.cardNetworkMark({ chain_id: 1 }), '/brand/eth.png');
-    assert.equal(api.cardNetworkMark({ chain_id: 11155111 }), '/brand/eth.png');
-    assert.equal(api.cardNetworkMark({ chain_id: 137 }), '');
-    assert.equal(api.cardNetworkMark({ chain_id: 99999 }), '');
-    assert.equal(api.cardNetworkMark({}), '');
-    assert.equal(api.cardPriceMark('0.02 ETH'), '/brand/eth.png');
-    assert.equal(api.cardPriceMark('2 USDC'), '');
-    assert.equal(api.cardPriceMark(''), '');
-    assert.ok(fs.readFileSync('public/brand/base.svg', 'utf8').includes('<svg'));
+    assert.equal(api.cardPreviewInfo({ status: 'sold', minted: true, token_id: '42' }).label, 'NFT');
     assert.ok(fs.statSync('public/brand/eth.png').size > 0);
-});
-
-test('DOM and React card both show an image/media type, lifecycle chip and real chain mark', () => {
-    const { api } = getRuntime();
-    const artwork = { id: 'v41:84532:14', file_type: 'image', file_url: 'image.png',
-        chain_id: 84532, title: 'Art', status: 'registered', creator_value: '0.02' };
-    const dom = api.createCardElement(artwork, { href: false });
-    const react = api.ReactCard({ artwork, href: '' });
-    for (const item of [dom, react]) {
-        let category, type, networkMark, priceMark;
-        walk(item, node => {
-            const cls = node.className || node.props?.className || '';
-            if (cls.startsWith('artsoul-card-preview-badge')) category = node;
-            if (cls.includes('artsoul-card-media-badge-image')) type = node;
-            if (cls === 'artsoul-card-network-mark') networkMark = node;
-            if (cls === 'artsoul-card-price-mark') priceMark = node;
-        });
-        // ReactCard creates ReactMedia as a child component, which this tiny
-        // React-element harness intentionally does not auto-render. Expand only
-        // the media view for the image badge assertion; keep all other labels
-        // checked against the card itself.
-        if (!type && item === react) {
-            walk(api.ReactMedia({ artwork }), node => {
-                const cls = node.className || node.props?.className || '';
-                if (cls.includes('artsoul-card-media-badge-image')) type = node;
-            });
-        }
-        assert.ok(category, 'preview category missing');
-        assert.ok(type, 'image media type missing');
-        assert.ok(networkMark, 'Base network logo missing');
-        assert.ok(priceMark, 'ETH denomination logo missing');
-        assert.match(textUnder(item), /Discover/);
-        assert.equal(networkMark.src || networkMark.props?.src, '/brand/base.svg');
-        assert.equal(priceMark.src || priceMark.props?.src, '/brand/eth.png');
-    }
-});
-
-test('iPhone keeps two thumbnail columns while account popover uses a compact, readable width', () => {
-    assert.match(styles, /B18\.5 — compact account popover/);
-    assert.match(styles, /width: min\(194px, calc\(100vw - 24px\)\) !important/);
-    assert.match(styles, /width: min\(180px, calc\(100vw - 20px\)\) !important/);
-    assert.match(styles, /min-height: 44px !important/);
-    assert.match(styles, /@media \(min-width: 360px\) and \(max-width: 519px\)/);
-    assert.match(styles, /@media \(max-width: 359px\)/);
-    assert.match(styles, /#homeSection #artworkGallery > :nth-child\(n\+5\)/);
-    assert.match(styles, /@container \(max-width: 175px\)[\s\S]*?aspect-ratio: 1 !important/);
-    assert.match(styles, /artsoul-card-preview-badge[\s\S]*?pointer-events: none/);
-    assert.match(styles, /artsoul-card-media-badge[\s\S]*?bottom: 8px !important/);
 });

@@ -3325,9 +3325,6 @@ body.future .resale-modal {
     .saved-button-overlay { top: 4px; left: 4px; right: auto; }
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-menu { top: 4px; left: 4px; right: 4px; }
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-media-controls { padding: 0; bottom: 4px; }
-    .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-countdown {
-        top: 52px; left: auto; right: 4px; min-width: 0; padding: 3px 4px; font-size: 10px;
-    }
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-media-badge,
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-audio-label {
         top: 52px; left: 4px; padding: 3px 4px; font-size: 10px; line-height: 1;
@@ -9394,111 +9391,149 @@ body:is(.classic, .future) #homeSection .home-showcase-caption .home-showcase-ti
     }
 }
 
-/* The exact same media/body geometry is used in Home, Explore, Profile and
-   Saved. Separate safe image/video/audio previews never stretch their crops. */
+/* Shared study hierarchy: one state over media, then title, creator and value.
+   The status stays in the shared renderer; absolute positioning costs no row. */
 body:is(.classic, .future) .artsoul-artwork-card {
+    position: relative;
     min-width: 0;
     height: 100%;
-    --artwork-card-radius: 17px;
+    --artwork-card-radius: 18px;
     display: flex;
     flex-direction: column;
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media {
-    aspect-ratio: 4 / 3 !important;
-    min-height: 0 !important;
+    aspect-ratio: 4 / 3;
+    min-height: 144px;
     flex: 0 0 auto;
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-body {
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    min-height: 148px;
-    padding: 12px 13px !important;
-    gap: 5px !important;
+    position: static;
+    min-height: 120px;
+    padding: 16px;
+    gap: 6px;
     flex: 1 0 auto;
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    white-space: normal;
-    line-height: 1.3 !important;
-    font-size: 15px !important;
-    min-height: 2.6em;
-    max-height: 2.6em;
+    display: block;
+    white-space: nowrap;
+    line-height: 1.35;
+    font-size: 17px;
+    min-height: 0;
+    margin: 0;
     overflow: hidden;
-    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-creator {
     display: block;
     margin: 0;
     font-size: 12px;
-    line-height: 1.3;
+    line-height: 1.4;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-provenance {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-    font-size: 10px;
-    line-height: 1.25;
-}
-body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-network, .artsoul-card-mint) {
-    display: inline-flex;
-    align-items: center;
-    min-width: 0;
-    max-width: 100%;
-    min-height: 19px;
-    padding: 3px 6px;
-    border-radius: 6px;
-    border: 1px solid var(--c-border-soft);
-    background: var(--c-surface-muted);
-    color: var(--c-text-muted);
-    font-weight: 600;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-mint.is-minted {
-    color: var(--c-accent);
-    border-color: var(--c-border);
-}
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
     margin-top: auto;
-    padding-top: 3px;
-    gap: 5px;
+    padding-top: 16px;
+    gap: 4px 8px;
     font-size: 12px;
 }
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-provenance {
-    grid-column: 1 / -1;
-    grid-row: 1;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-status {
-    grid-column: 1;
-    grid-row: 2;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-price {
-    grid-column: 2;
-    grid-row: 2;
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price-label {
+    color: var(--c-text-muted);
+    line-height: 1.4;
 }
 body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price {
-    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    min-height: 0;
+    background: transparent;
+    font-size: 14px;
     font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+}
+body:is(.classic, .future) .artsoul-card-price > span { min-width: 0; overflow-wrap: anywhere; }
+body:is(.classic, .future) .artsoul-card-price-mark {
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    padding: 3px;
+    border-radius: 50%;
+    background: var(--c-text);
+    object-fit: contain;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-status {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 3;
+    pointer-events: none;
+    max-width: calc(100% - 76px);
+    min-height: 23px;
+    padding: 4px 8px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.25;
+    text-align: left;
+    white-space: normal;
+    box-shadow: none;
+}
+body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-countdown:not(.is-ended)) .artsoul-card-status-live,
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-countdown.is-ended { display: none; }
+body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+    top: auto !important;
+    bottom: 8px !important;
+    left: 8px !important;
+    z-index: 3;
+    min-height: 20px;
+    padding: 3px 7px !important;
+    border: none;
+    border-radius: 7px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 10px !important;
+    line-height: 1.25;
+    pointer-events: none;
+}
+@container (max-width: 250px) {
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media { aspect-ratio: 1; }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-body { padding: 12px; }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-title { font-size: 15px; }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price { font-size: 12px; }
+}
+@container (max-width: 175px) {
+    body:is(.classic, .future) .artsoul-artwork-card .saved-button-overlay { top: 52px; left: auto; right: 4px; }
+    body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-status, .artsoul-card-countdown) {
+        top: 5px; left: 5px; right: auto; max-width: calc(100% - 56px); padding: 3px 5px; font-size: 10px;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-media-controls) :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+        bottom: 56px !important;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta { flex-direction: column; }
 }
 
 /* One density scale and a strict two-row home window at each breakpoint.
-   Unlike forcing 10 cards into 2 mobile columns, this does not create a
+   Unlike forcing 8 cards into 2 mobile columns, this does not create a
    five-row feed on a tablet or phone. Explore and Profile remain unpaginated. */
 body:is(.classic, .future) .gallery-page-main.site-page-container {
     max-width: 1720px !important;
 }
 @media (min-width: 1200px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 4; --home-loading-gap: 14px; }
     body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
-        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
         gap: 14px !important;
     }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+11) { display: none !important; }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+9) { display: none !important; }
 }
 @media (min-width: 900px) and (max-width: 1199px) {
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 4; --home-loading-gap: 14px; }
@@ -9516,14 +9551,15 @@ body:is(.classic, .future) .gallery-page-main.site-page-container {
     }
     body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+7) { display: none !important; }
 }
-@media (min-width: 520px) and (max-width: 768px) {
+@media (min-width: 360px) and (max-width: 768px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 2; --home-loading-gap: 12px; }
     body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 12px !important;
     }
     body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+5) { display: none !important; }
 }
-@media (max-width: 519px) {
+@media (max-width: 359px) {
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 1; --home-loading-gap: 12px; }
     body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
         grid-template-columns: minmax(0, 1fr) !important;
@@ -9626,163 +9662,5 @@ body:is(.classic, .future) .site-header .avatar-account-action .dropdown-item {
         width: min(180px, calc(100vw - 20px)) !important;
         max-width: calc(100vw - 20px) !important;
         padding: 4px !important;
-    }
-}
-
-/* The accepted study shows a state chip over the top-left of every preview,
-   the actual media type in its bottom-left, the source network with its real
-   icon, and a native-ETH currency mark beside a price. */
-body:is(.classic, .future) .artsoul-artwork-card {
-    position: relative;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge {
-    position: absolute;
-    top: 9px;
-    left: 9px;
-    z-index: 4;
-    pointer-events: none;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    max-width: calc(100% - 62px);
-    min-height: 23px;
-    padding: 4px 8px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    border: 1px solid var(--c-border);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--c-bg) 86%, transparent);
-    color: var(--c-accent);
-    font-size: 10.5px;
-    font-weight: 650;
-    line-height: 1.2;
-    box-shadow: none !important;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge-sold,
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge-listed {
-    border-color: var(--c-border-soft);
-    color: var(--c-accent-2);
-}
-body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-countdown) .artsoul-card-preview-badge {
-    top: 42px;
-}
-body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
-    position: absolute;
-    top: auto !important;
-    bottom: 8px !important;
-    left: 8px !important;
-    z-index: 4;
-    box-sizing: border-box;
-    min-height: 20px;
-    padding: 3px 7px !important;
-    border: 1px solid var(--c-border-soft);
-    border-radius: 7px;
-    background: color-mix(in srgb, var(--c-bg) 86%, transparent);
-    color: var(--c-accent);
-    font-size: 10px !important;
-    font-weight: 600;
-    line-height: 1.25;
-    letter-spacing: 0.01em;
-    pointer-events: none;
-}
-body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-network, .artsoul-card-price) {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 100%;
-}
-body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-network-mark, .artsoul-card-price-mark) {
-    display: inline-block;
-    box-sizing: border-box;
-    flex: 0 0 13px;
-    width: 13px;
-    height: 13px;
-    max-width: 13px;
-    max-height: 13px;
-    object-fit: contain;
-    border-radius: 50%;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-network-mark {
-    order: -1;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price {
-    justify-self: end;
-    background: transparent;
-}
-body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-card-provenance {
-    grid-column: 1 / -1;
-    grid-row: 1;
-}
-
-/* Keep the same 2-column iPhone gallery as the founder's screenshot.
-   Only exceptionally narrow phones use one column; Home remains two rows. */
-@media (min-width: 360px) and (max-width: 519px) {
-    #artworkGallery[aria-busy="true"] { --home-loading-columns: 2; --home-loading-gap: 12px; }
-    body:is(.classic, .future) :is(
-        #homeSection #artworkGallery,
-        .gallery-page-main .gallery-results-grid,
-        .profile-artwork-grid.grid
-    ) {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 12px !important;
-    }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+3) {
-        display: revert !important;
-    }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+5) {
-        display: none !important;
-    }
-}
-/* A two-column phone card is narrow: square media reserves space for the
-   bookmark, context menu, countdown, media type and play/mute controls. */
-@container (max-width: 175px) {
-    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media {
-        aspect-ratio: 1 !important;
-    }
-    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-preview-badge {
-        top: 5px;
-        left: 5px;
-        padding: 3px 5px;
-        max-width: calc(100% - 52px);
-        font-size: 9.5px;
-    }
-    body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-countdown) .artsoul-card-preview-badge {
-        top: 39px;
-    }
-    body:is(.classic, .future) .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-preview-badge {
-        top: 54px;
-    }
-    body:is(.classic, .future) .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])):has(.artsoul-card-countdown) .artsoul-card-preview-badge {
-        top: 82px;
-    }
-    body:is(.classic, .future) .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-countdown {
-        top: 51px;
-        left: 5px;
-        right: auto;
-    }
-    body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
-        bottom: 4px !important;
-        left: 4px !important;
-        padding: 2px 5px !important;
-        font-size: 9px !important;
-    }
-    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-network-mark {
-        flex-basis: 11px;
-        width: 11px;
-        height: 11px;
-    }
-}
-
-/* 320–359px remains one column so two 44px media controls never overlap. */
-@media (max-width: 359px) {
-    #artworkGallery[aria-busy="true"] { --home-loading-columns: 1; }
-    body:is(.classic, .future) :is(
-        #homeSection #artworkGallery,
-        .gallery-page-main .gallery-results-grid,
-        .profile-artwork-grid.grid
-    ) { grid-template-columns: minmax(0, 1fr) !important; }
-    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+3) {
-        display: none !important;
     }
 }

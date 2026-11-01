@@ -199,9 +199,11 @@ test('homepage keeps one editorial line and removes the demo slide and repeated 
     assert.match(home, /<p class="home-hero-eyebrow">Art first\. Ownership next\.<\/p>/);
     assert.match(home, /Collector demand comes before minting/);
     for (const repeat of [
-        'Art worth a closer look.', 'Find your next connection', 'Art to discover, auctions to follow.',
+        'Art worth a closer look.',
         'Bring new art into discovery', 'CURATED DISCOVERY', 'homepageFeaturedSection'
     ]) assert.equal(home.includes(repeat), false, repeat);
+    assert.equal(home.split('Find your next connection').length - 1, 1);
+    assert.equal(home.split('Art to discover, auctions to follow.').length - 1, 1);
     assert.match(css, /#homeSection \.home-hero-copy \{[\s\S]*?text-align: left !important;/);
 });
 

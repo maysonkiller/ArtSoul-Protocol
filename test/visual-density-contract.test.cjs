@@ -6,10 +6,10 @@ const pages = ['index.html','gallery.html','artwork.html','profile.html','upload
 const css = fs.readFileSync('unified-styles.css', 'utf8');
 const home = fs.readFileSync('index.html','utf8');
 
-test('all product screens load the same shared geometry CSS v76', () => {
+test('all product screens load the same shared geometry CSS v77', () => {
   for (const path of pages) {
     const html = fs.readFileSync(path,'utf8');
-    assert.equal((html.match(/unified-styles\.css\?v=76/g) || []).length, 1, path);
+    assert.equal((html.match(/unified-styles\.css\?v=77/g) || []).length, 1, path);
   }
 });
 
