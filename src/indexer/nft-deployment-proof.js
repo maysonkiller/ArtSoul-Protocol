@@ -106,9 +106,15 @@ async function readAtNftDeployment(listener, options, readRange) {
 // A bounded, read-only batch. Persistence must independently require this range
 // to follow the same deployment's committed coverage; a read is not a cursor.
 export async function readNftTransferRange(listener, options) {
+    // Normal catch-up stays at 1,000 blocks. A reviewed historical replay may
+    // request larger sparse windows, with the same log, source and fork checks.
+    // This bounds RPC work without repeating deployment reads for every empty
+    // 1,000-block window across months of history.
+    const maxBlocks = options?.maxBlocks ?? 1000;
     if (!options || !Number.isSafeInteger(options.fromBlock) || options.fromBlock < 1 ||
+        !Number.isSafeInteger(maxBlocks) || maxBlocks < 1 || maxBlocks > 100000 ||
         !Number.isSafeInteger(options.blockNumber) || options.blockNumber < options.fromBlock ||
-        options.blockNumber - options.fromBlock >= 1000 ||
+        options.blockNumber - options.fromBlock >= maxBlocks ||
         !matches(hashPattern, options.previousBlockHash) || !nonzero(options.previousBlockHash) ||
         typeof options.bootstrap !== 'boolean') throw new Error('Invalid NFT transfer range');
     const fromBlock = options.fromBlock;

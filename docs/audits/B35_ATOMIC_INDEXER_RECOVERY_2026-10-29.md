@@ -1048,3 +1048,71 @@ The migration is unapplied live and public endpoints do not call it yet.
 Next: integrate qualified ownership/timeline and owner filtering consistently
 with recovery/cache handling, then prove the existing-worker activation gates.
 Verified historical bootstrap remains separately unavailable on existing RPCs.
+
+## November 1 integrated ownership and provenance consumers
+
+The next dormant integration gives artwork detail, gallery/home cards, profile
+ownership filters, Saved and search the same verified owner. It never falls back
+to an old settlement, seller or resale recipient when association is unknown.
+Active listings require an exact original-Core journal match, current seller,
+price and update block, and a listing after the latest transfer (including a
+round trip back to the same wallet). Legacy Ethereum Sepolia detail reads remain
+independent of Base coverage and remain read-only.
+
+Provenance now consumes exact original-Core registration/auction/settlement/resale
+events and verified NFT transfers under one database boundary. It does not fetch
+token-only resale history after verification. Transfers are neutral movements,
+not invented sales, royalties or floor updates. Registration can predate the NFT
+coverage origin. Missing original registration fails closed; lifecycle and
+transfer truncation are explicit. Owner-filter responses fail closed when the
+latest-200 feed cannot establish complete membership.
+
+Before/after boundary and proof checks fence recovery, configuration changes,
+visibility reads and per-event commits ahead of the Core checkpoint. Enabled
+responses bypass the old projection cache and use no-store. This conservative
+policy must be cost/latency-tested before enabling it; it is not a claim that
+each future feed can scale indefinitely without pagination/caching work.
+
+Local validation: 110 helper checks, 21 real-handler fixture checks, and 29
+isolated PostgreSQL checks pass, with the database cluster stopped. Actual query
+plans use all three source-specific indexes without sequential journal scans.
+The first plan exposed a broad block-index scan; an equivalent chronology guard
+fixed it before acceptance. Security/proof/route coverage passes 328 with one
+unavailable-Docker skip. The build verifies 11 routes and 172 utilities. Six
+rendered width/theme combinations (320,390,1366; Classic/Future) and two unknown-
+proof states pass 22 assertions: no overflow, correct roles, neutral transfer
+copy, no fallback collector, no browser exceptions or remote mutations. These
+are isolated browser fixtures, not new native-iPhone or wallet acceptance.
+
+Evidence: `docs/private/b35-history-focused-final.log`,
+`docs/private/b35-route-current.log`, `docs/private/b35-history-build-current.log`,
+`docs/private/b35-history-render-result.json`, and
+`docs/private/reorg-atomicity-1793506747109-18336-dd40ba1f/`.
+No contract, economics, public data deletion or new chain was introduced.
+Canon §§1,4,5,9 still apply; the read boundary is an implementation detail,
+not a new NFT ownership rule. Hosted candidate checks/release remain pending.
+
+### Read-only historical coverage now available
+
+The earlier original-RPC archive blocker is narrowed by a successful bounded
+read through Tenderly's documented anonymous Base Sepolia endpoint. No account,
+paid service, runtime provider configuration or live database write was added.
+The shipped reader verified 110 contiguous ranges from block41,976,861 through
+52,911,896, including zero-supply bootstrap, pinned runtimes and canonical range
+endpoints. It recorded seven mints and three transfers across seven tokens:
+1,114 requests and 6,195,497 response bytes. The first unpaced rate-limit failure
+remains recorded separately; only the complete paced run is accepted.
+
+Independent replay verified every saved SHA-256 range digest, endpoint
+continuity, unique event and holder transition. Both original RPCs then agreed
+at the final block on its hash, both runtime hashes, totalSupply and all seven
+ownerOf values (12 bounded reads per provider). Final block hash:
+`0x4f214a9f0711fa28864471937b093b1fdb628f22c3fc999b922ebed1d01ca25b`.
+Evidence: `docs/private/b35-nft-archive-paced/evidence.json` and
+`docs/private/b35-archive-reconcile.json`. This is chain-read evidence, not
+persisted production coverage, an independent backup, or worker activation.
+
+Remaining B35 gates include original-Core journal source qualification (old
+NULL rows need event replay, not blanket address assignment), independent
+restore, recovery/cache and external-delivery acceptance, then updating and
+observing the existing worker. B35 and the full Phase B are not closed here.

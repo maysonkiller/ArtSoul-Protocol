@@ -1,5 +1,6 @@
 import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../backend.js';
 import { getModerationAccess } from '../../moderation-access.js';
+import { readNftOwnershipBoundary, readNftHistory, recheckNftOwnership } from '../../nft-ownership.js';
 
 const PUBLIC_CHAIN_IDS = new Set([84532, 11155111]);
 const MAX_ROWS_PER_SOURCE = 200;
@@ -57,7 +58,7 @@ function eventBase(type, row = {}) {
   };
 }
 
-function buildTimeline({ artwork, auctions, endings, settlements, resaleHistory, listingEvents }) {
+function buildTimeline({ artwork, auctions, endings, settlements, resaleHistory, listingEvents, transfers = [] }) {
   const events = [];
   const creatorAddress = addressOrNull(artwork.creator);
 
@@ -125,6 +126,9 @@ function buildTimeline({ artwork, auctions, endings, settlements, resaleHistory,
     });
   }
 
+  for (const transfer of transfers) {
+    events.push({ ...transfer, type: 'nft_transferred' });
+  }
   return events.sort(projectionOrder);
 }
 
@@ -132,6 +136,28 @@ function latestCompletedSettlement(settlements) {
   return settlements
     .filter(row => normalizeText(row.settlement_status).toLowerCase() === 'completed')
     .sort(projectionOrder)[0] || null;
+}
+
+function verifiedTimeline(history) {
+  const rows = name => history.lifecycle.filter(row => row.event_name === name);
+  const registration = history.lifecycle[0];
+  return buildTimeline({
+    artwork: { ...registration, creator: registration.event_data.creator },
+    auctions: rows('AuctionCreated').map(row => ({ ...row, auction_id: row.event_data.auctionId,
+      creator: row.event_data.creator, start_price: row.event_data.startPrice, duration: row.event_data.duration })),
+    endings: rows('AuctionEnded').map(row => ({ ...row, auction_id: row.event_data.auctionId,
+      winner: row.event_data.winner, winning_bid: row.event_data.winningBid,
+      settlement_deadline: toNumber(row.event_data.settlementDeadline) > 0
+        ? new Date(toNumber(row.event_data.settlementDeadline) * 1000).toISOString() : null })),
+    settlements: history.lifecycle.filter(row => ['SettlementCompleted', 'SettlementDefaulted'].includes(row.event_name))
+      .map(row => ({ ...row, auction_id: row.event_data.auctionId, winner: row.event_data.winner,
+        token_id: row.event_data.tokenId, final_price: row.event_data.finalPrice,
+        settlement_status: row.event_name === 'SettlementCompleted' ? 'completed' : 'defaulted' })),
+    resaleHistory: rows('ResaleCompleted').map(row => ({ ...row, token_id: row.event_data.tokenId,
+      seller: row.event_data.seller, buyer: row.event_data.buyer, price: row.event_data.price })),
+    listingEvents: rows('ResaleListed'),
+    transfers: history.transfers
+  });
 }
 
 function latestResale(resales) {
@@ -155,9 +181,10 @@ export default async function handler(req, res) {
 
     const chainFilter = `eq.${chainId}`;
     const artworkFilter = `eq.${artworkId}`;
+    const ownershipBoundary = chainId === 84532 ? await readNftOwnershipBoundary() : null;
     const [artworkRows, moderationRows] = await Promise.all([
       readRows(
-        'v41_artworks?select=chain_id,artwork_id,creator,minted,token_id,block_number,transaction_hash,log_index,indexed_at' +
+        'v41_artworks?select=chain_id,artwork_id::text,creator,minted,token_id::text,block_number,transaction_hash,log_index,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`
       ),
       readRows(
@@ -179,9 +206,27 @@ export default async function handler(req, res) {
       }
     }
 
+    const history = ownershipBoundary ? await readNftHistory(artwork, ownershipBoundary) : null;
+    const proof = history?.rows[0];
+    if (history && (!history.lifecycle_available || (artwork.minted && !proof?.verified))) {
+      throw Object.assign(new Error('Ownership history is temporarily unavailable. Please retry.'), { code: 'NFT_OWNERSHIP_UNAVAILABLE', statusCode: 503 });
+    }
+    if (history) {
+      const truncatedSources = [];
+      if (!history.lifecycle_complete) truncatedSources.push('lifecycle');
+      if (artwork.minted && !history.complete) truncatedSources.push('transfers');
+      await recheckNftOwnership(history);
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).json({
+        success: true, source: 'v41_provenance_projection', chain_id: chainId, artwork_id: artworkId,
+        roles: { creator_address: addressOrNull(history.lifecycle[0].event_data.creator),
+          first_collector_address: proof.first_collector_address, current_owner_address: proof.current_owner_address },
+        events: verifiedTimeline(history), complete: truncatedSources.length === 0, truncated_sources: truncatedSources
+      });
+    }
     const tokenId = protocolId(artwork.token_id);
     const auctionsPromise = readRows(
-      'v41_auctions?select=chain_id,auction_id,artwork_id,creator,start_price,duration,block_number,transaction_hash,log_index,indexed_at' +
+      'v41_auctions?select=chain_id,auction_id::text,artwork_id::text,creator,start_price,duration,block_number,transaction_hash,log_index,indexed_at' +
       `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
       `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
     );
@@ -189,7 +234,7 @@ export default async function handler(req, res) {
       const auctionIds = auctions.map(row => protocolId(row.auction_id)).filter(Boolean);
       return auctionIds.length > 0
         ? readRows(
-            'v41_auction_endings?select=chain_id,auction_id,winner,winning_bid,settlement_deadline,block_number,transaction_hash,log_index,indexed_at' +
+            'v41_auction_endings?select=chain_id,auction_id::text,winner,winning_bid,settlement_deadline,block_number,transaction_hash,log_index,indexed_at' +
             `&chain_id=${chainFilter}&auction_id=in.(${auctionIds.join(',')})` +
             `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
           )
@@ -198,20 +243,20 @@ export default async function handler(req, res) {
     const [auctions, settlements, resaleHistory, listingRows, endings, listingEvents] = await Promise.all([
       auctionsPromise,
       readRows(
-        'v41_settlements?select=chain_id,auction_id,artwork_id,winner,final_price,token_id,settlement_status,block_number,transaction_hash,log_index,indexed_at' +
+        'v41_settlements?select=chain_id,auction_id::text,artwork_id::text,winner,final_price,token_id::text,settlement_status,block_number,transaction_hash,log_index,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}` +
         `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
       ),
       tokenId
         ? readRows(
-            'v41_resale_history?select=chain_id,token_id,seller,buyer,price,block_number,transaction_hash,log_index,indexed_at' +
+            'v41_resale_history?select=chain_id,token_id::text,seller,buyer,price,block_number,transaction_hash,log_index,indexed_at' +
             `&chain_id=${chainFilter}&token_id=eq.${tokenId}` +
             `&order=block_number.asc,log_index.asc&limit=${MAX_ROWS_PER_SOURCE}`
           )
         : [],
       tokenId
         ? readRows(
-            'v41_resale_listings?select=chain_id,token_id,seller,price,active,block_number,transaction_hash,log_index,indexed_at' +
+            'v41_resale_listings?select=chain_id,token_id::text,seller,price,active,block_number,transaction_hash,log_index,indexed_at' +
             `&chain_id=${chainFilter}&token_id=eq.${tokenId}&active=eq.true&limit=1`
           )
         : [],
@@ -242,6 +287,7 @@ export default async function handler(req, res) {
     const truncatedSources = Object.entries(sourceCounts)
       .filter(([, count]) => count >= MAX_ROWS_PER_SOURCE)
       .map(([source]) => source);
+    if (chainId === 84532) await recheckNftOwnership(ownershipBoundary);
 
     res.setHeader('Cache-Control', hidden
       ? 'private, no-store'
@@ -268,6 +314,7 @@ export default async function handler(req, res) {
       truncated_sources: truncatedSources
     });
   } catch (error) {
+    res.setHeader('Cache-Control', 'private, no-store');
     sendError(res, error);
   }
 }

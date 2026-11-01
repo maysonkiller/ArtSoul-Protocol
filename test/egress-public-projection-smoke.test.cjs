@@ -70,6 +70,10 @@ function loadHandler({ missDirectArtworkOnce = false, beforeRead = async () => {
 
   const context = vm.createContext({
     allowMethods: () => true,
+    readNftOwnershipConfig: () => null,
+    readNftOwnershipBoundary: async () => null,
+    readNftOwnership: async () => null,
+    recheckNftOwnership: async () => null,
     sendError: (res, error) => res.status(error.statusCode || 500).json({ error: error.code, message: error.message }),
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },
@@ -125,7 +129,7 @@ test('cold-cache list response is CDN-cacheable and non-empty', async () => {
 
   const modCall = calls.find(p => tableOf(p) === 'artwork_moderation_visibility');
   assert.ok(modCall, 'moderation visibility table is queried');
-  assert.ok(modCall.includes('select=chain_id,artwork_id,hidden'), 'narrow moderation select');
+  assert.ok(modCall.includes('select=chain_id,artwork_id::text,hidden'), 'narrow moderation select with exact protocol identity');
   assert.ok(!calls.some(p => p.includes('select=*')), 'no select=* anywhere in the projection build');
   assert.equal(res.body.public_metrics.chain_id, 84532);
   assert.equal(res.body.public_metrics.artists_onboarded, 12);

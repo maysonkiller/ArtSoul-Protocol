@@ -38,6 +38,11 @@ function endpoint(name, amount, bidAmounts = [amount]) {
   const context = vm.createContext({
     process: { env: {} }, console: { warn() {}, error() {}, log() {} },
     allowMethods: () => true,
+    readNftOwnershipConfig: () => null,
+    readNftOwnershipBoundary: async () => null,
+    readNftOwnership: async () => null,
+    readNftHistory: async () => null,
+    recheckNftOwnership: async () => null,
     sendError: (res, error) => res.status(500).json({ error: error.message }),
     supabaseRest: async path => rows[path.split('?')[0]] || [],
     validateArtworkId: value => String(value || '').trim() || null,

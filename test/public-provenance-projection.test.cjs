@@ -212,6 +212,10 @@ function loadHandler({ fixtures = FIXTURES, calls = [], tableRead, metadataRead 
 
   const context = vm.createContext({
     allowMethods: () => true,
+    readNftOwnershipConfig: () => null,
+    readNftOwnershipBoundary: async () => null,
+    readNftOwnership: async () => null,
+    recheckNftOwnership: async () => null,
     sendError: (res, error) => res.status(500).json({ error: String((error && error.message) || error) }),
     supabaseRest,
     validateArtworkId: (value) => { const s = String(value ?? '').trim(); return s || null; },

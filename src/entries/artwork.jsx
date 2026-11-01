@@ -1390,6 +1390,13 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         role: 'Owner',
                         address: event.owner_address,
                         amount: event.price
+                    },
+                    nft_transferred: {
+                        title: 'NFT transferred',
+                        role: 'To',
+                        address: event.to_address,
+                        secondaryRole: 'From',
+                        secondaryAddress: event.from_address
                     }
                 };
                 return definitions[event.type] || { title: 'On-chain update' };
@@ -3098,6 +3105,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const ownershipPanel = (
                 <div key="ownership" className="artwork-page-panel artwork-page-people artwork-mobile-people">
                     <h3 className="artwork-page-card-title">Ownership</h3>
+                    {artwork.ownership_status === 'unavailable' && (
+                        <p className="artwork-page-note" role="status">Owner information is being verified. Please check again shortly.</p>
+                    )}
 
                     <div className="artwork-page-people-list">
                         {renderOwnershipRole({

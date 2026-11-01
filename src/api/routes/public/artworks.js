@@ -2,6 +2,7 @@ import { allowMethods, sendError, supabaseRest, validateArtworkId } from '../../
 import { getModerationAccess } from '../../moderation-access.js';
 import { allowedArtworkUrl, readArtworkMetadata } from '../../safe-artwork-fetch.js';
 import { readAIValuation } from '../../../features/artwork/ai-valuation-values.js';
+import { readNftOwnershipConfig, readNftOwnershipBoundary, readNftOwnership, recheckNftOwnership } from '../../nft-ownership.js';
 
 const PUBLIC_CHAIN_IDS = [84532, 11155111];
 // The active product chain. Ethereum Sepolia rows stay readable but are never
@@ -516,27 +517,32 @@ function ownershipProjection(artwork, maps) {
   const auction = maps.auctions.get(keyFor(chain, artworkId));
   const settlement = maps.settlements.get(keyFor(chain, artworkId));
   const tokenId = protocolId(artwork.token_id || settlement?.token_id || auction?.token_id);
-  const resale = tokenId
+  let resale = tokenId
     ? maps.resales.get(keyFor(chain, tokenId))
     : null;
   const latestResale = tokenId
     ? maps.resaleHistory.get(keyFor(chain, tokenId))
     : null;
-  const auctionWinnerAddress = addressOrNull(settlement?.winner);
-  const currentOwnerAddress = Boolean(artwork.minted)
+  const proof = chain === CANONICAL_PUBLIC_CHAIN_ID ? maps.ownership?.rows.find(row => row.artwork_id === artworkId) : undefined;
+  const qualified = chain === CANONICAL_PUBLIC_CHAIN_ID && Boolean(maps.ownership);
+  const auctionWinnerAddress = qualified ? proof?.first_collector_address || null : addressOrNull(settlement?.winner);
+  const currentOwnerAddress = qualified ? proof?.current_owner_address || null : Boolean(artwork.minted)
     ? (addressOrNull(latestResale?.buyer) || addressOrNull(resale?.seller) || auctionWinnerAddress)
     : null;
+  // The verified reader also binds a current listing to this Core and owner.
+  if (qualified) resale = proof?.verified && proof.active_listing ? { ...proof.active_listing, active: true } : null;
   const ownershipAddresses = [...new Set([
     artwork.creator,
     auctionWinnerAddress,
     currentOwnerAddress,
     auction?.status === 'settlement_pending' ? addressOrNull(auction.current_bidder) : null
   ].map(address => normalizeText(address).toLowerCase()).filter(address => address && address !== ZERO_ADDRESS))];
-  return { chain, artworkId, auction, tokenId, resale, auctionWinnerAddress, currentOwnerAddress, ownershipAddresses };
+  return { chain, artworkId, auction, tokenId, resale, auctionWinnerAddress, currentOwnerAddress, ownershipAddresses,
+    ownershipStatus: qualified ? (artwork.minted ? proof?.verified ? 'verified' : 'unavailable' : 'not_minted') : null };
 }
 
 async function toPublicCard(artwork, maps, preloadedMetadata) {
-  const { chain, artworkId, auction, tokenId, resale, auctionWinnerAddress, currentOwnerAddress, ownershipAddresses } = ownershipProjection(artwork, maps);
+  const { chain, artworkId, auction, tokenId, resale, auctionWinnerAddress, currentOwnerAddress, ownershipAddresses, ownershipStatus } = ownershipProjection(artwork, maps);
   const floor = maps.floors.get(keyFor(chain, artworkId));
   const signals = maps.socialSignals.get(keyFor(chain, artworkId)) || {
     like: 0,
@@ -608,6 +614,7 @@ async function toPublicCard(artwork, maps, preloadedMetadata) {
     winner: auction?.winner || null,
     auction_winner_address: auctionWinnerAddress,
     current_owner_address: currentOwnerAddress,
+    ...(ownershipStatus ? { ownership_status: ownershipStatus } : {}),
     vote_count: signals.like,
     like_count: signals.like,
     would_buy_count: signals.would_buy,
@@ -694,15 +701,34 @@ function parseDirectLookup(query = {}) {
 }
 
 async function projectTableData(tableData, warnings, publicMetrics = null, preload = {}) {
+  if (preload.ownershipBoundary) {
+    const end = BigInt(preload.ownershipBoundary.indexed_through);
+    const unavailable = () => Object.assign(new Error('Artwork history is still updating. Please retry.'), { statusCode: 503, code: 'NFT_OWNERSHIP_UNAVAILABLE' });
+    // Individual Core events commit before the complete range checkpoint. Do
+    // not combine a future mutable projection with an older NFT boundary.
+    for (const name of ['v41_artworks', 'v41_auctions', 'v41_resale_listings', 'v41_bids', 'v41_settlements', 'v41_resale_history', 'v41_floor_history']) {
+      const mutable = ['v41_artworks', 'v41_auctions', 'v41_resale_listings'].includes(name);
+      tableData[name] = tableData[name].filter(row => {
+        if (Number(row.chain_id) !== CANONICAL_PUBLIC_CHAIN_ID) return true;
+        const value = row[mutable ? 'last_updated_block' : 'block_number'];
+        if (!/^(0|[1-9][0-9]*)$/.test(String(value)) || (typeof value === 'number' && !Number.isSafeInteger(value))) throw unavailable();
+        if (BigInt(value) <= end) return true;
+        if (mutable) throw unavailable();
+        return false;
+      });
+    }
+  }
+  const ownership = preload.legacyOnly ? null : await readNftOwnership(tableData.v41_artworks, preload.ownershipBoundary);
   // Creator names and immutable metadata are independent reads. Starting them
   // together removes one serial network round trip from a cold projection.
-  const [publicIdentities, metadataRows] = await Promise.all([
+  let [publicIdentities, metadataRows] = await Promise.all([
     preload.publicIdentities ?? publicIdentitiesByAddress(tableData.v41_artworks.map(artwork => artwork.creator), warnings),
     preload.metadataRows ?? Promise.all(
       tableData.v41_artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
     )
   ]);
   const maps = {
+    ownership,
     publicIdentities,
     includeOwnershipProfiles: preload.includeOwnershipProfiles === true,
     auctions: latestAuctionByArtwork(tableData.v41_auctions),
@@ -714,6 +740,10 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
     moderation: moderationVisibilityByArtwork(tableData.artwork_moderation_visibility),
     bids: bidsByAuction(tableData.v41_bids)
   };
+  if (ownership && maps.includeOwnershipProfiles) {
+    publicIdentities = await publicIdentitiesByAddress(tableData.v41_artworks.flatMap(artwork => ownershipProjection(artwork, maps).ownershipAddresses), warnings, { includeAvatar: true });
+    maps.publicIdentities = publicIdentities;
+  }
 
   const cards = await Promise.all(
     tableData.v41_artworks.map((artwork, index) => toPublicCard(artwork, maps, metadataRows[index]))
@@ -726,52 +756,54 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
     return acc;
   }, {});
 
-  return { cards, bids: maps.bids, diagnostics, warnings, publicMetrics };
+  if (!preload.legacyOnly) await recheckNftOwnership(ownership);
+  return { cards, bids: maps.bids, diagnostics, warnings, publicMetrics, ownership };
 }
 
 async function buildDirectProjectionSnapshot({ chain, artworkId }) {
+  const ownershipBoundary = chain === CANONICAL_PUBLIC_CHAIN_ID ? await readNftOwnershipBoundary() : null;
   const warnings = [];
   const chainFilter = `eq.${chain}`;
   const artworkFilter = `eq.${artworkId}`;
   const v41ArtworksPromise = queryTable(
     'v41_artworks',
-    'select=chain_id,artwork_id,creator,metadata_uri,minted,token_id,canonical_floor,active_auction_id,block_number,transaction_hash,indexed_at,last_updated_at' +
+    'select=chain_id,artwork_id::text,creator,metadata_uri,minted,token_id::text,canonical_floor,active_auction_id::text,block_number,last_updated_block,transaction_hash,indexed_at,last_updated_at' +
       `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
     warnings
   );
   const v41AuctionsPromise = queryTable(
       'v41_auctions',
-      'select=chain_id,auction_id,artwork_id,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id' +
+      'select=chain_id,auction_id::text,artwork_id::text,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id::text,block_number,last_updated_block' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=last_updated_block.desc&limit=100`,
       warnings
     );
   const v41BidsPromise = queryTable(
       'v41_bids',
-      'select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at' +
+      'select=chain_id,auction_id::text,artwork_id::text,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
       warnings
     );
   const v41SettlementsPromise = queryTable(
       'v41_settlements',
-      'select=chain_id,artwork_id,settlement_status,winner,token_id,block_number,log_index,indexed_at' +
+      'select=chain_id,artwork_id::text,settlement_status,winner,token_id::text,block_number,log_index,indexed_at' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc,log_index.desc&limit=100`,
       warnings
     );
   const v41FloorHistoryPromise = queryTable(
       'v41_floor_history',
-      'select=chain_id,artwork_id,floor_price,block_number' +
+      'select=chain_id,artwork_id::text,floor_price,block_number' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&order=block_number.desc&limit=1`,
       warnings
     );
   const artworkSocialSignalsPromise = queryTable(
       'artwork_social_signals',
-      'select=chain_id,artwork_id,wallet_address,signal_type' +
+      'select=chain_id,artwork_id::text,wallet_address,signal_type' +
         `&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=5000`,
       warnings
     );
   const artworkModerationVisibilityPromise = queryTable(
       'artwork_moderation_visibility',
-      `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
+      `select=chain_id,artwork_id::text,hidden&chain_id=${chainFilter}&artwork_id=${artworkFilter}&limit=1`,
       warnings
     );
 
@@ -780,6 +812,8 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
   const v41Artworks = await v41ArtworksPromise;
   const tokenId = protocolId(v41Artworks[0]?.token_id);
   const preload = {
+    ownershipBoundary,
+    legacyOnly: chain !== CANONICAL_PUBLIC_CHAIN_ID,
     includeOwnershipProfiles: true,
     metadataRows: Promise.all(
       v41Artworks.map(artwork => loadMetadataCached(artwork.metadata_uri))
@@ -789,7 +823,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
     tokenId
       ? queryTable(
           'v41_resale_listings',
-          `select=chain_id,token_id,active,price,seller,last_updated_block&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
+          `select=chain_id,token_id::text,active,price,seller,last_updated_block&chain_id=${chainFilter}&token_id=eq.${tokenId}&limit=1`,
           warnings
         )
       : Promise.resolve([]);
@@ -797,7 +831,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
     tokenId
       ? queryTable(
           'v41_resale_history',
-          'select=chain_id,token_id,buyer,seller,block_number,log_index,indexed_at' +
+          'select=chain_id,token_id::text,buyer,seller,block_number,log_index,indexed_at' +
             `&chain_id=${chainFilter}&token_id=eq.${tokenId}&order=block_number.desc,log_index.desc&limit=1`,
           warnings
         )
@@ -806,7 +840,7 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
   // Ownership reads can finish while bids, signals and metadata are still in
   // flight. Use the same role projection as the response, including the
   // pending highest bidder without assigning an unearned First Collector.
-  preload.publicIdentities = Promise.all([
+  if (!ownershipBoundary) preload.publicIdentities = Promise.all([
     v41AuctionsPromise, v41SettlementsPromise, v41ResaleListingsPromise, v41ResaleHistoryPromise
   ]).then(([auctions, settlements, listings, history]) => {
     const ownershipMaps = {
@@ -854,17 +888,19 @@ async function buildDirectProjectionSnapshot({ chain, artworkId }) {
 }
 
 async function buildProjectionSnapshot() {
+  const ownershipBoundary = await readNftOwnershipBoundary();
   const warnings = [];
   const chainFilter = `in.(${PUBLIC_CHAIN_IDS.join(',')})`;
   const artworksPromise = queryTable(
     'v41_artworks',
-    'select=chain_id,artwork_id,creator,metadata_uri,minted,token_id,canonical_floor,active_auction_id,block_number,transaction_hash,indexed_at,last_updated_at' +
+    'select=chain_id,artwork_id::text,creator,metadata_uri,minted,token_id::text,canonical_floor,active_auction_id::text,block_number,last_updated_block,transaction_hash,indexed_at,last_updated_at' +
       `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
     warnings
   );
   // Metadata and public creator profiles only depend on the artwork rows, not
   // on bids, settlements or metrics. Keep all lifecycle reads in the final gate.
   const preload = {
+    ownershipBoundary,
     metadataRows: artworksPromise.then(loadFeedMetadata),
     publicIdentities: artworksPromise.then(rows => publicIdentitiesByAddress(rows.map(artwork => artwork.creator), warnings))
   };
@@ -888,44 +924,44 @@ async function buildProjectionSnapshot() {
     artworksPromise,
     queryTable(
       'v41_auctions',
-      'select=chain_id,auction_id,artwork_id,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id' +
+      'select=chain_id,auction_id::text,artwork_id::text,status,start_price,end_time,current_bid,current_bidder,winner,winning_bid,settlement_deadline,final_price,token_id::text,block_number,last_updated_block' +
         `&chain_id=${chainFilter}&order=last_updated_block.desc&limit=200`,
       warnings
     ),
     queryTable(
       'v41_bids',
-      `select=chain_id,auction_id,artwork_id,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
+      `select=chain_id,auction_id::text,artwork_id::text,bidder,bid_amount,block_number,log_index,transaction_hash,indexed_at&chain_id=${chainFilter}&limit=1000`,
       warnings
     ),
     queryTable(
       'v41_settlements',
-      `select=chain_id,artwork_id,settlement_status,winner,token_id,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,artwork_id::text,settlement_status,winner,token_id::text,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=200`,
       warnings
     ),
     queryTable(
       'v41_resale_listings',
-      `select=chain_id,token_id,active,price,seller,last_updated_block&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,token_id::text,active,price,seller,last_updated_block&chain_id=${chainFilter}&limit=200`,
       warnings
     ),
     queryTable(
       'v41_resale_history',
-      `select=chain_id,token_id,buyer,seller,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=1000`,
+      `select=chain_id,token_id::text,buyer,seller,block_number,log_index,indexed_at&chain_id=${chainFilter}&limit=1000`,
       warnings
     ),
     queryTable(
       'v41_floor_history',
-      `select=chain_id,artwork_id,floor_price,block_number&chain_id=${chainFilter}&limit=200`,
+      `select=chain_id,artwork_id::text,floor_price,block_number&chain_id=${chainFilter}&limit=200`,
       warnings
     ),
     queryTable('v41_trust_signals', `select=chain_id&chain_id=${chainFilter}&limit=1000`, warnings),
     queryTable(
       'artwork_social_signals',
-      `select=chain_id,artwork_id,wallet_address,signal_type&chain_id=${chainFilter}&limit=5000`,
+      `select=chain_id,artwork_id::text,wallet_address,signal_type&chain_id=${chainFilter}&limit=5000`,
       warnings
     ),
     queryTable(
       'artwork_moderation_visibility',
-      `select=chain_id,artwork_id,hidden&chain_id=${chainFilter}&limit=1000`,
+      `select=chain_id,artwork_id::text,hidden&chain_id=${chainFilter}&limit=1000`,
       warnings
     ),
     queryTable(
@@ -959,6 +995,7 @@ let projectionSnapshotAt = 0;
 const directProjectionCache = new Map();
 
 function getProjectionSnapshot() {
+  if (readNftOwnershipConfig()) return buildProjectionSnapshot();
   const now = Date.now();
   if (!projectionSnapshotPromise || now - projectionSnapshotAt >= PROJECTION_CACHE_MS) {
     projectionSnapshotAt = now;
@@ -972,6 +1009,7 @@ function getProjectionSnapshot() {
 }
 
 function getDirectProjectionSnapshot(lookup, fresh = false) {
+  if (lookup.chain === CANONICAL_PUBLIC_CHAIN_ID && readNftOwnershipConfig()) return buildDirectProjectionSnapshot(lookup);
   const now = Date.now();
   const key = keyFor(lookup.chain, lookup.artworkId);
   const cached = directProjectionCache.get(key);
@@ -1016,6 +1054,7 @@ export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
       artworkIds.some(id => typeof id !== 'string' || !/^[1-9][0-9]{0,77}$/.test(id) || BigInt(id) >= 2n ** 256n) ||
       !/^0x[0-9a-f]{40}$/.test(coreAddress) || /^0x0{40}$/.test(coreAddress)) throw new Error('Invalid search page');
   const ids = [...new Set(artworkIds)];
+  const ownershipBoundary = await readNftOwnershipBoundary();
   const data = await supabaseRest('rpc/read_public_search_cards', {
     method: 'POST', body: { p_artwork_ids: ids, p_core_address: coreAddress }
   });
@@ -1028,6 +1067,7 @@ export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
     v41_resale_listings: data.listings, v41_resale_history: data.resales, v41_floor_history: [],
     v41_bids: [], v41_trust_signals: [], artwork_social_signals: [], artwork_moderation_visibility: []
   }, warnings, null, {
+    ownershipBoundary,
     metadataRows: data.metadata,
     socialSignals: new Map(data.artworks.map((row, index) => [keyFor(chain, row.artwork_id), data.signals[index]]))
   });
@@ -1046,6 +1086,7 @@ export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
   const cards = new Map(snapshot.cards.filter(card => !hidden.has(card.artwork_id) &&
     current.get(card.artwork_id)?.metadata_uri === card.metadata_uri &&
     current.get(card.artwork_id)?.transaction_hash === card.transaction_hash).map(card => [card.artwork_id, card]));
+  await recheckNftOwnership(snapshot.ownership);
   return ids.map(id => cards.get(id)).filter(Boolean);
 }
 
@@ -1055,7 +1096,7 @@ export default async function handler(req, res) {
   try {
     const requestQuery = req.query || {};
     const directLookup = parseDirectLookup(requestQuery);
-    const { cards, bids, diagnostics, warnings, publicMetrics } = directLookup
+    const { cards, bids, diagnostics, warnings, publicMetrics, ownership } = directLookup
       ? await getDirectProjectionSnapshot(directLookup, requestQuery.fresh === '1')
       : await getProjectionSnapshot();
     // A failed source read is not an empty catalogue. In particular, quota
@@ -1077,6 +1118,9 @@ export default async function handler(req, res) {
     const visibleCards = cards.filter(card =>
       card.moderation_hidden !== true || (isDirectArtworkLookup && moderationAccess.canModerate)
     );
+    if (ownership && requestQuery.owner && (cards.length >= 200 || warnings.length || visibleCards.some(card => card.ownership_status === 'unavailable'))) {
+      throw Object.assign(new Error('The complete collection is temporarily unavailable. Please retry.'), { code: 'NFT_OWNERSHIP_UNAVAILABLE', statusCode: 503 });
+    }
     const filteredCards = filterCards(visibleCards, requestQuery);
     const data = isDirectArtworkLookup
       ? filteredCards.map(card => ({
@@ -1088,7 +1132,8 @@ export default async function handler(req, res) {
     // Direct lookups can differ per viewer (staff see hidden works), so only
     // list responses are CDN-cacheable.
     const cacheSeconds = Math.max(1, Math.round(PROJECTION_CACHE_MS / 1000));
-    res.setHeader('Cache-Control', isDirectArtworkLookup
+    if (!directLookup || directLookup.chain === CANONICAL_PUBLIC_CHAIN_ID) await recheckNftOwnership(ownership);
+    res.setHeader('Cache-Control', isDirectArtworkLookup || ownership
       ? 'private, no-store'
       : `public, s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 4}`);
 
@@ -1103,6 +1148,7 @@ export default async function handler(req, res) {
       warnings
     });
   } catch (error) {
+    res.setHeader('Cache-Control', 'private, no-store');
     sendError(res, error);
   }
 }
