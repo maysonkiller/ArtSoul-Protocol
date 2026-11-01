@@ -87,6 +87,49 @@ The next B18 implementation slice is the shared real artwork-card presentation,
 using `src/ui/components/artwork-card.js` across all existing consumers. Keep it
 separate from the pending B35 recovery work and from a wholesale site rewrite.
 
+## November 1 shared production-card adoption
+
+The first implementation slice uses the existing shared DOM/React card; no new
+card component, dependency or wallet/action handler is introduced. Future adopts
+four columns on wide screens, three at tablet widths and two on phones across
+both Home grids, Gallery, Profile and Saved. It uses an 18px frame, 16px body
+spacing, a landscape preview on sufficiently wide cards and square previews on
+narrow cards. Metadata stacks on narrow cards; long statuses and complete prices
+wrap rather than disappear. The palette values are unchanged. Classic retains
+its original composition. Shared media corners derive from the card radius.
+
+The existing Profile mobile heading override was narrowed to exclude card titles;
+otherwise it silently defeated the shared typography. Testing also found live
+Saved audio/video controls overlapping labels at 320px and the Saved button on
+short desktop previews. A 144px media minimum, square narrow-card previews and
+4px right inset on the narrowest playback row keep all controls separate.
+Menus remain over media and keep Donate, Report and Creation transaction order.
+Saved pressed/pending state, status/timer logic and media behavior are unchanged.
+All ten root HTML consumers advance the common stylesheet reference to v62.
+Admin and documentation routes and their implementations remain present.
+
+Validation: 126 focused unit checks passed with zero skips; production build,
+11-route verification and 172 Tailwind utility verification passed. The real
+Home/Gallery/Profile renderers passed 221 browser assertions in 30 combinations
+of five widths (320/390/768/1024/1366) and both themes, with zero page errors or
+outbound writes. Real Saved modules passed cross-surface add/remove in eight
+layouts plus pending-operation, wallet-change and expired-session checks.
+A further eight Saved audio/video layouts exercised actual sample playback,
+measured all five overlay regions and found no overlap or off-card controls.
+These browser checks use synthetic transport and local sample media; they do not
+claim fresh native iPhone, wallet signing or production service acceptance.
+The same 221 assertions also passed against the production build, with zero page errors. Exact-candidate CI and release status are recorded separately.
+Evidence is retained in ignored `docs/private/b18-card-*.log`,
+`docs/private/b18-saved-toggle-check.log` and
+`output/playwright/b18-{cards,saved-media}-*.png`.
+
+Interpretations: adopt Future geometry only, retain Classic appearance; adapt
+media ratio to actual card width so controls remain usable; use two phone columns
+while preserving all 44px primary overlay targets. No change to Bible sections 5,
+16 or17 architecture, economics, roles, deployment or supported networks.
+The wider page/header/detail redesign, mobile gestures and remaining B35 gates
+are not closed by this slice.
+
 ## Scope, versions and method
 
 Founder priority: profile/avatar consistency, simpler page hierarchy, a full

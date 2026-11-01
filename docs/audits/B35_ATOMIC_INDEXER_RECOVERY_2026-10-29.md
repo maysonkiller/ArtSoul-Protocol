@@ -707,3 +707,18 @@ Next B35 gate: reconstruct owner/provenance from transfers absent in the
 prototype core event stream, using evidence and bounded read-only fixtures
 before proposing another implementation. Worker activation remains blocked by
 the separately listed operations, recovery and restore gates.
+
+## November 1 final proof and merge
+
+PR #412 merged as 8ed3ce0efab05a79a10d00e35130da9fc64fc06f from
+fc754924c1ad487744bdf59b27856629374f783f. Exact CI41255813076 passed:
+Linux 3,171 unit checks/two skips; Windows 2,616/35 skips; 49 contract
+checks on each platform; both builds and static checks. Linux exercised the
+real PostgreSQL recovery and Docker media suites. Vercel preview was green.
+The final isolated local PostgreSQL rerun also passed 130/130, zero skips,
+with the disposable cluster stopped. Evidence:
+`docs/private/b35-common-ancestor-timeout-recheck.log` and
+`docs/private/reorg-atomicity-1793492096964-40124-91a84420/evidence.json`.
+These supersede the earlier incomplete local runs, without hiding their timing
+failures. The separate server worker and live schema remain unchanged; the
+remaining B35 gates above still apply.
