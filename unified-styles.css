@@ -9491,7 +9491,7 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price {
    Unlike forcing 10 cards into 2 mobile columns, this does not create a
    five-row feed on a tablet or phone. Explore and Profile remain unpaginated. */
 body:is(.classic, .future) .gallery-page-main.site-page-container {
-    max-width: 1320px !important;
+    max-width: 1720px !important;
 }
 @media (min-width: 1200px) {
     body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
