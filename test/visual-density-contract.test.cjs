@@ -28,8 +28,8 @@ test('Home uses the wide shared canvas without increasing editorial copy width',
   assert.match(css,/#homeSection \{ max-width: 1720px !important/);
   assert.match(css,/#homeSection \.home-hero-copy \{[\s\S]*?max-width: 700px/);
   assert.match(css,/#homeSection \.home-showcase \{[\s\S]*?max-width: 780px/);
-  assert.match(home,/<h1[^>]*>Discover artworks<\/h1>/);
-  assert.doesNotMatch(home,/Discover artworks\.<\/h1>/);
+  assert.match(home,/<h1[^>]*>Discovery-First Auctions for Digital Art<\/h1>/);
+  assert.doesNotMatch(home,/Discover artworks[.]?<\/h1>/);
 });
 
 test('Explore uses density breakpoints while leaving card controls and loading skeletons in the same grid', () => {
