@@ -8523,8 +8523,121 @@ body:is(.classic, .future) .home-showcase-status {
     line-height: 1.5;
     letter-spacing: 0;
 }
-body:is(.classic, .future) .home-showcase-controls #homeShowcasePause {
-    border-right: 1px solid var(--c-border-soft);
-    border-radius: 999px 0 0 999px;
-    font-size: 18px;
+
+
+/* November 1 owner acceptance: image remains fully visible beneath an
+   unobtrusive three-control carousel. The numeric counter also provides
+   accessible pause/resume without adding a fourth visual icon. */
+body:is(.classic, .future) #homeShowcaseControls {
+    left: 50%;
+    right: auto;
+    bottom: 10px;
+    transform: translateX(-50%);
+    gap: 8px;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+body:is(.classic, .future) #homeShowcaseControls > button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    border: 0 !important;
+    border-radius: 50%;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--c-accent);
+    -webkit-text-fill-color: currentColor;
+}
+body:is(.classic, .future) #homeShowcaseControls > button:hover {
+    background: transparent !important;
+    text-decoration: underline;
+}
+body:is(.classic, .future) #homeShowcaseCount {
+    min-width: 46px;
+    width: auto;
+    padding-inline: 2px;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: pointer;
+}
+body:is(.classic, .future) #homeShowcaseControls > button:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -3px;
+}
+/* Keep controls visible on a low-contrast artwork without a pill over the
+   image. A gentle shadow on glyphs, not on a background, is sufficient. */
+body.future #homeShowcaseControls > button { text-shadow: 0 1px 8px var(--c-bg); }
+
+/* Mobile account menu: the avatar stays in the same circular tool row;
+   only the popover narrows, while all activatable targets remain 44px. */
+body:is(.classic, .future) .site-header #navButtons .avatar-button {
+    border-radius: 50% !important;
+}
+@media (max-width: 768px) {
+    body:is(.classic, .future) .site-header #navButtons {
+        flex: 0 0 44px;
+        align-self: center;
+    }
+    body:is(.classic, .future) .site-header .avatar-dropdown-menu {
+        width: min(252px, calc(100vw - 24px)) !important;
+        max-width: calc(100vw - 24px) !important;
+        padding: 6px !important;
+        box-sizing: border-box;
+    }
+    body:is(.classic, .future) .site-header .avatar-menu-identity { padding: 2px 8px !important; }
+    body:is(.classic, .future) .site-header .avatar-menu-name { font-size: 13px !important; }
+    body:is(.classic, .future) .site-header .avatar-menu-address { padding: 2px 0 !important; min-height: 44px; }
+    body:is(.classic, .future) .site-header .avatar-wallet-section { padding-block: 4px !important; }
+    body:is(.classic, .future) .site-header .network-current-row { min-height: 44px !important; }
+    body:is(.classic, .future) .site-header .avatar-wallet-provider { padding: 0 8px 4px; }
+    body:is(.classic, .future) .site-header .avatar-dropdown-navigation { padding: 0 0 4px !important; }
+    body:is(.classic, .future) .site-header .avatar-account-action .avatar-dropdown-divider { margin-block: 0 !important; }
+    body:is(.classic, .future) .site-header .avatar-account-links .dropdown-item {
+        border: 0 !important;
+        border-radius: 8px !important;
+    }
+}
+.avatar-menu-address-value {
+    flex: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+/* The full wallet stays on the button as accessible text/data, and the
+   polite status remains available to assistive technology, not visible. */
+.avatar-menu-copy-status {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+body:is(.classic, .future) .profile-admin-shortcut {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 10px;
+    color: var(--c-text);
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+body:is(.classic, .future) .profile-admin-shortcut:hover { border-color: var(--c-accent); }
+body:is(.classic, .future) .profile-admin-shortcut:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
 }
