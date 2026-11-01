@@ -2910,11 +2910,11 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         ? { key: 'live', label: 'Live' }
                         : presentationStatus;
 
-            const DetailsPanel = isClassic ? 'div' : 'details';
-            const DetailsHeading = isClassic ? React.Fragment : 'summary';
-            const GuidancePanel = isClassic ? 'section' : 'details';
-            const HistoryPanel = isClassic ? 'section' : 'details';
-            const DisclosureHeading = isClassic ? 'div' : 'summary';
+            const DetailsPanel = 'details';
+            const DetailsHeading = 'summary';
+            const GuidancePanel = 'details';
+            const HistoryPanel = 'details';
+            const DisclosureHeading = 'summary';
 
             const detailsPanel = (
                 <DetailsPanel key="details" className="artwork-page-extra artwork-mobile-details">
@@ -2989,7 +2989,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         <h2>Description</h2>
                         <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
                     </div>
-                    {isClassic && detailsPanel}
 
                 </section>
             );
@@ -3150,7 +3149,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             );
 
             const provenancePanel = isV41CompositeId && (
-                <HistoryPanel key="history" open={isClassic ? undefined : true} className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">
+                <HistoryPanel key="history" open className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">
                     <DisclosureHeading className="artwork-page-card-heading">
                         <h3 id="provenanceTitle" className="artwork-page-card-title">Provenance</h3>
                         {provenanceState.status === 'ready' && (
@@ -4041,14 +4040,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     <main className="artwork-page-shell site-page-container">
                         <div className="artwork-page-layout">
                             <div className="artwork-page-left">
-                                {isClassic
-                                    ? [mediaPanel, contextPanel, communityPanel, guidancePanel]
-                                    : [mediaPanel, contextPanel, ownershipPanel, auctionPanel, communityPanel, provenancePanel, guidancePanel, detailsPanel]}
+                                {[mediaPanel, contextPanel, ownershipPanel, auctionPanel, communityPanel, provenancePanel, guidancePanel, detailsPanel]}
                             </div>
                             <aside className="artwork-page-right">
-                                {isClassic
-                                    ? [ownershipPanel, provenancePanel, auctionPanel]
-                                    : null}
                                 {legacyPanel}
                             </aside>
                         </div>

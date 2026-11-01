@@ -302,13 +302,13 @@
     .protocol-section { scroll-margin-top: calc(var(--site-header-height, 77px) + 0.75rem); }
 }
 
-/* Future documentation keeps the real topics in a quiet reading layout. */
-body.future .protocol-docs-shell {
+/* Shared documentation composition keeps the real topics in a quiet reading layout. */
+body:is(.classic, .future) .protocol-docs-shell {
     width: min(1180px, calc(100% - 3rem));
     padding: 2.5rem 0 4rem;
 }
 
-body.future .protocol-docs-intro {
+body:is(.classic, .future) .protocol-docs-intro {
     margin-bottom: 2.25rem;
     padding: 0;
     border: 0;
@@ -316,25 +316,25 @@ body.future .protocol-docs-intro {
     background: transparent;
 }
 
-body.future .protocol-docs-intro h1 {
+body:is(.classic, .future) .protocol-docs-intro h1 {
     margin: 0.5rem 0 0.85rem;
     font-size: clamp(2.25rem, 4.5vw, 3.75rem);
     line-height: 1.08;
     letter-spacing: -0.035em;
 }
 
-body.future .protocol-docs-intro > p:last-child {
+body:is(.classic, .future) .protocol-docs-intro > p:last-child {
     max-width: 44rem;
     font-size: 1rem;
     line-height: 1.7;
 }
 
-body.future .protocol-docs-layout {
+body:is(.classic, .future) .protocol-docs-layout {
     grid-template-columns: 250px minmax(0, 1fr);
     gap: clamp(1.5rem, 3.5vw, 3rem);
 }
 
-body.future .protocol-side-nav {
+body:is(.classic, .future) .protocol-side-nav {
     padding: 0 1rem 0 0;
     border: 0;
     border-right: 1px solid var(--c-border-soft);
@@ -343,11 +343,11 @@ body.future .protocol-side-nav {
     scrollbar-width: thin;
 }
 
-body.future .protocol-side-nav > p {
+body:is(.classic, .future) .protocol-side-nav > p {
     margin: 0 0.75rem 0.75rem;
 }
 
-body.future .protocol-side-nav button {
+body:is(.classic, .future) .protocol-side-nav button {
     min-height: 44px;
     padding: 0.6rem 0.75rem;
     border-radius: 0.4rem;
@@ -356,68 +356,68 @@ body.future .protocol-side-nav button {
     overflow-wrap: anywhere;
 }
 
-body.future .protocol-side-nav button:hover,
-body.future .protocol-side-nav button:focus-visible {
+body:is(.classic, .future) .protocol-side-nav button:hover,
+body:is(.classic, .future) .protocol-side-nav button:focus-visible {
     border-color: transparent;
     box-shadow: none;
 }
 
-body.future .protocol-content { gap: 0; }
+body:is(.classic, .future) .protocol-content { gap: 0; }
 
-body.future .protocol-section {
+body:is(.classic, .future) .protocol-section {
     border: 0;
     border-bottom: 1px solid var(--c-border-soft);
     border-radius: 0;
     background: transparent;
 }
 
-body.future .protocol-section:first-child {
+body:is(.classic, .future) .protocol-section:first-child {
     border-top: 1px solid var(--c-border-soft);
 }
 
-body.future .protocol-section-trigger {
+body:is(.classic, .future) .protocol-section-trigger {
     min-height: 64px;
     padding: 1rem 0.5rem;
     font-size: 1.1rem;
     line-height: 1.4;
 }
 
-body.future .protocol-section-trigger > span { min-width: 0; overflow-wrap: anywhere; }
+body:is(.classic, .future) .protocol-section-trigger > span { min-width: 0; overflow-wrap: anywhere; }
 
-body.future .protocol-section-body {
+body:is(.classic, .future) .protocol-section-body {
     padding: 0 0.5rem 1.4rem;
     border-top: 0;
     font-size: 0.98rem;
     overflow-wrap: anywhere;
 }
 
-body.future .protocol-section-body h3 { font-size: 1rem; }
-body.future .protocol-section-body p,
-body.future .protocol-section-body li { line-height: 1.75; }
+body:is(.classic, .future) .protocol-section-body h3 { font-size: 1rem; }
+body:is(.classic, .future) .protocol-section-body p,
+body:is(.classic, .future) .protocol-section-body li { line-height: 1.75; }
 
-body.future .protocol-nav-toggle {
+body:is(.classic, .future) .protocol-nav-toggle {
     min-height: 44px;
     background: transparent;
     border-radius: 0.5rem;
 }
 
-body.future .protocol-docs-shell :is(.protocol-section-trigger, .protocol-side-nav button, .protocol-nav-toggle):focus-visible {
+body:is(.classic, .future) .protocol-docs-shell :is(.protocol-section-trigger, .protocol-side-nav button, .protocol-nav-toggle):focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: -2px;
 }
 
 @media (max-width: 760px) {
-    body.future .protocol-docs-shell {
+    body:is(.classic, .future) .protocol-docs-shell {
         width: calc(100% - 2rem);
         padding: 1.25rem 0 2.5rem;
     }
-    body.future .protocol-docs-intro { margin-bottom: 1.5rem; }
-    body.future .protocol-docs-intro h1 { font-size: clamp(2rem, 9vw, 3rem); }
-    body.future .protocol-side-nav {
+    body:is(.classic, .future) .protocol-docs-intro { margin-bottom: 1.5rem; }
+    body:is(.classic, .future) .protocol-docs-intro h1 { font-size: clamp(2rem, 9vw, 3rem); }
+    body:is(.classic, .future) .protocol-side-nav {
         padding: 0.5rem 0 1rem;
         border-right: 0;
         border-bottom: 1px solid var(--c-border-soft);
     }
-    body.future .protocol-section-trigger { min-height: 58px; font-size: 1rem; }
-    body.future .protocol-section-body { font-size: 0.95rem; }
+    body:is(.classic, .future) .protocol-section-trigger { min-height: 58px; font-size: 1rem; }
+    body:is(.classic, .future) .protocol-section-body { font-size: 0.95rem; }
 }

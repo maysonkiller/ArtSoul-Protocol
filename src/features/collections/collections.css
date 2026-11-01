@@ -130,10 +130,10 @@
     .launch-summary dl div { padding-block: 8px; }
 }
 
-/* Accepted Future collection-draft composition; existing draft behavior remains. */
-body.future .launch-page { min-width: 0; }
-body.future .launch-page .launch-topline { margin-bottom: 1rem; gap: 0.75rem; }
-body.future .launch-page .launch-topline > a {
+/* Shared collection-draft composition; existing draft behavior remains. */
+body:is(.classic, .future) .launch-page { min-width: 0; }
+body:is(.classic, .future) .launch-page .launch-topline { margin-bottom: 1rem; gap: 0.75rem; }
+body:is(.classic, .future) .launch-page .launch-topline > a {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
@@ -141,13 +141,13 @@ body.future .launch-page .launch-topline > a {
     line-height: 1.4;
     overflow-wrap: anywhere;
 }
-body.future .launch-page .launch-hero { gap: 1.25rem; margin-bottom: 1.25rem; }
-body.future .launch-page .launch-hero > div { min-width: 0; }
-body.future .launch-page .launch-hero h1 { font-size: clamp(2rem, 3.5vw, 2.75rem); overflow-wrap: anywhere; }
-body.future .launch-page .launch-hero p { margin-top: 0.625rem; font-size: 0.9375rem; line-height: 1.5; }
-body.future .launch-page .launch-actions { gap: 0.5rem; min-width: 0; }
-body.future .launch-page button,
-body.future .launch-page .launch-button {
+body:is(.classic, .future) .launch-page .launch-hero { gap: 1.25rem; margin-bottom: 1.25rem; }
+body:is(.classic, .future) .launch-page .launch-hero > div { min-width: 0; }
+body:is(.classic, .future) .launch-page .launch-hero h1 { font-size: clamp(2rem, 3.5vw, 2.75rem); overflow-wrap: anywhere; }
+body:is(.classic, .future) .launch-page .launch-hero p { margin-top: 0.625rem; font-size: 0.9375rem; line-height: 1.5; }
+body:is(.classic, .future) .launch-page .launch-actions { gap: 0.5rem; min-width: 0; }
+body:is(.classic, .future) .launch-page button,
+body:is(.classic, .future) .launch-page .launch-button {
     min-width: 44px;
     min-height: 44px;
     max-width: 100%;
@@ -157,15 +157,15 @@ body.future .launch-page .launch-button {
     white-space: normal;
     overflow-wrap: anywhere;
 }
-body.future .launch-page .launch-draft-tools { margin: 1rem 0 1.25rem; }
-body.future .launch-page .launch-note { font-size: 0.875rem; line-height: 1.5; border-radius: 0 0.5rem 0.5rem 0; }
-body.future .launch-page .launch-banner-status,
-body.future .launch-page .launch-help { font-size: 0.8125rem; line-height: 1.5; }
-body.future .launch-page .launch-layout { gap: 1.25rem; }
-body.future .launch-page .launch-steps,
-body.future .launch-page .launch-summary { top: calc(var(--site-header-height, 77px) + 12px); }
-body.future .launch-page .launch-steps { min-width: 0; max-width: 100%; gap: 0.375rem; }
-body.future .launch-page .launch-steps button {
+body:is(.classic, .future) .launch-page .launch-draft-tools { margin: 1rem 0 1.25rem; }
+body:is(.classic, .future) .launch-page .launch-note { font-size: 0.875rem; line-height: 1.5; border-radius: 0 0.5rem 0.5rem 0; }
+body:is(.classic, .future) .launch-page .launch-banner-status,
+body:is(.classic, .future) .launch-page .launch-help { font-size: 0.8125rem; line-height: 1.5; }
+body:is(.classic, .future) .launch-page .launch-layout { gap: 1.25rem; }
+body:is(.classic, .future) .launch-page .launch-steps,
+body:is(.classic, .future) .launch-page .launch-summary { top: calc(var(--site-header-height, 77px) + 12px); }
+body:is(.classic, .future) .launch-page .launch-steps { min-width: 0; max-width: 100%; gap: 0.375rem; }
+body:is(.classic, .future) .launch-page .launch-steps button {
     padding: 0.625rem 0.75rem;
     border: 0;
     border-bottom: 2px solid transparent;
@@ -173,23 +173,23 @@ body.future .launch-page .launch-steps button {
     background: transparent;
     color: var(--c-text-muted);
 }
-body.future .launch-page .launch-steps button[aria-current="step"] {
+body:is(.classic, .future) .launch-page .launch-steps button[aria-current="step"] {
     border-bottom-color: var(--c-accent);
     background: var(--c-surface-muted);
     color: var(--c-text);
     font-weight: 600;
 }
-body.future .launch-page .launch-step-index { color: var(--c-accent); font-size: 0.75rem; opacity: 1; }
-body.future .launch-page .launch-panel { padding: 1.25rem; border-radius: 1rem; box-shadow: none; }
-body.future .launch-page .launch-panel-title { margin-bottom: 1.25rem; }
-body.future .launch-page .launch-panel-title h2 { font-size: 1.375rem; line-height: 1.3; }
-body.future .launch-page .launch-panel-title p { font-size: 0.875rem; line-height: 1.5; }
-body.future .launch-page .launch-stack { gap: 1.25rem; }
-body.future .launch-page .launch-grid { gap: 1rem; }
-body.future .launch-page .launch-field { font-size: 0.875rem; line-height: 1.4; }
-body.future .launch-page .launch-field input:not([type="checkbox"]):not([type="radio"]),
-body.future .launch-page .launch-field textarea,
-body.future .launch-page .launch-field select {
+body:is(.classic, .future) .launch-page .launch-step-index { color: var(--c-accent); font-size: 0.75rem; opacity: 1; }
+body:is(.classic, .future) .launch-page .launch-panel { padding: 1.25rem; border-radius: 1rem; box-shadow: none; }
+body:is(.classic, .future) .launch-page .launch-panel-title { margin-bottom: 1.25rem; }
+body:is(.classic, .future) .launch-page .launch-panel-title h2 { font-size: 1.375rem; line-height: 1.3; }
+body:is(.classic, .future) .launch-page .launch-panel-title p { font-size: 0.875rem; line-height: 1.5; }
+body:is(.classic, .future) .launch-page .launch-stack { gap: 1.25rem; }
+body:is(.classic, .future) .launch-page .launch-grid { gap: 1rem; }
+body:is(.classic, .future) .launch-page .launch-field { font-size: 0.875rem; line-height: 1.4; }
+body:is(.classic, .future) .launch-page .launch-field input:not([type="checkbox"]):not([type="radio"]),
+body:is(.classic, .future) .launch-page .launch-field textarea,
+body:is(.classic, .future) .launch-page .launch-field select {
     min-width: 0;
     min-height: 44px;
     max-width: 100%;
@@ -201,50 +201,50 @@ body.future .launch-page .launch-field select {
     font-size: 1rem;
     line-height: 1.5;
 }
-body.future .launch-page .launch-field textarea { min-height: 6rem; }
-body.future .launch-page .launch-field :is(input, textarea)::placeholder { color: var(--c-text-muted); opacity: 1; }
-body.future .launch-page .launch-inline-check { min-height: 44px; }
-body.future .launch-page .launch-phase {
+body:is(.classic, .future) .launch-page .launch-field textarea { min-height: 6rem; }
+body:is(.classic, .future) .launch-page .launch-field :is(input, textarea)::placeholder { color: var(--c-text-muted); opacity: 1; }
+body:is(.classic, .future) .launch-page .launch-inline-check { min-height: 44px; }
+body:is(.classic, .future) .launch-page .launch-phase {
     padding: 1rem;
     border-radius: 0.75rem;
     background: transparent;
     box-shadow: none;
 }
-body.future .launch-page .launch-phase-head { flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
-body.future .launch-page .launch-phase-head h3 { min-width: 0; }
-body.future .launch-page .launch-phase-head button { padding-inline: 0.625rem; }
-body.future .launch-page .launch-footer { margin-top: 1.25rem; padding-top: 1rem; }
-body.future .launch-page .launch-footer.launch-row { flex-wrap: wrap; gap: 0.75rem; }
-body.future .launch-page .launch-summary { background: var(--c-surface-muted); }
-body.future .launch-page .launch-summary dl,
-body.future .launch-page .launch-definition { margin-top: 1rem; }
-body.future .launch-page .launch-summary dl div,
-body.future .launch-page .launch-definition div { min-width: 0; gap: 0.75rem; padding-block: 0.625rem; font-size: 0.8125rem; }
-body.future .launch-page .launch-summary :is(dt, dd),
-body.future .launch-page .launch-definition :is(dt, dd) { min-width: 0; overflow-wrap: anywhere; }
-body.future .launch-page .launch-details > summary {
+body:is(.classic, .future) .launch-page .launch-phase-head { flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
+body:is(.classic, .future) .launch-page .launch-phase-head h3 { min-width: 0; }
+body:is(.classic, .future) .launch-page .launch-phase-head button { padding-inline: 0.625rem; }
+body:is(.classic, .future) .launch-page .launch-footer { margin-top: 1.25rem; padding-top: 1rem; }
+body:is(.classic, .future) .launch-page .launch-footer.launch-row { flex-wrap: wrap; gap: 0.75rem; }
+body:is(.classic, .future) .launch-page .launch-summary { background: var(--c-surface-muted); }
+body:is(.classic, .future) .launch-page .launch-summary dl,
+body:is(.classic, .future) .launch-page .launch-definition { margin-top: 1rem; }
+body:is(.classic, .future) .launch-page .launch-summary dl div,
+body:is(.classic, .future) .launch-page .launch-definition div { min-width: 0; gap: 0.75rem; padding-block: 0.625rem; font-size: 0.8125rem; }
+body:is(.classic, .future) .launch-page .launch-summary :is(dt, dd),
+body:is(.classic, .future) .launch-page .launch-definition :is(dt, dd) { min-width: 0; overflow-wrap: anywhere; }
+body:is(.classic, .future) .launch-page .launch-details > summary {
     min-height: 44px;
     padding-block: 0.625rem;
     font-size: 0.875rem;
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
-body.future .launch-page .launch-finding { font-size: 0.875rem; line-height: 1.5; }
-body.future .launch-page .launch-table { font-size: 0.8125rem; }
-body.future .launch-page .launch-table-wrap { min-width: 0; max-width: 100%; }
-body.future .launch-page :is(button, a, input, textarea, select, summary):focus-visible {
+body:is(.classic, .future) .launch-page .launch-finding { font-size: 0.875rem; line-height: 1.5; }
+body:is(.classic, .future) .launch-page .launch-table { font-size: 0.8125rem; }
+body:is(.classic, .future) .launch-page .launch-table-wrap { min-width: 0; max-width: 100%; }
+body:is(.classic, .future) .launch-page :is(button, a, input, textarea, select, summary):focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: 3px;
 }
 @media (max-width: 720px) {
-    body.future .launch-page .launch-hero > .launch-actions { margin-top: 1rem; }
-    body.future .launch-page .launch-layout { gap: 1rem; }
-    body.future .launch-page .launch-panel { padding: 1rem; }
-    body.future .launch-page .launch-phase { padding: 0.875rem; }
-    body.future .launch-page .launch-steps { padding: 0.25rem 0.125rem; }
-    body.future .launch-page .launch-steps button { white-space: nowrap; }
-    body.future .launch-page .launch-steps button:focus-visible { outline-offset: -2px; }
-    body.future .launch-page .launch-step-index { display: inline; min-width: 1.125rem; }
+    body:is(.classic, .future) .launch-page .launch-hero > .launch-actions { margin-top: 1rem; }
+    body:is(.classic, .future) .launch-page .launch-layout { gap: 1rem; }
+    body:is(.classic, .future) .launch-page .launch-panel { padding: 1rem; }
+    body:is(.classic, .future) .launch-page .launch-phase { padding: 0.875rem; }
+    body:is(.classic, .future) .launch-page .launch-steps { padding: 0.25rem 0.125rem; }
+    body:is(.classic, .future) .launch-page .launch-steps button { white-space: nowrap; }
+    body:is(.classic, .future) .launch-page .launch-steps button:focus-visible { outline-offset: -2px; }
+    body:is(.classic, .future) .launch-page .launch-step-index { display: inline; min-width: 1.125rem; }
 }
 /* Keep imported-file inputs and any future conditional controls hidden. */
-body.future .launch-page [hidden] { display: none !important; }
+body:is(.classic, .future) .launch-page [hidden] { display: none !important; }
