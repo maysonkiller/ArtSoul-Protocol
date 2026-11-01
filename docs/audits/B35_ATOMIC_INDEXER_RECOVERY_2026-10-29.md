@@ -994,3 +994,57 @@ This adds no new interpretation of economics or NFT lifecycle. It implements
 the same canon §§1,4,5,9 source and non-sale-transfer boundaries. Historical
 bootstrap, source-qualified public ownership/timeline reads, independent
 restore, external delivery/cache acceptance and worker activation remain open.
+
+PR421 released the writer from candidate `1162f5d86c3e748b8da7ebaa6eec6b7be1e82fba`,
+merge `19a0b5e95bd13d12513506095844d8379af6c3c8`. Exact CI41269676707 passed
+Linux3,447/two skips, Windows2,849/35 skips,49 contracts each and both builds/static.
+Preview7468101385 and production7468146673 succeeded; six apex routes retain the
+exact tested stylesheet. Evidence: `docs/private/b35-nft-writer-{ci,preview-release,production-release}.log`.
+The writer is still dormant; this release made no live database or worker change.
+
+## November 1 source-qualified ownership read foundation
+
+The dormant `read_verified_nft_owners` SQL function accepts at most20 exact
+artwork IDs and explicit Core/NFT runtime pins. It uses one stable statement
+snapshot for coverage, indexer state, original registration and settlement
+journals, mutable projections, mint and the latest NFT transfer. Readiness
+requires coverage to equal the Core indexed boundary and the durable cache
+obligation to be acknowledged. The response includes that boundary, confirmed
+boundary, coverage hash and state revision; it does not claim chain finality.
+
+A non-NULL original-Core journal source must match every registration and
+settlement identity/payload. The same token cannot belong to two original
+settlements and the same artwork cannot belong to two tokens. Its first NFT
+transfer must be zero-to-winner in the settlement transaction, before the Core
+settlement log. Subsequent ordinary transfers change only the derived current
+owner; neither mutable `NFT.core()` nor a foreign deployment can establish
+membership. Missing, partial or ambiguous evidence returns `verified=false`
+with no owner or First Collector claim. Consumers must never interpret that
+result as permission to fall back to a known-stale settlement/listing owner.
+
+The function is stable, invoker-only, service-executable and mutation-free.
+It reuses the existing search settlement index and adds two bounded source
+lookups to avoid scanning unrelated settlements. A5,000-settlement/10,000-event
+decoy fixture used all four intended indexes without a journal/settlement
+sequential scan (local execution0.52ms; not a production latency promise).
+
+Local checks pass38/38 in real isolated PostgreSQL, including the existing
+engine rewind, concurrent snapshot, missing/foreign sources, mismatched mint,
+uint256 limits, cache obligation and role denial. Cluster stopped; evidence:
+`docs/private/b35-nft-owners-postgres-reviewed.log` and
+`docs/private/reorg-atomicity-1793504788806-51584-950a19a8/`.
+An earlier test incorrectly expected primitive SQL rewind to move the Core
+cursor; it correctly failed closed. The corrected regression calls the actual
+engine rewind before rebuilding fixture coverage. Failed evidence is retained.
+Independent review found and resolved the same-artwork/different-token ambiguity
+and optional-search-index dependency before release. Full local units pass2,878
+with35 environment skips (including29 unrelated untracked authority-policy passes).
+Security checks pass25 with one unavailable-Docker skip. Hosted exact CI remains
+required. The expanded overall PG-suite allowance is480seconds; individual SQL
+and concurrency timeouts remain unchanged.
+
+This is the next B35 prerequisite under canon §§1,4,5,9, not a new NFT rule.
+The migration is unapplied live and public endpoints do not call it yet.
+Next: integrate qualified ownership/timeline and owner filtering consistently
+with recovery/cache handling, then prove the existing-worker activation gates.
+Verified historical bootstrap remains separately unavailable on existing RPCs.

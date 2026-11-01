@@ -55,7 +55,7 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   skip: BIN ? false : 'Set ARTSOUL_TEST_POSTGRES_BIN; no database connection attempted',
   // Full migration/recovery/transfer matrix also runs on slower Windows disks;
   // individual SQL statements and concurrency gates retain their short bounds.
-  timeout: 360000
+  timeout: 480000
 }, async t => {
   const suffix = `${Date.now()}-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
   const directory = path.join(ROOT, 'docs', 'private', `reorg-atomicity-${suffix}`);
@@ -110,7 +110,8 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
   const notificationMigrations = ['phase18_artwork_moderation_visibility','a8b_artwork_report_intake',
     'a8c_protocol_admin_review','artist_support','artist_support_moderation','auction_notifications',
     'auction_notification_lifecycle','auction_notification_reminders','notification_summary','notification_inbox_removal',
-    '20261029212603_notification_reorg_identity','20261029220854_recovery_cache_obligation','20261101120000_nft_transfer_coverage'];
+    '20261029212603_notification_reorg_identity','20261029220854_recovery_cache_obligation','20261101120000_nft_transfer_coverage',
+    '20261101130000_verified_nft_owners'];
   for (const name of notificationMigrations) await pool.query(read(`sql/migrations/${name}.sql`));
   evidence.migrations = [...migrations, ...['identity', 'preparation', 'submission', 'registration', 'reorg']
     .map(name => `sql/migrations/artwork_media_${name}.sql`), ...notificationMigrations.map(name=>`sql/migrations/${name}.sql`)];
@@ -1954,4 +1955,188 @@ const {pathToFileURL}=require('node:url');
     });
   }
 
+  const OWNER_NFT=`0x${'d'.repeat(40)}`, HOLDER=`0x${'e'.repeat(40)}`, LAST_HOLDER=`0x${'f'.repeat(40)}`;
+  const ownerSql='SELECT * FROM public.read_verified_nft_owners($1,$2,$3,$4,$5)';
+  const ownerParams=(ids=['1'])=>[CORE,OWNER_NFT,hash(900),hash(901),ids];
+  const owners=async(client=pool,ids=['1'])=>(await client.query(ownerSql,ownerParams(ids))).rows;
+  async function seedOwnerProof() {
+    await apply(target,'SettlementCompleted',106,{auctionId:1,artworkId:1,winner:WINNER,finalPrice:2000,tokenId:7},4);
+    await pool.query('UPDATE contract_events SET contract_address=$1 WHERE chain_id=$2',[CORE,CHAIN]);
+    const settlement=(await pool.query("SELECT * FROM contract_events WHERE chain_id=$1 AND event_name='SettlementCompleted'",[CHAIN])).rows[0];
+    for(const [block,log,tx,from,to] of [[106,1,settlement.transaction_hash,'0x'+'0'.repeat(40),WINNER],
+      [110,3,hash(501),WINNER,HOLDER],[110,9,hash(501),HOLDER,LAST_HOLDER]]) {
+      await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data,indexed_at)
+        VALUES($1,'Transfer',$2,$3,$4,$5,$6,to_timestamp($7))`,[CHAIN,OWNER_NFT,block,tx,log,
+        JSON.stringify({from,to,tokenId:'7',blockHash:hash(block),transactionIndex:2}),1700000000+block*2]);
+    }
+    await seedCoverage();return settlement;
+  }
+  await t.test('NFT ownership proof follows the latest transfer while preserving First Collector and indexed boundary',async()=>{
+    await seedOwnerProof();const before=await snapshot(CHAIN);const [row]=await owners();
+    assert.equal(row.verified,true);assert.equal(row.artwork_id,'1');assert.equal(row.token_id,'7');
+    assert.equal(row.current_owner_address,LAST_HOLDER);assert.equal(row.first_collector_address,WINNER);
+    assert.equal(row.latest_transfer.log_index,9);assert.equal(row.latest_transfer.block_number,110);
+    assert.equal(row.latest_transfer.from_address,HOLDER);assert.equal(row.latest_transfer.to_address,LAST_HOLDER);
+    assert.equal(row.indexed_through,'115');assert.equal(row.confirmed_through,'115');assert.equal(row.covered_hash,hash(115));
+    assert.match(row.state_revision,/^\d+$/);assert.equal(row.latest_transfer.price,undefined);
+    assert.deepEqual(await snapshot(CHAIN),before,'ownership reads cannot change lifecycle, floor, journal or balances');
+  });
+  for(const [name,sql,params] of [
+    ['registration source is unknown',"UPDATE contract_events SET contract_address=NULL WHERE chain_id=$1 AND event_name='ArtworkRegistered'",[CHAIN]],
+    ['registration belongs to another Core',"UPDATE contract_events SET contract_address=$2 WHERE chain_id=$1 AND event_name='ArtworkRegistered'",[CHAIN,CREATOR]],
+    ['registration creator disagrees',"UPDATE contract_events SET event_data=jsonb_set(event_data,'{creator}',to_jsonb($2::TEXT)) WHERE chain_id=$1 AND event_name='ArtworkRegistered'",[CHAIN,HOLDER]],
+    ['registration media disagrees',"UPDATE v41_artworks SET metadata_uri='ipfs://changed' WHERE chain_id=$1",[CHAIN]],
+    ['settlement source is unknown',"UPDATE contract_events SET contract_address=NULL WHERE chain_id=$1 AND event_name='SettlementCompleted'",[CHAIN]],
+    ['settlement belongs to another Core',"UPDATE contract_events SET contract_address=$2 WHERE chain_id=$1 AND event_name='SettlementCompleted'",[CHAIN,HOLDER]],
+    ['settlement token disagrees',"UPDATE contract_events SET event_data=jsonb_set(event_data,'{tokenId}','8') WHERE chain_id=$1 AND event_name='SettlementCompleted'",[CHAIN]],
+    ['settlement winner disagrees',"UPDATE v41_settlements SET winner=$2 WHERE chain_id=$1",[CHAIN,HOLDER]],
+    ['settlement price disagrees',"UPDATE v41_settlements SET final_price=3000 WHERE chain_id=$1",[CHAIN]],
+    ['settlement is not completed',"UPDATE v41_settlements SET settlement_status='pending' WHERE chain_id=$1",[CHAIN]],
+    ['artwork is not minted',"UPDATE v41_artworks SET minted=false WHERE chain_id=$1",[CHAIN]],
+    ['mint is missing',"DELETE FROM contract_events WHERE chain_id=$1 AND event_name='Transfer' AND block_number=106",[CHAIN]],
+    ['mint comes from a foreign NFT',"UPDATE contract_events SET contract_address=$2 WHERE chain_id=$1 AND event_name='Transfer' AND block_number=106",[CHAIN,HOLDER]],
+    ['mint token is different',"UPDATE contract_events SET event_data=jsonb_set(event_data,'{tokenId}','8') WHERE chain_id=$1 AND event_name='Transfer' AND block_number=106",[CHAIN]],
+    ['mint is from a foreign transaction',"UPDATE contract_events SET transaction_hash=$2 WHERE chain_id=$1 AND event_name='Transfer' AND block_number=106",[CHAIN,hash(999)]],
+    ['mint follows settlement log',"UPDATE contract_events SET log_index=5 WHERE chain_id=$1 AND event_name='Transfer' AND block_number=106",[CHAIN]],
+    ['mint recipient is different',"UPDATE contract_events SET event_data=jsonb_set(event_data,'{to}',to_jsonb($2::TEXT)) WHERE chain_id=$1 AND event_name='Transfer' AND block_number=106",[CHAIN,HOLDER]],
+    ['latest movement recipient is invalid',"UPDATE contract_events SET event_data=jsonb_set(event_data,'{to}','\"invalid\"') WHERE chain_id=$1 AND event_name='Transfer' AND log_index=9",[CHAIN]],
+    ['latest movement is an unexpected second mint',"UPDATE contract_events SET event_data=jsonb_set(event_data,'{from}',to_jsonb($2::TEXT)) WHERE chain_id=$1 AND event_name='Transfer' AND log_index=9",[CHAIN,'0x'+'0'.repeat(40)]],
+    ['latest movement has an unverified artwork link',"UPDATE contract_events SET artwork_id=1 WHERE chain_id=$1 AND event_name='Transfer' AND log_index=9",[CHAIN]],
+    ['coverage is partial',"UPDATE nft_transfer_coverage SET covered_through=114 WHERE chain_id=$1",[CHAIN]],
+    ['coverage is ahead of Core',"UPDATE nft_transfer_coverage SET covered_through=116 WHERE chain_id=$1",[CHAIN]],
+    ['runtime pin differs',"UPDATE nft_transfer_coverage SET nft_code_hash=$2 WHERE chain_id=$1",[CHAIN,hash(902)]],
+    ['recovery is pending',"UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1",[CHAIN]],
+    ['deployment changed',"UPDATE indexer_state SET contract_address=$2 WHERE chain_id=$1",[CHAIN,HOLDER]]
+  ])await t.test(`NFT ownership proof refuses ${name}`,async()=>{
+    await seedOwnerProof();await pool.query(sql,params);const [row]=await owners();
+    assert.equal(row.verified,false);assert.equal(row.current_owner_address,null);assert.equal(row.first_collector_address,null);
+    assert.equal(row.latest_transfer,null);
+  });
+  await t.test('NFT ownership proof ignores foreign chain, NFT, token and future records',async()=>{
+    await seedOwnerProof();
+    for(const [chain,nft,token,block,tx] of [[OTHER_CHAIN,OWNER_NFT,'7',114,601],[CHAIN,HOLDER,'7',114,602],
+      [CHAIN,OWNER_NFT,'8',114,603],[CHAIN,OWNER_NFT,'7',116,604]]) {
+      await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+        VALUES($1,'Transfer',$2,$3,$4,1,$5)`,[chain,nft,block,hash(tx),JSON.stringify({tokenId:token,from:LAST_HOLDER,to:CREATOR})]);
+    }
+    assert.equal((await owners())[0].current_owner_address,LAST_HOLDER);
+  });
+  await t.test('NFT ownership proof refuses ambiguous settlement mapping',async()=>{
+    const s=await seedOwnerProof();
+    await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+      VALUES($1,'SettlementCompleted',$2,107,$3,4,$4)`,[CHAIN,CORE,hash(610),s.event_data]);
+    assert.equal((await owners())[0].verified,false);
+  });
+  await t.test('NFT ownership proof refuses a second token for the same original artwork',async()=>{
+    const s=await seedOwnerProof();
+    await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+      VALUES($1,'SettlementCompleted',$2,107,$3,4,$4)`,[CHAIN,CORE,hash(611),{...s.event_data,tokenId:'8',auctionId:'2'}]);
+    assert.equal((await owners())[0].verified,false);
+  });
+  await t.test('NFT ownership proof refuses a foreign Core token even when its artwork number matches',async()=>{
+    const s=await seedOwnerProof();
+    await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+      VALUES($1,'SettlementCompleted',$2,107,$3,4,$4)`,[CHAIN,HOLDER,hash(612),{...s.event_data,tokenId:'8'}]);
+    await pool.query('UPDATE v41_artworks SET token_id=8 WHERE chain_id=$1',[CHAIN]);
+    await pool.query('UPDATE v41_settlements SET token_id=8,block_number=107,transaction_hash=$2 WHERE chain_id=$1',[CHAIN,hash(612)]);
+    await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+      VALUES($1,'Transfer',$2,107,$3,1,$4)`,[CHAIN,OWNER_NFT,hash(612),{tokenId:'8',from:'0x'+'0'.repeat(40),to:WINNER}]);
+    assert.equal((await owners())[0].verified,false);
+  });
+  await t.test('NFT ownership proof keeps new coverage unavailable until its cache obligation is acknowledged',async()=>{
+    await seedOwnerProof();await pool.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+    await seedCoverage();assert.equal((await owners())[0].verified,false);
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[CHAIN]);
+    assert.equal((await owners())[0].verified,true);
+  });
+  await t.test('NFT ownership proof retains exact uint256 identifiers and request ordering',async()=>{
+    await seedOwnerProof();const huge='115792089237316195423570985008687907853269984665640564039457584007913129639935';
+    await pool.query('UPDATE v41_artworks SET artwork_id=$1,token_id=$1 WHERE chain_id=$2',[huge,CHAIN]);
+    await pool.query('UPDATE v41_settlements SET artwork_id=$1,token_id=$1 WHERE chain_id=$2',[huge,CHAIN]);
+    await pool.query(`UPDATE contract_events SET event_data=CASE
+      WHEN event_name='ArtworkRegistered' THEN jsonb_set(event_data,'{artworkId}',to_jsonb($1::TEXT))
+      WHEN event_name='SettlementCompleted' THEN jsonb_set(jsonb_set(event_data,'{artworkId}',to_jsonb($1::TEXT)),'{tokenId}',to_jsonb($1::TEXT))
+      WHEN event_name='Transfer' THEN jsonb_set(event_data,'{tokenId}',to_jsonb($1::TEXT)) ELSE event_data END WHERE chain_id=$2`,[huge,CHAIN]);
+    const rows=await owners(pool,[huge,'2']);assert.equal(rows[0].verified,true);assert.equal(rows[0].artwork_id,huge);
+    assert.equal(rows[0].token_id,huge);assert.equal(rows[1].artwork_id,'2');assert.equal(rows[1].verified,false);
+  });
+  await t.test('NFT ownership proof uses bounded indexed lookups with unrelated history present',async()=>{
+    await seedOwnerProof();
+    await pool.query(`INSERT INTO v41_settlements(chain_id,auction_id,artwork_id,token_id,winner,final_price,
+      settlement_status,block_number,transaction_hash,log_index)
+      SELECT $1,1000+g,1000+g,1000+g,$2,2000,'completed',107,'0x'||lpad(to_hex(10000+g),64,'0'),4
+      FROM generate_series(1,5000) g`,[CHAIN,WINNER]);
+    await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+      SELECT chain_id,'SettlementCompleted',$2,block_number,transaction_hash,log_index,
+        jsonb_build_object('artworkId',artwork_id::TEXT,'tokenId',token_id::TEXT,'auctionId',auction_id::TEXT,'winner',winner,'finalPrice','2000')
+      FROM v41_settlements WHERE chain_id=$1 AND artwork_id>1000`,[CHAIN,CORE]);
+    await pool.query(`INSERT INTO contract_events(chain_id,event_name,contract_address,block_number,transaction_hash,log_index,event_data)
+      SELECT chain_id,'Transfer',$2,block_number,transaction_hash,1,
+        jsonb_build_object('tokenId',token_id::TEXT,'from','0x'||repeat('0',40),'to',winner)
+      FROM v41_settlements WHERE chain_id=$1 AND artwork_id>1000`,[CHAIN,OWNER_NFT]);
+    await pool.query('ANALYZE v41_settlements; ANALYZE contract_events; ANALYZE v41_artworks; ANALYZE nft_transfer_coverage; ANALYZE indexer_state');
+    const sql=read('sql/migrations/20261101130000_verified_nft_owners.sql');
+    const statement=sql.slice(sql.indexOf('WITH scope AS'),sql.indexOf('ORDER BY requested.position;')+'ORDER BY requested.position;'.length)
+      .replace(/\bp_core_address\b/g,'$1::TEXT').replace(/\bp_nft_address\b/g,'$2::TEXT')
+      .replace(/\bp_core_code_hash\b/g,'$3::TEXT').replace(/\bp_nft_code_hash\b/g,'$4::TEXT')
+      .replace(/\bp_artwork_ids\b/g,'$5::TEXT[]');
+    const plan=(await pool.query('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) '+statement,ownerParams())).rows[0]['QUERY PLAN'];
+    fs.writeFileSync(path.join(directory,'nft-owner-query-plan.json'),JSON.stringify(plan,null,2));
+    const nodes=[];const visit=node=>{nodes.push(node);for(const child of node.Plans||[])visit(child);};visit(plan[0].Plan);
+    assert.ok(nodes.some(node=>node['Index Name']==='artwork_search_settlements_latest'));
+    assert.ok(nodes.some(node=>node['Index Name']==='contract_events_nft_transfer_token'));
+    assert.ok(nodes.some(node=>node['Index Name']==='contract_events_core_settlement_artwork'));
+    assert.ok(nodes.some(node=>node['Index Name']==='contract_events_core_settlement_token'));
+    assert.equal(nodes.some(node=>node['Node Type']==='Seq Scan'&&['v41_settlements','contract_events'].includes(node['Relation Name'])),false);
+    assert.equal((await owners())[0].current_owner_address,LAST_HOLDER);
+  });
+  await t.test('NFT ownership proof validates lookup bounds and pins before reading data',async()=>{
+    for(const ids of [[],Array.from({length:21},(_,i)=>String(i+1)),['1','1'],[null],['0'],['01'],['-1'],['1.5'],['1e3'],
+      ['1); DELETE FROM contract_events'],['115792089237316195423570985008687907853269984665640564039457584007913129639936']]) {
+      await assert.rejects(pool.query(ownerSql,ownerParams(ids)),e=>e.code==='22023');
+    }
+    for(const [index,value] of [[0,null],[0,HOLDER.toUpperCase()],[1,CORE],[2,'0x0'],[3,'0x'+'0'.repeat(64)]]) {
+      const args=ownerParams();args[index]=value;await assert.rejects(pool.query(ownerSql,args),e=>e.code==='22023');
+    }
+  });
+  await t.test('NFT ownership proof stays coherent across a concurrent journal and coverage change',async()=>{
+    await seedOwnerProof();const writer=await pool.connect(),reader=await pool.connect();
+    try {
+      await reader.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      assert.equal((await owners(reader))[0].current_owner_address,LAST_HOLDER);
+      await writer.query('BEGIN');await writer.query("DELETE FROM contract_events WHERE chain_id=$1 AND event_name='Transfer' AND log_index=9",[CHAIN]);
+      await writer.query('UPDATE indexer_state SET recovery_cache_token=gen_random_uuid() WHERE chain_id=$1',[CHAIN]);
+      assert.equal((await owners())[0].current_owner_address,LAST_HOLDER,'uncommitted recovery is invisible');
+      await writer.query('COMMIT');
+      assert.equal((await owners(reader))[0].current_owner_address,LAST_HOLDER,'old snapshot keeps all matching facts');
+      await reader.query('COMMIT');assert.equal((await owners())[0].verified,false,'new snapshot cannot combine old coverage with changed facts');
+      await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[CHAIN]);
+      await seedCoverage();assert.equal((await owners())[0].current_owner_address,HOLDER);
+    }finally{await writer.query('ROLLBACK');await reader.query('ROLLBACK');writer.release();reader.release();}
+  });
+  await t.test('NFT ownership proof after engine rewind requires restored coverage and never invents a missing mint',async()=>{
+    await seedOwnerProof();await target._handleReorg(110);
+    assert.equal((await owners())[0].verified,false);
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[CHAIN]);
+    await seedCoverage(CHAIN,{covered_through:109,covered_hash:hash(109)});
+    assert.equal((await owners())[0].current_owner_address,WINNER);
+    await target._handleReorg(106);
+    await pool.query('UPDATE indexer_state SET recovery_cache_token=NULL WHERE chain_id=$1',[CHAIN]);
+    await seedCoverage(CHAIN,{covered_through:105,covered_hash:hash(105)});
+    assert.equal((await owners())[0].verified,false);
+  });
+  await t.test('NFT ownership proof is a stable invoker-only read with explicit service execution',async()=>{
+    await seedOwnerProof();await pool.query(read('sql/migrations/20261101130000_verified_nft_owners.sql'));
+    const fn=(await pool.query("SELECT provolatile,prosecdef FROM pg_proc WHERE oid='public.read_verified_nft_owners(text,text,text,text,text[])'::regprocedure")).rows[0];
+    assert.equal(fn.provolatile,'s');assert.equal(fn.prosecdef,false);
+    const role=await pool.connect();try {
+      for(const name of ['anon','authenticated']){
+        await role.query(`SET ROLE ${name}`);await assert.rejects(owners(role),e=>e.code==='42501');await role.query('RESET ROLE');
+      }
+      // The existing legacy classifier provides these read grants in the real
+      // migration sequence; model only those existing permissions here.
+      await pool.query('GRANT SELECT ON indexer_state,contract_events,v41_artworks,v41_settlements TO service_role');
+      await role.query('SET ROLE service_role');assert.equal((await owners(role))[0].verified,true);
+    }finally{await role.query('RESET ROLE');role.release();}
+  });
 });
