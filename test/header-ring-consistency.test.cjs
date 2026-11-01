@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const css = fs.readFileSync('unified-styles.css', 'utf8');
-const block = css.slice(css.indexOf('/* B18.3 — single idle/interaction treatment'));
+const block = css.slice(css.indexOf('/* B18.3 — single idle/interaction treatment'), css.indexOf('/* B18.4 — founder-requested compact Home'));
+// The B18.4 Home grid intentionally hides excess rows, not header buttons.
 const pages = [
   'index.html','gallery.html','artwork.html','profile.html','upload.html',
   'admin.html','docs-protocol.html','collection-builder.html','visual-lab.html'
