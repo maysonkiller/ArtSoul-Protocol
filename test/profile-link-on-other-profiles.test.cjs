@@ -85,8 +85,9 @@ test('ownership is answered from the connected wallet, not the loaded profile', 
   // applyLiveNetworkSection issues exactly one read per render and discards a
   // result whose key has moved - so the network and balance row it was already
   // fetching was thrown away and stayed empty until a reload.
-  const order = source.indexOf('const walletAddress = this.profile?.wallet_address || options.walletAddress');
+  const order = source.indexOf('const walletAddress = options.walletAddress || window.currentWalletAddress || this.identityWallet');
   const use = source.indexOf('const isOwnProfile = isProfilePage && this.isOwnProfileAddress(walletAddress);');
   assert.ok(order > -1 && use > order, 'the wallet must be resolved before ownership is decided');
+  assert.doesNotMatch(source, /const walletAddress = this\.profile\?\.wallet_address/);
   assert.doesNotMatch(source, /isOwnProfileAddress\(this\.profile\?\.wallet_address\)/);
 });

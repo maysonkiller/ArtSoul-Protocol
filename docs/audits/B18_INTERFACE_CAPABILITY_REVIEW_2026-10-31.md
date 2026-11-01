@@ -89,7 +89,10 @@ separate from the pending B35 recovery work and from a wholesale site rewrite.
 
 ## November 1 shared navigation adoption
 
-Local candidate on codex/interface-navigation-adoption, based on723461df. Eight
+Released in PR414 /63163ad5 after exact CI41260263441 (Linux3204/2skips,
+Windows2649/35skips,49 contracts each, both builds/static). Production7466914003
+is green; six live routes and exact built CSS bytes match. Guest Gallery, Admin
+and Docs pass390/1366 header geometry checks. Eight
 product pages ship native Home, Explore, Create and Guide links in their existing
 header. Future displays them at first paint, on a second row below1101px. Classic
 keeps its previous composition and both palettes are unchanged. Mobile Future
@@ -354,6 +357,41 @@ unchanged-file run passed. No production failure is inferred from that event.
 The repository-wide grid guard also caught a generic `grid` class in the
 standalone study. It was renamed `study-grid`; the guard was not weakened.
 
+## November 1 Home and Gallery adoption
+
+Local candidate on `codex/interface-discovery-adoption`, based on `63163ad5`.
+Future adopts the accepted two-column hero with a static CSS illustration,
+left-aligned discovery heading, quieter informational panels, Gallery heading
+and underline categories. The illustration makes no media/API request and is
+not presented as a purchasable work. Real metrics, ranked feeds, error/retry,
+all five categories, status, sorting, local search and price filters remain.
+Classic retains its composition; Home copy is shared and both original theme
+palettes remain unchanged. Gallery's category strip scrolls natively on narrow
+screens; direct category bookmarks stay visible without moving the page.
+
+The shared select had two keyboard/accessibility stops: clipped native control
+and visible replacement. Enhancement now exposes only its ready replacement,
+preserving labels, native values, form reset, validation and events. Unsupported
+multi-select/listbox controls stay native. This is a behavior correction shared
+by both themes, not an alternate form implementation.
+
+A reproduced mismatched profile response could place wallet B's identity and
+initial balance in wallet A's header. The existing menu/cache generation guards
+did not prevent the in-memory profile cache from accepting it. Responses with
+an explicit different wallet are rejected before caching; render uses the
+requested/current wallet and existing wallet-only fallback. Bounded retry,
+matching casefold and missing-wallet compatibility remain. No signing/auth
+bypass was demonstrated, and no real wallet action was run for this fix.
+
+Local full units2695pass/35 explicit skips; build verifies11 routes/172 utilities.
+Initial unit run caught two runtime-pin updates and one old initializer assertion;
+all corrected without weakening their guards. Browser source190 assertions across
+20 Home/Gallery layouts passed; final built checks add direct category bookmark
+and actual keyboard selection/focus. Built checks passed 195 assertions across
+20 layouts, with no page errors or write requests. Deployment remains pending.
+Evidence: docs/private/b18-discovery-*.log and output/playwright/b18-discovery-*.
+No native iPhone or wallet acceptance is inferred from synthetic transport.
+
 ## Verification mark policy
 
 The founder-approved rule remains: review creator-to-collection origin, record
@@ -393,9 +431,11 @@ repair an unbounded query or recovery error; no million-user capacity is claimed
 Phase A is recorded complete in its closeout with its historical coverage limits.
 Phase B still has concrete work:
 
-1. **B35:** prove a retained common ancestor before reorg rewind. The preserved
-   sparse-header reproduction leaves an orphan auction; repair and verify before
-   activating the existing indexer worker's new release. No new host is implied.
+1. **B35:** common-ancestor proof is merged in PR412 with130 isolated PostgreSQL
+   checks passing. A new offline fixture reproduces missing direct NFT transfers
+   in ownership/history/recovery (five controls pass, six desired checks fail).
+   Repair the deployment-bound journal/projection before activation; do not add
+   a listener alone. The existing worker remains on B30; no new host is implied.
 2. **B30/B03:** measure corrected usage slope, exercise independent restore,
    finish monitored-operation evidence. Do not change billing to claim closure.
 3. **B11/B12/B17:** close the exact remaining page/assistant/reminder acceptance
@@ -410,6 +450,6 @@ current-beta gate. Collection publication, authoritative badges/aura, contract
 redesign, Genesis issuance and mainnet assurance belong to their recorded C work;
 multichain payments remain research, not an active product promise.
 
-Next data-integrity step: resume the existing B35 sparse-ancestor regression
-and require proof before mutation, preserving current writer/cache/lease fences.
+Next data-integrity step: complete deployment-bound NFT transfer ingestion,
+projection and bounded history/recovery, preserving writer/cache/lease fences.
 Do not open a second source checkout or silently close B35 based on UI success.

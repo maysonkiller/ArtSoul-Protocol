@@ -1253,6 +1253,10 @@
                     return window.ArtSoulDB.getProfile(walletAddress);
                 })
                 .then(profile => {
+                    const profileWallet = String(profile?.wallet_address || '').toLowerCase();
+                    if (profileWallet && profileWallet !== cacheKey) {
+                        throw new Error('The returned profile does not match the requested wallet.');
+                    }
                     // Only cache a result that still describes the active wallet.
                     // A read that was superseded by a wallet switch must not
                     // reintroduce the previous wallet after
@@ -1641,7 +1645,13 @@
             // Check if on profile page
             const isProfilePage = this.isPage(currentPath, 'profile');
 
-            const walletAddress = this.profile?.wallet_address || options.walletAddress || window.currentWalletAddress || '';
+            if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
+            const walletAddress = options.walletAddress || window.currentWalletAddress || this.identityWallet || '';
+            if (!walletAddress) return this.renderConnectButton(options);
+            const profileWallet = String(this.profile?.wallet_address || '').toLowerCase();
+            if (profileWallet && profileWallet !== walletAddress.toLowerCase()) {
+                return this.renderWalletInfo(walletAddress, { ...options, resolved: true });
+            }
             // Answered from the connected wallet, not from the loaded profile.
             // Reading `this.profile` here made this false until the profile
             // arrived and true afterwards, so a second render followed, its key
@@ -1656,7 +1666,6 @@
             const avatarUrl = this.getProfileAvatarUrl(this.profile);
             const username = this.getProfileDisplayName(this.profile, walletAddress);
 
-            if (options.renderKey && this.pendingRenderKey !== options.renderKey) return;
             // The identity depends on the profile alone. Committing it before the
             // network read means a slow, failed or hanging Base Sepolia RPC can
             // no longer hold the avatar, name and address off the screen.

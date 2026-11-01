@@ -42,7 +42,7 @@
     <script src="/header-prepaint.js?v=9"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=63">
+    <link rel="stylesheet" href="/unified-styles.css?v=64">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/ai-ui-styles.css?v=1">
     <link rel="stylesheet" href="/simplified-ui.css?v=1">
@@ -50,7 +50,7 @@
     <script src="/storage-image.js?v=3" defer></script>
     <script src="/base-network.js?v=2" defer></script>
     <script src="/src/ui/theme-manager.js?v=1" defer></script>
-    <script defer src="/src/ui/themed-selects.js?v=1"></script>
+    <script defer src="/src/ui/themed-selects.js?v=2"></script>
     <script defer src="/src/ui/theme-validator.js"></script>
     <script src="/src/ui/navigation-manager.js?v=8" defer></script>
     <script defer src="/src/ui/system-logger.js"></script>
@@ -228,7 +228,7 @@
         }
     </style>
     <script src="/data-prefetch.js?v=6" async></script>
-    <script src="/avatar-dropdown.js?v=58" defer></script>
+    <script src="/avatar-dropdown.js?v=59" defer></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
     <script src="/webmcp-tools.js?v=11" defer></script>
@@ -302,11 +302,13 @@
 
         <!-- Hero Section -->
         <div class="home-hero text-center mb-8">
+            <div class="home-hero-copy">
+            <p class="home-hero-eyebrow">Art first. Ownership next.</p>
             <h1 class="text-3xl md:text-5xl font-bold mb-3">
-                Discovery-First Auctions for Digital Art
+                Discover a work. <br class="home-hero-break">Start its next chapter.
             </h1>
             <p class="text-base md:text-xl font-light opacity-90 mb-5 max-w-2xl mx-auto">
-                Collector demand comes before minting. Publish artwork, build conviction through an auction, and mint only after settlement.
+                Meet independent artists. Support the work you love. Collector demand comes before minting. An NFT is created only after successful settlement.
             </p>
             <div class="home-hero-actions flex flex-wrap gap-4 justify-center">
                 <a href="/gallery" class="btn-main text-lg px-7 py-3">
@@ -315,6 +317,11 @@
                 <a href="/upload" class="btn-secondary text-lg px-7 py-3">
                     Publish Artwork
                 </a>
+            </div>
+            </div>
+            <div class="home-hero-art" aria-hidden="true">
+                <div class="home-hero-ribbon"></div>
+                <span class="home-hero-caption">ArtSoul · Art comes first.</span>
             </div>
         </div>
 
@@ -334,7 +341,13 @@
 
         <!-- Discovery Spotlight -->
         <div class="home-spotlight mb-12">
+            <div class="home-spotlight-heading">
+            <div>
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-center">Discovery Spotlight</h2>
+            <p>Art to discover, auctions to follow.</p>
+            </div>
+            <a href="/gallery#discover" class="home-section-link">Explore all art <span aria-hidden="true">→</span></a>
+            </div>
             <div id="homepageFeedError" class="home-protocol-section mb-4" role="status" hidden>
                 <p id="homepageFeedErrorMessage">Artworks are temporarily unavailable. Please retry.</p>
                 <button id="homepageFeedRetry" type="button" class="btn-secondary mt-4">Retry</button>

@@ -215,15 +215,111 @@ test('a profile belonging to another wallet cannot name the menu identity', () =
     assert.ok(html.includes(`class="avatar-menu-address">${WALLET}</span>`));
 });
 
-test('a mismatched profile response cannot become a wallet-bound restoring name', async () => {
+test('a mismatched profile response cannot redirect header identity, caching or balance reads', async () => {
+    const foreignAvatar = 'https://fixture.invalid/foreign-avatar.png';
     const harness = networkHarness({ profiles: {
-        [WALLET]: { wallet_address: OTHER_WALLET, username: 'Another Artist' }
+        [WALLET]: { wallet_address: OTHER_WALLET, username: 'Another Artist', avatar_url: foreignAvatar }
     } });
+    const balanceWallets = [];
+    harness.context.window.ArtSoulBaseSepolia = { rpc: async (_method, params) => {
+        balanceWallets.push(params[0]);
+        return '0xde0b6b3a7640000';
+    } };
+    harness.dropdown.protocolAdminWallet = WALLET;
+    harness.dropdown.protocolAdminEligible = true;
     await harness.dropdown.sync(WALLET, { confirmed: true });
     await harness.flush();
+    assert.equal(harness.avatarName(), '0xaaaa...aaaa');
+    assert.equal(harness.avatarAddress(), '');
+    assert.equal(harness.avatarSrc(), '/default-avatar.png');
+    assert.equal(harness.imageLoads.includes(foreignAvatar), false);
     assert.doesNotMatch(harness.menuHtml(), /class="avatar-menu-name">Another Artist/);
     assert.ok(harness.menuHtml().includes(`class="avatar-menu-address">${WALLET}</span>`));
     assert.equal(harness.dropdown.getCachedHeaderIdentity(WALLET), null);
+    assert.equal(harness.dropdown.profileCache.has(WALLET), false);
+    assert.equal(harness.dropdown.profile, null);
+    assert.equal(harness.dropdown.resolvedIdentityWallet, null);
+    assert.ok(balanceWallets.length > 0);
+    assert.ok(balanceWallets.every(wallet => wallet === WALLET));
+    assert.equal(harness.dropdown.protocolAdminWallet, WALLET);
+    assert.equal(harness.dropdown.protocolAdminEligible, true);
+    assert.equal(harness.profileCalls.length, 3);
+    assert.deepEqual(harness.firedDelays(), [400, 1600]);
+    assert.equal(harness.pendingTimerCount(), 0);
+    harness.dispatchDbReady();
+    harness.triggerMutationObservers();
+    await harness.flush();
+    assert.equal(harness.profileCalls.length, 3, 'automatic recovery remains bounded');
+});
+
+test('a mismatched profile response recovers to the correct profile without showing the foreign identity', async () => {
+    const ownAvatar = 'https://fixture.invalid/own-avatar.png';
+    const foreignAvatar = 'https://fixture.invalid/foreign-avatar.png';
+    const harness = networkHarness({ profiles: {
+        [WALLET]: { wallet_address: WALLET, username: 'Current Artist', avatar_url: ownAvatar }
+    } });
+    harness.setProfileBehaviour((_wallet, attempt) => attempt === 1
+        ? { wallet_address: OTHER_WALLET, username: 'Another Artist', avatar_url: foreignAvatar }
+        : undefined);
+    const visibleNames = [];
+    harness.observeCommits(() => visibleNames.push(harness.avatarName()));
+    await harness.dropdown.sync(WALLET, { confirmed: true });
+    await harness.flush();
+    assert.equal(harness.avatarName(), 'Current Artist');
+    assert.equal(harness.avatarAddress(), '0xaaaa...aaaa');
+    assert.equal(harness.avatarSrc(), ownAvatar);
+    assert.equal(visibleNames.includes('Another Artist'), false);
+    assert.equal(harness.imageLoads.includes(foreignAvatar), false);
+    assert.equal(harness.dropdown.profileCache.get(WALLET).wallet_address, WALLET);
+    assert.equal(harness.dropdown.getCachedHeaderIdentity(WALLET).name, 'Current Artist');
+    assert.equal(harness.dropdown.resolvedIdentityWallet, WALLET);
+    assert.equal(harness.profileCalls.length, 2);
+    assert.equal(harness.dropdown.automaticRecoveries, 1);
+});
+
+for (const [description, walletAddress] of [['case-insensitive', WALLET.toUpperCase()], ['omitted', undefined]]) {
+    test(`${description} profile wallet fields preserve correctly bound profile display`, async () => {
+        const profile = { username: 'Current Artist', avatar_url: 'https://fixture.invalid/own-avatar.png' };
+        if (walletAddress !== undefined) profile.wallet_address = walletAddress;
+        const harness = networkHarness({ profiles: { [WALLET]: profile } });
+        await harness.dropdown.sync(WALLET, { confirmed: true });
+        await harness.flush();
+        assert.equal(harness.avatarName(), 'Current Artist');
+        assert.equal(harness.avatarAddress(), '0xaaaa...aaaa');
+        assert.equal(harness.avatarSrc(), profile.avatar_url);
+        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address">${WALLET}</span>`));
+        assert.equal(harness.dropdown.profileCache.get(WALLET).username, 'Current Artist');
+        assert.equal(harness.profileCalls.length, 1);
+        assert.equal(harness.dropdown.automaticRecoveries, 0);
+    });
+}
+
+for (const explicitWallet of [true, false]) {
+    test(`render binds the ${explicitWallet ? 'requested' : 'current'} wallet when an unrelated profile is already present`, async () => {
+        const harness = networkHarness();
+        harness.dropdown.identityWallet = WALLET;
+        harness.dropdown.resolvedIdentityWallet = WALLET;
+        harness.dropdown.profile = {
+            wallet_address: OTHER_WALLET, username: 'Another Artist', avatar_url: 'https://fixture.invalid/foreign-avatar.png'
+        };
+        await harness.dropdown.render(explicitWallet ? { walletAddress: WALLET } : {});
+        await harness.flush();
+        assert.equal(harness.avatarName(), '0xaaaa...aaaa');
+        assert.equal(harness.avatarSrc(), '/default-avatar.png');
+        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address">${WALLET}</span>`));
+        assert.equal(harness.imageLoads.includes('https://fixture.invalid/foreign-avatar.png'), false);
+    });
+}
+
+test('a profile alone cannot create a connected header without an active wallet', async () => {
+    const harness = networkHarness();
+    harness.context.window.currentWalletAddress = null;
+    harness.dropdown.profile = { wallet_address: OTHER_WALLET, username: 'Another Artist' };
+    await harness.dropdown.render();
+    await harness.flush();
+    assert.equal(harness.avatarName(), 'ArtSoul Guest');
+    assert.equal(harness.uiState(), 'disconnected');
+    assert.match(harness.menuHtml(), /Connect Wallet/);
 });
 
 test('a profile from the previous wallet generation cannot name the new wallet', () => {

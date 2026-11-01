@@ -50,6 +50,7 @@ const { useState, useEffect, useMemo, useRef } = React;
             const [searchQuery, setSearchQuery] = useState('');
             const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
             const [filtersOpen, setFiltersOpen] = useState(false);
+            const galleryTabsRef = useRef(null);
 
             const isClassic = theme === 'classic';
             const isGlobalSearch = debouncedSearchQuery.trim() !== '';
@@ -95,6 +96,18 @@ const { useState, useEffect, useMemo, useRef } = React;
                 window.addEventListener('hashchange', handleHashChange);
                 return () => window.removeEventListener('hashchange', handleHashChange);
             }, []);
+
+            useEffect(() => {
+                const row = galleryTabsRef.current;
+                const selected = row?.querySelector('[aria-pressed="true"]');
+                if (!selected || row.scrollWidth <= row.clientWidth) return;
+                const bounds = row.getBoundingClientRect();
+                const item = selected.getBoundingClientRect();
+                // Reveal a bookmarked or newly selected category without moving
+                // the page vertically or intercepting a touch gesture.
+                if (item.left < bounds.left) row.scrollLeft += item.left - bounds.left;
+                else if (item.right > bounds.right) row.scrollLeft += item.right - bounds.right;
+            }, [activeTab, theme]);
 
             useEffect(() => {
                 const debounceTimer = setTimeout(() => {
@@ -376,15 +389,19 @@ const { useState, useEffect, useMemo, useRef } = React;
                 <div className="min-h-screen">
                     {/* Main Content */}
                     <main className="gallery-page-main site-page-container py-6">
-                        {/* Page title + subtitle live in the compact sticky header
-                            (.page-context) — no large in-page hero heading here. */}
+                        <div className="gallery-page-heading">
+                            <p className="home-section-kicker">Explore ArtSoul</p>
+                            <h1>Art worth discovering.</h1>
+                        </div>
 
                         {/* Filters */}
                         <div className="gallery-filter-panel rounded-xl">
-                            <div className="gallery-tab-row">
+                            <div className="gallery-tab-row" ref={galleryTabsRef} role="group" aria-label="Artwork categories">
                                 {GALLERY_TABS.map(tab => (
                                     <button
                                         key={tab.id}
+                                        type="button"
+                                        aria-pressed={activeTab === tab.id}
                                         onClick={() => selectGalleryTab(tab.id)}
                                         className={`gallery-tab rounded-lg text-sm font-medium ${
                                             activeTab === tab.id
@@ -453,6 +470,9 @@ const { useState, useEffect, useMemo, useRef } = React;
                                 {/* Clear Filters */}
                                 <div className="gallery-filter-actions">
                                     <button
+                                        type="button"
+                                        aria-expanded={filtersOpen}
+                                        aria-controls={filtersOpen ? 'gallery-price-filters' : undefined}
                                         onClick={() => setFiltersOpen(open => !open)}
                                         className="btn-secondary"
                                     >
@@ -469,11 +489,12 @@ const { useState, useEffect, useMemo, useRef } = React;
 
                             {/* Price Range */}
                             {filtersOpen && (
-                                <div className="gallery-price-grid">
+                                <div id="gallery-price-filters" className="gallery-price-grid">
                                     <input
                                         type="number"
                                         step="0.01"
                                         placeholder="Min Price (ETH)"
+                                        aria-label="Minimum artwork price in ETH"
                                         value={minPrice}
                                         onChange={(e) => setMinPrice(e.target.value)}
                                         className="gallery-price-input rounded-lg"
@@ -482,6 +503,7 @@ const { useState, useEffect, useMemo, useRef } = React;
                                         type="number"
                                         step="0.01"
                                         placeholder="Max Price (ETH)"
+                                        aria-label="Maximum artwork price in ETH"
                                         value={maxPrice}
                                         onChange={(e) => setMaxPrice(e.target.value)}
                                         className="gallery-price-input rounded-lg"
