@@ -58,7 +58,7 @@ test('title, description and details share one tight transparent card with Gemin
     assert.match(styles, /\.artwork-page-context \.artwork-page-header \{[\s\S]*?min-height: 0 !important;/);
     assert.match(styles, /\.artwork-page-left \.artwork-page-ai \{ grid-area: ai; \}/);
     assert.match(styles, /\.artwork-page-root \.artwork-page-ai \.artwork-page-copy \{[\s\S]*?font-size: 0\.86rem;/);
-    assert.match(html, /unified-styles\.css\?v=64/);
+    assert.match(html, /unified-styles\.css\?v=65/);
 });
 
 test('mobile scroll order matches the rebuilt blocks and disables motion', () => {
@@ -137,10 +137,10 @@ test('Community contains Share and Back while the header subtitle and V3 player 
 });
 
 test('Community owns artwork actions while Ownership keeps only participant identities', () => {
-    const community = source.slice(source.indexOf('<section className="artwork-page-panel artwork-page-trust'),
-        source.indexOf('<section className="artwork-page-panel artwork-page-ai'));
-    const ownership = source.slice(source.indexOf('{/* Ownership Info - Three Roles */}'),
-        source.indexOf('<section className="artwork-page-panel artwork-page-provenance'));
+    const community = source.slice(source.indexOf('const communityPanel ='),
+        source.indexOf('const guidancePanel ='));
+    const ownership = source.slice(source.indexOf('const ownershipPanel ='),
+        source.indexOf('const provenancePanel ='));
     for (const action of ['<ArtistSupport', 'artwork-page-share', 'artwork-page-report', 'artwork-mobile-back']) {
         assert.ok(community.includes(action), `${action} belongs to Community`);
         assert.ok(!ownership.includes(action), `${action} must not crowd Ownership`);

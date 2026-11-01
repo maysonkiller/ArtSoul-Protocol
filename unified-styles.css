@@ -7308,3 +7308,736 @@ body.future .gallery-price-grid { margin-bottom: 16px; }
     body.future .gallery-search-input,
     body.future .gallery-price-input { font-size: 16px; }
 }
+
+/* Future Profile composition. Append after the existing responsive Profile rules.
+   Reuses the live summary, statistics, tabs and native editor without DOM changes. */
+body.future .profile-hero {
+    padding: 0 0 1.25rem !important;
+    margin-bottom: 1.25rem !important;
+    border: 0;
+    border-bottom: 1px solid var(--c-border);
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+}
+body.future .profile-hero .profile-identity-layout {
+    display: grid !important;
+    grid-template-columns: 86px minmax(0, 1fr);
+    align-items: center !important;
+    gap: 1.25rem !important;
+}
+body.future .profile-hero .profile-identity-copy,
+body.future .profile-hero .profile-display-details { display: contents; }
+body.future .profile-hero .profile-summary {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+}
+body.future .profile-hero .profile-avatar-column {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+}
+body.future .profile-hero .profile-avatar-column,
+body.future .profile-hero .profile-avatar-shell {
+    width: 86px !important;
+    min-width: 86px !important;
+    max-width: 86px !important;
+}
+body.future .profile-hero .profile-avatar-shell {
+    height: 86px !important;
+    min-height: 86px !important;
+    max-height: 86px !important;
+    border-width: 2px !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+body.future .profile-hero .profile-display-name {
+    font-size: clamp(1.5rem, 2.5vw, 1.875rem) !important;
+    line-height: 1.2;
+    letter-spacing: -0.035em;
+}
+body.future .profile-hero .profile-social-action-row {
+    flex-wrap: wrap;
+    width: auto;
+    gap: 0.5rem;
+}
+body.future .profile-hero .profile-social-links {
+    display: flex !important;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    width: auto;
+    max-width: 100%;
+    gap: 0.5rem !important;
+}
+body.future .profile-hero .profile-social-links:empty { display: none !important; }
+body.future .profile-hero .profile-social-links > * {
+    width: auto;
+    min-height: 44px;
+    max-width: 100%;
+    padding: 0.375rem 0.625rem !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+body.future .profile-hero .profile-social-links .truncate {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+body.future .profile-hero .profile-inline-edit-action { flex: 0 0 auto; margin: 0; }
+body.future .profile-hero .profile-inline-edit-action .btn-main {
+    min-height: 44px;
+    padding: 0.5rem 0.875rem !important;
+    font-size: 0.875rem;
+    border-radius: 12px;
+    clip-path: none;
+    transform: none;
+    background: var(--c-accent);
+    color: var(--c-bg);
+    box-shadow: none;
+}
+body.future .profile-hero .profile-stat-grid,
+body.future .profile-hero .profile-oauth-notice { grid-column: 1 / -1; }
+body.future .profile-hero .profile-stat-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    margin-top: 0 !important;
+    column-gap: 0 !important;
+}
+body.future .profile-hero .profile-stat-card {
+    padding: 0 1.25rem !important;
+    border: 0;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none;
+}
+body.future .profile-hero .profile-stat-card:first-child { padding-left: 0 !important; }
+body.future .profile-hero .profile-stat-card:last-child { padding-right: 0 !important; }
+body.future .profile-hero .profile-stat-card + .profile-stat-card { border-left: 1px solid var(--c-border); }
+body.future .profile-collection-panel {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+body.future .profile-sections-nav {
+    padding: 0 !important;
+    border-bottom-color: var(--c-border);
+}
+body.future .profile-section-tabs {
+    flex-wrap: nowrap !important;
+    gap: 0.5rem !important;
+    padding: 0.125rem 0.125rem 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+body.future .profile-section-tabs > .profile-content-tab {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0.625rem 0.875rem !important;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+body.future .profile-section-tabs > .profile-content-tab[aria-pressed="true"] { border-bottom-color: var(--c-accent); }
+body.future .profile-content-tab:focus-visible { outline-offset: -2px; }
+body.future .profile-gallery-panel,
+body.future .profile-collection-panel > .saved-list { padding: 1.25rem 0 !important; }
+body.future .profile-gallery-panel > .flex:first-child { margin-bottom: 1rem !important; }
+body.future .profile-empty-state { padding: 1.5rem 0; }
+@media (max-width: 768px) {
+    body.future .profile-hero { padding-bottom: 1rem !important; margin-bottom: 1rem !important; }
+    body.future .profile-hero .profile-identity-layout { grid-template-columns: 64px minmax(0, 1fr); gap: 1rem !important; }
+    body.future .profile-hero .profile-avatar-column,
+    body.future .profile-hero .profile-avatar-shell { width: 64px !important; min-width: 64px !important; max-width: 64px !important; }
+    body.future .profile-hero .profile-avatar-shell { height: 64px !important; min-height: 64px !important; max-height: 64px !important; }
+    body.future .profile-hero .profile-stat-card { padding: 0 0.625rem !important; }
+    body.future .profile-section-tabs { gap: 0.25rem !important; }
+    body.future .profile-section-tabs > .profile-content-tab { padding-inline: 0.625rem !important; }
+    body.future .profile-gallery-panel,
+    body.future .profile-collection-panel > .saved-list { padding: 1rem 0 !important; }
+}
+@media (max-width: 540px) {
+    body.future .profile-section-tabs { gap: 2px !important; }
+    body.future .profile-section-tabs > .profile-content-tab {
+        flex: 1 1 0;
+        min-width: 44px;
+        padding-inline: 1px !important;
+        font-size: 12px;
+    }
+}
+
+/* Artwork: accepted Future composition. Classic retains its existing layout. */
+body.future .artwork-page-root,
+body.future .artwork-page-shell,
+body.future .artwork-page-layout {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+body.future .artwork-page-shell {
+    width: min(100%, 1320px);
+    padding: 28px 28px 56px;
+}
+
+body.future .artwork-page-layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+    grid-template-areas: "media context" "media people" "media auction" "trust ai" "provenance extra";
+    gap: clamp(24px, 3vw, 42px);
+    align-items: start;
+}
+
+body.future .artwork-page-left,
+body.future .artwork-page-right {
+    position: static;
+    display: contents;
+    height: auto;
+    max-height: none;
+    gap: 20px;
+    padding: 0;
+    overflow: visible;
+    scrollbar-gutter: auto;
+}
+
+body.future .artwork-page-left > *,
+body.future .artwork-page-right > * {
+    order: initial;
+    min-width: 0;
+    max-width: 100%;
+    flex: none;
+}
+
+body.future .artwork-page-left .artwork-detail-stage {
+    height: clamp(360px, 54vw, 540px);
+    max-height: none;
+}
+body.future .artwork-mobile-media { grid-area: media; }
+body.future .artwork-mobile-context { grid-area: context; }
+body.future .artwork-mobile-people { grid-area: people; }
+body.future .artwork-mobile-auction { grid-area: auction; }
+body.future .artwork-mobile-trust { grid-area: trust; }
+body.future .artwork-mobile-provenance { grid-area: provenance; }
+body.future .artwork-mobile-ai { grid-area: ai; }
+body.future .artwork-mobile-details { grid-area: extra; }
+
+body.future .artwork-page-left .artwork-detail-frame,
+body.future .artwork-page-left .artwork-detail-frame:not(.artwork-detail-frame-audio):not(.artwork-detail-frame-unknown) {
+    height: 100%;
+    max-height: none;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 22px;
+    box-shadow: none;
+}
+
+body.future .artwork-page-left .artwork-detail-media-object,
+body.future .artwork-page-left .artwork-detail-image {
+    object-fit: contain;
+}
+
+body.future .artwork-page-root .artwork-page-context {
+    padding: 0 !important;
+    gap: 18px;
+    border: 0;
+    border-radius: 0;
+}
+
+body.future .artwork-page-context .artwork-page-header,
+body.future .artwork-page-context .artwork-page-description {
+    padding: 0;
+    border: 0;
+}
+
+body.future .artwork-page-header .artwork-detail-title {
+    font-size: clamp(2rem, 3.4vw, 3.3rem);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+    overflow-wrap: anywhere;
+}
+
+body.future .artwork-page-root .artwork-page-copy {
+    font-size: 0.95rem;
+    line-height: 1.65;
+}
+
+body.future .artwork-page-description .artwork-page-copy {
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    scrollbar-gutter: auto;
+    overflow-wrap: anywhere;
+}
+
+body.future .artwork-page-root .auction-detail-panel {
+    padding: 22px;
+    border-radius: 20px;
+}
+
+body.future .artwork-page-root .btn-main,
+body.future .artwork-page-root .btn-secondary {
+    min-height: 44px !important;
+    border-radius: 12px;
+    clip-path: none;
+    transform: none;
+    box-shadow: none;
+}
+body.future .artwork-page-root .btn-main {
+    background: var(--c-accent);
+    color: var(--c-bg);
+}
+body.future .artwork-page-root .btn-main:hover {
+    background: var(--c-accent);
+    color: var(--c-bg);
+}
+body.future .artwork-page-root .artwork-page-trust .artwork-page-action-control {
+    min-height: 44px !important;
+    padding: 0.5rem !important;
+    border: 1px solid var(--c-border);
+    background: transparent;
+    color: var(--c-text);
+    font-size: 0.8rem;
+}
+body.future .artwork-page-root .artwork-page-trust .artwork-page-action-control:hover {
+    background: var(--c-surface-strong);
+}
+
+body.future .artwork-page-left .artwork-page-trust,
+body.future .artwork-page-root .artwork-page-people {
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+body.future .artwork-page-people > .artwork-page-card-title {
+    text-align: left;
+}
+
+body.future .artwork-ownership-profile {
+    padding: 8px 0;
+    border: 0 !important;
+    border-bottom: 1px solid var(--c-border-soft) !important;
+    border-radius: 0;
+    box-shadow: none !important;
+}
+body.future .artwork-page-people-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+}
+body.future .artwork-ownership-profile > :first-child {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+}
+
+body.future .artwork-ownership-profile .truncate {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+body.future .artwork-page-root details.artwork-page-ai,
+body.future .artwork-page-root details.artwork-page-provenance,
+body.future .artwork-page-root details.artwork-page-extra {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-top: 1px solid var(--c-border-soft);
+    border-radius: 0;
+    background: transparent;
+}
+
+body.future .artwork-page-root details > summary {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 10px 0;
+    cursor: pointer;
+    list-style: none;
+    text-align: left;
+}
+
+body.future .artwork-page-root details > summary::-webkit-details-marker { display: none; }
+body.future .artwork-page-root details > summary::after { content: '+'; margin-left: auto; }
+body.future .artwork-page-root details[open] > summary::after { content: '−'; }
+body.future .artwork-page-root details > summary:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+body.future .artwork-page-root details > summary h2,
+body.future .artwork-page-root details > summary h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: left;
+}
+
+body.future .artwork-page-root details > summary > .text-xs { position: static; }
+body.future .artwork-page-root details[open] > summary { margin-bottom: 10px; }
+body.future .artwork-page-root .artwork-page-detail-list { font-size: 0.85rem; }
+body.future .artwork-page-root .artwork-page-detail-list dd { overflow-wrap: anywhere; }
+body.future .artwork-community-help { margin-top: 12px; text-align: left; font-size: 0.85rem; }
+body.future .artwork-community-help p { margin: 0 0 10px; line-height: 1.6; }
+body.future .artwork-community-help a { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 900px) {
+    body.future .artwork-page-shell { padding: 16px 16px 36px; }
+    body.future .artwork-page-layout { display: flex; gap: 20px; }
+    body.future .artwork-page-left,
+    body.future .artwork-page-right { display: contents; }
+    body.future .artwork-page-layout .artwork-mobile-media { order: 1; }
+    body.future .artwork-page-layout .artwork-mobile-context { order: 2; }
+    body.future .artwork-page-layout .artwork-mobile-people { order: 3; }
+    body.future .artwork-page-layout .artwork-mobile-auction { order: 4; }
+    body.future .artwork-page-layout .artwork-mobile-trust { order: 5; }
+    body.future .artwork-page-layout .artwork-mobile-provenance { order: 6; }
+    body.future .artwork-page-layout .artwork-mobile-ai { order: 7; }
+    body.future .artwork-page-layout .artwork-mobile-details { order: 8; }
+    body.future .artwork-page-left .artwork-detail-stage { height: min(43svh, 410px); }
+    body.future .artwork-page-header .artwork-detail-title { font-size: clamp(1.65rem, 6.5vw, 2.65rem); }
+    body.future .artwork-page-root .auction-detail-panel { padding: 18px; }
+    body.future .artwork-page-root .artwork-bid-input { font-size: 16px; }
+}
+
+/* Future single-artwork Publish composition. Keep the live form's DOM order,
+   hidden recovery states and all existing publication handlers. */
+body.future .upload-page-main > .upload-page-heading {
+    margin-bottom: 1.25rem;
+    text-align: left;
+}
+body.future .upload-page-main .upload-page-heading h1 {
+    font-size: clamp(2rem, 3.5vw, 2.75rem) !important;
+    font-weight: 650;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+}
+body.future .upload-page-main .upload-page-heading p { font-size: 1rem; line-height: 1.5; }
+body.future .upload-page-main :is(.btn-main, .btn-secondary) {
+    min-height: 44px;
+    border-radius: 12px;
+    clip-path: none;
+    transform: none;
+    box-shadow: none;
+}
+body.future .upload-page-main .btn-main {
+    background: var(--c-accent);
+    color: var(--c-bg);
+}
+body.future .upload-page-main > .publication-type-nav { width: 100%; max-width: 48rem; margin-inline: auto; }
+body.future .upload-page-main > .upload-process {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    width: 100%;
+    max-width: 48rem;
+    margin: 0 auto 1.5rem;
+    padding: 0;
+    list-style: none;
+}
+body.future .upload-page-main .upload-process li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
+    padding-block: 0.5rem;
+    color: var(--c-text-muted);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+body.future .upload-page-main .upload-process li > span { color: var(--c-accent); font-weight: 600; }
+body.future .upload-page-main .upload-zone {
+    padding: 2rem 1.5rem !important;
+    border: 1px dashed var(--c-border);
+    border-radius: 1rem !important;
+    background: var(--c-surface-muted);
+    box-shadow: none;
+    transition: border-color 140ms ease;
+}
+body.future .upload-page-main .upload-zone:hover {
+    border-color: var(--c-accent);
+    background: var(--c-surface-muted);
+    box-shadow: none;
+}
+body.future .upload-page-main #uploadPrompt > svg {
+    width: 40px !important;
+    height: 40px !important;
+    margin-bottom: 0.75rem !important;
+    color: var(--c-text-muted);
+}
+body.future .upload-page-main #uploadPrompt .text-xl {
+    font-size: 1.125rem !important;
+    line-height: 1.4;
+    opacity: 1;
+}
+body.future .upload-page-main #uploadFileHelp,
+body.future .upload-page-main #fileName {
+    font-size: 0.875rem !important;
+    line-height: 1.5;
+    color: var(--c-text-muted);
+    opacity: 1;
+    overflow-wrap: anywhere;
+}
+body.future .upload-page-main #filePreview {
+    border: 1px solid var(--c-border-soft);
+    border-radius: 0.75rem;
+    opacity: 1;
+}
+body.future .upload-page-main #previewImage { max-height: 18rem !important; background: var(--c-bg); }
+body.future .upload-page-main .form-input {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 44px;
+    border: 1px solid var(--c-border);
+    border-radius: 0.625rem;
+    background: var(--c-surface);
+    color: var(--c-text);
+    padding: 0.6875rem 0.8125rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    box-shadow: none;
+    transition: border-color 140ms ease;
+}
+body.future .upload-page-main .form-input::placeholder { color: var(--c-text-muted); opacity: 1; }
+body.future .upload-page-main .form-input:focus {
+    border-color: var(--c-accent);
+    background: var(--c-surface);
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+body.future .upload-page-main textarea.form-input { min-height: 6rem; height: 6rem !important; resize: vertical; }
+body.future .upload-page-main label.block { color: var(--c-text-muted); font-size: 0.875rem; line-height: 1.4; opacity: 1; }
+body.future .upload-page-main .publish-panel {
+    padding: 1rem 0;
+    border: 0;
+    border-top: 1px solid var(--c-border-soft);
+    border-radius: 0;
+    background: transparent;
+}
+body.future .upload-page-main #aiValuationPanel > .flex { flex-wrap: wrap; align-items: start; }
+body.future .upload-page-main #aiValuationPanel > .flex > div:first-child { flex: 1 1 16rem; min-width: 0; }
+body.future .upload-page-main .ai-guidance-actions { flex-wrap: wrap; justify-content: flex-start; max-width: 100%; }
+body.future .upload-page-main #prePublishAction,
+body.future .upload-page-main #aiValuationRetry,
+body.future .upload-page-main .upload-file-picker { min-height: 44px; padding: 0.625rem 0.875rem; font-size: 0.875rem; }
+body.future .upload-page-main #aiValuationStatus,
+body.future .upload-page-main #aiValuationSuggestion,
+body.future .upload-page-main #aiValuationRationale,
+body.future .upload-page-main .publish-panel li,
+body.future .upload-page-main .original-work-confirmation span,
+body.future .upload-page-main .validation-message { font-size: 0.875rem !important; line-height: 1.5; overflow-wrap: anywhere; }
+body.future .upload-page-main .duration-option {
+    min-height: 44px;
+    padding: 0.625rem 0.375rem;
+    border-radius: 0.625rem;
+    font-size: 0.875rem;
+    transform: none;
+    box-shadow: none;
+    transition: border-color 140ms ease;
+}
+body.future .upload-page-main .duration-option:hover,
+body.future .upload-page-main .duration-option:focus-visible,
+body.future .upload-page-main .duration-option[aria-pressed="true"] {
+    border-color: var(--c-accent);
+    box-shadow: none;
+    transform: none;
+}
+body.future .upload-page-main .duration-option:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+body.future .upload-page-main .original-work-confirmation { align-items: center; min-height: 44px; }
+body.future .upload-page-main .publish-readiness-hint {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    text-align: left;
+}
+body.future .upload-page-main .publish-readiness-hint[data-blocked="true"] { margin-top: 0.75rem !important; }
+@media (max-width: 640px) {
+    body.future .upload-page-main > .upload-process { grid-template-columns: 1fr; gap: 0.125rem; margin-bottom: 1rem; }
+    body.future .upload-page-main .upload-process li { padding-block: 0.25rem; }
+    body.future .upload-page-main .upload-zone { padding: 1.25rem 1rem !important; }
+    body.future .upload-page-main .publication-type-nav > a { padding-inline: 0.625rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    body.future .upload-page-main .upload-zone,
+    body.future .upload-page-main .form-input,
+    body.future .upload-page-main .duration-option { transition: none; }
+}
+
+/* Future Admin presentation only. Existing server/session gates and native
+   dialogs remain in control of what is mounted, hidden and actionable. */
+body.future .protocol-admin-shell { min-width: 0; padding-top: 1.25rem; }
+body.future .protocol-admin-shell .protocol-admin-heading {
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0 0 1.25rem;
+    margin-bottom: 1rem;
+    border: 0;
+    border-bottom: 1px solid var(--c-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+body.future .protocol-admin-shell .protocol-admin-heading > div { min-width: 0; }
+body.future .protocol-admin-shell .protocol-admin-heading h1 {
+    color: var(--c-text);
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
+    font-weight: 650;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+}
+body.future .protocol-admin-shell .protocol-admin-heading p { line-height: 1.5; overflow-wrap: anywhere; }
+body.future .protocol-admin-shell .protocol-admin-header-actions { gap: 0.5rem; max-width: 100%; }
+body.future .protocol-admin-shell button,
+body.future .protocol-admin-shell a[href] {
+    min-height: 44px;
+    min-width: 44px;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+    font-size: 0.875rem;
+}
+body.future .protocol-admin-shell a[href] { display: inline-flex; align-items: center; }
+body.future .protocol-admin-shell button { padding: 0.625rem 0.875rem; border-radius: 0.625rem; }
+body.future .protocol-admin-shell button:focus-visible,
+body.future .protocol-admin-shell a[href]:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+body.future .protocol-admin-shell :is(input, select, textarea) { min-width: 0; max-width: 100%; font-size: 1rem; }
+body.future .protocol-admin-shell .protocol-admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.25rem 0.5rem;
+    margin: 0 0 1.25rem;
+    padding-bottom: 0;
+    border-bottom: 1px solid var(--c-border);
+}
+body.future .protocol-admin-shell .protocol-admin-tabs > button {
+    flex: 0 1 auto;
+    padding: 0.625rem 0.875rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--c-text-muted);
+    box-shadow: none;
+}
+body.future .protocol-admin-shell .protocol-admin-tabs > button[aria-current="page"] {
+    border-bottom-color: var(--c-accent);
+    background: transparent;
+    color: var(--c-accent);
+    box-shadow: none;
+}
+body.future .protocol-admin-shell .protocol-admin-tabs > button:hover { color: var(--c-text); }
+body.future .protocol-admin-shell .protocol-admin-tabs > button:focus-visible { outline-offset: -2px; }
+body.future .protocol-admin-shell .protocol-admin-section-heading {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+body.future .protocol-admin-shell .protocol-admin-section-heading h2,
+body.future .protocol-admin-shell section > h2 {
+    color: var(--c-text);
+    font-size: 1.25rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+body.future .protocol-admin-shell .protocol-admin-status-filter {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    max-width: 100%;
+}
+body.future .protocol-admin-shell .protocol-admin-status-filter button {
+    background: transparent;
+    color: var(--c-text-muted);
+    box-shadow: none;
+}
+body.future .protocol-admin-shell .protocol-admin-status-filter button[aria-pressed="true"] {
+    border-color: var(--c-accent);
+    background: var(--c-surface-strong);
+    color: var(--c-accent);
+    box-shadow: inset 0 -2px 0 var(--c-accent);
+}
+body.future .protocol-admin-shell .protocol-admin-gate,
+body.future .protocol-admin-shell .protocol-admin-group,
+body.future .protocol-admin-shell .protocol-admin-ledger,
+body.future .protocol-admin-shell .protocol-admin-dialog { box-shadow: none; }
+body.future .protocol-admin-shell .protocol-admin-gate {
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    overflow-wrap: anywhere;
+}
+body.future .protocol-admin-shell .protocol-admin-group { padding: 1rem; border-radius: 1rem; }
+body.future .protocol-admin-shell .protocol-admin-group > header {
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    padding-bottom: 0.875rem;
+}
+body.future .protocol-admin-shell .protocol-admin-group > header > div:not(.protocol-admin-artwork-preview) {
+    flex: 1 1 16rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+body.future .protocol-admin-shell .protocol-admin-report-card { padding: 0.875rem; border-radius: 0.75rem; }
+body.future .protocol-admin-shell .protocol-admin-card-meta { flex-wrap: wrap; gap: 0.375rem 0.75rem; font-size: 0.8125rem; }
+body.future .protocol-admin-shell .protocol-admin-card-meta > * { min-width: 0; }
+body.future .protocol-admin-shell .protocol-admin-report-text { line-height: 1.5; }
+body.future .protocol-admin-shell .protocol-admin-card-actions { gap: 0.5rem; }
+body.future .protocol-admin-shell .protocol-admin-ledger {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+}
+body.future .protocol-admin-shell .protocol-admin-ledger > div {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 0.5rem 1.25rem;
+    padding: 0.875rem 0;
+    line-height: 1.5;
+}
+body.future .protocol-admin-shell .protocol-admin-ledger > div > * { min-width: 0; overflow-wrap: anywhere; }
+body.future .protocol-admin-shell .protocol-admin-ledger > div > button { justify-self: start; }
+body.future .protocol-admin-shell .protocol-admin-ledger > p { display: block; padding: 0.875rem 0; line-height: 1.5; }
+body.future .protocol-admin-shell .protocol-admin-message { line-height: 1.5; overflow-wrap: anywhere; }
+body.future .protocol-admin-shell .protocol-admin-authority { min-width: 0; margin-top: 1rem; }
+body.future .protocol-admin-shell .protocol-admin-approval-message { min-width: 0; max-width: 100%; }
+body.future .protocol-admin-shell .protocol-admin-team-list > li { padding-block: 0.875rem; }
+body.future .protocol-admin-shell .protocol-admin-dialog {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+body.future .protocol-admin-shell .protocol-admin-passkey-content { min-width: 0; gap: 1rem; }
+body.future .protocol-admin-shell .protocol-admin-passkey-content header { flex-wrap: wrap; gap: 0.75rem; }
+body.future .protocol-admin-shell .protocol-admin-passkey-content header h2 { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+    body.future .protocol-admin-shell .protocol-admin-heading { align-items: flex-start; padding-bottom: 1rem; }
+    body.future .protocol-admin-shell .protocol-admin-tabs { gap: 0.125rem 0.25rem; }
+    body.future .protocol-admin-shell .protocol-admin-tabs > button { padding-inline: 0.625rem; }
+    body.future .protocol-admin-shell .protocol-admin-section-heading { align-items: flex-start; }
+    body.future .protocol-admin-shell .protocol-admin-group,
+    body.future .protocol-admin-shell .protocol-admin-gate { padding: 0.875rem; }
+    body.future .protocol-admin-shell .protocol-admin-group > header > div:not(.protocol-admin-artwork-preview) { flex-basis: auto; }
+    body.future .protocol-admin-shell .protocol-admin-ledger > div { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+    body.future .protocol-admin-shell .protocol-admin-card-meta { flex-direction: row; }
+}
+@media (prefers-reduced-motion: reduce) {
+    body.future .protocol-admin-shell button,
+    body.future .protocol-admin-shell a[href] { transition: none; }
+}
+/* Presentation must never reveal the retained staff container or a hidden control. */
+body.future .protocol-admin-shell [hidden] { display: none !important; }

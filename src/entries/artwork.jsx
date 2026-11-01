@@ -998,7 +998,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                 return resolver?.(profileData, fallbackAvatar) || fallbackAvatar;
             }
 
-            function renderOwnershipRole({ label, address, profile }) {
+            function renderOwnershipRole({ label, address, profile, currentOwner = false }) {
                 if (!address || isZeroAddress(address)) return null;
                 const projectedProfiles = artwork.ownership_profiles || {};
                 const projected = Object.hasOwn(projectedProfiles, address.toLowerCase());
@@ -1040,7 +1040,7 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             <OwnershipIdentity
                                 key={address.toLowerCase()}
                                 source={identityResolved ? getProfileAvatarUrl(resolvedProfile, address) : ''}
-                                label={label}
+                                label={currentOwner ? `${label} · Owner` : label}
                                 name={getProfileDisplayName(resolvedProfile, address)}
                                 nameStyle={nameStyle}
                                 isClassic={isClassic}
@@ -2903,6 +2903,737 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                         ? { key: 'live', label: 'Live' }
                         : presentationStatus;
 
+            const DetailsPanel = isClassic ? 'div' : 'details';
+            const DetailsHeading = isClassic ? React.Fragment : 'summary';
+            const GuidancePanel = isClassic ? 'section' : 'details';
+            const HistoryPanel = isClassic ? 'section' : 'details';
+            const DisclosureHeading = isClassic ? 'div' : 'summary';
+
+            const detailsPanel = (
+                <DetailsPanel key="details" className="artwork-page-extra artwork-mobile-details">
+                    <DetailsHeading><h2>Artwork details</h2></DetailsHeading>
+                    <dl className="artwork-page-detail-list">
+                        {resolvedMedia.type && <><dt>Media</dt><dd className="artwork-detail-media-type">{resolvedMedia.type}</dd></>}
+                        {describeArtworkNetwork(artwork) && <><dt>Network</dt><dd>{describeArtworkNetwork(artwork)}</dd></>}
+                        {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
+                        {artwork.token_id && (
+                            <>
+                                <dt>Token ID</dt>
+                                <dd>
+                                    {tokenExplorerUrl ? (
+                                        <a href={tokenExplorerUrl} target="_blank" rel="noopener noreferrer">{artwork.token_id}</a>
+                                    ) : artwork.token_id}
+                                </dd>
+                            </>
+                        )}
+                    </dl>
+                </DetailsPanel>
+            );
+
+            const mediaPanel = (
+                <section key="media" className="artwork-detail-stage artwork-mobile-media" aria-label="Artwork media">
+                <div className={`artwork-detail-frame artwork-detail-frame-${resolvedMedia.type} relative w-full h-full rounded-xl overflow-hidden`}>
+                    {safeMediaUrl ? (
+                        <MediaViewer
+                            media={{ ...resolvedMedia, url: safeMediaUrl }}
+                            title={artwork.title}
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-black p-6">
+                            <div className="max-w-lg text-center">
+                                <div className="text-xs uppercase tracking-wide opacity-60 mb-3">
+                                        Indexed metadata unavailable
+                                </div>
+                                <h2 className="text-2xl font-semibold mb-3">{artwork.title || 'Indexed artwork'}</h2>
+                                <p className="text-sm opacity-70 mb-5">
+                                    {artwork.description || 'This artwork is indexed on-chain, but its metadata media URL is unavailable.'}
+                                </p>
+                                <div className="artwork-fallback-facts grid gap-3 text-left text-xs">
+                                    <div className="rounded-lg border border-current/20 p-3">
+                                        <div className="uppercase tracking-wide opacity-60 mb-1">Artwork ID</div>
+                                        <div className="break-all">{artwork.artwork_id || artwork.blockchain_id || 'Unavailable'}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-current/20 p-3">
+                                        <div className="uppercase tracking-wide opacity-60 mb-1">Auction ID</div>
+                                        <div className="break-all">{artwork.auction_id || artwork.active_auction_id || 'Unavailable'}</div>
+                                    </div>
+                                    <div className="rounded-lg border border-current/20 p-3">
+                                        <div className="uppercase tracking-wide opacity-60 mb-1">Register tx hash</div>
+                                        <div className="break-all">{artwork.transaction_hash || 'Unavailable'}</div>
+                                    </div>
+                                </div>
+                                <p className="text-sm opacity-70 mt-5">
+                                    This artwork is indexed on-chain, but its metadata media URL is unavailable.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                </section>
+            );
+
+            const contextPanel = (
+                <section key="context" className="artwork-page-panel artwork-page-context artwork-mobile-context">
+                    <header className="artwork-page-header">
+                        <h1 className="artwork-detail-title">{artwork.title}</h1>
+                        {window.ArtSoulArtworkCard?.ReactSavedControl && React.createElement(window.ArtSoulArtworkCard.ReactSavedControl, { artwork, detail: true })}
+                    </header>
+                    <div className="artwork-page-description">
+                        <h2>Description</h2>
+                        <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
+                    </div>
+                    {isClassic && detailsPanel}
+
+                </section>
+            );
+
+            const communityPanel = (
+                <section key="community" className="artwork-page-panel artwork-page-trust artwork-mobile-trust" aria-label="Community signals">
+                        <div className="artwork-page-panel-heading">
+                            <h2>Community</h2>
+                            {trustScore > 0 && (
+                                <span className="artwork-page-chip artwork-community-trust" title="Community signal for discovery. Does not affect price or ownership.">
+                                    <span>Trust</span>
+                                    <strong>{trustScore}<small>/100</small></strong>
+                                </span>
+                            )}
+                        </div>
+                        <div className="artwork-page-signal-actions">
+                            <div className="artwork-page-signal-action">
+                                <strong>{socialSignals.likes || votes.length}</strong>
+                                {userVote ? (
+                                    <p className="artwork-page-saved artwork-page-action-control">You voted</p>
+                                ) : (
+                                    <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
+                                )}
+                            </div>
+                            <div className="artwork-page-signal-action">
+                                <strong>{socialSignals.wouldBuy || 0}</strong>
+                                <ExplainedAction onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'}
+                                    contextKey={connectedWalletAddress} explanationTitle="Your interest is recorded"
+                                    reason={interactionState.would_buy ? 'Your Would Buy signal is already recorded for this artwork. It expresses interest, not a bid or a purchase. It cannot be submitted again from this wallet.' : ''}>
+                                    {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
+                                </ExplainedAction>
+                            </div>
+                            <div className="artwork-page-signal-action">
+                                <strong>{socialSignals.watching || 0}</strong>
+                                <ExplainedAction onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'}
+                                    contextKey={connectedWalletAddress} explanationTitle="Your interest is recorded"
+                                    reason={interactionState.watching ? 'Your Watching signal is already recorded for this artwork. It cannot be submitted again from this wallet. Use Favorites to add or remove the artwork from your private list.' : ''}>
+                                    {interactionState.watching ? 'Watching Saved' : 'Watching'}
+                                </ExplainedAction>
+                            </div>
+                        </div>
+                    <div className="artwork-community-actions" aria-label="Artwork actions">
+                        {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
+                            <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
+                                creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
+                                initialOpen={openDonationFromCard}
+                                onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
+                        )}
+                        <button
+                            onClick={() => {
+                                const intent = artworkShareIntent({ ...artwork, creator_name: creatorName });
+                                if (intent) window.open(intent, '_blank', 'noopener,noreferrer,width=550,height=420');
+                            }}
+                            className="btn-secondary artwork-page-compact-action artwork-page-share"
+                            title="Share on X"
+                        >
+                            Share on X
+                        </button>
+                        {reportingEnabled && (
+                            <button
+                                type="button"
+                                ref={reportTriggerRef}
+                                data-allow-rapid="true"
+                                onClick={() => openArtworkReport()}
+                                className="btn-secondary artwork-page-compact-action artwork-page-report"
+                            >
+                                Report
+                            </button>
+                        )}
+                        <button
+                            onClick={() => window.history.back()}
+                            className="btn-secondary artwork-page-compact-action artwork-mobile-back"
+                        >
+                            Back
+                        </button>
+                    </div>
+                    <details className="artwork-community-help">
+                        <summary>About community signals</summary>
+                        <p>Like supports artwork you appreciate. Would Buy expresses interest; it does not place a bid or make a purchase. Watching records your interest in following the artwork.</p>
+                        <p>Trust is a community signal for discovery. It does not change price, floor, ownership, or settlement.</p>
+                        <a href="/docs-protocol#trust-community">How community signals work</a>
+                    </details>
+                    {cardActionNotice && <p role="status">{cardActionNotice}</p>}
+                </section>
+            );
+
+            const guidancePanel = (
+                <GuidancePanel key="guidance" className="artwork-page-panel artwork-page-ai artwork-mobile-ai" aria-label="Gemini analysis">
+                        <DisclosureHeading className="artwork-page-panel-heading">
+                            <h2>Gemini Analysis</h2>
+                            {aiGuidance?.confidence != null && (
+                                <span className="artwork-page-chip">
+                                    {Number.isFinite(Number(aiGuidance.confidence)) ? `${Number(aiGuidance.confidence)}%` : String(aiGuidance.confidence)} confidence
+                                </span>
+                            )}
+                        </DisclosureHeading>
+                        {aiGuidance ? (
+                            <>
+                                <p className="artwork-page-ai-range">
+                                    {formatAIPrice(aiGuidance.estimated_value_min_eth)} to {formatAIPrice(aiGuidance.estimated_value_max_eth)} ETH
+                                </p>
+                                <p className="artwork-page-copy">Suggested starting price: {formatAIPrice(aiGuidance.suggested_start_price_eth)} ETH</p>
+                                {aiGuidance.rationale && <p className="artwork-page-copy">{aiGuidance.rationale}</p>}
+                            </>
+                        ) : (
+                            <p className="artwork-page-copy">AI analysis is unavailable for this artwork.</p>
+                        )}
+                        <p className="artwork-page-note">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</p>
+                </GuidancePanel>
+            );
+
+            // Ownership Info - Three Roles
+            const ownershipPanel = (
+                <div key="ownership" className="artwork-page-panel artwork-page-people artwork-mobile-people">
+                    <h3 className="artwork-page-card-title">Ownership</h3>
+
+                    <div className="artwork-page-people-list">
+                        {renderOwnershipRole({
+                            label: 'Creator',
+                            address: creatorAddress,
+                            profile: creatorProfile
+                        })}
+
+                        {awaitingPayment && !isSameAddress(creatorAddress, winnerAddress) && renderOwnershipRole({
+                            label: 'Highest Bidder',
+                            address: winnerAddress,
+                            profile: bidderProfiles[String(winnerAddress || '').toLowerCase()] || auctionWinnerProfile
+                        })}
+
+                        {mintedArtwork && renderOwnershipRole({
+                            label: 'First Collector',
+                            address: artwork.auction_winner_address,
+                            profile: auctionWinnerProfile,
+                            currentOwner: !isZeroAddress(ownerAddress) && isSameAddress(ownerAddress, artwork.auction_winner_address)
+                        })}
+
+                        {shouldShowOwnerRole({
+                            ownerAddress,
+                            creatorAddress,
+                            firstCollectorAddress: artwork.auction_winner_address,
+                            winnerAddress,
+                            minted: mintedArtwork,
+                            awaitingPayment
+                        }) &&
+                            renderOwnershipRole({
+                                label: 'Owner',
+                                address: ownerAddress,
+                                // A buyback puts the same person in two rows; they
+                                // must read the same, not a name above an address.
+                                profile: currentOwnerProfile || (isSameAddress(ownerAddress, creatorAddress) ? creatorProfile : null)
+                            })}
+                    </div>
+
+                </div>
+            );
+
+            const provenancePanel = isV41CompositeId && (
+                <HistoryPanel key="history" open={isClassic ? undefined : true} className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">
+                    <DisclosureHeading className="artwork-page-card-heading">
+                        <h3 id="provenanceTitle" className="artwork-page-card-title">Provenance</h3>
+                        {provenanceState.status === 'ready' && (
+                            <span className="text-xs opacity-70">
+                                {provenanceState.events.length} {provenanceState.events.length === 1 ? 'event' : 'events'}
+                            </span>
+                        )}
+                    </DisclosureHeading>
+
+                    {provenanceState.status === 'loading' && (
+                        <p className="provenance-state-copy" role="status">Loading indexer history...</p>
+                    )}
+                    {provenanceState.status === 'unavailable' && (
+                        <p className="provenance-state-copy">Indexer history is temporarily unavailable.</p>
+                    )}
+                    {provenanceState.status === 'ready' && provenanceState.events.length === 0 && (
+                        <p className="provenance-state-copy">No indexer history is available yet.</p>
+                    )}
+                    {provenanceState.events.length > 0 && (
+                        <ol className="provenance-timeline">
+                            {provenanceState.events.map((event, index) => {
+                                const view = provenanceEventView(event);
+                                const explorerUrl = transactionExplorerUrl(event);
+                                const amount = Number(event?.type === 'auction_started' ? view.amount : view.amount || 0);
+                                return (
+                                    <li
+                                        key={`${event.type}:${event.transaction_hash || event.block_number}:${event.log_index}:${index}`}
+                                        className="provenance-event"
+                                    >
+                                        <span className="provenance-event-marker" aria-hidden="true" />
+                                        <div className="provenance-event-main">
+                                            <strong>{view.title}</strong>
+                                            {renderProvenanceAddress(view.role, view.address)}
+                                            {renderProvenanceAddress(view.secondaryRole, view.secondaryAddress)}
+                                            {formatProvenanceTime(event) && (
+                                                <time dateTime={event.recorded_at}>{formatProvenanceTime(event)}</time>
+                                            )}
+                                        </div>
+                                        <div className="provenance-event-meta">
+                                            {Number.isFinite(amount) && amount > 0 && <span>{view.amount} ETH</span>}
+                                            {explorerUrl && (
+                                                <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
+                                                    Transaction
+                                                </a>
+                                            )}
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    )}
+                    {!provenanceState.complete && provenanceState.status === 'ready' && (
+                        <p className="provenance-state-copy provenance-state-note">
+                            This history reached the current display limit. Older indexer events remain preserved.
+                        </p>
+                    )}
+                </HistoryPanel>
+            );
+
+            const auctionPanel = (
+                <div key="auction" id="artwork-actions" className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">
+                        <div className="artwork-page-card-heading">
+                            <h3 className="artwork-page-card-title">Auction</h3>
+                            <span className={`artsoul-card-status artsoul-card-status-${statusForState.key}`}>
+                                {statusForState.label}
+                            </span>
+                        </div>
+
+                        {(artwork.pending_auction_sync || refreshError) && (
+                            <p className="text-sm mb-3" role="status">
+                                {artwork.pending_auction_sync && 'Transaction confirmed. Updating auction data. '}
+                                {refreshError}
+                                {refreshError && <button type="button" className="underline ml-2" onClick={() => void loadArtwork()}>Retry</button>}
+                            </p>
+                        )}
+                        <div className="space-y-3">
+                            {getAuctionActionId() && (
+                            <div className="flex justify-between artwork-auction-fact artwork-auction-id">
+                                <span className="opacity-70">Auction ID:</span>
+                                <span className="font-mono">{getAuctionActionId()}</span>
+                            </div>
+                            )}
+                            {startingPrice && Number(startingPrice) >= 0 && (
+                            <div className="flex justify-between artwork-auction-fact">
+                                <span className="opacity-70">Starting Price:</span>
+                                <span className="font-bold">{startingPrice} ETH</span>
+                            </div>
+                            )}
+                            {(liveAuction || awaitingPayment) && (
+                            <div className="flex justify-between artwork-auction-fact">
+                                <span className="opacity-70">
+                                    {awaitingPayment ? 'Final Bid:' : 'Current Bid:'}
+                                </span>
+                                <span className="font-bold text-2xl" data-testid="live-auction-current-bid">
+                                    {hasAuctionBids ? `${currentHighestBid} ETH` : 'No bids'}
+                                </span>
+                            </div>
+                            )}
+                            {mintedArtwork && (
+                                <div className="flex justify-between artwork-auction-fact">
+                                    <span className="opacity-70">Final Price:</span>
+                                    <span className="font-bold">{finalPrice} ETH</span>
+                                </div>
+                            )}
+                            {liveAuction && (
+                                <div className="flex justify-between artwork-auction-fact">
+                                    <span className="opacity-70">Time Left:</span>
+                                    <span className="font-bold" data-testid="live-auction-countdown">{timeLeft}</span>
+                                </div>
+                            )}
+                            {liveAuction && (
+                                <div className="flex justify-between artwork-auction-fact">
+                                    <span className="opacity-70">Next Bid:</span>
+                                    <span className="font-bold">{minimumBidDetails.eth} ETH</span>
+                                </div>
+                            )}
+
+                            {/* Settlement window countdown */}
+                            {awaitingPayment && settlementDeadlineMs > 0 && (
+                                <div className="artwork-settlement-window p-4 rounded-lg border-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-bold">Settlement Window</span>
+                                        <span className="text-xs opacity-70">24h to complete</span>
+                                    </div>
+                                    <div className="text-2xl font-bold text-center">
+                                        <SettlementCountdown deadline={settlementDeadlineMs} />
+                                    </div>
+                                    <div className="text-xs opacity-70 text-center mt-2">
+                                        Deadline: {new Date(settlementDeadlineMs).toLocaleString()}
+                                    </div>
+                                    {settlementExpired && (
+                                        <p className="text-xs opacity-70 text-center mt-2" role="status">
+                                            Payment is no longer possible. Until the default is recorded, the artwork cannot be auctioned again.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Deposit Info */}
+                            {liveAuction && auction.depositAmount > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="opacity-70">Locked deposit:</span>
+                                    <span className="font-mono">{auction.depositAmount} ETH</span>
+                                </div>
+                            )}
+                            {mintedArtwork && artwork.floor_price && parseFloat(artwork.floor_price) > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="opacity-70">Floor Price:</span>
+                                    <span className="font-bold text-lg">{artwork.floor_price} ETH</span>
+                                </div>
+                            )}
+                            {listedForResale && (
+                                <div className="flex justify-between">
+                                    <span className="opacity-70">Sale Price:</span>
+                                    <span className="artwork-sale-price font-bold text-xl">{artwork.sale_price} ETH</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {liveAuction && (
+                        <section
+                                className="bid-activity-panel mt-6 rounded-lg p-4"
+                                aria-live="polite"
+                                data-testid="live-auction-bid-feed"
+                            >
+                                <div className="artwork-page-card-heading artwork-bid-heading">
+                                    <h4 className="artwork-page-card-title">Bid Activity</h4>
+                                    <span className="text-xs opacity-70">
+                                        {bidActivity.length} {bidActivity.length === 1 ? 'bid' : 'bids'}
+                                    </span>
+                                </div>
+
+                                {bidActivity.length > 0 ? (
+                                    <div>
+                                        {bidActivity.map(bid => (
+                                            <div
+                                                key={`${bid.transaction_hash || bid.block_number}:${bid.log_index}`}
+                                                className="bid-activity-row rounded-lg px-3 py-3"
+                                            >
+                                                <div className="bid-activity-identity">
+                                                    <a
+                                                        href={`/profile?address=${encodeURIComponent(bid.bidder)}`}
+                                                        className="bidder-profile-link min-w-0 truncate font-semibold"
+                                                    >
+                                                        {getBidderDisplayName(bid.bidder)}
+                                                    </a>
+                                                    {formatBidTime(bid) && <time dateTime={bid.indexed_at || bid.timestamp}>{formatBidTime(bid)}</time>}
+                                                </div>
+                                                <span className="bid-activity-amount whitespace-nowrap font-bold">
+                                                    {bid.bid_amount} ETH
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null}
+                        </section>
+                        )}
+
+                        {/* Bid Input (during auction; Base Sepolia artworks only) */}
+                        {liveAuction && artworkWriteEnabled && (
+                            <div className="mt-6 space-y-3">
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Enter bid amount (ETH)"
+                                    value={bidAmount}
+                                    onChange={(e) => setBidAmount(e.target.value)}
+                                    disabled={isTransactionActionPending('bid') || bidIdentityBlocked}
+                                    className="artwork-bid-input w-full px-4 py-3 rounded-lg"
+                                />
+                                <div className="text-sm opacity-70 text-center">
+                                    Minimum bid: {minimumBidDetails.eth} ETH
+                                </div>
+                                <div className="artwork-bid-deposit-note" aria-live="polite">
+                                    {enteredBidDepositWei > 0n
+                                        ? `Pay now: ${formatWeiToEth(enteredBidDepositWei, 18)} ETH deposit plus gas on Base Sepolia. The deposit is max(10% of your bid, 0.01 ETH), rounded up to wei. Fully refundable if you are outbid.`
+                                        : 'Your deposit is 10% of the bid or 0.01 ETH minimum. It is fully refundable if you are outbid.'}
+                                </div>
+                                <ExplainedAction
+                                    onClick={handlePlaceBid}
+                                    className="btn-main w-full artwork-page-primary-action"
+                                    disabled={isTransactionActionPending('bid')}
+                                    reason={bidRestriction}
+                                    contextKey={connectedWalletAddress}
+                                    explanationTitle={isSameAddress(connectedWalletAddress, creatorAddress) ? 'You are the creator' : 'You are already leading'}
+                                    aria-busy={isTransactionActionPending('bid')}
+                                >
+                                    {isTransactionActionPending('bid')
+                                        ? <TransactionProcessingLabel />
+                                        : bidIdentityBlocked ? (isSameAddress(connectedWalletAddress, creatorAddress) ? 'Creators cannot bid on their own artwork' : 'You are already the highest bidder') : 'Review Bid and Deposit'}
+                                </ExplainedAction>
+                            </div>
+                        )}
+
+                        {artworkWriteEnabled && (showWithdrawableDeposit || withdrawalState.message) && (
+                            <section className="artwork-withdrawal-panel" aria-live="polite">
+                                {showWithdrawableDeposit && (
+                                    <>
+                                        <div className="artwork-withdrawal-summary">
+                                            <span>Withdrawable balance</span>
+                                            <strong>{withdrawalState.amount} ETH</strong>
+                                        </div>
+                                        <p>
+                                            You placed a non-leading bid on this auction and the contract reports an available balance. This transaction withdraws the full balance, including any other refunds or proceeds.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            className="btn-secondary artwork-page-primary-action"
+                                            onClick={handleWithdrawDeposit}
+                                            disabled={isTransactionActionPending('withdraw-deposit')}
+                                            aria-busy={isTransactionActionPending('withdraw-deposit')}
+                                        >
+                                            {isTransactionActionPending('withdraw-deposit')
+                                                ? <TransactionProcessingLabel />
+                                                : `Withdraw deposit balance: ${withdrawalState.amount} ETH`}
+                                        </button>
+                                    </>
+                                )}
+                                {withdrawalState.message && (
+                                    <p className={withdrawalState.status === 'error' ? 'transaction-message-error' : 'transaction-message-success'}>
+                                        {withdrawalState.message}
+                                    </p>
+                                )}
+                            </section>
+                        )}
+
+                        {/* End Auction Button (for anyone after time expires) */}
+                        {canEndAuction && (
+                            <div className="artwork-auction-next-step mt-4">
+                                <p>Confirm the expired auction. With a winning bid, this opens payment for the winner. With no bids, the creator can start a new auction.</p>
+                                <button
+                                    onClick={handleEndAuction}
+                                    className="btn-secondary w-full artwork-page-primary-action"
+                                    disabled={isTransactionActionPending('end-auction')}
+                                    aria-busy={isTransactionActionPending('end-auction')}
+                                >
+                                    {isTransactionActionPending('end-auction')
+                                        ? <TransactionProcessingLabel />
+                                        : 'End Expired Auction'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Close Expired Settlement (for anyone after the 24h window passes) */}
+                        {artworkWriteEnabled && settlementExpired && (
+                            <div className="artwork-auction-next-step mt-4">
+                                <p>The winner did not complete payment in time. Record the default on-chain so the creator can auction this artwork again.</p>
+                                <button
+                                    type="button"
+                                    onClick={handleClaimSettlementDefault}
+                                    className="btn-secondary w-full artwork-page-primary-action"
+                                    disabled={isTransactionActionPending('settlement-default')}
+                                    aria-busy={isTransactionActionPending('settlement-default')}
+                                >
+                                    {isTransactionActionPending('settlement-default')
+                                        ? <TransactionProcessingLabel />
+                                        : 'Close Expired Settlement'}
+                                </button>
+                            </div>
+                        )}
+
+                        {!isNewAuctionModalOpen && auctionCreationError && (
+                            <p role="alert">{auctionCreationError}</p>
+                        )}
+                        {canCreateNewAuction && (
+                            <div className="artwork-auction-next-step mt-4">
+                                <p>Create a primary auction when you are ready. The current on-chain state will be checked before setup.</p>
+                                <button
+                                    type="button"
+                                    className="btn-main w-full artwork-page-primary-action"
+                                    onClick={openNewAuctionModal}
+                                    disabled={auctionCreationChecking || isTransactionActionPending('create-auction')}
+                                    aria-busy={auctionCreationChecking}
+                                >
+                                    {auctionCreationChecking ? 'Checking auction eligibility…' : 'Create New Auction'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Settlement button (24h window; winner only, Base Sepolia artworks only) */}
+                        {artworkWriteEnabled && walletRenderState.settled && awaitingPayment && !settlementExpired && isSameAddress(connectedWalletAddress, winnerAddress) && (
+                            <div className="mt-6 space-y-3">
+                                <div className="artwork-settlement-notice p-4 rounded-lg border-2">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <p className="text-sm font-bold">Settlement requires wallet confirmation</p>
+                                    </div>
+                                    <p className="text-xs opacity-70 mb-2">
+                                        Complete settlement within the 24h window to mint and claim this NFT.
+                                    </p>
+                                    <div className="text-xs opacity-50">
+                                        If settlement is missed within 24h, the deposit is split between the artist and platform. The artwork remains unminted.
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleWinnerPurchase}
+                                    className="btn-main w-full text-lg font-bold"
+                                    disabled={isTransactionActionPending('settlement')}
+                                    aria-busy={isTransactionActionPending('settlement')}
+                                    style={!isClassic ? {
+                                        background: 'linear-gradient(90deg, var(--c-accent), var(--c-accent-2))',
+                                        boxShadow: '0 0 20px rgba(var(--c-accent-rgb), 0.5)',
+                                        animation: 'glow-pulse 2s ease-in-out infinite'
+                                    } : {}}
+                                >
+                                    {isTransactionActionPending('settlement')
+                                        ? <TransactionProcessingLabel />
+                                        : `Complete Settlement & Mint NFT - ${finalPrice} ETH`}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Resale actions (only after successful settlement/mint; Base Sepolia artworks only) */}
+                        {artworkWriteEnabled && resaleEligibility.showOwnerAction && (
+                            <div className="artwork-auction-next-step mt-4">
+                                <p>
+                                    List this minted NFT at or above its canonical floor of {resaleFloorPrice || 'pending'} ETH.
+                                </p>
+                                <ExplainedAction
+                                    type="button"
+                                    onClick={openResaleListingModal}
+                                    className="btn-main w-full artwork-page-primary-action"
+                                    disabled={isTransactionActionPending('resale-list')}
+                                    reason={resaleEligibility.canList ? '' : resaleEligibility.reason === 'wrong_chain'
+                                        ? 'This NFT is on Base Sepolia. Switch your connected wallet to Base Sepolia before listing it. No transaction has been requested.'
+                                        : 'The confirmed floor price is still loading. Listing will become available when it is known, so you can review the correct minimum price.'}
+                                    contextKey={connectedWalletAddress}
+                                    explanationTitle={resaleEligibility.reason === 'wrong_chain' ? 'Switch network to continue' : 'Waiting for the floor price'}
+                                    aria-busy={isTransactionActionPending('resale-list')}
+                                >
+                                    {isTransactionActionPending('resale-list')
+                                        ? <TransactionProcessingLabel />
+                                        : resaleEligibility.reason === 'wrong_chain'
+                                            ? 'Base Sepolia Required'
+                                            : resaleEligibility.reason === 'floor_unavailable'
+                                                ? 'Floor Price Loading'
+                                                : 'List NFT'}
+                                </ExplainedAction>
+                            </div>
+                        )}
+
+                        {listedForResale && (connectedWalletOwnsArtwork || connectedWalletIsSeller) && artworkWriteEnabled && (
+                            <div className="artwork-auction-next-step mt-4">
+                                <p>This NFT is listed for {artwork.sale_price} ETH.</p>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {connectedWalletOwnsArtwork && <ExplainedAction type="button" className="btn-main" onClick={() => openResaleListingModal('edit')}
+                                        reason={walletRenderState.chainId !== 84532 ? 'Switch your connected wallet to Base Sepolia to change this listing. No transaction has been requested.' : ''}
+                                        explanationTitle="Switch network to continue" contextKey={connectedWalletAddress}
+                                        disabled={isTransactionActionPending('resale-list')}>
+                                        Change price
+                                    </ExplainedAction>}
+                                    {connectedWalletIsSeller && <ExplainedAction type="button" className="btn-secondary" onClick={() => openResaleListingModal('cancel')}
+                                        reason={walletRenderState.chainId !== 84532 ? 'Switch your connected wallet to Base Sepolia to remove this listing. No transaction has been requested.' : ''}
+                                        explanationTitle="Switch network to continue" contextKey={connectedWalletAddress}
+                                        disabled={isTransactionActionPending('resale-list')}>
+                                        Remove from sale
+                                    </ExplainedAction>}
+                                </div>
+                                {walletRenderState.chainId !== 84532 && <p>Switch to Base Sepolia to manage this listing.</p>}
+                            </div>
+                        )}
+
+                        {resaleNotice && <p className="mt-3" role="status">{resaleNotice}</p>}
+
+                        {listedForResale && !connectedWalletOwnsArtwork && !connectedWalletIsSeller && artworkWriteEnabled && (
+                            <div className="mt-6">
+                                <button
+                                    onClick={handleDirectPurchase}
+                                    className="btn-main w-full"
+                                    disabled={isTransactionActionPending('resale-purchase')}
+                                    aria-busy={isTransactionActionPending('resale-purchase')}
+                                >
+                                    {isTransactionActionPending('resale-purchase')
+                                        ? <TransactionProcessingLabel />
+                                        : `Buy Now - ${artwork.sale_price} ETH`}
+                                </button>
+                            </div>
+                        )}
+
+                </div>
+            );
+
+            const legacyPanel = (
+                <div key="legacy" className="artwork-page-legacy-discovery" aria-hidden="true">
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-bold">Discovery Signals</h3>
+                        <span className="text-sm opacity-70">{window.ArtSoulDiscovery?.classifyLifecycle?.(artwork)?.label || 'Artwork'}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center mb-4">
+                        <div className={`p-3 rounded-lg ${isClassic ? 'bg-gray-700/60' : 'bg-cyan-900/20 border border-cyan-500/20'}`}>
+                            <div className="text-xl font-bold">{socialSignals.likes || votes.length}</div>
+                            <div className="text-xs opacity-70">Likes</div>
+                        </div>
+                        <div className={`p-3 rounded-lg ${isClassic ? 'bg-gray-700/60' : 'bg-cyan-900/20 border border-cyan-500/20'}`}>
+                            <div className="text-xl font-bold">{socialSignals.wouldBuy || 0}</div>
+                            <div className="text-xs opacity-70">Would Buy</div>
+                        </div>
+                        <div className={`p-3 rounded-lg ${isClassic ? 'bg-gray-700/60' : 'bg-cyan-900/20 border border-cyan-500/20'}`}>
+                            <div className="text-xl font-bold">{socialSignals.watching || 0}</div>
+                            <div className="text-xs opacity-70">Watching</div>
+                        </div>
+                    </div>
+
+                    {userVote ? (
+                        <div className="text-center py-1">
+                            <p className="text-sm opacity-70">✓ You voted</p>
+                        </div>
+                    ) : (
+                        <button onClick={handleVote} className="btn-main w-full">
+                            Like
+                        </button>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                        <button
+                            onClick={() => handleDiscoverySignal('would_buy')}
+                            className={interactionState.would_buy ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'}
+                            disabled={interactionState.would_buy}
+                        >
+                            {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
+                        </button>
+                        <button
+                            onClick={() => handleDiscoverySignal('watching')}
+                            className={interactionState.watching ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'}
+                            disabled={interactionState.watching}
+                        >
+                            {interactionState.watching ? 'Watching Saved' : 'Watching'}
+                        </button>
+                    </div>
+
+                    {aiGuidance && (
+                        <div
+                            className="mt-4 p-3 rounded-lg text-sm"
+                            style={{
+                                background: 'var(--c-surface-muted)',
+                                border: '1px solid var(--c-border-soft)',
+                                color: 'var(--c-text)'
+                            }}
+                        >
+                            <div className="font-semibold mb-1">Value Guidance</div>
+                                <div className="opacity-80">
+                                    Estimated range: {formatAIPrice(aiGuidance.estimated_value_min_eth)} - {formatAIPrice(aiGuidance.estimated_value_max_eth)} ETH
+                                    <div className="mt-1">
+                                        Suggested starting price: {formatAIPrice(aiGuidance.suggested_start_price_eth)} ETH - {aiGuidance.confidence || 'medium'} confidence
+                                    </div>
+                                    {aiGuidance.rationale && <div className="mt-1 opacity-80">{aiGuidance.rationale}</div>}
+                                </div>
+                            <div className="text-xs opacity-60 mt-1">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</div>
+                        </div>
+                    )}
+                </div>
+            );
+
             return (
                 <div className="artwork-page-root">
                     {isReportModalOpen && (
@@ -3290,711 +4021,16 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                     {/* Content */}
                     <main className="artwork-page-shell site-page-container">
                         <div className="artwork-page-layout">
-                            {/* Artwork Media Viewer */}
                             <div className="artwork-page-left">
-                                <section className="artwork-detail-stage artwork-mobile-media" aria-label="Artwork media">
-                                <div className={`artwork-detail-frame artwork-detail-frame-${resolvedMedia.type} relative w-full h-full rounded-xl overflow-hidden`}>
-                                    {safeMediaUrl ? (
-                                        <MediaViewer
-                                            media={{ ...resolvedMedia, url: safeMediaUrl }}
-                                            title={artwork.title}
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-black p-6">
-                                            <div className="max-w-lg text-center">
-                                                <div className="text-xs uppercase tracking-wide opacity-60 mb-3">
-                                                        Indexed metadata unavailable
-                                                </div>
-                                                <h2 className="text-2xl font-semibold mb-3">{artwork.title || 'Indexed artwork'}</h2>
-                                                <p className="text-sm opacity-70 mb-5">
-                                                    {artwork.description || 'This artwork is indexed on-chain, but its metadata media URL is unavailable.'}
-                                                </p>
-                                                <div className="artwork-fallback-facts grid gap-3 text-left text-xs">
-                                                    <div className="rounded-lg border border-current/20 p-3">
-                                                        <div className="uppercase tracking-wide opacity-60 mb-1">Artwork ID</div>
-                                                        <div className="break-all">{artwork.artwork_id || artwork.blockchain_id || 'Unavailable'}</div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-current/20 p-3">
-                                                        <div className="uppercase tracking-wide opacity-60 mb-1">Auction ID</div>
-                                                        <div className="break-all">{artwork.auction_id || artwork.active_auction_id || 'Unavailable'}</div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-current/20 p-3">
-                                                        <div className="uppercase tracking-wide opacity-60 mb-1">Register tx hash</div>
-                                                        <div className="break-all">{artwork.transaction_hash || 'Unavailable'}</div>
-                                                    </div>
-                                                </div>
-                                                <p className="text-sm opacity-70 mt-5">
-                                                    This artwork is indexed on-chain, but its metadata media URL is unavailable.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                </section>
-
-                                <section className="artwork-page-panel artwork-page-context artwork-mobile-context">
-                                    <header className="artwork-page-header">
-                                        <h1 className="artwork-detail-title">{artwork.title}</h1>
-                                        {window.ArtSoulArtworkCard?.ReactSavedControl && React.createElement(window.ArtSoulArtworkCard.ReactSavedControl, { artwork, detail: true })}
-                                    </header>
-                                    <div className="artwork-page-description">
-                                        <h2>Description</h2>
-                                        <p className="artwork-page-copy">{artwork.description || 'No description supplied.'}</p>
-                                    </div>
-                                    <div className="artwork-page-extra">
-                                        <h2>Artwork details</h2>
-                                        <dl className="artwork-page-detail-list">
-                                            {resolvedMedia.type && <><dt>Media</dt><dd className="artwork-detail-media-type">{resolvedMedia.type}</dd></>}
-                                            {describeArtworkNetwork(artwork) && <><dt>Network</dt><dd>{describeArtworkNetwork(artwork)}</dd></>}
-                                            {(artwork.artwork_id || artwork.blockchain_id) && <><dt>Artwork ID</dt><dd>{artwork.artwork_id || artwork.blockchain_id}</dd></>}
-                                            {artwork.token_id && (
-                                                <>
-                                                    <dt>Token ID</dt>
-                                                    <dd>
-                                                        {tokenExplorerUrl ? (
-                                                            <a href={tokenExplorerUrl} target="_blank" rel="noopener noreferrer">{artwork.token_id}</a>
-                                                        ) : artwork.token_id}
-                                                    </dd>
-                                                </>
-                                            )}
-                                        </dl>
-                                    </div>
-                                </section>
-
-                                <section className="artwork-page-panel artwork-page-trust artwork-mobile-trust" aria-label="Community signals">
-                                        <div className="artwork-page-panel-heading">
-                                            <h2>Community</h2>
-                                            {trustScore > 0 && (
-                                                <span className="artwork-page-chip artwork-community-trust" title="Community signal for discovery. Does not affect price or ownership.">
-                                                    <span>Trust</span>
-                                                    <strong>{trustScore}<small>/100</small></strong>
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="artwork-page-signal-actions">
-                                            <div className="artwork-page-signal-action">
-                                                <strong>{socialSignals.likes || votes.length}</strong>
-                                                {userVote ? (
-                                                    <p className="artwork-page-saved artwork-page-action-control">You voted</p>
-                                                ) : (
-                                                    <button onClick={handleVote} className="btn-main artwork-page-action-control">Like</button>
-                                                )}
-                                            </div>
-                                            <div className="artwork-page-signal-action">
-                                                <strong>{socialSignals.wouldBuy || 0}</strong>
-                                                <ExplainedAction onClick={() => handleDiscoverySignal('would_buy')} className={interactionState.would_buy ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'}
-                                                    contextKey={connectedWalletAddress} explanationTitle="Your interest is recorded"
-                                                    reason={interactionState.would_buy ? 'Your Would Buy signal is already recorded for this artwork. It expresses interest, not a bid or a purchase. It cannot be submitted again from this wallet.' : ''}>
-                                                    {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
-                                                </ExplainedAction>
-                                            </div>
-                                            <div className="artwork-page-signal-action">
-                                                <strong>{socialSignals.watching || 0}</strong>
-                                                <ExplainedAction onClick={() => handleDiscoverySignal('watching')} className={interactionState.watching ? 'btn-secondary artwork-page-action-control opacity-70' : 'btn-main artwork-page-action-control'}
-                                                    contextKey={connectedWalletAddress} explanationTitle="Your interest is recorded"
-                                                    reason={interactionState.watching ? 'Your Watching signal is already recorded for this artwork. It cannot be submitted again from this wallet. Use Favorites to add or remove the artwork from your private list.' : ''}>
-                                                    {interactionState.watching ? 'Watching Saved' : 'Watching'}
-                                                </ExplainedAction>
-                                            </div>
-                                        </div>
-                                    <div className="artwork-community-actions" aria-label="Artwork actions">
-                                        {isV41CompositeId && Number(artwork.chain_id) === 84532 && (
-                                            <ArtistSupport key={artworkId} deployment={donationDeployment} artworkId={artwork.blockchain_id}
-                                                creator={creatorAddress} creatorName={creatorName} connectedWallet={connectedWalletAddress}
-                                                initialOpen={openDonationFromCard}
-                                                onReportDonation={reportingEnabled ? openArtworkReport : undefined}/>
-                                        )}
-                                        <button
-                                            onClick={() => {
-                                                const intent = artworkShareIntent({ ...artwork, creator_name: creatorName });
-                                                if (intent) window.open(intent, '_blank', 'noopener,noreferrer,width=550,height=420');
-                                            }}
-                                            className="btn-secondary artwork-page-compact-action artwork-page-share"
-                                            title="Share on X"
-                                        >
-                                            Share on X
-                                        </button>
-                                        {reportingEnabled && (
-                                            <button
-                                                type="button"
-                                                ref={reportTriggerRef}
-                                                data-allow-rapid="true"
-                                                onClick={() => openArtworkReport()}
-                                                className="btn-secondary artwork-page-compact-action artwork-page-report"
-                                            >
-                                                Report
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => window.history.back()}
-                                            className="btn-secondary artwork-page-compact-action artwork-mobile-back"
-                                        >
-                                            Back
-                                        </button>
-                                    </div>
-                                    {cardActionNotice && <p role="status">{cardActionNotice}</p>}
-                                </section>
-
-                                <section className="artwork-page-panel artwork-page-ai artwork-mobile-ai" aria-label="Gemini analysis">
-                                        <div className="artwork-page-panel-heading">
-                                            <h2>Gemini Analysis</h2>
-                                            {aiGuidance?.confidence != null && (
-                                                <span className="artwork-page-chip">
-                                                    {Number.isFinite(Number(aiGuidance.confidence)) ? `${Number(aiGuidance.confidence)}%` : String(aiGuidance.confidence)} confidence
-                                                </span>
-                                            )}
-                                        </div>
-                                        {aiGuidance ? (
-                                            <>
-                                                <p className="artwork-page-ai-range">
-                                                    {formatAIPrice(aiGuidance.estimated_value_min_eth)} to {formatAIPrice(aiGuidance.estimated_value_max_eth)} ETH
-                                                </p>
-                                                <p className="artwork-page-copy">Suggested starting price: {formatAIPrice(aiGuidance.suggested_start_price_eth)} ETH</p>
-                                                {aiGuidance.rationale && <p className="artwork-page-copy">{aiGuidance.rationale}</p>}
-                                            </>
-                                        ) : (
-                                            <p className="artwork-page-copy">AI analysis is unavailable for this artwork.</p>
-                                        )}
-                                        <p className="artwork-page-note">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</p>
-                                </section>
+                                {isClassic
+                                    ? [mediaPanel, contextPanel, communityPanel, guidancePanel]
+                                    : [mediaPanel, contextPanel, ownershipPanel, auctionPanel, communityPanel, provenancePanel, guidancePanel, detailsPanel]}
                             </div>
-
-                            {/* Artwork Info */}
                             <aside className="artwork-page-right">
-                                {/* Ownership Info - Three Roles */}
-                                <div className="artwork-page-panel artwork-page-people artwork-mobile-people">
-                                    <h3 className="artwork-page-card-title">Ownership</h3>
-
-                                    <div className="artwork-page-people-list">
-                                        {renderOwnershipRole({
-                                            label: 'Creator',
-                                            address: creatorAddress,
-                                            profile: creatorProfile
-                                        })}
-
-                                        {awaitingPayment && !isSameAddress(creatorAddress, winnerAddress) && renderOwnershipRole({
-                                            label: 'Highest Bidder',
-                                            address: winnerAddress,
-                                            profile: bidderProfiles[String(winnerAddress || '').toLowerCase()] || auctionWinnerProfile
-                                        })}
-
-                                        {mintedArtwork && renderOwnershipRole({
-                                            label: 'First Collector',
-                                            address: artwork.auction_winner_address,
-                                            profile: auctionWinnerProfile
-                                        })}
-
-                                        {shouldShowOwnerRole({
-                                            ownerAddress,
-                                            creatorAddress,
-                                            firstCollectorAddress: artwork.auction_winner_address,
-                                            winnerAddress,
-                                            minted: mintedArtwork,
-                                            awaitingPayment
-                                        }) &&
-                                            renderOwnershipRole({
-                                                label: 'Owner',
-                                                address: ownerAddress,
-                                                // A buyback puts the same person in two rows; they
-                                                // must read the same, not a name above an address.
-                                                profile: currentOwnerProfile || (isSameAddress(ownerAddress, creatorAddress) ? creatorProfile : null)
-                                            })}
-                                    </div>
-
-                                </div>
-                                {isV41CompositeId && (
-                                    <section className="artwork-page-panel artwork-page-provenance artwork-mobile-provenance" aria-labelledby="provenanceTitle">
-                                        <div className="artwork-page-card-heading">
-                                            <h3 id="provenanceTitle" className="artwork-page-card-title">Provenance</h3>
-                                            {provenanceState.status === 'ready' && (
-                                                <span className="text-xs opacity-70">
-                                                    {provenanceState.events.length} {provenanceState.events.length === 1 ? 'event' : 'events'}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {provenanceState.status === 'loading' && (
-                                            <p className="provenance-state-copy" role="status">Loading indexer history...</p>
-                                        )}
-                                        {provenanceState.status === 'unavailable' && (
-                                            <p className="provenance-state-copy">Indexer history is temporarily unavailable.</p>
-                                        )}
-                                        {provenanceState.status === 'ready' && provenanceState.events.length === 0 && (
-                                            <p className="provenance-state-copy">No indexer history is available yet.</p>
-                                        )}
-                                        {provenanceState.events.length > 0 && (
-                                            <ol className="provenance-timeline">
-                                                {provenanceState.events.map((event, index) => {
-                                                    const view = provenanceEventView(event);
-                                                    const explorerUrl = transactionExplorerUrl(event);
-                                                    const amount = Number(event?.type === 'auction_started' ? view.amount : view.amount || 0);
-                                                    return (
-                                                        <li
-                                                            key={`${event.type}:${event.transaction_hash || event.block_number}:${event.log_index}:${index}`}
-                                                            className="provenance-event"
-                                                        >
-                                                            <span className="provenance-event-marker" aria-hidden="true" />
-                                                            <div className="provenance-event-main">
-                                                                <strong>{view.title}</strong>
-                                                                {renderProvenanceAddress(view.role, view.address)}
-                                                                {renderProvenanceAddress(view.secondaryRole, view.secondaryAddress)}
-                                                                {formatProvenanceTime(event) && (
-                                                                    <time dateTime={event.recorded_at}>{formatProvenanceTime(event)}</time>
-                                                                )}
-                                                            </div>
-                                                            <div className="provenance-event-meta">
-                                                                {Number.isFinite(amount) && amount > 0 && <span>{view.amount} ETH</span>}
-                                                                {explorerUrl && (
-                                                                    <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
-                                                                        Transaction
-                                                                    </a>
-                                                                )}
-                                                            </div>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ol>
-                                        )}
-                                        {!provenanceState.complete && provenanceState.status === 'ready' && (
-                                            <p className="provenance-state-copy provenance-state-note">
-                                                This history reached the current display limit. Older indexer events remain preserved.
-                                            </p>
-                                        )}
-                                    </section>
-                                )}
-
-                                {/* Auction Info */}
-                                <div id="artwork-actions" className="auction-detail-panel artwork-mobile-auction p-6 rounded-xl">
-                                        <div className="artwork-page-card-heading">
-                                            <h3 className="artwork-page-card-title">Auction</h3>
-                                            <span className={`artsoul-card-status artsoul-card-status-${statusForState.key}`}>
-                                                {statusForState.label}
-                                            </span>
-                                        </div>
-
-                                        {(artwork.pending_auction_sync || refreshError) && (
-                                            <p className="text-sm mb-3" role="status">
-                                                {artwork.pending_auction_sync && 'Transaction confirmed. Updating auction data. '}
-                                                {refreshError}
-                                                {refreshError && <button type="button" className="underline ml-2" onClick={() => void loadArtwork()}>Retry</button>}
-                                            </p>
-                                        )}
-                                        <div className="space-y-3">
-                                            {getAuctionActionId() && (
-                                            <div className="flex justify-between artwork-auction-fact artwork-auction-id">
-                                                <span className="opacity-70">Auction ID:</span>
-                                                <span className="font-mono">{getAuctionActionId()}</span>
-                                            </div>
-                                            )}
-                                            {startingPrice && Number(startingPrice) >= 0 && (
-                                            <div className="flex justify-between artwork-auction-fact">
-                                                <span className="opacity-70">Starting Price:</span>
-                                                <span className="font-bold">{startingPrice} ETH</span>
-                                            </div>
-                                            )}
-                                            {(liveAuction || awaitingPayment) && (
-                                            <div className="flex justify-between artwork-auction-fact">
-                                                <span className="opacity-70">
-                                                    {awaitingPayment ? 'Final Bid:' : 'Current Bid:'}
-                                                </span>
-                                                <span className="font-bold text-2xl" data-testid="live-auction-current-bid">
-                                                    {hasAuctionBids ? `${currentHighestBid} ETH` : 'No bids'}
-                                                </span>
-                                            </div>
-                                            )}
-                                            {mintedArtwork && (
-                                                <div className="flex justify-between artwork-auction-fact">
-                                                    <span className="opacity-70">Final Price:</span>
-                                                    <span className="font-bold">{finalPrice} ETH</span>
-                                                </div>
-                                            )}
-                                            {liveAuction && (
-                                                <div className="flex justify-between artwork-auction-fact">
-                                                    <span className="opacity-70">Time Left:</span>
-                                                    <span className="font-bold" data-testid="live-auction-countdown">{timeLeft}</span>
-                                                </div>
-                                            )}
-                                            {liveAuction && (
-                                                <div className="flex justify-between artwork-auction-fact">
-                                                    <span className="opacity-70">Next Bid:</span>
-                                                    <span className="font-bold">{minimumBidDetails.eth} ETH</span>
-                                                </div>
-                                            )}
-
-                                            {/* Settlement window countdown */}
-                                            {awaitingPayment && settlementDeadlineMs > 0 && (
-                                                <div className="artwork-settlement-window p-4 rounded-lg border-2">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-sm font-bold">Settlement Window</span>
-                                                        <span className="text-xs opacity-70">24h to complete</span>
-                                                    </div>
-                                                    <div className="text-2xl font-bold text-center">
-                                                        <SettlementCountdown deadline={settlementDeadlineMs} />
-                                                    </div>
-                                                    <div className="text-xs opacity-70 text-center mt-2">
-                                                        Deadline: {new Date(settlementDeadlineMs).toLocaleString()}
-                                                    </div>
-                                                    {settlementExpired && (
-                                                        <p className="text-xs opacity-70 text-center mt-2" role="status">
-                                                            Payment is no longer possible. Until the default is recorded, the artwork cannot be auctioned again.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* Deposit Info */}
-                                            {liveAuction && auction.depositAmount > 0 && (
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="opacity-70">Locked deposit:</span>
-                                                    <span className="font-mono">{auction.depositAmount} ETH</span>
-                                                </div>
-                                            )}
-                                            {mintedArtwork && artwork.floor_price && parseFloat(artwork.floor_price) > 0 && (
-                                                <div className="flex justify-between">
-                                                    <span className="opacity-70">Floor Price:</span>
-                                                    <span className="font-bold text-lg">{artwork.floor_price} ETH</span>
-                                                </div>
-                                            )}
-                                            {listedForResale && (
-                                                <div className="flex justify-between">
-                                                    <span className="opacity-70">Sale Price:</span>
-                                                    <span className="artwork-sale-price font-bold text-xl">{artwork.sale_price} ETH</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {liveAuction && (
-                                        <section
-                                                className="bid-activity-panel mt-6 rounded-lg p-4"
-                                                aria-live="polite"
-                                                data-testid="live-auction-bid-feed"
-                                            >
-                                                <div className="artwork-page-card-heading artwork-bid-heading">
-                                                    <h4 className="artwork-page-card-title">Bid Activity</h4>
-                                                    <span className="text-xs opacity-70">
-                                                        {bidActivity.length} {bidActivity.length === 1 ? 'bid' : 'bids'}
-                                                    </span>
-                                                </div>
-
-                                                {bidActivity.length > 0 ? (
-                                                    <div>
-                                                        {bidActivity.map(bid => (
-                                                            <div
-                                                                key={`${bid.transaction_hash || bid.block_number}:${bid.log_index}`}
-                                                                className="bid-activity-row rounded-lg px-3 py-3"
-                                                            >
-                                                                <div className="bid-activity-identity">
-                                                                    <a
-                                                                        href={`/profile?address=${encodeURIComponent(bid.bidder)}`}
-                                                                        className="bidder-profile-link min-w-0 truncate font-semibold"
-                                                                    >
-                                                                        {getBidderDisplayName(bid.bidder)}
-                                                                    </a>
-                                                                    {formatBidTime(bid) && <time dateTime={bid.indexed_at || bid.timestamp}>{formatBidTime(bid)}</time>}
-                                                                </div>
-                                                                <span className="bid-activity-amount whitespace-nowrap font-bold">
-                                                                    {bid.bid_amount} ETH
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : null}
-                                        </section>
-                                        )}
-
-                                        {/* Bid Input (during auction; Base Sepolia artworks only) */}
-                                        {liveAuction && artworkWriteEnabled && (
-                                            <div className="mt-6 space-y-3">
-                                                <input
-                                                    type="text"
-                                                    inputMode="decimal"
-                                                    placeholder="Enter bid amount (ETH)"
-                                                    value={bidAmount}
-                                                    onChange={(e) => setBidAmount(e.target.value)}
-                                                    disabled={isTransactionActionPending('bid') || bidIdentityBlocked}
-                                                    className="artwork-bid-input w-full px-4 py-3 rounded-lg"
-                                                />
-                                                <div className="text-sm opacity-70 text-center">
-                                                    Minimum bid: {minimumBidDetails.eth} ETH
-                                                </div>
-                                                <div className="artwork-bid-deposit-note" aria-live="polite">
-                                                    {enteredBidDepositWei > 0n
-                                                        ? `Pay now: ${formatWeiToEth(enteredBidDepositWei, 18)} ETH deposit plus gas on Base Sepolia. The deposit is max(10% of your bid, 0.01 ETH), rounded up to wei. Fully refundable if you are outbid.`
-                                                        : 'Your deposit is 10% of the bid or 0.01 ETH minimum. It is fully refundable if you are outbid.'}
-                                                </div>
-                                                <ExplainedAction
-                                                    onClick={handlePlaceBid}
-                                                    className="btn-main w-full artwork-page-primary-action"
-                                                    disabled={isTransactionActionPending('bid')}
-                                                    reason={bidRestriction}
-                                                    contextKey={connectedWalletAddress}
-                                                    explanationTitle={isSameAddress(connectedWalletAddress, creatorAddress) ? 'You are the creator' : 'You are already leading'}
-                                                    aria-busy={isTransactionActionPending('bid')}
-                                                >
-                                                    {isTransactionActionPending('bid')
-                                                        ? <TransactionProcessingLabel />
-                                                        : bidIdentityBlocked ? (isSameAddress(connectedWalletAddress, creatorAddress) ? 'Creators cannot bid on their own artwork' : 'You are already the highest bidder') : 'Review Bid and Deposit'}
-                                                </ExplainedAction>
-                                            </div>
-                                        )}
-
-                                        {artworkWriteEnabled && (showWithdrawableDeposit || withdrawalState.message) && (
-                                            <section className="artwork-withdrawal-panel" aria-live="polite">
-                                                {showWithdrawableDeposit && (
-                                                    <>
-                                                        <div className="artwork-withdrawal-summary">
-                                                            <span>Withdrawable balance</span>
-                                                            <strong>{withdrawalState.amount} ETH</strong>
-                                                        </div>
-                                                        <p>
-                                                            You placed a non-leading bid on this auction and the contract reports an available balance. This transaction withdraws the full balance, including any other refunds or proceeds.
-                                                        </p>
-                                                        <button
-                                                            type="button"
-                                                            className="btn-secondary artwork-page-primary-action"
-                                                            onClick={handleWithdrawDeposit}
-                                                            disabled={isTransactionActionPending('withdraw-deposit')}
-                                                            aria-busy={isTransactionActionPending('withdraw-deposit')}
-                                                        >
-                                                            {isTransactionActionPending('withdraw-deposit')
-                                                                ? <TransactionProcessingLabel />
-                                                                : `Withdraw deposit balance: ${withdrawalState.amount} ETH`}
-                                                        </button>
-                                                    </>
-                                                )}
-                                                {withdrawalState.message && (
-                                                    <p className={withdrawalState.status === 'error' ? 'transaction-message-error' : 'transaction-message-success'}>
-                                                        {withdrawalState.message}
-                                                    </p>
-                                                )}
-                                            </section>
-                                        )}
-
-                                        {/* End Auction Button (for anyone after time expires) */}
-                                        {canEndAuction && (
-                                            <div className="artwork-auction-next-step mt-4">
-                                                <p>Confirm the expired auction. With a winning bid, this opens payment for the winner. With no bids, the creator can start a new auction.</p>
-                                                <button
-                                                    onClick={handleEndAuction}
-                                                    className="btn-secondary w-full artwork-page-primary-action"
-                                                    disabled={isTransactionActionPending('end-auction')}
-                                                    aria-busy={isTransactionActionPending('end-auction')}
-                                                >
-                                                    {isTransactionActionPending('end-auction')
-                                                        ? <TransactionProcessingLabel />
-                                                        : 'End Expired Auction'}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* Close Expired Settlement (for anyone after the 24h window passes) */}
-                                        {artworkWriteEnabled && settlementExpired && (
-                                            <div className="artwork-auction-next-step mt-4">
-                                                <p>The winner did not complete payment in time. Record the default on-chain so the creator can auction this artwork again.</p>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleClaimSettlementDefault}
-                                                    className="btn-secondary w-full artwork-page-primary-action"
-                                                    disabled={isTransactionActionPending('settlement-default')}
-                                                    aria-busy={isTransactionActionPending('settlement-default')}
-                                                >
-                                                    {isTransactionActionPending('settlement-default')
-                                                        ? <TransactionProcessingLabel />
-                                                        : 'Close Expired Settlement'}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {!isNewAuctionModalOpen && auctionCreationError && (
-                                            <p role="alert">{auctionCreationError}</p>
-                                        )}
-                                        {canCreateNewAuction && (
-                                            <div className="artwork-auction-next-step mt-4">
-                                                <p>Create a primary auction when you are ready. The current on-chain state will be checked before setup.</p>
-                                                <button
-                                                    type="button"
-                                                    className="btn-main w-full artwork-page-primary-action"
-                                                    onClick={openNewAuctionModal}
-                                                    disabled={auctionCreationChecking || isTransactionActionPending('create-auction')}
-                                                    aria-busy={auctionCreationChecking}
-                                                >
-                                                    {auctionCreationChecking ? 'Checking auction eligibility…' : 'Create New Auction'}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* Settlement button (24h window; winner only, Base Sepolia artworks only) */}
-                                        {artworkWriteEnabled && walletRenderState.settled && awaitingPayment && !settlementExpired && isSameAddress(connectedWalletAddress, winnerAddress) && (
-                                            <div className="mt-6 space-y-3">
-                                                <div className="artwork-settlement-notice p-4 rounded-lg border-2">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <p className="text-sm font-bold">Settlement requires wallet confirmation</p>
-                                                    </div>
-                                                    <p className="text-xs opacity-70 mb-2">
-                                                        Complete settlement within the 24h window to mint and claim this NFT.
-                                                    </p>
-                                                    <div className="text-xs opacity-50">
-                                                        If settlement is missed within 24h, the deposit is split between the artist and platform. The artwork remains unminted.
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={handleWinnerPurchase}
-                                                    className="btn-main w-full text-lg font-bold"
-                                                    disabled={isTransactionActionPending('settlement')}
-                                                    aria-busy={isTransactionActionPending('settlement')}
-                                                    style={!isClassic ? {
-                                                        background: 'linear-gradient(90deg, var(--c-accent), var(--c-accent-2))',
-                                                        boxShadow: '0 0 20px rgba(var(--c-accent-rgb), 0.5)',
-                                                        animation: 'glow-pulse 2s ease-in-out infinite'
-                                                    } : {}}
-                                                >
-                                                    {isTransactionActionPending('settlement')
-                                                        ? <TransactionProcessingLabel />
-                                                        : `Complete Settlement & Mint NFT - ${finalPrice} ETH`}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* Resale actions (only after successful settlement/mint; Base Sepolia artworks only) */}
-                                        {artworkWriteEnabled && resaleEligibility.showOwnerAction && (
-                                            <div className="artwork-auction-next-step mt-4">
-                                                <p>
-                                                    List this minted NFT at or above its canonical floor of {resaleFloorPrice || 'pending'} ETH.
-                                                </p>
-                                                <ExplainedAction
-                                                    type="button"
-                                                    onClick={openResaleListingModal}
-                                                    className="btn-main w-full artwork-page-primary-action"
-                                                    disabled={isTransactionActionPending('resale-list')}
-                                                    reason={resaleEligibility.canList ? '' : resaleEligibility.reason === 'wrong_chain'
-                                                        ? 'This NFT is on Base Sepolia. Switch your connected wallet to Base Sepolia before listing it. No transaction has been requested.'
-                                                        : 'The confirmed floor price is still loading. Listing will become available when it is known, so you can review the correct minimum price.'}
-                                                    contextKey={connectedWalletAddress}
-                                                    explanationTitle={resaleEligibility.reason === 'wrong_chain' ? 'Switch network to continue' : 'Waiting for the floor price'}
-                                                    aria-busy={isTransactionActionPending('resale-list')}
-                                                >
-                                                    {isTransactionActionPending('resale-list')
-                                                        ? <TransactionProcessingLabel />
-                                                        : resaleEligibility.reason === 'wrong_chain'
-                                                            ? 'Base Sepolia Required'
-                                                            : resaleEligibility.reason === 'floor_unavailable'
-                                                                ? 'Floor Price Loading'
-                                                                : 'List NFT'}
-                                                </ExplainedAction>
-                                            </div>
-                                        )}
-
-                                        {listedForResale && (connectedWalletOwnsArtwork || connectedWalletIsSeller) && artworkWriteEnabled && (
-                                            <div className="artwork-auction-next-step mt-4">
-                                                <p>This NFT is listed for {artwork.sale_price} ETH.</p>
-                                                <div className="flex flex-wrap gap-2 mt-3">
-                                                    {connectedWalletOwnsArtwork && <ExplainedAction type="button" className="btn-main" onClick={() => openResaleListingModal('edit')}
-                                                        reason={walletRenderState.chainId !== 84532 ? 'Switch your connected wallet to Base Sepolia to change this listing. No transaction has been requested.' : ''}
-                                                        explanationTitle="Switch network to continue" contextKey={connectedWalletAddress}
-                                                        disabled={isTransactionActionPending('resale-list')}>
-                                                        Change price
-                                                    </ExplainedAction>}
-                                                    {connectedWalletIsSeller && <ExplainedAction type="button" className="btn-secondary" onClick={() => openResaleListingModal('cancel')}
-                                                        reason={walletRenderState.chainId !== 84532 ? 'Switch your connected wallet to Base Sepolia to remove this listing. No transaction has been requested.' : ''}
-                                                        explanationTitle="Switch network to continue" contextKey={connectedWalletAddress}
-                                                        disabled={isTransactionActionPending('resale-list')}>
-                                                        Remove from sale
-                                                    </ExplainedAction>}
-                                                </div>
-                                                {walletRenderState.chainId !== 84532 && <p>Switch to Base Sepolia to manage this listing.</p>}
-                                            </div>
-                                        )}
-
-                                        {resaleNotice && <p className="mt-3" role="status">{resaleNotice}</p>}
-
-                                        {listedForResale && !connectedWalletOwnsArtwork && !connectedWalletIsSeller && artworkWriteEnabled && (
-                                            <div className="mt-6">
-                                                <button
-                                                    onClick={handleDirectPurchase}
-                                                    className="btn-main w-full"
-                                                    disabled={isTransactionActionPending('resale-purchase')}
-                                                    aria-busy={isTransactionActionPending('resale-purchase')}
-                                                >
-                                                    {isTransactionActionPending('resale-purchase')
-                                                        ? <TransactionProcessingLabel />
-                                                        : `Buy Now - ${artwork.sale_price} ETH`}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                </div>
-
-                                {/* Discovery Signals */}
-                                <div className="artwork-page-legacy-discovery" aria-hidden="true">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h3 className="text-lg font-bold">Discovery Signals</h3>
-                                        <span className="text-sm opacity-70">{window.ArtSoulDiscovery?.classifyLifecycle?.(artwork)?.label || 'Artwork'}</span>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-2 text-center mb-4">
-                                        <div className={`p-3 rounded-lg ${isClassic ? 'bg-gray-700/60' : 'bg-cyan-900/20 border border-cyan-500/20'}`}>
-                                            <div className="text-xl font-bold">{socialSignals.likes || votes.length}</div>
-                                            <div className="text-xs opacity-70">Likes</div>
-                                        </div>
-                                        <div className={`p-3 rounded-lg ${isClassic ? 'bg-gray-700/60' : 'bg-cyan-900/20 border border-cyan-500/20'}`}>
-                                            <div className="text-xl font-bold">{socialSignals.wouldBuy || 0}</div>
-                                            <div className="text-xs opacity-70">Would Buy</div>
-                                        </div>
-                                        <div className={`p-3 rounded-lg ${isClassic ? 'bg-gray-700/60' : 'bg-cyan-900/20 border border-cyan-500/20'}`}>
-                                            <div className="text-xl font-bold">{socialSignals.watching || 0}</div>
-                                            <div className="text-xs opacity-70">Watching</div>
-                                        </div>
-                                    </div>
-
-                                    {userVote ? (
-                                        <div className="text-center py-1">
-                                            <p className="text-sm opacity-70">✓ You voted</p>
-                                        </div>
-                                    ) : (
-                                        <button onClick={handleVote} className="btn-main w-full">
-                                            Like
-                                        </button>
-                                    )}
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
-                                        <button
-                                            onClick={() => handleDiscoverySignal('would_buy')}
-                                            className={interactionState.would_buy ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'}
-                                            disabled={interactionState.would_buy}
-                                        >
-                                            {interactionState.would_buy ? 'Would Buy Saved' : 'Would Buy'}
-                                        </button>
-                                        <button
-                                            onClick={() => handleDiscoverySignal('watching')}
-                                            className={interactionState.watching ? 'btn-secondary w-full opacity-70' : 'btn-main w-full'}
-                                            disabled={interactionState.watching}
-                                        >
-                                            {interactionState.watching ? 'Watching Saved' : 'Watching'}
-                                        </button>
-                                    </div>
-
-                                    {aiGuidance && (
-                                        <div
-                                            className="mt-4 p-3 rounded-lg text-sm"
-                                            style={{
-                                                background: 'var(--c-surface-muted)',
-                                                border: '1px solid var(--c-border-soft)',
-                                                color: 'var(--c-text)'
-                                            }}
-                                        >
-                                            <div className="font-semibold mb-1">Value Guidance</div>
-                                                <div className="opacity-80">
-                                                    Estimated range: {formatAIPrice(aiGuidance.estimated_value_min_eth)} - {formatAIPrice(aiGuidance.estimated_value_max_eth)} ETH
-                                                    <div className="mt-1">
-                                                        Suggested starting price: {formatAIPrice(aiGuidance.suggested_start_price_eth)} ETH - {aiGuidance.confidence || 'medium'} confidence
-                                                    </div>
-                                                    {aiGuidance.rationale && <div className="mt-1 opacity-80">{aiGuidance.rationale}</div>}
-                                                </div>
-                                            <div className="text-xs opacity-60 mt-1">Guidance only. It does not affect settlement, floor, royalties, or mint rights.</div>
-                                        </div>
-                                    )}
-                                </div>
-
+                                {isClassic
+                                    ? [ownershipPanel, provenancePanel, auctionPanel]
+                                    : null}
+                                {legacyPanel}
                             </aside>
                         </div>
                     </main>

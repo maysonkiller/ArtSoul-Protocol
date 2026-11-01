@@ -39,7 +39,7 @@
     <link rel="apple-touch-icon" href="/ARTSOULlogo.png?v=3">
     <script src="/header-prepaint.js?v=9"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
-    <link rel="stylesheet" href="/unified-styles.css?v=64">
+    <link rel="stylesheet" href="/unified-styles.css?v=65">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/mobile-responsive.css?v=5">
     <link rel="stylesheet" href="/performance-optimizations.css?v=2">
@@ -171,6 +171,10 @@
             transition: all 0.3s;
             cursor: pointer;
         }
+
+        .upload-process { display: none; }
+        .upload-file-picker { min-height: 44px; margin-top: 1rem; }
+        .upload-file-picker:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }
 
         .classic .upload-zone {
             border: 2px dashed var(--accent-classic);
@@ -628,6 +632,12 @@
             <a href="/collection-builder">Collection <span>Local draft</span></a>
         </nav>
 
+        <ol class="upload-process" aria-label="Publication steps">
+            <li><span aria-hidden="true">01</span> Choose your file</li>
+            <li><span aria-hidden="true">02</span> Add details and review</li>
+            <li><span aria-hidden="true">03</span> Confirm with your wallet</li>
+        </ol>
+
         <div class="upload-form-stack space-y-8">
             <section id="commandDraftPanel" class="publish-panel" aria-labelledby="commandDraftTitle" hidden>
                 <h2 id="commandDraftTitle" class="font-semibold mb-3">Publication draft</h2>
@@ -644,7 +654,7 @@
                 <p id="savedPublicationsError" class="validation-message" role="status" hidden></p>
                 <div id="savedPublicationsList" class="space-y-4 mt-3"></div>
             </section>
-            <div class="upload-zone rounded-xl p-12 text-center" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-zone rounded-xl p-12 text-center" onclick="if (event.target !== document.getElementById('fileInput')) document.getElementById('fileInput').click()">
                 <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.gif" style="display: none;" onchange="handleFileSelect(event)">
 
                 <!-- Upload prompt (hidden when file selected) -->
@@ -653,7 +663,7 @@
                         <path d="M12 3L12 21M12 3L6 9M12 3L18 9M3 15L3 21L21 21L21 15" stroke="currentColor" class="icon-svg"/>
                     </svg>
                     <p class="text-xl opacity-70 mb-2">Select the artwork you want collectors to discover</p>
-                    <p class="text-sm opacity-40">Supports JPG, PNG, WebP, MP4, WebM, GIF, MP3, WAV, OGG, AAC, and M4A. Maximum 50 MB.</p>
+                    <p id="uploadFileHelp" class="text-sm opacity-40">Supports JPG, PNG, WebP, MP4, WebM, GIF, MP3, WAV, OGG, AAC, and M4A. Maximum 50 MB.</p>
                 </div>
 
                 <!-- File info and preview (shown when file selected) -->
@@ -663,6 +673,7 @@
                         <img id="previewImage" alt="Preview" class="w-full h-auto max-h-96 object-contain bg-black">
                     </div>
                 </div>
+                <button type="button" class="btn-secondary upload-file-picker" aria-describedby="uploadFileHelp fileName fileValidationError">Choose file</button>
                 <p id="fileValidationError" class="validation-message" style="display: none;"></p>
             </div>
 

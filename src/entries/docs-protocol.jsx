@@ -81,7 +81,14 @@ function ProtocolDocsApp() {
     const openFromNav = (id) => {
         setOpenSections(previous => ({ ...previous, [id]: true }));
         setNavOpen(false);
-        requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        requestAnimationFrame(() => {
+            const section = document.getElementById(id);
+            section?.querySelector('.protocol-section-trigger')?.focus({ preventScroll: true });
+            section?.scrollIntoView({
+                behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth',
+                block: 'start'
+            });
+        });
     };
 
     return (

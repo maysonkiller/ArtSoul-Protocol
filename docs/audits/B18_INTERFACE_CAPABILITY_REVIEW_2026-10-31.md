@@ -359,7 +359,7 @@ standalone study. It was renamed `study-grid`; the guard was not weakened.
 
 ## November 1 Home and Gallery adoption
 
-Local candidate on `codex/interface-discovery-adoption`, based on `63163ad5`.
+Released in PR415 / `e396dfb5`, based on `63163ad5`.
 Future adopts the accepted two-column hero with a static CSS illustration,
 left-aligned discovery heading, quieter informational panels, Gallery heading
 and underline categories. The illustration makes no media/API request and is
@@ -388,9 +388,55 @@ Initial unit run caught two runtime-pin updates and one old initializer assertio
 all corrected without weakening their guards. Browser source190 assertions across
 20 Home/Gallery layouts passed; final built checks add direct category bookmark
 and actual keyboard selection/focus. Built checks passed 195 assertions across
-20 layouts, with no page errors or write requests. Deployment remains pending.
+20 layouts, with no page errors or write requests. Exact CI41261857497 passed:
+Linux3221/two skips, Windows2666/35 skips, 49 contract tests on each platform,
+both builds and static checks. Preview7467067613 and production7467108395 pass.
+Six apex routes serve the exact compiled stylesheet, SHA256
+`fe861b1e8aef8ead9bc9f149c11948e192acb081a33b0386079dfbb9c61d97bf`.
+Live guest Home/Gallery at390/1366 load real metrics and16/28 cards respectively,
+with no horizontal overflow. These public reads made no wallet operations.
 Evidence: docs/private/b18-discovery-*.log and output/playwright/b18-discovery-*.
 No native iPhone or wallet acceptance is inferred from synthetic transport.
+
+## Profile, artwork, publish, Admin and Docs adoption — November 1 candidate
+
+Based on PR415 / `e396dfb5`, in the same `C:\Projects\ArtSoul` checkout.
+Future now uses the accepted compact profile summary and equal statistics,
+ordinary page scrolling on artwork, readable publication form, calmer protected
+Admin navigation and accessible Docs contents. Classic composition and all 71
+theme variables remain unchanged. Existing media, wallet handlers, recovery,
+complaint/donation dialogs and protected access checks are retained.
+
+Artwork roles stay explicit: matching First Collector and current Owner share
+one identity row with both labels; transfers and creator buybacks retain their
+distinct roles. Provenance remains the real indexed history. AI guidance and
+technical details use native disclosures in Future; mobile visual and DOM order
+match. Community help explains the existing signals and links to the real Guide.
+The public contact address is the approved project mailbox.
+
+Two related interaction corrections accompany the presentation: profile tab
+switches retire the outgoing read immediately and release the temporary viewport
+reservation when the current load settles; the existing file picker gains a
+native keyboard button and ignores its own bubbled input click. Docs navigation
+focuses the opened topic and respects reduced motion. No new dependencies.
+
+Final local units: 2,717 pass, zero failures, 35 explicit environment skips
+(includes 29 pre-existing untracked authority-policy checks, outside this PR).
+Build: 11 routes and 172 utilities verified. Actual built-browser checks pass
+706 assertions across both themes and 320–1366px layouts: all eight artwork
+panels, role labels, dialogs, native audio/video playback, profile editing and
+all five tabs, publication file types, 14 Docs topics/keyboard focus, and Admin
+queue/navigation/session-loss gates. Native Space activates the chooser once.
+Synthetic transport blocks remote writes; protected Admin states use fixtures.
+No physical iPhone, live wallet, paid AI or new moderation ceremony is inferred.
+Evidence: `docs/private/b18-built-*.log`, `b18-detail-{units,build}-final.log`
+and `output/playwright/b18-{detail,profile-flow,publish,docs,admin}-*`.
+
+Interpretations: publication steps are orientation, not a new state machine;
+disclosures do not hide required publication or auction actions; the changed
+layout does not amend economics or lifecycle. Collection drafts are the next
+presentation slice; issuance, badges and contract deployment remain unfinished
+capabilities rather than enabled demonstration buttons. Release proof pending.
 
 ## Verification mark policy
 
