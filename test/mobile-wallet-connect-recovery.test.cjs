@@ -242,12 +242,12 @@ test('single-teardown invariant: session teardown stays on explicit, user-driven
     // explicit user Disconnect (resetWalletConnection).
     const appKitDisconnectCalls = appKit.match(/disconnectCoreWallet\(\)/g) || [];
     assert.equal(appKitDisconnectCalls.length, 1, 'disconnectCoreWallet must only run inside resetWalletConnection');
-    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    const reset = appKit.match(/async function resetWalletConnection\(\)[\s\S]*?\n\}/)?.[0] || '';
     assert.match(reset, /disconnectCoreWallet\(\)/);
     // Storage-clearing helpers are guarded: with a live core session and no
     // explicit-disconnect flag they refuse to run.
     const cacheClear = appKit.match(/async function clearWalletConnectionCache[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(cacheClear, /isCoreSessionActive\(\) && !sessionStorage\.getItem\('artsoul_disconnecting'\)/);
+    assert.match(cacheClear, /isCoreSessionActive\(\) && !isWalletExplicitlyDisconnected\(\)/);
     assert.match(cacheClear, /wallet cache clear skipped; live core session without explicit disconnect/);
     const incompleteClear = appKit.match(/async function clearIncompleteWalletConnectState[\s\S]*?\n\}/)?.[0] || '';
     assert.match(incompleteClear, /hasConfirmedWalletAddress\(\) \|\| isCoreSessionActive\(\)/);
@@ -317,7 +317,7 @@ test('no failure or cleanup path clears WalletConnect storage with a live sessio
     // disconnectCoreWallet stays confined to the explicit user disconnect.
     const disconnectCalls = appKit.match(/disconnectCoreWallet\(\)/g) || [];
     assert.equal(disconnectCalls.length, 1, 'disconnectCoreWallet must only run inside resetWalletConnection');
-    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    const reset = appKit.match(/async function resetWalletConnection\(\)[\s\S]*?\n\}/)?.[0] || '';
     assert.match(reset, /disconnectCoreWallet\(\)/);
 });
 
@@ -325,7 +325,7 @@ test('the site never reloads or redirects itself in the wallet flow', () => {
     assert.doesNotMatch(appKit, /location\.reload/);
     assert.doesNotMatch(coreWallet, /location\.reload/);
     assert.doesNotMatch(coreWallet, /location\.href/);
-    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    const reset = appKit.match(/async function resetWalletConnection\(\)[\s\S]*?\n\}/)?.[0] || '';
     assert.ok(reset, 'resetWalletConnection must exist');
     assert.doesNotMatch(reset, /location\.href/);
     assert.doesNotMatch(reset, /location\.reload/);

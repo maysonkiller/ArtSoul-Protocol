@@ -899,13 +899,13 @@ test('X/Discord linking routes through ensureWalletConnected instead of an error
 });
 
 test('explicit disconnect does not resurrect: cache clear runs before restore starts', () => {
-    const initSection = appKit.match(/const explicitDisconnectRequested = sessionStorage\.getItem\('artsoul_disconnecting'\);[\s\S]*?coreSessionRestoreTask = restoreCoreSessionOutcome\(\);/)?.[0] || '';
+    const initSection = appKit.match(/const explicitDisconnectRequested = isWalletExplicitlyDisconnected\(\);[\s\S]*?coreSessionRestoreTask = restoreCoreSessionOutcome\(\);/)?.[0] || '';
     assert.ok(initSection, 'explicit-disconnect cleanup must precede the restore kick-off');
     assert.match(initSection, /await clearWalletConnectionCache\(\)/);
     // Restore only runs on the mobile external-browser path.
-    assert.match(initSection, /isMobile && !isInjectedWalletBrowser\(\)/);
+    assert.match(initSection, /isMobile && !isInjectedWalletBrowser\(\) && !explicitDisconnectRequested/);
     // Disconnect settles the UI in place — never via reload/redirect.
-    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    const reset = appKit.match(/async function resetWalletConnection\(\)[\s\S]*?\n\}/)?.[0] || '';
     assert.match(reset, /disconnectCoreWallet\(\)/);
     assert.match(reset, /await window\.SupabaseAuth\?\.signOut\?\.\(\)/);
     assert.ok(
@@ -916,10 +916,17 @@ test('explicit disconnect does not resurrect: cache clear runs before restore st
 });
 
 test('explicit disconnect revokes the SIWE session before wallet teardown', async () => {
-    const reset = appKit.match(/window\.resetWalletConnection = async[\s\S]*?\n\};/)?.[0] || '';
+    const reset = appKit.match(/async function resetWalletConnection\(\)[\s\S]*?\n\}/)?.[0] || '';
     const calls = [];
     const sessionValues = new Map();
+    const localValues = new Map();
     const context = {
+        walletConnectionRevision: 0,
+        activeConnectAttempt: null,
+        walletResumeTimer: null,
+        activeWalletProvider: null,
+        latestAppKitAccountSnapshot: null,
+        lastObservedAppKitAccountKey: null,
         window: {
             SupabaseAuth: {
                 signOut: async () => calls.push('siwe-sign-out')
@@ -929,6 +936,10 @@ test('explicit disconnect revokes the SIWE session before wallet teardown', asyn
         sessionStorage: {
             setItem: (key, value) => sessionValues.set(key, value),
             removeItem: (key) => sessionValues.delete(key)
+        },
+        localStorage: {
+            setItem: (key, value) => localValues.set(key, value),
+            removeItem: (key) => localValues.delete(key)
         },
         clearModalIntent() {},
         CORE_NETWORK_CONFIRMATION_KEY: 'network-confirmation',
@@ -946,7 +957,8 @@ test('explicit disconnect revokes the SIWE session before wallet teardown', asyn
     };
     vm.runInNewContext(reset, context, { filename: 'appkit-init.resetWalletConnection.js' });
 
-    assert.equal(await context.window.resetWalletConnection(), true);
+    assert.equal(await context.resetWalletConnection(), true);
     assert.deepEqual(calls, ['siwe-sign-out', 'wallet-disconnect', 'cache-clear']);
-    assert.equal(sessionValues.has('artsoul_disconnecting'), false);
+    assert.equal(sessionValues.get('artsoul_disconnecting'), 'true');
+    assert.equal(localValues.get('artsoul_disconnecting'), 'true');
 });

@@ -656,7 +656,8 @@ let selectedFile = null;
             }
 
             const scrollTo = target || document.getElementById('aiValuationPanel');
-            scrollTo?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const staticMotion = document.documentElement.classList.contains('classic') || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+            scrollTo?.scrollIntoView({ behavior: staticMotion ? 'auto' : 'smooth', block: 'center' });
             if (target) {
                 target.classList.add('publish-step-wanted');
                 window.setTimeout(() => target.classList.remove('publish-step-wanted'), 2400);

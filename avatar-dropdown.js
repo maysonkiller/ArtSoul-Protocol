@@ -91,8 +91,9 @@
     let appKitDisconnectedAtBoot = window.ArtSoulHeaderPrepaint?.boot?.appKitDisconnectedAtBoot === true;
     if (!window.ArtSoulHeaderPrepaint?.boot) {
         try {
-            appKitDisconnectedAtBoot = !MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
-                && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected';
+            appKitDisconnectedAtBoot = localStorage.getItem('artsoul_disconnecting') === 'true'
+                || (!MOBILE_USER_AGENT_PATTERN.test(navigator.userAgent)
+                    && localStorage.getItem(APPKIT_CONNECTION_STATUS_STORAGE_KEY) === 'disconnected');
         } catch {
             // Storage can be unavailable in privacy-restricted browsers.
         }
@@ -624,6 +625,7 @@
             const currentHash = window.location.hash || '';
             const isOwnProfile = options.isOwnProfile !== false;
             return this.getNavigationItems()
+                .filter(item => item.profile || !document.querySelector('.site-primary-nav'))
                 .filter(item => !this.isCurrentNavigationItem(item, currentPath, currentHash, isOwnProfile))
                 .map(item => {
                     return `
@@ -1412,7 +1414,8 @@
             const network = NETWORK_IDENTITIES[Number(networkInfo?.chainId)];
             if (!network) return '';
             const currency = [84532, 11155111].includes(Number(networkInfo.chainId)) ? 'test ETH' : 'ETH';
-            return `${this.renderIdentityMark('eth')}<span class="network-balance-value">${networkBalanceText(networkInfo.balance)} ${currency}</span>`;
+            const tokenMark = network.mark === 'eth' ? '' : this.renderIdentityMark('eth');
+            return `${tokenMark}<span class="network-balance-value">${networkBalanceText(networkInfo.balance)} ${currency}</span>`;
         }
 
         renderWalletProvider(walletProvider) {
@@ -1437,7 +1440,30 @@
 
         renderMenuIdentity(walletAddress, restoring) {
             const identity = this.getMenuIdentity(walletAddress, restoring);
-            return `<div class="avatar-menu-identity"><span class="avatar-menu-name">${escapeMenuText(identity.name)}</span>${identity.wallet ? `<span class="avatar-menu-address">${escapeMenuText(identity.wallet)}</span>` : ''}</div>`;
+            return `<div class="avatar-menu-identity"><span class="avatar-menu-name">${escapeMenuText(identity.name)}</span>${identity.wallet ? `
+                <button type="button" class="avatar-menu-address" data-wallet-address="${escapeMenuText(identity.wallet)}" onclick="window.AvatarDropdown.copyMenuAddress(event)" aria-label="Copy wallet address ${escapeMenuText(identity.wallet)}">
+                    <span class="avatar-menu-address-value">${escapeMenuText(identity.wallet)}</span>
+                    <span class="avatar-menu-copy-status" aria-live="polite">Copy address</span>
+                </button>` : ''}</div>`;
+        }
+
+        async copyMenuAddress(event) {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
+            const button = event?.currentTarget;
+            const address = button?.dataset.walletAddress || '';
+            if (!WALLET_ADDRESS_PATTERN.test(address) || button.disabled) return;
+            const status = button.querySelector('.avatar-menu-copy-status');
+            button.disabled = true;
+            try {
+                if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+                await navigator.clipboard.writeText(address);
+                if (status) status.textContent = 'Copied';
+            } catch {
+                if (status) status.textContent = 'Could not copy. Select the address above.';
+            } finally {
+                button.disabled = false;
+            }
         }
 
         /**
@@ -1962,7 +1988,7 @@
             if (!container) return false;
 
             // The boot snapshot, never a fresh read: see appKitDisconnectedAtBoot.
-            if (appKitDisconnectedAtBoot) {
+            if (appKitDisconnectedAtBoot || localStorage.getItem('artsoul_disconnecting') === 'true') {
                 return this.renderConnectButton({ renderKey: 'initializing-disconnected' });
             }
 

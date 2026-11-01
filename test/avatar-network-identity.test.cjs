@@ -62,6 +62,9 @@ for (const [chainId, name, mark, currency] of [
         assert.ok(html.includes(`data-network-name>${name}</span>`));
         assert.ok(html.includes(`src="/brand/${mark}"`));
         assert.ok(html.includes(`0.0000 ${currency}</span>`));
+        const balance = html.match(/data-network-balance>(.*?)<\/div>/)?.[1];
+        assert.ok(balance);
+        assert.equal(balance.includes('/brand/eth.png'), mark !== 'eth.png', 'do not repeat the network glyph in the balance');
         assert.deepEqual([...html.matchAll(/selectNetwork\((\d+), event\)/g)].map(match => Number(match[1])), [84532]);
         assert.match(html, /aria-controls="avatarNetworkOptions"/);
     });
@@ -201,7 +204,7 @@ test('the mobile menu identity shows the current resolved name and full wallet a
     await harness.dropdown.sync(WALLET, { confirmed: true });
     await harness.flush();
     assert.match(harness.menuHtml(), /class="avatar-menu-name">Current Artist<\/span>/);
-    assert.ok(harness.menuHtml().includes(`class="avatar-menu-address">${WALLET}</span>`));
+    assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET}</span>`));
 });
 
 test('a profile belonging to another wallet cannot name the menu identity', () => {
@@ -212,7 +215,7 @@ test('a profile belonging to another wallet cannot name the menu identity', () =
     const html = harness.dropdown.renderMenuIdentity(WALLET);
     assert.doesNotMatch(html, /Another Artist/);
     assert.match(html, /class="avatar-menu-name">0xaaaa\.\.\.aaaa<\/span>/);
-    assert.ok(html.includes(`class="avatar-menu-address">${WALLET}</span>`));
+    assert.ok(html.includes(`class="avatar-menu-address-value">${WALLET}</span>`));
 });
 
 test('a mismatched profile response cannot redirect header identity, caching or balance reads', async () => {
@@ -234,7 +237,7 @@ test('a mismatched profile response cannot redirect header identity, caching or 
     assert.equal(harness.avatarSrc(), '/default-avatar.png');
     assert.equal(harness.imageLoads.includes(foreignAvatar), false);
     assert.doesNotMatch(harness.menuHtml(), /class="avatar-menu-name">Another Artist/);
-    assert.ok(harness.menuHtml().includes(`class="avatar-menu-address">${WALLET}</span>`));
+    assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET}</span>`));
     assert.equal(harness.dropdown.getCachedHeaderIdentity(WALLET), null);
     assert.equal(harness.dropdown.profileCache.has(WALLET), false);
     assert.equal(harness.dropdown.profile, null);
@@ -287,7 +290,7 @@ for (const [description, walletAddress] of [['case-insensitive', WALLET.toUpperC
         assert.equal(harness.avatarName(), 'Current Artist');
         assert.equal(harness.avatarAddress(), '0xaaaa...aaaa');
         assert.equal(harness.avatarSrc(), profile.avatar_url);
-        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address">${WALLET}</span>`));
+        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET}</span>`));
         assert.equal(harness.dropdown.profileCache.get(WALLET).username, 'Current Artist');
         assert.equal(harness.profileCalls.length, 1);
         assert.equal(harness.dropdown.automaticRecoveries, 0);
@@ -306,7 +309,7 @@ for (const explicitWallet of [true, false]) {
         await harness.flush();
         assert.equal(harness.avatarName(), '0xaaaa...aaaa');
         assert.equal(harness.avatarSrc(), '/default-avatar.png');
-        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address">${WALLET}</span>`));
+        assert.ok(harness.menuHtml().includes(`class="avatar-menu-address-value">${WALLET}</span>`));
         assert.equal(harness.imageLoads.includes('https://fixture.invalid/foreign-avatar.png'), false);
     });
 }

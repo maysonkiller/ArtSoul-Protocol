@@ -146,23 +146,15 @@
    moment shows nothing at all, and only a wait long enough to notice gets a
    placeholder.
 
-   Opacity alone, and a step rather than a fade: the element keeps its box the
-   whole time, so the layout it reserves and the aria-busy it announces are
-   unchanged, and nothing moves on screen. Reduced motion is not gated here -
-   there is no motion, and gating it would leave the placeholder invisible for
-   the people who most need to be told something is happening. */
+   The component removes this class after a short wait without a CSS animation.
+   Its box and aria-busy stay unchanged, including in static Classic mode. */
 .artsoul-placeholder {
     opacity: 0;
-    animation: artsoulPlaceholderReveal 1ms linear 320ms forwards;
-}
-
-@keyframes artsoulPlaceholderReveal {
-    to { opacity: 1; }
 }
 
 /* Branded wait indicator.
    Shown while a freshly published artwork is still reaching the projection.
-   Both themes animate; each keeps its own colors. The colour flow across the
+   Future animates; Classic keeps static progress feedback. The colour flow across the
    wordmark is a Future treatment and never appears in Classic. */
 .artsoul-wait-screen {
     min-height: 100vh;
@@ -1233,14 +1225,12 @@ body.future .artwork-detail-frame {
 }
 
 .artsoul-themed-select__listbox {
-    position: absolute;
-    z-index: 120;
-    top: calc(100% + 7px);
-    left: 0;
-    width: max-content;
-    min-width: 100%;
-    max-width: min(420px, calc(100vw - 32px));
-    max-height: min(320px, 55vh);
+    position: fixed;
+    z-index: 20000;
+    min-width: 0;
+    max-height: min(60vh, 360px);
+    box-sizing: border-box;
+    overscroll-behavior: contain;
     padding: 6px;
     overflow-y: auto;
     border: 1px solid var(--c-border);
@@ -1324,18 +1314,7 @@ body.future .artwork-detail-frame {
     }
 
     .artsoul-themed-select__listbox {
-        position: fixed;
-        z-index: 20000;
-        top: auto;
-        right: 12px;
-        bottom: max(12px, env(safe-area-inset-bottom));
-        left: 12px;
-        width: auto;
-        min-width: 0;
-        max-width: none;
-        max-height: min(60vh, 360px);
         border-radius: 14px;
-        background: var(--c-surface);
     }
 
     .artsoul-themed-select__option {
@@ -7075,7 +7054,28 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button {
 .avatar-wallet-provider { display: flex; align-items: center; gap: 6px; padding: 6px 10px; color: var(--c-text-muted); font-size: 12px; }
 .avatar-wallet-provider .avatar-identity-mark { width: 18px; height: 18px; flex-basis: 18px; }
 .avatar-wallet-provider > span { min-width: 0; overflow-wrap: anywhere; }
-.avatar-menu-identity { display: none; }
+.avatar-menu-identity { display: grid; gap: 4px; padding: 10px; border-bottom: 1px solid var(--c-border-soft); }
+.avatar-menu-name { color: var(--c-text); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.avatar-menu-address {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    min-height: 44px;
+    padding: 4px 0;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-muted);
+    font-size: 11px;
+    line-height: 1.5;
+    cursor: pointer;
+}
+.avatar-menu-address-value { overflow-wrap: anywhere; user-select: text; }
+.avatar-menu-copy-status { color: var(--c-accent); font-size: 12px; }
+.avatar-menu-address:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 4px; }
+body:is(.classic, .future) .site-header .avatar-dropdown-menu .avatar-theme-section { padding: 8px 10px; }
+body:is(.classic, .future) .site-header .avatar-dropdown-menu .avatar-theme-switch { min-height: 44px; padding: 2px; }
+body:is(.classic, .future) .site-header .avatar-dropdown-menu .avatar-theme-switch .theme-btn { min-height: 44px !important; padding: 6px 12px !important; font-size: 13px !important; }
 @media (max-width: 768px) {
     .site-header .network-switcher-btn .avatar-network-mark > img { width: 16px; height: 16px; flex-basis: 16px; }
 }
@@ -7114,9 +7114,6 @@ body:is(.classic, .future) .site-header #navButtons .avatar-button {
         width: min(280px, calc(100vw - 24px)) !important;
         max-width: calc(100vw - 24px) !important;
     }
-    body:is(.classic, .future) .avatar-menu-identity { display: grid; gap: 4px; padding: 10px; border-bottom: 1px solid var(--c-border-soft); }
-    body:is(.classic, .future) .avatar-menu-name { color: var(--c-text); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-    body:is(.classic, .future) .avatar-menu-address { color: var(--c-text-muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
     body:is(.classic, .future) .site-header .avatar-dropdown-menu :is(.dropdown-item, .theme-btn) { min-height: 44px !important; font-size: 13px !important; }
     body:is(.classic, .future) .site-header .avatar-dropdown-menu .network-current-row { height: auto !important; min-height: 52px !important; max-height: none !important; }
     body:is(.classic, .future) .site-header .network-switcher-copy [data-network-name] { font-size: 13px !important; color: var(--c-text); }
@@ -7354,6 +7351,9 @@ body:is(.classic, .future) .profile-hero .profile-social-links .truncate {
     overflow-wrap: anywhere;
 }
 body:is(.classic, .future) .profile-hero .profile-inline-edit-action { flex: 0 0 auto; margin: 0; }
+@media (min-width: 769px) {
+    body:is(.classic, .future) .profile-hero .profile-inline-edit-action { margin-inline-start: auto; }
+}
 body:is(.classic, .future) .profile-hero .profile-inline-edit-action .btn-main {
     min-height: 44px;
     padding: 0.5rem 0.875rem !important;
@@ -7419,7 +7419,18 @@ body:is(.classic, .future) .profile-gallery-panel > .flex:first-child { margin-b
 body:is(.classic, .future) .profile-empty-state { padding: 1.5rem 0; }
 @media (max-width: 768px) {
     body:is(.classic, .future) .profile-hero { padding-bottom: 1rem !important; margin-bottom: 1rem !important; }
-    body:is(.classic, .future) .profile-hero .profile-identity-layout { grid-template-columns: 64px minmax(0, 1fr); gap: 1rem !important; }
+    body:is(.classic, .future) .profile-hero .profile-identity-layout { grid-template-columns: 64px minmax(0, 1fr); gap: 0.75rem !important; }
+    body:is(.classic, .future) .profile-hero .profile-summary { display: contents; }
+    body:is(.classic, .future) .profile-hero .profile-heading { grid-column: 2; grid-row: 1; min-width: 0; }
+    body:is(.classic, .future) .profile-hero .profile-heading > div { margin-bottom: 0; }
+    body:is(.classic, .future) .profile-hero .profile-display-name { font-size: 1.375rem !important; }
+    body:is(.classic, .future) .profile-hero .profile-display-bio,
+    body:is(.classic, .future) .profile-hero .profile-social-action-row { grid-column: 1 / -1; margin: 0; }
+    body:is(.classic, .future) .profile-hero .profile-display-bio { font-size: 0.875rem; line-height: 1.5; }
+    body:is(.classic, .future) .profile-hero .profile-social-links { flex: 1 1 100%; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body:is(.classic, .future) .profile-hero .profile-social-links > * { font-size: 0.8125rem; }
+    body:is(.classic, .future) .profile-hero .profile-stat-card > div { font-size: 0.75rem; }
+    body:is(.classic, .future) .profile-hero .profile-stat-card > :is(.text-lg, .text-xl) { font-size: 1rem; }
     body:is(.classic, .future) .profile-hero .profile-avatar-column,
     body:is(.classic, .future) .profile-hero .profile-avatar-shell { width: 64px !important; min-width: 64px !important; max-width: 64px !important; }
     body:is(.classic, .future) .profile-hero .profile-avatar-shell { height: 64px !important; min-height: 64px !important; max-height: 64px !important; }
@@ -8153,3 +8164,15 @@ body:is(.classic, .future) .notification-panel a[href]:focus-visible {
 body.future #homeSection .home-hero-actions > .btn-main { background: linear-gradient(120deg, var(--c-accent), var(--c-accent-2)); }
 body.future .artsoul-artwork-card:hover,
 body.future .artsoul-artwork-card:focus-within { box-shadow: 0 4px 16px rgba(var(--c-accent-rgb), 0.08); }
+
+/* Founder direction, 2026-11-01: Classic interface feedback is static.
+   Media playback is content and remains controlled by its own player. */
+html.classic,
+html.classic body,
+html.classic body *,
+html.classic body *::before,
+html.classic body *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+}

@@ -734,10 +734,10 @@ test('only the mobile external browser takes the core path', () => {
     // The injected-mobile and AppKit desktop branches keep their own flow.
     assert.match(safeConnect, /const accounts = await requestInjectedMobileAccounts\(\);/);
     assert.match(safeConnect, /await openAppKitConnectModal\(attempt\);/);
-    assert.match(safeConnect, /await waitForConfirmedDesktopWallet\(WALLET_CONNECT_TIMEOUT_DESKTOP\);/);
+    assert.match(safeConnect, /await waitForConfirmedDesktopWallet\(WALLET_CONNECT_TIMEOUT_DESKTOP, attempt\);/);
     // Reconciliation from AppKit/Wagmi/injected reads stays off the core path.
     const reconciliation = appKitSource.match(/function scheduleWalletReconciliation[\s\S]*?\n\}/)?.[0] || '';
-    assert.match(reconciliation, /if \(isMobileDevice\(\) && !isInjectedWalletBrowser\(\)\) return;/);
+    assert.match(reconciliation, /if \(isWalletExplicitlyDisconnected\(\) \|\| \(isMobileDevice\(\) && !isInjectedWalletBrowser\(\)\)\) return;/);
 });
 
 // ---------------------------------------------------------------------------

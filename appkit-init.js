@@ -159,6 +159,8 @@ let walletResumeTimer = null;
 let walletResumeListenersBound = false;
 let latestAppKitAccountSnapshot = null;
 let appKitAccountRevision = 0;
+let walletConnectionRevision = 0;
+let walletDisconnectPromise = null;
 let deferMobileAuthenticationThisTurn = false;
 let coreNetworkConfirmationPromise = null;
 const walletResumeWaiters = new Set();
@@ -232,6 +234,23 @@ window.artsoulWalletHydrating = true;
 window.artsoulWalletStateSettled = false;
 window.artsoulSettledWalletState = null;
 window.artsoulMobileWalletRestoreState = mobileCoreRestoreState;
+
+function isWalletExplicitlyDisconnected() {
+    return Boolean(localStorage.getItem('artsoul_disconnecting') || sessionStorage.getItem('artsoul_disconnecting'));
+}
+
+function isWalletResultCurrent(revision) {
+    return revision === walletConnectionRevision && !isWalletExplicitlyDisconnected();
+}
+
+function beginWalletConnection() {
+    walletConnectionRevision++;
+    if (modalCloseRetryTimer) clearTimeout(modalCloseRetryTimer);
+    modalCloseRetryTimer = null;
+    localStorage.removeItem('artsoul_disconnecting');
+    sessionStorage.removeItem('artsoul_disconnecting');
+    return walletConnectionRevision;
+}
 
 function walletDebugEnabled() {
     try {
@@ -598,13 +617,23 @@ async function requestProviderAccounts(provider) {
 }
 
 async function getWalletProviderCandidates({ allowInjectedFallback = true } = {}) {
+    if (isWalletExplicitlyDisconnected()) return [];
     const appKitProvider = await getAppKitWalletProvider();
-    const providers = [activeWalletProvider, appKitProvider];
-    if (allowInjectedFallback) providers.push(window.ethereum);
-    return [...new Set(providers.filter(Boolean))];
+    // While choosing a wallet, only a fresh selected-connector account can
+    // confirm it. An extension's old site authorization is not a selection.
+    if (activeConnectAttempt && !isInjectedWalletBrowser()) {
+        const account = latestAppKitAccountSnapshot;
+        if (!activeConnectAttempt.connectionConfirmed || appKitAccountRevision <= activeConnectAttempt.accountRevision
+            || !account || account.isConnected === false || account.status === 'disconnected') return [];
+        return appKitProvider ? [appKitProvider] : [];
+    }
+    if (activeWalletProvider) return [activeWalletProvider];
+    if (appKitProvider) return [appKitProvider];
+    return allowInjectedFallback && window.ethereum ? [window.ethereum] : [];
 }
 
 async function getProviderForWallet(walletAddress) {
+    if (isWalletExplicitlyDisconnected()) return null;
     const normalizedWallet = normalizeWalletAddress(walletAddress);
     if (!normalizedWallet) return null;
 
@@ -708,16 +737,26 @@ window.getArtSoulWalletProviderSource = (provider) => {
 };
 
 async function reconcileActiveWalletFromProviders(source = 'provider reconciliation', options = {}) {
+    const revision = walletConnectionRevision;
+    if (!isWalletResultCurrent(revision)) return null;
     const providers = await getWalletProviderCandidates(options);
 
     for (const provider of providers) {
+        if (!isWalletResultCurrent(revision)) return null;
         const accounts = await requestProviderAccounts(provider);
+        if (!isWalletResultCurrent(revision)) return null;
         if (!accounts.length) continue;
+        if (activeConnectAttempt && !isInjectedWalletBrowser()) {
+            const selectedAddress = normalizeWalletAddress(latestAppKitAccountSnapshot?.address
+                || latestAppKitAccountSnapshot?.allAccounts?.[0]?.address);
+            if (!selectedAddress || !accounts.includes(selectedAddress)) continue;
+        }
 
-        activeWalletProvider = provider;
-        await handleProviderAccountsChanged(accounts, source, provider);
+        await handleProviderAccountsChanged(accounts, source, provider, { allowProviderChange: true });
+        if (!isWalletResultCurrent(revision)) return null;
         const chainId = await requestProviderChainId(provider);
-        if (chainId) await handleProviderChainConfirmed(chainId, source);
+        if (!isWalletResultCurrent(revision)) return null;
+        if (chainId) await handleProviderChainConfirmed(chainId, source, provider);
 
         return {
             address: accounts[0],
@@ -762,6 +801,7 @@ function appKitAccountSnapshotScore(account) {
 }
 
 function readAppKitAccountSnapshot() {
+    if (isWalletExplicitlyDisconnected()) return null;
     try {
         const candidates = [
             modal?.getAccount?.(),
@@ -1198,10 +1238,12 @@ function scheduleWalletReconciliation(source, delay = 150, options = {}) {
     // Desktop and injected wallet browsers only. On the mobile external path
     // the core provider's session is the single source of truth — no
     // reconciliation from AppKit/Wagmi/injected reads may touch state there.
-    if (isMobileDevice() && !isInjectedWalletBrowser()) return;
+    if (isWalletExplicitlyDisconnected() || (isMobileDevice() && !isInjectedWalletBrowser())) return;
+    const revision = walletConnectionRevision;
     if (walletResumeTimer) clearTimeout(walletResumeTimer);
     walletResumeTimer = setTimeout(async () => {
         walletResumeTimer = null;
+        if (!isWalletResultCurrent(revision)) return;
         walletDebugLog('wallet state reconciliation', {
             source,
             snapshot: getWalletDebugSnapshot()
@@ -1211,6 +1253,7 @@ function scheduleWalletReconciliation(source, delay = 150, options = {}) {
 }
 
 async function processWalletResume(source) {
+    if (isWalletExplicitlyDisconnected()) return;
     if (document.visibilityState === 'visible') {
         // A core session loses its relay socket whenever the mobile browser
         // goes to the background. Reopen it on every return so the session
@@ -1296,12 +1339,13 @@ function bindWalletResumeListeners() {
     });
 }
 
-async function waitForConfirmedDesktopWallet(timeoutMs) {
+async function waitForConfirmedDesktopWallet(timeoutMs, attempt = activeConnectAttempt) {
     const startedAt = Date.now();
     let modalWasOpen = false;
     let modalClosedAt = null;
 
     while (Date.now() - startedAt < timeoutMs) {
+        if (attempt?.cancelled || (attempt && activeConnectAttempt !== attempt) || isWalletExplicitlyDisconnected()) return null;
         const restored = await reconcileActiveWalletFromProviders('connect confirmation');
         if (restored?.address) return restored;
 
@@ -1490,6 +1534,7 @@ async function waitForProviderChainId(expectedChainId, timeout = NETWORK_CONFIRM
 
 async function safeCloseModal(reason = 'modal cleanup', options = {}) {
     if (modalClosePromise) return modalClosePromise;
+    const revision = walletConnectionRevision;
 
     const activeModals = [...new Set([modal, window.web3Modal].filter(Boolean))];
     const modalStates = activeModals.map((activeModal) => {
@@ -1503,6 +1548,7 @@ async function safeCloseModal(reason = 'modal cleanup', options = {}) {
 
     modalClosePromise = (async () => {
         for (const activeModal of activeModals) {
+            if (revision !== walletConnectionRevision) return false;
             const closeMethod = typeof activeModal.close === 'function'
                 ? activeModal.close
                 : activeModal.closeModal;
@@ -1530,8 +1576,10 @@ async function safeCloseModal(reason = 'modal cleanup', options = {}) {
 
 function scheduleModalCloseRetries(reason = 'modal cleanup') {
     if (modalCloseRetryTimer) return;
+    const revision = walletConnectionRevision;
     modalCloseRetryTimer = setTimeout(() => {
         modalCloseRetryTimer = null;
+        if (revision !== walletConnectionRevision) return;
         safeCloseModal(`${reason} retry`, { silent: true });
     }, MODAL_CLOSE_RETRY_DELAY);
 }
@@ -1551,7 +1599,8 @@ async function closeNetworkModalAfterConfirmedChain(chainId) {
     return true;
 }
 
-async function handleProviderChainConfirmed(chainId, source = 'provider') {
+async function handleProviderChainConfirmed(chainId, source = 'provider', provider = null) {
+    if (isWalletExplicitlyDisconnected() || (provider && provider !== activeWalletProvider)) return null;
     const normalizedChainId = setCurrentChainId(chainId);
     if (!normalizedChainId) return null;
 
@@ -1590,6 +1639,11 @@ async function handleProviderChainConfirmed(chainId, source = 'provider') {
 }
 
 async function handleProviderAccountsChanged(accounts, source = 'provider', provider = null, options = {}) {
+    const revision = walletConnectionRevision;
+    if (isWalletExplicitlyDisconnected()) return;
+    if (!options.allowProviderChange && provider && (
+        (activeWalletProvider && provider !== activeWalletProvider) || activeConnectAttempt
+    )) return;
     const list = Array.isArray(accounts) ? accounts : (accounts ? [accounts] : []);
     const nextAddress = normalizeWalletAddress(list[0]) || null;
     console.log(`Provider accountsChanged from ${source}:`, maskWalletAddress(nextAddress) || 'none');
@@ -1638,6 +1692,7 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
             !genuineCoreSessionEnd
         ) {
             await sleep(300);
+            if (!isWalletResultCurrent(revision)) return;
             const reconciledAddress = getCoreSessionAddress(provider);
             if (reconciledAddress || provider.session) {
                 walletDebugLog('empty accountsChanged reconciled to live core session', {
@@ -1668,6 +1723,7 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
         } catch (error) {
             console.warn('Sign-out after accounts cleared failed:', error);
         }
+        if (!isWalletResultCurrent(revision)) return;
         updateNavButtons(null);
         updateNetworkBadge(null);
         dispatchWalletStateChanged(
@@ -1687,6 +1743,7 @@ async function handleProviderAccountsChanged(accounts, source = 'provider', prov
     // Always check the backend SIWE session; lastProcessedAddress can be empty
     // after reload while the server session still belongs to a previous wallet.
     await signOutMismatchedSession(nextAddress);
+    if (!isWalletResultCurrent(revision)) return;
 
     const chainId = normalizeChainId();
     lastProcessedAddress = nextAddress;
@@ -1714,7 +1771,7 @@ function bindRuntimeProviderEvents(provider, source = 'provider') {
     }
 
     const chainHandler = (chainId) => {
-        handleProviderChainConfirmed(chainId, source);
+        handleProviderChainConfirmed(chainId, source, provider);
     };
 
     // Single global account listener → one app-wide event that the header,
@@ -2051,6 +2108,10 @@ function applyConfirmedNetwork(chainId) {
 }
 
 function getAuthoritativeWalletState() {
+    if (isWalletExplicitlyDisconnected()) return { address: null, chainId: null, isConnected: false };
+    if (activeConnectAttempt && !activeConnectAttempt.connectionConfirmed && !isInjectedWalletBrowser()) {
+        return { address: null, chainId: null, isConnected: false };
+    }
     if (window.currentWalletAddress) {
         return {
             address: normalizeWalletAddress(window.currentWalletAddress),
@@ -2089,6 +2150,8 @@ function getAuthoritativeWalletState() {
 }
 
 function getProviderWalletState() {
+    if (isWalletExplicitlyDisconnected()) return null;
+    if (activeConnectAttempt || (activeWalletProvider && activeWalletProvider !== window.ethereum)) return null;
     const providerAddress = window.ethereum?.selectedAddress || null;
     if (!providerAddress) return null;
 
@@ -2119,6 +2182,7 @@ function dispatchWalletStateChanged(state = {}, options = {}) {
         (state.chainId === null || state.chainId === undefined || state.chainId === '');
     const chainId = hasExplicitEmptyChain ? null : normalizeChainId(state.chainId ?? state);
     const isConnected = Boolean(address && state.isConnected !== false);
+    if (isConnected && isWalletExplicitlyDisconnected()) return false;
     const detail = { address, chainId, isConnected };
     let didSettleInitialState = false;
 
@@ -2139,7 +2203,7 @@ function dispatchWalletStateChanged(state = {}, options = {}) {
         isMobileDevice() &&
         !isInjectedWalletBrowser() &&
         isCoreSessionActive() &&
-        !sessionStorage.getItem('artsoul_disconnecting') &&
+        !isWalletExplicitlyDisconnected() &&
         options.acceptCoreDisconnect !== true
     ) {
         walletDebugLog('disconnected state ignored; live core session is authoritative', {});
@@ -2188,6 +2252,7 @@ function finishWalletHydration() {
 // confirmation remains separate so a compatible session can settle before
 // Base Sepolia is requested.
 function applyConfirmedWalletState(walletState) {
+    if (isWalletExplicitlyDisconnected()) return;
     const normalizedAddress = walletState.address.toLowerCase();
     const normalizedChainId = setCurrentChainId(walletState);
     finishWalletHydration();
@@ -2217,7 +2282,7 @@ async function clearWalletConnectionCache() {
     // Disconnect (resetWalletConnection sets artsoul_disconnecting first).
     // Every other caller — failure handlers, retries, boot — must leave the
     // session record and our hints intact.
-    if (isCoreSessionActive() && !sessionStorage.getItem('artsoul_disconnecting')) {
+    if (isCoreSessionActive() && !isWalletExplicitlyDisconnected()) {
         walletDebugLog('wallet cache clear skipped; live core session without explicit disconnect', {});
         return;
     }
@@ -2448,6 +2513,7 @@ async function signOutMismatchedSession(newAddress) {
  * Shows Avatar Dropdown when connected
  */
 window.updateNavButtons = function updateNavButtons(state) {
+    if (state?.address && isWalletExplicitlyDisconnected()) return;
     const navButtons = document.getElementById('navButtons');
     if (!navButtons) {
         if (!window._navButtonsRetries) window._navButtonsRetries = 0;
@@ -2602,6 +2668,8 @@ function notifyForeignChainAccepted(chainId) {
 }
 
 async function openAppKitConnectModal(attempt) {
+    if (modalClosePromise) await modalClosePromise;
+    if (attempt?.cancelled) return;
     walletDebugLog('modal open started', {
         walletId: lastSelectedWallet?.id || null,
         walletName: lastSelectedWallet?.name || null
@@ -2644,7 +2712,7 @@ function shouldDeferMobileAuthentication(connected) {
 // the awaited connect and the adopted late settle land here, so a session can
 // never be published two different ways.
 function applyCoreConnectedSession(connected, source) {
-    if (!connected?.address) return null;
+    if (!connected?.address || isWalletExplicitlyDisconnected()) return null;
     const coreProvider = connected.provider;
     activeWalletProvider = coreProvider;
     bindRuntimeProviderEvents(coreProvider, 'core walletconnect provider');
@@ -2667,11 +2735,13 @@ function applyCoreConnectedSession(connected, source) {
 }
 
 async function connectExternalMobileStandard() {
-    sessionStorage.removeItem('artsoul_disconnecting');
+    const restoreDisconnectIntent = isWalletExplicitlyDisconnected();
+    const revision = isCoreConnectInFlight() ? walletConnectionRevision : beginWalletConnection();
     setConnectButtonPending(true);
     walletDebugLog('standard mobile connect entered', {});
     try {
         const connected = await connectCoreWallet();
+        if (!isWalletResultCurrent(revision)) return null;
         if (!applyCoreConnectedSession(connected, 'connect')) {
             walletDebugLog('standard mobile connect returned no address', {});
             return null;
@@ -2699,6 +2769,11 @@ async function connectExternalMobileStandard() {
         }
         return null;
     } finally {
+        if (restoreDisconnectIntent && isWalletResultCurrent(revision) && !hasConfirmedWalletAddress() && !isCoreConnectInFlight()) {
+            localStorage.setItem('artsoul_disconnecting', 'true');
+            sessionStorage.setItem('artsoul_disconnecting', 'true');
+            walletConnectionRevision++;
+        }
         setConnectButtonPending(false);
     }
 }
@@ -2811,7 +2886,7 @@ function handleAppKitEvent(event) {
     const properties = data?.properties || event?.properties || {};
     const wallet = properties?.wallet || data?.wallet || event?.wallet || {};
     const walletId = wallet?.id || properties?.wallet_id || properties?.walletId || data?.wallet_id || data?.walletId || null;
-    const walletName = wallet?.name || properties?.wallet_name || properties?.walletName || data?.wallet_name || data?.walletName || null;
+    const walletName = wallet?.name || properties?.name || properties?.wallet_name || properties?.walletName || data?.wallet_name || data?.walletName || null;
     const walletRdns = wallet?.rdns || properties?.wallet_rdn || properties?.walletRdns || data?.wallet_rdn || data?.walletRdns || null;
     const nativeLink = wallet?.mobile?.native || wallet?.mobile_link || wallet?.mobileLink ||
         properties?.mobile_native || properties?.mobileNative || properties?.mobile_link || properties?.mobileLink ||
@@ -2820,7 +2895,23 @@ function handleAppKitEvent(event) {
         properties?.mobile_universal || properties?.mobileUniversal || properties?.universal_link || properties?.universalLink ||
         data?.mobile_universal || data?.mobileUniversal || data?.universal_link || data?.universalLink || null;
     const deepLinkAvailable = Boolean(nativeLink || universalLink);
-    const eventType = event?.type || event?.event || data?.event || data?.type || 'unknown';
+    const eventType = data?.event || event?.event || event?.type || data?.type || 'unknown';
+    const attempt = activeConnectAttempt;
+    if (attempt && !attempt.cancelled && event?.timestamp >= attempt.startedAt) {
+        if (eventType === 'SELECT_WALLET') {
+            attempt.selectedWalletName = walletName;
+            attempt.selectedWalletPlatform = properties.platform;
+            attempt.connectionConfirmed = false;
+            attempt.accountRevision = appKitAccountRevision;
+            latestAppKitAccountSnapshot = null;
+            lastObservedAppKitAccountKey = null;
+        } else if (eventType === 'CONNECT_SUCCESS' && attempt.selectedWalletName && (
+            walletName === attempt.selectedWalletName ||
+            (attempt.selectedWalletPlatform === 'qrcode' && properties.method === 'qrcode')
+        )) {
+            attempt.connectionConfirmed = true;
+        }
+    }
     const walletConnectUri = findWalletConnectUri(event);
     if (walletConnectUri) lastWalletConnectUri = walletConnectUri;
     if (walletId || walletName) {
@@ -2851,6 +2942,7 @@ function handleAppKitEvent(event) {
  * Prevents duplicate connection attempts
  */
 window.safeConnectWallet = async () => {
+    if (walletDisconnectPromise) await walletDisconnectPromise;
     const mobileConnect = isMobileDevice();
     const injectedMobileConnect = mobileConnect && isInjectedWalletBrowser();
 
@@ -2883,6 +2975,8 @@ window.safeConnectWallet = async () => {
     const attempt = {
         id: ++connectAttemptSequence,
         cancelled: false,
+        accountRevision: appKitAccountRevision,
+        restoreDisconnectIntent: isWalletExplicitlyDisconnected(),
         startedAt: Date.now()
     };
     activeConnectAttempt = attempt;
@@ -2894,7 +2988,10 @@ window.safeConnectWallet = async () => {
     });
 
     try {
-        sessionStorage.removeItem('artsoul_disconnecting');
+        const revision = beginWalletConnection();
+        activeWalletProvider = null;
+        latestAppKitAccountSnapshot = null;
+        lastObservedAppKitAccountKey = null;
         markConnectModalIntent();
         if (injectedMobileConnect) {
             walletDebugLog('mobile injected connect start', {
@@ -2903,6 +3000,7 @@ window.safeConnectWallet = async () => {
             });
             bindRuntimeProviderEvents(window.ethereum, 'mobile injected provider');
             const accounts = await requestInjectedMobileAccounts();
+            if (!isWalletResultCurrent(revision) || attempt.cancelled) return null;
             const connectedAddress = normalizeWalletAddress(Array.isArray(accounts) ? accounts[0] : accounts);
             if (!connectedAddress) {
                 throw createWalletConnectError(
@@ -2911,6 +3009,7 @@ window.safeConnectWallet = async () => {
                 );
             }
             const chainId = await requestProviderChainId(window.ethereum);
+            if (!isWalletResultCurrent(revision) || attempt.cancelled) return null;
             const validated = {
                 address: connectedAddress,
                 chainId,
@@ -2918,7 +3017,8 @@ window.safeConnectWallet = async () => {
             };
             activeWalletProvider = window.ethereum;
             await handleProviderChainConfirmed(validated.chainId, 'mobile injected provider');
-            await handleProviderAccountsChanged([validated.address], 'mobile injected provider', window.ethereum);
+            await handleProviderAccountsChanged([validated.address], 'mobile injected provider', window.ethereum, { allowProviderChange: true });
+            if (!isWalletResultCurrent(revision) || attempt.cancelled) return null;
             notifyForeignChainAccepted(validated.chainId);
             clearModalIntent();
             walletDebugLog('mobile injected connect complete', {
@@ -2932,7 +3032,8 @@ window.safeConnectWallet = async () => {
             await openAppKitConnectModal(attempt);
 
             walletDebugLog('waiting for wallet confirmation', { mobile: mobileConnect });
-            const confirmed = await waitForConfirmedDesktopWallet(WALLET_CONNECT_TIMEOUT_DESKTOP);
+            const confirmed = await waitForConfirmedDesktopWallet(WALLET_CONNECT_TIMEOUT_DESKTOP, attempt);
+            if (!isWalletResultCurrent(revision)) return null;
             if (attempt.cancelled) return null;
             if (attempt.failure) throw attempt.failure;
             if (!confirmed?.address) {
@@ -2993,6 +3094,11 @@ window.safeConnectWallet = async () => {
             snapshot: getWalletDebugSnapshot()
         });
         if (activeConnectAttempt === attempt) {
+            if (attempt.restoreDisconnectIntent && !hasConfirmedWalletAddress()) {
+                localStorage.setItem('artsoul_disconnecting', 'true');
+                sessionStorage.setItem('artsoul_disconnecting', 'true');
+                walletConnectionRevision++;
+            }
             activeConnectAttempt = null;
             setConnectButtonPending(false);
         }
@@ -3071,7 +3177,6 @@ window.ensureArtSoulWriteNetwork = async () => {
 
 window.openArtSoulNetworkSelector = async () => {
     try {
-        sessionStorage.removeItem('artsoul_disconnecting');
         const walletState = getRestoredWalletState();
         if (!walletState?.isConnected || !walletState.address) {
             alert('Please connect your wallet before switching networks.');
@@ -3185,10 +3290,21 @@ window.switchArtSoulNetwork = async (chainId) => {
  * Reset wallet connection state
  * Clears all WalletConnect/AppKit cache
  */
-window.resetWalletConnection = async () => {
+async function resetWalletConnection() {
     try {
         // Set disconnecting flag to prevent auto-reconnect
         sessionStorage.setItem('artsoul_disconnecting', 'true');
+        localStorage.setItem('artsoul_disconnecting', 'true');
+        walletConnectionRevision++;
+        if (activeConnectAttempt) activeConnectAttempt.cancelled = true;
+        activeConnectAttempt = null;
+        if (walletResumeTimer) clearTimeout(walletResumeTimer);
+        walletResumeTimer = null;
+        activeWalletProvider = null;
+        latestAppKitAccountSnapshot = null;
+        lastObservedAppKitAccountKey = null;
+        localStorage.removeItem('artsoul_wallet');
+        localStorage.removeItem('artsoul_header_identity');
         clearModalIntent();
         sessionStorage.removeItem(CORE_NETWORK_CONFIRMATION_KEY);
 
@@ -3238,7 +3354,6 @@ window.resetWalletConnection = async () => {
 
         // The site NEVER reloads or redirects itself around wallet flows.
         // The UI settles to guest in place; nothing resurrects the session.
-        sessionStorage.removeItem('artsoul_disconnecting');
         return true;
     } catch (error) {
         console.error('Reset failed:', error);
@@ -3249,6 +3364,16 @@ window.resetWalletConnection = async () => {
             isConnected: false
         }, { settled: true });
         return false;
+    }
+}
+
+window.resetWalletConnection = async () => {
+    if (walletDisconnectPromise) return walletDisconnectPromise;
+    walletDisconnectPromise = resetWalletConnection();
+    try {
+        return await walletDisconnectPromise;
+    } finally {
+        walletDisconnectPromise = null;
     }
 };
 
@@ -3444,20 +3569,19 @@ async function initializeAppKit() {
 
         await migrateWalletStorageOnce();
 
-        const explicitDisconnectRequested = sessionStorage.getItem('artsoul_disconnecting');
+        const explicitDisconnectRequested = isWalletExplicitlyDisconnected();
         if (explicitDisconnectRequested) {
             await clearWalletConnectionCache();
-            sessionStorage.removeItem('artsoul_disconnecting');
         }
 
         // Mobile external browsers: await the provider init. The provider's
         // persisted session is the single source of truth on this path —
         // session exists -> connected immediately; else guest. The
         // fail-open/hydration timers below wait for it instead of declaring
-        // "disconnected" while it is still in flight. After an explicit
-        // disconnect the WalletConnect storage was just cleared, so the
-        // restore settles as "none" almost instantly.
-        if (isMobile && !isInjectedWalletBrowser()) {
+        // "disconnected" while it is still in flight. Explicit logout skips
+        // restore until the user deliberately starts another connection.
+        const restoreRevision = walletConnectionRevision;
+        if (isMobile && !isInjectedWalletBrowser() && !explicitDisconnectRequested) {
             setMobileCoreRestoreState('restoring', { reason: 'page boot' });
             coreSessionRestoreTask = restoreCoreSessionOutcome();
         }
@@ -3671,6 +3795,7 @@ async function initializeAppKit() {
         // the hydration timer and protected actions wait on.
         if (coreSessionRestoreTask) {
             coreSessionRestoreCompletion = coreSessionRestoreTask.then((outcome) => {
+                if (!isWalletResultCurrent(restoreRevision)) return;
                 const restored = outcome.session;
                 if (restored?.address) {
                     const restoredChainId = resolveCoreSessionChainId(
@@ -3760,6 +3885,8 @@ async function initializeAppKit() {
 
         // Subscribe to account changes with detailed logging
         modal.subscribeAccount(async (account) => {
+            const revision = walletConnectionRevision;
+            if (!isWalletResultCurrent(revision)) return;
             // Mobile external browsers: the core provider's session is the
             // single source of truth. AppKit account events are fully inert
             // on this path — they must never touch wallet state.
@@ -3773,6 +3900,7 @@ async function initializeAppKit() {
 
             latestAppKitAccountSnapshot = account || null;
             appKitAccountRevision++;
+            const accountRevision = appKitAccountRevision;
             const observedAddress = normalizeWalletAddress(account?.address || account?.allAccounts?.[0]?.address);
             const observedChainId = normalizeChainId(account);
             const observedConnected = Boolean(observedAddress) &&
@@ -3782,6 +3910,8 @@ async function initializeAppKit() {
 
             if (observedAccountKey === lastObservedAppKitAccountKey) return;
             lastObservedAppKitAccountKey = observedAccountKey;
+
+            if (activeConnectAttempt && !isInjectedWalletBrowser() && !activeConnectAttempt.connectionConfirmed) return;
 
             walletDebugLog('appkit account update', {
                 address: maskWalletAddress(observedAddress),
@@ -3842,25 +3972,18 @@ async function initializeAppKit() {
                 account?.status !== 'disconnected';
 
             if (accountIsConnected) {
-                const eventAddress = observedAddress;
-                const eventChainId = normalizeChainId(account);
-                if (
-                    eventAddress &&
-                    eventAddress === lastProcessedAddress &&
-                    (!eventChainId || !lastProcessedChainId || eventChainId === lastProcessedChainId)
-                ) {
-                    finishWalletHydration();
-                    return;
-                }
-
                 // Prevent duplicate processing
                 const provider = await getAppKitWalletProvider();
                 const providerAccounts = await requestProviderAccounts(provider);
+                if (!isWalletResultCurrent(revision) || accountRevision !== appKitAccountRevision) return;
+                if (!providerAccounts.includes(observedAddress)) return;
                 const normalizedAddress = providerAccounts[0] || observedAddress;
                 const providerChainId = await getProviderTruthChainId(provider);
+                if (!isWalletResultCurrent(revision) || accountRevision !== appKitAccountRevision) return;
                 const normalizedChainId = setCurrentChainId(providerChainId || account);
                 finishWalletHydration();
                 if (lastProcessedAddress === normalizedAddress && lastProcessedChainId === normalizedChainId) {
+                    if (provider) activeWalletProvider = provider;
                     console.log('⏭️ Skipping duplicate address');
                     return;
                 }
@@ -3868,6 +3991,7 @@ async function initializeAppKit() {
                 // Active address changed under us → drop any session tied to the
                 // previous address before adopting the new one.
                 await signOutMismatchedSession(normalizedAddress);
+                if (!isWalletResultCurrent(revision) || accountRevision !== appKitAccountRevision) return;
 
                 lastProcessedAddress = normalizedAddress;
                 lastProcessedChainId = normalizedChainId;
@@ -3932,6 +4056,7 @@ async function initializeAppKit() {
                 } catch (error) {
                     console.error('Supabase signout failed:', error);
                 }
+                if (!isWalletResultCurrent(revision) || accountRevision !== appKitAccountRevision) return;
 
                 // Clear Supabase session from localStorage
                 try {
@@ -4015,6 +4140,7 @@ async function initializeAppKit() {
 
             if (modal.subscribeProvider) {
                 modal.subscribeProvider((providerState) => {
+                    if (isWalletExplicitlyDisconnected()) return;
                     // Same rule as subscribeAccount: AppKit provider updates are
                     // inert on the mobile external path — the core provider owns it.
                     if (isMobileDevice() && !isInjectedWalletBrowser()) return;
@@ -4027,7 +4153,6 @@ async function initializeAppKit() {
                     bindRuntimeProviderEvents(provider, 'appkit provider subscription');
                     bindWalletConnectDiagnostics(provider, 'appkit provider subscription');
                 if (provider?.request) {
-                    activeWalletProvider = provider;
                     scheduleWalletReconciliation('appkit provider available');
                 }
 
@@ -4038,7 +4163,7 @@ async function initializeAppKit() {
                     provider?.networkVersion
                 );
                 if (providerChainId) {
-                    handleProviderChainConfirmed(providerChainId, 'appkit provider subscription');
+                    handleProviderChainConfirmed(providerChainId, 'appkit provider subscription', provider);
                 }
             });
         }

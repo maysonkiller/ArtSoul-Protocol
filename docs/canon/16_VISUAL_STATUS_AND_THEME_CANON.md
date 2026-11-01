@@ -9,7 +9,7 @@ Classic and Future are separate themes.
 - Do not hardcode theme hex colors in pages or JS.
 - Future colors never appear in Classic.
 - Classic colors never appear in Future.
-- Classic may use animation, but only in its own colors (Amended 2026-08-10; supersedes "Classic is static"). Animation in Classic stays functional — loading and progress feedback — and never adopts Future's glow or neon treatment.
+- Classic interface feedback is static: no animated transitions, loading effects or smooth scrolling (founder amendment, 2026-11-01; supersedes the August 10 allowance). Keep the original Classic palette. Artwork video/audio remains user-controlled content, not interface animation. Verification marks and any separately approved static frame treatment remain available.
 - Future may use animation, glow, and neon effects.
 - Mobile and desktop differ in layout only; color semantics stay identical.
 - Any animation must be disabled under `prefers-reduced-motion: reduce` in both themes.
