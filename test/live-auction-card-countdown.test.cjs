@@ -109,6 +109,8 @@ test('DOM cards share one timer and keep their compact body structure', () => {
   assert.equal(firstTimer.textContent, '1m 00s', 'detached cards already contain their countdown before insertion');
   assert.equal(firstTimer.attributes['aria-label'], 'Auction ends in 1m 00s');
   assert.equal(secondTimer.textContent, '1m 00s');
+  const openingChip = first.children.find(child => String(child.className).startsWith('artsoul-card-preview-badge'));
+  assert.equal(openingChip.textContent, 'Auction open', 'open auction category uses the same live state');
 
   firstTimer.isConnected = true;
   secondTimer.isConnected = true;
@@ -124,6 +126,7 @@ test('DOM cards share one timer and keep their compact body structure', () => {
   const firstBadge = first.children[1].children[2].children[0];
   assert.equal(firstBadge.textContent, 'No bids', 'expiry must update the status as well as the timer');
   assert.equal(firstBadge.className, 'artsoul-card-status artsoul-card-status-ended_no_bids');
+  assert.equal(openingChip.textContent, 'No bids', 'expired category must never remain Auction open');
   const firstLink = first.children.find(child => child.className === 'artsoul-card-link');
   assert.match(firstLink.title, /Status: No bids/);
   assert.doesNotMatch(firstLink.attributes['aria-label'], /Live/);
@@ -141,6 +144,7 @@ test('expiry with a bid changes the card status and a replacement round starts l
   intervals[0]();
   assert.equal(timer.textContent, 'Ended');
   assert.equal(previous.children[1].children[2].children[0].textContent, 'Awaiting payment');
+  assert.equal(previous.children.find(child => String(child.className).startsWith('artsoul-card-preview-badge')).textContent, 'Awaiting payment');
 
   const replacement = api.createCardElement({ ...artwork, auction_id: '67', auction_end_time: clock.now + 86400000,
     current_bid: '0', current_bidder: '' });
