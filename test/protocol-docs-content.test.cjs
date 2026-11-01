@@ -77,18 +77,23 @@ test('shared blocks render text safely and retain table and ordered-list semanti
 });
 
 async function harness(hash = '') {
-  const values = [], effects = [], frames = new Map(), scrolls = [], windowEvents = new Map(), documentEvents = new Map();
+  const values = [], effects = [], frames = new Map(), scrolls = [], focuses = [], navigationEvents = [], windowEvents = new Map(), documentEvents = new Map();
   let index = 0, frameId = 0, mounted = false;
   const window = {location: new URL('https://artsoul.example/docs-protocol' + hash),
     addEventListener: (name, fn) => windowEvents.set(name, fn), removeEventListener: name => windowEvents.delete(name)};
-  const document = {getElementById: id => ({scrollIntoView: options => scrolls.push({id, ...options})}),
+  const document = {getElementById: id => ({
+      scrollIntoView: options => { scrolls.push({id, ...options}); navigationEvents.push(`scroll:${id}`); },
+      querySelector: selector => selector === '.protocol-section-trigger' ? {
+        focus: options => { focuses.push({id, ...options}); navigationEvents.push(`focus:${id}`); }
+      } : null
+    }),
     addEventListener: (name, fn) => documentEvents.set(name, fn), removeEventListener: name => documentEvents.delete(name)};
   const scope = await components({...React,
     useState(initial) {const slot = index++; if (!(slot in values)) values[slot] = typeof initial === 'function' ? initial() : initial;
       return [values[slot], next => {values[slot] = typeof next === 'function' ? next(values[slot]) : next;}];},
     useEffect: fn => {if (!mounted) effects.push(fn);}
   }, {window, document, URL, requestAnimationFrame: fn => {frames.set(++frameId, fn); return frameId;}, cancelAnimationFrame: id => frames.delete(id)});
-  const result = {window, values, frames, scrolls, windowEvents, documentEvents,
+  const result = {window, values, frames, scrolls, focuses, navigationEvents, windowEvents, documentEvents,
     render() {index = 0; return scope.App();},
     flush() {for (const [id, fn] of frames) {frames.delete(id); fn();}},
     hash(value) {window.location.hash = value; windowEvents.get('hashchange')();},
@@ -98,6 +103,46 @@ async function harness(hash = '') {
   result.render(); mounted = true; result.cleanup = effects.map(fn => fn());
   return result;
 }
+
+function findElement(node, predicate) {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findElement(child, predicate);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!React.isValidElement(node)) return null;
+  return predicate(node) ? node : findElement(node.props.children, predicate);
+}
+
+test('contents navigation respects the current reduced-motion preference and keeps the topic revealed', async () => {
+  const h = await harness();
+  let reduceMotion = false;
+  const queries = [];
+  h.window.matchMedia = query => { queries.push(query); return {matches: reduceMotion}; };
+  for (const behavior of ['smooth', 'auto']) {
+    reduceMotion = behavior === 'auto';
+    h.values[1] = true;
+    const button = findElement(h.render(), element => element.type === 'button' && element.props.children === 'Fees and Economics');
+    assert.ok(button, 'the real contents button must remain available');
+    button.props.onClick();
+    h.render(); h.flush();
+    assert.equal(h.values[0].fees, true);
+    assert.equal(h.values[1], false, 'choosing a topic closes the mobile contents');
+    assert.deepEqual(h.focuses.at(-1), {id: 'fees', preventScroll: true}, 'focus leaves the hidden contents and reaches the revealed topic');
+    assert.deepEqual(h.navigationEvents.slice(-2), ['focus:fees', 'scroll:fees'], 'focus must not override the requested scroll behavior');
+    assert.deepEqual(h.scrolls.at(-1), {id: 'fees', behavior, block: 'start'});
+  }
+  assert.deepEqual(queries, ['(prefers-reduced-motion: reduce)', '(prefers-reduced-motion: reduce)']);
+});
+
+test('contents navigation remains available when the browser has no motion-query API', async () => {
+  const h = await harness();
+  const button = findElement(h.render(), element => element.type === 'button' && element.props.children === 'Frequently Asked Questions');
+  button.props.onClick(); h.render(); h.flush();
+  assert.deepEqual(h.scrolls, [{id: 'faq', behavior: 'smooth', block: 'start'}]);
+});
 
 test('initial section links open and reveal the requested accordion without closing others', async () => {
   const h = await harness('#fees');

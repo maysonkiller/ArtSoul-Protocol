@@ -65,7 +65,7 @@ test('a creator who bought the work back is shown as its owner', () => {
 });
 
 test('an owner who is still the first collector is not listed twice', () => {
-  // Artworks 13, 18, 19 and 32. "First Collector" already says who holds it.
+  // The existing First Collector row also carries the Owner label.
   assert.equal(show(minted(COLLECTOR)), false);
 });
 

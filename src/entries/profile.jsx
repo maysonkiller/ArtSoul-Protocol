@@ -205,6 +205,14 @@ const { useState, useEffect, useRef } = React;
             }, [selectedGallery]);
 
             useEffect(() => {
+                // Release the temporary viewport reservation after the current
+                // load settles, including an empty result or failed refresh.
+                if (!artworksLoading && galleryPanelRef.current) {
+                    galleryPanelRef.current.style.minHeight = '';
+                }
+            }, [artworksLoading, selectedGallery]);
+
+            useEffect(() => {
                 const showSaved = () => { if (savedEnabled && isOwnProfile && window.location.hash === '#saved') setSelectedGallery('saved'); };
                 showSaved();
                 if (!isOwnProfile && selectedGallery === 'saved') setSelectedGallery('created');
@@ -1834,8 +1842,11 @@ const { useState, useEffect, useRef } = React;
                                         aria-pressed={selectedGallery === gallery.id}
                                         onClick={() => {
                                             if (gallery.id !== selectedGallery) {
-                                                // Keep the viewport filled while the old list
-                                                // is replaced, including when the new tab is empty.
+                                                // Retire the outgoing read before the next effect
+                                                // starts its load, so it cannot settle this tab.
+                                                artworksRequestRef.current++;
+                                                // Keep the viewport filled while the next tab
+                                                // loads; release it when that tab's result commits.
                                                 const panel = galleryPanelRef.current;
                                                 if (panel) panel.style.minHeight = `${Math.max(0, window.innerHeight - panel.getBoundingClientRect().top)}px`;
                                                 setArtworksLoading(true);

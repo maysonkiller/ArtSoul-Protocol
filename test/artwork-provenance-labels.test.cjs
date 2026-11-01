@@ -18,7 +18,7 @@ function between(start, end) {
 }
 
 test('ownership panel uses the exact canonical labels', () => {
-  const panel = between('{/* Ownership Info - Three Roles */}', 'artwork-page-panel artwork-page-provenance');
+  const panel = between('const ownershipPanel =', 'const provenancePanel =');
   assert.match(panel, /label: 'Creator'/);
   assert.match(panel, /label: 'First Collector'/);
   assert.match(panel, /label: 'Owner'/);
@@ -28,7 +28,7 @@ test('ownership panel uses the exact canonical labels', () => {
 });
 
 test('First Collector renders only after mint and only from the settlement projection', () => {
-  const panel = between('{/* Ownership Info - Three Roles */}', 'artwork-page-panel artwork-page-provenance');
+  const panel = between('const ownershipPanel =', 'const provenancePanel =');
   assert.match(
     panel,
     /mintedArtwork && renderOwnershipRole\(\{\s*label: 'First Collector',\s*address: artwork\.auction_winner_address/,
