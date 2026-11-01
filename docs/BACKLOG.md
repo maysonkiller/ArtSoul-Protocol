@@ -325,3 +325,11 @@ This is one B18 review slice, not closure of B35, beta operation or Phase B.
 Verification registry and authoritative aura assignment remain future work under
 the October7 origin-review policy/C14; presentation helpers are not an issued badge.
 Accepted Future page composition is released in PR413–418, retaining both original palettes, Admin and documentation. Remaining interface acceptance requires the new composition on a native iPhone; no old wallet test is repeated. Next engineering slice is B35 deployment-bound NFT-transfer history and recovery; the isolated proof foundation does not authorize worker activation.
+
+November1 B35: PR421 released the fenced atomic NFT journal/coverage writer after
+exact Linux/Windows CI and preview/production checks. The next dormant SQL read
+foundation joins exact original-Core registration/settlement sources to the NFT
+mint and latest transfer in one snapshot;38 real isolated PostgreSQL checks pass.
+Neither migration nor NFT writer/reader is activated live. Historical bootstrap,
+consistent API/timeline integration and worker/recovery acceptance remain open.
+See the B35 audit for evidence and explicit missing-history behavior.
