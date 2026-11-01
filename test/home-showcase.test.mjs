@@ -195,7 +195,8 @@ test('reduced-motion users retain manual navigation without autoplay', () => {
 test('homepage keeps one editorial line and removes the demo slide and repeated feed', () => {
     const home = readFileSync('index.html', 'utf8');
     const css = readFileSync('unified-styles.css', 'utf8');
-    assert.match(home, /Discover artworks\./);
+    assert.match(home, />Discover artworks<\/h1>/);
+    assert.doesNotMatch(home, />Discover artworks\.<\/h1>/);
     assert.match(home, /Original pieces, live auctions and ownership history/);
     for (const repeat of [
         'Art worth a closer look.', 'Find your next connection', 'Art to discover, auctions to follow.',
@@ -236,4 +237,16 @@ test('counter is the only pause control and no opaque pause icon is rendered', (
     assert.doesNotMatch(markup, /homeShowcasePause|>Ⅱ<|>▶</);
     assert.match(markup, /<button id="homeShowcaseCount"[^>]*aria-pressed="false"/);
     assert.equal((markup.match(/<button /g) || []).length, 3);
+});
+
+test('showcase copy is punctuation-free and caption readability is protected by a theme-token scrim', () => {
+    const html = readFileSync('index.html','utf8');
+    const css = readFileSync('unified-styles.css','utf8');
+    assert.match(html, />Discover artworks<\/h1>/);
+    assert.doesNotMatch(html, />Discover artworks\.<\/h1>/);
+    assert.match(css, /B18\.2 — one measured visual system/);
+    assert.match(css, /\.home-showcase-slide::after \{[\s\S]*?pointer-events: none;[\s\S]*?linear-gradient/);
+    assert.match(css, /\.home-showcase-caption \{[\s\S]*?z-index: 2;[\s\S]*?padding: 38px 22px 72px/);
+    assert.match(css, /-webkit-line-clamp: 2;/);
+    assert.match(css, /#homeShowcaseControls \{[\s\S]*?z-index: 3;/);
 });
