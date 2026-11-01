@@ -806,9 +806,12 @@
             meta.appendChild(priceEl);
         }
 
+        // Keep the original three-row DOM contract (title, creator, meta).
+        // The factual chain/NFT chips belong inside meta and cannot displace
+        // the status at meta.children[0], used by the shared auction clock.
+        meta.appendChild(createCardProvenance(artwork));
         body.appendChild(title);
         body.appendChild(creator);
-        body.appendChild(createCardProvenance(artwork));
         body.appendChild(meta);
         const menu = href ? createActionMenu(artwork) : null;
         if (artwork.pending_auction_sync) {
@@ -1058,13 +1061,13 @@
             h('div', { className: 'artsoul-card-body' },
                 h('h3', { className: 'artsoul-card-title' }, artwork.title || 'Untitled Artwork'),
                 h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
-                h('div', { className: 'artsoul-card-provenance' },
-                    h('span', { className: 'artsoul-card-network' }, cardNetworkLabel(artwork)),
-                    h('span', { className: `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}` }, cardMintLabel(artwork))
-                ),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
-                    price ? h('span', { className: 'artsoul-card-price' }, price) : null
+                    price ? h('span', { className: 'artsoul-card-price' }, price) : null,
+                    h('div', { className: 'artsoul-card-provenance' },
+                        h('span', { className: 'artsoul-card-network' }, cardNetworkLabel(artwork)),
+                        h('span', { className: `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}` }, cardMintLabel(artwork))
+                    )
                 ),
                 artwork.pending_auction_sync ? h('p', { className: 'artsoul-card-creator', role: 'status' }, 'Transaction confirmed. Updating auction data.') : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
