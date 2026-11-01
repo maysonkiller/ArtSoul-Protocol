@@ -1,4 +1,5 @@
 import '../../supabase-client.js';
+import { renderHomeShowcase } from '../ui/home-showcase.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
 import './react-runtime.js';
@@ -750,6 +751,9 @@ let morphActive = false;
                     artwork
                 }));
 
+                // Reuse these already-loaded, visibility-filtered Discovery slots.
+                // Never issue a second DB request for the above-the-fold showcase.
+                renderHomeShowcase(spotlight?.slots || []);
                 renderHomepageFeaturedRow(artworks);
 
                 gallery.innerHTML = '';
