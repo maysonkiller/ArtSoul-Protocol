@@ -253,6 +253,37 @@
         return labels[chain] || `Chain ${chain}`;
     }
 
+    // Logos are bundled: never attribute an unknown network to the viewer's wallet.
+    function cardNetworkMark(artwork = {}) {
+        const label = cardNetworkLabel(artwork);
+        if (label === 'Base' || label === 'Base Sepolia') return '/brand/base.svg';
+        if (label === 'Ethereum' || label === 'Sepolia') return '/brand/eth.png';
+        return '';
+    }
+
+    // Presentation only; on-chain state stays in statusInfo, used for actions.
+    function cardPreviewInfo(artwork = {}, now = Date.now()) {
+        const state = statusInfo(artwork, now);
+        if (state.key === 'live') return { key: 'live', label: 'Auction open' };
+        if (state.key === 'listed') return { key: 'listed', label: 'For sale' };
+        if (state.key === 'sold' && isMinted(artwork)) return { key: 'sold', label: 'NFT' };
+        if (state.key === 'not_minted') return { key: 'not_minted', label: 'Discover' };
+        return state;
+    }
+
+    function createCardPreviewBadge(artwork = {}) {
+        const state = cardPreviewInfo(artwork);
+        const badge = document.createElement('span');
+        badge.className = `artsoul-card-preview-badge artsoul-card-preview-badge-${state.key}`;
+        badge.textContent = state.label;
+        badge.setAttribute('aria-hidden', 'true');
+        return badge;
+    }
+
+    function cardPriceMark(price) {
+        return /\bETH$/.test(String(price || '')) ? '/brand/eth.png' : '';
+    }
+
     function cardMintLabel(artwork = {}) {
         return isMinted(artwork) ? 'NFT' : 'Not minted';
     }
@@ -263,6 +294,15 @@
         const network = document.createElement('span');
         network.className = 'artsoul-card-network';
         network.textContent = cardNetworkLabel(artwork);
+        const networkMark = cardNetworkMark(artwork);
+        if (networkMark) {
+            const mark = document.createElement('img');
+            mark.src = networkMark;
+            mark.alt = '';
+            mark.className = 'artsoul-card-network-mark';
+            mark.setAttribute('aria-hidden', 'true');
+            network.appendChild(mark);
+        }
         const mint = document.createElement('span');
         mint.className = `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}`;
         mint.textContent = cardMintLabel(artwork);
@@ -765,6 +805,10 @@
         img.decoding = 'async';
         img.onerror = () => onUnavailable?.();
         container.appendChild(img);
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'artsoul-card-media-badge artsoul-card-media-badge-image';
+        typeBadge.textContent = 'IMAGE';
+        container.appendChild(typeBadge);
         return container;
     }
 
@@ -803,6 +847,14 @@
             const priceEl = document.createElement('span');
             priceEl.className = 'artsoul-card-price';
             priceEl.textContent = price;
+            if (cardPriceMark(price)) {
+                const mark = document.createElement('img');
+                mark.className = 'artsoul-card-price-mark';
+                mark.src = cardPriceMark(price);
+                mark.alt = '';
+                mark.setAttribute('aria-hidden', 'true');
+                priceEl.appendChild(mark);
+            }
             meta.appendChild(priceEl);
         }
 
@@ -827,6 +879,7 @@
         if (menu) card.appendChild(menu);
         const saved = href ? createSavedControl(artwork) : null;
         if (saved) card.appendChild(saved);
+        const previewBadge = createCardPreviewBadge(artwork);
         let link = null;
         const countdown = createCountdownElement(artwork, now => {
             // The clock changes presentation even before an indexer response.
@@ -834,6 +887,9 @@
             const next = statusInfo(artwork, now);
             badge.className = `artsoul-card-status artsoul-card-status-${next.key}`;
             badge.textContent = next.label;
+            const visual = cardPreviewInfo(artwork, now);
+            previewBadge.className = `artsoul-card-preview-badge artsoul-card-preview-badge-${visual.key}`;
+            previewBadge.textContent = visual.label;
             if (link) {
                 link.title = cardDetailsText(artwork, now);
                 link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
@@ -848,6 +904,7 @@
             link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
             card.appendChild(link);
         }
+        card.appendChild(previewBadge);
         return card;
     }
 
@@ -875,7 +932,8 @@
                 loading: 'lazy',
                 decoding: 'async',
                 onError: onUnavailable || undefined
-            })
+            }),
+            h('span', { className: 'artsoul-card-media-badge artsoul-card-media-badge-image' }, 'IMAGE')
         );
     }
 
@@ -1063,9 +1121,18 @@
                 h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
-                    price ? h('span', { className: 'artsoul-card-price' }, price) : null,
+                    price ? h('span', { className: 'artsoul-card-price' },
+                        cardPriceMark(price) ? h('img', {
+                            src: cardPriceMark(price), className: 'artsoul-card-price-mark',
+                            alt: '', 'aria-hidden': 'true'
+                        }) : null, price) : null,
                     h('div', { className: 'artsoul-card-provenance' },
-                        h('span', { className: 'artsoul-card-network' }, cardNetworkLabel(artwork)),
+                        h('span', { className: 'artsoul-card-network' },
+                            cardNetworkMark(artwork) ? h('img', {
+                                src: cardNetworkMark(artwork), className: 'artsoul-card-network-mark',
+                                alt: '', 'aria-hidden': 'true'
+                            }) : null,
+                            cardNetworkLabel(artwork)),
                         h('span', { className: `artsoul-card-mint${isMinted(artwork) ? ' is-minted' : ''}` }, cardMintLabel(artwork))
                     )
                 ),
@@ -1076,7 +1143,9 @@
             href || onOpen ? h(ReactSavedControl, { artwork }) : null,
             h(ReactCountdown, { artwork, onEnd: refreshAuctionState }),
             href ? h('a', { className: 'artsoul-card-link', href, title: cardDetailsText(artwork),
-                'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null
+                'aria-label': `Open ${cardDetailsText(artwork).replace(/\n/g, '. ')}` }) : null,
+            h('span', { className: `artsoul-card-preview-badge artsoul-card-preview-badge-${cardPreviewInfo(artwork).key}`,
+                'aria-hidden': 'true' }, cardPreviewInfo(artwork).label)
         );
     }
 
@@ -1109,6 +1178,9 @@
         creatorLabel,
         formatPrice,
         cardNetworkLabel,
+        cardNetworkMark,
+        cardPriceMark,
+        cardPreviewInfo,
         cardMintLabel,
         statusInfo,
         auctionEndTimestamp,
