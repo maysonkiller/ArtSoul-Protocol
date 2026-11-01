@@ -8443,3 +8443,52 @@ body.future .home-showcase-slide:not([hidden]) {
 @media (prefers-reduced-motion: reduce) {
     body.future .home-showcase-slide:not([hidden]) { animation: none !important; }
 }
+
+/* B18: compact Apple-like split appearance control, driven only by the
+   existing persisted ThemeManager. The old menu control remains a fail-safe
+   only if this tiny adapter has not initialized successfully. */
+body:is(.classic, .future) .site-header-actions > .site-theme-toggle {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 1px solid var(--c-border);
+    border-radius: 50%;
+    background: var(--c-surface);
+    box-shadow: none;
+    color: var(--c-text);
+    cursor: pointer;
+}
+body:is(.classic, .future) .site-theme-toggle-glyph {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    overflow: hidden;
+    border: 1.5px solid var(--c-accent);
+    border-radius: 50%;
+    transform: rotate(-35deg);
+}
+body:is(.classic, .future) .site-theme-toggle-classic { background: var(--c-text); }
+body:is(.classic, .future) .site-theme-toggle-future { background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2)); }
+body.classic .site-theme-toggle[data-current-theme="classic"] { border-color: var(--c-accent); }
+body.future .site-theme-toggle[data-current-theme="future"] { border-color: var(--c-accent-2); }
+body:is(.classic, .future) .site-theme-toggle:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+body:is(.classic, .future) .site-header:has(.site-theme-toggle[data-theme-ready="true"]) .avatar-theme-section {
+    display: none !important;
+}
+@media (max-width: 360px) {
+    body:is(.classic, .future) .site-header-shell { padding-inline: 6px !important; }
+    body:is(.classic, .future) .site-header-row { column-gap: 2px !important; }
+    body:is(.classic, .future) .site-header-actions { gap: 0 !important; }
+    body:is(.classic, .future) .site-header .site-wordmark { font-size: 19px !important; letter-spacing: -1.5px; }
+    body:is(.classic, .future) .site-wordmark > span { font-size: 6px; letter-spacing: 0.15em; }
+}
