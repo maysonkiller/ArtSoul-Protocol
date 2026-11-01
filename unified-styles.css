@@ -9079,3 +9079,76 @@ body:is(.classic, .future) .gallery-results-grid .artsoul-card-creator { font-si
         grid-template-columns: repeat(7, minmax(0, 1fr));
     }
 }
+
+/* B18-V5: native disclosure for misleading community/price terminology.
+   Collapsed by default; no JS, telemetry, new provider or ranking changes. */
+body:is(.classic, .future) .gallery-signal-help {
+    min-width: 0;
+    margin-top: 10px;
+    border-top: 1px solid var(--c-border-soft);
+    color: var(--c-text-muted);
+}
+body:is(.classic, .future) .gallery-signal-help > summary {
+    display: list-item;
+    min-height: 44px;
+    padding: 12px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--c-accent);
+    line-height: 1.5;
+    list-style-position: inside;
+}
+body:is(.classic, .future) .gallery-signal-help > summary:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+body:is(.classic, .future) .gallery-signal-help-content {
+    padding: 2px 4px 12px;
+    font-size: 13px;
+    line-height: 1.55;
+}
+body:is(.classic, .future) .gallery-signal-help-content dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    margin: 0 0 12px;
+}
+body:is(.classic, .future) .gallery-signal-help-content dl > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+body:is(.classic, .future) .gallery-signal-help-content dt {
+    margin-bottom: 3px;
+    color: var(--c-text);
+    font-weight: 650;
+}
+body:is(.classic, .future) .gallery-signal-help-content dd {
+    margin: 0;
+    color: var(--c-text-muted);
+}
+body:is(.classic, .future) .gallery-signal-help-content p {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+body:is(.classic, .future) .gallery-signal-help-content a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--c-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+body:is(.classic, .future) .gallery-signal-help-content a:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+@media (max-width: 640px) {
+    body:is(.classic, .future) .gallery-signal-help-content dl {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 9px;
+    }
+}
