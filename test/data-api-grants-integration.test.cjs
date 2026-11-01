@@ -36,7 +36,7 @@ const features = [
   'public_artwork_search', 'public_artwork_search_current_round', 'profile_layouts', 'auction_notifications', 'auction_notification_lifecycle',
   'auction_notification_reminders', 'notification_summary', 'notification_inbox_removal',
   '20261029212603_notification_reorg_identity', '20261029220854_recovery_cache_obligation',
-  '20261101120000_nft_transfer_coverage', '20261101130000_verified_nft_owners'
+  '20261101120000_nft_transfer_coverage', '20261101130000_verified_nft_owners', '20261101140000_verified_nft_history'
 ];
 // These tables deliberately accept writes only through protected RPCs.
 const rpcOnly = [

@@ -200,7 +200,7 @@ test('Phase 18.7b classifies tracked public tables while private tables have the
     'artist_support_moderation.sql',
     'moderation_report_email_delivery.sql',
     'artist_support.sql',
-    '20261101120000_nft_transfer_coverage.sql', '20261101130000_verified_nft_owners.sql'
+    '20261101120000_nft_transfer_coverage.sql', '20261101130000_verified_nft_owners.sql', '20261101140000_verified_nft_history.sql'
   ]);
 
   for (const root of sqlRoots) {

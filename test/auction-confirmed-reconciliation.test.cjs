@@ -488,6 +488,11 @@ function publicProjection() {
   const context = vm.createContext({
     Date: time.Date, console: quiet, process: { env: {} },
     allowMethods: () => true,
+    readNftOwnershipConfig: () => null,
+    readNftOwnershipBoundary: async () => null,
+    readNftOwnership: async () => null,
+    readNftHistory: async () => null,
+    recheckNftOwnership: async () => null,
     sendError: (res, error) => res.status(500).json({ error: error.message }),
     validateArtworkId: value => String(value || '').trim() || null,
     getModerationAccess: async () => ({ canModerate: false }),

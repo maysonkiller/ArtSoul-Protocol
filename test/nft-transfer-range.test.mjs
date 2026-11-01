@@ -69,6 +69,57 @@ test('empty complete range is explicit; it is not mistaken for an unavailable RP
     const f = fixture(); f.logs = []; const batch = await f.run();
     assert.deepEqual(batch.events, []); assert.equal(batch.blockNumber, 110); assert.equal(f.calls.length, 11);
 });
+
+function archiveFixture() {
+    const f = fixture();
+    Object.assign(f.options, { maxBlocks: 100000, blockNumber: 100099, blockHash: hash(100099) });
+    f.hook = (method, params) => {
+        if (method === 'eth_getCode') {
+            assert.equal(params[1].requireCanonical, true);
+            assert.ok([hash(99), hash(100099)].includes(params[1].blockHash));
+            return params[0] === CORE ? CORE_CODE : NFT_CODE;
+        }
+        if (method === 'eth_call') {
+            const parsed = abi.parseTransaction(params[0]);
+            assert.deepEqual(params[1], { blockHash: hash(parsed.name === 'totalSupply' ? 99 : 100099), requireCanonical: true });
+            return abi.encodeFunctionResult(parsed.name, [parsed.name === 'totalSupply' ? f.supply : NFT]);
+        }
+        if (method === 'eth_getLogs') {
+            assert.deepEqual(params, [{ address: NFT, topics: [abi.getEvent('Transfer').topicHash], fromBlock: '0x64', toBlock: hex(100099) }]);
+            return f.logs;
+        }
+    };
+    return f;
+}
+test('explicit sparse archive windows retain deployment, origin, ordering and represented-block checks', async () => {
+    const f = archiveFixture(), batch = await f.run();
+    assert.equal(batch.fromBlock, 100); assert.equal(batch.blockNumber, 100099);
+    assert.deepEqual(batch.events.map(e => [e.blockNumber, e.logIndex]), [[100, 1], [110, 3], [110, 9]]);
+    assert.equal(f.calls.length, 13, 'sparse history does not repeat deployment reads for every empty subrange');
+    assert.equal(f.calls.filter(c => c.method === 'eth_getBlockByNumber' && c.params[0] === hex(100099)).length, 2);
+});
+test('explicit sparse archive windows still refuse an orphan interior transfer', async () => {
+    const f = archiveFixture(); f.logs[1].blockHash = hash(999);
+    await assert.rejects(f.run(), /not canonical/);
+});
+test('archive limits are operational bounds and never bypass the log count bound', async () => {
+    const f = archiveFixture(); f.logs = new Array(10001).fill(null);
+    await assert.rejects(f.run(), /log result exceeds/);
+});
+for (const maxBlocks of [0, -1, 1.5, '100000', 100001, Infinity]) {
+    test(`invalid archive window bound ${maxBlocks} makes no RPC request`, async () => {
+        const f = fixture(); f.options.maxBlocks = maxBlocks;
+        await assert.rejects(f.run(), /Invalid NFT transfer range/); assert.equal(f.calls.length, 0);
+    });
+}
+test('the caller cannot exceed its explicit archive window by one block', async () => {
+    const f = archiveFixture(); f.options.blockNumber++;
+    await assert.rejects(f.run(), /Invalid NFT transfer range/); assert.equal(f.calls.length, 0);
+});
+test('a smaller explicit range limit is enforced before RPC', async () => {
+    const f = fixture(); f.options.maxBlocks = 10;
+    await assert.rejects(f.run(), /Invalid NFT transfer range/); assert.equal(f.calls.length, 0);
+});
 test('continuation does not require zero supply or mutable NFT.core; immutable Core mapping remains required', async () => {
     const f = fixture(); f.options.bootstrap = false; f.supply = 8n;
     const batch = await f.run(); assert.equal(batch.events.length, 3);
