@@ -8430,3 +8430,16 @@ body:is(.classic, .future) #homeShowcaseCount { min-width: 40px; text-align: cen
     }
     #artworkGallery[aria-busy="true"] { --home-loading-columns: 1; }
 }
+
+/* The new image may fade into view only in Future. Classic stays instant/static
+   and system reduced-motion preference always takes precedence. */
+@keyframes artsoulShowcaseEnter {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+body.future .home-showcase-slide:not([hidden]) {
+    animation: artsoulShowcaseEnter 420ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+    body.future .home-showcase-slide:not([hidden]) { animation: none !important; }
+}
