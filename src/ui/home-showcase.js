@@ -178,12 +178,16 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     // moves to another control. Simply focusing the carousel always pauses it.
     let explicitResume = false;
     let focusPaused = false;
+    let pointerFocus = false;
+    // Touch browsers can hold :hover after a tap. Only fine-hover devices
+    // should let pointer hover suspend the carousel.
+    const fineHover = window.matchMedia?.('(hover: hover)')?.matches ?? true;
     const mayAdvance = () => shouldAutoAdvanceShowcase({
         slideCount: stage.children.length,
         visibility: document.visibilityState,
         reducedMotion: Boolean(motion?.matches),
-        hovered: root.matches(':hover') && !explicitResume,
-        focused: root.contains(document.activeElement) && !explicitResume,
+        hovered: fineHover && root.matches(':hover') && !explicitResume,
+        focused: root.contains(document.activeElement) && !pointerFocus && !explicitResume,
         paused: userPaused || focusPaused
     });
     const stop = () => {
@@ -228,9 +232,14 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     };
     syncPause();
 
-    const onHover = () => { explicitResume = false; stop(); };
-    const onLeave = () => { explicitResume = false; start(); };
+    const onHover = () => { if (fineHover) { explicitResume = false; stop(); } };
+    const onLeave = () => { if (fineHover) { explicitResume = false; start(); } };
+    const onPointerDown = () => { pointerFocus = true; };
+    const onPointerUp = () => { pointerFocus = false; };
     const onFocus = event => {
+        // Pointer/touch focus is not a keyboard navigation pause; otherwise
+        // tapping "Pause" on an iPhone would silently turn into "Resume".
+        if (pointerFocus) return;
         if (explicitResume && event.target === pause) return;
         explicitResume = false;
         focusPaused = true;
@@ -254,6 +263,9 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
     const pageShow = () => start();
     root.addEventListener('mouseenter', onHover);
     root.addEventListener('mouseleave', onLeave);
+    root.addEventListener('pointerdown', onPointerDown);
+    root.addEventListener('pointerup', onPointerUp);
+    root.addEventListener('pointercancel', onPointerUp);
     root.addEventListener('focusin', onFocus);
     root.addEventListener('focusout', onBlur);
     document.addEventListener('visibilitychange', onVisibility);
@@ -265,6 +277,9 @@ export function renderHomeShowcase(slots, { unavailable = false } = {}) {
         stop();
         root.removeEventListener('mouseenter', onHover);
         root.removeEventListener('mouseleave', onLeave);
+        root.removeEventListener('pointerdown', onPointerDown);
+        root.removeEventListener('pointerup', onPointerUp);
+        root.removeEventListener('pointercancel', onPointerUp);
         root.removeEventListener('focusin', onFocus);
         root.removeEventListener('focusout', onBlur);
         document.removeEventListener('visibilitychange', onVisibility);
