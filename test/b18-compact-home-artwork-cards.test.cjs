@@ -190,6 +190,16 @@ test('DOM and React card both show an image/media type, lifecycle chip and real 
             if (cls === 'artsoul-card-network-mark') networkMark = node;
             if (cls === 'artsoul-card-price-mark') priceMark = node;
         });
+        // ReactCard creates ReactMedia as a child component, which this tiny
+        // React-element harness intentionally does not auto-render. Expand only
+        // the media view for the image badge assertion; keep all other labels
+        // checked against the card itself.
+        if (!type && item === react) {
+            walk(api.ReactMedia({ artwork }), node => {
+                const cls = node.className || node.props?.className || '';
+                if (cls.includes('artsoul-card-media-badge-image')) type = node;
+            });
+        }
         assert.ok(category, 'preview category missing');
         assert.ok(type, 'image media type missing');
         assert.ok(networkMark, 'Base network logo missing');
