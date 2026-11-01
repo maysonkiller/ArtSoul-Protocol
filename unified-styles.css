@@ -9773,3 +9773,16 @@ body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta > .artsoul-c
         height: 11px;
     }
 }
+
+/* 320–359px remains one column so two 44px media controls never overlap. */
+@media (max-width: 359px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 1; }
+    body:is(.classic, .future) :is(
+        #homeSection #artworkGallery,
+        .gallery-page-main .gallery-results-grid,
+        .profile-artwork-grid.grid
+    ) { grid-template-columns: minmax(0, 1fr) !important; }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+3) {
+        display: none !important;
+    }
+}
