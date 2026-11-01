@@ -160,7 +160,9 @@ test('rendered carousel actually changes slides every eight seconds in both Clas
             assert.equal(h.timers.size, 0, 'navigating between controls stops auto-rotation');
             h.document.activeElement = null;
             h.ids.homeShowcase.fire('focusout', { relatedTarget: null });
-            assert.equal(h.timers.size, 1, 'leaving the carousel allows auto-rotation');
+            assert.equal(h.timers.size, 0, 'keyboard focus pause persists after focus leaves');
+            h.ids.homeShowcasePause.onclick();
+            assert.equal(h.timers.size, 1, 'only explicit resume restarts the rotation');
             h.document.visibilityState = 'hidden';
             h.document.fire('visibilitychange');
             assert.equal(h.timers.size, 0, 'hidden tabs do not keep an interval');

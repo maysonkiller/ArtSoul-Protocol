@@ -8524,7 +8524,7 @@ body:is(.classic, .future) .home-showcase-status {
     letter-spacing: 0;
 }
 body:is(.classic, .future) .home-showcase-controls #homeShowcasePause {
-    border-left: 1px solid var(--c-border-soft);
-    border-radius: 0 999px 999px 0;
+    border-right: 1px solid var(--c-border-soft);
+    border-radius: 999px 0 0 999px;
     font-size: 18px;
 }
