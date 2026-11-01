@@ -625,7 +625,7 @@
             const currentHash = window.location.hash || '';
             const isOwnProfile = options.isOwnProfile !== false;
             return this.getNavigationItems()
-                .filter(item => item.profile || !document.querySelector('.site-primary-nav'))
+                .filter(item => !item.profile && !document.querySelector('.site-primary-nav'))
                 .filter(item => !this.isCurrentNavigationItem(item, currentPath, currentHash, isOwnProfile))
                 .map(item => {
                     return `
@@ -1441,20 +1441,70 @@
                 </button>` : ''}</div>`;
         }
 
+        // iOS embedded browsers do not consistently expose navigator.clipboard.
+        // The legacy path runs synchronously inside the genuine tap gesture, so
+        // it retains user activation where a promise-based fallback may lose it.
+        copyMenuAddressLegacy(address) {
+            if (typeof document.execCommand !== 'function' || !document.body) return false;
+            const field = document.createElement('textarea');
+            if (typeof field.select !== 'function') return false;
+            const previousFocus = document.activeElement;
+            field.value = address;
+            // Readonly textarea selection is unreliable in iOS WebKit.
+            // This ephemeral input contains only the validated wallet address.
+            field.readOnly = false;
+            field.setAttribute('aria-hidden', 'true');
+            field.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;font-size:16px;z-index:-1';
+            document.body.appendChild(field);
+            try {
+                field.focus?.({ preventScroll: true });
+                field.select();
+                field.setSelectionRange?.(0, address.length);
+                return document.execCommand('copy') === true;
+            } catch {
+                return false;
+            } finally {
+                if (typeof field.remove === 'function') field.remove();
+                else document.body.removeChild?.(field);
+                previousFocus?.focus?.({ preventScroll: true });
+            }
+        }
+
         async copyMenuAddress(event) {
             event?.preventDefault?.();
             event?.stopPropagation?.();
             const button = event?.currentTarget;
             const address = button?.dataset.walletAddress || '';
-            if (!WALLET_ADDRESS_PATTERN.test(address) || button.disabled) return;
+            if (!WALLET_ADDRESS_PATTERN.test(address) || button.disabled) return false;
             const status = button.querySelector('.avatar-menu-copy-status');
+            const isCurrent = () => button.isConnected !== false && button.dataset.walletAddress === address;
+            const feedback = (state, message) => {
+                if (!isCurrent()) return;
+                button.dataset.copyState = state;
+                if (status) status.textContent = message;
+            };
             button.disabled = true;
+            let copied = false;
             try {
-                if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-                await navigator.clipboard.writeText(address);
-                if (status) status.textContent = 'Copied';
-            } catch {
-                if (status) status.textContent = 'Could not copy. Select the address above.';
+                const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+                if (isIOS) copied = this.copyMenuAddressLegacy(address);
+                if (!copied && typeof navigator.clipboard?.writeText === 'function') {
+                    try {
+                        await navigator.clipboard.writeText(address);
+                        copied = true;
+                    } catch {
+                        // A denied embedded-browser Clipboard API is not final;
+                        // try the built-in selection route before reporting failure.
+                    }
+                }
+                if (!copied && !isIOS) copied = this.copyMenuAddressLegacy(address);
+                feedback(copied ? 'copied' : 'unavailable',
+                    copied ? 'Copied' : 'Could not copy');
+                if (!copied && typeof window.prompt === 'function' && isCurrent()) {
+                    // Explicit, selectable fallback rather than a fake success.
+                    window.prompt('Copy wallet address:', address);
+                }
+                return copied;
             } finally {
                 button.disabled = false;
             }

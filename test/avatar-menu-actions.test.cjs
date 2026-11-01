@@ -4,8 +4,8 @@ const { createAvatarHarness } = require('./helpers/avatar-dropdown-harness.cjs')
 
 const WALLET = '0x' + '11'.repeat(20);
 
-function copyHarness() {
-    const harness = createAvatarHarness();
+function copyHarness(options = {}) {
+    const harness = createAvatarHarness(options);
     const holder = harness.document.createElement('div');
     holder.innerHTML = harness.dropdown.renderMenuIdentity(WALLET);
     const button = holder.querySelector('.avatar-menu-address');
@@ -57,20 +57,21 @@ test('copy feedback from an older account never changes the new account menu', a
     assert.equal(next.querySelector('.avatar-menu-address-value').textContent, '0x2222...2222');
 });
 
-test('account menu keeps the profile destination without repeating visible primary navigation', () => {
+test('account menu never duplicates the fifth Profile link in shared navigation', () => {
     const harness = createAvatarHarness();
     const nav = harness.document.createElement('nav');
     nav.className = 'site-primary-nav';
     harness.document.body.appendChild(nav);
     const html = harness.dropdown.renderDropdownNavItems({ currentPath: '/gallery', isOwnProfile: false });
-    assert.match(html, /href="\/profile"/);
+    assert.doesNotMatch(html, /href="\/profile"/);
     for (const href of ['/', '/gallery', '/upload', '/docs-protocol']) assert.ok(!html.includes(`href="${href}"`));
 });
 
 test('legacy pages without primary navigation retain their existing destinations', () => {
     const harness = createAvatarHarness();
     const html = harness.dropdown.renderDropdownNavItems({ currentPath: '/artwork', isOwnProfile: false });
-    for (const href of ['/', '/profile', '/gallery', '/upload', '/docs-protocol']) assert.ok(html.includes(`href="${href}"`));
+    for (const href of ['/', '/gallery', '/upload', '/docs-protocol']) assert.ok(html.includes(`href="${href}"`));
+    assert.doesNotMatch(html, /href="\/profile"/, 'Profile is now a global primary destination');
     assert.doesNotMatch(harness.dropdown.renderMenuIdentity(''), /avatar-menu-address/);
 });
 
@@ -86,7 +87,7 @@ test('account shortcuts precede wallet details and appearance without changing n
     });
     const positions = ['avatar-menu-identity', 'avatar-account-links', 'avatar-wallet-section', 'avatar-theme-section', 'avatar-account-action'].map(value => html.indexOf(value));
     assert.ok(positions.every((value, i) => value >= 0 && (!i || value > positions[i - 1])));
-    assert.match(html, /href="\/profile"/);
+    assert.doesNotMatch(html, /href="\/profile"/);
     assert.doesNotMatch(html, /href="\/admin"/, 'Admin belongs to Profile, not wallet controls');
     assert.match(html, /data-wallet-provider/);
     assert.match(html, /network-current-row" role="status"/);
@@ -114,4 +115,78 @@ test('wallet menu uses a short address without showing a Copy button label', () 
     assert.match(html, /data-wallet-address="0x1111111111111111111111111111111111111111"/);
     assert.doesNotMatch(html, />Copy address<|class="avatar-menu-copy-button"/);
     assert.match(html, /aria-label="Copy wallet address /);
+});
+
+test('iOS embedded browser copies through the synchronous selection fallback when Clipboard API is absent', async () => {
+    const { harness, button, status, event } = copyHarness({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' });
+    harness.context.navigator.clipboard = undefined;
+    const original = harness.document.createElement.bind(harness.document);
+    let selected = '', copied = 0, removed = false;
+    harness.document.createElement = tag => {
+        const field = original(tag);
+        if (tag === 'textarea') {
+            field.focus = () => {};
+            field.select = () => {
+                assert.equal(field.readOnly, false, 'iOS needs a selectable, non-readonly textarea');
+                selected = field.value;
+            };
+            field.setSelectionRange = () => {};
+            field.remove = () => { removed = true; };
+        }
+        return field;
+    };
+    harness.document.execCommand = command => {
+        assert.equal(command, 'copy');
+        assert.equal(selected, WALLET);
+        copied++;
+        return true;
+    };
+    assert.equal(await harness.dropdown.copyMenuAddress(event), true);
+    assert.equal(copied, 1);
+    assert.equal(removed, true, 'temporary textarea must always be removed');
+    assert.equal(status.textContent, 'Copied');
+    assert.equal(button.dataset.copyState, 'copied');
+    assert.equal(button.disabled, false);
+});
+
+test('a rejected browser Clipboard API can recover using legacy copy without faking success', async () => {
+    const { harness, button, status, event } = copyHarness();
+    harness.context.navigator.clipboard = { writeText: async () => { throw new Error('NotAllowedError'); } };
+    const original = harness.document.createElement.bind(harness.document);
+    let selected = '';
+    harness.document.createElement = tag => {
+        const field = original(tag);
+        if (tag === 'textarea') {
+            field.focus = () => {};
+            field.select = () => { selected = field.value; };
+            field.remove = () => {};
+        }
+        return field;
+    };
+    harness.document.execCommand = command => command === 'copy' && selected === WALLET;
+    assert.equal(await harness.dropdown.copyMenuAddress(event), true);
+    assert.equal(status.textContent, 'Copied');
+    assert.equal(button.dataset.copyState, 'copied');
+});
+
+test('when both copy mechanisms fail, the user sees an honest failure and can manually select full address', async () => {
+    const { harness, button, status, event } = copyHarness({ userAgent: 'iPhone' });
+    harness.context.navigator.clipboard = { writeText: async () => { throw new Error('Denied'); } };
+    const prompts = [];
+    harness.context.window.prompt = (label, address) => prompts.push({ label, address });
+    const original = harness.document.createElement.bind(harness.document);
+    harness.document.createElement = tag => {
+        const field = original(tag);
+        if (tag === 'textarea') {
+            field.focus = () => {};
+            field.select = () => {};
+            field.remove = () => {};
+        }
+        return field;
+    };
+    harness.document.execCommand = () => false;
+    assert.equal(await harness.dropdown.copyMenuAddress(event), false);
+    assert.equal(button.dataset.copyState, 'unavailable');
+    assert.match(status.textContent, /Could not copy/);
+    assert.deepEqual(prompts, [{ label: 'Copy wallet address:', address: WALLET }]);
 });

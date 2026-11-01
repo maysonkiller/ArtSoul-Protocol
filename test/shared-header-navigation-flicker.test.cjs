@@ -572,13 +572,13 @@ test('every shared-header page boots the header in the same order with the same 
     const html = readPage(page);
     // Root-absolute so a page served at a subpath (/artwork/<id>) resolves the
     // same assets as one served at the root.
-    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=70">/, `${page} stylesheet pin`);
+    assert.match(html, /<link rel="stylesheet" href="\/unified-styles\.css\?v=71">/, `${page} stylesheet pin`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=10"><\/script>/, `${page} prepaint pin`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=63" defer><\/script>/, `${page} component pin`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=64" defer><\/script>/, `${page} component pin`);
 
-    const stylesheet = html.indexOf('unified-styles.css?v=70');
+    const stylesheet = html.indexOf('unified-styles.css?v=71');
     const prepaint = html.indexOf('header-prepaint.js?v=10');
-    const component = html.indexOf('avatar-dropdown.js?v=63');
+    const component = html.indexOf('avatar-dropdown.js?v=64');
     // A-64 moved the wallet SDK behind a loader, so the page's wallet entry is
     // wallet-runtime-loader.js and appkit-init is imported from inside it. The
     // ordering this guard protects is unchanged: the header component still has

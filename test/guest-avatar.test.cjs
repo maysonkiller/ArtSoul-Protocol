@@ -132,9 +132,9 @@ test('account menu has one stylesheet source and a full-width compact network ro
 test('every product page loads the same account menu and stylesheet versions', () => {
   for (const page of sharedHeaderPages) {
     const html = fs.readFileSync(page, 'utf8');
-    assert.match(html, /unified-styles\.css\?v=70/, `${page} must use the shared stylesheet cache version`);
+    assert.match(html, /unified-styles\.css\?v=71/, `${page} must use the shared stylesheet cache version`);
     assert.match(html, /<script src="\/header-prepaint\.js\?v=10"><\/script>/, `${page} must load the first-frame bridge`);
-    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=63" defer><\/script>/, `${page} must load the deferred account menu`);
+    assert.match(html, /<script src="\/avatar-dropdown\.js\?v=64" defer><\/script>/, `${page} must load the deferred account menu`);
     assert.match(
       html,
       /<\/header>\s*<script>window\.ArtSoulHeaderPrepaint\?\.hydrate\(document\.getElementById\('navButtons'\)\);<\/script>/,
@@ -273,8 +273,7 @@ test('an avatar image failure records the failure instead of claiming a successf
   assert.match(avatarDropdown, /button\.dataset\.avatarContentKey = failed\s*\? `\$\{snapshot\.contentKey\}\|image-error`\s*: snapshot\.contentKey;/);
 });
 
-test('Profile and Home are always visible with Profile first and no permanent profile styling', () => {
-  assert.ok(avatarDropdown.indexOf("href: '/profile'") < avatarDropdown.indexOf("href: '/'"));
-  assert.doesNotMatch(avatarDropdown, /filter\(item => !\(item\.profile && options\.isOwnProfile\)\)/);
-  assert.doesNotMatch(avatarDropdown, /filter\(item => item\.profile \|\| !this\.isCurrentNavigationItem/);
+test('Profile is a native top-level destination and never repeats inside account controls', () => {
+  assert.match(avatarDropdown, /\.filter\(item => !item\.profile && !document\.querySelector\('\.site-primary-nav'\)\)/);
+  assert.doesNotMatch(avatarDropdown, /filter\(item => item\.profile \|\| !document\.querySelector/);
 });

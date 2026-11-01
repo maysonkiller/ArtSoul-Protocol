@@ -8641,3 +8641,226 @@ body:is(.classic, .future) .profile-admin-shortcut:focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: 2px;
 }
+
+/* B18.1: real fifth Profile tab on every shared-header route.
+   All five destinations remain visible at phone widths: long guide label is
+   shortened visually, never removed from the accessible label. */
+.site-header .site-nav-guide-short { display: none; }
+@media (max-width: 768px) {
+    body:is(.classic, .future) .site-header .site-primary-nav {
+        display: grid !important;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        justify-items: stretch;
+        align-items: stretch;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        gap: 2px !important;
+        overflow: visible;
+    }
+    body:is(.classic, .future) .site-header .site-primary-nav a {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        min-height: 44px;
+        padding: 8px 2px !important;
+        font-size: clamp(11px, 2.9vw, 13px) !important;
+        line-height: 1.25;
+        white-space: nowrap;
+        text-align: center;
+        letter-spacing: -0.01em;
+    }
+    body:is(.classic, .future) .site-header .site-nav-guide-long { display: none; }
+    body:is(.classic, .future) .site-header .site-nav-guide-short { display: inline; }
+}
+/* The 320px case still has five real, keyboard-focusable 44px destinations. */
+@media (max-width: 360px) {
+    body:is(.classic, .future) .site-header .site-primary-nav a {
+        padding-inline: 0 !important;
+        font-size: 11px !important;
+    }
+}
+
+/* B18.1: account address is one full-row action. Make copied/error status
+   visible for a moment beside the short address; never add a Copy button. */
+body:is(.classic, .future) .site-header .avatar-menu-address {
+    position: relative;
+    cursor: copy;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+body:is(.classic, .future) .site-header .avatar-menu-address:active {
+    background: var(--c-surface-muted) !important;
+}
+body:is(.classic, .future) .site-header .avatar-menu-address[data-copy-state="copied"] .avatar-menu-copy-status,
+body:is(.classic, .future) .site-header .avatar-menu-address[data-copy-state="unavailable"] .avatar-menu-copy-status {
+    position: static !important;
+    display: inline !important;
+    flex: 0 0 auto;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: nowrap !important;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--c-accent);
+}
+
+/* B18.1: fewer competing panels, grouped navigation, existing-data overview.
+   Presentation only: server ownership, factor/role gates, review actions, and
+   immutable audit evidence remain unchanged. */
+body:is(.classic, .future) .protocol-admin-shell {
+    max-width: 1280px;
+    padding-top: clamp(18px, 3vw, 40px);
+}
+body:is(.classic, .future) .protocol-admin-heading {
+    align-items: flex-start;
+    gap: 12px 24px;
+    padding-block: 0 20px;
+}
+body:is(.classic, .future) .protocol-admin-heading h1 {
+    font-size: clamp(28px, 3.25vw, 42px);
+    margin-block: 4px 8px;
+}
+body:is(.classic, .future) .protocol-admin-kicker {
+    color: var(--c-accent);
+    letter-spacing: 0.12em;
+}
+body:is(.classic, .future) .protocol-admin-description {
+    margin: 0;
+    max-width: 650px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--c-text-muted);
+}
+body:is(.classic, .future) .protocol-admin-session {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 12px;
+    color: var(--c-text-muted);
+    font-size: 12px;
+}
+body:is(.classic, .future) .protocol-admin-session > span:last-child { overflow-wrap: anywhere; }
+body:is(.classic, .future) .protocol-admin-access-status { margin: 0; font-size: 12px; padding: 4px 10px; }
+body:is(.classic, .future) .protocol-admin-header-actions { gap: 8px; }
+body:is(.classic, .future) .protocol-admin-header-actions button {
+    border-radius: 10px;
+    background: transparent;
+}
+body:is(.classic, .future) .protocol-admin-header-actions .protocol-admin-primary {
+    background: var(--c-accent);
+}
+body:is(.classic, .future) .protocol-admin-overview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 4px 0 22px;
+}
+body:is(.classic, .future) .protocol-admin-overview > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--c-border-soft);
+    border-radius: 14px;
+    background: var(--c-surface);
+}
+body:is(.classic, .future) .protocol-admin-overview span {
+    color: var(--c-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+body:is(.classic, .future) .protocol-admin-overview strong {
+    color: var(--c-text);
+    font-size: clamp(22px, 3vw, 30px);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+body:is(.classic, .future) .protocol-admin-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 12px 20px;
+    border: 0;
+    margin: 0 0 26px;
+}
+body:is(.classic, .future) .protocol-admin-tab-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-width: 0;
+    gap: 4px;
+}
+body:is(.classic, .future) .protocol-admin-tab-label {
+    flex: 1 0 100%;
+    margin-bottom: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.085em;
+    text-transform: uppercase;
+    color: var(--c-text-muted);
+}
+body:is(.classic, .future) .protocol-admin-tab-group > button {
+    min-height: 44px;
+    padding: 8px 13px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--c-text-muted);
+    font-size: 13px;
+    font-weight: 550;
+    box-shadow: none;
+}
+body:is(.classic, .future) .protocol-admin-tab-group > button[aria-current="page"] {
+    border-color: var(--c-border-soft);
+    background: var(--c-surface-muted);
+    color: var(--c-accent);
+}
+body:is(.classic, .future) .protocol-admin-tab-group > button:not([aria-current="page"]):hover {
+    background: var(--c-surface-muted);
+    color: var(--c-text);
+}
+body:is(.classic, .future) .protocol-admin-tab-group > button:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+}
+body:is(.classic, .future) .protocol-admin-tab-group:nth-child(3) {
+    grid-column: 1 / -1;
+}
+body:is(.classic, .future) .protocol-admin-section-heading {
+    align-items: flex-start;
+    gap: 12px 24px;
+}
+body:is(.classic, .future) .protocol-admin-status-filter {
+    gap: 4px;
+}
+body:is(.classic, .future) .protocol-admin-status-filter button {
+    min-height: 44px;
+    padding: 7px 11px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+@media (max-width: 720px) {
+    body:is(.classic, .future) .protocol-admin-overview { gap: 6px; }
+    body:is(.classic, .future) .protocol-admin-overview > div { padding: 12px 8px; border-radius: 10px; }
+    body:is(.classic, .future) .protocol-admin-overview span { font-size: 11px; }
+    body:is(.classic, .future) .protocol-admin-tabs {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+    }
+    body:is(.classic, .future) .protocol-admin-tab-group:nth-child(3) { grid-column: 1; }
+    body:is(.classic, .future) .protocol-admin-tab-group { gap: 4px; }
+    body:is(.classic, .future) .protocol-admin-tab-group > button { padding: 8px 10px; }
+    body:is(.classic, .future) .protocol-admin-section-heading { align-items: flex-start; }
+}
