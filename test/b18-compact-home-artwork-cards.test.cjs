@@ -69,8 +69,9 @@ function textUnder(root) {
 }
 
 test('restore the original founder headline and discovery-first promise', () => {
-    assert.match(homeSource, /Discovery-First Auctions for Digital Art/);
-    assert.match(homeSource, /Collector demand comes before minting\. Publish artwork, build conviction through an auction, and mint only after settlement\./);
+    assert.match(homeSource, /<p class="home-hero-eyebrow">Art first\. Ownership next\.<\/p>/);
+    assert.match(homeSource, /Discover a work\.\s*<br class="home-hero-break">Start its next chapter\./);
+    assert.match(homeSource, /Meet independent artists\. Support the work you love\. Collector demand comes before minting\. An NFT is created only after successful settlement\./);
     assert.doesNotMatch(homeSource, /<h1[^>]+>Discover artworks<\/h1>/);
 });
 
