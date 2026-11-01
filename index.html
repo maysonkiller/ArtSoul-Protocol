@@ -42,7 +42,7 @@
     <script src="/header-prepaint.js?v=10"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="/design-system.css?v=1">
-    <link rel="stylesheet" href="/unified-styles.css?v=74">
+    <link rel="stylesheet" href="/unified-styles.css?v=77">
     <link rel="stylesheet" href="/button-effects.css?v=5">
     <link rel="stylesheet" href="/ai-ui-styles.css?v=1">
     <link rel="stylesheet" href="/simplified-ui.css?v=1">
@@ -56,7 +56,7 @@
     <script src="/modal-system.js?v=2" defer></script>
     <script src="/src/features/discovery/discovery-service.js?v=1" defer></script>
     <script src="/src/ui/artwork-url.js?v=1" defer></script>
-    <script src="/src/ui/components/artwork-card.js?v=23" defer></script>
+    <script src="/src/ui/components/artwork-card.js?v=27" defer></script>
     <style>
         @keyframes spin {
             from { transform: rotate(0deg); }
@@ -208,7 +208,7 @@
     <script src="/avatar-dropdown.js?v=64" defer></script>
     <script src="/contracts-config.js?v=1" defer></script>
     <!-- Agent tools (WebMCP). Registers nothing in a browser without the API. -->
-    <script src="/webmcp-tools.js?v=11" defer></script>
+    <script src="/webmcp-tools.js?v=15" defer></script>
     <!-- Voice commands: the same agent tools, spoken. Absent where the browser has no speech recognition. -->
     <script src="/voice-commands.js?v=12" defer></script>
     <script type="module" src="/contracts-integration.js?v=17"></script>
@@ -287,9 +287,12 @@
         <!-- Hero Section -->
         <div class="home-hero mb-8">
             <div class="home-hero-copy">
-            <h1 class="text-3xl md:text-5xl font-bold mb-3">Discover artworks</h1>
+            <p class="home-hero-eyebrow">Art first. Ownership next.</p>
+            <h1 class="text-3xl md:text-5xl font-bold mb-3">
+                Discover a work. <br class="home-hero-break">Start its next chapter.
+            </h1>
             <p class="text-base md:text-xl font-light opacity-90 mb-5 max-w-2xl">
-                Original pieces, live auctions and ownership history—all in one place.
+                Meet independent artists. Support the work you love. Collector demand comes before minting. An NFT is created only after successful settlement.
             </p>
             <div class="home-hero-actions flex flex-wrap gap-4 justify-center">
                 <a href="/gallery" class="btn-main text-lg px-7 py-3">
@@ -319,7 +322,8 @@
         <div class="home-spotlight mb-12">
             <div class="home-spotlight-heading">
             <div>
-            <h2 class="text-2xl md:text-3xl font-bold mb-6">From the gallery</h2>
+            <h2 class="text-2xl md:text-3xl font-bold mb-6">Find your next connection</h2>
+            <p class="home-section-intro">Art to discover, auctions to follow.</p>
             </div>
             <a href="/gallery#discover" class="home-section-link">View all <span aria-hidden="true">→</span></a>
             </div>

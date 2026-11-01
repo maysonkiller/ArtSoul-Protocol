@@ -664,6 +664,7 @@ let morphActive = false;
         }
 
         // Load artworks on page load
+        const HOMEPAGE_MAX_CARDS = 8; // Up to two rows, with a responsive visible limit per breakpoint.
         let homeArtworksRequest = 0;
         async function loadHomeArtworks() {
             const request = ++homeArtworksRequest;
@@ -704,7 +705,7 @@ let morphActive = false;
                 const rankedWorks = (spotlight?.ranked && spotlight.ranked.length
                     ? spotlight.ranked
                     : artworks.filter(hasRenderableArtworkMedia)
-                ).slice(0, 12);
+                ).slice(0, HOMEPAGE_MAX_CARDS);
                 const slots = rankedWorks.map(artwork => ({
                     label: 'Discovery Spotlight',
                     reason: window.ArtSoulDiscovery?.classifyLifecycle?.(artwork)?.label || 'Community signal',

@@ -1,6 +1,18 @@
 # ArtSoul Engineering Handoff
 
-Current continuation (2026-10-24): use `C:\Projects\ArtSoul`, branch
+Current continuation (2026-11-02): use only `C:\Projects\ArtSoul`.
+The Phase B redesign/card reconciliation continues in existing PR #441; do not
+create a competing checkout or reapply the older chat patches over this tree.
+Read [the current Phase B status](PHASE_B_STATUS_2026-11-02.md) and
+[the scoped verification](audits/B18_CARD_RECONCILIATION_2026-11-02.md).
+The PR's current checks and deployment readback determine release state.
+Preserve the accumulated unrelated checkpoint notes and untracked work.
+The remaining real beta, device, signed-flow and operations gates are explicit;
+Phase B is not marked fully complete by this interface release.
+
+## Historical acceptance — October 24, 2026
+
+Historical continuation (2026-10-24): use `C:\Projects\ArtSoul`, branch
 `codex/takeover-audit`. Application release PR #334 is deployed at `b0d722b`.
 Candidate/merge Linux/Windows CI, 74 focused checks, full local 2252-check suite,
 46 contract tests, build and nine apex assets pass. Reviewed media configuration

@@ -6,10 +6,10 @@ const pages = ['index.html','gallery.html','artwork.html','profile.html','upload
 const css = fs.readFileSync('unified-styles.css', 'utf8');
 const home = fs.readFileSync('index.html','utf8');
 
-test('all product screens load the same shared geometry CSS v72', () => {
+test('all product screens load the same shared geometry CSS v77', () => {
   for (const path of pages) {
     const html = fs.readFileSync(path,'utf8');
-    assert.equal((html.match(/unified-styles\.css\?v=74/g) || []).length, 1, path);
+    assert.equal((html.match(/unified-styles\.css\?v=77/g) || []).length, 1, path);
   }
 });
 
@@ -28,8 +28,8 @@ test('Home uses the wide shared canvas without increasing editorial copy width',
   assert.match(css,/#homeSection \{ max-width: 1720px !important/);
   assert.match(css,/#homeSection \.home-hero-copy \{[\s\S]*?max-width: 700px/);
   assert.match(css,/#homeSection \.home-showcase \{[\s\S]*?max-width: 780px/);
-  assert.match(home,/<h1[^>]*>Discover artworks<\/h1>/);
-  assert.doesNotMatch(home,/Discover artworks\.<\/h1>/);
+  assert.match(home,/Discover a work\.\s*<br class="home-hero-break">Start its next chapter\./);
+  assert.match(home,/Art first\. Ownership next\./);
 });
 
 test('Explore uses density breakpoints while leaving card controls and loading skeletons in the same grid', () => {

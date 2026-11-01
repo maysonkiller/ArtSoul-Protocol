@@ -7,7 +7,6 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'src', 'ui', 'components', 'artwork-card.js'), 'utf8');
 const profile = fs.readFileSync(path.join(root, 'src', 'entries', 'profile.jsx'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'unified-styles.css'), 'utf8');
 
 class FakeElement {
   constructor(tagName) {
@@ -109,6 +108,8 @@ test('DOM cards share one timer and keep their compact body structure', () => {
   assert.equal(firstTimer.textContent, '1m 00s', 'detached cards already contain their countdown before insertion');
   assert.equal(firstTimer.attributes['aria-label'], 'Auction ends in 1m 00s');
   assert.equal(secondTimer.textContent, '1m 00s');
+  const firstBadge = first.children[1].children[2].children[0];
+  assert.equal(firstBadge.textContent, 'Auction open', 'the single status uses the live presentation');
 
   firstTimer.isConnected = true;
   secondTimer.isConnected = true;
@@ -121,7 +122,7 @@ test('DOM cards share one timer and keep their compact body structure', () => {
   assert.equal(firstTimer.textContent, 'Ended');
   assert.equal(secondTimer.textContent, 'Ended');
   assert.match(firstTimer.className, /is-ended/);
-  const firstBadge = first.children[1].children[2].children[0];
+  assert.equal(first.children[1].children[2].children[0], firstBadge, 'expiry updates the existing status');
   assert.equal(firstBadge.textContent, 'No bids', 'expiry must update the status as well as the timer');
   assert.equal(firstBadge.className, 'artsoul-card-status artsoul-card-status-ended_no_bids');
   const firstLink = first.children.find(child => child.className === 'artsoul-card-link');
@@ -135,16 +136,24 @@ test('expiry with a bid changes the card status and a replacement round starts l
   const artwork = { id: '34', file_url: 'image.jpg', file_type: 'image', auction_id: '66',
     auction_end_time: clock.now + 1000, current_bid: '0.011', current_bidder: `0x${'1'.repeat(40)}` };
   const previous = api.createCardElement(artwork);
+  const meta = previous.children[1].children[2];
+  assert.equal(meta.children[0].textContent, 'Auction open');
+  assert.equal(meta.children[1].textContent, 'Current bid');
+  const value = meta.children[2].children[1];
+  assert.equal(value.textContent, '0.011 ETH');
   const timer = previous.children.find(child => child.className === 'artsoul-card-countdown');
   timer.isConnected = true;
   clock.now += 1000;
   intervals[0]();
   assert.equal(timer.textContent, 'Ended');
   assert.equal(previous.children[1].children[2].children[0].textContent, 'Awaiting payment');
+  assert.equal(meta.children[1].textContent, 'Final bid', 'an expired bid is no longer advertised as current');
+  assert.equal(meta.children[2].children[1], value, 'expiry preserves the confirmed amount');
+  assert.equal(value.textContent, '0.011 ETH');
 
   const replacement = api.createCardElement({ ...artwork, auction_id: '67', auction_end_time: clock.now + 86400000,
     current_bid: '0', current_bidder: '' });
-  assert.equal(replacement.children[1].children[2].children[0].textContent, 'Live');
+  assert.equal(replacement.children[1].children[2].children[0].textContent, 'Auction open');
   assert.equal(replacement.children.find(child => child.className === 'artsoul-card-countdown').textContent, '1d 00h');
 });
 
@@ -221,20 +230,6 @@ test('React countdown retires the previous round and refreshes its card once at 
   assert.deepEqual(endedAt, [clock.now], 'the expiry callback runs once');
   cleanup?.();
   assert.deepEqual(cleared, [1, 2]);
-});
-
-test('countdown is a height-neutral theme-safe media overlay', () => {
-  const cardRule = css.match(/\.artsoul-artwork-card\s*\{[\s\S]*?\n\}/)?.[0] || '';
-  const countdownRule = css.match(/\.artsoul-card-countdown\s*\{[\s\S]*?\n\}/)?.[0] || '';
-
-  assert.match(cardRule, /position:\s*relative/);
-  assert.match(countdownRule, /position:\s*absolute/);
-  assert.match(countdownRule, /top:\s*10px/);
-  assert.match(countdownRule, /right:\s*10px/);
-  assert.match(countdownRule, /font-variant-numeric:\s*tabular-nums/);
-  assert.match(countdownRule, /var\(--c-/);
-  assert.doesNotMatch(countdownRule, /animation|#[0-9a-f]{3,8}/i);
-  assert.doesNotMatch(countdownRule, /fetch|XMLHttpRequest|rpc/i);
 });
 
 test('countdown implementation performs no API or RPC request', () => {

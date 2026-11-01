@@ -3325,9 +3325,6 @@ body.future .resale-modal {
     .saved-button-overlay { top: 4px; left: 4px; right: auto; }
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-menu { top: 4px; left: 4px; right: 4px; }
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-media-controls { padding: 0; bottom: 4px; }
-    .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-countdown {
-        top: 52px; left: auto; right: 4px; min-width: 0; padding: 3px 4px; font-size: 10px;
-    }
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-media-badge,
     .artsoul-artwork-card:has(.saved-button-overlay:not([hidden])) .artsoul-card-audio-label {
         top: 52px; left: 4px; padding: 3px 4px; font-size: 10px; line-height: 1;
@@ -9281,5 +9278,389 @@ body:is(.classic, .future) .site-header .site-header-actions .artsoul-voice-butt
     ) {
         animation: none !important;
         transition: none !important;
+    }
+}
+
+
+/* B18.4 — founder-requested compact Home and consistent artwork previews.
+   Presentation only: live wallet/network authorization and card lifecycle
+   status continue to come from the original JavaScript resolvers. */
+
+/* Restore the pre-circle account capsule. Icon-only header tools remain 44px
+   circles with their existing hover states; this is a separate control. */
+@media (min-width: 769px) {
+    body:is(.classic, .future) .site-header .site-header-actions #navButtons .avatar-button {
+        width: 180px !important;
+        min-width: 180px !important;
+        max-width: 180px !important;
+        border-radius: 13px !important;
+        border: 1px solid var(--c-border-soft) !important;
+        background: var(--c-surface) !important;
+        box-shadow: none !important;
+        justify-content: flex-start !important;
+        gap: 6px !important;
+        padding: 5px 9px 5px 6px !important;
+        text-align: left !important;
+    }
+    body:is(.classic, .future) .site-header .site-header-actions #navButtons .avatar-button:is(:hover, :focus-visible, [aria-expanded="true"]) {
+        border-color: var(--c-accent) !important;
+        background: var(--c-surface-strong) !important;
+        box-shadow: 0 0 0 1px var(--c-glow) !important;
+    }
+    body:is(.classic, .future) .site-header #navButtons .avatar-info {
+        text-align: left !important;
+        align-items: flex-start !important;
+        min-width: 0 !important;
+        flex: 1 1 0 !important;
+    }
+    body:is(.classic, .future) .site-header #navButtons .avatar-button .dropdown-arrow {
+        flex: 0 0 10px !important;
+    }
+}
+body:is(.classic, .future) .site-header #navButtons :is([data-avatar-name], [data-avatar-address]) {
+    animation: none !important;
+    transition: none !important;
+    font-variant-numeric: tabular-nums;
+    text-shadow: none !important;
+}
+
+/* The showcase is no taller than the editorial introduction on wide screens.
+   On smaller screens its ratio compresses before the real gallery begins. */
+body:is(.classic, .future) #homeSection {
+    padding-top: 16px !important;
+}
+body:is(.classic, .future) #homeSection .home-hero {
+    gap: clamp(16px, 2.2vw, 30px) !important;
+    padding-block: 8px 20px !important;
+}
+body:is(.classic, .future) #homeSection .home-hero h1 {
+    font-size: clamp(32px, 3vw, 44px) !important;
+    line-height: 1.08 !important;
+    margin: 0 0 12px !important;
+    text-wrap: balance;
+}
+body:is(.classic, .future) #homeSection .home-hero p {
+    max-width: 570px !important;
+    font-size: 15px !important;
+    line-height: 1.45 !important;
+}
+body:is(.classic, .future) #homeSection .home-hero-actions {
+    margin-top: 17px !important;
+}
+body:is(.classic, .future) #homeSection .home-spotlight-heading {
+    margin-top: 0;
+    margin-bottom: 14px;
+}
+body:is(.classic, .future) #homeSection .home-spotlight-heading h2 {
+    font-size: 22px;
+    line-height: 1.3;
+}
+body:is(.classic, .future) #homeSection .home-showcase-shell {
+    min-height: 0 !important;
+    border-radius: 18px;
+}
+body:is(.classic, .future) #homeSection .home-showcase-caption {
+    gap: 4px;
+    padding: 20px 16px 51px;
+}
+body:is(.classic, .future) #homeSection .home-showcase-caption .home-showcase-title {
+    font-size: clamp(17px, 1.5vw, 22px);
+}
+@media (min-width: 1050px) {
+    body:is(.classic, .future) #homeSection .home-hero {
+        align-items: stretch !important;
+    }
+    body:is(.classic, .future) #homeSection .home-showcase {
+        display: flex;
+        align-self: stretch;
+        margin: 0;
+        max-width: 100%;
+    }
+    body:is(.classic, .future) #homeSection .home-showcase-shell {
+        aspect-ratio: auto !important;
+        width: 100%;
+        height: 100% !important;
+        max-height: 280px;
+    }
+}
+@media (max-width: 1049px) {
+    body:is(.classic, .future) #homeSection .home-showcase-shell {
+        aspect-ratio: 2.3 / 1 !important;
+        max-height: 250px;
+        min-height: 180px !important;
+    }
+}
+
+/* Shared study hierarchy: one state over media, then title, creator and value.
+   The status stays in the shared renderer; absolute positioning costs no row. */
+body:is(.classic, .future) .artsoul-artwork-card {
+    position: relative;
+    min-width: 0;
+    height: 100%;
+    --artwork-card-radius: 18px;
+    display: flex;
+    flex-direction: column;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media {
+    aspect-ratio: 4 / 3;
+    min-height: 144px;
+    flex: 0 0 auto;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-body {
+    position: static;
+    min-height: 120px;
+    padding: 16px;
+    gap: 6px;
+    flex: 1 0 auto;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-title {
+    display: block;
+    white-space: nowrap;
+    line-height: 1.35;
+    font-size: 17px;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-creator {
+    display: block;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-top: auto;
+    padding-top: 16px;
+    gap: 4px 8px;
+    font-size: 12px;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price-label {
+    color: var(--c-text-muted);
+    line-height: 1.4;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    min-height: 0;
+    background: transparent;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+}
+body:is(.classic, .future) .artsoul-card-price > span { min-width: 0; overflow-wrap: anywhere; }
+body:is(.classic, .future) .artsoul-card-price-mark {
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    padding: 3px;
+    border-radius: 50%;
+    background: var(--c-text);
+    object-fit: contain;
+}
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-status {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 3;
+    pointer-events: none;
+    max-width: calc(100% - 76px);
+    min-height: 23px;
+    padding: 4px 8px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.25;
+    text-align: left;
+    white-space: normal;
+    box-shadow: none;
+}
+body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-countdown:not(.is-ended)) .artsoul-card-status-live,
+body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-countdown.is-ended { display: none; }
+body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+    top: auto !important;
+    bottom: 8px !important;
+    left: 8px !important;
+    z-index: 3;
+    min-height: 20px;
+    padding: 3px 7px !important;
+    border: none;
+    border-radius: 7px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 10px !important;
+    line-height: 1.25;
+    pointer-events: none;
+}
+@container (max-width: 250px) {
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media { aspect-ratio: 1; }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-body { padding: 12px; }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-title { font-size: 15px; }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-price { font-size: 12px; }
+}
+@container (max-width: 175px) {
+    body:is(.classic, .future) .artsoul-artwork-card .saved-button-overlay { top: 52px; left: auto; right: 4px; }
+    body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-status, .artsoul-card-countdown) {
+        top: 5px; left: 5px; right: auto; max-width: calc(100% - 56px); padding: 3px 5px; font-size: 10px;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card:has(.artsoul-card-media-controls) :is(.artsoul-card-media-badge, .artsoul-card-audio-label) {
+        bottom: 56px !important;
+    }
+    body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-meta { flex-direction: column; }
+}
+
+/* One density scale and a strict two-row home window at each breakpoint.
+   Unlike forcing 8 cards into 2 mobile columns, this does not create a
+   five-row feed on a tablet or phone. Explore and Profile remain unpaginated. */
+body:is(.classic, .future) .gallery-page-main.site-page-container {
+    max-width: 1720px !important;
+}
+@media (min-width: 1200px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 4; --home-loading-gap: 14px; }
+    body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+    }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+9) { display: none !important; }
+}
+@media (min-width: 900px) and (max-width: 1199px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 4; --home-loading-gap: 14px; }
+    body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+    }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+9) { display: none !important; }
+}
+@media (min-width: 769px) and (max-width: 899px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 3; --home-loading-gap: 14px; }
+    body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+    }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+7) { display: none !important; }
+}
+@media (min-width: 360px) and (max-width: 768px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 2; --home-loading-gap: 12px; }
+    body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+    }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+5) { display: none !important; }
+}
+@media (max-width: 359px) {
+    #artworkGallery[aria-busy="true"] { --home-loading-columns: 1; --home-loading-gap: 12px; }
+    body:is(.classic, .future) :is(#homeSection #artworkGallery, .gallery-page-main .gallery-results-grid, .profile-artwork-grid.grid) {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 12px !important;
+    }
+    body:is(.classic, .future) #homeSection #artworkGallery > :nth-child(n+3) { display: none !important; }
+    body:is(.classic, .future) #homeSection .home-hero {
+        gap: 12px !important;
+        padding-bottom: 16px !important;
+    }
+    body:is(.classic, .future) #homeSection .home-showcase-shell {
+        min-height: 170px !important;
+        max-height: 195px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    body:is(.classic, .future) #homeSection .home-showcase-slide,
+    body:is(.classic, .future) #navButtons .avatar-button,
+    body:is(.classic, .future) #navButtons .avatar-button * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+
+/* B18.5 — compact account popover and design-study artwork metadata.
+   Owner review: the iPhone menu occupied too much viewport. Keep network,
+   copy-address, provider and disconnect access, with 44px touch targets.
+   No JavaScript wallet lifecycle, permissions or transactions are changed. */
+body:is(.classic, .future) .site-header .avatar-dropdown-menu {
+    width: min(194px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    box-sizing: border-box !important;
+    padding: 5px !important;
+    border-radius: 14px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    max-height: calc(100dvh - var(--site-header-height) - 12px) !important;
+}
+body:is(.classic, .future) .site-header .avatar-menu-identity {
+    padding: 4px 6px !important;
+    min-width: 0;
+}
+body:is(.classic, .future) .site-header .avatar-menu-name {
+    font-size: 12.5px !important;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+body:is(.classic, .future) .site-header .avatar-menu-address {
+    min-height: 44px !important;
+    gap: 3px !important;
+    padding: 2px 0 !important;
+    font-size: 11px !important;
+}
+body:is(.classic, .future) .site-header .avatar-menu-address-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body:is(.classic, .future) .site-header .avatar-wallet-section {
+    padding-block: 3px !important;
+}
+body:is(.classic, .future) .site-header .avatar-dropdown-menu .network-current-row {
+    min-height: 44px !important;
+    gap: 5px !important;
+    padding: 4px 5px !important;
+    font-size: 12px !important;
+    align-items: center;
+}
+body:is(.classic, .future) .site-header .network-switcher-copy [data-network-name] {
+    font-size: 12px !important;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+body:is(.classic, .future) .site-header .network-switcher-copy [data-network-balance] {
+    font-size: 11px !important;
+    line-height: 1.3;
+}
+body:is(.classic, .future) .site-header .avatar-wallet-provider {
+    gap: 4px !important;
+    padding: 1px 5px 3px !important;
+    font-size: 11px !important;
+}
+body:is(.classic, .future) .site-header .avatar-dropdown-navigation {
+    padding: 0 !important;
+}
+body:is(.classic, .future) .site-header .avatar-account-links:has(.dropdown-profile-item):has(.dropdown-protocol-admin-item) {
+    grid-template-columns: minmax(0, 1fr);
+}
+body:is(.classic, .future) .site-header .avatar-dropdown-divider {
+    margin: 2px 0 !important;
+}
+body:is(.classic, .future) .site-header .avatar-account-action .dropdown-item {
+    min-height: 44px !important;
+    padding: 7px 5px !important;
+    justify-content: center;
+}
+@media (max-width: 768px) {
+    body:is(.classic, .future) .site-header .avatar-dropdown-menu {
+        width: min(180px, calc(100vw - 20px)) !important;
+        max-width: calc(100vw - 20px) !important;
+        padding: 4px !important;
     }
 }

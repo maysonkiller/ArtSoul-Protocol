@@ -19,8 +19,6 @@ import {
     optimizeAnimations,
     initPerformanceOptimizations
 } from './core/utils/performance-utils.js';
-import './ai/index.js';
-import './ui/ai-evaluation-panel.js';
 
 /**
  * Initialize all services

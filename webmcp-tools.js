@@ -1722,7 +1722,7 @@
                 // Docs and the collection builder have no card renderer at
                 // startup. Load the same policy only when a form is requested.
                 if (!window.ArtSoulArtworkUrl) await import('/src/ui/artwork-url.js?v=1');
-                if (!window.ArtSoulArtworkCard) await import('/src/ui/components/artwork-card.js?v=23');
+                if (!window.ArtSoulArtworkCard) await import('/src/ui/components/artwork-card.js?v=27');
                 return window.ArtSoulArtworkCard?.cardActionItems?.(card, config || {}) || [];
             },
             readContracts: () => window.ArtSoulContracts || null,

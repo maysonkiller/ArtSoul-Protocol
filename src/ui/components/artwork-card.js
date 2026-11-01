@@ -121,7 +121,7 @@
     //
     // Presentation only. mediaUrl still returns the original, so the artwork
     // page and fullscreen keep full quality and nothing projected changes.
-    // The card media box is square (aspect-ratio: 1) and crops with
+    // The responsive card media box crops with
     // object-fit: cover, so one number is asked for and the same crop is
     // simply made before the bytes are sent rather than after.
     const CARD_THUMBNAIL_SIZE = 600;
@@ -235,6 +235,39 @@
     function isMinted(artwork = {}) {
         const tokenId = normalize(artwork.token_id || artwork.tokenId);
         return Boolean(artwork.minted) || Boolean(tokenId && tokenId !== '0' && tokenId !== 'none');
+    }
+
+    // Presentation only; on-chain state stays in statusInfo, used for actions.
+    function cardPreviewInfo(artwork = {}, now = Date.now()) {
+        const state = statusInfo(artwork, now);
+        if (state.key === 'live') return { key: 'live', label: 'Auction open' };
+        if (state.key === 'listed') return { key: 'listed', label: 'For sale' };
+        if (state.key === 'sold' && isMinted(artwork)) return { key: 'sold', label: 'NFT' };
+        if (state.key === 'not_minted') return { key: 'not_minted', label: 'Discover' };
+        return state;
+    }
+
+    function cardPriceMark(price) {
+        return /\bETH$/.test(String(price || '')) ? '/brand/eth.png' : '';
+    }
+
+    // A single contextual row, rather than repeated mint/network/status chips.
+    // A retained listing price is not an offer once the NFT is unlisted.
+    function cardSummary(artwork = {}, now = Date.now()) {
+        const state = statusInfo(artwork, now);
+        if (state.key === 'finalizing') return { label: 'Status', value: 'Updating' };
+        if (isMinted(artwork) && !isListedForSale(artwork)) {
+            return { label: 'Status', value: 'Not for sale' };
+        }
+        let price = formatPrice(artwork);
+        if (!price) return { label: 'Price', value: 'Not set' };
+        const chain = Number(artwork.chain_id || artwork.chainId ||
+            String(artwork.canonical_v41_id || artwork.id || '').match(/^v41:(\d+):/i)?.[1]);
+        if ([84532, 11155111].includes(chain)) price = price.replace(/ ETH$/, ' test ETH');
+        const hasBidPrice = [artwork.current_bid, artwork.highest_bid].some(value => Number(value) > 0);
+        const label = isListedForSale(artwork) ? 'Asking price' : hasBidPrice
+            ? (state.key === 'live' ? 'Current bid' : 'Final bid') : 'Starting price';
+        return { label, value: price };
     }
 
     function isListedForSale(artwork = {}) {
@@ -436,8 +469,9 @@
     }
 
     function cardDetailsText(artwork, now = Date.now()) {
+        const summary = cardSummary(artwork, now);
         return [artwork.title || 'Untitled Artwork', `Creator: ${creatorLabel(artwork)}`,
-            `Status: ${statusInfo(artwork, now).label}`, formatPrice(artwork)].filter(Boolean).join('\n');
+            `Status: ${cardPreviewInfo(artwork, now).label}`, `${summary.label}: ${summary.value}`].filter(Boolean).join('\n');
     }
 
     // Both renderers use this disclosure; opening it only reads cached public
@@ -732,6 +766,10 @@
         img.decoding = 'async';
         img.onerror = () => onUnavailable?.();
         container.appendChild(img);
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'artsoul-card-media-badge artsoul-card-media-badge-image';
+        typeBadge.textContent = 'IMAGE';
+        container.appendChild(typeBadge);
         return container;
     }
 
@@ -746,7 +784,7 @@
         card.className = `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surfaceClass}`;
         if (options.onClick) card.addEventListener('click', options.onClick);
 
-        const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
+        const status = cardPreviewInfo(artwork);
         const body = document.createElement('div');
         body.className = 'artsoul-card-body';
 
@@ -765,14 +803,24 @@
         badge.textContent = status.label;
         meta.appendChild(badge);
 
-        const price = formatPrice(artwork);
-        if (price) {
-            const priceEl = document.createElement('span');
-            priceEl.className = 'artsoul-card-price';
-            priceEl.textContent = price;
-            meta.appendChild(priceEl);
+        const summary = cardSummary(artwork);
+        const priceLabel = document.createElement('span');
+        priceLabel.className = 'artsoul-card-price-label';
+        priceLabel.textContent = summary.label;
+        const priceEl = document.createElement('span');
+        priceEl.className = 'artsoul-card-price';
+        if (cardPriceMark(summary.value)) {
+            const mark = document.createElement('img');
+            mark.className = 'artsoul-card-price-mark';
+            mark.src = cardPriceMark(summary.value);
+            mark.alt = '';
+            mark.setAttribute('aria-hidden', 'true');
+            priceEl.appendChild(mark);
         }
-
+        const value = document.createElement('span');
+        value.textContent = summary.value;
+        priceEl.appendChild(value);
+        meta.append(priceLabel, priceEl);
         body.appendChild(title);
         body.appendChild(creator);
         body.appendChild(meta);
@@ -794,9 +842,10 @@
         const countdown = createCountdownElement(artwork, now => {
             // The clock changes presentation even before an indexer response.
             // Keep the body and accessible label in step with the same timer.
-            const next = statusInfo(artwork, now);
+            const next = cardPreviewInfo(artwork, now);
             badge.className = `artsoul-card-status artsoul-card-status-${next.key}`;
             badge.textContent = next.label;
+            priceLabel.textContent = cardSummary(artwork, now).label;
             if (link) {
                 link.title = cardDetailsText(artwork, now);
                 link.setAttribute('aria-label', `Open ${link.title.replace(/\n/g, '. ')}`);
@@ -838,7 +887,8 @@
                 loading: 'lazy',
                 decoding: 'async',
                 onError: onUnavailable || undefined
-            })
+            }),
+            h('span', { className: 'artsoul-card-media-badge artsoul-card-media-badge-image' }, 'IMAGE')
         );
     }
 
@@ -1003,8 +1053,8 @@
         if (respectHidden !== false && isHidden(artwork)) return null;
         if (!hasSafeMedia(artwork) || mediaUnavailable) return null;
 
-        const status = minimal ? discoveryStatusInfo(artwork) : statusInfo(artwork);
-        const price = formatPrice(artwork);
+        const status = cardPreviewInfo(artwork);
+        const summary = cardSummary(artwork);
         return h('div', {
             className: `artsoul-artwork-card${minimal ? ' artsoul-artwork-card-minimal' : ''}${surface ? ` artsoul-artwork-card-${surface}` : ''}`,
             title: onOpen && !href ? cardDetailsText(artwork) : undefined,
@@ -1026,7 +1076,12 @@
                 h('p', { className: 'artsoul-card-creator' }, `Creator: ${creatorLabel(artwork)}`),
                 h('div', { className: 'artsoul-card-meta' },
                     h('span', { className: `artsoul-card-status artsoul-card-status-${status.key}` }, status.label),
-                    price ? h('span', { className: 'artsoul-card-price' }, price) : null
+                    h('span', { className: 'artsoul-card-price-label' }, summary.label),
+                    h('span', { className: 'artsoul-card-price' },
+                        cardPriceMark(summary.value) ? h('img', {
+                            src: cardPriceMark(summary.value), className: 'artsoul-card-price-mark',
+                            alt: '', 'aria-hidden': 'true'
+                        }) : null, h('span', null, summary.value))
                 ),
                 artwork.pending_auction_sync ? h('p', { className: 'artsoul-card-creator', role: 'status' }, 'Transaction confirmed. Updating auction data.') : null,
                 actions ? h('div', { className: 'artsoul-card-actions', onClick: event => event.stopPropagation() }, actions) : null
@@ -1067,6 +1122,9 @@
         cardActionItems,
         creatorLabel,
         formatPrice,
+        cardPriceMark,
+        cardPreviewInfo,
+        cardSummary,
         statusInfo,
         auctionEndTimestamp,
         formatAuctionCountdown,
