@@ -1450,7 +1450,9 @@
             if (typeof field.select !== 'function') return false;
             const previousFocus = document.activeElement;
             field.value = address;
-            field.readOnly = true;
+            // Readonly textarea selection is unreliable in iOS WebKit.
+            // This ephemeral input contains only the validated wallet address.
+            field.readOnly = false;
             field.setAttribute('aria-hidden', 'true');
             field.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;font-size:16px;z-index:-1';
             document.body.appendChild(field);

@@ -126,7 +126,10 @@ test('iOS embedded browser copies through the synchronous selection fallback whe
         const field = original(tag);
         if (tag === 'textarea') {
             field.focus = () => {};
-            field.select = () => { selected = field.value; };
+            field.select = () => {
+                assert.equal(field.readOnly, false, 'iOS needs a selectable, non-readonly textarea');
+                selected = field.value;
+            };
             field.setSelectionRange = () => {};
             field.remove = () => { removed = true; };
         }
