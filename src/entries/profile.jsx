@@ -54,7 +54,7 @@ const { useState, useEffect, useRef } = React;
         // A cached name, a displayed profile or a matching address alone never
         // grants an administrative shortcut.
         function ProfileAdminShortcut({ walletAddress }) {
-            const [eligible, setEligible] = useState(false);
+            const [authorizedWallet, setAuthorizedWallet] = useState('');
 
             useEffect(() => {
                 let disposed = false;
@@ -75,18 +75,19 @@ const { useState, useEffect, useRef } = React;
                 const refresh = async () => {
                     const epoch = ++generation;
                     if (!validSession()) {
-                        if (!disposed) setEligible(false);
+                        if (!disposed) setAuthorizedWallet('');
                         return;
                     }
                     try {
                         const permitted = await window.AvatarDropdown?.requestProtocolAdminAccessOnce?.();
                         if (disposed || epoch !== generation || !validSession()) return;
-                        setEligible(permitted === true && window.AvatarDropdown?.protocolAdminEligible === true);
+                        setAuthorizedWallet(permitted === true && window.AvatarDropdown?.protocolAdminEligible === true
+                            ? String(walletAddress || '').toLowerCase() : '');
                     } catch {
-                        if (!disposed && epoch === generation) setEligible(false);
+                        if (!disposed && epoch === generation) setAuthorizedWallet('');
                     }
                 };
-                const dismiss = () => { generation++; if (!disposed) setEligible(false); };
+                const dismiss = () => { generation++; if (!disposed) setAuthorizedWallet(''); };
                 const onStorage = event => {
                     if (!event.key || event.key === 'artsoul_authenticated_wallet') dismiss();
                 };
@@ -109,7 +110,16 @@ const { useState, useEffect, useRef } = React;
                 };
             }, [walletAddress]);
 
-            if (!eligible) return null;
+            // Fail closed synchronously on account changes, even before React
+            // runs the effect cleanup for an older authorized wallet.
+            const live = String(
+                window.currentWalletAddress || window.artsoulSettledWalletState?.address || ''
+            ).toLowerCase();
+            const signedIn = String(window.SupabaseAuth?.getAuthenticatedWallet?.() || '').toLowerCase();
+            const expected = String(walletAddress || '').toLowerCase();
+            if (!expected || authorizedWallet !== expected || live !== expected || signedIn !== expected
+                || window.artsoulWalletStateSettled !== true
+                || window.artsoulSettledWalletState?.isConnected !== true) return null;
             return <a href="/admin" className="profile-admin-shortcut">Admin panel</a>;
         }
 
