@@ -14,6 +14,7 @@ test('shared native header has five destinations, Profile last, on every product
         const links = [...nav.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map(m => m[1]);
         assert.deepEqual(links, DESTINATIONS, page);
         assert.match(nav, /href="\/profile"[^>]*aria-label="My profile"/);
+        assert.match(nav, /href="\/docs-protocol"[^>]*aria-label="How it works"/);
         assert.match(nav, /site-nav-guide-long/);
         assert.match(nav, /site-nav-guide-short/);
         if (page === 'profile.html') assert.match(nav, /href="\/profile"[^>]*aria-current="page"/);
