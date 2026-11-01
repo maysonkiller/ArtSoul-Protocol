@@ -9253,6 +9253,15 @@ body:is(.classic, .future) .site-header .site-header-actions
     box-shadow: 0 0 0 1px var(--c-glow), 0 0 14px var(--c-glow) !important;
 }
 
+/* Search opens a native dialog outside the header. Keep its ring highlighted
+   until the dialog actually closes, matching wallet and notification controls. */
+body:is(.classic, .future):has(#artsoul-search-dialog[open]) .site-header .site-header-actions .site-search-button {
+    border-color: var(--c-accent) !important;
+    background: var(--c-surface-strong) !important;
+    color: var(--c-accent) !important;
+    box-shadow: 0 0 0 1px var(--c-glow), 0 0 14px var(--c-glow) !important;
+}
+
 /* Recording is safety-critical: never disguise an active microphone as idle.
    This exception is state-owned, not the theme's ambient decorative glow. */
 body:is(.classic, .future) .site-header .site-header-actions .artsoul-voice-button.artsoul-voice-button.is-listening {

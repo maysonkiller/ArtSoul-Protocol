@@ -44,6 +44,7 @@ test('hover, keyboard focus and open state show one common theme-aware glow', ()
   assert.match(block, /:is\(:focus-visible, :active, \[aria-expanded="true"\]\)/);
   assert.match(block, /outline: 2px solid var\(--c-accent\) !important/);
   assert.match(block, /#notification-preview-panel:popover-open/);
+  assert.match(block, /#artsoul-search-dialog\\[open\\]/);
 });
 
 test('voice listening state remains explicit; all buttons keep 44px targets', () => {
