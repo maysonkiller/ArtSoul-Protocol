@@ -195,6 +195,7 @@
             this.identityGeneration = 0;
             this.identityWallet = null;
             this.resolvedIdentityWallet = null;
+            this.walletProviderIdentity = null;
             // Automatic (ArtSoulDB readiness) recoveries used by the current
             // wallet generation, and the single readiness listener.
             this.automaticRecoveries = 0;
@@ -250,6 +251,16 @@
                         <path d="M4 6l4 4 4-4"></path>
                     </svg>
                 `;
+            }
+
+            // Static page shells already contain the account text. Add the
+            // connector mark without rebuilding that paint-ready identity.
+            if (!button.querySelector('[data-avatar-wallet-provider]')) {
+                const providerSlot = document.createElement('span');
+                providerSlot.className = 'avatar-button-provider';
+                providerSlot.setAttribute('data-avatar-wallet-provider', '');
+                providerSlot.hidden = true;
+                button.appendChild(providerSlot);
             }
 
             let menu = dropdown.querySelector('#avatarDropdownMenu');
@@ -518,7 +529,7 @@
             preloader.src = snapshot.avatarUrl;
         }
 
-        updateStableMenu(html, menuKey) {
+        updateStableMenu(html, menuKey, walletProvider) {
             const structure = this.getStableStructure();
             if (!structure) return null;
             const identity = this.getMenuIdentity(this.identityWallet);
@@ -528,6 +539,10 @@
                 structure.menu.dataset.menuKey = menuKey;
             }
             structure.menu.style.display = this.isOpen ? 'block' : 'none';
+            if (walletProvider !== undefined) this.rememberWalletProvider(walletProvider, window.currentWalletAddress);
+            this.syncAccountWalletProvider(walletProvider === undefined
+                ? this.getRememberedWalletProvider(this.identityWallet || window.currentWalletAddress)
+                : walletProvider);
             return structure;
         }
 
@@ -1124,6 +1139,12 @@
             this.identityWallet = nextWallet || null;
             this.resolvedIdentityWallet = null;
             this.profile = null;
+            if (!nextWallet || previousWallet !== this.identityWallet) {
+                this.walletProviderIdentity = null;
+                this.syncAccountWalletProvider(null);
+                const providerSlot = this.getNavContainer()?.querySelector('[data-wallet-provider]');
+                if (providerSlot) providerSlot.innerHTML = '';
+            }
             // A new wallet gets its own recovery budget; work still in flight
             // for the previous generation is discarded by the isCurrent() guard,
             // and any pending retry for the wallet we are leaving is dropped.
@@ -1413,7 +1434,34 @@
 
         renderWalletProvider(walletProvider) {
             if (!walletProvider?.name) return '';
-            return `<div class="avatar-wallet-provider">${this.renderIdentityMark(walletProvider.mark)}<span>${escapeMenuText(walletProvider.name)}</span></div>`;
+            const label = escapeMenuText(`Connected wallet: ${walletProvider.name}`);
+            const mark = this.renderIdentityMark(walletProvider.mark);
+            return `<span class="avatar-wallet-provider" title="${label}" role="img" aria-label="${label}">${mark || `<span>${escapeMenuText(walletProvider.name)}</span>`}</span>`;
+        }
+
+        rememberWalletProvider(provider, walletAddress) {
+            const wallet = String(walletAddress || '').toLowerCase();
+            if (!WALLET_ADDRESS_PATTERN.test(wallet) || wallet !== String(window.currentWalletAddress || '').toLowerCase()) return;
+            // Presentation continuity only, scoped to this document and wallet.
+            this.walletProviderIdentity = { wallet, provider };
+        }
+
+        getRememberedWalletProvider(walletAddress) {
+            const wallet = String(walletAddress || '').toLowerCase();
+            return wallet && wallet === String(window.currentWalletAddress || '').toLowerCase()
+                && this.walletProviderIdentity?.wallet === wallet
+                ? this.walletProviderIdentity.provider : null;
+        }
+
+        syncAccountWalletProvider(walletProvider) {
+            const container = this.getNavContainer();
+            const buttonSlot = container?.querySelector('[data-avatar-wallet-provider]');
+            if (!buttonSlot) return;
+            // Unknown connector names remain readable in the dropdown. Do not
+            // squeeze arbitrary peer metadata into the compact account button.
+            const html = this.renderIdentityMark(walletProvider?.mark) ? this.renderWalletProvider(walletProvider) : '';
+            if (buttonSlot.innerHTML !== html) buttonSlot.innerHTML = html;
+            buttonSlot.hidden = !html;
         }
 
         getMenuIdentity(walletAddress, restoring = false) {
@@ -1431,14 +1479,19 @@
             return { name, wallet };
         }
 
-        renderMenuIdentity(walletAddress, restoring) {
+        renderMenuIdentity(walletAddress, restoring, walletProvider) {
             const identity = this.getMenuIdentity(walletAddress, restoring);
             const shortAddress = identity.wallet ? this.shortWalletAddress(identity.wallet) : '';
+            // A pending balance read must not erase the connector already
+            // confirmed for this wallet in this document. Never persist brands.
+            if (walletProvider === undefined) walletProvider = this.getRememberedWalletProvider(identity.wallet);
             return `<div class="avatar-menu-identity"><span class="avatar-menu-name">${escapeMenuText(identity.name)}</span>${identity.wallet ? `
+                <div class="avatar-menu-wallet">
+                <span data-wallet-provider>${this.renderWalletProvider(walletProvider)}</span>
                 <button type="button" class="avatar-menu-address" data-wallet-address="${escapeMenuText(identity.wallet)}" onclick="window.AvatarDropdown.copyMenuAddress(event)" aria-label="Copy wallet address ${escapeMenuText(identity.wallet)}" title="Tap address to copy">
                     <span class="avatar-menu-address-value">${escapeMenuText(shortAddress)}</span>
                     <span class="avatar-menu-copy-status" aria-live="polite"></span>
-                </button>` : ''}</div>`;
+                </button></div>` : ''}</div>`;
         }
 
         // iOS embedded browsers do not consistently expose navigator.clipboard.
@@ -1516,8 +1569,9 @@
         async updateNetworkDisplay() {
             const walletAddress = window.currentWalletAddress;
             const renderKey = this.pendingRenderKey;
+            const generation = this.identityGeneration;
             const networkInfo = await this.getCurrentNetworkInfo();
-            if (walletAddress !== window.currentWalletAddress || renderKey !== this.pendingRenderKey) return;
+            if (walletAddress !== window.currentWalletAddress || renderKey !== this.pendingRenderKey || generation !== this.identityGeneration) return;
             const networkButton = document.querySelector('.network-switcher-btn');
             if (networkButton) {
                 const icon = networkButton.querySelector('[data-network-mark]');
@@ -1528,6 +1582,8 @@
                 if (balance) balance.innerHTML = this.renderNetworkBalance(networkInfo);
                 const providerSlot = document.querySelector('[data-wallet-provider]');
                 if (providerSlot) providerSlot.innerHTML = this.renderWalletProvider(networkInfo.walletProvider);
+                this.rememberWalletProvider(networkInfo.walletProvider, walletAddress);
+                this.syncAccountWalletProvider(networkInfo.walletProvider);
             }
         }
 
@@ -1611,7 +1667,6 @@
             const networkSection = networkInfo ? `<div class="avatar-wallet-section">
                 ${networkCurrentRow}
                 ${networkOptions}
-                <div data-wallet-provider>${this.renderWalletProvider(networkInfo.walletProvider)}</div>
                 </div>
             ` : '';
 
@@ -1641,7 +1696,7 @@
             }
 
             return `
-                ${this.renderMenuIdentity(walletAddress || (isConnected ? this.identityWallet || window.currentWalletAddress : ''), restoring)}
+                ${this.renderMenuIdentity(walletAddress || (isConnected ? this.identityWallet || window.currentWalletAddress : ''), restoring, networkInfo?.walletProvider)}
                 <div class="avatar-dropdown-navigation${document.querySelector('.site-primary-nav') ? ' avatar-account-links' : ''}">
                     ${this.renderDropdownNavItems({ currentPath, isOwnProfile })}
                     ${this.renderProtocolAdminSlot(currentPath)}
@@ -1774,8 +1829,8 @@
 
         /**
          * Read the live network/balance once and fold it into the already
-         * committed menu. Never touches the account button, so it can never
-         * delay or repaint the visible identity.
+         * committed menu and connector mark. Never replaces the account avatar
+         * or text, so the read cannot delay the visible identity.
          *
          * Guarded by the render key: a late result belonging to a superseded
          * render or a previous wallet is discarded instead of applied. Exactly
@@ -1783,6 +1838,7 @@
          * polling or retry loop is introduced.
          */
         async applyLiveNetworkSection({ walletAddress, currentPath, isOwnProfile, renderKey }) {
+            const generation = this.identityGeneration;
             let networkInfo = null;
             try {
                 networkInfo = await this.getCurrentNetworkInfo({ walletAddress });
@@ -1791,10 +1847,12 @@
                 return;
             }
             if (renderKey && this.pendingRenderKey !== renderKey) return;
+            if (generation !== this.identityGeneration || String(walletAddress || '').toLowerCase() !== String(window.currentWalletAddress || '').toLowerCase()) return;
             if (!networkInfo) return;
             this.updateStableMenu(
                 this.renderMenuContent({ currentPath, isOwnProfile, networkInfo, connected: true }),
-                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`
+                `connected:${currentPath}:${isOwnProfile}:${this.networkMenuKeySegment(networkInfo)}`,
+                networkInfo.walletProvider
             );
             this.applyThemeStyles();
             void this.updateNetworkDisplay();

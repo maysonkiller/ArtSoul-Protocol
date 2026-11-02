@@ -35,6 +35,13 @@ and its enabled Donate/Report/Creation transaction menu were inspected. PR443's
 earlier deployment-limit failure is historical. No paid upgrade or limit bypass
 was used.
 
+The next B18 slice removes the reproduced Home theme-switch layout jump,
+keeps six selections available at every width, straightens the theme symbol
+and groups connector identity separately from network/native balance.
+The built interface passes 575 assertions across 13 viewport sizes and both
+palettes; release evidence and limitations are recorded in
+[the theme/account audit](audits/B18_THEME_ACCOUNT_2026-11-02.md).
+
 ## Remaining acceptance and operational work
 
 | Gate | What remains | Boundary |
