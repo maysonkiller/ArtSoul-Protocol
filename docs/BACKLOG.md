@@ -404,3 +404,11 @@ readable coverage, preserving quarantined notification/read/dismissal state.
 The container is stopped. This closes the local logical-restoration slice;
 real worker/cache cutover, independent encrypted recovery and representative
 usage remain open. See [post-commit evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md#committed-schema-archive-restoration).
+
+November 2 B35 runtime-metadata follow-up: one read-only comparison on the
+existing server matches 50 installed dependency metadata records against the
+candidate closure, with only documented optional/platform absences. The stable
+worker shares the clean Node 22 probe's executable identity. No installation,
+restart or configuration change occurred. Package/native integrity, module
+loading and actual worker cutover remain separate checks; this is not production
+activation. See [runtime metadata evidence](audits/B35_RUNTIME_METADATA_2026-11-02.md).

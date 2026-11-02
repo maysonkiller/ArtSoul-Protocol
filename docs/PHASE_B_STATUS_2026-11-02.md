@@ -106,6 +106,13 @@ cache/provider recovery.
 Production activation, independent encrypted durability/key custody and actual
 recovery cutover remain open. See [archive migration evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
 
+The 14:00 UTC read-only server comparison also passes: 50 installed package
+metadata records match the candidate dependency closure, with only documented
+optional/platform absences. The stable running worker shares the Node 22 probe's
+executable identity. This does not verify package/native content integrity,
+module loading or worker configuration and does not activate the newer worker.
+See [runtime metadata evidence](audits/B35_RUNTIME_METADATA_2026-11-02.md).
+
 ## Subsequent architecture work
 
 The next contract phase must consolidate the collection launch, auction,
