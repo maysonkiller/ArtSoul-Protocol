@@ -1073,6 +1073,95 @@ describe("ArtSoul V4.1 protocol", function () {
     });
   });
 
+  describe("C1 privileged mint-authority characterization", function () {
+    it("currently permits an owner-authorized EOA to mint without settlement until revoked", async function () {
+      expect(await network.provider.send("eth_chainId")).to.equal("0x7a69");
+      const ctx = await deployProtocol();
+      const { core, nft, owner, artist, bidder, outsider, buyer, treasury } = ctx;
+      const { deposit, bidAmount } = await createBidAndEndAuction(ctx);
+      const coreAddress = await core.getAddress();
+      const issuer = await outsider.getAddress();
+      const recipient = await buyer.getAddress();
+      const unregisteredId = 99n;
+      const uri = "ipfs://owner-authorized-without-settlement";
+      const readState = async () => ({
+        auction: Array.from(await core.auctions(1)),
+        artwork: Array.from(await core.artworks(1)),
+        unregistered: Array.from(await core.artworks(unregisteredId)),
+        artworkCounter: await core.artworkCounter(),
+        auctionCounter: await core.auctionCounter(),
+        balance: await ethBalance(coreAddress),
+        credits: await Promise.all([owner, artist, bidder, outsider, buyer, treasury].map(async signer =>
+          core.pendingWithdrawals(await signer.getAddress()))),
+        settlements: await core.successfulSettlements(),
+        coreTokenArtwork: await core.tokenToArtwork(1),
+      });
+      const funded = await readState();
+      expect(funded.artworkCounter).to.equal(1n);
+      expect((await core.artworks(unregisteredId)).creator).to.equal(ethers.ZeroAddress);
+
+      const initialBlock = BigInt(await network.provider.send("eth_blockNumber"));
+      await expectRevert(nft.connect(outsider).mint(recipient, uri, unregisteredId, issuer, {
+        gasLimit: 1_000_000,
+      }), "UnauthorizedCore");
+      expect(BigInt(await network.provider.send("eth_blockNumber"))).to.equal(initialBlock + 1n);
+      expect(await readState()).to.deep.equal(funded);
+      expect(await nft.totalSupply()).to.equal(0n);
+      expect(await nft.artworkToToken(unregisteredId)).to.equal(0n);
+
+      await mine(nft.connect(owner).setCore(issuer));
+      expect(await nft.core()).to.equal(issuer);
+      const receipt = await mine(nft.connect(outsider).mint(recipient, uri, unregisteredId, issuer));
+      const minted = await expectEvent(receipt, nft, "CanonicalArtworkMinted");
+      expect(Array.from(minted.args)).to.deep.equal([1n, unregisteredId, issuer, recipient, uri]);
+      expect(await readState()).to.deep.equal(funded);
+      expect(await nft.totalSupply()).to.equal(1n);
+      expect(await nft.artworkToToken(unregisteredId)).to.equal(1n);
+      expect(await nft.tokenToArtwork(1)).to.equal(unregisteredId);
+      expect(await nft.tokenCreator(1)).to.equal(issuer);
+      expect(await nft.ownerOf(1)).to.equal(recipient);
+      expect(await nft.tokenURI(1)).to.equal(uri);
+
+      await mine(nft.connect(owner).setCore(coreAddress));
+      expect(await nft.core()).to.equal(coreAddress);
+      const revokedBlock = BigInt(await network.provider.send("eth_blockNumber"));
+      await expectRevert(nft.connect(outsider).mint(recipient, uri, unregisteredId + 1n, issuer, {
+        gasLimit: 1_000_000,
+      }), "UnauthorizedCore");
+      expect(BigInt(await network.provider.send("eth_blockNumber"))).to.equal(revokedBlock + 1n);
+      expect(await readState()).to.deep.equal(funded);
+      expect(await nft.totalSupply()).to.equal(1n);
+      expect(await nft.artworkToToken(unregisteredId + 1n)).to.equal(0n);
+
+      // Revocation stops future mints but cannot undo the token already issued.
+      await mine(core.connect(bidder).settleAuction(1, { value: bidAmount - deposit }));
+      const artwork = await core.artworks(1);
+      expect((await core.auctions(1)).status).to.equal(3n);
+      expect((await core.auctions(1)).depositLocked).to.equal(0n);
+      expect(artwork.minted).to.equal(true);
+      expect(artwork.tokenId).to.equal(2n);
+      expect(artwork.canonicalFloor).to.equal(bidAmount);
+      expect(await core.tokenToArtwork(2)).to.equal(1n);
+      expect(await core.successfulSettlements()).to.equal(1n);
+      expect(await ethBalance(coreAddress)).to.equal(bidAmount);
+      expect(await core.pendingWithdrawals(await artist.getAddress())).to.equal(bidAmount * 9750n / BPS);
+      expect(await core.pendingWithdrawals(await treasury.getAddress())).to.equal(bidAmount * 250n / BPS);
+      expect(await nft.totalSupply()).to.equal(2n);
+      expect(await nft.artworkToToken(1)).to.equal(2n);
+      expect(await nft.tokenToArtwork(2)).to.equal(1n);
+      expect(await nft.ownerOf(2)).to.equal(await bidder.getAddress());
+      expect(await nft.tokenCreator(2)).to.equal(await artist.getAddress());
+      expect(await nft.tokenURI(2)).to.equal(artwork.metadataURI);
+      expect(await nft.artworkToToken(unregisteredId)).to.equal(1n);
+      expect(await nft.tokenToArtwork(1)).to.equal(unregisteredId);
+      expect(await nft.tokenCreator(1)).to.equal(issuer);
+      expect(await nft.ownerOf(1)).to.equal(recipient);
+      expect(await nft.tokenURI(1)).to.equal(uri);
+      expect((await core.artworks(unregisteredId)).creator).to.equal(ethers.ZeroAddress);
+      expect(await core.tokenToArtwork(1)).to.equal(0n);
+    });
+  });
+
   describe("security and invalid transitions", function () {
     it("blocks unauthorized NFT mint and owner-only core wiring", async function () {
       const { nft, projectNFT, artist, bidder } = await deployProtocol();

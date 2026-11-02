@@ -168,6 +168,13 @@ on-chain spending authority: ordinary users do not gain stolen-key protection
 from existing staff passkey/TOTP sessions. Customer factors, protected accounts,
 recovery and their upgrade bypass boundaries remain design decisions in C1.
 
+A further D1 test now exercises owner-authorized minting without any registered
+artwork or successful settlement. Revocation stops new mints but does not remove
+the issued NFT. The pending legitimate auction's escrow and credits stay intact,
+and it settles successfully after the genuine Core regains authority. The full
+suite passes 55 local contract tests. This records a privileged mint-authority
+hazard for the replacement design; no deployed configuration or Solidity changed.
+
 Actual Snapshot A remains at the end of the final public testnet, announced in
 advance and independently stored/verified before any destructive reset. Export
 tooling readiness is separate from capturing that final snapshot. Mainnet,
