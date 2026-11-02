@@ -119,6 +119,16 @@ executable identity. This does not verify package/native content integrity,
 module loading or worker configuration and does not activate the newer worker.
 See [runtime metadata evidence](audits/B35_RUNTIME_METADATA_2026-11-02.md).
 
+The 15:19 UTC content follow-up matches all 3,948 installed files in the 50-package
+closure to integrity-verified tarballs, with one explicitly reviewed declared-bin
+execute-bit difference. Isolated native and JavaScript-fallback runs pass 106
+checks and import all 27 candidate modules without network access. The container
+and live Node patch versions differ, so exact live equivalence is not claimed.
+At 15:35 UTC the startup-context probe also confirmed the NFT writer, its new pins
+and Redis URL are absent from the initial worker environment. Configuration and
+transport qualification remain necessary; nothing was activated or restarted.
+See [runtime content and loading evidence](audits/B35_RUNTIME_CONTENT_2026-11-02.md).
+
 ## Subsequent architecture work
 
 The next contract phase must consolidate the collection launch, auction,
