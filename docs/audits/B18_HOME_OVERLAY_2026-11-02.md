@@ -65,12 +65,25 @@ screenshots under `output/playwright`.
 
 ## Release and remaining gates
 
-This change is prepared from merged PR443 (`7211d527`). Its production release
-was blocked by Vercel's deployment rate limit; the running site was still the
-preceding PR442 release when the follow-up was prepared. Passing local checks
-does not mean this UI is already live. Record the new PR's exact CI and release
-result before claiming deployment. No paid upgrade or deployment-limit bypass
-is authorized.
+PR444 merged as `5876eb5e096b0d5f1b90f224e1e71e68f1ed9c23` at
+01:34:25 UTC. Candidate `a176a94d45458e9635f6a642b80675f8d0668763`
+passed CI run `41372825109`: Linux 4,078 unit tests with two environment skips,
+Windows 3,381 with 35 environment skips, both builds, static checks and 49
+contract tests per platform. Independent read-only review found no blockers.
+
+Production deployment `7482199645` succeeded through the normal Vercel release
+flow; the earlier PR443 daily-limit failure is historical. No paid upgrade or
+limit bypass was used. At 01:41 UTC all eight checked public route shells
+returned HTTP 200. The served card v28 and WebMCP v16 content hashes matched the
+merged commit; all seven homepage stylesheets matched the validated build.
+Private evidence: `docs/private/pr444-production-assets.json`.
+
+The actual production homepage rendered its populated cards and metrics, with
+the image filling the showcase and the first desktop card row visible. Its
+Taes menu exposed Donate, Report and Creation transaction. This was read-only
+inspection, without signing or submitting any of those actions. The preview
+address was intercepted by the user's wallet-extension site warning and was
+not bypassed; hosted verification used the normal production domain instead.
 
 No dependencies, database settings, server services, feature flags or contract
 state changed in this slice. Revert its UI commit and cache references together
