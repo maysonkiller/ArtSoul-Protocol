@@ -1,4 +1,5 @@
 import { ProfileEditDialog } from '../features/profile/profile-edit-dialog.jsx';
+import { ContextHelp } from '../ui/context-help.jsx';
 import { React, createRoot, hydrateRoot } from './react-runtime.js';
 import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
@@ -1730,7 +1731,7 @@ const { useState, useEffect, useRef } = React;
                                                     <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
-                                                        <div className="opacity-70 mb-1">Trust score</div>
+                                                        <div className="context-help-label"><span>Trust score</span><ContextHelp topic="trust" /></div>
                                                         <div className="text-xl font-bold">{discoveryProfile.trust.score}</div>
                                                         <div className="text-xs opacity-70">{discoveryProfile.trust.tier}</div>
                                                     </div>
@@ -1748,7 +1749,7 @@ const { useState, useEffect, useRef } = React;
                                                     <div className={`profile-stat-card p-3 rounded-lg ${
                                                         isClassic ? 'bg-gray-700/60 border border-gray-600' : 'bg-cyan-900/20 border border-cyan-500/30'
                                                     }`}>
-                                                        <div className="opacity-70 mb-1" title="Discovery influence">Discovery</div>
+                                                        <div className="context-help-label"><span>Discovery</span><ContextHelp topic="trust" /></div>
                                                         <div className="text-xl font-bold">{discoveryProfile.trust.influenceWeight}x</div>
                                                         <div className="text-xs opacity-70">Ranking only. No price impact.</div>
                                                     </div>

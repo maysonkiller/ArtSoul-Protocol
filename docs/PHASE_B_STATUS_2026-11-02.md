@@ -19,6 +19,11 @@ The November 2 B18 slice reconciles PR441 with the accepted shared-card study;
 its exact verification/release is recorded in
 [the card audit](audits/B18_CARD_RECONCILIATION_2026-11-02.md).
 
+The subsequent 178-second video follow-up preserves the showcase shell while
+showing whole artwork, removes hover shaking, makes desktop cards smaller and
+adds visible contextual guidance. See [the video follow-up audit](audits/B18_VIDEO_HELP_HERO_2026-11-02.md)
+for scope, verification and interpretation of the revised desktop density.
+
 ## Remaining acceptance and operational work
 
 | Gate | What remains | Boundary |

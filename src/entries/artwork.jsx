@@ -11,6 +11,7 @@ import { artworkShareIntent } from '../features/artwork/artwork-sharing.js';
 import { getOwnerResaleEligibility, validateResalePrice } from '../features/marketplace/resale-eligibility.js';
 import { classifyBidFailure } from '../features/auction/bid-error.js';
 import { ExplainedAction } from '../ui/explained-action.jsx';
+import { ContextHelp } from '../ui/context-help.jsx';
 import '../../supabase-client.js';
 import '../../supabase-auth.js';
 import '../features/saved/saved-ui.js';
@@ -2996,11 +2997,12 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
             const communityPanel = (
                 <section key="community" className="artwork-page-panel artwork-page-trust artwork-mobile-trust" aria-label="Community signals">
                         <div className="artwork-page-panel-heading">
-                            <h2>Community</h2>
+                            <div className="context-help-label"><h2>Community</h2><ContextHelp topic="reactions" /></div>
                             {trustScore > 0 && (
-                                <span className="artwork-page-chip artwork-community-trust" title="Community signal for discovery. Does not affect price or ownership.">
+                                <span className="artwork-page-chip artwork-community-trust">
                                     <span>Trust</span>
                                     <strong>{trustScore}<small>/100</small></strong>
+                                    <ContextHelp topic="trust" />
                                 </span>
                             )}
                         </div>
@@ -3065,12 +3067,6 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             Back
                         </button>
                     </div>
-                    <details className="artwork-community-help">
-                        <summary>About community signals</summary>
-                        <p>Like supports artwork you appreciate. Would Buy expresses interest; it does not place a bid or make a purchase. Watching records your interest in following the artwork.</p>
-                        <p>Trust is a community signal for discovery. It does not change price, floor, ownership, or settlement.</p>
-                        <a href="/docs-protocol#trust-community">How community signals work</a>
-                    </details>
                     {cardActionNotice && <p role="status">{cardActionNotice}</p>}
                 </section>
             );
@@ -3309,14 +3305,9 @@ function OwnershipIdentity({ source, label, name, className, style, nameStyle, i
                             )}
                         </div>
 
-                        <details className="artwork-payment-help">
-                            <summary>About bids, payment and floor</summary>
-                            <p>Review the bid and required deposit before confirming in your wallet. The highest bid alone does not create an NFT.</p>
-                            <p>The winner completes payment within the displayed deadline. The deposit counts toward the auction price; any excess becomes withdrawable credit. Successful settlement creates the NFT and sets its floor to the paid auction price.</p>
-                            <p>ArtSoul resale listings cannot be below that floor. The floor is not an estimate or guarantee of market value.</p>
-                            <a href="/docs-protocol#settlement">Read the payment and minting guide</a>
-                            <a href="/docs-protocol#deposits">How deposits work</a>
-                        </details>
+                        <div className="context-help-label artwork-payment-help">
+                            <span>Bids, payment and floor</span><ContextHelp topic="auction" />
+                        </div>
 
                         {liveAuction && (
                         <section
