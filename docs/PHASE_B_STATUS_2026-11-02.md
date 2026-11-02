@@ -36,6 +36,13 @@ limits. Dedicated official-release announcements remain off until the project's
 publisher address is designated; an artwork contract is not silently substituted
 for that publisher wallet.
 
+November 2 operations: the explicitly free Nano-to-Micro upgrade increased
+database RAM to 1 GB at the same displayed price, and the previously disabled
+Spend Cap was enabled. Worker cursors/hashes survived the restart unchanged;
+the worker recovered to 11 blocks behind with no errors and four populated
+public API checks passed. This is containment and recovery evidence, not
+long-term IO/egress acceptance. See [the Disk IO audit](audits/B30_DISK_IO_2026-11-02.md).
+
 ## Subsequent architecture work
 
 The next contract phase must consolidate the collection launch, auction,

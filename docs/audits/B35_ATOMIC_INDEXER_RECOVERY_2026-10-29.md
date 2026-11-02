@@ -1396,3 +1396,11 @@ contracts, roles, or the public API schema. Combined poll/RPC/SQL/cache workload
 independent durable encrypted recovery, and live worker/API activation remain
 separate open gates. The existing server still requires its reviewed worker
 update; no additional server is required.
+
+PR #442 released this outer-response slice as main
+`759a5ab718475b4a5e7fe716c1f6c184743d2068`, candidate
+`11e9465adf598b016a0ca3dbe35c54f47b12d2c3`. Exact CI 41365711915 passed
+Linux, Windows and static checks. Preview 7481218048 and production 7481332433
+succeeded; eight routes and six runtime/CSS assets matched the built candidate.
+No feature flag, schema or worker-source activation was performed. Private
+evidence: `b18-runtime-b35-nov2-{preview,production}-release.json`.
