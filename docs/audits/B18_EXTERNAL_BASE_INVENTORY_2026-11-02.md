@@ -70,8 +70,8 @@ The owner completed phone verification. The signed-in project account opened
 new-team onboarding, rather than the old RPC account. Its dashboard confirms
 Free ($0/month), 30 million CU/month and no payment method. The automatically
 created app was dedicated to Base NFT inventory; only Base Mainnet is enabled.
-Its credential is kept in a protected, ignored local file pending server-secret
-installation. Existing protocol RPC credentials have not changed. Separate apps
+Its credential is kept in a protected, ignored local file and the production
+server-secret store. Existing protocol RPC credentials have not changed. Separate apps
 do not provide additional account quota; old RPC account usage is still unverified.
 
 One real inventory request returned HTTP 200: 12 items, 463,568 response bytes,
@@ -98,9 +98,17 @@ The existing wallet sign-in is reused to bind the inventory to its owner;
 anonymous profile browsing does not trigger third-party inventory requests.
 These are explicit UX/data-boundary decisions, not new protocol mechanics.
 
-PR461 is merged and its dormant production release was verified. Provider-plan
-inspection and the bounded live request are now complete. The CDN compatibility
-patch, production-secret installation and explicit feature activation must still
-be verified in the release record. Native iPhone acceptance is not inferred from
-desktop fixtures or the provider probe. Phase B is not closed by this optional
-inventory feature.
+PR461 and PR463 are merged. The CDN patch passed Linux/Windows CI; the dedicated
+secret and production feature flag are installed on the ArtSoul project only.
+The activated deployment passed route/config and unauthenticated denial checks.
+The signed-in production browser then exposed a separate routing failure:
+`/api/wallet-nfts` returned `INVALID_WALLET_NFT_QUERY` before any provider read.
+Unlike the existing profile and notification endpoints, this route lacked an
+explicit Vercel catch-all rewrite. The follow-up adds that same deployment
+mapping and exercises its actual query through the private dispatcher test.
+Owner binding and query rejection remain unchanged. Signed-in production
+acceptance must be rerun after the routing release; activation alone is not
+recorded as a successful browser inventory load.
+
+Native iPhone acceptance is not inferred from desktop fixtures or the provider
+probe. Phase B is not closed by this optional inventory feature.

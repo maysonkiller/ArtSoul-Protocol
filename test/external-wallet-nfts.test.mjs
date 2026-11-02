@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import handler from '../src/api/routes/wallet-nfts.js';
 import dispatch from '../api/[...route].js';
 import { setWalletSession } from '../src/api/backend.js';
@@ -290,23 +291,30 @@ test('successful handler returns a private provider-attributed page for exactly 
 
 test('catch-all dispatcher preserves wallet NFT route metadata without widening the private owner query', async t => {
   setup(t); const owner = `0x${'5'.repeat(40)}`, h = headers(owner); let calls = 0, cursor;
+  const deployment = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const rewrite = deployment.rewrites.filter(rule => rule.source === '/api/wallet-nfts');
+  assert.equal(rewrite.length, 1);
+  const destination = new URL(rewrite[0].destination, 'https://deployment.test');
+  assert.equal(destination.pathname, '/api/[...route]');
+  const routedQuery = Object.fromEntries(destination.searchParams);
+  assert.deepEqual(routedQuery, { route: 'wallet-nfts' });
   globalThis.fetch = async input => {
     const url = new URL(input); assert.equal(url.searchParams.get('owner'), owner); calls++;
     if (calls === 1) return Response.json(page({ pageKey: 'next-page' }));
     assert.equal(url.searchParams.get('pageKey'), 'next-page');
     return Response.json(page({ ownedNfts: [nft({ tokenId: '8' })] }));
   };
-  for (const query of [{}, { route: ['wallet-nfts'] }, { route: 'wallet-nfts' }]) {
-    const res = response(); await dispatch({ method: 'GET', url: '/api/wallet-nfts', query, headers: h }, res);
+  for (const query of [{}, { route: ['wallet-nfts'] }, routedQuery]) {
+    const res = response(); await dispatch({ method: 'GET', url: query === routedQuery ? destination.pathname : '/api/wallet-nfts', query, headers: h }, res);
     assert.equal(res.statusCode, 200); assert.equal(res.body.wallet, owner);
     assert.equal(res.headers['Cache-Control'], 'private, no-store'); assert.equal(res.headers['X-Content-Type-Options'], 'nosniff');
     assert.equal(res.body.items[0].tokenId, '7'); cursor = res.body.nextCursor;
   }
   assert.equal(calls, 1);
   const next = response();
-  await dispatch({ method: 'GET', url: '/api/wallet-nfts', query: { route: ['wallet-nfts'], cursor }, headers: h }, next);
+  await dispatch({ method: 'GET', url: destination.pathname, query: { ...routedQuery, cursor }, headers: h }, next);
   assert.equal(next.statusCode, 200); assert.equal(next.body.items[0].tokenId, '8'); assert.equal(calls, 2);
   const rejected = response();
-  await dispatch({ method: 'GET', url: '/api/wallet-nfts', query: { route: ['wallet-nfts'], owner: B }, headers: h }, rejected);
+  await dispatch({ method: 'GET', url: destination.pathname, query: { ...routedQuery, owner: B }, headers: h }, rejected);
   assert.equal(rejected.statusCode, 400); assert.equal(rejected.body.error, 'INVALID_WALLET_NFT_QUERY'); assert.equal(calls, 2);
 });

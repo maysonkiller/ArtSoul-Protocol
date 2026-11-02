@@ -140,6 +140,10 @@
       "destination": "/api/[...route]?route=notifications"
     },
     {
+      "source": "/api/wallet-nfts",
+      "destination": "/api/[...route]?route=wallet-nfts"
+    },
+    {
       "source": "/api/artworks",
       "destination": "/api/[...route]?route=artworks"
     },
