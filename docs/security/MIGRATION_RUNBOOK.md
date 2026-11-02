@@ -2,6 +2,12 @@
 
 This runbook is the authoritative operational path for the current ArtSoul repository. It is intentionally conservative: production predates the checksum ledger, so no script may guess which migrations were applied.
 
+The five B35 recovery/NFT migrations passed a November 2 local rehearsal against
+the actual November 1 archive, including original-data preservation, full-batch
+transaction rollback, effective privileges and replay safety. See [the evidence](../audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
+They remain unapplied to production. This does not establish a safe downgrade to
+the older worker after schema commit or replace independent recovery evidence.
+
 ## Migration Families
 
 | Location | Purpose | Treatment |
