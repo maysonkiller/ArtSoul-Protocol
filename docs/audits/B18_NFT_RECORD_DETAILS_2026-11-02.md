@@ -50,7 +50,13 @@ External Base inventory is separate work. An existing provider can answer an
 ownership request, but that alone proves neither account spending controls nor
 historical third-party purchase prices. No paid service is activated here.
 
-Release status: locally verified; hosted CI, merge and production verification
-are recorded separately after they actually complete. Phase B remains open for
-the device, signed-journey, operational recovery and real-beta gates in the
-current phase status.
+PR #460 was merged as `1b9bf1026ad558132d2f6bb71f4dbefb12856b96` after
+static, Linux and Windows checks passed (Actions run `41501102604`). Vercel
+reported a successful production deployment. A November 2 read-only check
+found the shipped NFT identity/sale labels in the production artwork bundle
+and a complete artwork 32 provenance response with token 5 and exact decimal
+string price `0.0001`. This sample does not exercise a sale beyond six decimal
+places; precision edge cases remain covered by the local regression checks.
+The live check was HTTP asset/API verification, not another wallet or receipt
+rehearsal. Phase B remains open for the device, signed-journey, operational
+recovery and real-beta gates in the current phase status.

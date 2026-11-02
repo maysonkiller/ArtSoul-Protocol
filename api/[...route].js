@@ -32,6 +32,7 @@ import profileHandler from '../src/api/routes/profile.js';
 import profileEmailHandler from '../src/api/routes/profile-email.js';
 import profileLayoutHandler from '../src/api/routes/profile-layout.js';
 import savedHandler from '../src/api/routes/saved.js';
+import walletNftsHandler from '../src/api/routes/wallet-nfts.js';
 import auctionNotificationsHandler from '../src/api/routes/notifications.js';
 import publicArtworksHandler from '../src/api/routes/public/artworks.js';
 import publicArtworkProvenanceHandler from '../src/api/routes/public/artwork-provenance.js';
@@ -53,6 +54,7 @@ const ROUTES = new Map([
   ['profile/email', profileEmailHandler],
   ['profile/layout', profileLayoutHandler],
   ['saved', savedHandler],
+  ['wallet-nfts', walletNftsHandler],
   ['notifications', auctionNotificationsHandler],
   ['discovery/like', likeHandler],
   ['discovery/signal', signalHandler],

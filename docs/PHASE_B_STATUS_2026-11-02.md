@@ -53,6 +53,10 @@ It reuses provenance without extra requests and distinguishes sale evidence
 from ownership, asking price and floor. See [NFT record details](audits/B18_NFT_RECORD_DETAILS_2026-11-02.md)
 for the local tests and release boundary. External Base wallet NFTs are a
 separate requested read-only inventory; they are not active ArtSoul listings.
+Its [default-off implementation](audits/B18_EXTERNAL_BASE_INVENTORY_2026-11-02.md)
+uses explicit pagination and a dedicated server credential. Local API/browser
+checks pass; activation still requires verified provider quota and no-spend
+controls. Alchemy phone verification currently blocks the account inspection.
 The owner selected Google Password Manager for backup-key custody. Actual
 independent encrypted-copy and key-recovery verification remain pending.
 
