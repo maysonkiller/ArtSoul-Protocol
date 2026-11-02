@@ -54,7 +54,13 @@ those separate responsibilities. No HTTP request is allowed by the scenario.
 
 The selected PostgreSQL scenario passes: two Node tests including its parent.
 The related runner/checkpoint/cache suites pass 72 tests. The final disposable
-cluster stopped successfully. No full-suite result is claimed.
+cluster stopped successfully. CI run `41372931396` on candidate
+`f4b34277f5ace632b567201d64e883dc1d053ed6` also passed: Linux 4,075 unit tests
+with two environment skips, Windows 3,377 with 35 environment skips, 49 contract
+tests on each platform, both builds and static checks. The isolated PostgreSQL
+scenario runs on Linux CI; Windows' environment skips are not recorded as
+PostgreSQL acceptance. The branch was subsequently reconciled with merged
+PR444 and its production-release documentation; final-head CI remains required.
 
 ```powershell
 $env:ARTSOUL_TEST_POSTGRES_BIN = (& 'C:/Users/mayso/scoop/apps/postgresql/current/bin/pg_config.exe' --bindir).Trim()

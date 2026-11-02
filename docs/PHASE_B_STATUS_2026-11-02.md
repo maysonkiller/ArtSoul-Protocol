@@ -28,10 +28,12 @@ The owner's next preview review superseded that banner arrangement: artwork
 fills the banner with attribution over a darkened lower edge, and the shared
 desktop card row is more compact. Menu load/retry feedback and viewport-aware
 placement preserve the existing actions. See [the overlay follow-up](audits/B18_HOME_OVERLAY_2026-11-02.md).
-Local verification is complete; production release is not yet established.
-PR443's production build was blocked by the Vercel deployment rate limit, with
-the site still serving PR442 at the time of this follow-up. No paid upgrade or
-limit bypass is authorized.
+PR444 is merged and deployed: production deployment `7482199645` succeeded,
+and the normal domain serves the verified card v28, WebMCP v16 and matching
+built stylesheets. Eight route shells returned HTTP 200; the actual homepage
+and its enabled Donate/Report/Creation transaction menu were inspected. PR443's
+earlier deployment-limit failure is historical. No paid upgrade or limit bypass
+was used.
 
 ## Remaining acceptance and operational work
 
@@ -39,7 +41,7 @@ limit bypass is authorized.
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
 | B11/B12 actual journeys | Current-page expired settlement/default/re-auction and the remaining signed assistant scenarios | Retain accepted receipts, voice acceptance and completed transactions. Never replay a completed operation merely to collect another test result. |
-| B30/B35 operations | Verify usage/egress over a representative interval, coordinated Core/NFT polling/cache checks, and review activation of the newer worker on the existing server | Whole outer Saved/search response acceptance now passes isolated real-handler tests; release evidence is in its PR and the B35 audit. The existing Hetzner worker is still the B30 version. No new server is required or purchased. Ownership API/NFT-writer activation is a separate deployment gate. |
+| B30/B35 operations | Representative usage/egress, full combined workload including auxiliary refresh/reorg work, and review activation of the newer worker on the existing server | Whole outer Saved/search responses and a bounded combined polling/cache recovery scenario pass isolated tests. The latter excludes resale/search enrichment, periodic reorg work and real provider/cache transport. The Hetzner worker is still the B30 version. No new server is required or purchased; ownership API/NFT-writer activation remains a separate gate. |
 | Recovery | An independently durable encrypted copy and restore evidence | All 159 objects were recovered and verified locally. Two copies on one computer do not meet independent durability. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 
@@ -56,6 +58,13 @@ Spend Cap was enabled. Worker cursors/hashes survived the restart unchanged;
 the worker recovered to 11 blocks behind with no errors and four populated
 public API checks passed. This is containment and recovery evidence, not
 long-term IO/egress acceptance. See [the Disk IO audit](audits/B30_DISK_IO_2026-11-02.md).
+
+The next B35 acceptance slice exercises actual confirmation polling, catch-up
+and coordinated publication against disposable local PostgreSQL. A failed cache
+purge recovers without replaying committed events, and an old delayed refill
+cannot repopulate stale data. It also verifies the existing publication interval
+and counts bounded work. See [combined acceptance](audits/B35_COMBINED_POLL_CACHE_ACCEPTANCE_2026-11-02.md)
+for measured scope and exclusions; this does not establish production capacity.
 
 ## Subsequent architecture work
 
