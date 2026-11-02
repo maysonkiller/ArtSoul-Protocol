@@ -55,8 +55,10 @@ for the local tests and release boundary. External Base wallet NFTs are a
 separate requested read-only inventory; they are not active ArtSoul listings.
 Its [default-off implementation](audits/B18_EXTERNAL_BASE_INVENTORY_2026-11-02.md)
 uses explicit pagination and a dedicated server credential. Local API/browser
-checks pass; activation still requires verified provider quota and no-spend
-controls. Alchemy phone verification currently blocks the account inspection.
+checks pass. The owner completed Alchemy verification: the new project team is
+on Free with no payment method, and one bounded live inventory request succeeded.
+The current CDN compatibility patch and server-only activation are tracked in
+the inventory audit; the existing RPC account quota remains unverified.
 The owner selected Google Password Manager for backup-key custody. Actual
 independent encrypted-copy and key-recovery verification remain pending.
 

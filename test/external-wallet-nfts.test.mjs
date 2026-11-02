@@ -137,6 +137,22 @@ test('unsupported, malformed, duplicate and zero-balance assets are counted as o
   assert.deepEqual((await empty(A)).items, []); assert.equal((await empty(A)).validAt, null);
 });
 
+test('current provider CDN accepts cached raster paths without allowing arbitrary hosts or transformations', async t => {
+  setup(t); const read = await fresh();
+  const valid = 'https://nft2-cdn.alchemy.com/cacheGroup/cachedImage_123';
+  const urls = [valid, valid + '?url=https://bad.test', valid + '#fragment', valid + '/extra',
+    valid.replace('alchemy.com', 'alchemy.com.evil.test'), valid.replace('https:', 'http:'),
+    'https://nft2-cdn.alchemy.com@bad.test/group/image',
+    'https://nft2-cdn.alchemy.com/group/%2e%2e',
+    'https://nft2-cdn.alchemy.com/' + 'a'.repeat(129) + '/image'];
+  const rows = urls.map((cachedUrl, index) => nft({ tokenId: String(index), image: { cachedUrl, contentType: 'image/png' } }));
+  rows.push(nft({ tokenId: '99', image: { cachedUrl: valid, contentType: 'image/svg+xml' } }));
+  globalThis.fetch = async () => Response.json(page({ ownedNfts: rows, totalCount: rows.length }));
+  const result = await read(A);
+  assert.equal(result.items[0].imageUrl, valid);
+  assert.ok(result.items.slice(1).every(item => item.imageUrl === null));
+});
+
 test('signed cursors are wallet/config-bound, expire, reject tampering and preserve only provider-issued pagination', async t => {
   setup(t); const read = await fresh(); let now = 1_800_000_000_000; Date.now = () => now; const calls = [];
   const next = 'opaque/next?x=1&y=2';
