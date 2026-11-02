@@ -1348,3 +1348,51 @@ acceptance limitation: Saved pages hydrate separate groups of cards, and global
 search may await artist profiles alongside card hydration. Per-card/segment
 proof does not by itself establish one publication boundary for the entire
 outer response. That broader acceptance remains open before activation.
+
+## November 2 whole Saved/search response acceptance
+
+The outer-response limitation above is now addressed in code and isolated
+real-handler acceptance. Saved captured independently verified groups of four
+cards; search could finish card verification while outer artist profiles were
+still pending. Neither established a single publication for its complete HTTP
+response. This was an opt-in-path defect, not evidence of an incident in the
+currently disabled ownership projection.
+
+Both handlers now capture one ownership boundary, retain every hydrated proof,
+and recheck the combined bounded set after all response dependencies complete.
+One validated forward publication retries the entire response once, including
+Saved membership/visibility or search categories/profiles. Helpers inside that
+response cannot independently retry. A second publication, unchanged-marker
+owner mutation, changed deployment, or changed feature configuration returns
+one sanitized 503 without a partial 200. Route flags are checked again after
+the final asynchronous proof. Membership-only Saved lookups and artist-only
+search do not acquire ownership proofs.
+
+The real-handler fixture contains 18 acceptance cases (19 Node tests including
+the parent). An in-memory loader using the four production modules from
+`f9f7168a` reproduced eight behavioral failures without reverting the working
+tree; the completed implementation passes all cases. It covers five Saved
+cards across two groups, delayed outer search profiles, one and two publication
+moves, late owner/configuration changes, unavailable entries, empty responses,
+privacy, and the disabled ownership path. All requests are synthetic; no live
+database, environment flag, transaction, or worker was modified.
+
+A stable five-card Saved response uses one boundary read and six ownership
+proof RPCs (five captures plus one final batch), versus five boundary reads and
+ten proof RPCs in the previous per-card path. Search retains one boundary read
+and two proof passes. These are asserted fixture request budgets, not claims
+about production latency or billed bandwidth. The disabled path performs no
+ownership RPCs and retains its existing cached projection.
+
+Validation: 205 focused tests pass; the full local unit run reports 3,401 passes
+and 35 skips. The local tree contains preserved unrelated tests, so exact
+tracked CI remains the release authority. Evidence is retained privately in
+`b35-outer-focused-final.log` and `b35-outer-unit.log`. Exact candidate CI and
+deployment verification belong to this change's PR.
+
+Interpretation: this closes the whole outer Saved/search response acceptance
+slice within canon sections 1/4/5/9. It does not change economics, lifecycle,
+contracts, roles, or the public API schema. Combined poll/RPC/SQL/cache workload,
+independent durable encrypted recovery, and live worker/API activation remain
+separate open gates. The existing server still requires its reviewed worker
+update; no additional server is required.

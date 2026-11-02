@@ -767,8 +767,9 @@ async function projectTableData(tableData, warnings, publicMetrics = null, prelo
   return { cards, bids: maps.bids, diagnostics, warnings, publicMetrics, ownership };
 }
 
-async function buildDirectProjectionSnapshot({ chain, artworkId }) {
-  const ownershipBoundary = chain === CANONICAL_PUBLIC_CHAIN_ID ? await readNftOwnershipBoundary() : null;
+async function buildDirectProjectionSnapshot({ chain, artworkId }, initialBoundary) {
+  const ownershipBoundary = chain === CANONICAL_PUBLIC_CHAIN_ID
+    ? initialBoundary === undefined ? await readNftOwnershipBoundary() : initialBoundary : null;
   const warnings = [];
   const chainFilter = `eq.${chain}`;
   const artworkFilter = `eq.${artworkId}`;
@@ -1047,25 +1048,31 @@ function getDirectProjectionSnapshot(lookup, fresh = false) {
 
 // Reuse the exact public projection for bounded private bookmark hydration.
 // This helper never takes a staff session and never bypasses hidden visibility.
-export async function readVisibleArtworkCard(chain, artworkId) {
-  return readWithNftOwnershipRetry(async () => {
-  const snapshot = await getDirectProjectionSnapshot({ chain, artworkId });
+export async function readVisibleArtworkCard(chain, artworkId, responseScope) {
+  const read = async () => {
+  const snapshot = responseScope?.boundary
+    ? await buildDirectProjectionSnapshot({ chain, artworkId }, responseScope.boundary)
+    : await getDirectProjectionSnapshot({ chain, artworkId });
   if (snapshot.warnings.length) throw new Error('Artwork projection is unavailable');
   const card = snapshot.cards.find(row => Number(row.chain_id) === chain && String(row.artwork_id) === artworkId);
-  if (chain === CANONICAL_PUBLIC_CHAIN_ID) await recheckNftOwnership(snapshot.ownership);
+  if (chain === CANONICAL_PUBLIC_CHAIN_ID) {
+    if (responseScope) responseScope.retain(snapshot.ownership);
+    else await recheckNftOwnership(snapshot.ownership);
+  }
   return card && card.moderation_hidden !== true ? card : null;
-  });
+  };
+  return responseScope ? read() : readWithNftOwnershipRetry(read);
 }
 
 // Bounded search hydration reuses the public serializer once. The RPC returns
 // per-work latest lifecycle rows and indexed metadata, not the latest-200 feed.
-export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
+export async function readVisibleArtworkCards(chain, artworkIds, coreAddress, responseScope) {
   if (chain !== 84532 || !Array.isArray(artworkIds) || !artworkIds.length || artworkIds.length > 20 ||
       artworkIds.some(id => typeof id !== 'string' || !/^[1-9][0-9]{0,77}$/.test(id) || BigInt(id) >= 2n ** 256n) ||
       !/^0x[0-9a-f]{40}$/.test(coreAddress) || /^0x0{40}$/.test(coreAddress)) throw new Error('Invalid search page');
   const ids = [...new Set(artworkIds)];
-  return readWithNftOwnershipRetry(async () => {
-  const ownershipBoundary = await readNftOwnershipBoundary();
+  const read = async () => {
+  const ownershipBoundary = responseScope ? responseScope.boundary : await readNftOwnershipBoundary();
   const data = await supabaseRest('rpc/read_public_search_cards', {
     method: 'POST', body: { p_artwork_ids: ids, p_core_address: coreAddress }
   });
@@ -1097,9 +1104,11 @@ export async function readVisibleArtworkCards(chain, artworkIds, coreAddress) {
   const cards = new Map(snapshot.cards.filter(card => !hidden.has(card.artwork_id) &&
     current.get(card.artwork_id)?.metadata_uri === card.metadata_uri &&
     current.get(card.artwork_id)?.transaction_hash === card.transaction_hash).map(card => [card.artwork_id, card]));
-  await recheckNftOwnership(snapshot.ownership);
+  if (responseScope) responseScope.retain(snapshot.ownership);
+  else await recheckNftOwnership(snapshot.ownership);
   return ids.map(id => cards.get(id)).filter(Boolean);
-  });
+  };
+  return responseScope ? read() : readWithNftOwnershipRetry(read);
 }
 
 export default async function handler(req, res) {

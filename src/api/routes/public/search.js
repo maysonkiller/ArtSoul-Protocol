@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { allowMethods, normalizeWallet, sendError, supabaseRest } from '../../backend.js';
 import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../../profile-fields.js';
 import { readVisibleArtworkCards } from './artworks.js';
+import { readWithNftOwnershipResponse } from '../../nft-ownership.js';
 
 const CATEGORIES = ['artworks', 'auctions', 'artists'];
 const validId = value => typeof value === 'string' && /^[1-9][0-9]{0,77}$/.test(value) && BigInt(value) < 2n ** 256n;
@@ -40,6 +41,13 @@ export default async function searchHandler(req, res) {
     if (process.env.ARTSOUL_SEARCH_ENABLED !== 'true' || !core || /^0x0{40}$/.test(core)) {
       throw Object.assign(new Error('Search is not available yet. Please try again later.'), { code: 'SEARCH_UNAVAILABLE', statusCode: 503 });
     }
+    const requireSearchConfig = () => {
+      if (process.env.ARTSOUL_SEARCH_ENABLED !== 'true' || normalizeWallet(process.env.ARTSOUL_CORE_ADDRESS_BASE_SEPOLIA) !== core) {
+        throw new Error('Search configuration changed');
+      }
+    };
+    const read = async responseScope => {
+    requireSearchConfig();
     const limit = input.category === 'all' ? 5 : 20;
     const selected = input.category === 'all' ? CATEGORIES : [input.category];
     const pages = await Promise.all(selected.map(async category => {
@@ -56,7 +64,7 @@ export default async function searchHandler(req, res) {
     const artworkIds = [...new Set(pages.filter(page => page.category !== 'artists').flatMap(page => page.keys))];
     const artistIds = pages.find(page => page.category === 'artists')?.keys || [];
     const [cards, profiles] = await Promise.all([
-      artworkIds.length ? readVisibleArtworkCards(84532, artworkIds, core) : [],
+      artworkIds.length ? readVisibleArtworkCards(84532, artworkIds, core, responseScope) : [],
       artistIds.length ? supabaseRest(`profiles?wallet_address=in.(${artistIds.join(',')})&select=${[...PUBLIC_PROFILE_FIELDS, 'twitter_id', 'discord_id'].join(',')}&limit=${artistIds.length}`) : []
     ]);
     if (!Array.isArray(profiles) || profiles.some(profile => !artistIds.includes(profile.wallet_address))) throw new Error('Invalid search profiles');
@@ -72,7 +80,13 @@ export default async function searchHandler(req, res) {
     const nextCursor = input.category !== 'all' && page.hasMore ? Buffer.from(JSON.stringify({
       v: 1, q: fingerprint(input.query, input.category), k: page.keys.at(-1)
     })).toString('base64url') : null;
-    return res.status(200).json({ query: input.query, category: input.category, groups, nextCursor });
+    requireSearchConfig();
+    return { query: input.query, category: input.category, groups, nextCursor };
+    };
+    // Artist-only search does not read ownership or require an indexer marker.
+    const data = input.category === 'artists' ? await read() : await readWithNftOwnershipResponse(read);
+    requireSearchConfig();
+    return res.status(200).json(data);
   } catch (error) {
     if (!['INVALID_SEARCH', 'SEARCH_UNAVAILABLE'].includes(error?.code)) {
       error = Object.assign(new Error('Search is temporarily unavailable. Please try again.'), { code: 'SEARCH_UNAVAILABLE', statusCode: 503 });

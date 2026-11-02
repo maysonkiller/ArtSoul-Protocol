@@ -4,6 +4,7 @@ import test from 'node:test';
 import { allowMethods, normalizeWallet, requireWallet, sendError, setWalletSession, supabaseRest } from '../src/api/backend.js';
 import { publicOrigin, readBoundedJson, serviceError } from '../src/api/launch-services.js';
 import { readSavedConfig } from '../src/api/saved-config.js';
+import { readWithNftOwnershipResponse } from '../src/api/nft-ownership.js';
 
 const A = `0x${'1'.repeat(40)}`, B = `0x${'2'.repeat(40)}`, CORE = `0x${'3'.repeat(40)}`, OLD = `0x${'4'.repeat(40)}`;
 const env = { SESSION_SECRET: 'local-saved-test-only', SUPABASE_URL: 'https://saved.example.test',
@@ -17,8 +18,8 @@ function response() {
 }
 function handler(hydrate = async (chain, id) => ({ id: `v41:${chain}:${id}`, title: 'Public artwork' })) {
   return new Function('allowMethods','normalizeWallet','requireWallet','sendError','supabaseRest','publicOrigin',
-    'readBoundedJson','serviceError','readSavedConfig','readVisibleArtworkCard',source)(allowMethods,normalizeWallet,
-    requireWallet,sendError,supabaseRest,publicOrigin,readBoundedJson,serviceError,readSavedConfig,hydrate);
+    'readBoundedJson','serviceError','readSavedConfig','readVisibleArtworkCard','readWithNftOwnershipResponse',source)(allowMethods,normalizeWallet,
+    requireWallet,sendError,supabaseRest,publicOrigin,readBoundedJson,serviceError,readSavedConfig,hydrate,readWithNftOwnershipResponse);
 }
 function row(id, changes = {}) {
   return { id: String(id), wallet_address: A, chain_id: '84532', core_address: CORE, artwork_id: String(id),
