@@ -60,7 +60,12 @@ with two environment skips, Windows 3,377 with 35 environment skips, 49 contract
 tests on each platform, both builds and static checks. The isolated PostgreSQL
 scenario runs on Linux CI; Windows' environment skips are not recorded as
 PostgreSQL acceptance. The branch was subsequently reconciled with merged
-PR444 and its production-release documentation; final-head CI remains required.
+PR444 and its production-release documentation. Final-head CI `41373887537`
+passed on `6a762227297e784ca79967bd3bd407a57eda5e81`: Linux 4,079 unit tests
+with two environment skips, Windows 3,381 with 35 environment skips, 49 contract
+tests per platform, both builds and static checks. PR445 merged as `e7951abf`.
+Its Vercel preview hit the build-rate limit; this test/documentation-only slice
+introduced no product runtime to deploy. The existing worker was not updated.
 
 ```powershell
 $env:ARTSOUL_TEST_POSTGRES_BIN = (& 'C:/Users/mayso/scoop/apps/postgresql/current/bin/pg_config.exe' --bindir).Trim()

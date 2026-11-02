@@ -39,7 +39,10 @@ The next B18 slice removes the reproduced Home theme-switch layout jump,
 keeps six selections available at every width, straightens the theme symbol
 and groups connector identity separately from network/native balance.
 The built interface passes 575 assertions across 13 viewport sizes and both
-palettes; release evidence and limitations are recorded in
+palettes. PR446 is merged and production deployment `7489083598` succeeded;
+eight route shells and 14 shared assets match the build, and real public Home
+data passes six mobile/desktop theme checks with zero measured layout shift.
+Release evidence and limitations are recorded in
 [the theme/account audit](audits/B18_THEME_ACCOUNT_2026-11-02.md).
 
 ## Remaining acceptance and operational work
@@ -65,6 +68,16 @@ Spend Cap was enabled. Worker cursors/hashes survived the restart unchanged;
 the worker recovered to 11 blocks behind with no errors and four populated
 public API checks passed. This is containment and recovery evidence, not
 long-term IO/egress acceptance. See [the Disk IO audit](audits/B30_DISK_IO_2026-11-02.md).
+
+The 09:41–09:54 UTC read-only follow-up found Micro healthy, the worker synced
+at eight-block lag and four populated public API responses. Displayed current
+cycle egress was 0.055 GB, with the dashboard's normal reporting delay. Matching
+database reset markers establish 1.965 GB of temporary files over 7h56m;
+temporary bytes are not billed egress. Historical catalog/statistics queries
+lead the retained statement counters, but they do not explain the new growth.
+Per-file logging was disabled, so attribution remains open. No further database,
+worker or billing setting was changed. A provider trace or a reviewed bounded
+logging plan is the next diagnostic step, not an assumed application rewrite.
 
 The next B35 acceptance slice exercises actual confirmation polling, catch-up
 and coordinated publication against disposable local PostgreSQL. A failed cache

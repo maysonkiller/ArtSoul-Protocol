@@ -77,7 +77,25 @@ listed layouts, not every possible device or browser configuration.
 
 ## Release and remaining work
 
-Release verification will be recorded after exact-candidate CI and deployment.
+PR446 merged as `64a3bffe5f76927fc85b16dfd9c1549645c30c86` after exact-head
+CI `41423621460` passed on `5a681680a0e573a8d6bd6bb27db698b6d34b1ae3`:
+Linux 4,084 unit tests passed with two environment skips; Windows 3,386 passed
+with 35 environment skips. Both builds, static checks and 49 contract tests on
+each platform passed. Skipped platform-specific checks are not device evidence.
+
+Production deployment `7489083598` succeeded. The normal domain serves the exact
+build on all eight checked public routes and 14 shared assets. A fresh guest
+browser check of real Home data at 390, 1366 and 1920px in both themes confirms
+six cards, zero measured CTA/heading/grid movement and no horizontal overflow
+or page errors. Mobile and desktop screenshots were inspected. The first
+production browser probe used an incorrect card selector and timed out; the
+corrected probe passed. This was a verification-harness error, not an inferred
+site outage. The full responsive matrix and wallet-event fixtures remain
+separate from this public guest check.
+
+Private release evidence: `docs/private/theme-account-production-assets.json`
+and `docs/private/theme-account-production-browser.json`.
+
 Revert the UI commit and its HTML cache references together to undo this slice.
 The unrelated local checkpoint and recovery material are preserved.
 
