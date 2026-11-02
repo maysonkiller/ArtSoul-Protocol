@@ -60,6 +60,16 @@ All 111 focused header/network/menu/showcase checks pass, including delayed
 network responses, unknown connectors, disconnect and same-address reconnect.
 The build passes its 11 route contracts and 172 required style utilities.
 
+The first hosted CI run identified eight stale assertions for the old CSS and
+account-runtime cache versions. The HTML already used the new versions; the
+test pins and normalized runtime hash were then updated together. All 122
+related cache/layout/header checks pass. No failing assertion was removed.
+
+The hosted preview serves the exact build on eight public routes and 14 shared
+assets. Its real public Home data renders six works at 390, 1366 and 1920px in
+both themes, with identical measured CTA/card positions and no overflow or page
+errors. Preview account authentication is not inferred from this guest check.
+
 Private evidence: `docs/private/theme-account-layout-check.mjs`,
 `theme-account-layout-results.json`, focused-test/build logs and the
 `output/playwright/theme-account-*` screenshots. These measurements cover the
