@@ -101,6 +101,13 @@ requirements before a new test deployment. Cross-network payment routing is
 future design work, not an enabled product capability. No new chain support or
 economics are introduced by the redesign.
 
+The [C1 decision/invariant annex](architecture/C1_DECISION_INVARIANTS_2026-11-02.md)
+now records four concrete next-phase reviews: deployment identity and mint
+authority, funded-auction pause/deadline behavior, exact liability/rounding
+accounting and resale authorization lifetime. Source facts and unapproved policy
+are separated; no Solidity or existing deployment was changed. Architecture
+sign-off, replacement storage layout and independent security review remain open.
+
 Actual Snapshot A remains at the end of the final public testnet, announced in
 advance and independently stored/verified before any destructive reset. Export
 tooling readiness is separate from capturing that final snapshot. Mainnet,

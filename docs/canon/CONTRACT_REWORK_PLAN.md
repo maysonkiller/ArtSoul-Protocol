@@ -243,6 +243,12 @@ Prototype tests do not prove these future guarantees.
 
 ## 6. Delivery and decisions
 
+The [November 2 decision/invariant annex](../architecture/C1_DECISION_INVARIANTS_2026-11-02.md)
+adds a source-linked deployment/mint-authority map, current pause/deadline matrix,
+liability equations and integer vectors, and listing transition/event requirements.
+It distinguishes present prototype facts, approved requirements, recommendations
+and undecided policy. It is not architecture sign-off or replacement Solidity.
+
 1. C1: state/rounding/deadline specification, identity/capability graph, upgrade
    selection, threats and invariants. Approve changed rules before Solidity.
 2. C2/C3/C6: smallest complete publish → auction → settlement → resale → withdrawal
