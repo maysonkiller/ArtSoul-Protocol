@@ -131,6 +131,14 @@ still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
   captures six constructor-based layouts plus immutable bindings from the matching
   compiler. Reproduction and refusal checks pass; replacement layout/topology and
   upgrade compatibility remain undecided and are not inferred from this export.
+  D6 adds the requested compromised-wallet threat review: exact once-only payouts,
+  customer website factors versus independently enforced account authorization,
+  device/IP risk signals, delegation bypass and recovery/upgrade authority.
+  Optional protected accounts and recovery policy are proposals, not an activated
+  customer MFA requirement or a custody decision. Current staff policy is unchanged.
+  Two additional local cases prove exact settlement/replay and credit-owner/once-only
+  withdrawal behavior; all 54 contract tests pass. These are prototype accounting
+  checks, not proof of wallet-key compromise protection or C1 sign-off.
 - [ ] **C2 — Core rework.** Implement the frozen economics, deterministic lazy/creator/keeper finalization, default handling, and the Bible §3.1 refund obligations with bounded batches and withdrawable-credit fallback. No unbounded bidder loop.
 - [ ] **C3 — ArtworkNFT rework.** Implement the canonical 5.5% royalty, marketplace whitelist, provenance, and migration-safe interfaces.
 - [ ] **C4 — ArtSoulGenesis.** Build the dedicated soulbound contract and audited grant path. The numeric grant cadence is tunable operational policy, not canon or an immutable roadmap value. Grants require published categories, durable grant records, an audit log, and multisig-authorized administration.
