@@ -67,13 +67,31 @@ permitted state transition; do not infer compatibility from matching field names
 old funded auction during authority rotation; malicious/removed module mint;
 duplicate successful-path delivery; creator/First Collector preservation;
 old credit withdrawal after deploying a new engine. Reuse
-[current authorization checks](../../test/ArtSoulV41.test.cjs#L1077), but those
+[current authorization checks](../../test/ArtSoulV41.test.cjs#L1166), but those
 do not prove safe rotation or mixed-version operation.
 
 November 2 characterization now reproduces both old-settlement authority denial
 and cross-Core local-ID collision, with an authority-restoration positive control
 and atomic rollback checks. See [the executed evidence](../audits/C1_PAUSE_AUTHORITY_CHARACTERIZATION_2026-11-02.md).
 This confirms current hazards; it does not choose a replacement topology.
+
+The subsequent [privileged-authority case](../../test/ArtSoulV41.test.cjs#L1077)
+also executes grant, use and revocation: after the NFT owner sets an EOA as
+`core`, that EOA mints an unregistered artwork ID with its chosen recipient,
+creator and metadata, without registration, an auction or payment. The funded
+Core auction, floor, counters, escrow and credits are unchanged. Restoring the
+genuine Core blocks the removed EOA's next mint and permits the original winner
+to settle; the previously issued token remains. This is a privileged lifecycle
+bypass, not an unprivileged exploit or demonstrated theft of escrow.
+
+The threat therefore includes compromise or misuse of NFT-owner authority as
+well as the currently designated issuer. Requiring a contract address alone
+would still permit a malicious issuing contract; a website passkey would not
+constrain a direct on-chain call. The replacement must specify how mint capability
+is bound to a valid settled obligation and how governance can change that trust
+boundary. Governance controls, issuance limits and rotation policy remain D1/D6
+decisions. No live owner/issuer configuration was inspected or changed by this
+local reproduction; it does not establish compromise of the deployed protocol.
 
 ## 3. D2 — Pause, deadlines and reachable exit paths
 
@@ -122,7 +140,7 @@ No clock compensation, grace period or delay value is proposed as approved polic
 **Acceptance cases:** `endTime - 1`, equality and `+1`; delayed end transaction;
 `deadline - 1`, equality and `+1`; pause before/after funding and across expiry;
 withdrawal during pause; no-bid repeated finalization; unaffected parallel auctions.
-[Core pause test](../../test/ArtSoulV41.test.cjs#L1098) covers registration denial
+[Core pause test](../../test/ArtSoulV41.test.cjs#L1187) covers registration denial
 and invalid transitions, not the funded pause-expiry case.
 [Launch pause test:162](../../test/CollectionLaunch.test.cjs#L162) already verifies
 its distinct settlement/claim/withdrawal policy; retain it without generalizing it.
@@ -561,7 +579,7 @@ unchanged after rejection. Positive controls confirm one NFT/settlement, total
 credits equal to the funded price and payment only to the creditor with gas
 accounted for; the treasury's credit and ETH balance remain intact.
 
-`npm run test:contracts -- --network hardhat` now passes **54 tests**, including
+At the D6 checkpoint, `npm run test:contracts -- --network hardhat` passed **54 tests**, including
 Core, Collection Launch/Forge and Donations. The initial focused run expected
 `AuctionAlreadyFinalized` for a repeated settlement; current Core reports
 `AuctionNotEnded` for any status other than SettlementPending. The test oracle
@@ -569,3 +587,13 @@ was corrected to current behavior before the passing full run; Solidity was not
 changed. Core/NFT source hashes still match the prior characterization baseline.
 No browser factor ceremony, protected-account implementation, live-bytecode
 verification or independent security audit is claimed by these local tests.
+
+The subsequent D1 grant/use/revoke case passes with the full suite at **55 tests**
+on local chain 31337. Both unauthorized mint attempts execute mined reverts;
+Core state snapshots remain identical before grant, after direct issuance and
+after revocation. The positive control settles the original funded auction to
+the original winner, preserving the legitimate creator and creating its floor
+exactly once, while the earlier unregistered token remains outside Core's
+artwork/token registry. The Core/NFT SHA-256 values still match the prior
+characterization baseline; Solidity is unchanged. This test records a replacement
+design requirement, not a repair, a new mint policy or C1 approval.

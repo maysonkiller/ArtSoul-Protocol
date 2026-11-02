@@ -139,6 +139,11 @@ still require C0/C8/C13 acceptance; testnet credentials are not mainnet custody.
   Two additional local cases prove exact settlement/replay and credit-owner/once-only
   withdrawal behavior; all 54 contract tests pass. These are prototype accounting
   checks, not proof of wallet-key compromise protection or C1 sign-off.
+  The D1 privileged-authority follow-up proves an owner-authorized EOA can mint
+  an unregistered artwork without settlement; revocation blocks future mints but
+  leaves the issued token intact. The funded Core auction/escrow is unchanged and
+  settles after authority restoration. All 55 local contract tests pass; this is
+  a governance/lifecycle hazard to address in C1/C3, not a live exploit or a fix.
 - [ ] **C2 — Core rework.** Implement the frozen economics, deterministic lazy/creator/keeper finalization, default handling, and the Bible §3.1 refund obligations with bounded batches and withdrawable-credit fallback. No unbounded bidder loop.
 - [ ] **C3 — ArtworkNFT rework.** Implement the canonical 5.5% royalty, marketplace whitelist, provenance, and migration-safe interfaces.
 - [ ] **C4 — ArtSoulGenesis.** Build the dedicated soulbound contract and audited grant path. The numeric grant cadence is tunable operational policy, not canon or an immutable roadmap value. Grants require published categories, durable grant records, an audit log, and multisig-authorized administration.
