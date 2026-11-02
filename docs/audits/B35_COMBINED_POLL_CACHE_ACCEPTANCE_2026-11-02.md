@@ -102,3 +102,8 @@ and real provider/cache behavior. Independent durable encrypted recovery and
 restore evidence, and reviewed activation of the newer worker and ownership API
 on the existing server, remain separate gates. The Saved/search whole-response
 gate was already closed by PR442 and was not repeated here.
+
+The subsequent [auxiliary/reorg acceptance](B35_AUXILIARY_REORG_ACCEPTANCE_2026-11-02.md)
+adds actual resale/search refresh and a due periodic reorg to a second combined
+scenario. It closes those specific offline omissions; real provider/cache cost,
+independent encrypted recovery and worker activation remain open.

@@ -114,8 +114,15 @@ test('rewind events, cursor, hashes and media revision atomically (isolated Post
     '20261029212603_notification_reorg_identity','20261029220854_recovery_cache_obligation','20261101120000_nft_transfer_coverage',
     '20261101130000_verified_nft_owners','20261101140000_verified_nft_history'];
   for (const name of notificationMigrations) await pool.query(read(`sql/migrations/${name}.sql`));
+  // Search enrichment shares the same registrations and reorg cascade. Only
+  // the profile shape needed by the shipped search migrations is fixture data.
+  await pool.query(`CREATE TABLE profiles(wallet_address TEXT PRIMARY KEY,username TEXT,bio TEXT,avatar_url TEXT,
+    twitter_username TEXT,twitter_id TEXT,discord_username TEXT,discord_id TEXT)`);
+  const searchMigrations = ['public_artwork_search','public_artwork_search_current_round'];
+  for (const name of searchMigrations) await pool.query(read(`sql/migrations/${name}.sql`));
   evidence.migrations = [...migrations, ...['identity', 'preparation', 'submission', 'registration', 'reorg']
-    .map(name => `sql/migrations/artwork_media_${name}.sql`), ...notificationMigrations.map(name=>`sql/migrations/${name}.sql`)];
+    .map(name => `sql/migrations/artwork_media_${name}.sql`), ...notificationMigrations.map(name=>`sql/migrations/${name}.sql`),
+    ...searchMigrations.map(name=>`sql/migrations/${name}.sql`)];
   const engineFile = path.join(directory, 'isolated-engine.mjs');
   fs.writeFileSync(engineFile, isolatedEngineSource());
   const Engine = (await import(pathToFileURL(engineFile).href)).default;
@@ -2028,6 +2035,7 @@ const {pathToFileURL}=require('node:url');
     const f=nftFixture(sub);
     f.options.blockNumber=115;f.options.blockHash=hash(115);
     await f.run();await target._purgeRecoveryCache();
+    f.retainedLogs=[...f.logs];
     const moved={...f.logs[0],blockNumber:'0x75',blockHash:hash(117),transactionHash:hash(11700),logIndex:'0x2'};
     f.config=Object.freeze({...f.options,maxBlocks:10});f.logs=[];f.coreEvents=events;f.calls=[];f.purges=0;
     target.fixtureCachePurgeHook=async()=>{f.purges++;return true;};
@@ -2271,6 +2279,228 @@ const {pathToFileURL}=require('node:url');
     evidence.results.push({scenario:'coordinated_poll_cache',phases,cacheFetches:refills,
       limitations:'Synthetic chain/cache transport; SQL row JSON bytes exclude protocol overhead. Auxiliary resale/search refreshes are stubbed. Not production latency, billed egress or Redis atomicity evidence.'});
   });
+  await t.test('coordinated auxiliary refresh and due reorg reject stale metadata through cache recovery',async sub=>{
+    const {reconcileResaleState,readResaleStateAtBlock}=await import('../src/indexer/resale-state-reconciliation.js');
+    const {refreshSearchMetadata}=await import('../src/indexer/search-metadata.js');
+    for(let id=7;id<=15;id++)await apply(target,'ResaleListed',108,{tokenId:id,seller:WINNER,price:2500},id);
+    await pool.query('UPDATE indexer_state SET state_hash=$1 WHERE chain_id=$2',
+      [await target._computeStateHash(115),CHAIN]);
+    await pool.query("UPDATE artwork_search_metadata SET title='Retained artwork',metadata_status='ready'");
+    const f=await coordinatedFixture(sub,coordinatedEvents());f.addTransfer();
+    const foreign=await snapshot(OTHER_CHAIN),baseline=await writerSnapshot();
+    f.logs=[...f.retainedLogs,...f.logs];
+    const {cache,data}=await recoveryCache();
+    const entered=deferred(),release=deferred(),phases=[],searchResults=[],metadataReads=[],resaleCalls=[];
+    const startedAt=Date.now();let now=startedAt,phase=null,fork=false,failDeletion=false,holdMetadata=true;
+    const canonicalHash=number=>hash(number+(fork&&number>=116?10000:0));
+    const methods=(start,end)=>{
+      const from=runnerSource.indexOf(start),to=runnerSource.indexOf(end,from);
+      assert.ok(from>0&&to>from);return runnerSource.slice(from,to);
+    };
+    // Only transport and the runner clock are replaced. The poll, auxiliary
+    // scheduling, SQL revision fences, rewind and cache implementation are real.
+    const refreshMetadata=(database,options)=>refreshSearchMetadata(database,options,async uri=>{
+      metadataReads.push(uri);assert.equal(uri,'ipfs://coordinated-fixture');
+      if(holdMetadata){entered.resolve();await release.promise;return{name:'Orphaned title'};}
+      return{name:'Canonical replacement'};
+    }).then(result=>{searchResults.push(result);return result;});
+    const PollRunner=new Function('readNftTransferProgress','syncNftTransferCheckpoint','syncCoordinatedCheckpoint',
+      'reconcileResaleState','readResaleStateAtBlock','refreshSearchMetadata','Date',
+      `return class PollRunner {${methods('    _runConfirmationPoll()','    async getHealth(')}
+      ${methods('    async _refreshEventFailureMetric(','    async start()')}}`)
+      (readNftTransferProgress,syncNftTransferCheckpoint,syncCoordinatedCheckpoint,
+        reconcileResaleState,readResaleStateAtBlock,refreshMetadata,{now:()=>now});
+    const runner=Object.assign(new PollRunner(),{db,config:{chainId:CHAIN,contractAddress:CORE,
+      nftTransferConfig:f.config,searchIndexEnabled:true},confirmationDepth:15,isLeader:true,isRunning:true,
+      isStopping:false,lastReorgCheckAt:now,reorgCheckInterval:60000,lastSearchMetadataAt:0,
+      resaleCursor:'0',resaleSweepEnd:null,syncEngine:target,eventListener:target.eventListener,
+      _getRecoveryAuthority:()=>target.getRecoveryAuthority(),metrics:{updateEventFailures(){}}});
+    sub.after(async()=>{release.resolve();await runner.searchMetadataInFlight?.catch(()=>{});});
+    const errors=[];
+    sub.mock.method(console,'error',(...args)=>{errors.push(args.map(String).join(' '));});
+    sub.mock.method(console,'warn',()=>{});
+    sub.mock.method(globalThis,'fetch',async()=>assert.fail('External HTTP forbidden in auxiliary reorg acceptance'));
+    const sqlResult=(sql,result)=>{
+      if(phase){phase.sqlCalls++;phase.sqlRowsJsonBytes+=Buffer.byteLength(JSON.stringify(result.rows));
+        if(sql.includes('SELECT encode(digest('))phase.digestCalls++;}
+      return result;
+    };
+    const originalQuery=pool.query.bind(pool),originalConnect=db.pool.connect.bind(db.pool);
+    sub.mock.method(pool,'query',async(sql,values)=>sqlResult(sql,await originalQuery(sql,values)));
+    sub.mock.method(db.pool,'connect',async()=>{
+      const client=await originalConnect();return{release:()=>client.release(),
+        query:async(sql,values)=>sqlResult(sql,await client.query(sql,values))};
+    });
+    const originalRead=target.eventListener._readRpcCall.bind(target.eventListener);
+    sub.mock.method(target.eventListener,'_readRpcCall',operation=>originalRead(provider=>operation({
+      async send(method,params){
+        if(phase)phase.rpc[method]=(phase.rpc[method]||0)+1;
+        if(method==='eth_getBlockByNumber'){
+          const number=Number(BigInt(params[0]));
+          return{number:params[0],hash:canonicalHash(number),timestamp:'0x64'};
+        }
+        if(method==='eth_getLogs')return f.logs.filter(log=>
+          BigInt(log.blockNumber)>=BigInt(params[0].fromBlock)&&BigInt(log.blockNumber)<=BigInt(params[0].toBlock));
+        if(method==='eth_call'&&params[0].data.startsWith(resaleInterface.getFunction('resaleListings').selector)){
+          assert.equal(params[0].to,CORE);assert.equal(params[1].requireCanonical,true);
+          const block=[115,117].find(number=>params[1].blockHash===canonicalHash(number));
+          assert.ok(block,'resale reads must use a current canonical confirmed block hash');
+          const tokenId=resaleInterface.decodeFunctionData('resaleListings',params[0].data)[0].toString();
+          resaleCalls.push({tokenId,block,blockHash:params[1].blockHash});
+          return resaleInterface.encodeFunctionResult('resaleListings',[WINNER,2500n,block<116||fork]);
+        }
+        return provider.send(method,params);
+      }
+    })));
+    target.eventListener.getCurrentBlock=async()=>{if(phase)phase.headReads++;return 132;};
+    target.eventListener.getBlock=async number=>{
+      if(phase)phase.headers++;return{number,hash:canonicalHash(number),parentHash:canonicalHash(number-1),timestamp:100};
+    };
+    target.eventListener.queryAllHistoricalEvents=async(from,to)=>{
+      if(phase)phase.coreQueries++;return f.coreEvents.filter(event=>event.blockNumber>=from&&event.blockNumber<=to);
+    };
+    const detect=target.detectReorg.bind(target),publish=runner._publishCoordinatedRange.bind(runner);
+    sub.mock.method(target,'detectReorg',async(...args)=>{if(phase)phase.reorgChecks++;return detect(...args);});
+    sub.mock.method(runner,'_publishCoordinatedRange',async(...args)=>{if(phase)phase.publications++;return publish(...args);});
+    const redis=await cache.getRedis();
+    sub.mock.method(cache,'getRedis',async()=>({...redis,async del(...keys){
+      if(phase)phase.cacheDeletes++;
+      if(failDeletion)throw new Error('fixture auxiliary cache deletion unavailable');
+      return redis.del(...keys);
+    }}));
+    target.fixtureCachePurgeHook=options=>cache.purge(options);
+    const metadata=async()=> (await pool.query(`SELECT artwork_id::TEXT,revision::TEXT,metadata_uri,
+      source_transaction_hash,title,metadata_status FROM artwork_search_metadata WHERE artwork_id=2`)).rows;
+    const listings=async()=> (await pool.query(`SELECT token_id::TEXT,seller,price::TEXT,active,block_number,
+      transaction_hash,log_index,last_updated_block FROM v41_resale_listings r WHERE chain_id=$1 ORDER BY r.token_id`,[CHAIN])).rows;
+    const originalListings=await listings();
+    const measure=async(name,elapsed,operation=()=>runner._runConfirmationPoll())=>{
+      now=startedAt+elapsed;const recorded={name,elapsedMs:elapsed,reorgChecks:0,headReads:0,headers:0,
+        publications:0,coreQueries:0,cacheDeletes:0,sqlCalls:0,sqlRowsJsonBytes:0,digestCalls:0,rpc:{}};
+      phases.push(recorded);phase=recorded;
+      try{await operation();}finally{phase=null;}return recorded;
+    };
+    const initial=await measure('publish-and-start-auxiliary-refresh',0);
+    assert.equal(initial.publications,1);assert.equal(initial.reorgChecks,0);
+    assert.equal(runner.resaleReconciliationError,null);assert.equal(runner.nftTransferError,null);
+    assert.equal(runner.resaleCursor,'14');assert.equal(runner.resaleSweepEnd,'15');
+    assert.equal(resaleCalls.length,8,'one resale batch is bounded to eight actual pinned reads');
+    assert.ok(resaleCalls.every(call=>call.block===117));
+    assert.deepEqual((await listings()).map(row=>row.active),[false,false,false,false,false,false,false,false,true]);
+    const pendingSearch=runner.searchMetadataInFlight;assert.ok(pendingSearch);
+    await reach(entered,settle(pendingSearch));
+    const originalMetadata=(await metadata())[0];assert.equal(originalMetadata.metadata_status,'pending');
+    const published=await writerSnapshot();
+    const orphanTransactions=new Set(published.chain.contract_events.filter(row=>row.block_number>115).map(row=>row.transaction_hash));
+    const orphanOutbox=published.outbox.filter(row=>!baseline.outbox.some(old=>old.id===row.id));
+    assert.equal(orphanTransactions.size,3);assert.ok(orphanOutbox.length>0,'the publication must produce real durable side effects');
+    const orphanNotifications=orphanOutbox.filter(row=>row.event_type==='notification');
+    assert.ok(orphanNotifications.length>0,'include the real notification quarantine path');
+    assert.equal((await f.boundary())[0].indexed_through,'117');
+    const cacheKey=cache.keys.stats('auxiliary-reorg-old');await cache.set(cacheKey,{indexedThrough:117},3600);
+    fork=true;failDeletion=true;
+    // The fork starts at 116. Every Core/NFT header and replacement event uses
+    // that same fork; the last proven ancestor is 115, never an invented reset.
+    const reorg=await measure('due-reorg-commits-before-cache-failure',60000);
+    assert.equal(reorg.reorgChecks,1);assert.ok(reorg.headers>0);assert.equal(reorg.headReads,0);
+    assert.equal(reorg.publications,0);assert.equal(reorg.coreQueries,0);assert.equal(reorg.cacheDeletes,1);
+    assert.equal(runner.lastReorgCheckAt,startedAt,'failed recovery remains due');
+    assert.equal((await target.getIndexerState()).last_indexed_block,115);
+    assert.deepEqual(await coverageRows(CHAIN),[],'a rewind invalidates coverage until the retained NFT history is proved again');
+    assert.ok(await recoveryToken());assert.deepEqual(await f.boundary(),[]);assert.deepEqual(await metadata(),[]);
+    assert.equal(runner.searchMetadataInFlight,pendingSearch,'reorg must not pretend a pending metadata read has finished');
+    assert.equal(metadataReads.length,1);
+    const restored=await listings();assert.ok(restored.every(row=>row.active));
+    for(let i=0;i<restored.length;i++){
+      for(const key of ['token_id','seller','price','block_number','transaction_hash','log_index'])
+        assert.equal(restored[i][key],originalListings[i][key],key);
+      assert.equal(Number(restored[i].last_updated_block),i<8?115:108);
+    }
+    assert.equal(resaleCalls.length,16,'rewind reconciles the eight rows changed after the ancestor');
+    const rewound=await writerSnapshot(),token=await recoveryToken();
+    assert.ok(rewound.chain.contract_events.every(row=>!orphanTransactions.has(row.transaction_hash)));
+    assert.ok(rewound.chain.event_processing_registry.every(row=>!orphanTransactions.has(row.transaction_hash)));
+    const quarantined=rewound.outbox.filter(row=>orphanOutbox.some(orphan=>orphan.id===row.id));
+    assert.equal(quarantined.length,orphanNotifications.length);
+    assert.ok(quarantined.every(row=>row.event_type==='notification'&&row.processing_status==='dead'&&
+      row.correlation_id===null&&row.idempotency_key===`notification-orphan-${row.id}`));
+    assert.deepEqual(rewound.outbox.filter(row=>!quarantined.some(orphan=>orphan.id===row.id)),baseline.outbox);
+    const identities=(await pool.query(`SELECT orphaned FROM artsoul_private.notification_reorg_identities
+      WHERE outbox_id=ANY($1::BIGINT[])`,[orphanNotifications.map(row=>row.id)])).rows;
+    assert.equal(identities.length,orphanNotifications.length);assert.ok(identities.every(row=>row.orphaned));
+    assert.ok((await notificationInbox(CREATOR)).items.every(row=>!orphanTransactions.has(row.transaction_hash)));
+    const retry=await measure('due-reorg-cache-retry-stays-closed',62000);
+    assert.equal(retry.reorgChecks,1);assert.equal(retry.headReads,0);assert.equal(retry.headers,0);
+    assert.equal(retry.publications,0);assert.deepEqual(retry.rpc,{});assert.equal(retry.cacheDeletes,1);
+    assert.equal(retry.digestCalls,0);
+    assert.equal(await recoveryToken(),token);assert.deepEqual(await writerSnapshot(),rewound);
+    failDeletion=false;
+    const recovered=await measure('due-reorg-cache-recovers',64000);
+    assert.equal(recovered.reorgChecks,1);assert.equal(recovered.headReads,0);assert.equal(recovered.publications,0);
+    assert.equal(recovered.digestCalls,0);
+    assert.deepEqual(recovered.rpc,{});assert.equal(await recoveryToken(),null);assert.equal(data.has(cacheKey),false);
+    assert.equal(runner.resaleCursor,'0');assert.equal(runner.resaleSweepEnd,null);
+    assert.equal(runner.lastReorgCheckAt,startedAt+64000);assert.deepEqual(await f.boundary(),[]);
+    f.coreEvents=coordinatedEvents().map(event=>({...event,blockHash:canonicalHash(event.blockNumber),
+      transactionHash:hash(21600+event.logIndex)}));
+    f.logs=f.logs.map(log=>Number(BigInt(log.blockNumber))<116?log:
+      {...log,blockHash:canonicalHash(Number(BigInt(log.blockNumber))),transactionHash:hash(21700)});
+    for(const [elapsed,through] of [[66000,109],[76000,115]]){
+      const bootstrap=await measure('rebuild-retained-nft-coverage',elapsed);
+      assert.equal(bootstrap.publications,0);assert.equal(bootstrap.rpc.eth_getLogs,1);
+      assert.equal(runner.nftTransferError,null);assert.equal((await target.getIndexerState()).last_indexed_block,115);
+      assert.equal((await coverageRows(CHAIN))[0].covered_through,String(through));
+      assert.equal((await f.boundary()).length,through===115?1:0);
+      assert.equal(runner.searchMetadataInFlight,pendingSearch);assert.equal(metadataReads.length,1);
+    }
+    const replacement=await measure('publish-canonical-replacement-while-old-metadata-pending',86000);
+    assert.equal(replacement.publications,1);assert.equal(replacement.reorgChecks,0);
+    assert.equal(runner.resaleReconciliationError,null);assert.equal(runner.nftTransferError,null);
+    assert.equal(metadataReads.length,1,'an in-flight search batch prevents a second concurrent batch');
+    const replacementMetadata=(await metadata())[0];
+    assert.equal(replacementMetadata.metadata_uri,originalMetadata.metadata_uri);
+    assert.notEqual(replacementMetadata.source_transaction_hash,originalMetadata.source_transaction_hash);
+    assert.notEqual(replacementMetadata.revision,originalMetadata.revision);
+    const canonical=await writerSnapshot();
+    assert.equal(canonical.chain.contract_events.length,published.chain.contract_events.length);
+    assert.equal(canonical.chain.event_processing_registry.length,published.chain.event_processing_registry.length);
+    assert.equal(canonical.outbox.length,published.outbox.length+quarantined.length);
+    assert.deepEqual(canonical.outbox.filter(row=>quarantined.some(orphan=>orphan.id===row.id)),quarantined);
+    assert.equal(canonical.outbox.filter(row=>row.processing_status!=='dead').length,
+      published.outbox.filter(row=>row.processing_status!=='dead').length);
+    assert.ok(canonical.chain.contract_events.every(row=>!orphanTransactions.has(row.transaction_hash)));
+    const inbox=(await notificationInbox(CREATOR)).items;
+    assert.ok(inbox.every(row=>!orphanTransactions.has(row.transaction_hash)));
+    assert.equal(inbox.filter(row=>row.transaction_hash===f.coreEvents[1].transactionHash).length,1);
+    await measure('late-orphan-metadata-is-rejected',86000,async()=>{release.resolve();await pendingSearch;});
+    assert.deepEqual(searchResults,[{checked:1,updated:0}]);assert.equal(runner.searchMetadataInFlight,null);
+    assert.deepEqual(await metadata(),[replacementMetadata]);
+    holdMetadata=false;f.coreEvents=[];f.logs=[];
+    // The next eligible poll runs the real metadata scheduler. Await its own
+    // promise inside the phase so a background write cannot escape acceptance.
+    const final=await measure('refresh-canonical-metadata-without-replay',96000,async()=>{
+      await runner._runConfirmationPoll();assert.ok(runner.searchMetadataInFlight);await runner.searchMetadataInFlight;
+    });
+    assert.equal(final.publications,0);assert.equal(final.reorgChecks,0);
+    assert.deepEqual(searchResults,[{checked:1,updated:0},{checked:1,updated:1}]);assert.equal(metadataReads.length,2);
+    assert.equal((await metadata())[0].title,'Canonical replacement');assert.equal((await metadata())[0].metadata_status,'ready');
+    assert.equal(runner.resaleCursor,'0');assert.equal(runner.resaleSweepEnd,null);
+    assert.deepEqual(await writerSnapshot(),canonical,'auxiliary retries never replay chain events or side effects');
+    assert.deepEqual(await snapshot(OTHER_CHAIN),foreign);
+    assert.equal((await f.boundary())[0].indexed_through,'117');
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'117');
+    assert.equal((await coverageRows(CHAIN))[0].covered_hash,canonicalHash(117));
+    assert.equal(await recoveryToken(),null);
+    assert.ok(errors.some(message=>message.includes('REORG DETECTED')));
+    const pollErrors=errors.filter(message=>message.includes('Confirmation polling error:'));
+    assert.equal(pollErrors.length,2);
+    assert.ok(pollErrors.every(message=>
+      message.includes('cache')),'only the injected cache failure may stop polling');
+    evidence.results.push({scenario:'coordinated_auxiliary_due_reorg',phases,searchResults,metadataReads:metadataReads.length,
+      pinnedResaleReads:resaleCalls.length,orphanOutboxRemoved:orphanOutbox.length-quarantined.length,
+      orphanNotificationsQuarantined:quarantined.length,
+      limitations:'Real polling, auxiliary SQL and periodic recovery on disposable PostgreSQL; synthetic RPC, metadata and cache transports. SQL row JSON bytes exclude protocol overhead. Not production latency, billed egress or Redis atomicity evidence.'});
+  });
   for(const stage of ['Core handler','NFT journal','digest','checkpoint'])await t.test(
     `coordinated ${stage} failure rolls back the whole publication`,async sub=>{
       const events=coordinatedEvents(),f=await coordinatedFixture(sub,events);f.addTransfer();
@@ -2460,7 +2690,9 @@ const {pathToFileURL}=require('node:url');
   });
   await t.test('NFT ownership proof retains exact uint256 identifiers and request ordering',async()=>{
     await seedOwnerProof();const huge='115792089237316195423570985008687907853269984665640564039457584007913129639935';
-    await pool.query('UPDATE v41_artworks SET artwork_id=$1,token_id=$1 WHERE chain_id=$2',[huge,CHAIN]);
+    // Re-key this synthetic fixture and rebuild its derived search row through the shipped trigger.
+    await pool.query('DELETE FROM artwork_search_metadata WHERE chain_id=$1',[CHAIN]);
+    await pool.query('UPDATE v41_artworks SET artwork_id=$1,token_id=$1,metadata_uri=metadata_uri WHERE chain_id=$2',[huge,CHAIN]);
     await pool.query('UPDATE v41_settlements SET artwork_id=$1,token_id=$1 WHERE chain_id=$2',[huge,CHAIN]);
     await pool.query(`UPDATE contract_events SET event_data=CASE
       WHEN event_name='ArtworkRegistered' THEN jsonb_set(event_data,'{artworkId}',to_jsonb($1::TEXT))
