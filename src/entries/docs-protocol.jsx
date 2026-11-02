@@ -2,7 +2,7 @@ import { React, createRoot } from './react-runtime.js';
 import '../../docs-protocol.css';
 import { PROTOCOL_DOC_SECTIONS as sections } from '../content/protocol-docs.js';
 
-const { useEffect, useState } = React;
+const { useEffect, useLayoutEffect, useState } = React;
 
 const Chevron = ({ className = '' }) => (
     <svg className={`protocol-chevron ${className}`} width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -47,17 +47,32 @@ function ProtocolSection({ section, isOpen, onToggle }) {
 function ProtocolDocsApp() {
     const [openSections, setOpenSections] = useState(() => ({ 'what-is-artsoul': true }));
     const [navOpen, setNavOpen] = useState(false);
+    const [navigation, setNavigation] = useState(null);
+
+    const revealSection = (id, fromContents = false) => {
+        if (!sections.some(section => section.id === id)) {
+            setNavigation(null);
+            return;
+        }
+        setOpenSections(previous => ({ ...previous, [id]: true }));
+        setNavOpen(false);
+        setNavigation({ id, fromContents });
+    };
+
+    // A frame requested alongside setState can run before React commits the
+    // open accordion. Measure and scroll only after its visible layout exists.
+    useLayoutEffect(() => {
+        if (!navigation) return;
+        const section = document.getElementById(navigation.id);
+        section?.querySelector('.protocol-section-trigger')?.focus({ preventScroll: true });
+        section?.scrollIntoView({
+            behavior: navigation.fromContents && !document.documentElement.classList.contains('classic') && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'smooth' : 'auto',
+            block: 'start'
+        });
+    }, [navigation]);
 
     useEffect(() => {
-        let frame;
-        const reveal = hash => {
-            cancelAnimationFrame(frame);
-            const id = hash.slice(1);
-            if (!sections.some(section => section.id === id)) return;
-            setOpenSections(previous => ({ ...previous, [id]: true }));
-            setNavOpen(false);
-            frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
-        };
+        const reveal = hash => revealSection(hash.slice(1));
         const onHashChange = () => reveal(window.location.hash);
         const onAnchorClick = event => {
             if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -72,24 +87,10 @@ function ProtocolDocsApp() {
         window.addEventListener('hashchange', onHashChange);
         document.addEventListener('click', onAnchorClick);
         return () => {
-            cancelAnimationFrame(frame);
             window.removeEventListener('hashchange', onHashChange);
             document.removeEventListener('click', onAnchorClick);
         };
     }, []);
-
-    const openFromNav = (id) => {
-        setOpenSections(previous => ({ ...previous, [id]: true }));
-        setNavOpen(false);
-        requestAnimationFrame(() => {
-            const section = document.getElementById(id);
-            section?.querySelector('.protocol-section-trigger')?.focus({ preventScroll: true });
-            section?.scrollIntoView({
-                behavior: document.documentElement.classList.contains('classic') || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth',
-                block: 'start'
-            });
-        });
-    };
 
     return (
         <main className="protocol-docs-shell site-page-container">
@@ -109,7 +110,7 @@ function ProtocolDocsApp() {
                     <p>On this page</p>
                     <nav>
                         {sections.map(section => (
-                            <button key={section.id} type="button" onClick={() => openFromNav(section.id)}>{section.title}</button>
+                            <button key={section.id} type="button" onClick={() => revealSection(section.id, true)}>{section.title}</button>
                         ))}
                     </nav>
                 </aside>
