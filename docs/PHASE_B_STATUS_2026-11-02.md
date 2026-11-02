@@ -93,6 +93,13 @@ preserves identity without showing orphan messages. See [auxiliary/reorg accepta
 The read-only 11:03 UTC worker check remains healthy; this test-only slice does
 not activate the newer worker or establish production resource usage.
 
+The actual November 1 archive now passes the ordered five-migration rehearsal:
+111 tables / 286,532 rows preserved, full transaction rollback, explicit Data
+API privilege checks and replay preserving both pending and acknowledged
+recovery tokens. The network-isolated container was stopped. The exact runtime
+staging bundle is prepared; production activation, independent encrypted recovery
+and committed-schema recovery remain open. See [archive migration evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
+
 ## Subsequent architecture work
 
 The next contract phase must consolidate the collection launch, auction,

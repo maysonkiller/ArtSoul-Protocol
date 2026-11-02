@@ -387,3 +387,11 @@ Retained dead notification identities remain excluded from the public inbox.
 See [auxiliary/reorg acceptance](audits/B35_AUXILIARY_REORG_ACCEPTANCE_2026-11-02.md)
 for validation, phase counters and limitations. Production activation and
 representative usage/egress remain open on the existing server.
+
+November 2 B35 archive-migration follow-up: the actual November 1 full archive
+passes the ordered five-migration batch as the catalogued non-superuser role.
+All 111 original tables / 286,532 rows survive commit and transaction rollback;
+Data API restrictions and replay of pending/acknowledged recovery tokens pass.
+The isolated container is stopped. No live schema/worker activation occurred;
+independent encrypted recovery, compatible post-commit recovery and real usage
+remain open. See [archive rehearsal](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
