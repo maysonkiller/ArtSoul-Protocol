@@ -19,6 +19,11 @@ The November 2 B18 slice reconciles PR441 with the accepted shared-card study;
 its exact verification/release is recorded in
 [the card audit](audits/B18_CARD_RECONCILIATION_2026-11-02.md).
 
+The subsequent 178-second video follow-up preserves the showcase shell while
+showing whole artwork, removes hover shaking, makes desktop cards smaller and
+adds visible contextual guidance. See [the video follow-up audit](audits/B18_VIDEO_HELP_HERO_2026-11-02.md)
+for scope, verification and interpretation of the revised desktop density.
+
 ## Remaining acceptance and operational work
 
 | Gate | What remains | Boundary |
@@ -35,6 +40,13 @@ commands and the authenticated public product continue within their configured
 limits. Dedicated official-release announcements remain off until the project's
 publisher address is designated; an artwork contract is not silently substituted
 for that publisher wallet.
+
+November 2 operations: the explicitly free Nano-to-Micro upgrade increased
+database RAM to 1 GB at the same displayed price, and the previously disabled
+Spend Cap was enabled. Worker cursors/hashes survived the restart unchanged;
+the worker recovered to 11 blocks behind with no errors and four populated
+public API checks passed. This is containment and recovery evidence, not
+long-term IO/egress acceptance. See [the Disk IO audit](audits/B30_DISK_IO_2026-11-02.md).
 
 ## Subsequent architecture work
 

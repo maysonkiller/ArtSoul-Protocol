@@ -6,10 +6,10 @@ const pages = ['index.html','gallery.html','artwork.html','profile.html','upload
 const css = fs.readFileSync('unified-styles.css', 'utf8');
 const home = fs.readFileSync('index.html','utf8');
 
-test('all product screens load the same shared geometry CSS v77', () => {
+test('all product screens load the same shared geometry CSS v78', () => {
   for (const path of pages) {
     const html = fs.readFileSync(path,'utf8');
-    assert.equal((html.match(/unified-styles\.css\?v=77/g) || []).length, 1, path);
+    assert.equal((html.match(/unified-styles\.css\?v=78/g) || []).length, 1, path);
   }
 });
 
@@ -47,7 +47,6 @@ test('Explore uses density breakpoints while leaving card controls and loading s
 test('showcase artwork title and byline stay readable and clickable, without opaque controls or new media requests', () => {
   const js = fs.readFileSync('src/ui/home-showcase.js','utf8');
   const layout = css.slice(css.indexOf('/* B18.2 — one measured visual system'));
-  assert.match(layout, /home-showcase-slide::after \{[\s\S]*?pointer-events: none/);
   assert.match(layout, /home-showcase-caption \{[\s\S]*?z-index: 2/);
   assert.match(layout, /home-showcase-caption :is\([\s\S]*?-webkit-text-fill-color: currentColor/);
   assert.match(layout, /#homeShowcaseControls \{[\s\S]*?z-index: 3/);

@@ -241,14 +241,8 @@ test('counter is the only pause control and no opaque pause icon is rendered', (
     assert.equal((markup.match(/<button /g) || []).length, 3);
 });
 
-test('restored founder copy and caption readability are protected by a theme-token scrim', () => {
+test('Home explains that successful settlement creates the NFT', () => {
     const html = readFileSync('index.html','utf8');
-    const css = readFileSync('unified-styles.css','utf8');
     assert.match(html, /Discover a work\.\s*<br class="home-hero-break">Start its next chapter\./);
     assert.match(html, /An NFT is created only after successful settlement\./);
-    assert.match(css, /B18\.2 — one measured visual system/);
-    assert.match(css, /\.home-showcase-slide::after \{[\s\S]*?pointer-events: none;[\s\S]*?linear-gradient/);
-    assert.match(css, /\.home-showcase-caption \{[\s\S]*?z-index: 2;[\s\S]*?padding: 38px 22px 72px/);
-    assert.match(css, /-webkit-line-clamp: 2;/);
-    assert.match(css, /#homeShowcaseControls \{[\s\S]*?z-index: 3;/);
 });

@@ -133,7 +133,6 @@ test('the layout reuses each keyed panel and keeps a single support/media/action
     assert.equal((source.match(/<ArtistSupport\b/g) || []).length, 1);
     assert.equal((source.match(/id="artwork-actions"/g) || []).length, 1);
     const community = declaration('communityPanel');
-    assert.match(community, /<details className="artwork-community-help">\s*<summary>About community signals<\/summary>/);
-    assert.match(community, /href="\/docs-protocol#trust-community"/);
-    assert.match(community, /does not place a bid or make a purchase/);
+    assert.equal((community.match(/<ContextHelp topic="reactions"/g) || []).length, 1);
+    assert.equal((community.match(/<ContextHelp topic="trust"/g) || []).length, 1);
 });
