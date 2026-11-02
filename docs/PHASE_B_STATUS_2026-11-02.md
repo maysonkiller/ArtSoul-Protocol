@@ -51,7 +51,7 @@ Release evidence and limitations are recorded in
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |
 | B11/B12 actual journeys | Current-page expired settlement/default/re-auction and the remaining signed assistant scenarios | Retain accepted receipts, voice acceptance and completed transactions. Never replay a completed operation merely to collect another test result. |
-| B30/B35 operations | Representative usage/egress, full combined workload including auxiliary refresh/reorg work, and review activation of the newer worker on the existing server | Whole outer Saved/search responses and a bounded combined polling/cache recovery scenario pass isolated tests. The latter excludes resale/search enrichment, periodic reorg work and real provider/cache transport. The Hetzner worker is still the B30 version. No new server is required or purchased; ownership API/NFT-writer activation remains a separate gate. |
+| B30/B35 operations | Representative usage/egress and reviewed activation of the newer worker on the existing server | Whole outer Saved/search responses and combined polling/cache/auxiliary/periodic-reorg paths pass isolated tests. Real provider/cache transport and representative capacity remain unproven. The Hetzner worker is still the B30 version. No new server is required or purchased; ownership API/NFT-writer activation remains a separate gate. |
 | Recovery | An independently durable encrypted copy and restore evidence | All 159 objects were recovered and verified locally. Two copies on one computer do not meet independent durability. |
 | Real beta | Cohort/operator/support coverage and complete real-user journeys under the final agreed testnet plan | The owner wants the meaningful public testnet after the forthcoming contracts. Rehearsal evidence stays useful, but is not a substitute for that later cohort. |
 
@@ -85,6 +85,13 @@ purge recovers without replaying committed events, and an old delayed refill
 cannot repopulate stale data. It also verifies the existing publication interval
 and counts bounded work. See [combined acceptance](audits/B35_COMBINED_POLL_CACHE_ACCEPTANCE_2026-11-02.md)
 for measured scope and exclusions; this does not establish production capacity.
+
+The follow-up also runs actual resale/search refresh with a due periodic reorg,
+cache retry, bounded NFT coverage rebuild and a delayed orphan metadata response.
+That response cannot overwrite a replacement registration; notification quarantine
+preserves identity without showing orphan messages. See [auxiliary/reorg acceptance](audits/B35_AUXILIARY_REORG_ACCEPTANCE_2026-11-02.md).
+The read-only 11:03 UTC worker check remains healthy; this test-only slice does
+not activate the newer worker or establish production resource usage.
 
 ## Subsequent architecture work
 

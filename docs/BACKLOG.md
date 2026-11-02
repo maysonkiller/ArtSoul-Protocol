@@ -378,3 +378,12 @@ grew 1.965 GB over 7h56m under matching reset markers. Retained statement leader
 and available logs cannot attribute that interval; no speculative polling,
 digest or memory change was made. B30 stays open for representative usage and
 a provider trace or reviewed bounded logging plan. See the Disk IO audit.
+
+November 2 B35 combined-work follow-up: actual resale/search refresh and a due
+periodic reorg now run together in disposable PostgreSQL. Failed cache deletion
+blocks publication until recovery; bounded NFT history rebuild precedes resumed
+publication, and late orphan metadata cannot overwrite a canonical replacement.
+Retained dead notification identities remain excluded from the public inbox.
+See [auxiliary/reorg acceptance](audits/B35_AUXILIARY_REORG_ACCEPTANCE_2026-11-02.md)
+for validation, phase counters and limitations. Production activation and
+representative usage/egress remain open on the existing server.
