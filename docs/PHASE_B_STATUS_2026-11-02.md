@@ -97,8 +97,14 @@ The actual November 1 archive now passes the ordered five-migration rehearsal:
 111 tables / 286,532 rows preserved, full transaction rollback, explicit Data
 API privilege checks and replay preserving both pending and acknowledged
 recovery tokens. The network-isolated container was stopped. The exact runtime
-staging bundle is prepared; production activation, independent encrypted recovery
-and committed-schema recovery remain open. See [archive migration evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
+staging bundle is prepared. A subsequent full committed-schema archive restore
+also passes: 113 tables / 286,536 rows, 22 sequences, normalized complete schema,
+effective privileges and migration replay. Fresh-token barriers close both
+pending and previously acknowledged readable coverage without losing inbox
+state. These barrier checks are local rolled-back scenarios, not real
+cache/provider recovery.
+Production activation, independent encrypted durability/key custody and actual
+recovery cutover remain open. See [archive migration evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
 
 ## Subsequent architecture work
 

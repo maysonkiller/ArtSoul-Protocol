@@ -395,3 +395,12 @@ Data API restrictions and replay of pending/acknowledged recovery tokens pass.
 The isolated container is stopped. No live schema/worker activation occurred;
 independent encrypted recovery, compatible post-commit recovery and real usage
 remain open. See [archive rehearsal](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
+
+November 2 B35 post-commit restore follow-up: a complete updated archive restores
+into a distinct isolated database with matching 113 tables / 286,536 rows,
+22 sequences and normalized schema. Effective privilege checks, migration replay
+and fresh-token barriers pass for both pending and previously acknowledged
+readable coverage, preserving quarantined notification/read/dismissal state.
+The container is stopped. This closes the local logical-restoration slice;
+real worker/cache cutover, independent encrypted recovery and representative
+usage remain open. See [post-commit evidence](audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md#committed-schema-archive-restoration).

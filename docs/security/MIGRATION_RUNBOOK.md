@@ -7,6 +7,11 @@ the actual November 1 archive, including original-data preservation, full-batch
 transaction rollback, effective privileges and replay safety. See [the evidence](../audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md).
 They remain unapplied to production. This does not establish a safe downgrade to
 the older worker after schema commit or replace independent recovery evidence.
+The same archive now also passes full post-commit logical restoration into a
+second isolated database, including inbox state, effective privileges and fresh
+recovery-token barriers. See [post-commit evidence](../audits/B35_ARCHIVE_MIGRATION_REHEARSAL_2026-11-02.md#committed-schema-archive-restoration)
+and the [operational recovery sequence](#b35-recovery-after-a-committed-schema-change)
+below. Real worker/cache cutover remains untested.
 
 ## Migration Families
 
@@ -589,3 +594,50 @@ The migration baseline audit for the current testnet database remains historical
 ## Rollback Policy
 
 Most migrations are forward-only. Do not improvise destructive down migrations on production. For a failed uncommitted migration, the runner rolls back that migration transaction. For a committed migration defect, stop writes, preserve evidence, restore from the approved backup if required, and prepare a new reviewed forward migration.
+
+### B35 recovery after a committed schema change
+
+Keep the recovery schema and run compatible, reviewed worker code. Installing
+the older B30 worker over it is not an accepted rollback. A logical database
+restore is a separate procedure from rolling back an uncommitted transaction.
+
+1. Quiesce all affected API/database writers, notification/delivery workers and
+   legacy cache fillers before restoring data; drain the indexer and disable
+   dependent publication and NFT ownership readers. Record the last
+   source/cursor boundaries, migration checksums,
+   installed code and pending operations. Preserve the failed database before
+   choosing a consistent recovery point. Reconcile later writes and external
+   side effects; restoring an older archive does not undo a sent email or a
+   confirmed blockchain transaction.
+2. Restore the complete compatible schema and data, including private
+   notification identities, recipient read/dismissal state, recovery tokens and
+   NFT coverage. Verify all columns, sequence states, ownership, grants, RLS,
+   functions and triggers. Reproduce separately captured role and database
+   access configuration rather than granting broad privileges to make a restore
+   pass. Storage objects require their own verified backup.
+3. Treat the restored database as a new cache boundary. A restored NULL recovery
+   token proves only that an older process acknowledged an older purge. While
+   writers/readers are stopped, rearm a fresh recovery token for every restored
+   deployment through a reviewed, journalled database-owner operation. The
+   existing trigger invalidates that deployment's NFT coverage atomically.
+   Verify those effects and preserve notification identities and read state.
+   Reapplying the migration is **not** this barrier: its intentional idempotency
+   preserves acknowledged NULL tokens.
+4. Resume only the compatible recovery path under fresh leadership. Verify
+   source/deployment pins and the restored chain boundary against RPC evidence;
+   perform the required cache invalidation under the current revision/token and
+   rebuild bounded NFT history before enabling verified readers. Failed purge
+   or missing evidence keeps dependent publication blocked. In-memory caches,
+   Redis and CDN responses have separate invalidation/expiry requirements.
+5. Verify public/API convergence, duplicate-effect prevention and service health
+   before restoring traffic. Record the actual recovery time and any unrecovered
+   interval. A local database test supplies neither a production recovery-time
+   promise nor evidence for provider cutover, credential recovery or off-site
+   durability.
+
+PostgreSQL documents [the scope of `pg_dump`](https://www.postgresql.org/docs/17/app-pgdump.html)
+and [restore options](https://www.postgresql.org/docs/17/app-pgrestore.html).
+In particular, database-level access metadata is included by the create/restore
+path when requested; the project's existing non-create archive rehearsal uses a
+separate captured database-access catalog. Supabase confirms that
+[database backups do not contain Storage object bytes](https://supabase.com/docs/guides/platform/backups).
