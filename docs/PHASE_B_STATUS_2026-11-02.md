@@ -145,6 +145,14 @@ accounted optional gas reserves/payment funding. Source facts and unapproved pol
 are separated; no Solidity or existing deployment was changed. Architecture
 sign-off, replacement storage layout and independent security review remain open.
 
+Three C1 local contract cases now reproduce funded pause expiry, old-settlement
+mint-authority denial and artwork-ID collision between two Core versions sharing
+one NFT contract. Failed payments preserve balances/state, and authority restoration
+is verified as a positive control before expiry. All 52 current contract tests pass.
+See [the characterization](audits/C1_PAUSE_AUTHORITY_CHARACTERIZATION_2026-11-02.md);
+these are confirmed prototype hazards to resolve in the replacement design, not
+newly approved behavior or repairs to existing deployed contracts.
+
 Actual Snapshot A remains at the end of the final public testnet, announced in
 advance and independently stored/verified before any destructive reset. Export
 tooling readiness is separate from capturing that final snapshot. Mainnet,
