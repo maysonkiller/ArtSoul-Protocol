@@ -3267,6 +3267,18 @@ body.future .resale-modal {
 .artsoul-card-menu-toggle::-webkit-details-marker { display: none; }
 .artsoul-card-menu-toggle:hover,
 .artsoul-card-menu-toggle:focus-visible { background: var(--c-surface-muted); }
+/* Keep controls legible over both dark and light artwork in static Classic. */
+.classic :is(.artsoul-card-menu-toggle, .saved-button-overlay, .artsoul-media-toggle, .artsoul-media-mute, .artwork-detail-image-controls > button) {
+    border-color: var(--c-border);
+    box-shadow: 0 0 0 2px var(--c-surface);
+}
+.classic :is(.artsoul-card-menu-toggle, .saved-button-overlay:not([aria-pressed="true"]), .artsoul-media-toggle, .artsoul-media-mute, .artwork-detail-image-controls > button) {
+    background: color-mix(in srgb, var(--c-accent) 14%, var(--c-surface));
+}
+.classic :is(.artsoul-card-menu-toggle, .saved-button-overlay:not([aria-pressed="true"]), .artsoul-media-toggle, .artsoul-media-mute, .artwork-detail-image-controls > button):is(:hover, :focus-visible),
+.classic .artsoul-card-menu[open] > .artsoul-card-menu-toggle {
+    background: color-mix(in srgb, var(--c-accent) 24%, var(--c-surface));
+}
 .artsoul-artwork-card:has(.artsoul-card-menu[open]) { overflow: visible; z-index: 5; }
 .artsoul-artwork-card:has(.artsoul-card-menu) .artsoul-card-countdown { left: 10px; right: auto; }
 .artsoul-artwork-card:has(.artsoul-card-menu):has(.artsoul-card-countdown) .artsoul-card-media-badge,
@@ -9582,7 +9594,8 @@ body:is(.classic, .future) .artsoul-artwork-card :is(.artsoul-card-media-badge, 
 @media (min-width: 769px) {
     body:is(.classic, .future) .artsoul-artwork-card .artsoul-card-media {
         aspect-ratio: 3 / 2;
-        min-height: 124px;
+        /* Two action buttons above and playback below must remain separate. */
+        min-height: 168px;
     }
 }
 @container (max-width: 175px) {

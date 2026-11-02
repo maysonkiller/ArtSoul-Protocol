@@ -47,6 +47,12 @@ Release evidence and limitations are recorded in
 
 ## Remaining acceptance and operational work
 
+The next bounded B18 fix improves Classic controls over dark/light media and
+opens contextual Guide links only after the target section is expanded.
+It also removes a Saved/playback overlap in the compact desktop Home row.
+See [the control and guide audit](audits/B18_CLASSIC_CONTROLS_GUIDE_LINKS_2026-11-02.md)
+for the 53 focused checks, 450 built-browser assertions and release boundary.
+
 | Gate | What remains | Boundary |
 | --- | --- | --- |
 | B18 device acceptance | Native iPhone review of the latest composition; real Phantom Disconnect → choose another wallet after the fix | Browser geometry and synthetic wallet events are covered, but do not establish extension/device behavior. Android testing was declined. |

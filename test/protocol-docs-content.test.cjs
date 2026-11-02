@@ -77,12 +77,12 @@ test('shared blocks render text safely and retain table and ordered-list semanti
 });
 
 async function harness(hash = '', theme = 'future') {
-  const values = [], effects = [], frames = new Map(), scrolls = [], focuses = [], navigationEvents = [], windowEvents = new Map(), documentEvents = new Map();
-  let index = 0, frameId = 0, mounted = false;
+  const values = [], effects = [], layoutEffects = [], layoutDeps = [], frames = new Map(), scrolls = [], focuses = [], navigationEvents = [], layoutAtScroll = [], windowEvents = new Map(), documentEvents = new Map();
+  let index = 0, layoutIndex = 0, frameId = 0, mounted = false, committedOpen = {};
   const window = {location: new URL('https://artsoul.example/docs-protocol' + hash),
     addEventListener: (name, fn) => windowEvents.set(name, fn), removeEventListener: name => windowEvents.delete(name)};
   const document = {documentElement: {classList: {contains: value => value === theme}}, getElementById: id => ({
-      scrollIntoView: options => { scrolls.push({id, ...options}); navigationEvents.push(`scroll:${id}`); },
+      scrollIntoView: options => { scrolls.push({id, ...options}); navigationEvents.push(`scroll:${id}`); layoutAtScroll.push({id, open: Boolean(committedOpen[id])}); },
       querySelector: selector => selector === '.protocol-section-trigger' ? {
         focus: options => { focuses.push({id, ...options}); navigationEvents.push(`focus:${id}`); }
       } : null
@@ -91,10 +91,21 @@ async function harness(hash = '', theme = 'future') {
   const scope = await components({...React,
     useState(initial) {const slot = index++; if (!(slot in values)) values[slot] = typeof initial === 'function' ? initial() : initial;
       return [values[slot], next => {values[slot] = typeof next === 'function' ? next(values[slot]) : next;}];},
-    useEffect: fn => {if (!mounted) effects.push(fn);}
+    useEffect: fn => {if (!mounted) effects.push(fn);},
+    useLayoutEffect(fn, deps) {
+      const slot = layoutIndex++;
+      if (!layoutDeps[slot] || deps.some((value, i) => !Object.is(value, layoutDeps[slot][i]))) layoutEffects.push(fn);
+      layoutDeps[slot] = deps;
+    }
   }, {window, document, URL, requestAnimationFrame: fn => {frames.set(++frameId, fn); return frameId;}, cancelAnimationFrame: id => frames.delete(id)});
-  const result = {window, values, frames, scrolls, focuses, navigationEvents, windowEvents, documentEvents,
-    render() {index = 0; return scope.App();},
+  const result = {window, values, frames, scrolls, focuses, navigationEvents, layoutAtScroll, windowEvents, documentEvents,
+    render() {
+      index = 0; layoutIndex = 0;
+      const view = scope.App();
+      committedOpen = {...values[0]};
+      for (const effect of layoutEffects.splice(0)) effect();
+      return view;
+    },
     flush() {for (const [id, fn] of frames) {frames.delete(id); fn();}},
     hash(value) {window.location.hash = value; windowEvents.get('hashchange')();},
     click(href, extra = {}, linkExtra = {}) {documentEvents.get('click')({button: 0,
@@ -156,22 +167,36 @@ test('initial section links open and reveal the requested accordion without clos
   const h = await harness('#fees');
   assert.equal(h.values[0].fees, true); assert.equal(h.values[0]['what-is-artsoul'], true);
   h.render(); h.flush();
-  assert.deepEqual(h.scrolls, [{id: 'fees', block: 'start'}]);
+  assert.deepEqual(h.scrolls, [{id: 'fees', behavior: 'auto', block: 'start'}]);
+  assert.deepEqual(h.focuses, [{id: 'fees', preventScroll: true}]);
+});
+
+test('guide links wait for the opened accordion commit before measuring or moving focus', async () => {
+  for (const id of ['trust-community', 'settlement', 'deposits']) {
+    const h = await harness('#' + id);
+    h.flush();
+    assert.equal(h.scrolls.length, 0, 'a browser frame before the state commit must not scroll the collapsed layout');
+    assert.equal(h.focuses.length, 0);
+    h.render(); h.flush();
+    assert.deepEqual(h.layoutAtScroll, [{id, open: true}]);
+    assert.deepEqual(h.navigationEvents, [`focus:${id}`, `scroll:${id}`]);
+    assert.deepEqual(h.scrolls, [{id, behavior: 'auto', block: 'start'}]);
+  }
 });
 
 test('hash changes reveal a known section in the existing page and reject unrelated anchors', async () => {
   const h = await harness();
   assert.equal(h.frames.size, 0);
   h.hash('#faq'); h.render(); h.flush();
-  assert.equal(h.values[0].faq, true); assert.deepEqual(h.scrolls, [{id: 'faq', block: 'start'}]);
+  assert.equal(h.values[0].faq, true); assert.deepEqual(h.scrolls, [{id: 'faq', behavior: 'auto', block: 'start'}]);
   h.hash('#unknown'); h.hash('#__proto__');
   assert.equal(h.frames.size, 0); assert.equal(Object.hasOwn(h.values[0], '__proto__'), false);
 });
 
 test('a repeated link to the current hash reopens an accordion the reader collapsed', async () => {
-  const h = await harness('#fees'); h.flush(); h.values[0] = {...h.values[0], fees: false};
+  const h = await harness('#fees'); h.render(); h.flush(); h.values[0] = {...h.values[0], fees: false}; h.render();
   h.click('https://artsoul.example/docs-protocol#fees');
-  assert.equal(h.values[0].fees, true); h.flush(); assert.equal(h.scrolls.length, 2);
+  assert.equal(h.values[0].fees, true); h.render(); h.flush(); assert.equal(h.scrolls.length, 2);
   h.values[0] = {...h.values[0], fees: false};
   h.click('https://artsoul.example/docs-protocol.html#fees');
   assert.equal(h.values[0].fees, true);
@@ -189,10 +214,11 @@ test('modified, external and unrelated links do not reopen documentation section
   assert.equal(h.values[0].fees, false); assert.equal(h.frames.size, 0);
 });
 
-test('rapid navigation and unmount cancel obsolete scrolling and remove listeners', async () => {
+test('rapid navigation reveals only the final target and unmount removes listeners', async () => {
   const h = await harness('#fees'); h.hash('#faq');
-  assert.equal(h.frames.size, 1); h.flush(); assert.deepEqual(h.scrolls, [{id: 'faq', block: 'start'}]);
-  h.hash('#deposits'); h.hash('#unknown'); assert.equal(h.frames.size, 0);
+  h.flush(); assert.equal(h.scrolls.length, 0);
+  h.render(); h.flush(); assert.deepEqual(h.scrolls, [{id: 'faq', behavior: 'auto', block: 'start'}]);
+  h.hash('#deposits'); h.hash('#unknown'); h.render(); h.flush(); assert.equal(h.scrolls.length, 1);
   h.hash('#fees'); h.cleanup.forEach(fn => fn?.());
   assert.equal(h.frames.size, 0); assert.equal(h.windowEvents.size, 0); assert.equal(h.documentEvents.size, 0);
 });
