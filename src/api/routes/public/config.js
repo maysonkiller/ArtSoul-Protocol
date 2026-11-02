@@ -23,6 +23,7 @@ function readPublicConfig() {
     reportingEnabled: readReportingConfig().enabled,
     donations: readDonationConfig(),
     saved: readSavedConfig(),
+    externalBaseNftsEnabled: process.env.ARTSOUL_EXTERNAL_BASE_NFTS_ENABLED === 'true',
     profileLayout: readProfileLayoutConfig(),
     auctionNotifications: readAuctionNotificationConfig()
   };

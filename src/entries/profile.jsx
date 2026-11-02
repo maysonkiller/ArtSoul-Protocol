@@ -5,6 +5,7 @@ import { decodeAvatar } from '../features/artwork/decoded-image.js';
 import { isWalletStateSettled, resolveProfileOwnership } from '../features/profile/profile-ownership.js';
 import { EmailConnection } from '../features/profile/email-connection.jsx';
 import { SavedList, useSavedEnabled } from '../features/saved/saved-list.jsx';
+import { WalletNfts } from '../features/profile/wallet-nfts.jsx';
 import { ProfilePageSkeleton } from './loading-skeletons.jsx';
 import { inspectAuctionCreation } from '../features/auction/auction-creation.js';
 import '../../supabase-client.js';
@@ -2040,6 +2041,7 @@ const { useState, useEffect, useRef } = React;
                         </div>
                         )}
                         </section>
+                        {isOwnProfile && selectedGallery === 'collected' && <WalletNfts key={profile.wallet_address} wallet={profile.wallet_address} />}
                     </main>
                 </div>
             );
