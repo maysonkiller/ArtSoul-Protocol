@@ -6,7 +6,7 @@ This annex turns the existing rework direction into specific decisions and
 acceptance cases; it does not replace the rework roadmap.
 
 Authority: [October 26 research direction](../canon/CHANGELOG_2026-10-26_CONTRACT_EXTENSIBILITY.md).
-Baseline: [Bible §§1–5, 9, 14, 17](../canon/ARTSOUL_CANON_BIBLE_FULL.md).
+Baseline: [Bible §§1–5, 9, 11, 14, 17](../canon/ARTSOUL_CANON_BIBLE_FULL.md).
 Use alongside [Rework Plan §§2, 5, 6](../canon/CONTRACT_REWORK_PLAN.md), which already
 contains topology alternatives, the threat list and the stale-listing reproduction.
 Existing [A1 security evidence](../security/A1_SECURITY_AND_MIGRATION_AUDIT.md)
@@ -19,7 +19,7 @@ covers application/data boundaries; it is not replacement-contract acceptance.
 - **RECOMMENDATION** is a reviewable design preference, not an adopted rule.
 - **UNDECIDED** requires an explicit decision before replacement Solidity.
 
-The five records below connect a decision to protected state, money, authority,
+The six records below connect a decision to protected state, money, authority,
 events and falsifiable acceptance cases. They do not select signer addresses,
 thresholds, delays, proxy topology, new fees, currencies or collection parameters.
 All examples are native-ETH arithmetic in wei, not new product price parameters.
@@ -67,7 +67,7 @@ permitted state transition; do not infer compatibility from matching field names
 old funded auction during authority rotation; malicious/removed module mint;
 duplicate successful-path delivery; creator/First Collector preservation;
 old credit withdrawal after deploying a new engine. Reuse
-[current authorization checks](../../test/ArtSoulV41.test.cjs#L1005), but those
+[current authorization checks](../../test/ArtSoulV41.test.cjs#L1077), but those
 do not prove safe rotation or mixed-version operation.
 
 November 2 characterization now reproduces both old-settlement authority denial
@@ -122,12 +122,12 @@ No clock compensation, grace period or delay value is proposed as approved polic
 **Acceptance cases:** `endTime - 1`, equality and `+1`; delayed end transaction;
 `deadline - 1`, equality and `+1`; pause before/after funding and across expiry;
 withdrawal during pause; no-bid repeated finalization; unaffected parallel auctions.
-[Core pause test](../../test/ArtSoulV41.test.cjs#L1026) covers registration denial
+[Core pause test](../../test/ArtSoulV41.test.cjs#L1098) covers registration denial
 and invalid transitions, not the funded pause-expiry case.
 [Launch pause test:162](../../test/CollectionLaunch.test.cjs#L162) already verifies
 its distinct settlement/claim/withdrawal policy; retain it without generalizing it.
 
-The new [funded pause characterization](../../test/ArtSoulV41.test.cjs#L900)
+The new [funded pause characterization](../../test/ArtSoulV41.test.cjs#L901)
 reproduces payment denial during pause, the unchanged deadline, subsequent payment
 expiry and default after unpause. No payment or mint-side state survives a failed
 transaction. This is current-source evidence, not approval of that deadline policy.
@@ -386,13 +386,186 @@ Interpretation: propose fewer mandatory transactions first, with optional scoped
 payment automation afterward. This qualifies the idea of precharging every stage;
 it does not amend Bible §§2–4, 14 or activate future cross-chain capabilities.
 
-## 7. Decision and verification limits
+## 7. D6 — Transaction authorization and compromised-wallet recovery
+
+Status: **research proposal**, requested November 2; not approval to introduce
+mandatory customer MFA, a custodial co-signer, new recovery powers or a new wallet.
+Source review for this addition: `83e3827e9e3c91f7cadd2428a7278cc33962ed58`.
+It extends D1–D5 rather than replacing their accounting or governance decisions.
+
+### Evidence and current boundaries
+
+[Binance's October 30 incident update](https://www.binance.com/en-TR/support/announcement/detail/d3306d9dca5243548c813b605e1d1751)
+([official announcement mirror](https://www.binance.com/en/square/post/382966610455230))
+reports approximately $6.3 billion lost from compromised hot wallets on October
+29. Its preliminary investigation mentions multiple breach points and does not
+establish a final technical cause. This is motivation for a threat review, not
+evidence that ArtSoul shares that vulnerability or that one specific factor would
+have prevented the incident.
+
+**FACT — current prototype, not replacement acceptance:**
+
+| Boundary | Source behavior | What it does not establish |
+| --- | --- | --- |
+| Primary payment | [Core settlement](../../contracts/ArtSoulCore.sol#L356) requires the winning sender and exactly the recorded price minus credited deposit | Identity of the human controlling that sender; website approval |
+| Resale payment | [Core resale](../../contracts/ArtSoulCore.sol#L487) requires the stored price, active listing and current seller ownership | Safety of signing a malicious purchase or approval; D4's ownership-cycle hazard remains |
+| Credit withdrawal | [Core withdrawal](../../contracts/ArtSoulCore.sol#L564) clears the caller's full credit before paying only that caller, with a reentrancy guard; failed payment reverts | A partial-withdrawal API or protection when that caller's key is stolen |
+| Administrator | [Treasury setter](../../contracts/ArtSoulCore.sol#L574) changes future fee recipients; [NFT authority setter](../../contracts/ArtSoulNFT.sol#L43) changes the address allowed to mint | Immutable mint policy: the NFT trusts the configured authority rather than independently proving settlement. It can be an EOA. This is not a power to seize existing NFTs |
+| Customer website session | [SIWE verification](../../src/api/routes/auth/verify.js) and [cookie issuance](../../src/api/backend.js#L145) authenticate a wallet with a signed session cookie | Customer MFA, physical-device identity or on-chain enforcement of a website session |
+| Staff step-up | [Staff factor/session code](../../src/api/moderation-passkey.js) supports passkey/TOTP, a 24-hour session and trusted-IP/User-Agent context binding, subject to its flags | Per-payment approval or ordinary-user protection. Runtime flag state was not reverified for this review |
+
+Existing Core economic constants are prototype behavior; this review does not
+adopt its resale split for the replacement. D3 and the Bible remain authoritative.
+No generic owner credit-sweep endpoint was found in Core; that narrow source fact
+is not a claim that the entire protocol is immune to administrative compromise.
+
+### Threats and proposed controls
+
+| Threat | Proposed enforceable boundary | Residual risk / required proof |
+| --- | --- | --- |
+| Compromised website or API changes amount/recipient | The contract derives payment from a valid stored obligation and verifies authority, recipient, asset and lifecycle | A malicious UI can still solicit a separately valid harmful signature; independent wallet confirmation and readable transaction details remain necessary |
+| Repeated small transfers drain escrow | Each claim is consumed once; aggregate paid amount never exceeds that claim; unrelated liabilities cannot fund it | A per-transaction cap alone permits repeated drains and is insufficient |
+| Stolen ordinary wallet key | An optional protected contract account requires an independent cryptographic authorization for its protected operations | Website MFA cannot stop direct transactions from an ordinary EOA. Funds/NFTs outside the protected boundary remain exposed |
+| Stolen staff cookie, server key or database | Application authority never grants arbitrary escrow spend, signature custody or unilateral financial recovery | TOTP seeds and sessions remain sensitive; staff powers must be scoped and revoked independently of fund authority |
+| Compromised owner, module or upgrade authority | D1 specifies who can change minting, executors, treasury recipients and validation; configuration cannot silently bypass the promised user policy | A guard is ineffective if the compromised key can remove it. Review initialization, upgrades, modules and recovery together |
+| Lost factor, changed mobile IP or provider outage | Documented recovery preserving obligations and an independent exit path, with the same security strength as normal authorization | A service that can block every withdrawal becomes a fund-availability dependency; a weaker reset path defeats MFA |
+| Executor, callback or retry interference | D3/D5 atomic state changes, replay protection, bounded execution and failed-transfer credits | Test partial batches and repeated claims across entry points, not only one happy-path function |
+
+**RECOMMENDATION — exact authorization, not website-only spending permission.**
+For a recorded obligation of 1 ETH, only its legitimate beneficiary may receive
+at most the remaining 1 ETH across all executions. No second call creates another
+1 ETH entitlement. The amount and recipient cannot come from an unrestricted
+server-supplied transfer instruction. Existing Core withdrawals pay the whole
+caller credit; this example does not assert an existing partial-withdrawal feature.
+
+Any future signed authorization must bind the account, chain, verifying contract
+and deployment, action/selector, calldata or its hash, asset, amount, beneficiary,
+obligation identity, nonce, expiry and applicable funding/refund terms. Automation
+must additionally bind the approved spending/gas-reserve scope from D5. Structured
+signatures alone are insufficient: [EIP-712](https://eips.ethereum.org/EIPS/eip-712)
+explicitly leaves replay prevention to the application. Consumers must reject
+reuse and substituted intent, including across contracts, versions and chains.
+No arbitrary target, approval or `delegatecall` may be hidden inside an auction
+payment authorization. Limited session permissions must not enable installing
+modules, changing owners or disabling the factor policy.
+
+### Separate website security from protected custody
+
+1. **Protocol protection for everyone:** exact obligations, authenticated
+   beneficiaries, once-only accounting and bounded execution apply even when the
+   website is bypassed. An attacker controlling an unrelated wallet must never
+   spend another person's credit. These are not an optional MFA subscription.
+2. **Optional website account protection:** prefer passkeys, with an explicitly
+   described authenticator-app alternative. Reading public art and merely
+   connecting a wallet need not force enrollment. Protect sensitive account
+   changes with fresh verification and session revocation; do not call this
+   protection against direct blockchain use of a stolen key. Do not reuse the
+   founder's staff-recovery quorum as a reset service for every customer.
+3. **Optional protected contract account:** evaluate a reviewed account whose
+   financial authorization actually requires independent proof on-chain. Assets
+   and credits must belong to that account, and every relevant execution path
+   must enforce the policy. A single compromised key must not remove the factor,
+   change its validator, recover ownership or execute through another module.
+   Existing users require an explicit migration/activation flow; no silent wallet
+   conversion or new token approval during connection.
+
+These are proposed layers, not implemented customer features. A central server
+co-signature would add custody/control, availability and recovery dependencies;
+it is not the default recommendation. Standard smart-account interfaces may help
+integration, but [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) defines contract
+signature validation and [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) defines
+account-operation infrastructure, not a complete factor or recovery policy.
+
+**Delegation caveat.** [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) allows
+the EOA authority to replace or clear its delegation and originate transactions.
+Therefore, delegating a stolen-key EOA to a validator does not by itself remove
+that key's bypass powers. This is an inference from the specification, not a claim
+about Binance's cause. Do not market delegated-wallet UX as protection against
+compromise of the original key without proving all bypass paths are closed.
+
+### Factors, device changes and recovery
+
+[NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html) distinguishes
+phishing-resistant cryptographic authentication from manually entered OTPs and
+discusses IP/device signals as risk inputs. [FIDO passkeys](https://fidoalliance.org/passkeys/)
+use asymmetric credentials bound to the relying party. Accordingly:
+
+- Prefer passkeys for website authentication. TOTP is a shared-secret code and
+  can be phished; do not treat it as equivalent on-chain transaction protection.
+  Never put TOTP seeds, codes or recovery secrets in public calldata or logs.
+- New IP/browser signals may trigger re-verification, not irreversible fund
+  freezing. Mobile networks change addresses; User-Agent strings are spoofable.
+  Same IP is not proof of safety. Minimize stored risk data and define retention.
+  Do not silently change the currently approved staff-session binding.
+- A successful website login is not approval for every future transfer. A
+  protected financial action must bind the exact reviewed operation to the
+  required proofs. Factor reuse, cancellation and replay must be tested.
+- Wallet and passkey on one compromised device or cloud account are correlated
+  risks. Enrollment from an already-compromised wallet cannot retrospectively
+  prove the rightful owner. A legitimate-site compromise can also present harmful
+  requests despite phishing-resistant login.
+- Email/social accounts can receive alerts or support a reviewed recovery flow;
+  they must not alone reset financial authorization. Recovery, factor replacement,
+  upgrade and emergency paths must preserve the promised independent approvals.
+  Recovery quorum/delay and loss handling remain undecided; invent no defaults.
+- Treasury signers need independent trusted review of the actual target, asset,
+  amount and calldata. Multiple signatures on the same compromised UI are not
+  independent verification. Application administrators must not inherit escrow
+  sweep, mint-policy or treasury ownership powers from their website roles.
+
+### Acceptance cases before claiming protected payments
+
+The following are **proposed replacement acceptance**, not passed customer MFA tests:
+
+| Case | Required evidence |
+| --- | --- |
+| Underpayment, overpayment and non-winner settlement | Executed rejection preserves auction, floor, NFT supply, credits and escrow balances |
+| Duplicate settlement/claim, including another entry point | At most one mint/payout; no recreated credit; unrelated obligations unchanged |
+| Stolen key calls a protected account directly, outside ArtSoul | Missing independent authorization fails for transfers, NFT approvals, withdrawals and delegated execution |
+| Changed recipient, amount, calldata, deployment, chain, expiry or nonce | Either proof cannot be reused for the substituted operation |
+| Module installation, owner/validator replacement and recovery bypass | The compromised key alone cannot weaken or bypass the promised authorization |
+| A weak fallback, email reset or old factor after replacement | Cannot substitute for a required independent proof; old permissions are revoked |
+| Compromised website/backend and forged device headers | No arbitrary escrow spend; untrusted headers do not grant privileged API access |
+| Browser network change and lost factors | Documented re-verification/recovery works without silent loss, double payment or permanent provider lock-in |
+| Treasury or mint-authority rotation with pending liabilities | D1 obligations still complete under the approved policy; no arbitrary new mint authority |
+| Failed recipient, partial batch and executor retry | D3/D5 conservation and once-only obligations hold through recovery |
+
+**UNDECIDED before implementation:** customer opt-in versus mandatory scope;
+account/validator implementation and Base support; proof independence; enrollment
+and migration; recovery quorum/delay and availability; supported wallets; limited
+session permissions; custody/privacy implications; funding and operational cost.
+The user requested investigation, not a particular answer to those questions.
+No paid provider, schema change, new secret or current fund restriction is needed
+for this research. There is no claim that any design makes theft impossible.
+
+Interpretations to review: use IP as an application risk signal rather than a
+fund owner; prioritize passkeys over manually entered codes; propose optional
+protected accounts rather than requiring them at first connection; reject a
+website-only gate as the financial security boundary. None is a canon amendment.
+
+## 8. Decision and verification limits
 
 The annex is ready for policy comparison, not C1 sign-off. Populate decisions and
 their canon impacts explicitly; no unanswered cell becomes a constructor default.
 No Solidity, schema, signing, deployment or live protocol operation was changed.
 The initial document review checked references and integer vectors without running
 contracts. The subsequent [D1/D2 characterization](../audits/C1_PAUSE_AUTHORITY_CHARACTERIZATION_2026-11-02.md)
-adds three local executed cases; the complete current contract suite passes 52
-tests. This is not replacement acceptance, a renewed live-bytecode verification
-or an external security audit.
+added three local executed cases and passed 52 tests at that point.
+
+The D6 follow-up adds [exact settlement/replay](../../test/ArtSoulV41.test.cjs#L1004)
+and [credit ownership/once-only withdrawal](../../test/ArtSoulV41.test.cjs#L1040)
+cases. Under/overpayment by one wei, a non-winner with the correct payment, a
+repeated settlement, owner/outsider withdrawal and a repeated beneficiary claim
+all execute mined reverts on chain 31337. The full settlement snapshot remains
+unchanged after rejection. Positive controls confirm one NFT/settlement, total
+credits equal to the funded price and payment only to the creditor with gas
+accounted for; the treasury's credit and ETH balance remain intact.
+
+`npm run test:contracts -- --network hardhat` now passes **54 tests**, including
+Core, Collection Launch/Forge and Donations. The initial focused run expected
+`AuctionAlreadyFinalized` for a repeated settlement; current Core reports
+`AuctionNotEnded` for any status other than SettlementPending. The test oracle
+was corrected to current behavior before the passing full run; Solidity was not
+changed. Core/NFT source hashes still match the prior characterization baseline.
+No browser factor ceremony, protected-account implementation, live-bytecode
+verification or independent security audit is claimed by these local tests.

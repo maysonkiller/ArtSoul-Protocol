@@ -138,10 +138,13 @@ future design work, not an enabled product capability. No new chain support or
 economics are introduced by the redesign.
 
 The [C1 decision/invariant annex](architecture/C1_DECISION_INVARIANTS_2026-11-02.md)
-now records five concrete next-phase reviews: deployment identity and mint
+now records six concrete next-phase reviews: deployment identity and mint
 authority, funded-auction pause/deadline behavior, exact liability/rounding
 accounting, resale authorization lifetime and automatic execution with separately
-accounted optional gas reserves/payment funding. Source facts and unapproved policy
+accounted optional gas reserves/payment funding, and compromised-wallet transaction
+authorization/recovery. Customer website MFA and protected contract accounts are
+separate proposals; no customer enrollment or custody change is activated.
+Source facts and unapproved policy
 are separated; no Solidity or existing deployment was changed. Architecture
 sign-off, replacement storage layout and independent security review remain open.
 
@@ -157,6 +160,13 @@ The [C1 source-storage baseline](audits/C1_STORAGE_BASELINE_2026-11-02.md) also
 captures six current contract layouts and their immutable bindings. Repeated
 compiler output agrees and six refusal cases pass. This provides comparison
 evidence, not replacement layouts, deployed-state migration or proxy approval.
+
+The D6 follow-up checks exact settlement amounts, unauthorized/repeated settlement
+and unauthorized/repeated credit withdrawal on the local chain. The full contract
+suite now passes 54 tests. Website authentication is explicitly separate from
+on-chain spending authority: ordinary users do not gain stolen-key protection
+from existing staff passkey/TOTP sessions. Customer factors, protected accounts,
+recovery and their upgrade bypass boundaries remain design decisions in C1.
 
 Actual Snapshot A remains at the end of the final public testnet, announced in
 advance and independently stored/verified before any destructive reset. Export

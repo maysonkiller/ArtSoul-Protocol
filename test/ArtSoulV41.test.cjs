@@ -38,6 +38,7 @@ const ERROR_SIGNATURES = {
   NotArtworkCreator: "NotArtworkCreator()",
   NotAuctionWinner: "NotAuctionWinner()",
   NotTokenOwner: "NotTokenOwner()",
+  NothingToWithdraw: "NothingToWithdraw()",
   OwnableUnauthorizedAccount: "OwnableUnauthorizedAccount(address)",
   PriceBelowCanonicalFloor: "PriceBelowCanonicalFloor(uint256)",
   ProjectNFTAlreadyMinted: "ProjectNFTAlreadyMinted()",
@@ -850,8 +851,8 @@ describe("ArtSoul V4.1 protocol", function () {
     });
   });
 
-  // Current prototype hazards for C1 D1/D2 review, not replacement-contract requirements.
-  describe("C1 current pause and authority characterization", function () {
+  // Current prototype protections and hazards for C1 review, not replacement acceptance.
+  describe("C1 current accounting and authority characterization", function () {
     before(async function () {
       expect(await network.provider.send("eth_chainId")).to.equal("0x7a69");
     });
@@ -998,6 +999,77 @@ describe("ArtSoul V4.1 protocol", function () {
       expect((await core.auctions(1)).highestBidder).to.equal(await bidder.getAddress());
       expect((await core.auctions(1)).depositLocked).to.equal(deposit);
       expect(await ethBalance(await core.getAddress())).to.equal(deposit);
+    });
+
+    it("preserves funded settlement on substituted payments and consumes it only once", async function () {
+      const ctx = await deployProtocol();
+      const { core, bidder, outsider } = ctx;
+      const { deposit, bidAmount } = await createBidAndEndAuction(ctx);
+      const remaining = bidAmount - deposit;
+      const funded = await settlementState(ctx);
+
+      for (const [signer, value, error] of [
+        [bidder, remaining - 1n, "IncorrectSettlementPayment"],
+        [bidder, remaining + 1n, "IncorrectSettlementPayment"],
+        [outsider, remaining, "NotAuctionWinner"],
+      ]) {
+        const block = BigInt(await network.provider.send("eth_blockNumber"));
+        await expectRevert(core.connect(signer).settleAuction(1, {
+          value, gasLimit: 1_000_000,
+        }), error);
+        expect(BigInt(await network.provider.send("eth_blockNumber"))).to.equal(block + 1n);
+        expect(await settlementState(ctx)).to.deep.equal(funded);
+      }
+
+      await mine(core.connect(bidder).settleAuction(1, { value: remaining }));
+      const settled = await settlementState(ctx);
+      expect(settled.supply).to.equal(1n);
+      expect(settled.settlements).to.equal(1n);
+      expect(settled.tokenOwner).to.equal(await bidder.getAddress());
+      expect(settled.balance).to.equal(bidAmount);
+      expect(settled.credits.reduce((sum, credit) => sum + credit, 0n)).to.equal(bidAmount);
+
+      const block = BigInt(await network.provider.send("eth_blockNumber"));
+      await expectRevert(core.connect(bidder).settleAuction(1, {
+        value: remaining, gasLimit: 1_000_000,
+      }), "AuctionNotEnded");
+      expect(BigInt(await network.provider.send("eth_blockNumber"))).to.equal(block + 1n);
+      expect(await settlementState(ctx)).to.deep.equal(settled);
+    });
+
+    it("pays only the credited caller once without spending another beneficiary's balance", async function () {
+      const ctx = await deployProtocol();
+      const { core, owner, outsider, artist, treasury } = ctx;
+      await settlePrimaryAuction(ctx);
+      const artistAddress = await artist.getAddress();
+      const treasuryAddress = await treasury.getAddress();
+      const artistCredit = await core.pendingWithdrawals(artistAddress);
+      const treasuryCredit = await core.pendingWithdrawals(treasuryAddress);
+      const funded = await settlementState(ctx);
+      expect(artistCredit > 0n && treasuryCredit > 0n).to.equal(true);
+
+      for (const signer of [owner, outsider]) {
+        const block = BigInt(await network.provider.send("eth_blockNumber"));
+        await expectRevert(core.connect(signer).withdraw({ gasLimit: 100_000 }), "NothingToWithdraw");
+        expect(BigInt(await network.provider.send("eth_blockNumber"))).to.equal(block + 1n);
+        expect(await settlementState(ctx)).to.deep.equal(funded);
+      }
+
+      const balanceBefore = await ethBalance(artistAddress);
+      const treasuryBalanceBefore = await ethBalance(treasuryAddress);
+      const receipt = await mine(core.connect(artist).withdraw());
+      const gas = receipt.gasUsed * receipt.gasPrice;
+      expect(await ethBalance(artistAddress)).to.equal(balanceBefore + artistCredit - gas);
+      expect(await ethBalance(await core.getAddress())).to.equal(funded.balance - artistCredit);
+      expect(await core.pendingWithdrawals(artistAddress)).to.equal(0n);
+      expect(await core.pendingWithdrawals(treasuryAddress)).to.equal(treasuryCredit);
+      expect(await ethBalance(treasuryAddress)).to.equal(treasuryBalanceBefore);
+
+      const withdrawn = await settlementState(ctx);
+      const block = BigInt(await network.provider.send("eth_blockNumber"));
+      await expectRevert(core.connect(artist).withdraw({ gasLimit: 100_000 }), "NothingToWithdraw");
+      expect(BigInt(await network.provider.send("eth_blockNumber"))).to.equal(block + 1n);
+      expect(await settlementState(ctx)).to.deep.equal(withdrawn);
     });
   });
 
