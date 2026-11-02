@@ -2138,6 +2138,139 @@ const {pathToFileURL}=require('node:url');
     assert.deepEqual(recovered.outbox,committed.outbox);
     assert.deepEqual(recovered.chain.contract_events,committed.chain.contract_events);
   });
+  await t.test('coordinated poll/cache acceptance preserves one publication through purge retries and delayed refill',async sub=>{
+    const f=await coordinatedFixture(sub,coordinatedEvents());f.addTransfer();
+    const {cache,data}=await recoveryCache();
+    const phases=[],bytes=value=>Buffer.byteLength(JSON.stringify(value,(_,item)=>typeof item==='bigint'?item.toString():item));
+    let phase=null,now=Date.now(),head=132,failDeletion=true,refills=0;
+    const startedAt=now,entered=deferred(),release=deferred();
+    // Load shipped methods without runner startup, dotenv, provider construction
+    // or timers. Only this runner's clock advances; PostgreSQL retains real time.
+    const methods=(start,end)=>{
+      const from=runnerSource.indexOf(start),to=runnerSource.indexOf(end,from);
+      assert.ok(from>0&&to>from);return runnerSource.slice(from,to);
+    };
+    const PollRunner=new Function('readNftTransferProgress','syncNftTransferCheckpoint','syncCoordinatedCheckpoint','Date',
+      `return class PollRunner {${methods('    _runConfirmationPoll()','    async _refreshResaleState(')}
+      ${methods('    async _catchUpToSafeBlock(','    async getHealth(')}
+      ${methods('    async _refreshEventFailureMetric(','    async start()')}}`)
+      (readNftTransferProgress,syncNftTransferCheckpoint,syncCoordinatedCheckpoint,{now:()=>now});
+    const runner=Object.assign(new PollRunner(),{config:{chainId:CHAIN,contractAddress:CORE,nftTransferConfig:f.config},
+      confirmationDepth:15,isLeader:true,isRunning:true,isStopping:false,lastReorgCheckAt:now,
+      reorgCheckInterval:60000,syncEngine:target,eventListener:target.eventListener,
+      metrics:{updateEventFailures(){}},_refreshResaleState:async()=>{},_refreshSearchMetadata:()=>{}});
+    sub.mock.method(console,'error',()=>{});sub.mock.method(console,'warn',()=>{});
+    sub.mock.method(globalThis,'fetch',async()=>assert.fail('External HTTP forbidden in combined acceptance'));
+    const sqlResult=(sql,result)=>{
+      if(phase){phase.sqlCalls++;phase.sqlRowsJsonBytes+=bytes(result.rows);
+        if(sql.includes('SELECT encode(digest('))phase.digestCalls++;}
+      return result;
+    };
+    const originalQuery=pool.query.bind(pool),originalConnect=db.pool.connect.bind(db.pool);
+    sub.mock.method(pool,'query',async(sql,values)=>sqlResult(sql,await originalQuery(sql,values)));
+    sub.mock.method(db.pool,'connect',async()=>{
+      const client=await originalConnect();return{release:()=>client.release(),
+        query:async(sql,values)=>sqlResult(sql,await client.query(sql,values))};
+    });
+    const originalRead=target.eventListener._readRpcCall.bind(target.eventListener);
+    sub.mock.method(target.eventListener,'_readRpcCall',operation=>originalRead(provider=>operation({
+      async send(method,params){const result=await provider.send(method,params);
+        if(phase){phase.nftRpc[method]=(phase.nftRpc[method]||0)+1;phase.nftRpcJsonBytes+=bytes(result);}return result;}
+    })));
+    for(const name of ['getBlock','queryAllHistoricalEvents']){
+      const original=target.eventListener[name].bind(target.eventListener);
+      sub.mock.method(target.eventListener,name,async(...args)=>{
+        const result=await original(...args);if(phase){phase.coreListenerReads[name]=(phase.coreListenerReads[name]||0)+1;
+          phase.coreListenerJsonBytes+=bytes(result);}return result;
+      });
+    }
+    target.eventListener.getCurrentBlock=async()=>{if(phase)phase.headReads++;return head;};
+    const originalPublish=runner._publishCoordinatedRange.bind(runner);
+    sub.mock.method(runner,'_publishCoordinatedRange',async(...args)=>{
+      if(phase)phase.publications++;return originalPublish(...args);
+    });
+    const redis=await cache.getRedis(),transport={};
+    for(const name of ['get','set','scan','del','eval'])transport[name]=async(...args)=>{
+      if(phase)phase.cacheCommands[name]=(phase.cacheCommands[name]||0)+1;
+      if(name==='del'&&failDeletion)throw new Error('fixture cache deletion unavailable');
+      return redis[name](...args);
+    };
+    sub.mock.method(cache,'getRedis',async()=>transport);
+    target.fixtureCachePurgeHook=options=>cache.purge(options);
+    const key=cache.keys.auction(`${CHAIN}:combined-poll`),oldKey=cache.keys.stats('combined-poll-old');
+    await cache.set(oldKey,{indexedThrough:115},3600);
+    const fetchSnapshot=async()=>{
+      refills++;const rows=await f.boundary();assert.equal(rows.length,1);
+      const value={indexedThrough:Number(rows[0].indexed_through)};
+      if(refills===1){entered.resolve();await release.promise;}return value;
+    };
+    const pending=cache.remember(key,3600,fetchSnapshot);
+    sub.after(async()=>{release.resolve();await pending.catch(()=>{});});
+    await entered.promise;
+    const measure=async(name,elapsed,operation=()=>runner._runConfirmationPoll())=>{
+      now=startedAt+elapsed;
+      phase={name,elapsedMs:elapsed,headReads:0,publications:0,sqlCalls:0,sqlRowsJsonBytes:0,digestCalls:0,
+        nftRpc:{},nftRpcJsonBytes:0,coreListenerReads:{},coreListenerJsonBytes:0,cacheCommands:{}};
+      const recorded=phase;phases.push(recorded);
+      try{await operation();}finally{phase=null;}
+      return recorded;
+    };
+    const initial=await measure('publish-cache-fails',0);
+    assert.equal(initial.publications,1);assert.equal(initial.digestCalls,1);
+    assert.equal(initial.nftRpc.eth_getLogs,1);assert.equal(initial.coreListenerReads.queryAllHistoricalEvents,1);
+    assert.equal(initial.cacheCommands.scan,1);assert.equal(initial.cacheCommands.del,1);
+    assert.equal((await target.getIndexerState()).last_indexed_block,117);
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'117');
+    assert.ok(await recoveryToken());assert.deepEqual(await f.boundary(),[]);
+    assert.equal(runner.nftTransferError,'Verified publication refresh failed');
+    const committed=await writerSnapshot(),token=await recoveryToken();
+    assert.equal(committed.chain.contract_events.filter(row=>row.block_number>115).length,3);
+    const retry=await measure('purge-retry-fails',2000);
+    assert.equal(retry.publications,0);assert.equal(retry.headReads,0);assert.deepEqual(retry.nftRpc,{});
+    assert.equal(retry.digestCalls,0);assert.equal(retry.cacheCommands.del,1);
+    assert.equal(await recoveryToken(),token);assert.deepEqual(await f.boundary(),[]);
+    assert.deepEqual(await writerSnapshot(),committed);
+    failDeletion=false;
+    const recovered=await measure('purge-recovers',4000);
+    assert.equal(recovered.publications,0);assert.equal(recovered.headReads,0);assert.deepEqual(recovered.nftRpc,{});
+    assert.equal(recovered.digestCalls,0);assert.equal(recovered.cacheCommands.scan,1);
+    assert.equal(await recoveryToken(),null);assert.equal((await f.boundary())[0].indexed_through,'117');
+    assert.equal(data.has(oldKey),false);
+    await measure('delayed-refill-and-cache-hit',4000,async()=>{
+      release.resolve();assert.deepEqual(await pending,{indexedThrough:117});assert.equal(refills,2);
+      assert.equal(data.has(key),false,'a delayed old publication cannot refill the cache');
+      assert.deepEqual(await cache.remember(key,3600,fetchSnapshot),{indexedThrough:117});
+      assert.equal(refills,3);
+      assert.deepEqual(await cache.remember(key,3600,()=>assert.fail('expected the current cached publication')),{indexedThrough:117});
+    });
+    const afterRecovery=await writerSnapshot();
+    assert.deepEqual(afterRecovery.outbox,committed.outbox);
+    for(const table of tables.filter(name=>name!=='indexer_state'))
+      assert.deepEqual(afterRecovery.chain[table],committed.chain[table],table);
+    head=135;
+    for(const elapsed of [6000,8000]){
+      const idle=await measure('cadence-holds-publication',elapsed);
+      assert.equal(idle.headReads,1);assert.equal(runner.lastObservedBlock,135);
+      assert.equal(idle.publications,0);assert.deepEqual(idle.nftRpc,{});assert.deepEqual(idle.coreListenerReads,{});
+      assert.deepEqual(idle.cacheCommands,{});assert.equal(idle.digestCalls,0);
+      assert.ok(idle.sqlCalls<initial.sqlCalls);assert.equal((await f.boundary())[0].indexed_through,'117');
+    }
+    f.logs=[];f.coreEvents=[];
+    const next=await measure('next-empty-publication',10000);
+    assert.equal(next.publications,1);assert.equal(next.digestCalls,1);assert.equal(next.nftRpc.eth_getLogs,1);
+    assert.deepEqual(next.cacheCommands,{});assert.equal(runner.nftTransferError,null);
+    assert.equal((await target.getIndexerState()).last_indexed_block,120);
+    assert.equal((await coverageRows(CHAIN))[0].covered_through,'120');
+    assert.equal((await f.boundary())[0].indexed_through,'120');
+    const final=await writerSnapshot();
+    assert.deepEqual(final.outbox,committed.outbox);
+    assert.deepEqual(final.chain.contract_events,committed.chain.contract_events);
+    assert.deepEqual(final.chain.event_processing_registry,committed.chain.event_processing_registry);
+    assert.deepEqual(final.chain.v41_artworks,committed.chain.v41_artworks);
+    assert.deepEqual(final.chain.v41_auctions,committed.chain.v41_auctions);
+    evidence.results.push({scenario:'coordinated_poll_cache',phases,cacheFetches:refills,
+      limitations:'Synthetic chain/cache transport; SQL row JSON bytes exclude protocol overhead. Auxiliary resale/search refreshes are stubbed. Not production latency, billed egress or Redis atomicity evidence.'});
+  });
   for(const stage of ['Core handler','NFT journal','digest','checkpoint'])await t.test(
     `coordinated ${stage} failure rolls back the whole publication`,async sub=>{
       const events=coordinatedEvents(),f=await coordinatedFixture(sub,events);f.addTransfer();
