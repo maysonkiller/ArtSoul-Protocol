@@ -5,6 +5,7 @@ import test from 'node:test';
 import { allowMethods, normalizeWallet, sendError, supabaseRest } from '../src/api/backend.js';
 import { PUBLIC_PROFILE_FIELDS, publicProfile } from '../src/api/profile-fields.js';
 import { readVisibleArtworkCards } from '../src/api/routes/public/artworks.js';
+import { readWithNftOwnershipResponse } from '../src/api/nft-ownership.js';
 
 const A=`0x${'1'.repeat(40)}`,B=`0x${'2'.repeat(40)}`,CORE=`0x${'3'.repeat(40)}`;
 const env={SUPABASE_URL:'https://search.example.test',SUPABASE_SERVICE_ROLE_KEY:'local-search-service-fixture',
@@ -12,8 +13,8 @@ const env={SUPABASE_URL:'https://search.example.test',SUPABASE_SERVICE_ROLE_KEY:
 const source=fs.readFileSync('src/api/routes/public/search.js','utf8').replace(/^import .*;\r?$/gm,'')
   .replace('export default async function searchHandler','return async function searchHandler');
 function handler(hydrate){return new Function('createHash','allowMethods','normalizeWallet','sendError','supabaseRest',
-  'PUBLIC_PROFILE_FIELDS','publicProfile','readVisibleArtworkCards',source)(createHash,allowMethods,normalizeWallet,sendError,supabaseRest,
-    PUBLIC_PROFILE_FIELDS,publicProfile,hydrate);}
+  'PUBLIC_PROFILE_FIELDS','publicProfile','readVisibleArtworkCards','readWithNftOwnershipResponse',source)(createHash,allowMethods,normalizeWallet,sendError,supabaseRest,
+    PUBLIC_PROFILE_FIELDS,publicProfile,hydrate,readWithNftOwnershipResponse);}
 function response(){return{statusCode:200,headers:{},body:null,setHeader(k,v){this.headers[k]=v;},status(v){this.statusCode=v;return this;},json(v){this.body=v;return this;},end(){}};}
 const json=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
 function card(id,extra={}){return{artwork_id:id,chain_id:84532,title:'Public title',status:'auction',auction_end_time:'2099-01-01T00:00:00Z',...extra};}
@@ -57,7 +58,7 @@ test('global search API bounds queries, groups and public data',async t=>{
     assert.equal(result.body.query,'Art work');assert.equal(result.body.nextCursor,null);
     assert.equal(result.body.groups.artworks.items.length,5);assert.equal(result.body.groups.auctions.items.length,5);
     assert.equal(result.body.groups.artworks.hasMore,true);assert.equal(result.body.groups.artists.hasMore,false);
-    assert.deepEqual(batches,[[84532,['9','8','7','6','5'],CORE]]);assert.equal(calls.length,4);
+    assert.deepEqual(batches.map(args=>args.slice(0,3)),[[84532,['9','8','7','6','5'],CORE]]);assert.equal(calls.length,4);
     const alice=result.body.groups.artists.items.find(item=>item.wallet_address===A);
     assert.equal(alice.twitter_connected,true);assert.equal(alice.discord_profile_url,'https://discord.com/users/12345678');
     assert.ok(!('twitter_id'in alice));assert.ok(!('discord_id'in alice));assert.ok(!('email'in alice));assert.ok(!('role'in alice));

@@ -1,6 +1,7 @@
 import { allowMethods, normalizeWallet, requireWallet, sendError, supabaseRest } from '../backend.js';
 import { publicOrigin, readBoundedJson, serviceError } from '../launch-services.js';
 import { readSavedConfig } from '../saved-config.js';
+import { readWithNftOwnershipResponse } from '../nft-ownership.js';
 import { readVisibleArtworkCard } from './public/artworks.js';
 
 const PAGE_SIZE = 20;
@@ -44,7 +45,7 @@ async function visibleArtworkIds(ids, chain) {
   return new Set(artworks.map(row => row.artwork_id).filter(id => !hidden.has(id)));
 }
 
-async function readSaved(req, wallet, config) {
+async function readSaved(req, wallet, config, responseScope) {
   const requested = req.query?.artwork_ids;
   if (requested !== undefined) {
     if (req.query?.before !== undefined || typeof requested !== 'string') throw fail('INVALID_SAVED_LOOKUP', 'Choose a valid saved artwork lookup.');
@@ -79,7 +80,7 @@ async function readSaved(req, wallet, config) {
       chain_id: Number(row.chain_id), core_address: row.core_address, artwork_id: row.artwork_id,
       created_at: row.created_at,
       artwork: currentDeployment(row, config) && visible.has(row.artwork_id)
-        ? await readVisibleArtworkCard(config.chainId, row.artwork_id) : null
+        ? await readVisibleArtworkCard(config.chainId, row.artwork_id, responseScope) : null
     }))));
   }
   return { wallet, items, nextCursor: rows.length > PAGE_SIZE ? page.at(-1).id : null };
@@ -94,7 +95,21 @@ export default async function handler(req, res) {
     if (typeof expected !== 'string' || expected.toLowerCase() !== wallet) throw fail('SESSION_WALLET_MISMATCH', 'Sign in with your connected wallet to use Saved.', 401);
     const config = readSavedConfig();
     if (!config.enabled) throw fail('SAVED_DISABLED', 'Saved has not been activated.', 503);
-    if (req.method === 'GET') return res.status(200).json(await readSaved(req, wallet, config));
+    if (req.method === 'GET') {
+      const requireSavedConfig = () => {
+        if (JSON.stringify(readSavedConfig()) !== JSON.stringify(config)) throw new Error('Saved configuration changed');
+      };
+      const read = async responseScope => {
+        requireSavedConfig();
+        const data = await readSaved(req, wallet, config, responseScope);
+        requireSavedConfig();
+        return data;
+      };
+      // The membership lookup has no lifecycle projection to qualify.
+      const data = req.query?.artwork_ids !== undefined ? await read() : await readWithNftOwnershipResponse(read);
+      requireSavedConfig();
+      return res.status(200).json(data);
+    }
     const origins = new Set([publicOrigin(), ...String(process.env.API_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean)]);
     if (req.headers?.origin && !origins.has(req.headers.origin)) throw fail('INVALID_ORIGIN', 'Open ArtSoul to update Saved.', 401);
     if (!/^application\/json(?:;|$)/i.test(req.headers?.['content-type'] || '')) throw fail('JSON_REQUIRED', 'Use a JSON request.', 415);

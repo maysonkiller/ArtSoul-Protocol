@@ -49,6 +49,39 @@ export async function readWithNftOwnershipRetry(operation) {
   }
 }
 
+// Saved and search assemble an HTTP response across several asynchronous reads.
+// Keep their proofs until the last await, then recheck one bounded set. Only
+// this outer operation may retry; a card group must not restart independently.
+export async function readWithNftOwnershipResponse(operation) {
+  return readWithNftOwnershipRetry(async () => {
+    const initial = await readNftOwnershipBoundary();
+    const entries = new Map();
+    const scope = Object.freeze({
+      boundary: initial,
+      retain(snapshot) {
+        if (!snapshot) {
+          if (initial) throw unavailable();
+          return;
+        }
+        if (!initial || !same(snapshot.config, initial.config)) throw unavailable();
+        requireSameBoundary(initial, [snapshot]);
+        for (const [index, artwork] of snapshot.artworks.entries()) {
+          const entry = { artwork, row: snapshot.rows[index] };
+          const previous = entries.get(artwork.artwork_id);
+          if (previous && !same(previous, entry)) throw unavailable();
+          entries.set(artwork.artwork_id, entry);
+        }
+      }
+    });
+    const result = await operation(scope);
+    await recheckNftOwnership(initial && { ...initial,
+      artworks: [...entries.values()].map(entry => entry.artwork),
+      rows: [...entries.values()].map(entry => entry.row)
+    });
+    return result;
+  });
+}
+
 export function readNftOwnershipConfig() {
   const flag = process.env.ARTSOUL_NFT_OWNERSHIP_ENABLED;
   if (flag === undefined || flag === 'false') return null;
